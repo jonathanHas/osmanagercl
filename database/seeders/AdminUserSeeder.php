@@ -17,7 +17,8 @@ class AdminUserSeeder extends Seeder
         User::updateOrCreate(
             ['email' => 'admin@osmanager.local'],
             [
-                'name' => 'Admin User',
+                'name' => 'Admin',
+                'username' => 'admin',
                 'email' => 'admin@osmanager.local',
                 'password' => Hash::make('admin123'),
                 'email_verified_at' => now(),
@@ -25,6 +26,7 @@ class AdminUserSeeder extends Seeder
         );
 
         $this->command->info('Admin user created/updated:');
+        $this->command->info('Username: admin');
         $this->command->info('Email: admin@osmanager.local');
         $this->command->info('Password: admin123');
     }
