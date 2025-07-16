@@ -1,25 +1,52 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# OSManager CL
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A Laravel 12 application for managing operations, built with modern web technologies.
 
-## About Laravel
+## Features
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **Authentication**: Username or email login with Laravel Breeze
+- **Database**: SQLite primary database with placeholder POS connection
+- **Frontend**: Tailwind CSS with Alpine.js
+- **Testing**: PHPUnit with comprehensive test suite
+- **Development**: Hot reloading with Vite
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Quick Start
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+```bash
+# Install dependencies
+composer install
+npm install
+
+# Setup environment
+cp .env.example .env
+php artisan key:generate
+
+# Setup database
+touch database/database.sqlite
+php artisan migrate
+php artisan db:seed --class=AdminUserSeeder
+
+# Start development
+composer run dev
+```
+
+## Test Login
+
+- **Username:** `admin`
+- **Email:** `admin@osmanager.local`
+- **Password:** `admin123`
+
+## Built With Laravel
+
+This application is built on Laravel - a web application framework with expressive, elegant syntax. Laravel provides:
+
+- [Simple, fast routing engine](https://laravel.com/docs/routing)
+- [Powerful dependency injection container](https://laravel.com/docs/container)
+- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage
+- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent)
+- Database agnostic [schema migrations](https://laravel.com/docs/migrations)
+- [Robust background job processing](https://laravel.com/docs/queues)
+- [Real-time event broadcasting](https://laravel.com/docs/broadcasting)
 
 ## Learning Laravel
 

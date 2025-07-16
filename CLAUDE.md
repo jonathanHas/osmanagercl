@@ -151,9 +151,57 @@ The frontend uses Blade templates with Tailwind CSS and Alpine.js:
 
 Laravel Breeze provides:
 - User registration with email verification
-- Login/logout functionality
+- Login/logout functionality (supports username OR email)
 - Password reset flow
 - Profile management (edit profile, change password, delete account)
 - Email verification middleware
 
+### Username Authentication
+The application supports flexible login using either username or email:
+- Login form accepts "Username or Email"
+- Automatically detects whether input is email (using validation) or username
+- Modified `LoginRequest` handles both authentication methods
+- User model includes `username` field (unique, nullable)
+
+### Test Admin Account
+For development/testing, use the AdminUserSeeder:
+```bash
+php artisan db:seed --class=AdminUserSeeder
+```
+Credentials:
+- **Username:** `admin`
+- **Email:** `admin@osmanager.local`
+- **Password:** `admin123`
+
 All authentication routes are defined in `routes/auth.php` and controllers are in `app/Http/Controllers/Auth/`.
+
+## Database Connections
+
+### Primary Database
+- SQLite by default (`database/database.sqlite`)
+- Configuration in `config/database.php`
+
+### POS Database (Placeholder)
+A commented-out `pos` connection is configured for future uniCenta integration:
+- Located in `config/database.php` 
+- Uncomment and set environment variables when ready
+- Designed for read-only access to POS data
+- Usage: `DB::connection('pos')->table('products')->get()`
+
+## Troubleshooting
+
+### Storage Permission Issues
+If you encounter "Permission denied" errors for `storage/framework/views/`:
+
+```bash
+# Clear compiled views and caches
+php artisan view:clear
+php artisan config:clear
+php artisan route:clear
+
+# Fix storage permissions
+chmod -R 775 storage/
+chmod -R 775 bootstrap/cache/
+```
+
+This typically happens when Laravel runs under different users (web server vs CLI).
