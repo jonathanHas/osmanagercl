@@ -112,6 +112,34 @@ return [
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
 
+        /*
+        |--------------------------------------------------------------------------
+        | POS Database Connection (uniCenta)
+        |--------------------------------------------------------------------------
+        |
+        | Placeholder connection for Point of Sale system integration.
+        | Uncomment and configure when ready to connect to uniCenta database.
+        | Designed for read-only access to POS data.
+        |
+        */
+
+        // 'pos' => [
+        //     'driver' => 'mysql', // or 'pgsql' depending on uniCenta setup
+        //     'url' => env('POS_DB_URL'),
+        //     'host' => env('POS_DB_HOST', '127.0.0.1'),
+        //     'port' => env('POS_DB_PORT', '3306'),
+        //     'database' => env('POS_DB_DATABASE', 'unicenta'),
+        //     'username' => env('POS_DB_USERNAME', 'readonly_user'),
+        //     'password' => env('POS_DB_PASSWORD', ''),
+        //     'charset' => env('POS_DB_CHARSET', 'utf8mb4'),
+        //     'collation' => env('POS_DB_COLLATION', 'utf8mb4_unicode_ci'),
+        //     'prefix' => '',
+        //     'prefix_indexes' => true,
+        //     'strict' => false, // uniCenta may have non-strict SQL
+        //     'engine' => null,
+        //     'options' => [],
+        // ],
+
     ],
 
     /*
