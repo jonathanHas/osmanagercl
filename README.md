@@ -1,11 +1,14 @@
 # OSManager CL
 
-A Laravel 12 application for managing operations, built with modern web technologies.
+A Laravel 12 application for managing operations with integrated Point of Sale (POS) system connectivity.
 
 ## Features
 
 - **Authentication**: Username or email login with Laravel Breeze
-- **Database**: SQLite primary database with placeholder POS connection
+- **Dual Database Support**: 
+  - Primary SQLite/MySQL database for application data
+  - Secondary POS connection for uniCenta integration
+- **Product Management**: Read-only access to POS product catalog
 - **Frontend**: Tailwind CSS with Alpine.js
 - **Testing**: PHPUnit with comprehensive test suite
 - **Development**: Hot reloading with Vite
@@ -30,11 +33,46 @@ php artisan db:seed --class=AdminUserSeeder
 composer run dev
 ```
 
+## Configuration
+
+### Primary Database
+The application uses SQLite by default. Configure in `.env`:
+```
+DB_CONNECTION=sqlite
+DB_DATABASE=database/database.sqlite
+```
+
+### POS Database (uniCenta)
+Configure the POS database connection in `.env`:
+```
+POS_DB_HOST=127.0.0.1
+POS_DB_PORT=3306
+POS_DB_DATABASE=unicenta
+POS_DB_USERNAME=readonly_user
+POS_DB_PASSWORD=your_password
+```
+
 ## Test Login
 
 - **Username:** `admin`
 - **Email:** `admin@osmanager.local`
 - **Password:** `admin123`
+
+## Product Management
+
+The application provides read-only access to the uniCenta POS product catalog:
+
+- View all products with pagination
+- Search products by name, code, or reference
+- Filter active (non-service) products
+- View detailed product information
+- Dashboard statistics showing product counts
+
+### Demo Script
+Test the POS connection without starting the web server:
+```bash
+php demo-products.php
+```
 
 ## Built With Laravel
 

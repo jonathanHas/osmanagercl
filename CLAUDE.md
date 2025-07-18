@@ -90,9 +90,15 @@ php artisan view:clear
 
 ### Directory Structure
 - `app/Http/Controllers/` - HTTP controllers including Auth controllers from Breeze
-- `app/Models/` - Eloquent models (User model included)
+  - `ProductController.php` - Handles product listing and detail views
+- `app/Models/` - Eloquent models
+  - `User.php` - User authentication model
+  - `Product.php` - POS product model (read-only, connects to 'pos' database)
+- `app/Repositories/` - Repository pattern for data access
+  - `ProductRepository.php` - Handles product data queries and statistics
 - `app/View/Components/` - Blade components (AppLayout, GuestLayout)
 - `resources/views/` - Blade templates with auth views and dashboard
+  - `products/` - Product listing and detail views
 - `resources/js/` - JavaScript files (Alpine.js setup)
 - `resources/css/` - CSS files (Tailwind CSS)
 - `routes/` - Route definitions (web.php, auth.php)
@@ -102,7 +108,10 @@ php artisan view:clear
 ### Key Components
 - **Authentication**: Laravel Breeze provides login, registration, password reset, and email verification
 - **User Management**: Profile editing and account deletion functionality
-- **Database**: Uses SQLite by default with standard Laravel migrations
+- **Dual Database Support**: 
+  - Primary database (SQLite/MySQL) for application data
+  - Secondary POS connection for uniCenta product data (read-only)
+- **Product Management**: ProductRepository provides clean interface to POS products
 - **Frontend**: Server-side rendered Blade templates with Tailwind CSS styling
 - **Asset Pipeline**: Vite handles CSS and JavaScript compilation with hot reloading
 
@@ -181,12 +190,40 @@ All authentication routes are defined in `routes/auth.php` and controllers are i
 - SQLite by default (`database/database.sqlite`)
 - Configuration in `config/database.php`
 
-### POS Database (Placeholder)
-A commented-out `pos` connection is configured for future uniCenta integration:
-- Located in `config/database.php` 
-- Uncomment and set environment variables when ready
-- Designed for read-only access to POS data
-- Usage: `DB::connection('pos')->table('products')->get()`
+### POS Database (uniCenta)
+A secondary `pos` connection provides read-only access to uniCenta POS data:
+- Configuration in `config/database.php`
+- Environment variables:
+  - `POS_DB_HOST` - Database host (default: 127.0.0.1)
+  - `POS_DB_PORT` - Database port (default: 3306)
+  - `POS_DB_DATABASE` - Database name (default: unicenta)
+  - `POS_DB_USERNAME` - Database username
+  - `POS_DB_PASSWORD` - Database password
+
+#### Product Model
+The `Product` model (`app/Models/Product.php`) connects to the POS database:
+- Uses `PRODUCTS` table from uniCenta
+- Handles bit fields as booleans
+- Provides scopes for common queries (active, inStock, search)
+- No timestamps (uniCenta doesn't use Laravel timestamps)
+
+#### ProductRepository
+The `ProductRepository` (`app/Repositories/ProductRepository.php`) provides:
+- `getAllProducts()` - Paginated product list
+- `findById()` - Find product by ID
+- `searchByName()` - Search by product name
+- `searchByCode()` - Search by code or reference
+- `getActiveProducts()` - Non-service products only
+- `getByCategory()` - Products by category
+- `getStatistics()` - Product counts and statistics
+- `getLowStockProducts()` - Products low in stock
+
+Usage example:
+```php
+$repository = new ProductRepository();
+$products = $repository->searchProducts('coffee', activeOnly: true);
+$stats = $repository->getStatistics();
+```
 
 ## Troubleshooting
 
@@ -205,3 +242,55 @@ chmod -R 775 bootstrap/cache/
 ```
 
 This typically happens when Laravel runs under different users (web server vs CLI).
+
+## Admin UI Layout
+
+The application now includes a dedicated admin layout with sidebar navigation for better administrative functionality:
+
+### Admin Layout (`resources/views/layouts/admin.blade.php`)
+- **Sidebar Navigation**: Fixed sidebar on desktop, mobile-responsive slide-out menu
+- **Dark Theme**: Gray-900 sidebar with better visual hierarchy
+- **Icons**: SVG icons for all navigation items (Dashboard, Products, Users, Settings)
+- **User Profile**: Bottom section shows user avatar, name, and email with dropdown menu
+- **Alpine.js Integration**: Sidebar toggle functionality using Alpine.js `x-data`
+
+### Layout Usage
+Admin pages use the `<x-admin-layout>` component instead of `<x-app-layout>`:
+```blade
+<x-admin-layout>
+    <x-slot name="header">
+        <h2>Page Title</h2>
+    </x-slot>
+    
+    <!-- Page content -->
+</x-admin-layout>
+```
+
+### Enhanced Dashboard Design
+The dashboard (`resources/views/dashboard.blade.php`) features:
+- **Welcome Section**: Personalized greeting with user's name
+- **Metric Cards**: 4-column grid with icons and contextual information
+  - Total Products (with link to view all)
+  - Active Products (with percentage of total)
+  - In Stock (with out of stock count)
+  - Service Products (non-physical items)
+- **Quick Actions Grid**: 2x2 grid of action cards for common tasks
+  - View Products
+  - Active Items
+  - Reports (placeholder)
+  - Settings (placeholder)
+
+### Tailwind Configuration
+Extended Tailwind config (`tailwind.config.js`) with:
+- **Admin Color Palette**: Purple-based color scheme (`admin-50` through `admin-900`)
+- **Animations**: `slide-in` and `fade-in` animations for smooth transitions
+- **Custom Shadows**: `admin` and `admin-lg` for consistent elevation
+
+### Navigation Structure
+The admin sidebar includes:
+- Dashboard (home icon)
+- Products (package icon)
+- Users (users icon) - placeholder for future implementation
+- Settings (cog icon) - placeholder for future implementation
+
+Each navigation item shows active state with gray-800 background when on that route.
