@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Repositories\ProductRepository;
 use App\Repositories\SalesRepository;
+use App\Services\SupplierService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -22,12 +23,21 @@ class ProductController extends Controller
     protected SalesRepository $salesRepository;
 
     /**
+     * The supplier service instance.
+     */
+    protected SupplierService $supplierService;
+
+    /**
      * Create a new controller instance.
      */
-    public function __construct(ProductRepository $productRepository, SalesRepository $salesRepository)
-    {
+    public function __construct(
+        ProductRepository $productRepository, 
+        SalesRepository $salesRepository,
+        SupplierService $supplierService
+    ) {
         $this->productRepository = $productRepository;
         $this->salesRepository = $salesRepository;
+        $this->supplierService = $supplierService;
     }
 
     /**
@@ -68,18 +78,19 @@ class ProductController extends Controller
         // Only calculate statistics when requested
         $statistics = $showStats ? $this->productRepository->getStatistics() : null;
 
-        return view('products.index', compact(
-            'products', 
-            'statistics', 
-            'search', 
-            'activeOnly', 
-            'stockedOnly', 
-            'inStockOnly', 
-            'showStats',
-            'supplierId',
-            'showSuppliers',
-            'suppliers'
-        ));
+        return view('products.index', [
+            'products' => $products,
+            'statistics' => $statistics,
+            'search' => $search,
+            'activeOnly' => $activeOnly,
+            'stockedOnly' => $stockedOnly,
+            'inStockOnly' => $inStockOnly,
+            'showStats' => $showStats,
+            'supplierId' => $supplierId,
+            'showSuppliers' => $showSuppliers,
+            'suppliers' => $suppliers,
+            'supplierService' => $this->supplierService,
+        ]);
     }
 
     /**

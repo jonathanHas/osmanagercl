@@ -184,11 +184,30 @@
                                         @if($showSuppliers)
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                                                 @if($product->supplier)
-                                                    <div class="flex flex-col">
-                                                        <span class="font-medium">{{ $product->supplier->Supplier }}</span>
-                                                        @if($product->supplierLink && $product->supplierLink->SupplierCode)
-                                                            <span class="text-xs text-gray-500 dark:text-gray-400">{{ $product->supplierLink->SupplierCode }}</span>
+                                                    <div class="flex items-start space-x-3">
+                                                        @if($supplierService->hasExternalIntegration($product->supplier->SupplierID))
+                                                            <img 
+                                                                src="{{ $supplierService->getExternalImageUrl($product) }}" 
+                                                                alt="{{ $product->NAME }}"
+                                                                class="w-10 h-10 object-cover rounded border border-gray-200 dark:border-gray-700"
+                                                                loading="lazy"
+                                                                onerror="this.style.display='none'"
+                                                            >
                                                         @endif
+                                                        <div class="flex flex-col">
+                                                            <span class="font-medium">{{ $product->supplier->Supplier }}</span>
+                                                            @if($product->supplierLink && $product->supplierLink->SupplierCode)
+                                                                <span class="text-xs text-gray-500 dark:text-gray-400">{{ $product->supplierLink->SupplierCode }}</span>
+                                                            @endif
+                                                            @if($link = $supplierService->getSupplierWebsiteLink($product))
+                                                                <a href="{{ $link }}" 
+                                                                   target="_blank" 
+                                                                   rel="noopener noreferrer" 
+                                                                   class="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 mt-1">
+                                                                    View on {{ $supplierService->getSupplierDisplayName($product->supplier->SupplierID) }} site →
+                                                                </a>
+                                                            @endif
+                                                        </div>
                                                     </div>
                                                 @else
                                                     <span class="text-gray-400 dark:text-gray-500 text-xs">No supplier</span>

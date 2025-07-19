@@ -32,7 +32,7 @@ class ProductRepository
      */
     public function findById(string $id): ?Product
     {
-        return Product::with(['stockCurrent', 'taxCategory', 'tax'])
+        return Product::with(['stockCurrent', 'taxCategory', 'tax', 'supplierLink', 'supplier'])
             ->find($id);
     }
 
