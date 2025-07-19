@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -9,9 +9,9 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', function () {
-    $productRepository = new \App\Repositories\ProductRepository();
+    $productRepository = new \App\Repositories\ProductRepository;
     $statistics = $productRepository->getStatistics();
-    
+
     return view('dashboard', compact('statistics'));
 })->middleware(['auth', 'verified'])->name('dashboard');
 
@@ -19,10 +19,100 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-    
+
     // Product routes
     Route::get('/products', [ProductController::class, 'index'])->name('products.index');
+    Route::get('/products/suppliers', [ProductController::class, 'suppliersIndex'])->name('products.suppliers');
     Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show');
+    Route::patch('/products/{id}/tax', [ProductController::class, 'updateTax'])->name('products.update-tax');
+
+    // Debug routes for testing supplier tables
+    Route::get('/debug/suppliers', function () {
+        try {
+            // Test 1: Check if we can query suppliers table
+            $suppliers = \DB::connection('pos')->table('suppliers')->limit(5)->get();
+
+            // Test 2: Check if we can query supplier_link table
+            $supplierLinks = \DB::connection('pos')->table('supplier_link')->limit(5)->get();
+
+            // Test 3: Get table structure
+            $supplierColumns = \DB::connection('pos')->getSchemaBuilder()->getColumnListing('suppliers');
+            $linkColumns = \DB::connection('pos')->getSchemaBuilder()->getColumnListing('supplier_link');
+
+            // Test 4: Try using the models
+            $supplierModel = \App\Models\Supplier::first();
+            $linkModel = \App\Models\SupplierLink::first();
+
+            return view('debug.suppliers', compact(
+                'suppliers',
+                'supplierLinks',
+                'supplierColumns',
+                'linkColumns',
+                'supplierModel',
+                'linkModel'
+            ));
+        } catch (\Exception $e) {
+            return 'Error: '.$e->getMessage();
+        }
+    });
+
+    Route::get('/debug/product-suppliers', function () {
+        // Get some products and check if they have supplier links
+        $products = \App\Models\Product::limit(10)->get();
+        $results = [];
+
+        foreach ($products as $product) {
+            $supplierLink = \App\Models\SupplierLink::where('Barcode', $product->CODE)->first();
+            $stocking = \App\Models\Stocking::where('Barcode', $product->CODE)->first();
+            $results[] = [
+                'product_id' => $product->ID,
+                'product_code' => $product->CODE,
+                'product_name' => $product->NAME,
+                'has_supplier_link' => $supplierLink ? 'YES' : 'NO',
+                'supplier_id' => $supplierLink ? $supplierLink->SupplierID : null,
+                'supplier_name' => $supplierLink && $supplierLink->supplier ? $supplierLink->supplier->Supplier : null,
+                'is_stocked' => $stocking ? 'YES' : 'NO',
+            ];
+        }
+
+        return view('debug.product-suppliers', compact('results'));
+    });
+
+    Route::get('/debug/stock', function () {
+        try {
+            // Test 1: Check raw STOCKCURRENT data
+            $stockData = \DB::connection('pos')->table('STOCKCURRENT')->limit(10)->get();
+
+            // Test 2: Check specific product IDs and their stock
+            $products = \App\Models\Product::limit(5)->get();
+            $stockTests = [];
+
+            foreach ($products as $product) {
+                $rawStock = \DB::connection('pos')
+                    ->table('STOCKCURRENT')
+                    ->where('PRODUCT', $product->ID)
+                    ->first();
+
+                $modelStock = \App\Models\StockCurrent::where('PRODUCT', $product->ID)->first();
+
+                $stockTests[] = [
+                    'product_id' => $product->ID,
+                    'product_name' => $product->NAME,
+                    'raw_stock_query' => $rawStock ? $rawStock->UNITS : 'NOT FOUND',
+                    'model_stock_query' => $modelStock ? $modelStock->UNITS : 'NOT FOUND',
+                    'getCurrentStock_method' => $product->getCurrentStock(),
+                ];
+            }
+
+            // Test 3: Check if any products have stock relationships
+            $productsWithStock = \App\Models\Product::with('stockCurrent')->limit(10)->get();
+
+            return view('debug.stock', compact('stockData', 'stockTests', 'productsWithStock'));
+
+        } catch (\Exception $e) {
+            return 'Error: '.$e->getMessage();
+        }
+    });
 });
 
 require __DIR__.'/auth.php';

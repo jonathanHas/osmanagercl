@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use App\Models\Product;
+use App\Models\TaxCategory;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -10,74 +11,70 @@ class ProductRepository
 {
     /**
      * Get all products with pagination.
-     *
-     * @param int $perPage
-     * @return LengthAwarePaginator
      */
     public function getAllProducts(int $perPage = 20): LengthAwarePaginator
     {
-        return Product::orderBy('NAME')
+        return Product::with(['stockCurrent', 'taxCategory', 'tax'])
+            ->orderBy('NAME')
             ->paginate($perPage);
     }
 
     /**
      * Find a product by ID.
-     *
-     * @param string $id
-     * @return Product|null
      */
     public function findById(string $id): ?Product
     {
-        return Product::find($id);
+        return Product::with(['stockCurrent', 'taxCategory', 'tax'])
+            ->find($id);
     }
 
     /**
      * Search products by name.
-     *
-     * @param string $name
-     * @param int $perPage
-     * @return LengthAwarePaginator
      */
     public function searchByName(string $name, int $perPage = 20): LengthAwarePaginator
     {
-        return Product::where('NAME', 'like', '%' . $name . '%')
+        return Product::where('NAME', 'like', '%'.$name.'%')
             ->orderBy('NAME')
             ->paginate($perPage);
     }
 
     /**
      * Search products by code or reference.
-     *
-     * @param string $code
-     * @return Collection
      */
     public function searchByCode(string $code): Collection
     {
-        return Product::where('CODE', 'like', '%' . $code . '%')
-            ->orWhere('REFERENCE', 'like', '%' . $code . '%')
+        return Product::where('CODE', 'like', '%'.$code.'%')
+            ->orWhere('REFERENCE', 'like', '%'.$code.'%')
             ->orderBy('NAME')
             ->get();
     }
 
     /**
      * Get active (non-service) products.
-     *
-     * @param int $perPage
-     * @return LengthAwarePaginator
      */
     public function getActiveProducts(int $perPage = 20): LengthAwarePaginator
     {
-        return Product::active()
+        return Product::with(['stockCurrent', 'taxCategory', 'tax'])
+            ->active()
+            ->orderBy('NAME')
+            ->paginate($perPage);
+    }
+
+    /**
+     * Get products that are stocked and have current stock.
+     */
+    public function getAvailableProducts(int $perPage = 20): LengthAwarePaginator
+    {
+        return Product::with(['stockCurrent', 'taxCategory', 'tax'])
+            ->active()
+            ->stocked()
+            ->inCurrentStock()
             ->orderBy('NAME')
             ->paginate($perPage);
     }
 
     /**
      * Get products by category ID.
-     *
-     * @param string $categoryId
-     * @param int $perPage
-     * @return LengthAwarePaginator
      */
     public function getByCategory(string $categoryId, int $perPage = 20): LengthAwarePaginator
     {
@@ -88,16 +85,12 @@ class ProductRepository
 
     /**
      * Search products with multiple criteria.
-     *
-     * @param string|null $search
-     * @param bool|null $activeOnly
-     * @param string|null $categoryId
-     * @param int $perPage
-     * @return LengthAwarePaginator
      */
     public function searchProducts(
         ?string $search = null,
         ?bool $activeOnly = null,
+        ?bool $stockedOnly = null,
+        ?bool $inStockOnly = null,
         ?string $categoryId = null,
         int $perPage = 20
     ): LengthAwarePaginator {
@@ -111,17 +104,23 @@ class ProductRepository
             $query->active();
         }
 
+        if ($stockedOnly === true) {
+            $query->stocked();
+        }
+
+        if ($inStockOnly === true) {
+            $query->inCurrentStock();
+        }
+
         if ($categoryId) {
             $query->where('CATEGORY', $categoryId);
         }
 
-        return $query->orderBy('NAME')->paginate($perPage);
+        return $query->with(['stockCurrent', 'taxCategory', 'tax'])->orderBy('NAME')->paginate($perPage);
     }
 
     /**
      * Get product statistics.
-     *
-     * @return array
      */
     public function getStatistics(): array
     {
@@ -129,17 +128,19 @@ class ProductRepository
             'total_products' => Product::count(),
             'active_products' => Product::active()->count(),
             'service_products' => Product::where('ISSERVICE', 1)->count(),
-            'in_stock' => Product::inStock()->count(),
-            'out_of_stock' => Product::where('STOCKUNITS', '<=', 0)->count(),
+            'stocked_products' => Product::stocked()->count(),
+            'in_stock' => Product::inCurrentStock()->count(),
+            'out_of_stock' => Product::active()->where(function ($query) {
+                $query->whereDoesntHave('stockCurrent')
+                    ->orWhereHas('stockCurrent', function ($q) {
+                        $q->where('UNITS', '<=', 0);
+                    });
+            })->count(),
         ];
     }
 
     /**
      * Get products that are low in stock.
-     *
-     * @param float $threshold
-     * @param int $limit
-     * @return Collection
      */
     public function getLowStockProducts(float $threshold = 10, int $limit = 10): Collection
     {
@@ -153,14 +154,21 @@ class ProductRepository
 
     /**
      * Get recently added products.
-     *
-     * @param int $limit
-     * @return Collection
      */
     public function getRecentProducts(int $limit = 10): Collection
     {
         return Product::orderBy('ID', 'desc')
             ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Get all tax categories for dropdown lists.
+     */
+    public function getAllTaxCategories(): Collection
+    {
+        return TaxCategory::with('primaryTax')
+            ->orderBy('NAME')
             ->get();
     }
 }

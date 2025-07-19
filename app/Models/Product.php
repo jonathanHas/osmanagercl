@@ -49,6 +49,15 @@ class Product extends Model
     public $timestamps = false;
 
     /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
+    protected $fillable = [
+        'TAXCAT',
+    ];
+
+    /**
      * The attributes that should be cast.
      *
      * @var array<string, string>
@@ -82,8 +91,6 @@ class Product extends Model
 
     /**
      * Get the formatted price for display.
-     *
-     * @return string
      */
     public function getFormattedPriceAttribute(): string
     {
@@ -92,8 +99,6 @@ class Product extends Model
 
     /**
      * Check if the product is a service.
-     *
-     * @return bool
      */
     public function isService(): bool
     {
@@ -102,8 +107,6 @@ class Product extends Model
 
     /**
      * Check if the product is sold by weight/scale.
-     *
-     * @return bool
      */
     public function isSoldByWeight(): bool
     {
@@ -112,8 +115,6 @@ class Product extends Model
 
     /**
      * Check if the product is a kitchen item.
-     *
-     * @return bool
      */
     public function isKitchenItem(): bool
     {
@@ -146,15 +147,186 @@ class Product extends Model
      * Search products by name, code, or reference.
      *
      * @param  \Illuminate\Database\Eloquent\Builder  $query
-     * @param  string  $search
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeSearch($query, string $search)
     {
         return $query->where(function ($q) use ($search) {
-            $q->where('NAME', 'like', '%' . $search . '%')
-              ->orWhere('CODE', 'like', '%' . $search . '%')
-              ->orWhere('REFERENCE', 'like', '%' . $search . '%');
+            $q->where('NAME', 'like', '%'.$search.'%')
+                ->orWhere('CODE', 'like', '%'.$search.'%')
+                ->orWhere('REFERENCE', 'like', '%'.$search.'%');
         });
+    }
+
+    /**
+     * Get the supplier link for this product.
+     */
+    public function supplierLink()
+    {
+        return $this->hasOne(SupplierLink::class, 'Barcode', 'CODE');
+    }
+
+    /**
+     * Get the supplier for this product through the supplier link.
+     */
+    public function supplier()
+    {
+        return $this->hasOneThrough(
+            Supplier::class,
+            SupplierLink::class,
+            'Barcode',         // Foreign key on SupplierLink
+            'SupplierID',      // Foreign key on Supplier
+            'CODE',            // Local key on Product
+            'SupplierID'       // Local key on SupplierLink
+        );
+    }
+
+    /**
+     * Get the stocking record for this product.
+     */
+    public function stocking()
+    {
+        return $this->hasOne(Stocking::class, 'Barcode', 'CODE');
+    }
+
+    /**
+     * Scope a query to only include products that are stocked.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeStocked($query)
+    {
+        return $query->whereHas('stocking');
+    }
+
+    /**
+     * Get the current stock record for this product.
+     */
+    public function stockCurrent()
+    {
+        return $this->hasOne(StockCurrent::class, 'PRODUCT', 'ID');
+    }
+
+    /**
+     * Get the current stock quantity for this product.
+     */
+    public function getCurrentStock(): float
+    {
+        return $this->stockCurrent?->UNITS ?? 0.0;
+    }
+
+    /**
+     * Scope a query to only include products with current stock.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeInCurrentStock($query)
+    {
+        return $query->whereHas('stockCurrent', function ($q) {
+            $q->where('UNITS', '>', 0);
+        });
+    }
+
+    /**
+     * Get the tax category for this product.
+     */
+    public function taxCategory()
+    {
+        return $this->belongsTo(TaxCategory::class, 'TAXCAT', 'ID');
+    }
+
+    /**
+     * Get the primary tax for this product.
+     */
+    public function tax()
+    {
+        return $this->hasOneThrough(
+            Tax::class,
+            TaxCategory::class,
+            'ID',        // Foreign key on TaxCategory
+            'CATEGORY',  // Foreign key on Tax
+            'TAXCAT',    // Local key on Product
+            'ID'         // Local key on TaxCategory
+        )->orderBy('RATEORDER')->orderBy('ID');
+    }
+
+    /**
+     * Get the VAT rate for this product.
+     */
+    public function getVatRate(): float
+    {
+        return $this->tax?->RATE ?? 0.0;
+    }
+
+    /**
+     * Get the VAT rate as a percentage.
+     */
+    public function getVatRatePercentage(): float
+    {
+        return $this->getVatRate() * 100;
+    }
+
+    /**
+     * Get the formatted VAT rate as a percentage string.
+     */
+    public function getFormattedVatRateAttribute(): string
+    {
+        $rate = $this->getVatRatePercentage();
+
+        return $rate > 0 ? number_format($rate, 1).'%' : '0%';
+    }
+
+    /**
+     * Calculate the VAT amount for this product's sell price.
+     */
+    public function getVatAmount(): float
+    {
+        return $this->PRICESELL * $this->getVatRate();
+    }
+
+    /**
+     * Get the gross price (net price + VAT).
+     */
+    public function getGrossPrice(): float
+    {
+        return $this->PRICESELL * (1 + $this->getVatRate());
+    }
+
+    /**
+     * Get the formatted gross price for display.
+     */
+    public function getFormattedPriceWithVatAttribute(): string
+    {
+        $grossPrice = $this->getGrossPrice();
+
+        return '€'.number_format($grossPrice, 2);
+    }
+
+    /**
+     * Get the tax category name with fallback.
+     */
+    public function getTaxCategoryNameAttribute(): string
+    {
+        return $this->taxCategory?->NAME ?? 'Unknown';
+    }
+
+    /**
+     * Get a colored badge class for the tax category.
+     */
+    public function getTaxCategoryBadgeClassAttribute(): string
+    {
+        $rate = $this->getVatRatePercentage();
+
+        if ($rate == 0) {
+            return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100';
+        } elseif ($rate < 15) {
+            return 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100';
+        } elseif ($rate < 20) {
+            return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100';
+        } else {
+            return 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100';
+        }
     }
 }

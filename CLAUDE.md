@@ -11,6 +11,17 @@ This is a Laravel 12 application using PHP 8.2+ with Laravel Breeze for authenti
 - **Authentication**: Laravel Breeze with email verification
 - **Testing**: PHPUnit with Feature and Unit test suites
 
+## Documentation
+
+For detailed documentation on specific areas of the codebase, see the `docs/` folder:
+
+- **[POS Integration](./docs/pos-integration.md)** - uniCenta POS database integration, models, and relationships
+- **[Documentation Index](./docs/README.md)** - Complete list of available documentation
+
+## Planning and Next Steps
+
+- **[next.md](./next.md)** - VAT rate integration planning and requirements gathering
+
 ## Development Commands
 
 ### Starting Development

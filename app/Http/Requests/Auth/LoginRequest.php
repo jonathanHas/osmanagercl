@@ -64,7 +64,7 @@ class LoginRequest extends FormRequest
     public function getLoginField(): string
     {
         $login = $this->string('login');
-        
+
         return filter_var($login, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
     }
 

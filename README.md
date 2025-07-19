@@ -8,8 +8,15 @@ A Laravel 12 application for managing operations with integrated Point of Sale (
 - **Dual Database Support**: 
   - Primary SQLite/MySQL database for application data
   - Secondary POS connection for uniCenta integration
-- **Product Management**: Read-only access to POS product catalog
-- **Frontend**: Tailwind CSS with Alpine.js
+- **POS Integration**: 
+  - Product catalog with real-time stock levels
+  - Supplier management and cost tracking
+  - Inventory management integration
+- **Product Management**: 
+  - Product listings with supplier information
+  - Real-time stock quantities from STOCKCURRENT
+  - Margin calculations and cost analysis
+- **Frontend**: Tailwind CSS with Alpine.js and admin layout
 - **Testing**: PHPUnit with comprehensive test suite
 - **Development**: Hot reloading with Vite
 

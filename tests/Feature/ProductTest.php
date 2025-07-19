@@ -18,7 +18,7 @@ class ProductTest extends TestCase
 
         // Create POS database table for testing
         $this->createProductsTable();
-        
+
         // Seed test products
         $this->seedTestProducts();
     }
@@ -185,7 +185,7 @@ class ProductTest extends TestCase
     {
         // Drop the test products table
         Schema::connection('pos')->dropIfExists('PRODUCTS');
-        
+
         parent::tearDown();
     }
 }
