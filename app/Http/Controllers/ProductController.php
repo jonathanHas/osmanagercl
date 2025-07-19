@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Repositories\ProductRepository;
+use App\Repositories\SalesRepository;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -16,11 +17,17 @@ class ProductController extends Controller
     protected ProductRepository $productRepository;
 
     /**
+     * The sales repository instance.
+     */
+    protected SalesRepository $salesRepository;
+
+    /**
      * Create a new controller instance.
      */
-    public function __construct(ProductRepository $productRepository)
+    public function __construct(ProductRepository $productRepository, SalesRepository $salesRepository)
     {
         $this->productRepository = $productRepository;
+        $this->salesRepository = $salesRepository;
     }
 
     /**
@@ -65,8 +72,12 @@ class ProductController extends Controller
         }
 
         $taxCategories = $this->productRepository->getAllTaxCategories();
+        
+        // Load sales data for the product
+        $salesHistory = $this->salesRepository->getProductSalesHistory($id, 4); // Last 4 months
+        $salesStats = $this->salesRepository->getProductSalesStatistics($id);
 
-        return view('products.show', compact('product', 'taxCategories'));
+        return view('products.show', compact('product', 'taxCategories', 'salesHistory', 'salesStats'));
     }
 
     /**

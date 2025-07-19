@@ -329,4 +329,20 @@ class Product extends Model
             return 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100';
         }
     }
+
+    /**
+     * Get the stock diary entries for this product.
+     */
+    public function stockDiary()
+    {
+        return $this->hasMany(StockDiary::class, 'PRODUCT', 'ID');
+    }
+
+    /**
+     * Get the sales entries for this product.
+     */
+    public function salesEntries()
+    {
+        return $this->hasMany(StockDiary::class, 'PRODUCT', 'ID')->where('REASON', StockDiary::REASON_SALE);
+    }
 }
