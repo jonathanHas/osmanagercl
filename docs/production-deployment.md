@@ -22,6 +22,8 @@ Without these indexes, stock filtering operations can take 5-10+ seconds. With t
 - In Stock filter: < 0.3 seconds
 - Statistics page: < 1 second (down from 17+ seconds)
 
+**Note**: For suppliers with large product catalogs (e.g., supplier "Udea" with 4000+ products), combined supplier + stock filtering uses an optimized query strategy that pre-filters by supplier first to maintain performance.
+
 ## 🚀 Deployment Steps
 
 ### 1. Database Setup
@@ -85,6 +87,10 @@ Run these tests to verify performance improvements:
 3. **Combined Filters**:
    - Test multiple filters together
    - Should maintain fast performance
+   
+4. **Large Supplier Performance**:
+   - Test filtering by suppliers with many products (e.g., "Udea")
+   - Combined supplier + stock filters should load in < 2 seconds
 
 ## 🔄 Rollback Plan
 

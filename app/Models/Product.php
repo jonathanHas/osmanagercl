@@ -198,10 +198,12 @@ class Product extends Model
      */
     public function scopeStocked($query)
     {
-        // Using JOIN is much faster than whereHas for this simple existence check
-        return $query->join('stocking', 'PRODUCTS.CODE', '=', 'stocking.Barcode')
-            ->select('PRODUCTS.*')
-            ->distinct();
+        // Using EXISTS avoids Cartesian products when combined with other filters
+        return $query->whereExists(function ($q) {
+            $q->select(\DB::raw(1))
+              ->from('stocking')
+              ->whereRaw('stocking.Barcode = PRODUCTS.CODE');
+        });
     }
 
     /**
@@ -228,10 +230,13 @@ class Product extends Model
      */
     public function scopeInCurrentStock($query)
     {
-        // Using JOIN is much faster than whereHas for filtering
-        return $query->join('STOCKCURRENT', 'PRODUCTS.ID', '=', 'STOCKCURRENT.PRODUCT')
-            ->where('STOCKCURRENT.UNITS', '>', 0)
-            ->select('PRODUCTS.*');
+        // Using EXISTS avoids Cartesian products when combined with other filters
+        return $query->whereExists(function ($q) {
+            $q->select(\DB::raw(1))
+              ->from('STOCKCURRENT')
+              ->whereRaw('STOCKCURRENT.PRODUCT = PRODUCTS.ID')
+              ->where('STOCKCURRENT.UNITS', '>', 0);
+        });
     }
 
     /**

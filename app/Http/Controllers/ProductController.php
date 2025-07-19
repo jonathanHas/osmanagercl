@@ -40,24 +40,46 @@ class ProductController extends Controller
         $stockedOnly = $request->boolean('stocked_only');
         $inStockOnly = $request->boolean('in_stock_only');
         $showStats = $request->boolean('show_stats');
+        $supplierId = $request->get('supplier_id');
+        $showSuppliers = $request->boolean('show_suppliers');
         $perPage = $request->get('per_page', 20);
 
-        if ($search || $activeOnly || $stockedOnly || $inStockOnly) {
+        // Get suppliers for dropdown if needed, filtered by current search criteria
+        $suppliers = $showSuppliers ? $this->productRepository->getAllSuppliersWithProducts(
+            stockedOnly: $stockedOnly,
+            inStockOnly: $inStockOnly,
+            activeOnly: $activeOnly
+        ) : collect();
+
+        if ($search || $activeOnly || $stockedOnly || $inStockOnly || $supplierId) {
             $products = $this->productRepository->searchProducts(
                 search: $search,
                 activeOnly: $activeOnly,
                 stockedOnly: $stockedOnly,
                 inStockOnly: $inStockOnly,
-                perPage: $perPage
+                supplierId: $supplierId,
+                perPage: $perPage,
+                withSuppliers: $showSuppliers
             );
         } else {
-            $products = $this->productRepository->getAllProducts($perPage);
+            $products = $this->productRepository->getAllProducts($perPage, $showSuppliers);
         }
 
         // Only calculate statistics when requested
         $statistics = $showStats ? $this->productRepository->getStatistics() : null;
 
-        return view('products.index', compact('products', 'statistics', 'search', 'activeOnly', 'stockedOnly', 'inStockOnly', 'showStats'));
+        return view('products.index', compact(
+            'products', 
+            'statistics', 
+            'search', 
+            'activeOnly', 
+            'stockedOnly', 
+            'inStockOnly', 
+            'showStats',
+            'supplierId',
+            'showSuppliers',
+            'suppliers'
+        ));
     }
 
     /**
