@@ -151,5 +151,7 @@
              @click="sidebarOpen = false"
              class="fixed inset-0 bg-gray-600 bg-opacity-75 z-40 lg:hidden">
         </div>
+        
+        @stack('scripts')
     </body>
 </html>

@@ -211,25 +211,57 @@
 
                     <!-- Sales History Tab -->
                     <div x-show="activeTab === 'sales'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+                        <!-- Time Period Selection -->
+                        <div class="flex flex-wrap gap-2 mb-6" id="timePeriodButtons">
+                            <button onclick="loadSalesData(4)" class="period-btn active px-4 py-2 text-sm font-medium rounded-md bg-indigo-600 text-white">
+                                Last 4 Months
+                            </button>
+                            <button onclick="loadSalesData(6)" class="period-btn px-4 py-2 text-sm font-medium rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700">
+                                Last 6 Months
+                            </button>
+                            <button onclick="loadSalesData(12)" class="period-btn px-4 py-2 text-sm font-medium rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700">
+                                Last 12 Months
+                            </button>
+                            <button onclick="loadSalesData('ytd')" class="period-btn px-4 py-2 text-sm font-medium rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700">
+                                Year to Date
+                            </button>
+                        </div>
+
+                        <!-- Chart Container -->
+                        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
+                            <div class="relative" style="height: 300px;">
+                                <canvas id="salesChart"></canvas>
+                                <div id="chartLoading" class="hidden absolute inset-0 bg-white dark:bg-gray-800 bg-opacity-75 flex items-center justify-center">
+                                    <div class="text-center">
+                                        <svg class="animate-spin h-8 w-8 text-indigo-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Loading sales data...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         @if(isset($salesHistory) && count($salesHistory) > 0)
                             <!-- Sales Statistics Cards -->
                             @if(isset($salesStats))
                                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                                     <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
                                         <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Sales (12m)</div>
-                                        <div class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">{{ number_format($salesStats['total_sales_12m'], 0) }}</div>
+                                        <div class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100" data-stat="total_sales_12m">{{ number_format($salesStats['total_sales_12m'], 0) }}</div>
                                     </div>
                                     <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
                                         <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Avg Monthly</div>
-                                        <div class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">{{ number_format($salesStats['avg_monthly_sales'], 1) }}</div>
+                                        <div class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100" data-stat="avg_monthly_sales">{{ number_format($salesStats['avg_monthly_sales'], 1) }}</div>
                                     </div>
                                     <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
                                         <div class="text-sm font-medium text-gray-500 dark:text-gray-400">This Month</div>
-                                        <div class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">{{ number_format($salesStats['this_month_sales'], 0) }}</div>
+                                        <div class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100" data-stat="this_month_sales">{{ number_format($salesStats['this_month_sales'], 0) }}</div>
                                     </div>
                                     <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
                                         <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Trend</div>
-                                        <div class="mt-1 text-2xl font-semibold">
+                                        <div class="mt-1 text-2xl font-semibold" data-stat="trend">
                                             @if($salesStats['trend'] === 'up')
                                                 <span class="text-green-600 dark:text-green-400">↑ Up</span>
                                             @elseif($salesStats['trend'] === 'down')
@@ -245,7 +277,7 @@
                             <!-- Sales by Month Table -->
                             <h3 class="text-lg font-semibold mb-4">Sales by Month (Last 4 Months)</h3>
                             <div class="overflow-x-auto">
-                                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                <table id="salesTable" class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                                     <thead class="bg-gray-50 dark:bg-gray-700">
                                         <tr>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Month</th>
@@ -311,4 +343,209 @@
             </div>
         </div>
     </div>
+
+    @push('scripts')
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let salesChart = null;
+        const productId = '{{ $product->ID }}';
+        
+        // Initialize chart with existing data
+        document.addEventListener('DOMContentLoaded', function() {
+            @if(isset($salesHistory) && count($salesHistory) > 0)
+                const initialData = @json(array_values($salesHistory));
+                createChart(initialData);
+            @endif
+        });
+
+        function createChart(salesData) {
+            const ctx = document.getElementById('salesChart').getContext('2d');
+            
+            // Destroy existing chart if it exists
+            if (salesChart) {
+                salesChart.destroy();
+            }
+            
+            // Prepare data
+            const labels = salesData.map(item => item.month_short + ' ' + item.year);
+            const data = salesData.map(item => item.units);
+            
+            // Create gradient
+            const gradient = ctx.createLinearGradient(0, 0, 0, 250);
+            gradient.addColorStop(0, 'rgba(99, 102, 241, 0.8)');
+            gradient.addColorStop(1, 'rgba(99, 102, 241, 0.1)');
+            
+            salesChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Units Sold',
+                        data: data,
+                        backgroundColor: gradient,
+                        borderColor: 'rgb(99, 102, 241)',
+                        borderWidth: 2,
+                        borderRadius: 8,
+                        borderSkipped: false,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleColor: 'white',
+                            bodyColor: 'white',
+                            borderColor: 'rgb(99, 102, 241)',
+                            borderWidth: 1,
+                            displayColors: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return 'Units Sold: ' + context.parsed.y.toFixed(1);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(156, 163, 175, 0.1)'
+                            },
+                            ticks: {
+                                color: 'rgb(107, 114, 128)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                color: 'rgb(107, 114, 128)'
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 750,
+                        easing: 'easeInOutQuart'
+                    }
+                }
+            });
+        }
+
+        function loadSalesData(period) {
+            // Update button states
+            document.querySelectorAll('.period-btn').forEach(btn => {
+                btn.classList.remove('active', 'bg-indigo-600', 'text-white');
+                btn.classList.add('bg-white', 'dark:bg-gray-800', 'text-gray-700', 'dark:text-gray-300', 'border', 'border-gray-300', 'dark:border-gray-600');
+            });
+            event.target.classList.remove('bg-white', 'dark:bg-gray-800', 'text-gray-700', 'dark:text-gray-300', 'border', 'border-gray-300', 'dark:border-gray-600');
+            event.target.classList.add('active', 'bg-indigo-600', 'text-white');
+            
+            // Show loading
+            document.getElementById('chartLoading').classList.remove('hidden');
+            
+            // Fetch data
+            fetch(`/products/${productId}/sales-data?period=${period}`, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                createChart(data.salesHistory);
+                updateStatistics(data.salesStats);
+                updateTable(data.salesHistory);
+                document.getElementById('chartLoading').classList.add('hidden');
+            })
+            .catch(error => {
+                console.error('Error loading sales data:', error);
+                document.getElementById('chartLoading').classList.add('hidden');
+                alert('Failed to load sales data. Please try again.');
+            });
+        }
+
+        function updateStatistics(stats) {
+            // Update statistics cards if they exist
+            const statsElements = {
+                'total_sales_12m': document.querySelector('[data-stat="total_sales_12m"]'),
+                'avg_monthly_sales': document.querySelector('[data-stat="avg_monthly_sales"]'),
+                'this_month_sales': document.querySelector('[data-stat="this_month_sales"]'),
+                'trend': document.querySelector('[data-stat="trend"]')
+            };
+            
+            if (statsElements.total_sales_12m) {
+                statsElements.total_sales_12m.textContent = stats.total_sales_12m.toLocaleString();
+            }
+            if (statsElements.avg_monthly_sales) {
+                statsElements.avg_monthly_sales.textContent = stats.avg_monthly_sales.toFixed(1);
+            }
+            if (statsElements.this_month_sales) {
+                statsElements.this_month_sales.textContent = stats.this_month_sales.toLocaleString();
+            }
+            if (statsElements.trend) {
+                const trendHtml = stats.trend === 'up' 
+                    ? '<span class="text-green-600 dark:text-green-400">↑ Up</span>'
+                    : stats.trend === 'down'
+                    ? '<span class="text-red-600 dark:text-red-400">↓ Down</span>'
+                    : '<span class="text-gray-600 dark:text-gray-400">→ Stable</span>';
+                statsElements.trend.innerHTML = trendHtml;
+            }
+        }
+
+        function updateTable(salesData) {
+            // Update the sales table
+            const tbody = document.querySelector('#salesTable tbody');
+            if (!tbody) return;
+            
+            tbody.innerHTML = '';
+            let previousUnits = null;
+            
+            salesData.forEach(monthData => {
+                const row = document.createElement('tr');
+                
+                // Month cell
+                const monthCell = document.createElement('td');
+                monthCell.className = 'px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100';
+                monthCell.textContent = monthData.month;
+                row.appendChild(monthCell);
+                
+                // Units cell
+                const unitsCell = document.createElement('td');
+                unitsCell.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100';
+                unitsCell.textContent = monthData.units.toFixed(1);
+                row.appendChild(unitsCell);
+                
+                // Trend cell
+                const trendCell = document.createElement('td');
+                trendCell.className = 'px-6 py-4 whitespace-nowrap text-sm';
+                
+                if (previousUnits !== null) {
+                    if (monthData.units > previousUnits) {
+                        const percent = ((monthData.units - previousUnits) / Math.max(previousUnits, 1)) * 100;
+                        trendCell.innerHTML = `<span class="text-green-600 dark:text-green-400">↑ ${percent.toFixed(1)}%</span>`;
+                    } else if (monthData.units < previousUnits) {
+                        const percent = ((previousUnits - monthData.units) / Math.max(previousUnits, 1)) * 100;
+                        trendCell.innerHTML = `<span class="text-red-600 dark:text-red-400">↓ ${percent.toFixed(1)}%</span>`;
+                    } else {
+                        trendCell.innerHTML = '<span class="text-gray-600 dark:text-gray-400">→ 0%</span>';
+                    }
+                } else {
+                    trendCell.innerHTML = '<span class="text-gray-400 dark:text-gray-500">-</span>';
+                }
+                
+                row.appendChild(trendCell);
+                tbody.appendChild(row);
+                
+                previousUnits = monthData.units;
+            });
+        }
+    </script>
+    @endpush
 </x-admin-layout>

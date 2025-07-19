@@ -106,6 +106,35 @@ class ProductController extends Controller
     }
 
     /**
+     * Get sales data for AJAX requests.
+     */
+    public function salesData(Request $request, string $id)
+    {
+        $product = $this->productRepository->findById($id);
+
+        if (! $product) {
+            return response()->json(['error' => 'Product not found'], 404);
+        }
+
+        $period = $request->get('period', '4');
+        
+        // Determine the number of months based on period
+        $months = match($period) {
+            'ytd' => (int) date('n'), // Current month number
+            default => (int) $period
+        };
+
+        // Get sales history and statistics
+        $salesHistory = $this->salesRepository->getProductSalesHistory($id, $months);
+        $salesStats = $this->salesRepository->getProductSalesStatistics($id);
+
+        return response()->json([
+            'salesHistory' => array_values($salesHistory),
+            'salesStats' => $salesStats,
+        ]);
+    }
+
+    /**
      * Display products with supplier information.
      */
     public function suppliersIndex(Request $request): View
