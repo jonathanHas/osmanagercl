@@ -135,6 +135,31 @@ class ProductController extends Controller
     }
 
     /**
+     * Update the price for a product.
+     */
+    public function updatePrice(Request $request, string $id): RedirectResponse
+    {
+        $request->validate([
+            'net_price' => 'required|numeric|min:0|max:999999.99',
+        ]);
+
+        $product = $this->productRepository->findById($id);
+
+        if (! $product) {
+            abort(404, 'Product not found');
+        }
+
+        // Update the product's net price (PRICESELL is stored without VAT)
+        $product->update([
+            'PRICESELL' => $request->net_price,
+        ]);
+
+        return redirect()
+            ->route('products.show', $id)
+            ->with('success', 'Price updated successfully.');
+    }
+
+    /**
      * Display products with supplier information.
      */
     public function suppliersIndex(Request $request): View

@@ -55,6 +55,7 @@ class Product extends Model
      */
     protected $fillable = [
         'TAXCAT',
+        'PRICESELL',
     ];
 
     /**
@@ -197,7 +198,10 @@ class Product extends Model
      */
     public function scopeStocked($query)
     {
-        return $query->whereHas('stocking');
+        // Using JOIN is much faster than whereHas for this simple existence check
+        return $query->join('stocking', 'PRODUCTS.CODE', '=', 'stocking.Barcode')
+            ->select('PRODUCTS.*')
+            ->distinct();
     }
 
     /**
@@ -224,9 +228,10 @@ class Product extends Model
      */
     public function scopeInCurrentStock($query)
     {
-        return $query->whereHas('stockCurrent', function ($q) {
-            $q->where('UNITS', '>', 0);
-        });
+        // Using JOIN is much faster than whereHas for filtering
+        return $query->join('STOCKCURRENT', 'PRODUCTS.ID', '=', 'STOCKCURRENT.PRODUCT')
+            ->where('STOCKCURRENT.UNITS', '>', 0)
+            ->select('PRODUCTS.*');
     }
 
     /**

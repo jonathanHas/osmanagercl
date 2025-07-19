@@ -4,11 +4,20 @@ This folder contains detailed documentation for specific areas of the codebase t
 
 ## Available Documentation
 
+### Development & Integration
 - **[pos-integration.md](./pos-integration.md)** - POS Database Integration (uniCenta)
   - Product, Supplier, SupplierLink, Stocking, and StockCurrent models
   - Relationships and usage examples
   - Database schema information
   - Future integration opportunities (VAT, Categories, etc.)
+
+### Deployment & Production
+- **[production-deployment.md](./production-deployment.md)** - Production Deployment Guide
+  - Critical database indexes for performance
+  - Environment configuration for production
+  - Performance optimization requirements
+  - Deployment checklist and rollback procedures
+  - Troubleshooting and monitoring guidelines
 
 ## Contributing
 

@@ -26,6 +26,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show');
     Route::get('/products/{id}/sales-data', [ProductController::class, 'salesData'])->name('products.sales-data');
     Route::patch('/products/{id}/tax', [ProductController::class, 'updateTax'])->name('products.update-tax');
+    Route::patch('/products/{id}/price', [ProductController::class, 'updatePrice'])->name('products.update-price');
 
     // Debug routes for testing supplier tables
     Route::get('/debug/suppliers', function () {

@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\TaxCategory;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 
 class ProductRepository
 {
@@ -96,27 +97,32 @@ class ProductRepository
     ): LengthAwarePaginator {
         $query = Product::query();
 
-        if ($search) {
-            $query->search($search);
+        // Apply filters in order of most restrictive first for better performance
+        if ($categoryId) {
+            $query->where('CATEGORY', $categoryId);
         }
 
         if ($activeOnly === true) {
             $query->active();
         }
 
-        if ($stockedOnly === true) {
+        // Handle stock filters - use inCurrentStock if both are selected as it's more restrictive
+        if ($inStockOnly === true) {
+            $query->inCurrentStock();
+        } elseif ($stockedOnly === true) {
             $query->stocked();
         }
 
-        if ($inStockOnly === true) {
-            $query->inCurrentStock();
+        if ($search) {
+            $query->search($search);
         }
 
-        if ($categoryId) {
-            $query->where('CATEGORY', $categoryId);
-        }
-
-        return $query->with(['stockCurrent', 'taxCategory', 'tax'])->orderBy('NAME')->paginate($perPage);
+        // When using JOINs, we need to specify the table for ORDER BY
+        $orderByColumn = ($stockedOnly || $inStockOnly) ? 'PRODUCTS.NAME' : 'NAME';
+        
+        return $query->with(['stockCurrent', 'taxCategory', 'tax'])
+            ->orderBy($orderByColumn)
+            ->paginate($perPage);
     }
 
     /**
@@ -124,18 +130,39 @@ class ProductRepository
      */
     public function getStatistics(): array
     {
+        // Using raw queries for statistics is much faster
+        $stockedCount = DB::connection('pos')
+            ->table('PRODUCTS')
+            ->join('stocking', 'PRODUCTS.CODE', '=', 'stocking.Barcode')
+            ->distinct()
+            ->count('PRODUCTS.ID');
+
+        $inStockCount = DB::connection('pos')
+            ->table('PRODUCTS')
+            ->join('STOCKCURRENT', 'PRODUCTS.ID', '=', 'STOCKCURRENT.PRODUCT')
+            ->where('STOCKCURRENT.UNITS', '>', 0)
+            ->count();
+
+        $activeCount = Product::where('ISSERVICE', 0)->count();
+
+        // Calculate out of stock more efficiently
+        $outOfStockCount = DB::connection('pos')
+            ->table('PRODUCTS')
+            ->where('ISSERVICE', 0)
+            ->leftJoin('STOCKCURRENT', 'PRODUCTS.ID', '=', 'STOCKCURRENT.PRODUCT')
+            ->where(function ($query) {
+                $query->whereNull('STOCKCURRENT.PRODUCT')
+                    ->orWhere('STOCKCURRENT.UNITS', '<=', 0);
+            })
+            ->count();
+
         return [
             'total_products' => Product::count(),
-            'active_products' => Product::active()->count(),
+            'active_products' => $activeCount,
             'service_products' => Product::where('ISSERVICE', 1)->count(),
-            'stocked_products' => Product::stocked()->count(),
-            'in_stock' => Product::inCurrentStock()->count(),
-            'out_of_stock' => Product::active()->where(function ($query) {
-                $query->whereDoesntHave('stockCurrent')
-                    ->orWhereHas('stockCurrent', function ($q) {
-                        $q->where('UNITS', '<=', 0);
-                    });
-            })->count(),
+            'stocked_products' => $stockedCount,
+            'in_stock' => $inStockCount,
+            'out_of_stock' => $outOfStockCount,
         ];
     }
 
