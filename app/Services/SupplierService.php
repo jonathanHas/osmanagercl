@@ -43,19 +43,28 @@ class SupplierService
      */
     public function getExternalImageUrl(Product $product): ?string
     {
-        if (!$product->supplier || !$product->CODE) {
+        try {
+            if (!$product->supplier || !$product->CODE) {
+                return null;
+            }
+
+            $supplierId = (int) $product->supplier->SupplierID;
+            $config = $this->getSupplierConfig($supplierId);
+
+            if (!$config || !$config['enabled']) {
+                return null;
+            }
+
+            // Sanitize the product code to prevent URL injection
+            $code = preg_replace('/[^a-zA-Z0-9_-]/', '', $product->CODE);
+            
+            // Replace {CODE} with the actual product code
+            return str_replace('{CODE}', $code, $config['image_url']);
+        } catch (\Exception $e) {
+            // Log error but don't expose it to users
+            \Log::error('Error generating external image URL: ' . $e->getMessage());
             return null;
         }
-
-        $supplierId = (int) $product->supplier->SupplierID;
-        $config = $this->getSupplierConfig($supplierId);
-
-        if (!$config || !$config['enabled']) {
-            return null;
-        }
-
-        // Replace {CODE} with the actual product code
-        return str_replace('{CODE}', $product->CODE, $config['image_url']);
     }
 
     /**
@@ -63,19 +72,28 @@ class SupplierService
      */
     public function getSupplierWebsiteLink(Product $product): ?string
     {
-        if (!$product->supplier || !$product->supplierLink) {
+        try {
+            if (!$product->supplier || !$product->supplierLink) {
+                return null;
+            }
+
+            $supplierId = (int) $product->supplier->SupplierID;
+            $config = $this->getSupplierConfig($supplierId);
+
+            if (!$config || !$config['enabled'] || !$product->supplierLink->SupplierCode) {
+                return null;
+            }
+
+            // URL encode the supplier code to handle special characters
+            $supplierCode = urlencode($product->supplierLink->SupplierCode);
+            
+            // Replace {SUPPLIER_CODE} with the actual supplier code
+            return str_replace('{SUPPLIER_CODE}', $supplierCode, $config['website_search']);
+        } catch (\Exception $e) {
+            // Log error but don't expose it to users
+            \Log::error('Error generating supplier website link: ' . $e->getMessage());
             return null;
         }
-
-        $supplierId = (int) $product->supplier->SupplierID;
-        $config = $this->getSupplierConfig($supplierId);
-
-        if (!$config || !$config['enabled'] || !$product->supplierLink->SupplierCode) {
-            return null;
-        }
-
-        // Replace {SUPPLIER_CODE} with the actual supplier code
-        return str_replace('{SUPPLIER_CODE}', $product->supplierLink->SupplierCode, $config['website_search']);
     }
 
     /**

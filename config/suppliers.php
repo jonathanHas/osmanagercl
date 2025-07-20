@@ -45,5 +45,25 @@ return [
         
         // Lazy loading for performance
         'lazy_load_images' => true,
+        
+        // Cache external images for this many seconds (0 to disable)
+        'image_cache_ttl' => 86400, // 24 hours
+    ],
+    
+    /*
+    |--------------------------------------------------------------------------
+    | Security Settings
+    |--------------------------------------------------------------------------
+    */
+    
+    'security' => [
+        // Allowed external image domains for Content Security Policy
+        'allowed_image_domains' => [
+            'cdn.ekoplaza.nl',
+        ],
+        
+        // Maximum image size to display (in pixels)
+        'max_image_width' => 800,
+        'max_image_height' => 800,
     ],
 ];

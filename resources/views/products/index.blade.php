@@ -186,13 +186,16 @@
                                                 @if($product->supplier)
                                                     <div class="flex items-start space-x-3">
                                                         @if($supplierService->hasExternalIntegration($product->supplier->SupplierID))
-                                                            <img 
-                                                                src="{{ $supplierService->getExternalImageUrl($product) }}" 
-                                                                alt="{{ $product->NAME }}"
-                                                                class="w-10 h-10 object-cover rounded border border-gray-200 dark:border-gray-700"
-                                                                loading="lazy"
-                                                                onerror="this.style.display='none'"
-                                                            >
+                                                            <div class="relative w-10 h-10">
+                                                                <img 
+                                                                    src="{{ $supplierService->getExternalImageUrl($product) }}" 
+                                                                    alt="{{ $product->NAME }}"
+                                                                    class="w-10 h-10 object-cover rounded border border-gray-200 dark:border-gray-700 animate-pulse"
+                                                                    loading="lazy"
+                                                                    onload="this.classList.remove('animate-pulse')"
+                                                                    onerror="this.style.display='none'; this.parentElement.style.display='none'"
+                                                                >
+                                                            </div>
                                                         @endif
                                                         <div class="flex flex-col">
                                                             <span class="font-medium">{{ $product->supplier->Supplier }}</span>

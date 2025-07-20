@@ -11,6 +11,12 @@ This folder contains detailed documentation for specific areas of the codebase t
   - Database schema information
   - Future integration opportunities (VAT, Categories, etc.)
 
+- **[supplier-integration-plan.md](./supplier-integration-plan.md)** - Supplier External Integration
+  - External product images from supplier CDNs
+  - Supplier website links and search integration
+  - Implementation phases and current status
+  - Future enhancements for pricing data
+
 ### Deployment & Production
 - **[production-deployment.md](./production-deployment.md)** - Production Deployment Guide
   - Critical database indexes for performance

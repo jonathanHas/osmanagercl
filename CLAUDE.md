@@ -254,6 +254,41 @@ chmod -R 775 bootstrap/cache/
 
 This typically happens when Laravel runs under different users (web server vs CLI).
 
+## Supplier External Integration
+
+The application includes external supplier integration for product images and website links:
+
+### Features
+- **External Product Images**: Shows product images from supplier CDNs (currently Ekoplaza)
+- **Supplier Website Links**: Direct links to search products on supplier websites
+- **Product List Integration**: When "Show suppliers" is checked, shows thumbnails and links
+- **Product Detail Integration**: Dedicated supplier information section with larger images
+
+### Configuration
+- Config file: `config/suppliers.php`
+- Service: `app/Services/SupplierService.php`
+- Component: `resources/views/components/supplier-external-info.blade.php`
+- Currently configured for Udea (supplier IDs: 5, 44, 85)
+
+### Implementation Details
+- Images use lazy loading with `loading="lazy"` attribute
+- Graceful error handling for missing images
+- URL sanitization for security
+- Responsive design for mobile devices
+- Performance optimized with loading animations
+
+### Adding New Suppliers
+To add a new supplier integration, update `config/suppliers.php`:
+```php
+'new_supplier' => [
+    'supplier_ids' => [/* supplier IDs */],
+    'image_url' => 'https://example.com/images/{CODE}.jpg',
+    'website_search' => 'https://example.com/search?q={SUPPLIER_CODE}',
+    'display_name' => 'Supplier Name',
+    'enabled' => true,
+],
+```
+
 ## Admin UI Layout
 
 The application now includes a dedicated admin layout with sidebar navigation for better administrative functionality:

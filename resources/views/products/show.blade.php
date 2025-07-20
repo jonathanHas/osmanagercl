@@ -170,7 +170,10 @@
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Supplier External Information (if available) -->
+                        <x-supplier-external-info :product="$product" :supplier-service="$supplierService" />
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
                             <!-- Product Information -->
                             <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
                                 <h3 class="text-lg font-semibold mb-4">Product Information</h3>

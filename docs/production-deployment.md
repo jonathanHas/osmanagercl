@@ -183,10 +183,54 @@ Consider these optimizations based on production usage:
 3. **Database Optimization**: Regular ANALYZE and OPTIMIZE table maintenance
 4. **Connection Pooling**: Implement connection pooling for high-traffic scenarios
 
+## 🌐 External Resources Configuration
+
+### Supplier Integration
+
+The application integrates with external supplier resources (images and links). Configure the following for production:
+
+#### 1. Content Security Policy (CSP)
+If using CSP headers, add the following image sources:
+```nginx
+# Nginx example
+add_header Content-Security-Policy "img-src 'self' https://cdn.ekoplaza.nl;";
+```
+
+#### 2. Supplier Configuration
+Review and update `config/suppliers.php`:
+- Verify supplier IDs match production database
+- Confirm external URLs are correct
+- Enable/disable suppliers as needed
+
+#### 3. Performance Monitoring
+Monitor external resource loading:
+- Track failed image loads in browser console
+- Monitor page load times with external images
+- Consider implementing local image caching proxy if needed
+
+#### 4. Security Considerations
+- All external images use HTTPS
+- Links include `rel="noopener noreferrer"`
+- Product codes are sanitized before URL insertion
+- Supplier codes are URL-encoded
+
+#### 5. Troubleshooting External Resources
+If external images aren't loading:
+1. Check browser console for CORS or CSP errors
+2. Verify the CDN URL pattern is correct
+3. Test with a known product code
+4. Check if the external CDN is accessible
+
+Example test:
+```bash
+# Test if external image is accessible
+curl -I https://cdn.ekoplaza.nl/ekoplaza/producten/small/8711521145447.jpg
+```
+
 ## 🔗 Related Documentation
 
 - [POS Integration Guide](./pos-integration.md) - Detailed POS database integration
-- [Performance Optimization](./performance.md) - Additional performance tips
+- [Supplier Integration](./supplier-integration-plan.md) - External supplier integration details
 - [Main Documentation Index](./README.md) - Complete documentation overview
 
 ---

@@ -110,7 +110,13 @@ class ProductController extends Controller
         $salesHistory = $this->salesRepository->getProductSalesHistory($id, 4); // Last 4 months
         $salesStats = $this->salesRepository->getProductSalesStatistics($id);
 
-        return view('products.show', compact('product', 'taxCategories', 'salesHistory', 'salesStats'));
+        return view('products.show', [
+            'product' => $product,
+            'taxCategories' => $taxCategories,
+            'salesHistory' => $salesHistory,
+            'salesStats' => $salesStats,
+            'supplierService' => $this->supplierService,
+        ]);
     }
 
     /**
