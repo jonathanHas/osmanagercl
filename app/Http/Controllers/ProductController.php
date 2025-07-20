@@ -226,6 +226,31 @@ class ProductController extends Controller
     }
 
     /**
+     * Update the cost for a product.
+     */
+    public function updateCost(Request $request, string $id): RedirectResponse
+    {
+        $request->validate([
+            'cost_price' => 'required|numeric|min:0|max:999999.99',
+        ]);
+
+        $product = $this->productRepository->findById($id);
+
+        if (! $product) {
+            abort(404, 'Product not found');
+        }
+
+        // Update the product's cost price
+        $product->update([
+            'PRICEBUY' => $request->cost_price,
+        ]);
+
+        return redirect()
+            ->route('products.show', $id)
+            ->with('success', 'Cost updated successfully.');
+    }
+
+    /**
      * Refresh Udea pricing for a specific product via AJAX.
      */
     public function refreshUdeaPricing(string $id)

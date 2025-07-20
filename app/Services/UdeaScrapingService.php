@@ -273,20 +273,23 @@ class UdeaScrapingService
                     return $numeric > 0.01 && $numeric < 100;
                 });
                 
-                if (count($validPrices) >= 2) {
+                if (count($validPrices) >= 1) {
                     $sortedPrices = $validPrices;
                     usort($sortedPrices, function($a, $b) {
                         $numA = floatval(str_replace(',', '.', $a));
                         $numB = floatval(str_replace(',', '.', $b));
-                        return $numA <=> $numB;
+                        return $numB <=> $numA; // Sort descending (largest first)
                     });
                     
-                    // The smaller price is likely unit price, larger is case price
-                    $data['unit_price'] = $sortedPrices[0];
-                    $data['case_price'] = end($sortedPrices);
-                } elseif (count($validPrices) === 1) {
-                    // If only one price, assume it's the case price
-                    $data['case_price'] = array_values($validPrices)[0];
+                    // Use the largest reasonable price as case price
+                    // Don't assume smallest price is unit price (could be from navigation/footer)
+                    $data['case_price'] = $sortedPrices[0];
+                    
+                    // Calculate unit price from case price if we can determine units per case
+                    if (isset($data['units_per_case']) && $data['units_per_case'] > 0) {
+                        $casePrice = floatval(str_replace(',', '.', $data['case_price']));
+                        $data['unit_price'] = number_format($casePrice / $data['units_per_case'], 2, ',', '');
+                    }
                 }
                 
                 // Special handling for specific price patterns

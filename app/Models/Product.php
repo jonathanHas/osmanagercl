@@ -56,6 +56,7 @@ class Product extends Model
     protected $fillable = [
         'TAXCAT',
         'PRICESELL',
+        'PRICEBUY',
     ];
 
     /**

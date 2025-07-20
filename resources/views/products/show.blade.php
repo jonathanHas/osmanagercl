@@ -687,6 +687,78 @@
                 button.innerHTML = originalContent;
             });
         }
+
+        // Update Product Cost
+        function updateProductCost(newCost) {
+            if (!confirm(`Update product cost to €${parseFloat(newCost).toFixed(2)}?`)) {
+                return;
+            }
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/products/${productId}/cost`;
+            
+            // Add CSRF token
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = '_token';
+            csrfInput.value = csrfToken;
+            form.appendChild(csrfInput);
+            
+            // Add method override for PATCH
+            const methodInput = document.createElement('input');
+            methodInput.type = 'hidden';
+            methodInput.name = '_method';
+            methodInput.value = 'PATCH';
+            form.appendChild(methodInput);
+            
+            // Add cost price
+            const costInput = document.createElement('input');
+            costInput.type = 'hidden';
+            costInput.name = 'cost_price';
+            costInput.value = newCost;
+            form.appendChild(costInput);
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        // Update Product Price
+        function updateProductPrice(newPrice) {
+            if (!confirm(`Update product selling price to €${parseFloat(newPrice).toFixed(2)} (net)?`)) {
+                return;
+            }
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/products/${productId}/price`;
+            
+            // Add CSRF token
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = '_token';
+            csrfInput.value = csrfToken;
+            form.appendChild(csrfInput);
+            
+            // Add method override for PATCH
+            const methodInput = document.createElement('input');
+            methodInput.type = 'hidden';
+            methodInput.name = '_method';
+            methodInput.value = 'PATCH';
+            form.appendChild(methodInput);
+            
+            // Add net price
+            const priceInput = document.createElement('input');
+            priceInput.type = 'hidden';
+            priceInput.name = 'net_price';
+            priceInput.value = newPrice;
+            form.appendChild(priceInput);
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
     </script>
     @endpush
 </x-admin-layout>
