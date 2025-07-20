@@ -171,7 +171,7 @@
                         </div>
 
                         <!-- Supplier External Information (if available) -->
-                        <x-supplier-external-info :product="$product" :supplier-service="$supplierService" />
+                        <x-supplier-external-info :product="$product" :supplier-service="$supplierService" :udea-pricing="$udeaPricing" />
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
                             <!-- Product Information -->
@@ -650,6 +650,41 @@
                 tbody.appendChild(row);
                 
                 previousUnits = monthData.units;
+            });
+        }
+
+        // Udea Price Refresh Functionality
+        function refreshUdeaPricing() {
+            const button = document.getElementById('refreshPricingBtn');
+            const originalContent = button.innerHTML;
+            
+            // Show loading state
+            button.disabled = true;
+            button.innerHTML = '<svg class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Refreshing...';
+            
+            fetch(`/products/${productId}/refresh-udea-pricing`, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Reload the page to show updated pricing
+                    window.location.reload();
+                } else {
+                    alert('Failed to refresh pricing: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error refreshing pricing:', error);
+                alert('Network error while refreshing pricing. Please try again.');
+            })
+            .finally(() => {
+                // Restore button state
+                button.disabled = false;
+                button.innerHTML = originalContent;
             });
         }
     </script>

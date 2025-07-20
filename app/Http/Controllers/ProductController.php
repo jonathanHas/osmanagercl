@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Repositories\ProductRepository;
 use App\Repositories\SalesRepository;
 use App\Services\SupplierService;
+use App\Services\UdeaScrapingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -28,16 +29,23 @@ class ProductController extends Controller
     protected SupplierService $supplierService;
 
     /**
+     * The Udea scraping service instance.
+     */
+    protected UdeaScrapingService $udeaScrapingService;
+
+    /**
      * Create a new controller instance.
      */
     public function __construct(
         ProductRepository $productRepository, 
         SalesRepository $salesRepository,
-        SupplierService $supplierService
+        SupplierService $supplierService,
+        UdeaScrapingService $udeaScrapingService
     ) {
         $this->productRepository = $productRepository;
         $this->salesRepository = $salesRepository;
         $this->supplierService = $supplierService;
+        $this->udeaScrapingService = $udeaScrapingService;
     }
 
     /**
@@ -110,12 +118,31 @@ class ProductController extends Controller
         $salesHistory = $this->salesRepository->getProductSalesHistory($id, 4); // Last 4 months
         $salesStats = $this->salesRepository->getProductSalesStatistics($id);
 
+        // Fetch Udea pricing if product has supplier code and is Udea supplier
+        $udeaPricing = null;
+        if ($product->supplierLink?->SupplierCode && 
+            $product->supplier && 
+            $this->supplierService->hasExternalIntegration($product->supplier->SupplierID)) {
+            
+            try {
+                $udeaPricing = $this->udeaScrapingService->getProductData($product->supplierLink->SupplierCode);
+            } catch (\Exception $e) {
+                // Log error but don't break the page
+                \Log::warning('Failed to fetch Udea pricing for product', [
+                    'product_id' => $id,
+                    'supplier_code' => $product->supplierLink->SupplierCode,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
         return view('products.show', [
             'product' => $product,
             'taxCategories' => $taxCategories,
             'salesHistory' => $salesHistory,
             'salesStats' => $salesStats,
             'supplierService' => $this->supplierService,
+            'udeaPricing' => $udeaPricing,
         ]);
     }
 
@@ -196,6 +223,55 @@ class ProductController extends Controller
         return redirect()
             ->route('products.show', $id)
             ->with('success', 'Price updated successfully.');
+    }
+
+    /**
+     * Refresh Udea pricing for a specific product via AJAX.
+     */
+    public function refreshUdeaPricing(string $id)
+    {
+        $product = $this->productRepository->findById($id);
+
+        if (! $product) {
+            return response()->json(['error' => 'Product not found'], 404);
+        }
+
+        if (!$product->supplierLink?->SupplierCode || 
+            !$product->supplier || 
+            !$this->supplierService->hasExternalIntegration($product->supplier->SupplierID)) {
+            return response()->json(['error' => 'Product does not have Udea supplier integration'], 400);
+        }
+
+        try {
+            // Clear cache for this product to force fresh data
+            $this->udeaScrapingService->clearCache($product->supplierLink->SupplierCode);
+            
+            // Fetch fresh pricing data
+            $udeaPricing = $this->udeaScrapingService->getProductData($product->supplierLink->SupplierCode);
+
+            if (!$udeaPricing) {
+                return response()->json(['error' => 'Unable to fetch Udea pricing'], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $udeaPricing,
+                'product' => [
+                    'current_price' => $product->PRICESELL,
+                    'current_price_with_vat' => $product->PRICESELL * (1 + $product->getVatRate()),
+                    'supplier_code' => $product->supplierLink->SupplierCode,
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to refresh Udea pricing', [
+                'product_id' => $id,
+                'supplier_code' => $product->supplierLink->SupplierCode,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json(['error' => 'Failed to fetch Udea pricing: ' . $e->getMessage()], 500);
+        }
     }
 
     /**
