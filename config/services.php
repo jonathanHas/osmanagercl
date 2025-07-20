@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    'udea' => [
+        'base_uri' => env('UDEA_BASE_URI', 'https://www.udea.nl'),
+        'username' => env('UDEA_USERNAME'),
+        'password' => env('UDEA_PASSWORD'),
+        'timeout' => env('UDEA_TIMEOUT', 30),
+        'rate_limit_delay' => env('UDEA_RATE_LIMIT_DELAY', 2),
+        'cache_ttl' => env('UDEA_CACHE_TTL', 3600),
+    ],
+
 ];

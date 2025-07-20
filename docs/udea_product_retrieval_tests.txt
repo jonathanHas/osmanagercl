@@ -1,0 +1,166 @@
+    Server-side login + Guzzle
+
+    Client-side fetch (piggy-backs on browser session)
+
+    Headless-browser via Dusk
+
+You’ll add a couple of routes, a simple controller, and Blade views. Ready?
+1. Routes
+
+In routes/web.php, add:
+
+use App\Http\Controllers\TestScraperController;
+
+Route::get('/test-guzzle',   [TestScraperController::class, 'guzzleLogin']);
+Route::get('/test-client',   [TestScraperController::class, 'clientFetch']);
+
+And for Dusk, you’ll just create a test class under tests/Browser.
+2. Controller
+
+Create app/Http/Controllers/TestScraperController.php:
+
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use GuzzleHttp\Client;
+use Illuminate\Support\Facades\Cache;
+
+class TestScraperController extends Controller
+{
+    // 1) Server-side login + Guzzle
+    public function guzzleLogin()
+    {
+        // STEP A: Log in and store cookie
+        $client = new Client(['base_uri' => 'https://www.udea.nl', 'cookies' => true]);
+        // Replace these with real form field names & creds
+        $loginResp = $client->post('/login', [
+            'form_params' => [
+                'username' => 'YOUR_USER',
+                'password' => 'YOUR_PASS',
+                '_token'   => 'CSRF_TOKEN_HERE',
+            ]
+        ]);
+
+        // STEP B: Fetch product page
+        $code    = '5014415';
+        $resp    = $client->get("/search/?qry={$code}");
+        $html    = (string) $resp->getBody();
+
+        // VERY naive extraction for demo…
+        preg_match('/class="product-price">([^<]+)<\/span>/', $html, $m1);
+        preg_match('/class="units-per-case">([^<]+)<\/span>/', $html, $m2);
+
+        return view('tests.guzzle', [
+            'price' => $m1[1] ?? 'n/a',
+            'units' => $m2[1] ?? 'n/a',
+        ]);
+    }
+
+    // 2) Client-side fetch
+    public function clientFetch()
+    {
+        return view('tests.client', [
+            'code' => '5014415',
+        ]);
+    }
+}
+
+3. Blade Views
+
+Create a new folder resources/views/tests with two files:
+a) guzzle.blade.php
+
+<x-app-layout>
+  <x-slot name="header">
+    <h2>Guzzle Login Test</h2>
+  </x-slot>
+  <div class="p-6">
+    <p><strong>Case cost:</strong> {{ $price }}</p>
+    <p><strong>Units per case:</strong> {{ $units }}</p>
+  </div>
+</x-app-layout>
+
+b) client.blade.php
+
+<x-app-layout>
+  <x-slot name="header">
+    <h2>Client-Side Fetch Test</h2>
+  </x-slot>
+  <div x-data="{ loading: true, data: null, error: null }" class="p-6">
+    <template x-if="loading">
+      <p>Loading…</p>
+    </template>
+    <template x-if="error">
+      <p class="text-red-600" x-text="error"></p>
+    </template>
+    <template x-if="data">
+      <p><strong>Case cost:</strong> <span x-text="data.price"></span></p>
+      <p><strong>Units per case:</strong> <span x-text="data.units"></span></p>
+    </template>
+  </div>
+
+  <script>
+    document.addEventListener('alpine:init', () => {
+      const code = @json($code);
+      fetch(`https://www.udea.nl/search/?qry=${code}`, { credentials: 'include' })
+        .then(r => r.text())
+        .then(html => {
+          const dom = new DOMParser().parseFromString(html, 'text/html');
+          return {
+            price: dom.querySelector('.product-price')?.textContent.trim(),
+            units: dom.querySelector('.units-per-case')?.textContent.trim(),
+          };
+        })
+        .then(data => {
+          Alpine.store('data', data);
+          Alpine.store('loading', false);
+        })
+        .catch(err => {
+          Alpine.store('error', err.message);
+          Alpine.store('loading', false);
+        });
+    });
+  </script>
+</x-app-layout>
+
+4. Dusk (optional)
+
+If you want to try Laravel Dusk, install it (composer require laravel/dusk --dev) and then add a browser test in tests/Browser/SupplierTest.php:
+
+<?php
+
+namespace Tests\Browser;
+
+use Laravel\Dusk\Browser;
+use Tests\DuskTestCase;
+
+class SupplierTest extends DuskTestCase
+{
+    public function test_can_scrape_product()
+    {
+        $this->browse(function (Browser $browser) {
+            $browser
+                ->visit('https://www.udea.nl/login')
+                ->type('username', 'YOUR_USER')
+                ->type('password', 'YOUR_PASS')
+                ->press('Login')
+                ->visit('/search/?qry=5014415')
+                ->assertSeeElement('.product-price')
+                ->assertSeeElement('.units-per-case');
+        });
+    }
+}
+
+Then run:
+
+php artisan dusk
+
+What’s next?
+
+    Swap in your real form-field names & credentials.
+
+    Tweak the selectors if the HTML structure differs.
+
+    Once you’ve got a working prototype, we can turn the Guzzle logic into a proper service class + cache binding (as in our earlier example), or flesh out the Dusk script into a reusable job.

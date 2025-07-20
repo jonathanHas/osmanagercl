@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\TestScraperController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -27,6 +28,13 @@ Route::middleware('auth')->group(function () {
     Route::get('/products/{id}/sales-data', [ProductController::class, 'salesData'])->name('products.sales-data');
     Route::patch('/products/{id}/tax', [ProductController::class, 'updateTax'])->name('products.update-tax');
     Route::patch('/products/{id}/price', [ProductController::class, 'updatePrice'])->name('products.update-price');
+
+    // Udea scraping test routes
+    Route::prefix('tests')->name('tests.')->group(function () {
+        Route::get('/guzzle', [TestScraperController::class, 'guzzleLogin'])->name('guzzle');
+        Route::get('/client', [TestScraperController::class, 'clientFetch'])->name('client');
+        Route::get('/dashboard', [TestScraperController::class, 'dashboard'])->name('dashboard');
+    });
 
     // Debug routes for testing supplier tables
     Route::get('/debug/suppliers', function () {
