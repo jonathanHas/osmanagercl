@@ -159,6 +159,11 @@
                             <div class="font-medium text-orange-600 dark:text-orange-400">
                                 + Transport (15%): €{{ number_format($transportCostPerUnit, 2) }} per unit
                             </div>
+                            @if(isset($udeaPricing['customer_price']) && $udeaPricing['customer_price'])
+                                <div class="font-medium text-purple-600 dark:text-purple-400">
+                                    Customer price: €{{ $udeaPricing['customer_price'] }} (Udea's retail price)
+                                </div>
+                            @endif
                         </div>
                     </div>
 
@@ -261,7 +266,7 @@
                     <div class="flex items-center justify-between mb-3">
                         <h5 class="text-sm font-medium text-gray-900 dark:text-gray-100">Quick Price Actions</h5>
                     </div>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
                         @php
                             // Use the already calculated values from above
                             $actualUdeaCost = $unitPrice; // This is the actual unit cost from Udea
@@ -293,6 +298,15 @@
                             </button>
                         @endif
                         
+                        <!-- Match Customer Price -->
+                        @if(isset($udeaPricing['customer_price']) && $udeaPricing['customer_price'])
+                            @php $customerPrice = (float)str_replace(',', '.', $udeaPricing['customer_price']); @endphp
+                            <button onclick="updateProductPrice({{ $customerPrice }})" 
+                                    class="px-3 py-2 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-colors duration-200">
+                                Match Customer<br>€{{ number_format($customerPrice, 2) }}
+                            </button>
+                        @endif
+                        
                         <!-- Smart Optimal Price (Cost + Transport + Margin) -->
                         @if($actualUdeaCost > 0)
                             @php 
@@ -300,7 +314,7 @@
                                 $optimalPrice = $totalCostWithTransport * 1.35; // 35% margin on total cost
                             @endphp
                             <button onclick="updateProductPrice({{ $optimalPrice }})" 
-                                    class="px-3 py-2 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-colors duration-200">
+                                    class="px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors duration-200">
                                 Optimal Price<br>€{{ number_format($optimalPrice, 2) }}
                             </button>
                         @endif

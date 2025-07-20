@@ -59,9 +59,13 @@ class UdeaScrapingService
 
             sleep($this->config['rate_limit_delay']);
 
-            // Use the correct search URL format
+            // Use the correct search URL format with English language preference
             $searchUrl = "/search/?qry={$productCode}";
-            $response = $this->client->get($searchUrl);
+            $response = $this->client->get($searchUrl, [
+                'headers' => [
+                    'Accept-Language' => 'en-US,en;q=0.9,nl;q=0.1'
+                ]
+            ]);
             
             if ($response->getStatusCode() !== 200) {
                 Log::warning('Udea scraping failed: Invalid response status', [
@@ -72,6 +76,18 @@ class UdeaScrapingService
             }
 
             $html = (string) $response->getBody();
+            
+            // Detect language version for debugging
+            $isDutch = strpos($html, '/producten/product/') !== false;
+            $isEnglish = strpos($html, '/products/product/') !== false;
+            
+            Log::info('Udea language detection', [
+                'product_code' => $productCode,
+                'dutch_detected' => $isDutch,
+                'english_detected' => $isEnglish,
+                'search_url' => $searchUrl
+            ]);
+            
             return $this->parseProductData($html, $productCode);
 
         } catch (GuzzleException $e) {
@@ -171,6 +187,7 @@ class UdeaScrapingService
             'original_price' => null,
             'discount_price' => null,
             'is_discounted' => false,
+            'customer_price' => null,
         ];
 
         // Extract product name/title - try multiple patterns
@@ -317,12 +334,75 @@ class UdeaScrapingService
             return null;
         }
 
+        // Try to extract customer price from product detail page
+        $data['customer_price'] = $this->extractCustomerPrice($html);
+
         Log::info('Udea scraping successful', [
             'product_code' => $productCode,
             'data_found' => array_filter($data, fn($v) => !is_null($v))
         ]);
 
         return $data;
+    }
+
+    /**
+     * Extract customer price from product detail page
+     */
+    private function extractCustomerPrice(string $searchHtml): ?string
+    {
+        try {
+            // Look for the first product detail link after productsLists div
+            // The link appears after the productsLists div in the HTML structure
+            if (strpos($searchHtml, 'id="productsLists"') !== false) {
+                // Find the position of productsLists
+                $productsListPos = strpos($searchHtml, 'id="productsLists"');
+                
+                // Search for the detail link starting from productsLists position
+                $searchFromPos = substr($searchHtml, $productsListPos);
+                
+                // Look for the first product detail link (both Dutch and English versions)
+                if (preg_match('/<a[^>]*href="(https:\/\/www\.udea\.nl\/product(?:en|s)\/product\/[^"]+)"[^>]*class="[^"]*detail-image[^"]*"/', $searchFromPos, $matches)) {
+                    $detailUrl = $matches[1];
+                    
+                    Log::info('Found product detail URL', [
+                        'detail_url' => $detailUrl
+                    ]);
+
+                    // Fetch the product detail page
+                    $response = $this->client->get($detailUrl);
+                    $detailHtml = (string) $response->getBody();
+
+                    // Extract customer price from Product margin section
+                    // Pattern: "Customer price: 2,89" (English) or "Consumentenprijs: 2,89" (Dutch)
+                    if (preg_match('/(?:Customer price|Consumentenprijs):\s*([0-9]+,\d{2})/', $detailHtml, $priceMatches)) {
+                        $customerPrice = $priceMatches[1];
+                        
+                        Log::info('Extracted customer price', [
+                            'customer_price' => $customerPrice,
+                            'detail_url' => $detailUrl
+                        ]);
+                        
+                        return $customerPrice;
+                    }
+                    
+                    Log::warning('Customer price not found on detail page', [
+                        'detail_url' => $detailUrl
+                    ]);
+                } else {
+                    Log::warning('Product detail URL not found after productsLists marker');
+                }
+            } else {
+                Log::warning('productsLists marker not found in search results');
+            }
+            
+            return null;
+            
+        } catch (Exception $e) {
+            Log::error('Failed to extract customer price', [
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
     }
 
     public function testConnection(): array

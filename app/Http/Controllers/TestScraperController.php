@@ -460,4 +460,152 @@ class TestScraperController extends Controller
             ]);
         }
     }
+
+    /**
+     * Test customer price extraction with detailed debug output
+     */
+    public function testCustomerPrice(string $productCode): View
+    {
+        // Clear any existing cache for this product
+        $this->scrapingService->clearCache($productCode);
+        
+        $debugInfo = [
+            'product_code' => $productCode,
+            'timestamp' => now()->toISOString(),
+            'search_url' => '',
+            'search_html_preview' => '',
+            'detail_url_found' => false,
+            'detail_url' => '',
+            'detail_html_preview' => '',
+            'customer_price_found' => false,
+            'customer_price' => null,
+            'all_data' => null,
+            'errors' => [],
+        ];
+
+        try {
+            // Get the full scraping result with debugging
+            $result = $this->scrapingService->getProductData($productCode);
+            $debugInfo['all_data'] = $result;
+
+            // Now let's manually recreate the customer price extraction with debug info
+            $searchUrl = "https://www.udea.nl/search/?qry={$productCode}";
+            $debugInfo['search_url'] = $searchUrl;
+
+            // Use reflection to access the private client from the service
+            // This way we can reuse the authenticated session
+            $reflection = new \ReflectionClass($this->scrapingService);
+            $clientProperty = $reflection->getProperty('client');
+            $clientProperty->setAccessible(true);
+            $serviceClient = $clientProperty->getValue($this->scrapingService);
+
+            // First ensure the service is authenticated by making a test call
+            $testResult = $this->scrapingService->getProductData($productCode);
+            
+            // Now manually get search results using the authenticated client
+            $searchResponse = $serviceClient->get("/search/?qry={$productCode}");
+            $searchHtml = (string) $searchResponse->getBody();
+            $debugInfo['search_html_preview'] = substr($searchHtml, 0, 2000);
+            $debugInfo['search_response_code'] = $searchResponse->getStatusCode();
+            
+            // Check if we actually got search results or were redirected
+            $debugInfo['search_contains_results'] = strpos($searchHtml, 'search-results') !== false || strpos($searchHtml, 'product-list') !== false;
+            $debugInfo['search_title'] = '';
+            if (preg_match('/<title>([^<]+)<\/title>/', $searchHtml, $titleMatches)) {
+                $debugInfo['search_title'] = $titleMatches[1];
+            }
+            
+            // Detect language version
+            $debugInfo['dutch_detected'] = strpos($searchHtml, '/producten/product/') !== false;
+            $debugInfo['english_detected'] = strpos($searchHtml, '/products/product/') !== false;
+
+            // Look for productsLists section marker
+            if (strpos($searchHtml, 'id="productsLists"') !== false) {
+                $debugInfo['products_list_found'] = true;
+                
+                // Find content after productsLists marker
+                $productsListPos = strpos($searchHtml, 'id="productsLists"');
+                $contentAfterMarker = substr($searchHtml, $productsListPos);
+                $debugInfo['products_list_preview'] = substr($contentAfterMarker, 0, 3000);
+                
+                // Look for detail links after productsLists marker (both Dutch and English versions)
+                $detailLinkPattern = '/<a[^>]*href="(https:\/\/www\.udea\.nl\/product(?:en|s)\/product\/[^"]+)"[^>]*class="[^"]*detail-image[^"]*"/';
+                if (preg_match($detailLinkPattern, $contentAfterMarker, $matches)) {
+                    $debugInfo['detail_url_found'] = true;
+                    $debugInfo['detail_url'] = $matches[1];
+
+                    // Fetch the detail page using the authenticated service client
+                    $detailResponse = $serviceClient->get($matches[1]);
+                    $detailHtml = (string) $detailResponse->getBody();
+                    $debugInfo['detail_html_preview'] = substr($detailHtml, 0, 2000);
+
+                    // Look for customer price (both English and Dutch patterns)
+                    $customerPricePattern = '/(?:Customer price|Consumentenprijs):\s*([0-9]+,\d{2})/';
+                    if (preg_match($customerPricePattern, $detailHtml, $priceMatches)) {
+                        $debugInfo['customer_price_found'] = true;
+                        $debugInfo['customer_price'] = $priceMatches[1];
+                    } else {
+                        $debugInfo['errors'][] = 'Customer price pattern not found on detail page';
+                        
+                        // Look for all instances of "Customer" or "Klant" to debug
+                        if (preg_match_all('/(?:Customer|Klant)[^<]*/', $detailHtml, $customerMatches)) {
+                            $debugInfo['customer_mentions'] = $customerMatches[0];
+                        }
+                        
+                        // Look for patterns around the 2,89 price to identify context
+                        if (preg_match_all('/([^>]{0,50})2,89([^<]{0,50})/', $detailHtml, $contextMatches)) {
+                            $debugInfo['context_around_289'] = array_map(function($before, $after) {
+                                return trim($before) . ' [2,89] ' . trim($after);
+                            }, $contextMatches[1], $contextMatches[2]);
+                        }
+                        
+                        // Look for all price patterns to debug
+                        if (preg_match_all('/[0-9]+,[0-9]{2}/', $detailHtml, $allPrices)) {
+                            $debugInfo['all_prices_on_detail_page'] = array_unique($allPrices[0]);
+                        }
+                    }
+                } else {
+                    $debugInfo['errors'][] = 'Detail URL pattern not found within productsLists section';
+                    
+                    // Debug: show all href attributes after productsLists marker
+                    if (preg_match_all('/href="([^"]*)"/', $contentAfterMarker, $allLinks)) {
+                        $debugInfo['all_links_in_products_list'] = array_slice(array_unique($allLinks[1]), 0, 10);
+                    }
+                    
+                    // Debug: show all <a> tags after productsLists marker to see the structure
+                    if (preg_match_all('/<a[^>]*>/', $contentAfterMarker, $allATags)) {
+                        $debugInfo['all_a_tags_in_products_list'] = array_slice($allATags[0], 0, 5);
+                    }
+                    
+                    // Debug: look for any links containing 'product'
+                    if (preg_match_all('/href="([^"]*product[^"]*)"/', $contentAfterMarker, $productLinks)) {
+                        $debugInfo['product_links_found'] = array_unique($productLinks[1]);
+                    }
+                }
+            } else {
+                $debugInfo['products_list_found'] = false;
+                $debugInfo['errors'][] = 'productsLists section not found in search results';
+                
+                // Debug: show all href attributes to see what links are available
+                if (preg_match_all('/href="([^"]*)"/', $searchHtml, $allLinks)) {
+                    $debugInfo['all_links_found'] = array_slice(array_unique($allLinks[1]), 0, 20);
+                }
+                
+                // Debug: look for detail-image classes
+                if (preg_match_all('/class="[^"]*detail-image[^"]*"/', $searchHtml, $detailImageClasses)) {
+                    $debugInfo['detail_image_classes'] = $detailImageClasses[0];
+                }
+                
+                // Debug: look for any div with id attribute
+                if (preg_match_all('/<div[^>]*id="([^"]*)"/', $searchHtml, $divIds)) {
+                    $debugInfo['all_div_ids'] = array_unique($divIds[1]);
+                }
+            }
+
+        } catch (\Exception $e) {
+            $debugInfo['errors'][] = 'Exception: ' . $e->getMessage();
+        }
+
+        return view('tests.customer-price-debug', compact('debugInfo'));
+    }
 }

@@ -36,6 +36,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/guzzle', [TestScraperController::class, 'guzzleLogin'])->name('guzzle');
         Route::get('/client', [TestScraperController::class, 'clientFetch'])->name('client');
         Route::get('/dashboard', [TestScraperController::class, 'dashboard'])->name('dashboard');
+        Route::get('/customer-price/{productCode}', [TestScraperController::class, 'testCustomerPrice'])->name('customer-price');
     });
 
     // Debug routes for testing supplier tables

@@ -206,7 +206,7 @@ class ProductController extends Controller
     public function updatePrice(Request $request, string $id): RedirectResponse
     {
         $request->validate([
-            'net_price' => 'required|numeric|min:0|max:999999.99',
+            'net_price' => 'required|numeric|min:0|max:999999.9999',
         ]);
 
         $product = $this->productRepository->findById($id);

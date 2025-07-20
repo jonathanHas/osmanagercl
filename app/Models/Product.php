@@ -66,7 +66,7 @@ class Product extends Model
      */
     protected $casts = [
         'PRICEBUY' => 'decimal:2',
-        'PRICESELL' => 'decimal:2',
+        'PRICESELL' => 'decimal:4',
         'STOCKCOST' => 'decimal:2',
         'STOCKVOLUME' => 'decimal:2',
         'STOCKUNITS' => 'decimal:2',

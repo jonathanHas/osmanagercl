@@ -30,18 +30,7 @@
             <!-- Quick Stats Bar -->
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
                 <div class="p-6">
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                        <!-- Current Price -->
-                        <div class="relative">
-                            <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Current Price (incl. VAT)</h3>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ $product->formatted_price_with_vat }}</p>
-                            <button onclick="togglePriceEdit()" class="absolute top-0 right-0 text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-600">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                </svg>
-                            </button>
-                        </div>
-                        
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <!-- Stock Status -->
                         <div>
                             <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Stock Status</h3>
@@ -145,90 +134,95 @@
                 <div class="p-6 text-gray-900 dark:text-gray-100">
                     <!-- Overview Tab -->
                     <div x-show="activeTab === 'overview'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
-                        <!-- Pricing Details Card -->
-                        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 mb-6">
-                            <h3 class="text-lg font-semibold mb-4">Pricing Details</h3>
-                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div>
-                                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Buy Price</dt>
-                                    <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">€{{ number_format($product->PRICEBUY, 2) }}</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Net Sell Price</dt>
-                                    <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">€{{ $product->formatted_price }}</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">VAT Amount</dt>
-                                    <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">€{{ number_format($product->getVatAmount(), 2) }}</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Margin</dt>
-                                    <dd class="mt-1 text-lg font-semibold {{ $product->PRICESELL > $product->PRICEBUY ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
-                                        €{{ number_format($product->PRICESELL - $product->PRICEBUY, 2) }}
-                                    </dd>
-                                </div>
-                            </div>
-                        </div>
+                        <!-- Consolidated Pricing Section -->
+                        <x-product-pricing-section :product="$product" :supplier-service="$supplierService" :udea-pricing="$udeaPricing" />
+                        
+                        <!-- Supplier Information Card -->
+                        <x-supplier-info-card :product="$product" :supplier-service="$supplierService" />
 
-                        <!-- Supplier External Information (if available) -->
-                        <x-supplier-external-info :product="$product" :supplier-service="$supplierService" :udea-pricing="$udeaPricing" />
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                            <!-- Product Information -->
-                            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
-                                <h3 class="text-lg font-semibold mb-4">Product Information</h3>
-                                <dl class="space-y-3">
+                        <!-- Product Details & Configuration -->
+                        <div class="mt-6 bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+                            <div class="p-6">
+                                <h3 class="text-lg font-semibold mb-4 flex items-center">
+                                    <svg class="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    Product Details & Configuration
+                                </h3>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <!-- Basic Information -->
                                     <div>
-                                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Product ID</dt>
-                                        <dd class="mt-1 text-sm text-gray-900 dark:text-gray-100 font-mono text-xs">{{ $product->ID }}</dd>
+                                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Basic Information</h4>
+                                        <dl class="space-y-2">
+                                            <div>
+                                                <dt class="text-xs text-gray-500 dark:text-gray-400">Product ID</dt>
+                                                <dd class="text-sm text-gray-900 dark:text-gray-100 font-mono">{{ $product->ID }}</dd>
+                                            </div>
+                                            <div>
+                                                <dt class="text-xs text-gray-500 dark:text-gray-400">Warranty Period</dt>
+                                                <dd class="text-sm text-gray-900 dark:text-gray-100">{{ $product->WARRANTY }} days</dd>
+                                            </div>
+                                            <div>
+                                                <dt class="text-xs text-gray-500 dark:text-gray-400">Stock Cost</dt>
+                                                <dd class="text-sm text-gray-900 dark:text-gray-100">€{{ number_format($product->STOCKCOST, 2) }}</dd>
+                                            </div>
+                                        </dl>
                                     </div>
+                                    
+                                    <!-- POS Configuration -->
                                     <div>
-                                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Warranty</dt>
-                                        <dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{{ $product->WARRANTY }} days</dd>
+                                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">POS Configuration</h4>
+                                        <div class="space-y-2">
+                                            @php
+                                                $posConfigs = [
+                                                    ['field' => 'ISSCALE', 'label' => 'Sold by Weight', 'icon' => 'M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3'],
+                                                    ['field' => 'ISKITCHEN', 'label' => 'Kitchen Item', 'icon' => 'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4'],
+                                                    ['field' => 'PRINTKB', 'label' => 'Print to Kitchen', 'icon' => 'M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z'],
+                                                    ['field' => 'ISSERVICE', 'label' => 'Service Item', 'icon' => 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'],
+                                                ];
+                                            @endphp
+                                            @foreach($posConfigs as $config)
+                                                <div class="flex items-center justify-between">
+                                                    <span class="text-sm text-gray-600 dark:text-gray-400">{{ $config['label'] }}</span>
+                                                    @if($product->{$config['field']})
+                                                        <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                                        </svg>
+                                                    @else
+                                                        <svg class="w-5 h-5 text-gray-300 dark:text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                                                        </svg>
+                                                    @endif
+                                                </div>
+                                            @endforeach
+                                        </div>
                                     </div>
+                                    
+                                    <!-- Additional Settings -->
                                     <div>
-                                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Stock Cost</dt>
-                                        <dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">€{{ number_format($product->STOCKCOST, 2) }}</dd>
+                                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Additional Settings</h4>
+                                        <div class="space-y-2">
+                                            @php
+                                                $additionalConfigs = [
+                                                    ['field' => 'ISCOM', 'label' => 'Commission Product'],
+                                                    ['field' => 'SENDSTATUS', 'label' => 'Send Status Updates'],
+                                                    ['field' => 'ISVPRICE', 'label' => 'Variable Pricing'],
+                                                    ['field' => 'ISVERPATRIB', 'label' => 'Variable Attributes'],
+                                                ];
+                                            @endphp
+                                            @foreach($additionalConfigs as $config)
+                                                <div class="flex items-center justify-between">
+                                                    <span class="text-sm text-gray-600 dark:text-gray-400">{{ $config['label'] }}</span>
+                                                    @if($product->{$config['field']})
+                                                        <span class="text-xs font-medium text-green-600 dark:text-green-400">Active</span>
+                                                    @else
+                                                        <span class="text-xs text-gray-400 dark:text-gray-500">Inactive</span>
+                                                    @endif
+                                                </div>
+                                            @endforeach
+                                        </div>
                                     </div>
-                                </dl>
-                            </div>
-
-                            <!-- Product Attributes -->
-                            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
-                                <h3 class="text-lg font-semibold mb-4">Product Attributes</h3>
-                                <div class="grid grid-cols-2 gap-3">
-                                    <label class="flex items-center">
-                                        <input type="checkbox" {{ $product->ISCOM ? 'checked' : '' }} disabled class="rounded border-gray-300 text-indigo-600">
-                                        <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">Commission</span>
-                                    </label>
-                                    <label class="flex items-center">
-                                        <input type="checkbox" {{ $product->ISSCALE ? 'checked' : '' }} disabled class="rounded border-gray-300 text-indigo-600">
-                                        <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">Sold by Weight</span>
-                                    </label>
-                                    <label class="flex items-center">
-                                        <input type="checkbox" {{ $product->ISKITCHEN ? 'checked' : '' }} disabled class="rounded border-gray-300 text-indigo-600">
-                                        <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">Kitchen Item</span>
-                                    </label>
-                                    <label class="flex items-center">
-                                        <input type="checkbox" {{ $product->PRINTKB ? 'checked' : '' }} disabled class="rounded border-gray-300 text-indigo-600">
-                                        <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">Print to Kitchen</span>
-                                    </label>
-                                    <label class="flex items-center">
-                                        <input type="checkbox" {{ $product->SENDSTATUS ? 'checked' : '' }} disabled class="rounded border-gray-300 text-indigo-600">
-                                        <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">Send Status</span>
-                                    </label>
-                                    <label class="flex items-center">
-                                        <input type="checkbox" {{ $product->ISSERVICE ? 'checked' : '' }} disabled class="rounded border-gray-300 text-indigo-600">
-                                        <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">Service</span>
-                                    </label>
-                                    <label class="flex items-center">
-                                        <input type="checkbox" {{ $product->ISVPRICE ? 'checked' : '' }} disabled class="rounded border-gray-300 text-indigo-600">
-                                        <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">Variable Price</span>
-                                    </label>
-                                    <label class="flex items-center">
-                                        <input type="checkbox" {{ $product->ISVERPATRIB ? 'checked' : '' }} disabled class="rounded border-gray-300 text-indigo-600">
-                                        <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">Variable Attributes</span>
-                                    </label>
                                 </div>
                             </div>
                         </div>
@@ -754,6 +748,52 @@
             priceInput.type = 'hidden';
             priceInput.name = 'net_price';
             priceInput.value = newPrice;
+            form.appendChild(priceInput);
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        // Calculate net price from VAT-inclusive price
+        function calculateNetFromGross() {
+            const grossPrice = parseFloat(document.getElementById('quickPriceUpdateVat').value) || 0;
+            const netPrice = grossPrice / (1 + vatRate);
+            document.getElementById('calculatedNetPrice').textContent = netPrice.toFixed(2);
+        }
+
+        // Update Product Price from VAT-inclusive input
+        function updateProductPriceFromVat() {
+            const grossPrice = parseFloat(document.getElementById('quickPriceUpdateVat').value);
+            const netPrice = grossPrice / (1 + vatRate);
+            
+            if (!confirm(`Update product selling price to €${grossPrice.toFixed(2)} (incl. VAT) / €${netPrice.toFixed(2)} (net)?`)) {
+                return;
+            }
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/products/${productId}/price`;
+            
+            // Add CSRF token
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = '_token';
+            csrfInput.value = csrfToken;
+            form.appendChild(csrfInput);
+            
+            // Add method override for PATCH
+            const methodInput = document.createElement('input');
+            methodInput.type = 'hidden';
+            methodInput.name = '_method';
+            methodInput.value = 'PATCH';
+            form.appendChild(methodInput);
+            
+            // Add net price (calculated from gross) - use full precision
+            const priceInput = document.createElement('input');
+            priceInput.type = 'hidden';
+            priceInput.name = 'net_price';
+            priceInput.value = netPrice;
             form.appendChild(priceInput);
             
             document.body.appendChild(form);
