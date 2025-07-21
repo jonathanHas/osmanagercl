@@ -26,12 +26,15 @@ class DeliveryItem extends Model
         'product_id',
         'is_new_product',
         'scan_history',
+        'barcode_retrieval_failed',
+        'barcode_retrieval_error',
     ];
 
     protected $casts = [
         'unit_cost' => 'decimal:4',
         'total_cost' => 'decimal:2',
         'is_new_product' => 'boolean',
+        'barcode_retrieval_failed' => 'boolean',
         'scan_history' => 'array',
     ];
 

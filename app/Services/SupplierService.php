@@ -78,7 +78,15 @@ class SupplierService
             $code = preg_replace('/[^a-zA-Z0-9_-]/', '', $barcode);
 
             // Replace {CODE} with the actual barcode
-            return str_replace('{CODE}', $code, $config['image_url']);
+            $imageUrl = str_replace('{CODE}', $code, $config['image_url']);
+            
+            // Validate that this looks like an image URL
+            if (!$this->isValidImageUrl($imageUrl)) {
+                \Log::warning('Generated image URL does not appear to be a valid image URL: ' . $imageUrl);
+                return null;
+            }
+            
+            return $imageUrl;
         } catch (\Exception $e) {
             // Log error but don't expose it to users
             \Log::error('Error generating external image URL by barcode: '.$e->getMessage());
@@ -154,5 +162,23 @@ class SupplierService
         $udeaConfig = $this->config['udea'] ?? null;
 
         return $udeaConfig && in_array($supplierId, $udeaConfig['supplier_ids']);
+    }
+    
+    /**
+     * Validate that a URL appears to be a valid image URL.
+     */
+    protected function isValidImageUrl(string $url): bool
+    {
+        // Check if URL is well-formed
+        if (!filter_var($url, FILTER_VALIDATE_URL)) {
+            return false;
+        }
+        
+        // Check if URL ends with common image extensions
+        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+        $pathInfo = pathinfo(parse_url($url, PHP_URL_PATH));
+        
+        return isset($pathInfo['extension']) && 
+               in_array(strtolower($pathInfo['extension']), $imageExtensions);
     }
 }

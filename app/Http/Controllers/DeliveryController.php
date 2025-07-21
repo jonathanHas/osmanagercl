@@ -114,11 +114,43 @@ class DeliveryController extends Controller
     /**
      * Display the specified delivery
      */
-    public function show(Delivery $delivery): View
+    public function show(Delivery $delivery, Request $request)
     {
         $delivery->load(['supplier', 'items.product.supplier', 'scans']);
 
         $summary = $this->deliveryService->getDeliverySummary($delivery->id);
+
+        // Handle AJAX requests for auto-refresh
+        if ($request->wantsJson()) {
+            return response()->json([
+                'items' => $delivery->items->map(function ($item) {
+                    $imageUrl = null;
+                    $hasIntegration = false;
+                    
+                    if ($item->product && $item->product->supplier && $this->supplierService->hasExternalIntegration($item->product->supplier->SupplierID)) {
+                        // Existing product with supplier integration
+                        $imageUrl = $this->supplierService->getExternalImageUrl($item->product);
+                        $hasIntegration = true;
+                    } elseif ($item->barcode && $item->is_new_product && $this->supplierService->hasExternalIntegration($item->delivery->supplier_id)) {
+                        // New product with barcode and supplier integration
+                        $imageUrl = $this->supplierService->getExternalImageUrlByBarcode($item->delivery->supplier_id, $item->barcode);
+                        $hasIntegration = true;
+                    }
+
+                    return [
+                        'id' => $item->id,
+                        'barcode' => $item->barcode,
+                        'barcode_retrieval_failed' => $item->barcode_retrieval_failed,
+                        'barcode_retrieval_error' => $item->barcode_retrieval_error,
+                        'image_url' => $imageUrl,
+                        'has_integration' => $hasIntegration,
+                        'is_new_product' => $item->is_new_product,
+                        'description' => $item->description,
+                    ];
+                }),
+                'summary' => $summary,
+            ]);
+        }
 
         return view('deliveries.show', compact('delivery', 'summary'))->with('supplierService', $this->supplierService);
     }
@@ -272,10 +304,22 @@ class DeliveryController extends Controller
             if ($barcode) {
                 $item->update(['barcode' => $barcode]);
 
+                // Check for image URL if supplier has external integration
+                $imageUrl = null;
+                $hasIntegration = false;
+                if ($item->is_new_product && $this->supplierService->hasExternalIntegration($item->delivery->supplier_id)) {
+                    $imageUrl = $this->supplierService->getExternalImageUrlByBarcode($item->delivery->supplier_id, $barcode);
+                    $hasIntegration = true;
+                }
+
                 return response()->json([
                     'success' => true,
                     'barcode' => $barcode,
                     'message' => 'Barcode retrieved successfully',
+                    'image_url' => $imageUrl,
+                    'has_integration' => $hasIntegration,
+                    'item_id' => $item->id,
+                    'description' => $item->description,
                 ]);
             } else {
                 return response()->json([

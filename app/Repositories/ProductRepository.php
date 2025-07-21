@@ -19,9 +19,9 @@ class ProductRepository
         $query = Product::query();
 
         if ($withSuppliers) {
-            $query->with(['stockCurrent', 'taxCategory', 'tax', 'supplierLink', 'supplier']);
+            $query->with(['stockCurrent', 'taxCategory', 'tax', 'supplierLink', 'supplier', 'category']);
         } else {
-            $query->with(['stockCurrent', 'taxCategory', 'tax']);
+            $query->with(['stockCurrent', 'taxCategory', 'tax', 'category']);
         }
 
         return $query->orderBy('NAME')->paginate($perPage);
@@ -32,7 +32,7 @@ class ProductRepository
      */
     public function findById(string $id): ?Product
     {
-        return Product::with(['stockCurrent', 'taxCategory', 'tax', 'supplierLink', 'supplier'])
+        return Product::with(['stockCurrent', 'taxCategory', 'tax', 'supplierLink', 'supplier', 'category'])
             ->find($id);
     }
 
@@ -62,7 +62,7 @@ class ProductRepository
      */
     public function getActiveProducts(int $perPage = 20): LengthAwarePaginator
     {
-        return Product::with(['stockCurrent', 'taxCategory', 'tax'])
+        return Product::with(['stockCurrent', 'taxCategory', 'tax', 'category'])
             ->active()
             ->orderBy('NAME')
             ->paginate($perPage);
@@ -73,7 +73,7 @@ class ProductRepository
      */
     public function getAvailableProducts(int $perPage = 20): LengthAwarePaginator
     {
-        return Product::with(['stockCurrent', 'taxCategory', 'tax'])
+        return Product::with(['stockCurrent', 'taxCategory', 'tax', 'category'])
             ->active()
             ->stocked()
             ->inCurrentStock()
@@ -84,11 +84,17 @@ class ProductRepository
     /**
      * Get products by category ID.
      */
-    public function getByCategory(string $categoryId, int $perPage = 20): LengthAwarePaginator
+    public function getByCategory(string $categoryId, int $perPage = 20, bool $withSuppliers = false): LengthAwarePaginator
     {
-        return Product::where('CATEGORY', $categoryId)
-            ->orderBy('NAME')
-            ->paginate($perPage);
+        $query = Product::where('CATEGORY', $categoryId);
+
+        if ($withSuppliers) {
+            $query->with(['stockCurrent', 'taxCategory', 'tax', 'supplierLink', 'supplier', 'category']);
+        } else {
+            $query->with(['stockCurrent', 'taxCategory', 'tax', 'category']);
+        }
+
+        return $query->orderBy('NAME')->paginate($perPage);
     }
 
     /**
@@ -149,9 +155,9 @@ class ProductRepository
 
         // Load relationships based on requirements
         if ($withSuppliers) {
-            $query->with(['stockCurrent', 'taxCategory', 'tax', 'supplierLink', 'supplier']);
+            $query->with(['stockCurrent', 'taxCategory', 'tax', 'supplierLink', 'supplier', 'category']);
         } else {
-            $query->with(['stockCurrent', 'taxCategory', 'tax']);
+            $query->with(['stockCurrent', 'taxCategory', 'tax', 'category']);
         }
 
         return $query->orderBy('NAME')->paginate($perPage);
@@ -213,9 +219,9 @@ class ProductRepository
 
         // Load relationships based on requirements
         if ($withSuppliers) {
-            $query->with(['stockCurrent', 'taxCategory', 'tax', 'supplierLink', 'supplier']);
+            $query->with(['stockCurrent', 'taxCategory', 'tax', 'supplierLink', 'supplier', 'category']);
         } else {
-            $query->with(['stockCurrent', 'taxCategory', 'tax']);
+            $query->with(['stockCurrent', 'taxCategory', 'tax', 'category']);
         }
 
         return $query->orderBy('NAME')->paginate($perPage);
@@ -301,6 +307,65 @@ class ProductRepository
     {
         return TaxCategory::with('primaryTax')
             ->orderBy('NAME')
+            ->get();
+    }
+
+    /**
+     * Get products by multiple category IDs (including descendants).
+     */
+    public function getByCategoryIds(array $categoryIds, int $perPage = 20, bool $withSuppliers = false): LengthAwarePaginator
+    {
+        $query = Product::whereIn('CATEGORY', $categoryIds);
+
+        if ($withSuppliers) {
+            $query->with(['stockCurrent', 'taxCategory', 'tax', 'supplierLink', 'supplier', 'category']);
+        } else {
+            $query->with(['stockCurrent', 'taxCategory', 'tax', 'category']);
+        }
+
+        return $query->orderBy('NAME')->paginate($perPage);
+    }
+
+    /**
+     * Get all categories that have products for dropdown filter.
+     */
+    public function getAllCategoriesWithProducts(
+        ?bool $activeOnly = null,
+        ?bool $stockedOnly = null,
+        ?bool $inStockOnly = null
+    ): SupportCollection {
+        $query = DB::connection('pos')
+            ->table('CATEGORIES')
+            ->whereExists(function ($q) use ($activeOnly, $stockedOnly, $inStockOnly) {
+                $subQuery = $q->select(DB::raw(1))
+                    ->from('PRODUCTS')
+                    ->whereRaw('PRODUCTS.CATEGORY = CATEGORIES.ID');
+
+                if ($activeOnly === true) {
+                    $subQuery->where('PRODUCTS.ISSERVICE', 0);
+                }
+
+                if ($stockedOnly === true) {
+                    $subQuery->whereExists(function ($stQuery) {
+                        $stQuery->select(DB::raw(1))
+                            ->from('stocking')
+                            ->whereRaw('stocking.Barcode = PRODUCTS.CODE');
+                    });
+                }
+
+                if ($inStockOnly === true) {
+                    $subQuery->whereExists(function ($stQuery) {
+                        $stQuery->select(DB::raw(1))
+                            ->from('STOCKCURRENT')
+                            ->whereRaw('STOCKCURRENT.PRODUCT = PRODUCTS.ID')
+                            ->where('STOCKCURRENT.UNITS', '>', 0);
+                    });
+                }
+            })
+            ->where('CATSHOWNAME', 1);
+
+        return $query->select('CATEGORIES.ID', 'CATEGORIES.NAME', 'CATEGORIES.PARENTID')
+            ->orderBy('CATEGORIES.NAME')
             ->get();
     }
 

@@ -154,16 +154,14 @@
                                                     loading="lazy"
                                                     @error="$event.target.style.display='none'; $event.target.parentElement.style.display='none'"
                                                 >
-                                                <!-- Hover preview -->
-                                                <div class="absolute left-1/2 transform -translate-x-1/2 bottom-full mb-2 z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                                                <!-- Hover preview - Clean image only -->
+                                                <div class="absolute left-0 bottom-full mb-2 z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
                                                     <img 
                                                         :src="item.external_image_url" 
                                                         :alt="item.description"
-                                                        class="w-48 h-48 object-cover rounded-lg border-2 border-white dark:border-gray-600 shadow-xl"
+                                                        class="w-64 h-64 object-contain rounded-lg border-2 border-white dark:border-gray-600 shadow-xl bg-white"
                                                         loading="lazy"
                                                     >
-                                                    <div class="absolute inset-x-0 bottom-0 bg-black bg-opacity-75 text-white text-xs p-2 rounded-b-lg" x-text="item.description">
-                                                    </div>
                                                 </div>
                                             </div>
                                         </template>

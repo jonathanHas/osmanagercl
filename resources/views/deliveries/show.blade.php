@@ -165,8 +165,8 @@
                     </div>
                 </div>
                 
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <div class="overflow-x-auto" style="overflow-y: visible;">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 delivery-items-table">
                         <thead class="bg-gray-50 dark:bg-gray-700">
                             <tr>
                                 <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -214,7 +214,8 @@
                                             }
                                         @endphp
 
-                                        @if($hasIntegration && $imageUrl)
+                                        <div id="image-cell-{{ $item->id }}">
+                                            @if($hasIntegration && $imageUrl)
                                             <div class="relative w-10 h-10 mx-auto group">
                                                 <img 
                                                     src="{{ $imageUrl }}" 
@@ -224,20 +225,15 @@
                                                     onload="this.classList.remove('animate-pulse')"
                                                     onerror="this.style.display='none'; this.parentElement.style.display='none'"
                                                 >
-                                                <!-- Hover preview -->
-                                                <div class="absolute left-1/2 transform -translate-x-1/2 bottom-full mb-2 z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                                                <!-- Hover preview - Clean image only -->
+                                                <div class="absolute left-0 bottom-full mb-2 z-[9999] opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
                                                     <img 
                                                         src="{{ $imageUrl }}" 
                                                         alt="{{ $item->description }}"
-                                                        class="w-48 h-48 object-cover rounded-lg border-2 border-white dark:border-gray-600 shadow-xl"
+                                                        class="w-64 h-64 object-cover rounded-lg border-2 border-white dark:border-gray-600 shadow-xl"
                                                         loading="lazy"
+                                                        onerror="this.style.display='none'"
                                                     >
-                                                    <div class="absolute inset-x-0 bottom-0 bg-black bg-opacity-75 text-white text-xs p-2 rounded-b-lg">
-                                                        {{ $item->description }}
-                                                        @if($item->barcode)
-                                                            <br><span class="text-gray-300 text-xs">{{ $item->barcode }}</span>
-                                                        @endif
-                                                    </div>
                                                 </div>
                                             </div>
                                         @else
@@ -247,6 +243,7 @@
                                                 </svg>
                                             </div>
                                         @endif
+                                        </div>
                                     </td>
                                     <td class="px-6 py-4">
                                         <div class="text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -262,19 +259,28 @@
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 text-center text-sm">
-                                        @if($item->barcode)
-                                            <code class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">
-                                                {{ $item->barcode }}
-                                            </code>
-                                        @else
-                                            <span class="text-gray-400 text-xs">
-                                                @if($item->is_new_product)
-                                                    Retrieving...
-                                                @else
-                                                    No barcode
-                                                @endif
-                                            </span>
-                                        @endif
+                                        <div id="barcode-cell-{{ $item->id }}">
+                                            @if($item->barcode)
+                                                <code class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">
+                                                    {{ $item->barcode }}
+                                                </code>
+                                            @elseif($item->barcode_retrieval_failed)
+                                                <div class="flex items-center justify-center space-x-1">
+                                                    <span class="text-red-500 text-xs">❌ Failed</span>
+                                                    @if($item->barcode_retrieval_error)
+                                                        <span class="text-gray-400 text-xs cursor-help" title="{{ $item->barcode_retrieval_error }}">ⓘ</span>
+                                                    @endif
+                                                </div>
+                                            @else
+                                                <span class="text-gray-400 text-xs" id="barcode-status-{{ $item->id }}">
+                                                    @if($item->is_new_product)
+                                                        🔄 Retrieving...
+                                                    @else
+                                                        No barcode
+                                                    @endif
+                                                </span>
+                                            @endif
+                                        </div>
                                     </td>
                                     <td class="px-6 py-4 text-center text-sm text-gray-900 dark:text-gray-100">
                                         {{ $item->ordered_quantity }}
@@ -304,13 +310,12 @@
                                     </td>
                                     <td class="px-6 py-4 text-right text-sm font-medium">
                                         @if($item->is_new_product && !$item->barcode)
-                                            <form method="POST" action="{{ route('delivery-items.refresh-barcode', $item) }}" class="inline">
-                                                @csrf
-                                                <button type="submit" 
-                                                        class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 text-xs">
-                                                    Refresh Barcode
-                                                </button>
-                                            </form>
+                                            <button type="button" 
+                                                    onclick="refreshBarcode({{ $item->id }})"
+                                                    id="refresh-btn-{{ $item->id }}"
+                                                    class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 text-xs disabled:opacity-50 disabled:cursor-not-allowed">
+                                                🔄 Refresh Barcode
+                                            </button>
                                         @endif
                                     </td>
                                 </tr>
@@ -374,4 +379,255 @@
             @endif
         </div>
     </div>
+
+    <script>
+        // Auto-refresh barcode status every 10 seconds
+        function startBarcodeAutoRefresh() {
+            setInterval(() => {
+                checkBarcodeUpdates();
+            }, 10000); // Check every 10 seconds
+        }
+
+        // Check for barcode updates via AJAX
+        function checkBarcodeUpdates() {
+            const retrievingElements = document.querySelectorAll('[id^="barcode-status-"]:contains("🔄")');
+            
+            if (retrievingElements.length === 0) return;
+
+            fetch(window.location.href, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.items) {
+                    data.items.forEach(item => {
+                        updateBarcodeCell(item);
+                    });
+                }
+            })
+            .catch(error => {
+                console.log('Auto-refresh check failed:', error);
+            });
+        }
+
+        // Manual refresh barcode for specific item
+        function refreshBarcode(itemId) {
+            const button = document.getElementById(`refresh-btn-${itemId}`);
+            const statusElement = document.getElementById(`barcode-status-${itemId}`);
+            
+            // Disable button and show loading
+            button.disabled = true;
+            button.textContent = '🔄 Refreshing...';
+            
+            if (statusElement) {
+                statusElement.textContent = '🔄 Refreshing...';
+            }
+
+            fetch(`/delivery-items/${itemId}/refresh-barcode`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update the barcode cell with the new barcode
+                    const barcodeCell = document.getElementById(`barcode-cell-${itemId}`);
+                    if (barcodeCell) {
+                        barcodeCell.innerHTML = `
+                            <code class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">
+                                ${data.barcode}
+                            </code>
+                        `;
+                    }
+                    
+                    // Update image if available
+                    if (data.has_integration && data.image_url) {
+                        updateImageCell(itemId, data.image_url, data.description, data.barcode);
+                    }
+                    
+                    // Remove the refresh button
+                    button.remove();
+                    
+                    // Show success message
+                    showMessage(data.message || 'Barcode retrieved successfully!', 'success');
+                } else {
+                    // Show error and re-enable button
+                    showMessage(data.message || 'Failed to retrieve barcode', 'error');
+                    button.disabled = false;
+                    button.textContent = '🔄 Refresh Barcode';
+                    
+                    if (statusElement) {
+                        statusElement.innerHTML = `
+                            <span class="text-red-500 text-xs">❌ Failed</span>
+                        `;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Refresh failed:', error);
+                showMessage('Network error occurred', 'error');
+                button.disabled = false;
+                button.textContent = '🔄 Refresh Barcode';
+                
+                if (statusElement) {
+                    statusElement.innerHTML = `
+                        <span class="text-red-500 text-xs">❌ Error</span>
+                    `;
+                }
+            });
+        }
+
+        // Update barcode cell content
+        function updateBarcodeCell(item) {
+            const barcodeCell = document.getElementById(`barcode-cell-${item.id}`);
+            const refreshButton = document.getElementById(`refresh-btn-${item.id}`);
+            
+            if (!barcodeCell) return;
+
+            if (item.barcode) {
+                // Update cell with barcode
+                barcodeCell.innerHTML = `
+                    <code class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">
+                        ${item.barcode}
+                    </code>
+                `;
+                // Remove refresh button if it exists
+                if (refreshButton) {
+                    refreshButton.remove();
+                }
+                
+                // Update image if available
+                if (item.has_integration && item.image_url) {
+                    updateImageCell(item.id, item.image_url, item.description, item.barcode);
+                }
+            } else if (item.barcode_retrieval_failed) {
+                // Show failed status
+                barcodeCell.innerHTML = `
+                    <div class="flex items-center justify-center space-x-1">
+                        <span class="text-red-500 text-xs">❌ Failed</span>
+                        ${item.barcode_retrieval_error ? 
+                            `<span class="text-gray-400 text-xs cursor-help" title="${item.barcode_retrieval_error}">ⓘ</span>` : 
+                            ''
+                        }
+                    </div>
+                `;
+            }
+        }
+
+        // Update image cell with new image
+        function updateImageCell(itemId, imageUrl, description, barcode) {
+            const imageCell = document.getElementById(`image-cell-${itemId}`);
+            if (!imageCell) return;
+
+
+            imageCell.innerHTML = `
+                <div class="relative w-10 h-10 mx-auto group">
+                    <img 
+                        src="${imageUrl}" 
+                        alt="${description}"
+                        class="w-10 h-10 object-cover rounded border border-gray-200 dark:border-gray-700 animate-pulse cursor-pointer"
+                        loading="lazy"
+                        onload="this.classList.remove('animate-pulse')"
+                        onerror="this.style.display='none'; this.parentElement.style.display='none'"
+                    >
+                    <!-- Hover preview - Clean image only -->
+                    <div class="absolute left-0 bottom-full mb-2 z-[9999] opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                        <img 
+                            src="${imageUrl}" 
+                            alt="${description}"
+                            class="w-64 h-64 object-cover rounded-lg border-2 border-white dark:border-gray-600 shadow-xl"
+                            loading="lazy"
+                            onerror="this.style.display='none'"
+                        >
+                    </div>
+                </div>
+            `;
+
+            // Show success animation
+            imageCell.style.opacity = '0.5';
+            setTimeout(() => {
+                imageCell.style.transition = 'opacity 0.3s ease-in-out';
+                imageCell.style.opacity = '1';
+            }, 100);
+        }
+
+        // Show message to user
+        function showMessage(message, type = 'info') {
+            // Create a toast notification
+            const toast = document.createElement('div');
+            toast.className = `fixed top-4 right-4 z-50 px-4 py-2 rounded shadow-lg text-white ${
+                type === 'success' ? 'bg-green-500' : 
+                type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+            }`;
+            toast.textContent = message;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        // Start auto-refresh when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            startBarcodeAutoRefresh();
+        });
+    </script>
+
+    <style>
+        /* Ensure table cells allow hover previews to overflow */
+        .delivery-items-table td {
+            overflow: visible !important;
+            position: relative !important;
+        }
+        
+        /* Ensure table itself allows overflow for hover previews */
+        .delivery-items-table {
+            overflow: visible !important;
+        }
+        
+        /* Ensure table body allows overflow */
+        .delivery-items-table tbody {
+            overflow: visible !important;
+        }
+        
+        /* Ensure table rows allow overflow */
+        .delivery-items-table tr {
+            overflow: visible !important;
+        }
+        
+        /* Make sure the hover preview appears above everything */
+        .group .absolute.z-\[9999\] {
+            position: absolute !important;
+            z-index: 9999 !important;
+            background: white !important;
+            border: 2px solid white !important;
+            border-radius: 0.5rem !important;
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 10px 10px -5px rgb(0 0 0 / 0.04) !important;
+        }
+        
+        /* Ensure the hover preview image is properly sized */
+        .group .absolute.z-\[9999\] img {
+            display: block !important;
+            width: 256px !important;
+            height: 256px !important;
+            min-width: 256px !important;
+            max-width: 256px !important;
+            object-fit: contain !important;
+            background-color: white !important;
+        }
+        
+        /* Hide any other content that might interfere */
+        .group .absolute.z-\[9999\] * {
+            pointer-events: none !important;
+        }
+    </style>
 </x-admin-layout>

@@ -342,6 +342,41 @@ class Product extends Model
     }
 
     /**
+     * Get the category for this product.
+     */
+    public function category()
+    {
+        return $this->belongsTo(Category::class, 'CATEGORY', 'ID');
+    }
+
+    /**
+     * Get the category name with fallback.
+     */
+    public function getCategoryNameAttribute(): string
+    {
+        return $this->category?->NAME ?? 'Uncategorized';
+    }
+
+    /**
+     * Get the full category path for this product.
+     */
+    public function getCategoryPathAttribute(): string
+    {
+        return $this->category?->full_path ?? 'Uncategorized';
+    }
+
+    /**
+     * Scope a query to filter by category.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeInCategory($query, string $categoryId)
+    {
+        return $query->where('CATEGORY', $categoryId);
+    }
+
+    /**
      * Get the stock diary entries for this product.
      */
     public function stockDiary()

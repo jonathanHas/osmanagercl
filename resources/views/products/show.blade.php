@@ -57,7 +57,22 @@
                         <!-- Category -->
                         <div>
                             <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Category</h3>
-                            <p class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ $product->CATEGORY }}</p>
+                            @if($product->category)
+                                <div class="space-y-1">
+                                    <span class="inline-flex items-center px-3 py-1 text-lg font-semibold rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                        {{ $product->category->NAME }}
+                                    </span>
+                                    @if($product->category->parent)
+                                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                                            Path: {{ $product->category_path }}
+                                        </p>
+                                    @endif
+                                </div>
+                            @else
+                                <span class="inline-flex items-center px-3 py-1 text-lg font-semibold rounded-full bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                                    Uncategorized
+                                </span>
+                            @endif
                         </div>
                     </div>
                 </div>

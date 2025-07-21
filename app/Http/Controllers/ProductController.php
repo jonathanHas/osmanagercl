@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Product;
+use App\Repositories\CategoryRepository;
 use App\Repositories\ProductRepository;
 use App\Repositories\SalesRepository;
 use App\Services\SupplierService;
@@ -17,6 +18,11 @@ class ProductController extends Controller
      * The product repository instance.
      */
     protected ProductRepository $productRepository;
+
+    /**
+     * The category repository instance.
+     */
+    protected CategoryRepository $categoryRepository;
 
     /**
      * The sales repository instance.
@@ -38,11 +44,13 @@ class ProductController extends Controller
      */
     public function __construct(
         ProductRepository $productRepository,
+        CategoryRepository $categoryRepository,
         SalesRepository $salesRepository,
         SupplierService $supplierService,
         UdeaScrapingService $udeaScrapingService
     ) {
         $this->productRepository = $productRepository;
+        $this->categoryRepository = $categoryRepository;
         $this->salesRepository = $salesRepository;
         $this->supplierService = $supplierService;
         $this->udeaScrapingService = $udeaScrapingService;
@@ -59,6 +67,7 @@ class ProductController extends Controller
         $inStockOnly = $request->boolean('in_stock_only');
         $showStats = $request->boolean('show_stats');
         $supplierId = $request->get('supplier_id');
+        $categoryId = $request->get('category_id');
         $showSuppliers = $request->boolean('show_suppliers');
         $perPage = $request->get('per_page', 20);
 
@@ -69,12 +78,20 @@ class ProductController extends Controller
             activeOnly: $activeOnly
         ) : collect();
 
-        if ($search || $activeOnly || $stockedOnly || $inStockOnly || $supplierId) {
+        // Get categories for dropdown, filtered by current search criteria
+        $categories = $this->productRepository->getAllCategoriesWithProducts(
+            activeOnly: $activeOnly,
+            stockedOnly: $stockedOnly,
+            inStockOnly: $inStockOnly
+        );
+
+        if ($search || $activeOnly || $stockedOnly || $inStockOnly || $supplierId || $categoryId) {
             $products = $this->productRepository->searchProducts(
                 search: $search,
                 activeOnly: $activeOnly,
                 stockedOnly: $stockedOnly,
                 inStockOnly: $inStockOnly,
+                categoryId: $categoryId,
                 supplierId: $supplierId,
                 perPage: $perPage,
                 withSuppliers: $showSuppliers
@@ -95,8 +112,10 @@ class ProductController extends Controller
             'inStockOnly' => $inStockOnly,
             'showStats' => $showStats,
             'supplierId' => $supplierId,
+            'categoryId' => $categoryId,
             'showSuppliers' => $showSuppliers,
             'suppliers' => $suppliers,
+            'categories' => $categories,
             'supplierService' => $this->supplierService,
         ]);
     }

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\RetrieveBarcodeJob;
 use App\Models\Delivery;
 use App\Models\DeliveryItem;
 use App\Models\Product;
@@ -123,20 +124,10 @@ class DeliveryService
      */
     private function queueBarcodeRetrieval(DeliveryItem $item): void
     {
-        // Dispatch job to retrieve barcode from Udea
-        dispatch(function () use ($item) {
-            try {
-                $productData = $this->udeaService->getProductData($item->supplier_code);
-
-                if ($productData && isset($productData['barcode'])) {
-                    $item->update(['barcode' => $productData['barcode']]);
-                }
-            } catch (\Exception $e) {
-                Log::error('Failed to retrieve barcode for '.$item->supplier_code, [
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        })->afterResponse();
+        // Dispatch proper Laravel job with retry mechanism
+        RetrieveBarcodeJob::dispatch($item)
+            ->delay(now()->addSeconds(5)) // Small delay to let the response finish first
+            ->onQueue('barcode-retrieval'); // Use dedicated queue for barcode jobs
     }
 
     /**
