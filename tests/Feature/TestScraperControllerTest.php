@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Services\UdeaScrapingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Cache;
 use Mockery;
 use Tests\TestCase;
 
@@ -14,14 +13,15 @@ class TestScraperControllerTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private $mockService;
 
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         $this->user = User::factory()->create();
-        
+
         // Mock the UdeaScrapingService
         $this->mockService = Mockery::mock(UdeaScrapingService::class);
         $this->app->instance(UdeaScrapingService::class, $this->mockService);
@@ -124,7 +124,7 @@ class TestScraperControllerTest extends TestCase
 
         $response = $this->actingAs($this->user)
             ->postJson('/api/test-scraper/product-data', [
-                'product_code' => '1234567'
+                'product_code' => '1234567',
             ]);
 
         $response->assertStatus(200);
@@ -144,7 +144,7 @@ class TestScraperControllerTest extends TestCase
 
         $response = $this->actingAs($this->user)
             ->postJson('/api/test-scraper/product-data', [
-                'product_code' => 'invalid123'
+                'product_code' => 'invalid123',
             ]);
 
         $response->assertStatus(404);
@@ -167,7 +167,7 @@ class TestScraperControllerTest extends TestCase
     {
         $response = $this->actingAs($this->user)
             ->postJson('/api/test-scraper/product-data', [
-                'product_code' => str_repeat('a', 51) // Too long
+                'product_code' => str_repeat('a', 51), // Too long
             ]);
 
         $response->assertStatus(422);
@@ -224,7 +224,7 @@ class TestScraperControllerTest extends TestCase
 
         $response = $this->actingAs($this->user)
             ->postJson('/api/test-scraper/clear-cache', [
-                'product_code' => '5014415'
+                'product_code' => '5014415',
             ]);
 
         $response->assertStatus(200);
@@ -264,7 +264,7 @@ class TestScraperControllerTest extends TestCase
 
         foreach ($routes as [$method, $route]) {
             $response = $this->call($method, $route);
-            $this->assertContains($response->getStatusCode(), [302, 401], 
+            $this->assertContains($response->getStatusCode(), [302, 401],
                 "Route {$method} {$route} should require authentication");
         }
     }

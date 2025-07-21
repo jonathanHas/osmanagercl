@@ -11,11 +11,27 @@ This folder contains detailed documentation for specific areas of the codebase t
   - Database schema information
   - Future integration opportunities (VAT, Categories, etc.)
 
+- **[pricing-system.md](./pricing-system.md)** - Product Pricing System
+  - Consolidated pricing interface with supplier integration
+  - VAT-inclusive pricing with 4-decimal precision
+  - Live price comparison and competitive analysis
+  - Quick action buttons and advanced pricing strategies
+  - High-precision VAT calculations and storage
+
 - **[supplier-integration-plan.md](./supplier-integration-plan.md)** - Supplier External Integration
   - External product images from supplier CDNs
   - Supplier website links and search integration
+  - Live price comparison with Udea supplier
+  - Customer price extraction and analysis
   - Implementation phases and current status
-  - Future enhancements for pricing data
+
+- **[delivery-verification-system.md](./delivery-verification-system.md)** - Delivery Verification System
+  - Complete CSV import and scanning workflow
+  - Real-time barcode scanning with mobile optimization
+  - Discrepancy tracking and reporting
+  - Supplier image integration with hover previews
+  - Database schema and API documentation
+  - Comprehensive troubleshooting guide
 
 ### Deployment & Production
 - **[production-deployment.md](./production-deployment.md)** - Production Deployment Guide

@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Services\UdeaScrapingService;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class TestScraperController extends Controller
@@ -20,11 +20,11 @@ class TestScraperController extends Controller
     {
         $productCode = $request->get('product_code', '5014415');
         $data = $this->scrapingService->getProductData($productCode);
-        
+
         return view('tests.guzzle', [
             'product_code' => $productCode,
             'data' => $data,
-            'success' => !is_null($data),
+            'success' => ! is_null($data),
         ]);
     }
 
@@ -60,20 +60,20 @@ class TestScraperController extends Controller
     public function testConnection(): JsonResponse
     {
         $result = $this->scrapingService->testConnection();
-        
+
         return response()->json($result, $result['success'] ? 200 : 500);
     }
 
     public function clearCache(Request $request): JsonResponse
     {
         $productCode = $request->input('product_code');
-        
+
         $this->scrapingService->clearCache($productCode);
-        
+
         return response()->json([
             'success' => true,
-            'message' => $productCode 
-                ? "Cache cleared for product: {$productCode}" 
+            'message' => $productCode
+                ? "Cache cleared for product: {$productCode}"
                 : 'All cache cleared',
         ]);
     }
@@ -81,7 +81,7 @@ class TestScraperController extends Controller
     public function dashboard(): View
     {
         $connectionTest = $this->scrapingService->testConnection();
-        
+
         return view('tests.dashboard', [
             'connection_status' => $connectionTest,
         ]);
@@ -121,7 +121,7 @@ class TestScraperController extends Controller
         try {
             // Test multiple ways to make the request
             $results = [];
-            
+
             // Method 1: Basic Guzzle
             try {
                 $client = new \GuzzleHttp\Client([
@@ -154,7 +154,7 @@ class TestScraperController extends Controller
                 curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
                 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
                 curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (compatible; TestBot)');
-                
+
                 $response = curl_exec($ch);
                 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 $error = curl_error($ch);
@@ -186,12 +186,12 @@ class TestScraperController extends Controller
                 'server_name' => $_SERVER['SERVER_NAME'] ?? 'unknown',
                 'http_host' => $_SERVER['HTTP_HOST'] ?? 'unknown',
             ];
-            
+
             return response()->json([
                 'success' => true,
                 'results' => $results,
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -210,7 +210,7 @@ class TestScraperController extends Controller
                 'headers' => [
                     'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                     'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                ]
+                ],
             ]);
 
             // Get the homepage
@@ -267,7 +267,7 @@ class TestScraperController extends Controller
     {
         try {
             $productCode = '5014415';
-            
+
             // Create a fresh scraping service and manually get the search page
             $client = new \GuzzleHttp\Client([
                 'base_uri' => 'https://www.udea.nl',
@@ -275,7 +275,7 @@ class TestScraperController extends Controller
                 'cookies' => true,
                 'headers' => [
                     'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                ]
+                ],
             ]);
 
             // Login first
@@ -286,26 +286,26 @@ class TestScraperController extends Controller
                     'password' => config('services.udea.password'),
                     'remember-me' => '1',
                 ],
-                'allow_redirects' => false
+                'allow_redirects' => false,
             ]);
 
             // Then search
             $searchResponse = $client->get("/search/?qry={$productCode}");
             $html = (string) $searchResponse->getBody();
-            
+
             // Look for specific patterns that might contain product data
             $priceMatches = [];
             $productMatches = [];
             $caseMatches = [];
-            
+
             preg_match_all('/price[^>]*>([^<]+)</i', $html, $priceMatches);
             preg_match_all('/(\d+[.,]\d+).*(?:euro|€)/i', $html, $euroMatches);
             preg_match_all('/case[^>]*>([^<]+)</i', $html, $caseMatches);
             preg_match_all('/(\d+)\s*(?:units?|pieces?|stuks?)/i', $html, $unitMatches);
-            
+
             // Also look for the product code in the HTML
             $productCodeFound = str_contains($html, '5014415');
-            
+
             return response()->json([
                 'success' => true,
                 'login_status' => $loginResponse->getStatusCode(),
@@ -332,9 +332,9 @@ class TestScraperController extends Controller
                     'search_results' => $this->extractHtmlSection($html, 'search', 500),
                     'product_info' => $this->extractHtmlSection($html, 'product', 500),
                     'price_info' => $this->extractHtmlSection($html, 'price', 500),
-                ]
+                ],
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -350,10 +350,10 @@ class TestScraperController extends Controller
         if ($pos === false) {
             return "Keyword '{$keyword}' not found";
         }
-        
+
         $start = max(0, $pos - 200);
         $section = substr($html, $start, $maxLength);
-        
+
         return $section;
     }
 
@@ -362,14 +362,14 @@ class TestScraperController extends Controller
         try {
             $productCode = '5014415';
             $data = $this->scrapingService->getProductData($productCode);
-            
+
             return response()->json([
                 'success' => true,
                 'product_code' => $productCode,
                 'scraped_data' => $data,
-                'data_found' => !is_null($data),
+                'data_found' => ! is_null($data),
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -383,7 +383,7 @@ class TestScraperController extends Controller
     {
         try {
             $config = config('services.udea');
-            
+
             $client = new \GuzzleHttp\Client([
                 'base_uri' => $config['base_uri'] ?? 'https://www.udea.nl',
                 'timeout' => 10,
@@ -394,7 +394,7 @@ class TestScraperController extends Controller
                     'Accept-Encoding' => 'gzip, deflate',
                     'Connection' => 'keep-alive',
                     'Upgrade-Insecure-Requests' => '1',
-                ]
+                ],
             ]);
 
             $response = $client->get('/login');
@@ -414,7 +414,7 @@ class TestScraperController extends Controller
                 ],
                 'status_code' => $response->getStatusCode(),
                 'html_length' => strlen($html),
-                'html_preview' => substr($html, 0, 1500) . '...',
+                'html_preview' => substr($html, 0, 1500).'...',
                 'forms_found' => count($formMatches[0]),
                 'input_fields' => $inputMatches[1] ?? [],
                 'csrf_patterns' => [
@@ -422,7 +422,7 @@ class TestScraperController extends Controller
                     'csrf_token' => (bool) preg_match('/name=["\']csrf_token["\']/', $html),
                     'csrf_meta' => (bool) preg_match('/<meta name=["\']csrf-token["\']/', $html),
                 ],
-                'response_headers' => array_map(function($header) {
+                'response_headers' => array_map(function ($header) {
                     return implode(', ', $header);
                 }, $response->getHeaders()),
             ]);
@@ -468,7 +468,7 @@ class TestScraperController extends Controller
     {
         // Clear any existing cache for this product
         $this->scrapingService->clearCache($productCode);
-        
+
         $debugInfo = [
             'product_code' => $productCode,
             'timestamp' => now()->toISOString(),
@@ -501,20 +501,20 @@ class TestScraperController extends Controller
 
             // First ensure the service is authenticated by making a test call
             $testResult = $this->scrapingService->getProductData($productCode);
-            
+
             // Now manually get search results using the authenticated client
             $searchResponse = $serviceClient->get("/search/?qry={$productCode}");
             $searchHtml = (string) $searchResponse->getBody();
             $debugInfo['search_html_preview'] = substr($searchHtml, 0, 2000);
             $debugInfo['search_response_code'] = $searchResponse->getStatusCode();
-            
+
             // Check if we actually got search results or were redirected
             $debugInfo['search_contains_results'] = strpos($searchHtml, 'search-results') !== false || strpos($searchHtml, 'product-list') !== false;
             $debugInfo['search_title'] = '';
             if (preg_match('/<title>([^<]+)<\/title>/', $searchHtml, $titleMatches)) {
                 $debugInfo['search_title'] = $titleMatches[1];
             }
-            
+
             // Detect language version
             $debugInfo['dutch_detected'] = strpos($searchHtml, '/producten/product/') !== false;
             $debugInfo['english_detected'] = strpos($searchHtml, '/products/product/') !== false;
@@ -522,12 +522,12 @@ class TestScraperController extends Controller
             // Look for productsLists section marker
             if (strpos($searchHtml, 'id="productsLists"') !== false) {
                 $debugInfo['products_list_found'] = true;
-                
+
                 // Find content after productsLists marker
                 $productsListPos = strpos($searchHtml, 'id="productsLists"');
                 $contentAfterMarker = substr($searchHtml, $productsListPos);
                 $debugInfo['products_list_preview'] = substr($contentAfterMarker, 0, 3000);
-                
+
                 // Look for detail links after productsLists marker (both Dutch and English versions)
                 $detailLinkPattern = '/<a[^>]*href="(https:\/\/www\.udea\.nl\/product(?:en|s)\/product\/[^"]+)"[^>]*class="[^"]*detail-image[^"]*"/';
                 if (preg_match($detailLinkPattern, $contentAfterMarker, $matches)) {
@@ -546,37 +546,91 @@ class TestScraperController extends Controller
                         $debugInfo['customer_price'] = $priceMatches[1];
                     } else {
                         $debugInfo['errors'][] = 'Customer price pattern not found on detail page';
-                        
+
                         // Look for all instances of "Customer" or "Klant" to debug
                         if (preg_match_all('/(?:Customer|Klant)[^<]*/', $detailHtml, $customerMatches)) {
                             $debugInfo['customer_mentions'] = $customerMatches[0];
                         }
-                        
+
                         // Look for patterns around the 2,89 price to identify context
                         if (preg_match_all('/([^>]{0,50})2,89([^<]{0,50})/', $detailHtml, $contextMatches)) {
-                            $debugInfo['context_around_289'] = array_map(function($before, $after) {
-                                return trim($before) . ' [2,89] ' . trim($after);
+                            $debugInfo['context_around_289'] = array_map(function ($before, $after) {
+                                return trim($before).' [2,89] '.trim($after);
                             }, $contextMatches[1], $contextMatches[2]);
                         }
-                        
+
                         // Look for all price patterns to debug
                         if (preg_match_all('/[0-9]+,[0-9]{2}/', $detailHtml, $allPrices)) {
                             $debugInfo['all_prices_on_detail_page'] = array_unique($allPrices[0]);
                         }
                     }
+
+                    // Look for barcode/EAN extraction (testing all patterns)
+                    $debugInfo['barcode_extraction'] = [
+                        'barcode_found' => false,
+                        'barcode_value' => null,
+                        'pattern_used' => null,
+                        'patterns_tested' => [],
+                    ];
+
+                    // Pattern 1: HTML table format with class
+                    if (preg_match('/<td[^>]*class="[^"]*wt-semi[^"]*"[^>]*>(?:EAN|Barcode|GTIN)<\/td>\s*<td[^>]*>(\d{8,13})<\/td>/i', $detailHtml, $barcodeMatches)) {
+                        $debugInfo['barcode_extraction']['barcode_found'] = true;
+                        $debugInfo['barcode_extraction']['barcode_value'] = $barcodeMatches[1];
+                        $debugInfo['barcode_extraction']['pattern_used'] = 'html_table_with_class';
+                    }
+                    $debugInfo['barcode_extraction']['patterns_tested'][] = [
+                        'name' => 'html_table_with_class',
+                        'pattern' => '/<td[^>]*class="[^"]*wt-semi[^"]*"[^>]*>(?:EAN|Barcode|GTIN)<\/td>\s*<td[^>]*>(\d{8,13})<\/td>/i',
+                        'found' => $debugInfo['barcode_extraction']['barcode_found'],
+                    ];
+
+                    // Pattern 2: Simple table format (if not found yet)
+                    if (!$debugInfo['barcode_extraction']['barcode_found'] && preg_match('/<td[^>]*>(?:EAN|Barcode|GTIN)<\/td>\s*<td[^>]*>(\d{8,13})<\/td>/i', $detailHtml, $barcodeMatches)) {
+                        $debugInfo['barcode_extraction']['barcode_found'] = true;
+                        $debugInfo['barcode_extraction']['barcode_value'] = $barcodeMatches[1];
+                        $debugInfo['barcode_extraction']['pattern_used'] = 'simple_table';
+                    }
+                    $debugInfo['barcode_extraction']['patterns_tested'][] = [
+                        'name' => 'simple_table',
+                        'pattern' => '/<td[^>]*>(?:EAN|Barcode|GTIN)<\/td>\s*<td[^>]*>(\d{8,13})<\/td>/i',
+                        'found' => $debugInfo['barcode_extraction']['barcode_found'] && $debugInfo['barcode_extraction']['pattern_used'] === 'simple_table',
+                    ];
+
+                    // Pattern 3: Colon separated (if not found yet)
+                    if (!$debugInfo['barcode_extraction']['barcode_found'] && preg_match('/(?:EAN|Barcode):\s*(\d{8,13})/', $detailHtml, $barcodeMatches)) {
+                        $debugInfo['barcode_extraction']['barcode_found'] = true;
+                        $debugInfo['barcode_extraction']['barcode_value'] = $barcodeMatches[1];
+                        $debugInfo['barcode_extraction']['pattern_used'] = 'colon_separated';
+                    }
+                    $debugInfo['barcode_extraction']['patterns_tested'][] = [
+                        'name' => 'colon_separated',
+                        'pattern' => '/(?:EAN|Barcode):\s*(\d{8,13})/',
+                        'found' => $debugInfo['barcode_extraction']['barcode_found'] && $debugInfo['barcode_extraction']['pattern_used'] === 'colon_separated',
+                    ];
+
+                    // Debug: Find all EAN/Barcode mentions in HTML
+                    if (preg_match_all('/(?:EAN|Barcode|GTIN)[^<]{0,100}/', $detailHtml, $eanMentions)) {
+                        $debugInfo['barcode_extraction']['all_ean_mentions'] = array_slice($eanMentions[0], 0, 10);
+                    }
+
+                    // Debug: Find all table rows with td containing digits
+                    if (preg_match_all('/<tr[^>]*>.*?<td[^>]*>(?:EAN|Barcode|GTIN)[^<]*<\/td>\s*<td[^>]*>[^<]*<\/td>.*?<\/tr>/is', $detailHtml, $eanTableRows)) {
+                        $debugInfo['barcode_extraction']['ean_table_rows'] = array_slice($eanTableRows[0], 0, 5);
+                    }
                 } else {
                     $debugInfo['errors'][] = 'Detail URL pattern not found within productsLists section';
-                    
+
                     // Debug: show all href attributes after productsLists marker
                     if (preg_match_all('/href="([^"]*)"/', $contentAfterMarker, $allLinks)) {
                         $debugInfo['all_links_in_products_list'] = array_slice(array_unique($allLinks[1]), 0, 10);
                     }
-                    
+
                     // Debug: show all <a> tags after productsLists marker to see the structure
                     if (preg_match_all('/<a[^>]*>/', $contentAfterMarker, $allATags)) {
                         $debugInfo['all_a_tags_in_products_list'] = array_slice($allATags[0], 0, 5);
                     }
-                    
+
                     // Debug: look for any links containing 'product'
                     if (preg_match_all('/href="([^"]*product[^"]*)"/', $contentAfterMarker, $productLinks)) {
                         $debugInfo['product_links_found'] = array_unique($productLinks[1]);
@@ -585,17 +639,17 @@ class TestScraperController extends Controller
             } else {
                 $debugInfo['products_list_found'] = false;
                 $debugInfo['errors'][] = 'productsLists section not found in search results';
-                
+
                 // Debug: show all href attributes to see what links are available
                 if (preg_match_all('/href="([^"]*)"/', $searchHtml, $allLinks)) {
                     $debugInfo['all_links_found'] = array_slice(array_unique($allLinks[1]), 0, 20);
                 }
-                
+
                 // Debug: look for detail-image classes
                 if (preg_match_all('/class="[^"]*detail-image[^"]*"/', $searchHtml, $detailImageClasses)) {
                     $debugInfo['detail_image_classes'] = $detailImageClasses[0];
                 }
-                
+
                 // Debug: look for any div with id attribute
                 if (preg_match_all('/<div[^>]*id="([^"]*)"/', $searchHtml, $divIds)) {
                     $debugInfo['all_div_ids'] = array_unique($divIds[1]);
@@ -603,7 +657,7 @@ class TestScraperController extends Controller
             }
 
         } catch (\Exception $e) {
-            $debugInfo['errors'][] = 'Exception: ' . $e->getMessage();
+            $debugInfo['errors'][] = 'Exception: '.$e->getMessage();
         }
 
         return view('tests.customer-price-debug', compact('debugInfo'));

@@ -15,7 +15,9 @@ class ScrapeProductDataJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $timeout = 120;
+
     public int $tries = 3;
+
     public int $backoff = 60;
 
     public function __construct(
@@ -93,7 +95,7 @@ class ScrapeProductDataJob implements ShouldQueue
             ];
 
             $client = new \GuzzleHttp\Client(['timeout' => 10]);
-            
+
             $response = $client->post($this->callbackUrl, [
                 'json' => $payload,
                 'headers' => [

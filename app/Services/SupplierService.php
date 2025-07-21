@@ -25,7 +25,7 @@ class SupplierService
      */
     public function hasExternalIntegration(?int $supplierId): bool
     {
-        if (!$supplierId) {
+        if (! $supplierId) {
             return false;
         }
 
@@ -44,25 +44,45 @@ class SupplierService
     public function getExternalImageUrl(Product $product): ?string
     {
         try {
-            if (!$product->supplier || !$product->CODE) {
+            if (! $product->supplier || ! $product->CODE) {
                 return null;
             }
 
             $supplierId = (int) $product->supplier->SupplierID;
-            $config = $this->getSupplierConfig($supplierId);
+            return $this->getExternalImageUrlByBarcode($supplierId, $product->CODE);
+        } catch (\Exception $e) {
+            // Log error but don't expose it to users
+            \Log::error('Error generating external image URL: '.$e->getMessage());
 
-            if (!$config || !$config['enabled']) {
+            return null;
+        }
+    }
+
+    /**
+     * Get the external image URL using supplier ID and barcode directly.
+     */
+    public function getExternalImageUrlByBarcode(int $supplierId, ?string $barcode): ?string
+    {
+        try {
+            if (!$barcode) {
                 return null;
             }
 
-            // Sanitize the product code to prevent URL injection
-            $code = preg_replace('/[^a-zA-Z0-9_-]/', '', $product->CODE);
-            
-            // Replace {CODE} with the actual product code
+            $config = $this->getSupplierConfig($supplierId);
+
+            if (! $config || ! $config['enabled']) {
+                return null;
+            }
+
+            // Sanitize the barcode to prevent URL injection
+            $code = preg_replace('/[^a-zA-Z0-9_-]/', '', $barcode);
+
+            // Replace {CODE} with the actual barcode
             return str_replace('{CODE}', $code, $config['image_url']);
         } catch (\Exception $e) {
             // Log error but don't expose it to users
-            \Log::error('Error generating external image URL: ' . $e->getMessage());
+            \Log::error('Error generating external image URL by barcode: '.$e->getMessage());
+
             return null;
         }
     }
@@ -73,25 +93,26 @@ class SupplierService
     public function getSupplierWebsiteLink(Product $product): ?string
     {
         try {
-            if (!$product->supplier || !$product->supplierLink) {
+            if (! $product->supplier || ! $product->supplierLink) {
                 return null;
             }
 
             $supplierId = (int) $product->supplier->SupplierID;
             $config = $this->getSupplierConfig($supplierId);
 
-            if (!$config || !$config['enabled'] || !$product->supplierLink->SupplierCode) {
+            if (! $config || ! $config['enabled'] || ! $product->supplierLink->SupplierCode) {
                 return null;
             }
 
             // URL encode the supplier code to handle special characters
             $supplierCode = urlencode($product->supplierLink->SupplierCode);
-            
+
             // Replace {SUPPLIER_CODE} with the actual supplier code
             return str_replace('{SUPPLIER_CODE}', $supplierCode, $config['website_search']);
         } catch (\Exception $e) {
             // Log error but don't expose it to users
-            \Log::error('Error generating supplier website link: ' . $e->getMessage());
+            \Log::error('Error generating supplier website link: '.$e->getMessage());
+
             return null;
         }
     }
@@ -125,7 +146,7 @@ class SupplierService
      */
     public function isUdeaProduct(Product $product): bool
     {
-        if (!$product->supplier) {
+        if (! $product->supplier) {
             return false;
         }
 

@@ -13,8 +13,7 @@ class SalesRepository
      * Get sales history for a product with improved month names.
      * Limited to last 4 months for better performance.
      *
-     * @param string $productId
-     * @param int $monthsBack Number of months to retrieve (default 4)
+     * @param  int  $monthsBack  Number of months to retrieve (default 4)
      * @return array
      */
     public function getProductSalesHistory(string $productId, int $monthsBack = 4)
@@ -27,7 +26,7 @@ class SalesRepository
             $monthDate = $currentDate->copy()->subMonths($i);
             $monthKey = $monthDate->format('Y-m');
             $monthLabel = $monthDate->format('F Y');
-            
+
             $salesData[$monthKey] = [
                 'month' => $monthLabel,
                 'units' => 0,
@@ -61,7 +60,6 @@ class SalesRepository
     /**
      * Get sales statistics for a product.
      *
-     * @param string $productId
      * @return array
      */
     public function getProductSalesStatistics(string $productId)
@@ -116,9 +114,6 @@ class SalesRepository
     /**
      * Get top selling products for a given period.
      *
-     * @param Carbon $startDate
-     * @param Carbon $endDate
-     * @param int $limit
      * @return \Illuminate\Support\Collection
      */
     public function getTopSellingProducts(Carbon $startDate, Carbon $endDate, int $limit = 10)
@@ -135,9 +130,6 @@ class SalesRepository
 
     /**
      * Check if a product has any sales history.
-     *
-     * @param string $productId
-     * @return bool
      */
     public function hasProductSales(string $productId): bool
     {

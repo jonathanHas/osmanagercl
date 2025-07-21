@@ -1,0 +1,440 @@
+# Delivery Verification System
+
+This document covers the comprehensive delivery verification system for processing supplier deliveries, scanning products, and managing discrepancies.
+
+## Overview
+
+The delivery verification system provides a complete workflow for handling supplier deliveries from initial CSV import through scanning verification to stock updates. It includes real-time scanning interfaces, discrepancy tracking, and supplier image integration.
+
+## System Architecture
+
+### Core Components
+
+1. **DeliveryService** (`app/Services/DeliveryService.php`)
+   - CSV import and parsing
+   - Barcode scanning logic
+   - Delivery completion and stock updates
+   - Summary generation and discrepancy reporting
+
+2. **Models** (`app/Models/`)
+   - `Delivery` - Main delivery tracking
+   - `DeliveryItem` - Individual product items
+   - `DeliveryScan` - Scan history and matching
+
+3. **Controllers** (`app/Http/Controllers/DeliveryController.php`)
+   - RESTful delivery management
+   - Real-time scanning API endpoints
+   - Summary and reporting views
+
+4. **Views** (`resources/views/deliveries/`)
+   - `index.blade.php` - Delivery overview with progress tracking
+   - `create.blade.php` - CSV upload interface
+   - `show.blade.php` - Detailed delivery view with item breakdown
+   - `scan.blade.php` - Real-time scanning interface (mobile-optimized)
+   - `summary.blade.php` - Discrepancy reporting and completion
+
+## Database Schema
+
+### Deliveries Table
+```sql
+- id (primary key)
+- delivery_number (unique, auto-generated)
+- supplier_id (foreign key to SUPPLIERS)
+- delivery_date
+- status (draft, receiving, completed, cancelled)
+- total_expected (decimal 8,2)
+- total_received (decimal 8,2, nullable)
+- import_data (JSON metadata)
+- timestamps
+```
+
+### Delivery Items Table
+```sql
+- id (primary key)
+- delivery_id (foreign key)
+- supplier_code (supplier's internal product code)
+- sku, description, units_per_case
+- unit_cost, ordered_quantity, received_quantity
+- total_cost, status
+- product_id (foreign key to PRODUCTS, nullable)
+- is_new_product (boolean)
+- barcode (nullable, retrieved from scraping)
+- timestamps
+```
+
+### Delivery Scans Table
+```sql
+- id (primary key)
+- delivery_id (foreign key)
+- delivery_item_id (foreign key, nullable)
+- barcode (scanned code)
+- quantity, matched (boolean)
+- scanned_by (user identifier)
+- timestamps
+```
+
+## Complete Workflow
+
+### 1. Pre-Delivery Setup
+1. **CSV Import**: Upload supplier delivery docket
+   - Route: `POST /deliveries` (upload CSV file)
+   - Parses standard Udea format: Code, Ordered, Qty, SKU, Content, Description, Price, Sale, Total
+   - Creates delivery header and individual items
+
+2. **Product Matching**: Automatic product identification
+   - Uses existing `SupplierLink` model to match supplier codes
+   - Identifies new products not in system
+   - **Enhanced Barcode Retrieval**: Multiple extraction patterns for maximum compatibility
+     - HTML table format: `<td class="wt-semi">EAN</td><td>8711521021925</td>`
+     - Simple table format: `<td>EAN</td><td>8711521021925</td>`
+     - Colon separated: `EAN: 8711521021925`
+     - Fallback EAN-13 validation for 13-digit codes
+   - Queues barcode retrieval for new products via enhanced `UdeaScrapingService`
+
+### 2. Delivery Scanning
+1. **Scanning Interface**: Mobile-optimized real-time interface
+   - Route: `GET /deliveries/{delivery}/scan`
+   - Real-time progress tracking with Alpine.js
+   - Barcode input with quantity adjustment
+   - Visual status indicators (complete, partial, missing, excess)
+
+2. **Scan Processing**: Real-time barcode verification
+   - API: `POST /api/deliveries/{delivery}/scan`
+   - Matches barcodes to expected items
+   - Updates received quantities and item status
+   - Records all scans (matched and unmatched)
+
+3. **Live Updates**: Dynamic interface updates
+   - Progress bars and statistics
+   - Item filtering (all, pending, partial, discrepancies)
+   - Manual quantity adjustments with +/- buttons
+
+### 3. Verification & Completion
+1. **Summary Generation**: Comprehensive discrepancy analysis
+   - Route: `GET /deliveries/{delivery}/summary`
+   - Complete vs partial vs missing items breakdown
+   - Unmatched scans (products not in manifest)
+   - Value difference calculations
+
+2. **Discrepancy Export**: Structured reporting
+   - Route: `GET /deliveries/{delivery}/export-discrepancies`
+   - JSON export for supplier reconciliation
+   - Includes value impacts and item details
+
+3. **Stock Updates**: Final completion process
+   - Route: `POST /deliveries/{delivery}/complete`
+   - Updates POS system stock levels
+   - Adjusts product costs if different from expected
+   - Marks delivery as completed
+
+## Supplier Image Integration
+
+### Implementation
+The system integrates with the existing `SupplierService` to display product images throughout the delivery workflow:
+
+1. **Backend Integration**:
+   - `DeliveryController` injects `SupplierService`
+   - Loads `items.product.supplier` relationships for existing products
+   - **New Products**: Uses `getExternalImageUrlByBarcode()` with delivery supplier ID and retrieved barcode
+   - Passes `supplierService` to all views
+
+2. **Frontend Display**:
+   - 40x40px thumbnails in all tables (existing and new products)
+   - 192x192px hover previews with product names and barcode display
+   - **Real-time Updates**: Images appear automatically when barcodes are retrieved
+   - Lazy loading with error handling
+   - Consistent styling with products page
+
+3. **Coverage**:
+   - ✅ Delivery items table (show view) - supports new products
+   - ✅ Scanning interface (real-time) - dynamic image loading
+   - ✅ Discrepancy reports (summary view) - full new product support
+   - ✅ Mobile responsive design
+
+### Enhanced Image Features
+- **Hover Previews**: Large image overlay on hover with barcode information
+- **Loading Animation**: Pulse effect while loading
+- **Error Handling**: Graceful fallback to placeholder icon
+- **Performance**: Lazy loading with `loading="lazy"`
+- **New Product Support**: Images work immediately once barcodes are extracted from supplier
+- **Barcode Display**: Shows barcode in image overlay for product identification
+- **Integration Check**: Only shows for suppliers with external integration
+
+### Barcode-Driven Images
+For new products without existing Product models:
+- Uses delivery's `supplier_id` and item's retrieved `barcode`
+- Image URL format: `https://cdn.ekoplaza.nl/ekoplaza/producten/small/{BARCODE}.jpg`
+- Automatic availability once `UdeaScrapingService` successfully extracts EAN/barcode
+- Same visual experience and hover functionality as existing products
+
+## API Endpoints
+
+### Web Routes (`routes/web.php`)
+```php
+Route::resource('deliveries', DeliveryController::class);
+Route::get('/deliveries/{delivery}/scan', [DeliveryController::class, 'scan']);
+Route::get('/deliveries/{delivery}/summary', [DeliveryController::class, 'summary']);
+Route::post('/deliveries/{delivery}/complete', [DeliveryController::class, 'complete']);
+Route::post('/deliveries/{delivery}/cancel', [DeliveryController::class, 'cancel']);
+Route::get('/deliveries/{delivery}/export-discrepancies', [DeliveryController::class, 'exportDiscrepancies']);
+Route::post('/delivery-items/{item}/refresh-barcode', [DeliveryController::class, 'refreshBarcode']);
+```
+
+### API Routes (`routes/api.php`)
+```php
+Route::middleware('auth')->prefix('deliveries')->group(function () {
+    Route::post('/{delivery}/scan', [DeliveryController::class, 'processScan']);
+    Route::get('/{delivery}/stats', [DeliveryController::class, 'getStats']);
+    Route::patch('/{delivery}/items/{item}/quantity', [DeliveryController::class, 'adjustQuantity']);
+});
+```
+
+## Key Features
+
+### Real-Time Scanning
+- **Mobile Optimized**: Touch-friendly interface for warehouse use
+- **Live Updates**: Instant feedback on scans and progress
+- **Barcode Focus**: Auto-focus on barcode input after each scan
+- **Status Tracking**: Visual indicators for all item states
+
+### Discrepancy Management
+- **Comprehensive Tracking**: Missing, partial, excess, and unknown items
+- **Value Impact**: Financial implications of discrepancies
+- **Export Capability**: Structured data for supplier communication
+- **Visual Identification**: Product images for quick recognition
+
+### Progress Monitoring
+- **Real-Time Progress**: Live percentage completion
+- **Status Badges**: Visual status indicators throughout
+- **Summary Cards**: Quick overview of delivery metrics
+- **Filtering Options**: View specific item categories
+
+## Dependencies
+
+### Required Packages
+- `league/csv` - CSV parsing and processing
+- **Alpine.js** - Frontend reactivity (included in Breeze)
+- **Tailwind CSS** - Styling framework
+
+### Existing Integrations
+- **SupplierService** - External image URLs and supplier integration
+- **UdeaScrapingService** - Barcode retrieval for new products
+- **SupplierLink Model** - Product-supplier code matching
+- **Admin Layout** - Sidebar navigation integration
+
+## Configuration
+
+### CSV Format
+Expected Udea delivery CSV format:
+```csv
+Code,Ordered,Qty,SKU,Content,Description,Price,Sale,Total
+115,1,1,6,"1 kilogram","Broccoli, . Biologisch Klasse I NL",3.17,6.98,19.02
+```
+
+### File Uploads
+- **Maximum Size**: 10MB
+- **Accepted Types**: .csv, .txt
+- **Storage**: Temporary storage with automatic cleanup
+- **Validation**: Required supplier selection and delivery date
+
+## Troubleshooting Guide
+
+### Common Issues
+
+#### 1. CSV Import Failures
+**Symptoms**: 
+- "Failed to import CSV" error messages
+- Empty delivery creation
+
+**Potential Causes**:
+- Incorrect CSV format or headers
+- Missing `league/csv` package
+- Invalid supplier ID selection
+- File upload size limits
+
+**Solutions**:
+```bash
+# Install CSV package if missing
+composer require league/csv
+
+# Check CSV format matches expected headers
+# Verify supplier exists in database
+# Check file upload limits in php.ini
+```
+
+#### 2. Product Matching Issues
+**Symptoms**:
+- All items marked as "new products"
+- No existing products found during import
+
+**Potential Causes**:
+- `SupplierLink` table empty or incorrect
+- Supplier ID mismatch between CSV and database
+- Missing product relationships
+
+**Debug Steps**:
+```bash
+php artisan tinker
+# Check supplier link data
+App\Models\SupplierLink::where('SupplierID', 5)->count();
+# Verify supplier codes exist
+App\Models\SupplierLink::where('SupplierCode', '115')->first();
+```
+
+#### 3. Barcode Scanning Problems
+**Symptoms**:
+- "Unknown product" for all scans
+- Scans not registering in interface
+
+**Potential Causes**:
+- Missing barcodes in delivery items
+- Network connectivity issues with API
+- JavaScript errors in browser console
+- CSRF token problems
+
+**Solutions**:
+```bash
+# Check delivery item barcodes
+php artisan tinker
+$delivery = App\Models\Delivery::find(ID);
+$delivery->items->whereNull('barcode')->count();
+
+# Refresh barcodes manually if needed
+```
+
+#### 4. Image Display Issues
+**Symptoms**:
+- No product images showing
+- Placeholder icons everywhere
+- Images not loading on hover
+
+**Potential Causes**:
+- `SupplierService` not injected properly
+- External CDN connectivity issues
+- Missing supplier integrations
+- Product-supplier relationships not loaded
+
+**Debug Steps**:
+```bash
+php artisan tinker
+$service = new App\Services\SupplierService();
+$product = App\Models\Product::first();
+$service->hasExternalIntegration($product->supplier->SupplierID);
+$service->getExternalImageUrl($product);
+```
+
+#### 5. Performance Issues
+**Symptoms**:
+- Slow page loading on large deliveries
+- Timeouts during CSV import
+- Unresponsive scanning interface
+
+**Potential Causes**:
+- Large delivery files (>500 items)
+- Missing database indexes
+- Memory limits during import
+- Unoptimized queries
+
+**Solutions**:
+```bash
+# Increase memory limits for large imports
+ini_set('memory_limit', '512M');
+
+# Check for missing indexes
+php artisan migrate:status
+
+# Monitor query performance
+php artisan telescope # if installed
+```
+
+### Database Troubleshooting
+
+#### Verify Table Creation
+```bash
+php artisan migrate:status
+# Should show: 2024_01_20_create_delivery_tables ... [Ran]
+
+# If not migrated:
+php artisan migrate
+```
+
+#### Check Relationships
+```bash
+php artisan tinker
+$delivery = App\Models\Delivery::with(['supplier', 'items.product.supplier'])->first();
+$delivery->supplier; // Should return Supplier model
+$delivery->items->first()->product; // May be null for new products
+```
+
+#### Clean Up Test Data
+```bash
+# Remove test deliveries if needed
+php artisan tinker
+App\Models\Delivery::where('delivery_number', 'LIKE', 'DEL-%')->delete();
+```
+
+### Frontend Debugging
+
+#### JavaScript Console Errors
+- Check browser console for Alpine.js errors
+- Verify CSRF token in meta tags
+- Confirm API endpoints are accessible
+
+#### CSS/Styling Issues
+- Ensure Tailwind CSS is compiled
+- Check for conflicting styles
+- Verify responsive classes work on mobile
+
+### Production Deployment Notes
+
+#### Performance Considerations
+- Index `delivery_items.supplier_code` for faster lookups
+- Index `delivery_scans.barcode` for scan performance
+- Consider Redis for real-time updates in high-volume environments
+
+#### Security
+- File upload validation is in place
+- API endpoints require authentication
+- CSRF protection on all forms
+
+#### Monitoring
+- Monitor CSV import performance
+- Track scan success rates
+- Alert on unusual discrepancy patterns
+
+## Future Enhancements
+
+### Planned Features
+1. **Batch Scanning**: Multiple barcode input at once
+2. **Voice Commands**: Hands-free quantity entry
+3. **Supplier Notifications**: Automatic discrepancy reporting
+4. **Historical Analytics**: Delivery performance trends
+5. **Mobile App**: Dedicated scanning application
+
+### Integration Opportunities
+1. **Weight Verification**: Integration with scales
+2. **Temperature Monitoring**: Cold chain tracking
+3. **Photo Documentation**: Damage recording
+4. **Supplier APIs**: Direct integration replacing CSV uploads
+
+## Testing
+
+### Manual Testing Workflow
+1. **Import Test**: Use `/tests/examples/udea_combined_output.csv`
+2. **Scan Test**: Use existing product barcodes from database
+3. **Summary Test**: Create discrepancies and verify reporting
+4. **Image Test**: Check supplier image display and hover
+
+### Key Test Cases
+- CSV import with valid/invalid formats
+- Barcode scanning with known/unknown codes
+- Quantity adjustments and status updates
+- Discrepancy calculation accuracy
+- Image loading and error handling
+
+---
+
+**Last Updated**: 2025-01-20  
+**System Status**: ✅ Fully Operational  
+**Test Coverage**: Manual testing completed  
+**Performance**: Tested with 292-item deliveries

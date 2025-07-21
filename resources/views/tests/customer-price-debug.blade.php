@@ -176,6 +176,62 @@
             </div>
         @endif
 
+        @if($debugInfo['detail_url_found'] && isset($debugInfo['barcode_extraction']))
+            <div class="section {{ $debugInfo['barcode_extraction']['barcode_found'] ? 'success' : 'warning' }}">
+                <h2>Step 3: Barcode/EAN Extraction</h2>
+                <table>
+                    <tr><th>Barcode Found</th><td class="{{ $debugInfo['barcode_extraction']['barcode_found'] ? 'status-good' : 'status-bad' }}">{{ $debugInfo['barcode_extraction']['barcode_found'] ? 'YES' : 'NO' }}</td></tr>
+                    @if($debugInfo['barcode_extraction']['barcode_found'])
+                        <tr><th>Barcode Value</th><td class="status-good">{{ $debugInfo['barcode_extraction']['barcode_value'] }}</td></tr>
+                        <tr><th>Pattern Used</th><td class="status-good">{{ $debugInfo['barcode_extraction']['pattern_used'] }}</td></tr>
+                    @endif
+                </table>
+
+                <h3>🔍 Barcode Extraction Patterns Tested</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Pattern Name</th>
+                            <th>Found</th>
+                            <th>Regular Expression</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($debugInfo['barcode_extraction']['patterns_tested'] as $pattern)
+                            <tr class="{{ $pattern['found'] ? 'status-good' : '' }}">
+                                <td>{{ $pattern['name'] }}</td>
+                                <td class="{{ $pattern['found'] ? 'status-good' : 'status-bad' }}">{{ $pattern['found'] ? 'MATCH' : 'NO MATCH' }}</td>
+                                <td class="code-block" style="font-size: 10px; word-break: break-all;">{{ $pattern['pattern'] }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+
+                @if(isset($debugInfo['barcode_extraction']['all_ean_mentions']) && !empty($debugInfo['barcode_extraction']['all_ean_mentions']))
+                    <h3>🔍 Debug: All EAN/Barcode Mentions Found</h3>
+                    <div class="code-block">
+                        @foreach($debugInfo['barcode_extraction']['all_ean_mentions'] as $mention)
+                            <div style="margin: 3px 0; padding: 3px; background: #f0f0f0; border-left: 3px solid #007bff;">{{ $mention }}</div>
+                        @endforeach
+                    </div>
+                @endif
+
+                @if(isset($debugInfo['barcode_extraction']['ean_table_rows']) && !empty($debugInfo['barcode_extraction']['ean_table_rows']))
+                    <h3>🔍 Debug: EAN Table Rows Found</h3>
+                    <div class="code-block">
+                        @foreach($debugInfo['barcode_extraction']['ean_table_rows'] as $row)
+                            <div style="margin: 5px 0; padding: 5px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 3px;">{{ htmlspecialchars($row) }}</div>
+                        @endforeach
+                    </div>
+                @endif
+
+                @if(!$debugInfo['barcode_extraction']['barcode_found'])
+                    <h3>🔍 Debug: HTML Context Search</h3>
+                    <p>Look for the EAN value <strong>8711521021925</strong> in the detail page HTML preview below to identify the correct pattern.</p>
+                @endif
+            </div>
+        @endif
+
         <div class="section info">
             <h2>Complete Scraping Result</h2>
             @if($debugInfo['all_data'])

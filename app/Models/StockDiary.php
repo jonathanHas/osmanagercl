@@ -64,9 +64,13 @@ class StockDiary extends Model
      * Reason codes for stock movements.
      */
     const REASON_SALE = -1;
+
     const REASON_PURCHASE = 1;
+
     const REASON_MOVEMENT = 2;
+
     const REASON_ADJUSTMENT = 3;
+
     const REASON_RETURN = 4;
 
     /**

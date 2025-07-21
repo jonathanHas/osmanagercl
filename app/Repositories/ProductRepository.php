@@ -17,13 +17,13 @@ class ProductRepository
     public function getAllProducts(int $perPage = 20, bool $withSuppliers = false): LengthAwarePaginator
     {
         $query = Product::query();
-        
+
         if ($withSuppliers) {
             $query->with(['stockCurrent', 'taxCategory', 'tax', 'supplierLink', 'supplier']);
         } else {
             $query->with(['stockCurrent', 'taxCategory', 'tax']);
         }
-        
+
         return $query->orderBy('NAME')->paginate($perPage);
     }
 
@@ -107,7 +107,7 @@ class ProductRepository
         // For any supplier filtering, use an optimized strategy that pre-filters by supplier first
         if ($supplierId) {
             return $this->searchProductsWithSupplierOptimized(
-                $search, $activeOnly, $stockedOnly, $inStockOnly, 
+                $search, $activeOnly, $stockedOnly, $inStockOnly,
                 $categoryId, $supplierId, $perPage, $withSuppliers
             );
         }
@@ -127,7 +127,7 @@ class ProductRepository
         if ($inStockOnly === true) {
             // For in-stock filtering, use JOIN for better performance when no supplier filter
             $query->join('STOCKCURRENT', 'PRODUCTS.ID', '=', 'STOCKCURRENT.PRODUCT')
-                  ->where('STOCKCURRENT.UNITS', '>', 0);
+                ->where('STOCKCURRENT.UNITS', '>', 0);
         } elseif ($stockedOnly === true) {
             // For stocked filtering, use JOIN for better performance when no supplier filter
             $query->join('stocking', 'PRODUCTS.CODE', '=', 'stocking.Barcode');
@@ -137,9 +137,9 @@ class ProductRepository
         if ($supplierId) {
             $query->whereExists(function ($q) use ($supplierId) {
                 $q->select(DB::raw(1))
-                  ->from('supplier_link')
-                  ->whereRaw('supplier_link.Barcode = PRODUCTS.CODE')
-                  ->where('supplier_link.SupplierID', $supplierId);
+                    ->from('supplier_link')
+                    ->whereRaw('supplier_link.Barcode = PRODUCTS.CODE')
+                    ->where('supplier_link.SupplierID', $supplierId);
             });
         }
 
@@ -153,7 +153,7 @@ class ProductRepository
         } else {
             $query->with(['stockCurrent', 'taxCategory', 'tax']);
         }
-        
+
         return $query->orderBy('NAME')->paginate($perPage);
     }
 
@@ -193,9 +193,9 @@ class ProductRepository
         if ($inStockOnly === true) {
             $query->whereExists(function ($q) {
                 $q->select(DB::raw(1))
-                  ->from('STOCKCURRENT')
-                  ->whereRaw('STOCKCURRENT.PRODUCT = PRODUCTS.ID')
-                  ->where('STOCKCURRENT.UNITS', '>', 0);
+                    ->from('STOCKCURRENT')
+                    ->whereRaw('STOCKCURRENT.PRODUCT = PRODUCTS.ID')
+                    ->where('STOCKCURRENT.UNITS', '>', 0);
             });
         } elseif ($stockedOnly === true) {
             // Since we already have supplier products, filter stocking records by these barcodes first
@@ -203,7 +203,7 @@ class ProductRepository
                 ->table('stocking')
                 ->whereIn('Barcode', $supplierProducts)
                 ->pluck('Barcode');
-            
+
             $query->whereIn('CODE', $stockedBarcodes);
         }
 
@@ -217,7 +217,7 @@ class ProductRepository
         } else {
             $query->with(['stockCurrent', 'taxCategory', 'tax']);
         }
-        
+
         return $query->orderBy('NAME')->paginate($perPage);
     }
 
@@ -268,12 +268,12 @@ class ProductRepository
     public function getLowStockProducts(float $threshold = 10, int $limit = 10): Collection
     {
         return Product::whereExists(function ($q) use ($threshold) {
-                $q->select(DB::raw(1))
-                  ->from('STOCKCURRENT')
-                  ->whereRaw('STOCKCURRENT.PRODUCT = PRODUCTS.ID')
-                  ->where('STOCKCURRENT.UNITS', '>', 0)
-                  ->where('STOCKCURRENT.UNITS', '<=', $threshold);
-            })
+            $q->select(DB::raw(1))
+                ->from('STOCKCURRENT')
+                ->whereRaw('STOCKCURRENT.PRODUCT = PRODUCTS.ID')
+                ->where('STOCKCURRENT.UNITS', '>', 0)
+                ->where('STOCKCURRENT.UNITS', '<=', $threshold);
+        })
             ->where('ISSERVICE', 0)
             ->with(['stockCurrent'])
             ->limit($limit)
@@ -313,7 +313,7 @@ class ProductRepository
         ?bool $activeOnly = null
     ): SupportCollection {
         // If no filters are applied, use the simple query
-        if (!$stockedOnly && !$inStockOnly && !$activeOnly) {
+        if (! $stockedOnly && ! $inStockOnly && ! $activeOnly) {
             return DB::connection('pos')
                 ->table('suppliers')
                 ->join('supplier_link', 'suppliers.SupplierID', '=', 'supplier_link.SupplierID')

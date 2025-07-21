@@ -202,8 +202,8 @@ class Product extends Model
         // Using EXISTS avoids Cartesian products when combined with other filters
         return $query->whereExists(function ($q) {
             $q->select(\DB::raw(1))
-              ->from('stocking')
-              ->whereRaw('stocking.Barcode = PRODUCTS.CODE');
+                ->from('stocking')
+                ->whereRaw('stocking.Barcode = PRODUCTS.CODE');
         });
     }
 
@@ -234,9 +234,9 @@ class Product extends Model
         // Using EXISTS avoids Cartesian products when combined with other filters
         return $query->whereExists(function ($q) {
             $q->select(\DB::raw(1))
-              ->from('STOCKCURRENT')
-              ->whereRaw('STOCKCURRENT.PRODUCT = PRODUCTS.ID')
-              ->where('STOCKCURRENT.UNITS', '>', 0);
+                ->from('STOCKCURRENT')
+                ->whereRaw('STOCKCURRENT.PRODUCT = PRODUCTS.ID')
+                ->where('STOCKCURRENT.UNITS', '>', 0);
         });
     }
 

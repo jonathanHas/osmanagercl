@@ -126,6 +126,14 @@ php artisan view:clear
 - **Frontend**: Server-side rendered Blade templates with Tailwind CSS styling
 - **Asset Pipeline**: Vite handles CSS and JavaScript compilation with hot reloading
 
+### Development Best Practices
+- **Always Use Eloquent Models**: Check for existing models before accessing database tables directly
+  - Use `exists:App\Models\ModelName,column` in validation rules instead of `exists:table_name,column`
+  - Models handle database connections, table names, and configurations automatically
+  - Example: Use `exists:App\Models\Supplier,SupplierID` not `exists:SUPPLIERS,SupplierID`
+- **Follow Laravel Conventions**: Leverage Eloquent relationships and model configurations
+- **Database Access**: Prefer model-based queries over raw database calls for consistency
+
 ### Configuration
 - Database configured for SQLite in `.env`
 - Vite configuration in `vite.config.js` handles asset compilation
@@ -263,6 +271,7 @@ The application includes external supplier integration for product images and we
 - **Supplier Website Links**: Direct links to search products on supplier websites
 - **Product List Integration**: When "Show suppliers" is checked, shows thumbnails and links
 - **Product Detail Integration**: Dedicated supplier information section with larger images
+- **Delivery Integration**: Product images throughout delivery verification workflow with hover previews
 
 ### Configuration
 - Config file: `config/suppliers.php`
@@ -271,11 +280,33 @@ The application includes external supplier integration for product images and we
 - Currently configured for Udea (supplier IDs: 5, 44, 85)
 
 ### Implementation Details
+- **Live Price Comparison**: Real-time pricing data from Udea with automatic cost calculations
+- **VAT-Inclusive Pricing**: Input selling prices including VAT with automatic net price calculation
+- **High Precision Storage**: Prices stored with 4 decimal precision to preserve VAT calculations
+- **Transport Cost Analysis**: 15% transport cost calculations for accurate margin analysis
+- **Customer Price Extraction**: Retrieves retail prices from supplier product detail pages
+- **Enhanced Barcode Extraction**: Multiple regex patterns support various HTML formats including table structures
+- **Responsive Layout**: Mobile-optimized pricing interface with collapsible sections
+- **Hover Previews**: Large image overlays on hover (192x192px) with product information
+- **New Product Image Support**: Images work immediately for new products once barcodes are retrieved
 - Images use lazy loading with `loading="lazy"` attribute
 - Graceful error handling for missing images
 - URL sanitization for security
-- Responsive design for mobile devices
-- Performance optimized with loading animations
+
+### Barcode Extraction Patterns
+The `UdeaScrapingService` supports multiple barcode extraction patterns for maximum compatibility:
+
+1. **HTML Table Format with Class**: `<td class="wt-semi">EAN</td><td>8711521021925</td>`
+2. **Simple Table Format**: `<td>EAN</td><td>8711521021925</td>`
+3. **Colon Separated Format**: `EAN: 8711521021925`
+4. **Fallback EAN-13 Pattern**: Validates 13-digit codes starting with '87'
+
+### New Product Image Integration
+For products without existing Product models (new deliveries):
+- `SupplierService::getExternalImageUrlByBarcode()` generates image URLs using supplier ID + barcode
+- Delivery views automatically show images once barcodes are retrieved
+- Same hover preview functionality as existing products
+- Barcode displayed in image overlay for identification
 
 ### Adding New Suppliers
 To add a new supplier integration, update `config/suppliers.php`:
@@ -336,7 +367,75 @@ Extended Tailwind config (`tailwind.config.js`) with:
 The admin sidebar includes:
 - Dashboard (home icon)
 - Products (package icon)
+- Deliveries (delivery box icon) - Complete delivery verification system
 - Users (users icon) - placeholder for future implementation
 - Settings (cog icon) - placeholder for future implementation
 
 Each navigation item shows active state with gray-800 background when on that route.
+
+## Delivery Verification System
+
+The application includes a comprehensive delivery verification system for processing supplier deliveries:
+
+### Features
+- **CSV Import**: Upload delivery dockets from suppliers (Udea format supported)
+- **Real-time Scanning**: Mobile-optimized barcode scanning interface with Alpine.js
+- **Progress Tracking**: Live delivery completion monitoring with visual indicators
+- **Discrepancy Management**: Automatic detection and reporting of quantity differences
+- **Stock Updates**: Final stock level updates upon delivery completion
+- **Visual Product Identification**: Supplier images with hover previews throughout workflow
+- **Export Capability**: JSON export of discrepancies for supplier reconciliation
+
+### Workflow
+1. **Import**: Upload CSV delivery file → automatic product matching → barcode retrieval for new products
+2. **Scan**: Real-time barcode verification → quantity tracking → status updates → manual adjustments
+3. **Review**: Discrepancy analysis → export reports → complete delivery and update stock
+
+### Access
+- **Sidebar Navigation**: Click "Deliveries" in admin sidebar
+- **Main Features**: Import deliveries, scan products, track progress, manage discrepancies
+- **Documentation**: See `docs/delivery-verification-system.md` for complete technical guide
+
+### Database Tables
+- `deliveries` - Main delivery tracking with supplier and status information
+- `delivery_items` - Individual product items with quantities and matching status  
+- `delivery_scans` - Complete scan history with matched/unmatched tracking
+
+### Dependencies
+- `league/csv` package for CSV processing (auto-installed)
+- Existing SupplierService for product images and integration
+- UdeaScrapingService for automatic barcode retrieval
+- SupplierLink model for product-supplier code matching
+
+## Product Pricing System
+
+The application features an advanced pricing management system with supplier integration and precise VAT calculations.
+
+### Key Features
+- **Consolidated Pricing Interface**: All pricing information grouped in a single, organized section
+- **VAT-Inclusive Input**: Enter selling prices including VAT for easier price management
+- **Live Supplier Comparison**: Real-time price comparison with Udea supplier pricing
+- **High Precision Calculations**: 4-decimal precision storage to preserve VAT calculations exactly
+- **Quick Action Buttons**: One-click price updates based on supplier data or margin strategies
+
+### Pricing Components
+- **Product Pricing Section** (`resources/views/components/product-pricing-section.blade.php`): Main pricing interface
+- **Supplier Info Card** (`resources/views/components/supplier-info-card.blade.php`): Clean supplier information display
+- **UdeaScrapingService** (`app/Services/UdeaScrapingService.php`): Live price data retrieval
+
+### VAT Calculation Precision
+The system uses 4-decimal precision for net prices to ensure VAT-inclusive prices are preserved exactly:
+- **Input**: €7.30 (23% VAT inclusive)
+- **Stored**: €5.9350 (net price with 4 decimals)
+- **Display**: €7.30 (calculated from precise net price)
+
+### Price Update Methods
+1. **Manual Cost Update**: Direct cost price entry
+2. **VAT-Inclusive Selling Price**: Enter final selling price including VAT
+3. **Supplier-Based Updates**: Match Udea cost, customer price, or calculated optimal pricing
+4. **Quick Actions**: Competitive pricing (+10%), optimal margin (35%), customer price matching
+
+### Configuration
+- **Model Precision**: `PRICESELL` field uses `decimal:4` casting for high precision
+- **Validation**: Accepts up to 4 decimal places in price inputs
+- **Display**: Shows 2 decimal places for user interface while maintaining precision internally

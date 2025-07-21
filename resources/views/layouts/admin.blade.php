@@ -53,6 +53,15 @@
                             Products
                         </a>
 
+                        <!-- Deliveries -->
+                        <a href="{{ route('deliveries.index') }}" 
+                           class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('deliveries.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                            <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 11-2 0 1 1 0 012 0z" />
+                            </svg>
+                            Deliveries
+                        </a>
+
                         <!-- Users (placeholder for future) -->
                         <a href="#" 
                            class="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-300 hover:bg-gray-700 hover:text-white">

@@ -37,7 +37,7 @@ class ProductController extends Controller
      * Create a new controller instance.
      */
     public function __construct(
-        ProductRepository $productRepository, 
+        ProductRepository $productRepository,
         SalesRepository $salesRepository,
         SupplierService $supplierService,
         UdeaScrapingService $udeaScrapingService
@@ -113,17 +113,17 @@ class ProductController extends Controller
         }
 
         $taxCategories = $this->productRepository->getAllTaxCategories();
-        
+
         // Load sales data for the product
         $salesHistory = $this->salesRepository->getProductSalesHistory($id, 4); // Last 4 months
         $salesStats = $this->salesRepository->getProductSalesStatistics($id);
 
         // Fetch Udea pricing if product has supplier code and is Udea supplier
         $udeaPricing = null;
-        if ($product->supplierLink?->SupplierCode && 
-            $product->supplier && 
+        if ($product->supplierLink?->SupplierCode &&
+            $product->supplier &&
             $this->supplierService->hasExternalIntegration($product->supplier->SupplierID)) {
-            
+
             try {
                 $udeaPricing = $this->udeaScrapingService->getProductData($product->supplierLink->SupplierCode);
             } catch (\Exception $e) {
@@ -131,7 +131,7 @@ class ProductController extends Controller
                 \Log::warning('Failed to fetch Udea pricing for product', [
                     'product_id' => $id,
                     'supplier_code' => $product->supplierLink->SupplierCode,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
             }
         }
@@ -183,9 +183,9 @@ class ProductController extends Controller
         }
 
         $period = $request->get('period', '4');
-        
+
         // Determine the number of months based on period
-        $months = match($period) {
+        $months = match ($period) {
             'ytd' => (int) date('n'), // Current month number
             default => (int) $period
         };
@@ -261,20 +261,20 @@ class ProductController extends Controller
             return response()->json(['error' => 'Product not found'], 404);
         }
 
-        if (!$product->supplierLink?->SupplierCode || 
-            !$product->supplier || 
-            !$this->supplierService->hasExternalIntegration($product->supplier->SupplierID)) {
+        if (! $product->supplierLink?->SupplierCode ||
+            ! $product->supplier ||
+            ! $this->supplierService->hasExternalIntegration($product->supplier->SupplierID)) {
             return response()->json(['error' => 'Product does not have Udea supplier integration'], 400);
         }
 
         try {
             // Clear cache for this product to force fresh data
             $this->udeaScrapingService->clearCache($product->supplierLink->SupplierCode);
-            
+
             // Fetch fresh pricing data
             $udeaPricing = $this->udeaScrapingService->getProductData($product->supplierLink->SupplierCode);
 
-            if (!$udeaPricing) {
+            if (! $udeaPricing) {
                 return response()->json(['error' => 'Unable to fetch Udea pricing'], 404);
             }
 
@@ -285,17 +285,17 @@ class ProductController extends Controller
                     'current_price' => $product->PRICESELL,
                     'current_price_with_vat' => $product->PRICESELL * (1 + $product->getVatRate()),
                     'supplier_code' => $product->supplierLink->SupplierCode,
-                ]
+                ],
             ]);
 
         } catch (\Exception $e) {
             \Log::error('Failed to refresh Udea pricing', [
                 'product_id' => $id,
                 'supplier_code' => $product->supplierLink->SupplierCode,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
-            return response()->json(['error' => 'Failed to fetch Udea pricing: ' . $e->getMessage()], 500);
+            return response()->json(['error' => 'Failed to fetch Udea pricing: '.$e->getMessage()], 500);
         }
     }
 

@@ -16,14 +16,14 @@ use Tests\TestCase;
 
 class UdeaScrapingServiceTest extends TestCase
 {
-
     private UdeaScrapingService $service;
+
     private MockHandler $mockHandler;
 
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Mock configuration
         Config::set('services.udea', [
             'base_uri' => 'https://test.udea.nl',
@@ -35,12 +35,12 @@ class UdeaScrapingServiceTest extends TestCase
         ]);
 
         // Create mock handler
-        $this->mockHandler = new MockHandler();
+        $this->mockHandler = new MockHandler;
         $handlerStack = HandlerStack::create($this->mockHandler);
-        
+
         // Create service with mocked client
-        $this->service = new UdeaScrapingService();
-        
+        $this->service = new UdeaScrapingService;
+
         // Use reflection to replace the client with our mocked version
         $reflection = new \ReflectionClass($this->service);
         $clientProperty = $reflection->getProperty('client');
@@ -82,10 +82,10 @@ class UdeaScrapingServiceTest extends TestCase
 
         // Mock login page request
         $this->mockHandler->append(new Response(200, [], $loginPageHtml));
-        
+
         // Mock login form submission (redirect indicates success)
         $this->mockHandler->append(new Response(302, ['Location' => '/dashboard']));
-        
+
         // Mock product search request
         $this->mockHandler->append(new Response(200, [], $productPageHtml));
 
@@ -114,7 +114,7 @@ class UdeaScrapingServiceTest extends TestCase
 
         // Mock login page request
         $this->mockHandler->append(new Response(200, [], $loginPageHtml));
-        
+
         // Mock failed login (no redirect)
         $this->mockHandler->append(new Response(200, [], 'Login failed'));
 
@@ -184,7 +184,7 @@ class UdeaScrapingServiceTest extends TestCase
         // Mock successful connection
         $this->mockHandler->append(new Response(200, [], 'OK'));
         $this->mockHandler->append(new Response(200, [], 'OK')); // For response time measurement
-        
+
         // Mock successful authentication
         $loginPageHtml = '<input name="_token" value="csrf123">';
         $this->mockHandler->append(new Response(200, [], $loginPageHtml));
