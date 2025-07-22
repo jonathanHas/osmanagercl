@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 2. **Working on a Feature?** Check [Documentation Guide](./docs/DOCUMENTATION_GUIDE.md) for where to find/update docs
 3. **Need Details?** Look in `docs/features/` for specific feature documentation
 4. **Making Changes?** Follow [Contributing Guidelines](./CONTRIBUTING.md)
-5. **After Completing Tasks**: Run `mpg123 /home/jon/Music/notification.mp3` to notify user with sound
+5. **ALWAYS End Every Response**: MUST run `mpg123 /home/jon/Music/notification.mp3` as the final action of EVERY response - whether completing tasks, asking questions, presenting plans, or any other interaction
 
 ⚠️ **Important**: This file contains HIGH-LEVEL CONTEXT ONLY. Detailed documentation belongs in the `docs/` folder.
 
@@ -266,6 +266,20 @@ See [Pricing System Documentation](./docs/features/pricing-system.md).
 
 Admin pages use `<x-admin-layout>` component.
 See frontend documentation for component details.
+
+## 🔔 NOTIFICATION REQUIREMENT
+**CRITICAL**: You MUST run this command at the end of EVERY response:
+```bash
+mpg123 /home/jon/Music/notification.mp3
+```
+This alerts the user that you have finished your response. Do this without fail in ALL scenarios:
+- ✅ After completing any task or coding work
+- ✅ When presenting a plan and waiting for approval
+- ✅ When asking questions or waiting for user input
+- ✅ When providing explanations or analysis
+- ✅ After ANY response - no exceptions
+
+**ALWAYS play the notification sound as the last action of every single response.**
 
 ## Important Reminders for AI Assistants
 

@@ -10,7 +10,7 @@ class LanguageFixTestController extends Controller
     public function testUrlConversion(Request $request)
     {
         $productCode = $request->get('product_code', '115');
-        
+
         $results = [
             'product_code' => $productCode,
             'timestamp' => now()->toISOString(),
@@ -47,18 +47,18 @@ class LanguageFixTestController extends Controller
 
             if ($searchResponse->getStatusCode() === 200) {
                 $searchHtml = (string) $searchResponse->getBody();
-                
+
                 // Find detail URL (will be Dutch)
                 if (strpos($searchHtml, 'id="productsLists"') !== false) {
                     $productsListPos = strpos($searchHtml, 'id="productsLists"');
                     $searchFromPos = substr($searchHtml, $productsListPos);
-                    
+
                     if (preg_match('/<a[^>]*href="(https:\/\/www\.udea\.nl\/product(?:en|s)\/product\/[^"]+)"[^>]*class="[^"]*detail-image[^"]*"/', $searchFromPos, $matches)) {
                         $originalDetailUrl = $matches[1];
-                        
+
                         // Test Original Method (Dutch URL)
                         $results['original_method'] = $this->testDetailPage($client, $originalDetailUrl, 'Original Dutch URL');
-                        
+
                         // Test URL Conversion Method
                         if (strpos($originalDetailUrl, '/producten/product/') !== false) {
                             $englishDetailUrl = str_replace('/producten/product/', '/products/product/', $originalDetailUrl);
@@ -67,7 +67,7 @@ class LanguageFixTestController extends Controller
                                 'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                             ]);
                         }
-                        
+
                         // Compare results
                         if ($results['original_method'] && $results['url_conversion_method']) {
                             $results['comparison'] = [
@@ -95,12 +95,12 @@ class LanguageFixTestController extends Controller
             $headers = array_merge([
                 'Accept-Language' => 'en-US,en;q=0.9,nl;q=0.1',
             ], $additionalHeaders);
-            
+
             $response = $client->get($url, ['headers' => $headers]);
-            
+
             if ($response->getStatusCode() === 200) {
                 $html = (string) $response->getBody();
-                
+
                 $result = [
                     'description' => $description,
                     'url' => $url,
@@ -128,7 +128,7 @@ class LanguageFixTestController extends Controller
 
                 // Construct full description
                 $components = array_filter([$result['brand'], $result['product_name'], $result['size']]);
-                if (!empty($components)) {
+                if (! empty($components)) {
                     $result['full_description'] = implode(' ', $components);
                 }
 

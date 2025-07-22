@@ -32,8 +32,12 @@ class LabelLog extends Model
      * Event type constants
      */
     const EVENT_NEW_PRODUCT = 'new_product';
+
     const EVENT_PRICE_UPDATE = 'price_update';
+
     const EVENT_LABEL_PRINT = 'label_print';
+
+    const EVENT_REQUEUE_LABEL = 'requeue_label';
 
     /**
      * Get the user that created this log entry.
@@ -97,6 +101,18 @@ class LabelLog extends Model
         return self::create([
             'barcode' => $barcode,
             'event_type' => self::EVENT_LABEL_PRINT,
+            'user_id' => $userId ?? auth()->id(),
+        ]);
+    }
+
+    /**
+     * Log a requeue label event.
+     */
+    public static function logRequeueLabel(string $barcode, ?int $userId = null): self
+    {
+        return self::create([
+            'barcode' => $barcode,
+            'event_type' => self::EVENT_REQUEUE_LABEL,
             'user_id' => $userId ?? auth()->id(),
         ]);
     }

@@ -10,7 +10,7 @@ class SpecificProductTestController extends Controller
     public function testSpecificProduct(Request $request)
     {
         $productCode = $request->get('product_code', '6001223');
-        
+
         $results = [
             'product_code' => $productCode,
             'timestamp' => now()->toISOString(),
@@ -32,10 +32,10 @@ class SpecificProductTestController extends Controller
 
             // Test 1: Baseline (current method)
             $results['baseline_test'] = $this->testCurrentMethod($client, $productCode);
-            
+
             // Test 2: Various session setup methods
             $results['session_experiments'] = $this->testSessionMethods($client, $productCode);
-            
+
             // Test 3: Compare results
             $results['comparison'] = $this->compareResults($results['baseline_test'], $results['session_experiments']);
 
@@ -58,7 +58,7 @@ class SpecificProductTestController extends Controller
         try {
             // Authenticate
             $this->authenticate($client);
-            
+
             // Search
             sleep(2);
             $searchResponse = $client->get("/search/?qry={$productCode}", [
@@ -69,12 +69,12 @@ class SpecificProductTestController extends Controller
                 $html = (string) $searchResponse->getBody();
                 $result['success'] = true;
                 $result['search_html_sample'] = substr($html, 0, 2000);
-                
+
                 // Extract product links
                 $result['product_links'] = $this->extractProductLinks($html);
-                
+
                 // If we found a link, get product details
-                if (!empty($result['product_links'])) {
+                if (! empty($result['product_links'])) {
                     $result['product_details'] = $this->getProductDetails($client, $result['product_links'][0]);
                 }
             }
@@ -92,23 +92,23 @@ class SpecificProductTestController extends Controller
             // Method 1: Set language cookie first
             [
                 'name' => 'Language cookie before auth',
-                'setup' => function($client) {
+                'setup' => function ($client) {
                     $client->get('/', ['headers' => ['Cookie' => 'language=en']]);
                 },
             ],
-            
+
             // Method 2: Try localStorage simulation with cookie
             [
                 'name' => 'LocalStorage lang=EN + cookie',
-                'setup' => function($client) {
+                'setup' => function ($client) {
                     $client->get('/', ['headers' => ['Cookie' => 'language=en; lang=EN']]);
                 },
             ],
-            
+
             // Method 3: Try multiple language indicators
             [
                 'name' => 'Multiple language headers',
-                'setup' => function($client) {
+                'setup' => function ($client) {
                     $client->get('/', [
                         'headers' => [
                             'Cookie' => 'language=en; locale=en; site_lang=en',
@@ -117,11 +117,11 @@ class SpecificProductTestController extends Controller
                     ]);
                 },
             ],
-            
+
             // Method 4: Visit homepage with strong English preference first
             [
                 'name' => 'Strong English preference setup',
-                'setup' => function($client) {
+                'setup' => function ($client) {
                     $client->get('/', [
                         'headers' => [
                             'Accept-Language' => 'en-US,en;q=1.0',
@@ -132,22 +132,22 @@ class SpecificProductTestController extends Controller
                     $client->get('/', ['headers' => ['Cookie' => 'language=en']]);
                 },
             ],
-            
+
             // Method 5: Try session with specific English parameters
             [
                 'name' => 'English session parameters',
-                'setup' => function($client) use ($productCode) {
+                'setup' => function ($client) {
                     // Visit with language parameter
                     $client->get('/?lang=en&language=english');
                     // Set cookie
                     $client->get('/', ['headers' => ['Cookie' => 'language=en; currentSiteLang=en']]);
                 },
             ],
-            
+
             // Method 6: Try different cookie combinations from JavaScript analysis
             [
                 'name' => 'JavaScript-based session',
-                'setup' => function($client) {
+                'setup' => function ($client) {
                     // Based on the JS we found: currentSiteLang and currentDialogLanguage
                     $client->get('/', [
                         'headers' => [
@@ -159,7 +159,7 @@ class SpecificProductTestController extends Controller
         ];
 
         $results = [];
-        
+
         foreach ($methods as $methodConfig) {
             $result = [
                 'method_name' => $methodConfig['name'],
@@ -182,10 +182,10 @@ class SpecificProductTestController extends Controller
 
                 // Setup language preference
                 $methodConfig['setup']($testClient);
-                
+
                 // Authenticate
                 $this->authenticate($testClient);
-                
+
                 // Search with setup language preference
                 sleep(2);
                 $searchResponse = $testClient->get("/search/?qry={$productCode}");
@@ -194,17 +194,17 @@ class SpecificProductTestController extends Controller
                     $html = (string) $searchResponse->getBody();
                     $result['success'] = true;
                     $result['search_html_sample'] = substr($html, 0, 1500);
-                    
+
                     // Extract product links
                     $result['product_links'] = $this->extractProductLinks($html);
-                    
+
                     // Count English vs Dutch links
                     foreach ($result['product_links'] as $link) {
                         if (strpos($link, '/products/product/') !== false) {
                             $result['english_links_found']++;
                         }
                     }
-                    
+
                     // If we found English links, get details from the first one
                     if ($result['english_links_found'] > 0) {
                         $englishLink = null;
@@ -233,6 +233,7 @@ class SpecificProductTestController extends Controller
     private function authenticate($client)
     {
         $loginPage = $client->get('/users');
+
         return $client->post('/users/login', [
             'form_params' => [
                 'email' => config('services.udea.username'),
@@ -249,11 +250,12 @@ class SpecificProductTestController extends Controller
         if (strpos($html, 'id="productsLists"') !== false) {
             $productsListPos = strpos($html, 'id="productsLists"');
             $searchFromPos = substr($html, $productsListPos);
-            
+
             if (preg_match_all('/<a[^>]*href="(https:\/\/www\.udea\.nl\/product(?:en|s)\/product\/[^"]+)"/', $searchFromPos, $matches)) {
                 $links = array_unique($matches[1]);
             }
         }
+
         return $links;
     }
 
@@ -271,12 +273,12 @@ class SpecificProductTestController extends Controller
 
         try {
             $response = $client->get($detailUrl);
-            
+
             if ($response->getStatusCode() === 200) {
                 $html = (string) $response->getBody();
                 $details['success'] = true;
                 $details['html_sample'] = substr($html, 0, 2000);
-                
+
                 // Extract product information using the same patterns as main service
                 if (preg_match('/<h2[^>]*class="[^"]*prod-title[^"]*"[^>]*>\s*([^<]+?)\s*<\/h2>/is', $html, $matches)) {
                     $details['product_name'] = trim($matches[1]);
@@ -292,7 +294,7 @@ class SpecificProductTestController extends Controller
 
                 // Construct full description
                 $components = array_filter([$details['brand'], $details['product_name'], $details['size']]);
-                if (!empty($components)) {
+                if (! empty($components)) {
                     $details['full_description'] = implode(' ', $components);
                 }
             }
@@ -325,8 +327,8 @@ class SpecificProductTestController extends Controller
         foreach ($experiments as $experiment) {
             if (($experiment['english_links_found'] ?? 0) > 0) {
                 $comparison['successful_experiments'][] = $experiment['method_name'];
-                
-                if (!$comparison['best_method'] || 
+
+                if (! $comparison['best_method'] ||
                     ($experiment['english_links_found'] ?? 0) > ($comparison['best_method']['english_links'] ?? 0)) {
                     $comparison['best_method'] = [
                         'name' => $experiment['method_name'],

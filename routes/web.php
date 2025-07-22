@@ -40,7 +40,11 @@ Route::middleware('auth')->group(function () {
     // Label area routes
     Route::get('/labels', [LabelAreaController::class, 'index'])->name('labels.index');
     Route::post('/labels/print-a4', [LabelAreaController::class, 'printA4'])->name('labels.print-a4');
+    Route::get('/labels/preview-a4', [LabelAreaController::class, 'previewA4'])->name('labels.preview-a4');
     Route::get('/labels/preview/{productId}', [LabelAreaController::class, 'previewLabel'])->name('labels.preview');
+    
+    // Requeue product route
+    Route::post('/labels/requeue', [LabelAreaController::class, 'requeueProduct'])->name('labels.requeue');
 
     // Delivery management routes
     Route::resource('deliveries', DeliveryController::class);

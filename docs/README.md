@@ -39,6 +39,13 @@ Detailed documentation for each major feature.
   - Barcode extraction
   - Multi-supplier support
 
+- **[Label System](./features/label-system.md)** - Comprehensive label printing system
+  - Dynamic barcode generation with Code128 format
+  - Template-based label layouts with A4 optimization
+  - Event-driven re-queuing functionality
+  - Real-time print queue management
+  - Smart product filtering based on print history
+
 - **[Product Management](./features/product-management.md)** - Product catalog operations
   - CRUD operations with UUID support
   - Supplier linking

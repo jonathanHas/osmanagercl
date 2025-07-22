@@ -682,6 +682,7 @@ class UdeaScrapingService
         $detailHtml = $this->getDetailPageHtml($html);
         if (! $detailHtml) {
             Log::info('UDEA name extraction: could not get detail page HTML');
+
             return null;
         }
 
@@ -726,6 +727,7 @@ class UdeaScrapingService
 
         if (empty($components)) {
             Log::info('UDEA name extraction: no components found');
+
             return null;
         }
 
@@ -750,6 +752,7 @@ class UdeaScrapingService
         // Check if this is already a detail page (contains prod-display-col-top)
         if (strpos($searchHtml, 'prod-display-col-top') !== false) {
             Log::info('UDEA name extraction: already on detail page');
+
             return $searchHtml;
         }
 
@@ -762,7 +765,7 @@ class UdeaScrapingService
                 // Look for detail link
                 if (preg_match('/<a[^>]*href="(https:\/\/www\.udea\.nl\/product(?:en|s)\/product\/[^"]+)"[^>]*class="[^"]*detail-image[^"]*"/', $searchFromPos, $matches)) {
                     $detailUrl = $matches[1];
-                    
+
                     Log::info('UDEA name extraction: fetching detail page', [
                         'detail_url' => $detailUrl,
                     ]);

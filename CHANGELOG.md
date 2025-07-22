@@ -11,16 +11,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive documentation restructuring with new organization system
 - CONTRIBUTING.md with coding standards and development guidelines
 - Project-focused README.md replacing Laravel boilerplate
+- Label system documentation with complete feature overview
+- Enhanced label re-queuing functionality with "Add Back to Products Needing Labels"
+- Dynamic print/preview forms that use current product state instead of cached data
+- Real-time label queue management without requiring full page navigation
 
 ### Fixed
 - Delivery scanning syntax errors in Blade templates
 - Division by zero in progress bar calculations
 - Null date handling in delivery views
 - API data consistency between scan and quantity endpoints
+- Label system caching issues where re-queued products didn't appear in print/preview until navigation
+- Products not disappearing from "Products Needing Labels" after printing due to incorrect requeue vs print event logic
+- JavaScript errors when "Products Needing Labels" section is empty (null reference exceptions)
+- Label layout order changed from price-name-barcode to name-price-barcode as requested
 
 ### Changed
 - Refactored DeliveryController to use consistent data formatting
 - Moved complex PHP logic from Blade templates to controllers
+- Replaced session-based print queue with event-based re-queuing system
+- Improved getProductsNeedingLabels() algorithm to properly handle timestamp-based event comparison
+- Enhanced JavaScript form handling to collect current product IDs dynamically
+- Updated label system UI terminology from "Add to Queue" to "Add Back to Products Needing Labels"
+- Strengthened notification requirements in CLAUDE.md to ensure consistent user alerts
+
+### Technical Improvements
+- Added EVENT_REQUEUE_LABEL to LabelLog model with database migration
+- Implemented proper null checks and conditional initialization in JavaScript
+- Optimized label event tracking with timestamp-aware logic
+- Enhanced error handling and user feedback in label operations
 
 ## [0.3.0] - 2024-01-20
 

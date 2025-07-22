@@ -17,86 +17,90 @@
             background: white;
         }
         
+        @php
+            $labelsPerA4 = $template->labels_per_a4;
+            $usableWidth = 190; // A4 usable width in mm
+            $usableHeight = 277; // A4 usable height in mm
+            $labelsPerRow = floor($usableWidth / $template->width_mm);
+            $labelsPerColumn = floor($usableHeight / $template->height_mm);
+            $css = $template->css_dimensions;
+        @endphp
+        
         .labels-container {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            grid-template-rows: repeat(8, 1fr);
-            gap: 2mm;
+            grid-template-columns: repeat({{ $labelsPerRow }}, 1fr);
+            gap: 0;
             width: 190mm;
             height: 277mm;
         }
         
         .label {
-            width: 58mm;
-            height: 32mm;
-            border: 1px dashed #ccc;
-            padding: 2mm;
+            width: {{ $css['width'] }};
+            height: {{ $css['height'] }};
+            border: none;
+            padding: {{ $css['margin'] }};
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
             font-size: 8pt;
             line-height: 1.2;
             page-break-inside: avoid;
             box-sizing: border-box;
+            overflow: hidden;
         }
         
         .label-name {
-            font-weight: bold;
-            font-size: 9pt;
-            height: 2.4em;
+            font-weight: 600;
+            font-size: {{ $css['font_size_name'] }};
+            line-height: 1.3;
+            flex-grow: 1;
             overflow: hidden;
             text-overflow: ellipsis;
             display: -webkit-box;
-            -webkit-line-clamp: 2;
+            -webkit-line-clamp: 4;
             -webkit-box-orient: vertical;
-            margin-bottom: 2mm;
+            word-break: break-word;
+            hyphens: auto;
+            margin: 0 0 3px 0;
+        }
+        
+        .label-price-section {
+            text-align: center;
+            flex-shrink: 0;
+            margin: 2px 0;
+        }
+        
+        .label-price {
+            font-size: {{ $css['font_size_price'] }};
+            font-weight: bold;
+            color: #000;
+            margin: 0;
         }
         
         .label-barcode {
             text-align: center;
-            margin: 2mm 0;
+            flex-shrink: 0;
+            margin-top: auto;
         }
         
         .barcode-visual {
             display: flex;
             justify-content: center;
-            height: 15mm;
-            margin: 1mm 0;
+            height: calc({{ $css['barcode_height'] }} * 0.6);
+            margin: 1px 0;
         }
         
-        .barcode-bars {
-            display: flex;
-            align-items: end;
+        .barcode-visual svg {
+            width: auto;
+            max-width: 90%;
             height: 100%;
-        }
-        
-        .bar {
-            background: black;
-            margin: 0 0.5px;
         }
         
         .barcode-number {
             font-family: monospace;
-            font-size: 7pt;
-            letter-spacing: 1px;
-            margin-top: 1mm;
-        }
-        
-        .label-price-section {
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            margin-top: auto;
-        }
-        
-        .label-price {
-            font-size: 12pt;
-            font-weight: bold;
-        }
-        
-        .label-price-vat {
-            font-size: 6pt;
-            color: #666;
+            font-size: calc({{ $css['font_size_barcode'] }} * 0.7);
+            letter-spacing: 0.5px;
+            color: #555;
+            margin: 1px 0;
         }
         
         .empty-label {
@@ -135,38 +139,25 @@
     </div>
 
     <div class="labels-container">
-        @for($i = 0; $i < 24; $i++)
+        @for($i = 0; $i < $labelsPerA4; $i++)
             @if(isset($products[$i]))
-                @php $product = $products[$i]; @endphp
+                @php 
+                    $product = $products[$i]; 
+                    $labelService = app(\App\Services\LabelService::class);
+                    $barcodeImage = $labelService->generateBarcode($product->CODE);
+                @endphp
                 <div class="label">
                     <div class="label-name">{{ $product->NAME }}</div>
                     
-                    <div class="label-barcode">
-                        <div class="barcode-visual">
-                            <div class="barcode-bars">
-                                @php
-                                    // Simple barcode pattern generator
-                                    $barcode = $product->CODE;
-                                    $barcodeArray = str_split($barcode);
-                                @endphp
-                                @foreach($barcodeArray as $digit)
-                                    @php
-                                        $width = (intval($digit) % 3) + 1;
-                                        $height = 70 + (intval($digit) % 4) * 5; // Varying heights
-                                    @endphp
-                                    <div class="bar" style="width: {{ $width }}px; height: {{ $height }}%;"></div>
-                                    @if(intval($digit) % 2 == 0)
-                                        <div style="width: 1px;"></div>
-                                    @endif
-                                @endforeach
-                            </div>
-                        </div>
-                        <div class="barcode-number">{{ $product->CODE }}</div>
+                    <div class="label-price-section">
+                        <div class="label-price">{{ $product->getFormattedPriceWithVatAttribute() }}</div>
                     </div>
                     
-                    <div class="label-price-section">
-                        <div class="label-price">€{{ number_format($product->PRICESELL, 2) }}</div>
-                        <div class="label-price-vat">{{ $product->getFormattedPriceWithVatAttribute() }} incl. VAT</div>
+                    <div class="label-barcode">
+                        <div class="barcode-visual">
+                            {!! $barcodeImage !!}
+                        </div>
+                        <div class="barcode-number">{{ $product->CODE }}</div>
                     </div>
                 </div>
             @else

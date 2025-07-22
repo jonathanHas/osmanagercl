@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreProductRequest;
 use App\Models\Category;
+use App\Models\LabelLog;
+use App\Models\LabelTemplate;
 use App\Models\Product;
 use App\Models\Supplier;
 use App\Models\SupplierLink;
@@ -11,10 +13,9 @@ use App\Models\TaxCategory;
 use App\Repositories\CategoryRepository;
 use App\Repositories\ProductRepository;
 use App\Repositories\SalesRepository;
+use App\Services\LabelService;
 use App\Services\SupplierService;
 use App\Services\UdeaScrapingService;
-use App\Services\LabelService;
-use App\Models\LabelLog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -386,12 +387,12 @@ class ProductController extends Controller
                         $prefillData['price_sell_suggested'] = $customerPrice;
                         $prefillData['price_source'] = 'udea_scraped';
                         $prefillData['scraped_data'] = $scrapedData;
-                        
+
                         // Include scraped product name if available and different from delivery description
-                        if (isset($scrapedData['description']) && !empty($scrapedData['description'])) {
+                        if (isset($scrapedData['description']) && ! empty($scrapedData['description'])) {
                             $scrapedName = trim($scrapedData['description']);
                             $deliveryName = trim($deliveryItem->description);
-                            
+
                             // Only include if scraped name is different and not empty
                             if ($scrapedName !== $deliveryName && strlen($scrapedName) > 0) {
                                 $prefillData['scraped_name'] = $scrapedName;
@@ -530,7 +531,7 @@ class ProductController extends Controller
     /**
      * Generate and print a label for a product.
      */
-    public function printLabel(string $id)
+    public function printLabel(string $id, Request $request)
     {
         $product = $this->productRepository->findById($id);
 
@@ -538,11 +539,19 @@ class ProductController extends Controller
             abort(404, 'Product not found');
         }
 
+        // Get the selected template or use default
+        $templateId = $request->input('template_id');
+        $template = null;
+        if ($templateId) {
+            $template = LabelTemplate::active()->find($templateId);
+        }
+        $template = $template ?? LabelTemplate::getDefault();
+
         // Log the label print event
         LabelLog::logLabelPrint($product->CODE);
 
         // Generate the label HTML
-        $labelHtml = $this->labelService->generateLabelHtml($product);
+        $labelHtml = $this->labelService->generateLabelHtml($product, $template);
 
         // Return the label HTML with appropriate headers for printing
         return response($labelHtml)

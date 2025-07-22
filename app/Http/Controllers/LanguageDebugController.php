@@ -2,17 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\UdeaScrapingService;
 use GuzzleHttp\Client;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 class LanguageDebugController extends Controller
 {
     public function testLanguageControl(Request $request)
     {
         $productCode = $request->get('product_code', '115');
-        
+
         $debugInfo = [
             'product_code' => $productCode,
             'timestamp' => now()->toISOString(),
@@ -113,24 +111,24 @@ class LanguageDebugController extends Controller
 
             if ($result['success']) {
                 $html = (string) $response->getBody();
-                
+
                 // Detect language from search results
                 $result['language_detected'] = $this->detectLanguage($html);
-                
+
                 // Try to find detail URL
                 if (strpos($html, 'id="productsLists"') !== false) {
                     $productsListPos = strpos($html, 'id="productsLists"');
                     $searchFromPos = substr($html, $productsListPos);
-                    
+
                     if (preg_match('/<a[^>]*href="(https:\/\/www\.udea\.nl\/product(?:en|s)\/product\/[^"]+)"[^>]*class="[^"]*detail-image[^"]*"/', $searchFromPos, $matches)) {
                         $result['detail_url'] = $matches[1];
                         $result['detail_language'] = strpos($matches[1], '/producten/product/') !== false ? 'dutch' : 'english';
-                        
+
                         // Fetch detail page and extract product info
                         $detailResponse = $client->get($matches[1], [
                             'headers' => $settings['headers'],
                         ]);
-                        
+
                         if ($detailResponse->getStatusCode() === 200) {
                             $detailHtml = (string) $detailResponse->getBody();
                             $this->extractProductInfo($detailHtml, $result);
@@ -150,15 +148,25 @@ class LanguageDebugController extends Controller
     {
         $isDutch = strpos($html, '/producten/product/') !== false;
         $isEnglish = strpos($html, '/products/product/') !== false;
-        
-        if ($isDutch && !$isEnglish) return 'dutch';
-        if ($isEnglish && !$isDutch) return 'english';
-        if ($isDutch && $isEnglish) return 'mixed';
-        
+
+        if ($isDutch && ! $isEnglish) {
+            return 'dutch';
+        }
+        if ($isEnglish && ! $isDutch) {
+            return 'english';
+        }
+        if ($isDutch && $isEnglish) {
+            return 'mixed';
+        }
+
         // Look for language indicators in HTML
-        if (strpos($html, 'lang="nl"') !== false) return 'dutch';
-        if (strpos($html, 'lang="en"') !== false) return 'english';
-        
+        if (strpos($html, 'lang="nl"') !== false) {
+            return 'dutch';
+        }
+        if (strpos($html, 'lang="en"') !== false) {
+            return 'english';
+        }
+
         return 'unknown';
     }
 
@@ -181,7 +189,7 @@ class LanguageDebugController extends Controller
 
         // Construct full description
         $components = array_filter([$result['brand'], $result['product_name'], $result['size']]);
-        if (!empty($components)) {
+        if (! empty($components)) {
             $result['full_description'] = implode(' ', $components);
         }
     }

@@ -11,6 +11,13 @@
                 </p>
             </div>
             <div class="flex gap-2">
+                <button onclick="requeueProduct('{{ $product->ID }}', this)" 
+                        class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold text-xs uppercase tracking-widest rounded-md transition">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Add Back to Products Needing Labels
+                </button>
                 <a href="{{ route('products.print-label', $product->ID) }}" 
                    target="_blank"
                    class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs uppercase tracking-widest rounded-md transition">
@@ -823,6 +830,44 @@
             
             document.body.appendChild(form);
             form.submit();
+        }
+
+        // Requeue product function
+        function requeueProduct(productId, buttonElement) {
+            const button = buttonElement || event?.target?.closest('button');
+            
+            fetch('/labels/requeue', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({ product_id: productId })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message briefly
+                    if (button) {
+                        const originalText = button.innerHTML;
+                        button.innerHTML = '<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>Added Back!';
+                        button.disabled = true;
+                        
+                        setTimeout(() => {
+                            button.innerHTML = originalText;
+                            button.disabled = false;
+                        }, 2000);
+                    } else {
+                        alert('Product added back to Products Needing Labels!');
+                    }
+                } else {
+                    alert('Error: ' + (data.message || data.error));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error adding product back to labels list');
+            });
         }
     </script>
     @endpush

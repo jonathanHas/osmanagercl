@@ -17,7 +17,7 @@ return new class extends Migration
             $table->enum('event_type', ['new_product', 'price_update', 'label_print']);
             $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
             $table->timestamps();
-            
+
             $table->index('barcode');
             $table->index('event_type');
             $table->index('created_at');

@@ -10,7 +10,7 @@ class LanguageFlagTestController extends Controller
     public function testLanguageFlag(Request $request)
     {
         $productCode = $request->get('product_code', '115');
-        
+
         $results = [
             'product_code' => $productCode,
             'timestamp' => now()->toISOString(),
@@ -33,13 +33,13 @@ class LanguageFlagTestController extends Controller
 
             // Step 1: Analyze homepage to find the British flag
             $results['homepage_analysis'] = $this->analyzeHomepage($client);
-            
-            // Step 2: Analyze flag functionality 
+
+            // Step 2: Analyze flag functionality
             $results['flag_analysis'] = $this->analyzeFlagElement($results['homepage_analysis']['html'] ?? '');
-            
+
             // Step 3: Attempt to replicate flag click
             $results['language_switch_test'] = $this->testLanguageSwitch($client, $results['flag_analysis']);
-            
+
             // Step 4: Search after language switch
             if ($results['language_switch_test']['success'] ?? false) {
                 $results['search_after_switch'] = $this->searchAfterLanguageSwitch($client, $productCode);
@@ -65,22 +65,22 @@ class LanguageFlagTestController extends Controller
 
         try {
             $response = $client->get('/');
-            
+
             if ($response->getStatusCode() === 200) {
                 $html = (string) $response->getBody();
                 $result['success'] = true;
                 $result['html'] = $html;
-                
+
                 // Look for British flag or language switcher elements
                 $this->findFlagElements($html, $result);
-                
+
                 // Look for language-related JavaScript
                 $this->findLanguageScripts($html, $result);
-                
+
                 // Look for existing language cookies
                 $result['cookies_before'] = $this->extractCookies($response);
             }
-            
+
         } catch (\Exception $e) {
             $result['error'] = $e->getMessage();
         }
@@ -122,11 +122,11 @@ class LanguageFlagTestController extends Controller
         // Extract JavaScript that might handle language switching
         if (preg_match_all('/<script[^>]*>(.*?)<\/script>/is', $html, $matches)) {
             foreach ($matches[1] as $script) {
-                if (stripos($script, 'language') !== false || 
-                    stripos($script, 'lang') !== false || 
+                if (stripos($script, 'language') !== false ||
+                    stripos($script, 'lang') !== false ||
                     stripos($script, 'english') !== false ||
                     stripos($script, 'cookie') !== false) {
-                    $result['scripts'][] = substr($script, 0, 500) . (strlen($script) > 500 ? '...' : '');
+                    $result['scripts'][] = substr($script, 0, 500).(strlen($script) > 500 ? '...' : '');
                 }
             }
         }
@@ -142,6 +142,7 @@ class LanguageFlagTestController extends Controller
                 }
             }
         }
+
         return $cookies;
     }
 
@@ -169,9 +170,9 @@ class LanguageFlagTestController extends Controller
             $result['javascript_handlers'] = array_unique($matches[0]);
         }
 
-        $result['flag_found'] = !empty($result['ajax_endpoints']) || 
-                               !empty($result['cookie_operations']) || 
-                               !empty($result['javascript_handlers']);
+        $result['flag_found'] = ! empty($result['ajax_endpoints']) ||
+                               ! empty($result['cookie_operations']) ||
+                               ! empty($result['javascript_handlers']);
 
         return $result;
     }
@@ -186,7 +187,7 @@ class LanguageFlagTestController extends Controller
         // Method 1: Try common language cookies
         $commonCookies = [
             'language=en',
-            'lang=en', 
+            'lang=en',
             'locale=en',
             'site_language=english',
             'udea_language=en',
@@ -218,7 +219,7 @@ class LanguageFlagTestController extends Controller
             }
 
             $result['methods_tested'][] = $method;
-            
+
             if ($method['success'] && ($method['contains_english_indicators'] ?? false)) {
                 $result['success'] = true;
                 $result['successful_method'] = $cookieValue;
@@ -294,10 +295,10 @@ class LanguageFlagTestController extends Controller
                 if (strpos($html, 'id="productsLists"') !== false) {
                     $productsListPos = strpos($html, 'id="productsLists"');
                     $searchFromPos = substr($html, $productsListPos);
-                    
+
                     if (preg_match_all('/<a[^>]*href="(https:\/\/www\.udea\.nl\/product(?:en|s)\/product\/[^"]+)"/', $searchFromPos, $matches)) {
                         $result['product_links'] = array_unique($matches[1]);
-                        
+
                         foreach ($result['product_links'] as $link) {
                             if (strpos($link, '/products/product/') !== false) {
                                 $result['product_links_english']++;
@@ -320,20 +321,25 @@ class LanguageFlagTestController extends Controller
     {
         $englishWords = ['products', 'product', 'search', 'results', 'price', 'description'];
         $dutchWords = ['producten', 'product', 'zoeken', 'resultaten', 'prijs', 'beschrijving'];
-        
+
         $englishCount = 0;
         $dutchCount = 0;
-        
+
         foreach ($englishWords as $word) {
             $englishCount += substr_count(strtolower($html), $word);
         }
-        
+
         foreach ($dutchWords as $word) {
             $dutchCount += substr_count(strtolower($html), $word);
         }
-        
-        if ($englishCount > $dutchCount * 1.5) return 'english';
-        if ($dutchCount > $englishCount * 1.5) return 'dutch';
+
+        if ($englishCount > $dutchCount * 1.5) {
+            return 'english';
+        }
+        if ($dutchCount > $englishCount * 1.5) {
+            return 'dutch';
+        }
+
         return 'mixed';
     }
 
@@ -346,13 +352,13 @@ class LanguageFlagTestController extends Controller
             'Product description',
             'English',
         ];
-        
+
         foreach ($indicators as $indicator) {
             if (stripos($html, $indicator) !== false) {
                 return true;
             }
         }
-        
+
         return false;
     }
 }
