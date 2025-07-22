@@ -189,7 +189,7 @@ class Category extends Model
     public function descendants()
     {
         $descendants = collect();
-        
+
         foreach ($this->children as $child) {
             $descendants->push($child);
             $descendants = $descendants->merge($child->descendants());

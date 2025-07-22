@@ -586,7 +586,7 @@ class TestScraperController extends Controller
                     ];
 
                     // Pattern 2: Simple table format (if not found yet)
-                    if (!$debugInfo['barcode_extraction']['barcode_found'] && preg_match('/<td[^>]*>(?:EAN|Barcode|GTIN)<\/td>\s*<td[^>]*>(\d{8,13})<\/td>/i', $detailHtml, $barcodeMatches)) {
+                    if (! $debugInfo['barcode_extraction']['barcode_found'] && preg_match('/<td[^>]*>(?:EAN|Barcode|GTIN)<\/td>\s*<td[^>]*>(\d{8,13})<\/td>/i', $detailHtml, $barcodeMatches)) {
                         $debugInfo['barcode_extraction']['barcode_found'] = true;
                         $debugInfo['barcode_extraction']['barcode_value'] = $barcodeMatches[1];
                         $debugInfo['barcode_extraction']['pattern_used'] = 'simple_table';
@@ -598,7 +598,7 @@ class TestScraperController extends Controller
                     ];
 
                     // Pattern 3: Colon separated (if not found yet)
-                    if (!$debugInfo['barcode_extraction']['barcode_found'] && preg_match('/(?:EAN|Barcode):\s*(\d{8,13})/', $detailHtml, $barcodeMatches)) {
+                    if (! $debugInfo['barcode_extraction']['barcode_found'] && preg_match('/(?:EAN|Barcode):\s*(\d{8,13})/', $detailHtml, $barcodeMatches)) {
                         $debugInfo['barcode_extraction']['barcode_found'] = true;
                         $debugInfo['barcode_extraction']['barcode_value'] = $barcodeMatches[1];
                         $debugInfo['barcode_extraction']['pattern_used'] = 'colon_separated';
@@ -617,6 +617,107 @@ class TestScraperController extends Controller
                     // Debug: Find all table rows with td containing digits
                     if (preg_match_all('/<tr[^>]*>.*?<td[^>]*>(?:EAN|Barcode|GTIN)[^<]*<\/td>\s*<td[^>]*>[^<]*<\/td>.*?<\/tr>/is', $detailHtml, $eanTableRows)) {
                         $debugInfo['barcode_extraction']['ean_table_rows'] = array_slice($eanTableRows[0], 0, 5);
+                    }
+
+                    // NEW: Product Name Extraction Debug Section
+                    $debugInfo['name_extraction'] = [
+                        'current_method_result' => $result['description'] ?? 'NONE',
+                        'volume_div_found' => false,
+                        'brand_extraction' => [],
+                        'product_name_extraction' => [],
+                        'size_extraction' => [],
+                        'full_name_constructed' => null,
+                        'volume_div_content' => null,
+                    ];
+
+                    // Look for .volume div in both search and detail pages
+                    $htmlSources = [
+                        'search_page' => $searchHtml,
+                        'detail_page' => $detailHtml,
+                    ];
+
+                    foreach ($htmlSources as $sourceName => $sourceHtml) {
+                        if (preg_match('/<div[^>]*class="[^"]*volume[^"]*"[^>]*>(.*?)<\/div>/is', $sourceHtml, $volumeMatches)) {
+                            $volumeContent = $volumeMatches[1];
+                            $debugInfo['name_extraction'][$sourceName.'_volume_div'] = [
+                                'found' => true,
+                                'full_content' => trim($volumeContent),
+                                'content_preview' => substr(trim($volumeContent), 0, 500),
+                            ];
+
+                            // Extract brand from .volume-sub-title
+                            if (preg_match('/<div[^>]*class="[^"]*volume-sub-title[^"]*"[^>]*>\s*([^<]+)<\/div>/is', $volumeContent, $brandMatches)) {
+                                $brand = trim($brandMatches[1]);
+                                $debugInfo['name_extraction']['brand_extraction'][$sourceName] = [
+                                    'found' => true,
+                                    'value' => $brand,
+                                    'raw_match' => $brandMatches[0],
+                                ];
+                            } else {
+                                $debugInfo['name_extraction']['brand_extraction'][$sourceName] = ['found' => false];
+                            }
+
+                            // Extract product name from .prod-title .title-element
+                            if (preg_match('/<h3[^>]*class="[^"]*prod-title[^"]*"[^>]*>.*?<span[^>]*class="[^"]*title-element[^"]*"[^>]*(?:title="([^"]*)")?[^>]*>\s*([^<]+)\s*<\/span>.*?<\/h3>/is', $volumeContent, $nameMatches)) {
+                                $titleAttr = trim($nameMatches[1] ?? '');
+                                $spanContent = trim($nameMatches[2]);
+                                $productName = ! empty($titleAttr) ? $titleAttr : $spanContent;
+
+                                $debugInfo['name_extraction']['product_name_extraction'][$sourceName] = [
+                                    'found' => true,
+                                    'title_attribute' => $titleAttr,
+                                    'span_content' => $spanContent,
+                                    'selected_value' => $productName,
+                                    'raw_match' => $nameMatches[0],
+                                ];
+                            } else {
+                                $debugInfo['name_extraction']['product_name_extraction'][$sourceName] = ['found' => false];
+
+                                // Fallback: try just .prod-title content
+                                if (preg_match('/<h3[^>]*class="[^"]*prod-title[^"]*"[^>]*>\s*([^<]+)<\/h3>/is', $volumeContent, $fallbackMatches)) {
+                                    $debugInfo['name_extraction']['product_name_extraction'][$sourceName.'_fallback'] = [
+                                        'found' => true,
+                                        'value' => trim($fallbackMatches[1]),
+                                        'method' => 'fallback_direct_h3',
+                                    ];
+                                }
+                            }
+
+                            // Extract size/volume (text outside of child elements within .volume)
+                            // Remove child elements and extract remaining text
+                            $cleanedContent = $volumeContent;
+                            $cleanedContent = preg_replace('/<div[^>]*class="[^"]*volume-sub-title[^"]*"[^>]*>.*?<\/div>/is', '', $cleanedContent);
+                            $cleanedContent = preg_replace('/<h3[^>]*class="[^"]*prod-title[^"]*"[^>]*>.*?<\/h3>/is', '', $cleanedContent);
+                            $cleanedContent = strip_tags($cleanedContent);
+                            $cleanedContent = trim($cleanedContent);
+
+                            // Look for size patterns in the cleaned content
+                            if (preg_match('/(\d+(?:[.,]\d+)?\s*(?:ml|cl|l|liter|gram?|kg|stuks?|pieces?))/i', $cleanedContent, $sizeMatches)) {
+                                $debugInfo['name_extraction']['size_extraction'][$sourceName] = [
+                                    'found' => true,
+                                    'value' => trim($sizeMatches[1]),
+                                    'cleaned_content' => $cleanedContent,
+                                    'raw_match' => $sizeMatches[0],
+                                ];
+                            } else {
+                                $debugInfo['name_extraction']['size_extraction'][$sourceName] = [
+                                    'found' => false,
+                                    'cleaned_content' => $cleanedContent,
+                                ];
+                            }
+
+                            // Construct full name if we have the components
+                            $brand = $debugInfo['name_extraction']['brand_extraction'][$sourceName]['value'] ?? '';
+                            $productName = $debugInfo['name_extraction']['product_name_extraction'][$sourceName]['selected_value'] ?? '';
+                            $size = $debugInfo['name_extraction']['size_extraction'][$sourceName]['value'] ?? '';
+
+                            if (! empty($brand) || ! empty($productName) || ! empty($size)) {
+                                $fullName = trim(implode(' ', array_filter([$brand, $productName, $size])));
+                                $debugInfo['name_extraction']['full_name_constructed'][$sourceName] = $fullName;
+                            }
+                        } else {
+                            $debugInfo['name_extraction'][$sourceName.'_volume_div'] = ['found' => false];
+                        }
                     }
                 } else {
                     $debugInfo['errors'][] = 'Detail URL pattern not found within productsLists section';

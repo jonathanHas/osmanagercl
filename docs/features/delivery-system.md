@@ -109,7 +109,29 @@ The delivery verification system provides a complete workflow for handling suppl
    - Item filtering (all, pending, partial, discrepancies)
    - Manual quantity adjustments with +/- buttons
 
-### 3. Verification & Completion
+### 3. Product Creation Integration
+1. **New Product Identification**: Automatic detection of unmatched items
+   - Items without existing product matches are flagged as "new products"
+   - Barcode retrieval via `UdeaScrapingService` for product identification
+   - Visual indicators in delivery interfaces
+
+2. **Product Creation Workflow**: Direct integration with product creation system
+   - **Access**: "Add to POS" buttons appear next to all new product items
+   - **Pre-population**: Delivery item data automatically populates the product creation form
+   - **Fields**: Name, barcode, cost price, supplier information, units per case
+   - **Smart Pricing**: UDEA suppliers automatically use scraped customer prices
+   - **Visual Indicators**: Green badges for scraped prices, blue for calculated prices
+   - **Integration**: Created products are automatically linked back to delivery items
+
+3. **Creation Process**: Seamless workflow integration
+   - Route: `GET /products/create?delivery_item={id}` - Pre-populated form
+   - **UUID Generation**: Products get unique UUID identifiers
+   - **Intelligent Pricing**: UDEA deliveries use scraped customer prices when available
+   - **Fallback Logic**: Falls back to 30% markup if scraping fails
+   - **Supplier Linking**: Automatic SupplierLink creation with delivery supplier data
+   - **Status Update**: Delivery items updated from "new product" to matched product
+
+### 4. Verification & Completion
 1. **Summary Generation**: Comprehensive discrepancy analysis
    - Route: `GET /deliveries/{delivery}/summary`
    - Complete vs partial vs missing items breakdown
@@ -196,6 +218,23 @@ Route::middleware('auth')->prefix('deliveries')->group(function () {
 - **Live Updates**: Instant feedback on scans and progress
 - **Barcode Focus**: Auto-focus on barcode input after each scan
 - **Status Tracking**: Visual indicators for all item states
+
+### Product Creation Integration
+- **New Product Detection**: Automatic identification of items not in POS system
+- **One-Click Creation**: "Add to POS" buttons for instant product creation
+- **Pre-populated Forms**: Delivery data automatically fills product creation form
+- **UUID-Based Products**: Modern product identification system
+- **Supplier Integration**: Automatic supplier linking and barcode retrieval
+- **Seamless Workflow**: Created products immediately available for scanning
+
+### UDEA Smart Pricing Integration
+- **Automatic Detection**: Recognizes UDEA suppliers (IDs: 5, 44, 85) from delivery data
+- **Scraped Customer Prices**: Uses real retail prices from UDEA website instead of markup
+- **Visual Feedback**: Green badges indicate scraped prices, blue badges show calculated prices
+- **Real-time Data**: Prices are retrieved with timestamps showing data freshness
+- **User Control**: Scraped prices can be manually adjusted if needed
+- **Fallback Logic**: Gracefully falls back to 30% markup if scraping fails
+- **Performance**: Cached scraping results with 1-hour TTL for efficiency
 
 ### Discrepancy Management
 - **Comprehensive Tracking**: Missing, partial, excess, and unknown items

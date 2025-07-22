@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🚀 Quick Start for AI Assistants
+
+1. **First Time?** Read this file completely for project context
+2. **Working on a Feature?** Check [Documentation Guide](./docs/DOCUMENTATION_GUIDE.md) for where to find/update docs
+3. **Need Details?** Look in `docs/features/` for specific feature documentation
+4. **Making Changes?** Follow [Contributing Guidelines](./CONTRIBUTING.md)
+5. **After Completing Tasks**: Run `mpg123 /home/jon/Music/notification.mp3` to notify user with sound
+
+⚠️ **Important**: This file contains HIGH-LEVEL CONTEXT ONLY. Detailed documentation belongs in the `docs/` folder.
+
 ## Project Overview
 
 This is a Laravel 12 application using PHP 8.2+ with Laravel Breeze for authentication. The project uses:
@@ -13,14 +23,21 @@ This is a Laravel 12 application using PHP 8.2+ with Laravel Breeze for authenti
 
 ## Documentation
 
-For detailed documentation on specific areas of the codebase, see the `docs/` folder:
+📚 **IMPORTANT: See [Documentation Usage Guide](./docs/DOCUMENTATION_GUIDE.md) for how to use and update documentation properly.**
 
-- **[POS Integration](./docs/pos-integration.md)** - uniCenta POS database integration, models, and relationships
-- **[Documentation Index](./docs/README.md)** - Complete list of available documentation
+Comprehensive documentation is organized in the `docs/` folder:
 
-## Planning and Next Steps
+- **[Documentation Index](./docs/README.md)** - Complete documentation overview
+- **[Architecture](./docs/architecture/overview.md)** - System design and patterns
+- **[Features](./docs/features/)** - Detailed feature documentation
+- **[Development](./docs/development/)** - Setup and development guides
+- **[API Reference](./docs/api/)** - API documentation
 
-- **[next.md](./next.md)** - VAT rate integration planning and requirements gathering
+## Planning
+
+- **[Planning Documents](./planning/README.md)** - Future features and improvements
+- **[Contributing](./CONTRIBUTING.md)** - Development guidelines and standards
+- **[Changelog](./CHANGELOG.md)** - Version history and releases
 
 ## Development Commands
 
@@ -127,12 +144,19 @@ php artisan view:clear
 - **Asset Pipeline**: Vite handles CSS and JavaScript compilation with hot reloading
 
 ### Development Best Practices
+
+### Key Principles
 - **Always Use Eloquent Models**: Check for existing models before accessing database tables directly
   - Use `exists:App\Models\ModelName,column` in validation rules instead of `exists:table_name,column`
   - Models handle database connections, table names, and configurations automatically
   - Example: Use `exists:App\Models\Supplier,SupplierID` not `exists:SUPPLIERS,SupplierID`
 - **Follow Laravel Conventions**: Leverage Eloquent relationships and model configurations
 - **Database Access**: Prefer model-based queries over raw database calls for consistency
+- **Service Layer**: Extract complex business logic into service classes
+- **Repository Pattern**: Use repositories for data access when appropriate
+- **Testing**: Write tests for new features and bug fixes
+
+For detailed coding standards, see [Contributing Guidelines](./CONTRIBUTING.md).
 
 ### Configuration
 - Database configured for SQLite in `.env`
@@ -207,235 +231,82 @@ All authentication routes are defined in `routes/auth.php` and controllers are i
 
 ### Primary Database
 - SQLite by default (`database/database.sqlite`)
-- Configuration in `config/database.php`
+- See `.env.example` for configuration
 
 ### POS Database (uniCenta)
-A secondary `pos` connection provides read-only access to uniCenta POS data:
-- Configuration in `config/database.php`
-- Environment variables:
-  - `POS_DB_HOST` - Database host (default: 127.0.0.1)
-  - `POS_DB_PORT` - Database port (default: 3306)
-  - `POS_DB_DATABASE` - Database name (default: unicenta)
-  - `POS_DB_USERNAME` - Database username
-  - `POS_DB_PASSWORD` - Database password
-
-#### Product Model
-The `Product` model (`app/Models/Product.php`) connects to the POS database:
-- Uses `PRODUCTS` table from uniCenta
-- Handles bit fields as booleans
-- Provides scopes for common queries (active, inStock, search)
-- No timestamps (uniCenta doesn't use Laravel timestamps)
-
-#### ProductRepository
-The `ProductRepository` (`app/Repositories/ProductRepository.php`) provides:
-- `getAllProducts()` - Paginated product list
-- `findById()` - Find product by ID
-- `searchByName()` - Search by product name
-- `searchByCode()` - Search by code or reference
-- `getActiveProducts()` - Non-service products only
-- `getByCategory()` - Products by category
-- `getStatistics()` - Product counts and statistics
-- `getLowStockProducts()` - Products low in stock
-
-Usage example:
-```php
-$repository = new ProductRepository();
-$products = $repository->searchProducts('coffee', activeOnly: true);
-$stats = $repository->getStatistics();
-```
+- Secondary connection for read-only POS data
+- Configure POS_DB_* variables in `.env`
+- See [POS Integration Documentation](./docs/features/pos-integration.md) for details
 
 ## Troubleshooting
 
-### Storage Permission Issues
-If you encounter "Permission denied" errors for `storage/framework/views/`:
+For common issues and solutions, see [Troubleshooting Guide](./docs/development/troubleshooting.md).
 
+## Key Features
+
+### Supplier Integration
+External supplier connectivity for images, pricing, and product data.
+See [Supplier Integration Documentation](./docs/features/supplier-integration.md).
+
+### Delivery Verification
+Comprehensive delivery processing with barcode scanning.
+See [Delivery System Documentation](./docs/features/delivery-system.md).
+
+### Pricing Management
+Advanced pricing with VAT calculations and supplier comparison.
+See [Pricing System Documentation](./docs/features/pricing-system.md).
+
+## UI/UX Design
+
+### Admin Layout
+- Mobile-responsive sidebar navigation
+- Dark theme with consistent visual hierarchy
+- Alpine.js powered interactive components
+- Tailwind CSS utility-first styling
+
+Admin pages use `<x-admin-layout>` component.
+See frontend documentation for component details.
+
+## Important Reminders for AI Assistants
+
+### Code Generation Guidelines
+- **Always check for existing code** before creating new files
+- **Prefer editing existing files** over creating new ones
+- **Follow Laravel conventions** and existing patterns in the codebase
+- **Use appropriate service/repository layers** for business logic
+- **Write tests** for new features
+
+### Documentation
+- **Update documentation** when changing functionality
+- **Use the appropriate documentation file** based on the feature area
+- **Follow documentation templates** in `docs/templates/`
+- **Keep CLAUDE.md focused** - detailed information belongs in feature docs
+
+### Common Pitfalls to Avoid
+- Don't access database tables directly - use Eloquent models
+- Don't put business logic in controllers - use services
+- Don't create files unless absolutely necessary
+- Don't ignore existing patterns - maintain consistency
+- Don't forget to run tests after changes
+
+### Key Commands to Remember
 ```bash
-# Clear compiled views and caches
-php artisan view:clear
-php artisan config:clear
-php artisan route:clear
+# Always run after changes
+./vendor/bin/pint              # Format code
+php artisan test               # Run tests
+php artisan route:list         # Check routes
+php artisan tinker            # Debug models
 
-# Fix storage permissions
-chmod -R 775 storage/
-chmod -R 775 bootstrap/cache/
+# Clear caches if issues arise
+php artisan optimize:clear
 ```
 
-This typically happens when Laravel runs under different users (web server vs CLI).
+### Where to Find Information
+- **Architecture decisions**: `docs/architecture/`
+- **Feature details**: `docs/features/`
+- **API documentation**: `docs/api/`
+- **Development guides**: `docs/development/`
+- **Planning documents**: `planning/`
 
-## Supplier External Integration
+Remember: This file provides context for AI assistants. For detailed information about any feature or system, refer to the specific documentation files rather than adding it here.
 
-The application includes external supplier integration for product images and website links:
-
-### Features
-- **External Product Images**: Shows product images from supplier CDNs (currently Ekoplaza)
-- **Supplier Website Links**: Direct links to search products on supplier websites
-- **Product List Integration**: When "Show suppliers" is checked, shows thumbnails and links
-- **Product Detail Integration**: Dedicated supplier information section with larger images
-- **Delivery Integration**: Product images throughout delivery verification workflow with hover previews
-
-### Configuration
-- Config file: `config/suppliers.php`
-- Service: `app/Services/SupplierService.php`
-- Component: `resources/views/components/supplier-external-info.blade.php`
-- Currently configured for Udea (supplier IDs: 5, 44, 85)
-
-### Implementation Details
-- **Live Price Comparison**: Real-time pricing data from Udea with automatic cost calculations
-- **VAT-Inclusive Pricing**: Input selling prices including VAT with automatic net price calculation
-- **High Precision Storage**: Prices stored with 4 decimal precision to preserve VAT calculations
-- **Transport Cost Analysis**: 15% transport cost calculations for accurate margin analysis
-- **Customer Price Extraction**: Retrieves retail prices from supplier product detail pages
-- **Enhanced Barcode Extraction**: Multiple regex patterns support various HTML formats including table structures
-- **Responsive Layout**: Mobile-optimized pricing interface with collapsible sections
-- **Hover Previews**: Large image overlays on hover (192x192px) with product information
-- **New Product Image Support**: Images work immediately for new products once barcodes are retrieved
-- Images use lazy loading with `loading="lazy"` attribute
-- Graceful error handling for missing images
-- URL sanitization for security
-
-### Barcode Extraction Patterns
-The `UdeaScrapingService` supports multiple barcode extraction patterns for maximum compatibility:
-
-1. **HTML Table Format with Class**: `<td class="wt-semi">EAN</td><td>8711521021925</td>`
-2. **Simple Table Format**: `<td>EAN</td><td>8711521021925</td>`
-3. **Colon Separated Format**: `EAN: 8711521021925`
-4. **Fallback EAN-13 Pattern**: Validates 13-digit codes starting with '87'
-
-### New Product Image Integration
-For products without existing Product models (new deliveries):
-- `SupplierService::getExternalImageUrlByBarcode()` generates image URLs using supplier ID + barcode
-- Delivery views automatically show images once barcodes are retrieved
-- Same hover preview functionality as existing products
-- Barcode displayed in image overlay for identification
-
-### Adding New Suppliers
-To add a new supplier integration, update `config/suppliers.php`:
-```php
-'new_supplier' => [
-    'supplier_ids' => [/* supplier IDs */],
-    'image_url' => 'https://example.com/images/{CODE}.jpg',
-    'website_search' => 'https://example.com/search?q={SUPPLIER_CODE}',
-    'display_name' => 'Supplier Name',
-    'enabled' => true,
-],
-```
-
-## Admin UI Layout
-
-The application now includes a dedicated admin layout with sidebar navigation for better administrative functionality:
-
-### Admin Layout (`resources/views/layouts/admin.blade.php`)
-- **Sidebar Navigation**: Fixed sidebar on desktop, mobile-responsive slide-out menu
-- **Dark Theme**: Gray-900 sidebar with better visual hierarchy
-- **Icons**: SVG icons for all navigation items (Dashboard, Products, Users, Settings)
-- **User Profile**: Bottom section shows user avatar, name, and email with dropdown menu
-- **Alpine.js Integration**: Sidebar toggle functionality using Alpine.js `x-data`
-
-### Layout Usage
-Admin pages use the `<x-admin-layout>` component instead of `<x-app-layout>`:
-```blade
-<x-admin-layout>
-    <x-slot name="header">
-        <h2>Page Title</h2>
-    </x-slot>
-    
-    <!-- Page content -->
-</x-admin-layout>
-```
-
-### Enhanced Dashboard Design
-The dashboard (`resources/views/dashboard.blade.php`) features:
-- **Welcome Section**: Personalized greeting with user's name
-- **Metric Cards**: 4-column grid with icons and contextual information
-  - Total Products (with link to view all)
-  - Active Products (with percentage of total)
-  - In Stock (with out of stock count)
-  - Service Products (non-physical items)
-- **Quick Actions Grid**: 2x2 grid of action cards for common tasks
-  - View Products
-  - Active Items
-  - Reports (placeholder)
-  - Settings (placeholder)
-
-### Tailwind Configuration
-Extended Tailwind config (`tailwind.config.js`) with:
-- **Admin Color Palette**: Purple-based color scheme (`admin-50` through `admin-900`)
-- **Animations**: `slide-in` and `fade-in` animations for smooth transitions
-- **Custom Shadows**: `admin` and `admin-lg` for consistent elevation
-
-### Navigation Structure
-The admin sidebar includes:
-- Dashboard (home icon)
-- Products (package icon)
-- Deliveries (delivery box icon) - Complete delivery verification system
-- Users (users icon) - placeholder for future implementation
-- Settings (cog icon) - placeholder for future implementation
-
-Each navigation item shows active state with gray-800 background when on that route.
-
-## Delivery Verification System
-
-The application includes a comprehensive delivery verification system for processing supplier deliveries:
-
-### Features
-- **CSV Import**: Upload delivery dockets from suppliers (Udea format supported)
-- **Real-time Scanning**: Mobile-optimized barcode scanning interface with Alpine.js
-- **Progress Tracking**: Live delivery completion monitoring with visual indicators
-- **Discrepancy Management**: Automatic detection and reporting of quantity differences
-- **Stock Updates**: Final stock level updates upon delivery completion
-- **Visual Product Identification**: Supplier images with hover previews throughout workflow
-- **Export Capability**: JSON export of discrepancies for supplier reconciliation
-
-### Workflow
-1. **Import**: Upload CSV delivery file → automatic product matching → barcode retrieval for new products
-2. **Scan**: Real-time barcode verification → quantity tracking → status updates → manual adjustments
-3. **Review**: Discrepancy analysis → export reports → complete delivery and update stock
-
-### Access
-- **Sidebar Navigation**: Click "Deliveries" in admin sidebar
-- **Main Features**: Import deliveries, scan products, track progress, manage discrepancies
-- **Documentation**: See `docs/delivery-verification-system.md` for complete technical guide
-
-### Database Tables
-- `deliveries` - Main delivery tracking with supplier and status information
-- `delivery_items` - Individual product items with quantities and matching status  
-- `delivery_scans` - Complete scan history with matched/unmatched tracking
-
-### Dependencies
-- `league/csv` package for CSV processing (auto-installed)
-- Existing SupplierService for product images and integration
-- UdeaScrapingService for automatic barcode retrieval
-- SupplierLink model for product-supplier code matching
-
-## Product Pricing System
-
-The application features an advanced pricing management system with supplier integration and precise VAT calculations.
-
-### Key Features
-- **Consolidated Pricing Interface**: All pricing information grouped in a single, organized section
-- **VAT-Inclusive Input**: Enter selling prices including VAT for easier price management
-- **Live Supplier Comparison**: Real-time price comparison with Udea supplier pricing
-- **High Precision Calculations**: 4-decimal precision storage to preserve VAT calculations exactly
-- **Quick Action Buttons**: One-click price updates based on supplier data or margin strategies
-
-### Pricing Components
-- **Product Pricing Section** (`resources/views/components/product-pricing-section.blade.php`): Main pricing interface
-- **Supplier Info Card** (`resources/views/components/supplier-info-card.blade.php`): Clean supplier information display
-- **UdeaScrapingService** (`app/Services/UdeaScrapingService.php`): Live price data retrieval
-
-### VAT Calculation Precision
-The system uses 4-decimal precision for net prices to ensure VAT-inclusive prices are preserved exactly:
-- **Input**: €7.30 (23% VAT inclusive)
-- **Stored**: €5.9350 (net price with 4 decimals)
-- **Display**: €7.30 (calculated from precise net price)
-
-### Price Update Methods
-1. **Manual Cost Update**: Direct cost price entry
-2. **VAT-Inclusive Selling Price**: Enter final selling price including VAT
-3. **Supplier-Based Updates**: Match Udea cost, customer price, or calculated optimal pricing
-4. **Quick Actions**: Competitive pricing (+10%), optimal margin (35%), customer price matching
-
-### Configuration
-- **Model Precision**: `PRICESELL` field uses `decimal:4` casting for high precision
-- **Validation**: Accepts up to 4 decimal places in price inputs
-- **Display**: Shows 2 decimal places for user interface while maintaining precision internally

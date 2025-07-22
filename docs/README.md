@@ -1,59 +1,139 @@
-# Documentation
+# OSManager CL Documentation
 
-This folder contains detailed documentation for specific areas of the codebase to keep the main CLAUDE.md file focused and organized.
+Welcome to the comprehensive documentation for OSManager CL. This documentation is organized to help you quickly find the information you need.
 
-## Available Documentation
+📚 **New to the docs?** Start with the [Documentation Usage Guide](./DOCUMENTATION_GUIDE.md) to understand how to navigate and contribute to documentation.
 
-### Development & Integration
-- **[pos-integration.md](./pos-integration.md)** - POS Database Integration (uniCenta)
-  - Product, Supplier, SupplierLink, Stocking, and StockCurrent models
-  - Relationships and usage examples
-  - Database schema information
-  - Future integration opportunities (VAT, Categories, etc.)
+## 📚 Documentation Structure
 
-- **[pricing-system.md](./pricing-system.md)** - Product Pricing System
-  - Consolidated pricing interface with supplier integration
-  - VAT-inclusive pricing with 4-decimal precision
-  - Live price comparison and competitive analysis
-  - Quick action buttons and advanced pricing strategies
-  - High-precision VAT calculations and storage
+### 🏗️ Architecture & Design
+Core system architecture and design patterns.
 
-- **[supplier-integration-plan.md](./supplier-integration-plan.md)** - Supplier External Integration
-  - External product images from supplier CDNs
-  - Supplier website links and search integration
-  - Live price comparison with Udea supplier
-  - Customer price extraction and analysis
-  - Implementation phases and current status
+- **[Architecture Overview](./architecture/overview.md)** - System design, patterns, and principles
+- **[Database Design](./architecture/database-design.md)** - Schema design and relationships
+- **[API Design](./architecture/api-design.md)** - RESTful API principles and standards
 
-- **[delivery-verification-system.md](./delivery-verification-system.md)** - Delivery Verification System
-  - Complete CSV import and scanning workflow
-  - Real-time barcode scanning with mobile optimization
+### 🚀 Features
+Detailed documentation for each major feature.
+
+- **[POS Integration](./features/pos-integration.md)** - uniCenta POS database integration
+  - Product, Supplier, and Stock models
+  - Real-time inventory synchronization
+  - Read-only access patterns
+
+- **[Delivery System](./features/delivery-system.md)** - Comprehensive delivery verification
+  - CSV import and parsing
+  - Mobile-optimized barcode scanning
   - Discrepancy tracking and reporting
-  - Supplier image integration with hover previews
-  - Database schema and API documentation
-  - Comprehensive troubleshooting guide
+  - Stock update automation
 
-### Deployment & Production
-- **[production-deployment.md](./production-deployment.md)** - Production Deployment Guide
-  - Critical database indexes for performance
-  - Environment configuration for production
-  - Performance optimization requirements
-  - Deployment checklist and rollback procedures
-  - Troubleshooting and monitoring guidelines
+- **[Pricing System](./features/pricing-system.md)** - Advanced pricing management
+  - VAT-inclusive pricing with 4-decimal precision
+  - Live supplier price comparison
+  - Margin analysis and optimization
+  - Quick pricing actions
 
-## Contributing
+- **[Supplier Integration](./features/supplier-integration.md)** - External supplier connectivity
+  - Product image CDN integration
+  - Live price scraping
+  - Barcode extraction
+  - Multi-supplier support
 
-When adding new features or systems:
+- **[Product Management](./features/product-management.md)** - Product catalog operations
+  - CRUD operations with UUID support
+  - Supplier linking
+  - Category management
+  - Search and filtering
 
-1. Create a new `.md` file in this `docs/` folder for the specific area
-2. Update this README.md to include a link to the new documentation
-3. Keep the main `CLAUDE.md` focused on general project setup and common commands
-4. Reference the specific documentation from `CLAUDE.md` when relevant
+### 💻 Development
+Guides for developers working on the project.
 
-## File Naming Convention
+- **[Setup Guide](./development/setup.md)** - Complete development environment setup
+- **[Testing Guide](./development/testing.md)** - Testing strategies and examples
+- **[Coding Standards](./development/coding-standards.md)** - Code style and best practices
+- **[Troubleshooting](./development/troubleshooting.md)** - Common issues and solutions
 
-Use descriptive, lowercase names with hyphens:
-- `pos-integration.md` - POS database integration
-- `api-endpoints.md` - API documentation
-- `frontend-components.md` - Frontend component library
-- `testing-guide.md` - Testing strategies and examples
+### 🚢 Deployment
+Production deployment and operations.
+
+- **[Production Guide](./deployment/production-guide.md)** - Step-by-step deployment
+- **[Environment Configuration](./deployment/environment-config.md)** - Production settings
+- **[Monitoring](./deployment/monitoring.md)** - Application monitoring and alerts
+
+### 🔌 API Reference
+Complete API documentation.
+
+- **[API Endpoints](./api/endpoints.md)** - All available endpoints
+- **[Authentication](./api/authentication.md)** - API authentication methods
+- **[Webhooks](./api/webhooks.md)** - Webhook events and payloads
+
+### 📝 Templates
+Documentation templates for consistency.
+
+- **[Feature Template](./templates/feature-template.md)** - For documenting new features
+- **[API Endpoint Template](./templates/api-endpoint-template.md)** - For API documentation
+- **[Planning Template](./templates/planning-template.md)** - For project planning
+
+## 🎯 Quick Links
+
+### For New Developers
+1. Start with [Architecture Overview](./architecture/overview.md)
+2. Follow the [Setup Guide](./development/setup.md)
+3. Review [Coding Standards](./development/coding-standards.md)
+4. Read about key features you'll work on
+
+### For System Administrators
+1. Review [Production Guide](./deployment/production-guide.md)
+2. Configure using [Environment Config](./deployment/environment-config.md)
+3. Set up [Monitoring](./deployment/monitoring.md)
+4. Keep [Troubleshooting](./development/troubleshooting.md) handy
+
+### For API Consumers
+1. Start with [API Design](./architecture/api-design.md)
+2. Set up [Authentication](./api/authentication.md)
+3. Explore [API Endpoints](./api/endpoints.md)
+4. Subscribe to [Webhooks](./api/webhooks.md) if needed
+
+## 📋 Documentation Standards
+
+When contributing to documentation:
+
+1. **Use Templates**: Start with appropriate template from `templates/`
+2. **Be Concise**: Clear, direct explanations
+3. **Include Examples**: Code samples and use cases
+4. **Stay Current**: Update docs with code changes
+5. **Cross-Reference**: Link related documentation
+
+### Markdown Conventions
+- Use ATX-style headers (`#`, `##`, etc.)
+- Include a table of contents for long documents
+- Use code blocks with language hints
+- Add diagrams where helpful (Mermaid supported)
+
+## 🔄 Keeping Documentation Updated
+
+Documentation should be updated:
+- When adding new features
+- When changing existing functionality
+- When fixing bugs that affect behavior
+- When improving performance or security
+- During refactoring that changes architecture
+
+## 🤝 Contributing
+
+See our [Contributing Guidelines](../CONTRIBUTING.md) for information on:
+- Documentation standards
+- Pull request process
+- Review requirements
+
+## 📞 Getting Help
+
+If you can't find what you need:
+1. Search the documentation
+2. Check the [Troubleshooting Guide](./development/troubleshooting.md)
+3. Review closed GitHub issues
+4. Contact the development team
+
+---
+
+*Documentation is a living resource. If something is unclear or missing, please contribute improvements!*

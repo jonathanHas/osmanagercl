@@ -49,6 +49,7 @@ class SupplierService
             }
 
             $supplierId = (int) $product->supplier->SupplierID;
+
             return $this->getExternalImageUrlByBarcode($supplierId, $product->CODE);
         } catch (\Exception $e) {
             // Log error but don't expose it to users
@@ -64,7 +65,7 @@ class SupplierService
     public function getExternalImageUrlByBarcode(int $supplierId, ?string $barcode): ?string
     {
         try {
-            if (!$barcode) {
+            if (! $barcode) {
                 return null;
             }
 
@@ -79,13 +80,14 @@ class SupplierService
 
             // Replace {CODE} with the actual barcode
             $imageUrl = str_replace('{CODE}', $code, $config['image_url']);
-            
+
             // Validate that this looks like an image URL
-            if (!$this->isValidImageUrl($imageUrl)) {
-                \Log::warning('Generated image URL does not appear to be a valid image URL: ' . $imageUrl);
+            if (! $this->isValidImageUrl($imageUrl)) {
+                \Log::warning('Generated image URL does not appear to be a valid image URL: '.$imageUrl);
+
                 return null;
             }
-            
+
             return $imageUrl;
         } catch (\Exception $e) {
             // Log error but don't expose it to users
@@ -163,22 +165,22 @@ class SupplierService
 
         return $udeaConfig && in_array($supplierId, $udeaConfig['supplier_ids']);
     }
-    
+
     /**
      * Validate that a URL appears to be a valid image URL.
      */
     protected function isValidImageUrl(string $url): bool
     {
         // Check if URL is well-formed
-        if (!filter_var($url, FILTER_VALIDATE_URL)) {
+        if (! filter_var($url, FILTER_VALIDATE_URL)) {
             return false;
         }
-        
+
         // Check if URL ends with common image extensions
         $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
         $pathInfo = pathinfo(parse_url($url, PHP_URL_PATH));
-        
-        return isset($pathInfo['extension']) && 
+
+        return isset($pathInfo['extension']) &&
                in_array(strtolower($pathInfo['extension']), $imageExtensions);
     }
 }

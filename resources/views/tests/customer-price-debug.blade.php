@@ -232,6 +232,147 @@
             </div>
         @endif
 
+        @if(isset($debugInfo['name_extraction']))
+            <div class="section {{ isset($debugInfo['name_extraction']['full_name_constructed']) && !empty($debugInfo['name_extraction']['full_name_constructed']) ? 'success' : 'warning' }}">
+                <h2>🔤 Step 4: Product Name Extraction (NEW)</h2>
+                
+                <div style="background: #e3f2fd; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+                    <h3 style="margin-top: 0; color: #1565c0;">📊 Results Comparison</h3>
+                    <table>
+                        <tr>
+                            <th style="background: #bbdefb;">Method</th>
+                            <th style="background: #bbdefb;">Result</th>
+                        </tr>
+                        <tr>
+                            <td><strong>Current Method</strong></td>
+                            <td class="{{ !empty($debugInfo['name_extraction']['current_method_result']) && $debugInfo['name_extraction']['current_method_result'] !== 'NONE' ? 'status-good' : 'status-bad' }}">
+                                {{ $debugInfo['name_extraction']['current_method_result'] ?? 'NONE' }}
+                            </td>
+                        </tr>
+                        @if(isset($debugInfo['name_extraction']['full_name_constructed']) && !empty($debugInfo['name_extraction']['full_name_constructed']))
+                            @foreach($debugInfo['name_extraction']['full_name_constructed'] as $source => $fullName)
+                                <tr>
+                                    <td><strong>NEW Method ({{ $source }})</strong></td>
+                                    <td class="status-good" style="font-weight: bold; background: #c8e6c9;">{{ $fullName }}</td>
+                                </tr>
+                            @endforeach
+                        @else
+                            <tr>
+                                <td><strong>NEW Method</strong></td>
+                                <td class="status-bad">No full name constructed</td>
+                            </tr>
+                        @endif
+                    </table>
+                </div>
+
+                <h3>🔍 Volume Div Detection</h3>
+                <table>
+                    @if(isset($debugInfo['name_extraction']['search_page_volume_div']))
+                        <tr>
+                            <th>Search Page Volume Div</th>
+                            <td class="{{ $debugInfo['name_extraction']['search_page_volume_div']['found'] ? 'status-good' : 'status-bad' }}">
+                                {{ $debugInfo['name_extraction']['search_page_volume_div']['found'] ? 'FOUND' : 'NOT FOUND' }}
+                            </td>
+                        </tr>
+                    @endif
+                    @if(isset($debugInfo['name_extraction']['detail_page_volume_div']))
+                        <tr>
+                            <th>Detail Page Volume Div</th>
+                            <td class="{{ $debugInfo['name_extraction']['detail_page_volume_div']['found'] ? 'status-good' : 'status-bad' }}">
+                                {{ $debugInfo['name_extraction']['detail_page_volume_div']['found'] ? 'FOUND' : 'NOT FOUND' }}
+                            </td>
+                        </tr>
+                    @endif
+                </table>
+
+                @php
+                    $sources = ['search_page', 'detail_page'];
+                @endphp
+
+                @foreach($sources as $source)
+                    @if(isset($debugInfo['name_extraction'][$source.'_volume_div']) && $debugInfo['name_extraction'][$source.'_volume_div']['found'])
+                        <div style="border: 2px solid #2196f3; margin: 15px 0; padding: 15px; border-radius: 5px;">
+                            <h4 style="color: #1976d2; margin-top: 0;">📄 {{ ucfirst(str_replace('_', ' ', $source)) }} Analysis</h4>
+                            
+                            <h5>🏷️ Brand Extraction</h5>
+                            @if(isset($debugInfo['name_extraction']['brand_extraction'][$source]))
+                                @php $brand = $debugInfo['name_extraction']['brand_extraction'][$source]; @endphp
+                                <table style="margin-bottom: 15px;">
+                                    <tr>
+                                        <th>Brand Found</th>
+                                        <td class="{{ $brand['found'] ? 'status-good' : 'status-bad' }}">{{ $brand['found'] ? 'YES' : 'NO' }}</td>
+                                    </tr>
+                                    @if($brand['found'])
+                                        <tr>
+                                            <th>Brand Value</th>
+                                            <td class="status-good" style="font-weight: bold;">{{ $brand['value'] }}</td>
+                                        </tr>
+                                    @endif
+                                </table>
+                            @endif
+
+                            <h5>📝 Product Name Extraction</h5>
+                            @if(isset($debugInfo['name_extraction']['product_name_extraction'][$source]))
+                                @php $name = $debugInfo['name_extraction']['product_name_extraction'][$source]; @endphp
+                                <table style="margin-bottom: 15px;">
+                                    <tr>
+                                        <th>Product Name Found</th>
+                                        <td class="{{ $name['found'] ? 'status-good' : 'status-bad' }}">{{ $name['found'] ? 'YES' : 'NO' }}</td>
+                                    </tr>
+                                    @if($name['found'])
+                                        <tr>
+                                            <th>Title Attribute</th>
+                                            <td>{{ $name['title_attribute'] ?? 'None' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Span Content</th>
+                                            <td>{{ $name['span_content'] ?? 'None' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Selected Value</th>
+                                            <td class="status-good" style="font-weight: bold;">{{ $name['selected_value'] }}</td>
+                                        </tr>
+                                    @endif
+                                </table>
+                            @endif
+
+                            @if(isset($debugInfo['name_extraction']['product_name_extraction'][$source.'_fallback']))
+                                <div style="background: #fff3e0; padding: 10px; border-radius: 3px; margin: 10px 0;">
+                                    <strong>Fallback Method Result:</strong> {{ $debugInfo['name_extraction']['product_name_extraction'][$source.'_fallback']['value'] }}
+                                </div>
+                            @endif
+
+                            <h5>📏 Size/Volume Extraction</h5>
+                            @if(isset($debugInfo['name_extraction']['size_extraction'][$source]))
+                                @php $size = $debugInfo['name_extraction']['size_extraction'][$source]; @endphp
+                                <table style="margin-bottom: 15px;">
+                                    <tr>
+                                        <th>Size Found</th>
+                                        <td class="{{ $size['found'] ? 'status-good' : 'status-bad' }}">{{ $size['found'] ? 'YES' : 'NO' }}</td>
+                                    </tr>
+                                    @if($size['found'])
+                                        <tr>
+                                            <th>Size Value</th>
+                                            <td class="status-good" style="font-weight: bold;">{{ $size['value'] }}</td>
+                                        </tr>
+                                    @endif
+                                    <tr>
+                                        <th>Cleaned Content</th>
+                                        <td class="code-block" style="font-size: 11px;">{{ $size['cleaned_content'] ?? 'None' }}</td>
+                                    </tr>
+                                </table>
+                            @endif
+
+                            <h5>🔧 Raw Volume Div Content</h5>
+                            <div class="code-block" style="background: #f5f5f5; padding: 10px; border-radius: 3px; font-size: 11px;">
+                                <pre>{{ $debugInfo['name_extraction'][$source.'_volume_div']['content_preview'] ?? 'No content' }}</pre>
+                            </div>
+                        </div>
+                    @endif
+                @endforeach
+            </div>
+        @endif
+
         <div class="section info">
             <h2>Complete Scraping Result</h2>
             @if($debugInfo['all_data'])

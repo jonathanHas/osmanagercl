@@ -2,7 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreProductRequest;
+use App\Models\Category;
 use App\Models\Product;
+use App\Models\Supplier;
+use App\Models\SupplierLink;
+use App\Models\TaxCategory;
 use App\Repositories\CategoryRepository;
 use App\Repositories\ProductRepository;
 use App\Repositories\SalesRepository;
@@ -10,6 +15,8 @@ use App\Services\SupplierService;
 use App\Services\UdeaScrapingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class ProductController extends Controller
@@ -328,5 +335,180 @@ class ProductController extends Controller
             ->paginate(25);
 
         return view('products.supplier-test', compact('products'));
+    }
+
+    /**
+     * Show the form for creating a new product.
+     */
+    public function create(Request $request): View
+    {
+        // Get necessary data for the form
+        $taxCategories = TaxCategory::orderBy('NAME')->get();
+        $categories = Category::orderBy('NAME')->get();
+        $suppliers = Supplier::orderBy('Supplier')->get();
+
+        // Check if we're creating from a delivery item
+        $deliveryItemId = $request->query('delivery_item');
+        $prefillData = null;
+
+        if ($deliveryItemId) {
+            $deliveryItem = \App\Models\DeliveryItem::findOrFail($deliveryItemId);
+            $prefillData = [
+                'name' => $deliveryItem->description,
+                'code' => $deliveryItem->barcode ?: '',
+                'price_buy' => $deliveryItem->unit_cost,
+                'supplier_id' => $deliveryItem->delivery->supplier_id,
+                'supplier_code' => $deliveryItem->supplier_code,
+                'units_per_case' => $deliveryItem->units_per_case,
+                'initial_stock' => $deliveryItem->received_quantity ?: $deliveryItem->ordered_quantity,
+            ];
+
+            // Check if this is a UDEA delivery item and try to get scraped customer price
+            $udeaSupplierIds = config('suppliers.external_links.udea.supplier_ids', [5, 44, 85]);
+            if (in_array($deliveryItem->delivery->supplier_id, $udeaSupplierIds)) {
+                try {
+                    $scrapedData = $this->udeaScrapingService->getProductDataForDeliveryItem($deliveryItem);
+                    if ($scrapedData && isset($scrapedData['customer_price'])) {
+                        // Use scraped customer price, converting from European format (comma) to float
+                        $customerPrice = floatval(str_replace(',', '.', $scrapedData['customer_price']));
+                        $prefillData['price_sell_suggested'] = $customerPrice;
+                        $prefillData['price_source'] = 'udea_scraped';
+                        $prefillData['scraped_data'] = $scrapedData;
+                        
+                        // Include scraped product name if available and different from delivery description
+                        if (isset($scrapedData['description']) && !empty($scrapedData['description'])) {
+                            $scrapedName = trim($scrapedData['description']);
+                            $deliveryName = trim($deliveryItem->description);
+                            
+                            // Only include if scraped name is different and not empty
+                            if ($scrapedName !== $deliveryName && strlen($scrapedName) > 0) {
+                                $prefillData['scraped_name'] = $scrapedName;
+                                $prefillData['delivery_name'] = $deliveryName;
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('Failed to fetch UDEA scraped pricing for delivery item', [
+                        'delivery_item_id' => $deliveryItemId,
+                        'supplier_code' => $deliveryItem->supplier_code,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // If no scraped price available, use 30% markup as fallback
+            if (! isset($prefillData['price_sell_suggested'])) {
+                $prefillData['price_sell_suggested'] = $deliveryItem->unit_cost * 1.3;
+                $prefillData['price_source'] = 'calculated';
+            }
+        }
+
+        return view('products.create', compact('taxCategories', 'categories', 'suppliers', 'prefillData', 'deliveryItemId'));
+    }
+
+    /**
+     * Store a newly created product in storage.
+     */
+    public function store(StoreProductRequest $request): RedirectResponse
+    {
+        try {
+            // Generate unique product ID using UUID
+            $productId = (string) Str::uuid();
+
+            DB::connection('pos')->transaction(function () use ($request, $productId) {
+
+                // Create the product with essential fields only
+                $product = Product::create([
+                    'ID' => $productId,
+                    'NAME' => $request->name,
+                    'CODE' => $request->code,
+                    'REFERENCE' => $request->code, // Set reference same as barcode (CODE)
+                    'CATEGORY' => $request->category,
+                    'PRICEBUY' => $request->price_buy,
+                    'PRICESELL' => $request->price_sell,
+                    'TAXCAT' => $request->tax_category,
+                ]);
+
+                // Create supplier link if supplier information provided
+                if ($request->supplier_id && $request->supplier_code) {
+                    SupplierLink::create([
+                        'Barcode' => $request->code,
+                        'SupplierID' => $request->supplier_id,
+                        'SupplierCode' => $request->supplier_code,
+                        'CaseUnits' => $request->units_per_case ?? 1,
+                        'Cost' => $request->supplier_cost ?? $request->price_buy,
+                        'stocked' => true,
+                    ]);
+                }
+
+                // If this product was created from a delivery item, link them
+                if ($request->delivery_item_id) {
+                    $deliveryItem = \App\Models\DeliveryItem::findOrFail($request->delivery_item_id);
+                    $deliveryItem->update([
+                        'product_id' => $product->ID,
+                        'is_new_product' => false,
+                        'barcode' => $product->CODE,
+                    ]);
+                }
+            });
+
+            return redirect()
+                ->route('products.show', $productId)
+                ->with('success', 'Product created successfully!');
+
+        } catch (\Exception $e) {
+            return back()
+                ->withInput()
+                ->withErrors(['error' => 'Failed to create product: '.$e->getMessage()]);
+        }
+    }
+
+    /**
+     * Get UDEA pricing data for a given supplier code via AJAX.
+     */
+    public function getUdeaPricing(Request $request)
+    {
+        $request->validate([
+            'supplier_code' => 'required|string',
+        ]);
+
+        try {
+            $supplierCode = $request->input('supplier_code');
+            $scrapedData = $this->udeaScrapingService->getProductData($supplierCode);
+
+            if (! $scrapedData || ! isset($scrapedData['customer_price'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No UDEA pricing data found for this supplier code',
+                ], 404);
+            }
+
+            // Convert European format (comma) to float for calculations
+            $customerPrice = floatval(str_replace(',', '.', $scrapedData['customer_price']));
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'customer_price' => $customerPrice,
+                    'customer_price_formatted' => $scrapedData['customer_price'],
+                    'case_price' => $scrapedData['case_price'] ?? null,
+                    'description' => $scrapedData['description'] ?? null,
+                    'units_per_case' => $scrapedData['units_per_case'] ?? null,
+                    'scraped_at' => $scrapedData['scraped_at'] ?? null,
+                    'source' => 'udea_scraped',
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to fetch UDEA pricing via AJAX', [
+                'supplier_code' => $request->input('supplier_code'),
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch UDEA pricing: '.$e->getMessage(),
+            ], 500);
+        }
     }
 }

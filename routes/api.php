@@ -31,4 +31,5 @@ Route::middleware('auth')->prefix('deliveries')->group(function () {
     Route::post('/{delivery}/scan', [DeliveryController::class, 'processScan']);
     Route::get('/{delivery}/stats', [DeliveryController::class, 'getStats']);
     Route::patch('/{delivery}/items/{item}/quantity', [DeliveryController::class, 'adjustQuantity']);
+    Route::post('/{delivery}/items', [DeliveryController::class, 'createDeliveryItem']);
 });

@@ -1,28 +1,37 @@
 # OSManager CL
 
-A Laravel 12 application for managing operations with integrated Point of Sale (POS) system connectivity.
+A comprehensive retail operations management system with integrated Point of Sale (POS) connectivity, supplier integration, and delivery verification capabilities.
 
-## Features
+## Overview
 
-- **Authentication**: Username or email login with Laravel Breeze
-- **Dual Database Support**: 
-  - Primary SQLite/MySQL database for application data
-  - Secondary POS connection for uniCenta integration
-- **POS Integration**: 
-  - Product catalog with real-time stock levels
-  - Supplier management and cost tracking
-  - Inventory management integration
-- **Product Management**: 
-  - Product listings with supplier information
-  - Real-time stock quantities from STOCKCURRENT
-  - Margin calculations and cost analysis
-- **Frontend**: Tailwind CSS with Alpine.js and admin layout
-- **Testing**: PHPUnit with comprehensive test suite
-- **Development**: Hot reloading with Vite
+OSManager CL is a Laravel-based application designed to streamline retail operations by integrating with uniCenta POS systems and providing advanced features for inventory management, supplier integration, and delivery processing.
+
+### Key Features
+
+- **🛒 POS Integration**: Real-time product catalog synchronization with uniCenta POS
+- **📦 Delivery Verification**: Mobile-optimized barcode scanning and discrepancy tracking
+- **💰 Advanced Pricing**: VAT-inclusive pricing with 4-decimal precision and margin analysis
+- **🏪 Supplier Integration**: External product images and live price comparisons
+- **📊 Inventory Management**: Real-time stock levels and movement tracking
+- **🔐 Secure Authentication**: Username/email login with role-based access control
+- **📱 Mobile-First Design**: Responsive admin interface optimized for all devices
+
+## Tech Stack
+
+- **Backend**: Laravel 12, PHP 8.2+
+- **Frontend**: Blade templates, Tailwind CSS, Alpine.js
+- **Database**: SQLite (primary), MySQL (POS integration)
+- **Build Tools**: Vite, npm
+- **Testing**: PHPUnit
+- **Authentication**: Laravel Breeze
 
 ## Quick Start
 
 ```bash
+# Clone the repository
+git clone <repository-url>
+cd osmanagercl
+
 # Install dependencies
 composer install
 npm install
@@ -36,98 +45,98 @@ touch database/database.sqlite
 php artisan migrate
 php artisan db:seed --class=AdminUserSeeder
 
-# Start development
+# Configure POS database connection in .env
+# POS_DB_HOST=127.0.0.1
+# POS_DB_DATABASE=unicenta
+# POS_DB_USERNAME=your_username
+# POS_DB_PASSWORD=your_password
+
+# Start development server
 composer run dev
 ```
 
-## Configuration
+### Test Credentials
+- **Username**: `admin`
+- **Email**: `admin@osmanager.local`
+- **Password**: `admin123`
 
-### Primary Database
-The application uses SQLite by default. Configure in `.env`:
+## Project Structure
+
 ```
-DB_CONNECTION=sqlite
-DB_DATABASE=database/database.sqlite
+osmanagercl/
+├── app/                    # Application logic
+│   ├── Http/Controllers/   # Request handlers
+│   ├── Models/            # Eloquent models
+│   ├── Services/          # Business logic
+│   └── Repositories/      # Data access layer
+├── resources/             # Views and assets
+│   ├── views/            # Blade templates
+│   ├── js/               # JavaScript files
+│   └── css/              # Stylesheets
+├── routes/               # Application routes
+├── database/             # Migrations and seeds
+├── tests/                # Test suites
+└── docs/                 # Documentation
 ```
 
-### POS Database (uniCenta)
-Configure the POS database connection in `.env`:
-```
-POS_DB_HOST=127.0.0.1
-POS_DB_PORT=3306
-POS_DB_DATABASE=unicenta
-POS_DB_USERNAME=readonly_user
-POS_DB_PASSWORD=your_password
-```
+## Documentation
 
-## Test Login
+Comprehensive documentation is available in the `docs/` directory:
 
-- **Username:** `admin`
-- **Email:** `admin@osmanager.local`
-- **Password:** `admin123`
+- **[Documentation Index](./docs/README.md)** - Complete documentation overview
+- **[Development Setup](./docs/development/setup.md)** - Detailed setup instructions
+- **[Architecture Overview](./docs/architecture/overview.md)** - System design and patterns
+- **[API Documentation](./docs/api/endpoints.md)** - REST API reference
 
-## Product Management
+### Feature Documentation
+- [POS Integration](./docs/features/pos-integration.md)
+- [Delivery System](./docs/features/delivery-system.md)
+- [Pricing System](./docs/features/pricing-system.md)
+- [Supplier Integration](./docs/features/supplier-integration.md)
 
-The application provides read-only access to the uniCenta POS product catalog:
+## Development
 
-- View all products with pagination
-- Search products by name, code, or reference
-- Filter active (non-service) products
-- View detailed product information
-- Dashboard statistics showing product counts
+### Common Commands
 
-### Demo Script
-Test the POS connection without starting the web server:
 ```bash
-php demo-products.php
+# Run tests
+composer test
+
+# Format code
+./vendor/bin/pint
+
+# Clear caches
+php artisan optimize:clear
+
+# View routes
+php artisan route:list
 ```
 
-## Built With Laravel
-
-This application is built on Laravel - a web application framework with expressive, elegant syntax. Laravel provides:
-
-- [Simple, fast routing engine](https://laravel.com/docs/routing)
-- [Powerful dependency injection container](https://laravel.com/docs/container)
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent)
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations)
-- [Robust background job processing](https://laravel.com/docs/queues)
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting)
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
-
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-## Laravel Sponsors
-
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
-
-### Premium Partners
-
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+For detailed development instructions, see [Development Guide](./docs/development/setup.md).
 
 ## Contributing
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+We welcome contributions! Please see our [Contributing Guidelines](./CONTRIBUTING.md) for details on:
+- Code style and standards
+- Development workflow
+- Testing requirements
+- Pull request process
 
-## Code of Conduct
+## Deployment
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+For production deployment instructions, see [Production Deployment Guide](./docs/deployment/production-guide.md).
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+This project is proprietary software. All rights reserved.
+
+## Support
+
+For support, documentation, or questions:
+- Check the [documentation](./docs/)
+- Review [troubleshooting guide](./docs/development/troubleshooting.md)
+- Contact the development team
+
+---
+
+Built with ❤️ using [Laravel](https://laravel.com) - The PHP Framework for Web Artisans

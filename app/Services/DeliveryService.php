@@ -244,17 +244,39 @@ class DeliveryService
         DB::transaction(function () use ($deliveryId) {
             $delivery = Delivery::with('items')->findOrFail($deliveryId);
 
+            $processedItems = 0;
+            $skippedNewProducts = [];
+
             foreach ($delivery->items as $item) {
                 if ($item->product_id && $item->received_quantity > 0) {
-                    // Update stock in POS system
+                    // Update stock in POS system for existing products
                     $this->updateProductStock($item->product_id, $item->received_quantity);
 
                     // Update cost price if different
                     if ($item->unit_cost != $item->product->PRICEBUY) {
                         $item->product->update(['PRICEBUY' => $item->unit_cost]);
                     }
+
+                    $processedItems++;
+                } elseif ($item->is_new_product && $item->received_quantity > 0) {
+                    // Track new products that need manual POS integration
+                    $skippedNewProducts[] = [
+                        'supplier_code' => $item->supplier_code,
+                        'description' => $item->description,
+                        'barcode' => $item->barcode,
+                        'received_quantity' => $item->received_quantity,
+                        'unit_cost' => $item->unit_cost,
+                    ];
                 }
             }
+
+            // Log information about the completion
+            Log::info('Delivery completed', [
+                'delivery_id' => $deliveryId,
+                'processed_items' => $processedItems,
+                'new_products_requiring_pos_integration' => count($skippedNewProducts),
+                'new_products' => $skippedNewProducts,
+            ]);
 
             $delivery->update([
                 'status' => 'completed',
@@ -295,5 +317,42 @@ class DeliveryService
 
             return null;
         }
+    }
+
+    /**
+     * Create a new delivery item manually
+     */
+    public function createDeliveryItem(Delivery $delivery, array $itemData): DeliveryItem
+    {
+        // Try to find existing product by supplier code
+        $product = $this->findProductBySupplierCode($delivery->supplier_id, $itemData['supplier_code']);
+
+        // Calculate total cost
+        $totalCost = $itemData['ordered_quantity'] * $itemData['unit_cost'];
+
+        // Create the delivery item
+        $deliveryItem = DeliveryItem::create([
+            'delivery_id' => $delivery->id,
+            'supplier_code' => $itemData['supplier_code'],
+            'description' => $itemData['description'],
+            'barcode' => $itemData['barcode'] ?: ($product?->CODE ?? null),
+            'units_per_case' => $itemData['units_per_case'] ?? 1,
+            'unit_cost' => $itemData['unit_cost'],
+            'ordered_quantity' => $itemData['ordered_quantity'],
+            'total_cost' => $totalCost,
+            'product_id' => $product?->ID,
+            'is_new_product' => ! $product,
+            'received_quantity' => 0,
+            'status' => 'pending',
+        ]);
+
+        // If this is a new product and we don't have a barcode, queue barcode retrieval
+        if ($deliveryItem->is_new_product && ! $deliveryItem->barcode) {
+            RetrieveBarcodeJob::dispatch($deliveryItem)
+                ->delay(now()->addSeconds(2))
+                ->onQueue('barcode-retrieval');
+        }
+
+        return $deliveryItem;
     }
 }

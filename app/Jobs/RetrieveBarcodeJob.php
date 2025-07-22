@@ -50,16 +50,16 @@ class RetrieveBarcodeJob implements ShouldQueue
 
             if ($productData && isset($productData['barcode'])) {
                 $this->deliveryItem->update(['barcode' => $productData['barcode']]);
-                
+
                 Log::info("Successfully retrieved barcode: {$productData['barcode']} for supplier code: {$this->deliveryItem->supplier_code}");
             } else {
                 Log::warning("No barcode data returned for supplier code: {$this->deliveryItem->supplier_code}");
-                
+
                 // Mark as failed barcode retrieval after all attempts
                 if ($this->attempts() >= $this->tries) {
                     $this->deliveryItem->update([
                         'barcode_retrieval_failed' => true,
-                        'barcode_retrieval_error' => 'No barcode data found after ' . $this->tries . ' attempts'
+                        'barcode_retrieval_error' => 'No barcode data found after '.$this->tries.' attempts',
                     ]);
                 }
             }
@@ -73,7 +73,7 @@ class RetrieveBarcodeJob implements ShouldQueue
             if ($this->attempts() >= $this->tries) {
                 $this->deliveryItem->update([
                     'barcode_retrieval_failed' => true,
-                    'barcode_retrieval_error' => $e->getMessage()
+                    'barcode_retrieval_error' => $e->getMessage(),
                 ]);
             }
 

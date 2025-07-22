@@ -61,25 +61,25 @@ class DeliveryController extends Controller
         try {
             // Validate that file upload was successful
             $uploadedFile = $request->file('csv_file');
-            if (!$uploadedFile || !$uploadedFile->isValid()) {
+            if (! $uploadedFile || ! $uploadedFile->isValid()) {
                 throw new \Exception('File upload failed or file is invalid');
             }
 
             // Store the uploaded file
             $csvPath = $uploadedFile->store('temp');
-            if (!$csvPath) {
+            if (! $csvPath) {
                 throw new \Exception('Failed to store uploaded file');
             }
 
             $fullPath = Storage::disk('local')->path($csvPath);
-            
+
             // Verify the file exists after upload
-            if (!file_exists($fullPath)) {
+            if (! file_exists($fullPath)) {
                 throw new \Exception('Uploaded file not found at: '.$fullPath);
             }
 
             // Verify file is readable
-            if (!is_readable($fullPath)) {
+            if (! is_readable($fullPath)) {
                 throw new \Exception('Uploaded file is not readable: '.$fullPath);
             }
 
@@ -104,7 +104,7 @@ class DeliveryController extends Controller
             if (isset($fullPath) && file_exists($fullPath)) {
                 unlink($fullPath);
             }
-            
+
             return back()
                 ->withInput()
                 ->withErrors(['csv_file' => 'Failed to import CSV: '.$e->getMessage()]);
@@ -126,7 +126,7 @@ class DeliveryController extends Controller
                 'items' => $delivery->items->map(function ($item) {
                     $imageUrl = null;
                     $hasIntegration = false;
-                    
+
                     if ($item->product && $item->product->supplier && $this->supplierService->hasExternalIntegration($item->product->supplier->SupplierID)) {
                         // Existing product with supplier integration
                         $imageUrl = $this->supplierService->getExternalImageUrl($item->product);
@@ -167,7 +167,10 @@ class DeliveryController extends Controller
             $delivery->update(['status' => 'receiving']);
         }
 
-        return view('deliveries.scan', compact('delivery'))->with('supplierService', $this->supplierService);
+        // Process items with supplier integration data
+        $processedItems = $delivery->items->map(fn ($item) => $this->formatDeliveryItem($item, $delivery));
+
+        return view('deliveries.scan', compact('delivery', 'processedItems'));
     }
 
     /**
@@ -187,6 +190,15 @@ class DeliveryController extends Controller
             auth()->user()->name ?? 'System'
         );
 
+        // Format the item data if scan was successful
+        if ($result['success'] && isset($result['item'])) {
+            $item = \App\Models\DeliveryItem::find($result['item']['id']);
+            if ($item) {
+                $item->load('product.supplier');
+                $result['item'] = $this->formatDeliveryItem($item, $delivery);
+            }
+        }
+
         return response()->json($result);
     }
 
@@ -204,7 +216,7 @@ class DeliveryController extends Controller
 
         return response()->json([
             'success' => true,
-            'item' => $item->fresh(),
+            'item' => $this->formatDeliveryItem($item->fresh(['product.supplier']), $delivery),
             'message' => 'Quantity updated successfully',
         ]);
     }
@@ -333,5 +345,109 @@ class DeliveryController extends Controller
                 'message' => 'Error retrieving barcode: '.$e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Create a new delivery item manually
+     */
+    public function createDeliveryItem(Request $request, Delivery $delivery): JsonResponse
+    {
+        // Validate the request
+        $request->validate([
+            'supplier_code' => 'required|string|max:255',
+            'description' => 'required|string|max:255',
+            'barcode' => 'nullable|string|max:255',
+            'ordered_quantity' => 'required|integer|min:1|max:9999',
+            'unit_cost' => 'required|numeric|min:0|max:999999.99',
+            'units_per_case' => 'nullable|integer|min:1|max:9999',
+        ]);
+
+        // Only allow creating items for non-completed deliveries
+        if ($delivery->status === 'completed') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot add items to completed delivery',
+            ], 422);
+        }
+
+        try {
+            // Create the delivery item
+            $deliveryItem = $this->deliveryService->createDeliveryItem($delivery, [
+                'supplier_code' => $request->supplier_code,
+                'description' => $request->description,
+                'barcode' => $request->barcode,
+                'unit_cost' => $request->unit_cost,
+                'ordered_quantity' => $request->ordered_quantity,
+                'units_per_case' => $request->units_per_case ?? 1,
+            ]);
+
+            // Load relationships for response
+            $deliveryItem->load(['product.supplier']);
+
+            // Prepare response data similar to what the scan interface expects
+            $itemData = [
+                'id' => $deliveryItem->id,
+                'supplier_code' => $deliveryItem->supplier_code,
+                'description' => $deliveryItem->description,
+                'barcode' => $deliveryItem->barcode,
+                'ordered_quantity' => $deliveryItem->ordered_quantity,
+                'received_quantity' => $deliveryItem->received_quantity,
+                'unit_cost' => $deliveryItem->unit_cost,
+                'status' => $deliveryItem->status,
+                'is_new_product' => $deliveryItem->is_new_product,
+                'has_external_integration' => false,
+                'external_image_url' => null,
+                'product' => null,
+            ];
+
+            // Check for external integration
+            if ($deliveryItem->barcode && $this->supplierService->hasExternalIntegration($delivery->supplier_id)) {
+                $itemData['has_external_integration'] = true;
+                $itemData['external_image_url'] = $this->supplierService->getExternalImageUrlByBarcode($delivery->supplier_id, $deliveryItem->barcode);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Product added successfully',
+                'item' => $itemData,
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create product: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Format delivery item with consistent supplier integration data
+     */
+    private function formatDeliveryItem($item, $delivery)
+    {
+        $itemData = $item->toArray();
+        if ($item->product && $item->product->supplier) {
+            $itemData['has_external_integration'] = $this->supplierService->hasExternalIntegration($item->product->supplier->SupplierID);
+            $itemData['external_image_url'] = $this->supplierService->getExternalImageUrl($item->product);
+            $itemData['product'] = [
+                'id' => $item->product->ID,
+                'name' => $item->product->NAME,
+                'supplier' => $item->product->supplier ? $item->product->supplier->toArray() : null,
+            ];
+        } else {
+            // For new products, check if we have barcode and supplier integration
+            if ($item->barcode && $item->is_new_product) {
+                // Use delivery supplier ID for integration check
+                $supplierId = $delivery->supplier_id;
+                $itemData['has_external_integration'] = $this->supplierService->hasExternalIntegration($supplierId);
+                $itemData['external_image_url'] = $this->supplierService->getExternalImageUrlByBarcode($supplierId, $item->barcode);
+            } else {
+                $itemData['has_external_integration'] = false;
+                $itemData['external_image_url'] = null;
+            }
+            $itemData['product'] = null;
+        }
+
+        return $itemData;
     }
 }

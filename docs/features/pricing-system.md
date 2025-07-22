@@ -25,6 +25,7 @@ The pricing system has been redesigned to provide a consolidated interface for m
 - **Transport cost calculation**: Automatic 15% transport cost addition
 - **Customer price extraction**: Retrieves retail prices from supplier product pages
 - **Discount detection**: Identifies and tracks temporary supplier discounts
+- **Delivery Integration**: Automatic pricing for new products from UDEA deliveries
 
 ### 4. High-Precision Calculations
 - **4-decimal precision**: PRICESELL field stores up to 4 decimal places
@@ -53,6 +54,8 @@ Clean supplier information display:
 #### UdeaScrapingService (`app/Services/UdeaScrapingService.php`)
 Enhanced supplier data integration:
 - Customer price extraction from product detail pages
+- **Improved product name extraction using detail page structure**
+- **Full product name format**: "Brand ProductName Size" (e.g., "Ice Cream Factory Almond Choc 120 ml")
 - Improved price parsing with largest-price logic
 - Dutch/English language support
 - 1-hour caching with rate limiting
@@ -80,6 +83,35 @@ $request->validate([
 - Direct cost price entry
 - Maintains existing functionality
 - Used for non-supplier products
+
+### Delivery-Based Pricing (UDEA Integration)
+- **Automatic Detection**: Recognizes UDEA suppliers during product creation from deliveries
+- **Scraped Customer Prices**: Uses real UDEA retail prices instead of calculated markup
+- **Enhanced Product Names**: Extracts complete product names in "Brand ProductName Size" format
+- **Smart Fallback**: Falls back to 30% markup if scraping fails or unavailable
+- **Visual Indicators**: Green badges for scraped prices, blue for calculated prices
+- **User Control**: Prices can be manually adjusted before saving product
+- **Real-time Updates**: AJAX endpoint available for dynamic price fetching
+
+#### Product Name Extraction
+The system now uses an improved extraction method that:
+- **Fetches detail pages** from UDEA for complete product information
+- **Extracts components separately**:
+  - Product name from `<h2 class="prod-title">Almond Choc</h2>`
+  - Brand from `<div class="detail-subtitle"><strong>Ice Cream Factory</strong></div>`
+  - Size from `<span class="prod-qty">120 ml</span>`
+- **Constructs full names** in consistent format: "Ice Cream Factory Almond Choc 120 ml"
+- **Replaces complex patterns** with simple, reliable HTML parsing
+- **Provides comprehensive logging** for debugging and monitoring
+
+#### Enhanced Product Creation Interface
+When creating products from UDEA delivery items, the system now provides:
+- **Delivery vs Scraped Name Comparison**: Shows both the delivery description and enhanced scraped name
+- **Visual Name Enhancement**: Green info box highlighting the improved product name format
+- **One-Click Name Update**: "Use This Name" button to replace delivery description with scraped name
+- **User Choice Preservation**: Users can choose to keep delivery description or use enhanced name
+- **Visual Feedback**: Button animation and field highlighting when name is updated
+- **Non-Disruptive**: Only appears when scraped name differs from delivery description
 
 ### 2. VAT-Inclusive Selling Price
 - **Input**: Final selling price including VAT

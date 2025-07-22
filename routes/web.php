@@ -24,10 +24,13 @@ Route::middleware('auth')->group(function () {
 
     // Product routes
     Route::get('/products', [ProductController::class, 'index'])->name('products.index');
+    Route::get('/products/create', [ProductController::class, 'create'])->name('products.create');
+    Route::post('/products', [ProductController::class, 'store'])->name('products.store');
     Route::get('/products/suppliers', [ProductController::class, 'suppliersIndex'])->name('products.suppliers');
     Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show');
     Route::get('/products/{id}/sales-data', [ProductController::class, 'salesData'])->name('products.sales-data');
     Route::get('/products/{id}/refresh-udea-pricing', [ProductController::class, 'refreshUdeaPricing'])->name('products.refresh-udea-pricing');
+    Route::get('/products/udea-pricing', [ProductController::class, 'getUdeaPricing'])->name('products.udea-pricing');
     Route::patch('/products/{id}/tax', [ProductController::class, 'updateTax'])->name('products.update-tax');
     Route::patch('/products/{id}/price', [ProductController::class, 'updatePrice'])->name('products.update-price');
     Route::patch('/products/{id}/cost', [ProductController::class, 'updateCost'])->name('products.update-cost');
@@ -50,6 +53,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/client', [TestScraperController::class, 'clientFetch'])->name('client');
         Route::get('/dashboard', [TestScraperController::class, 'dashboard'])->name('dashboard');
         Route::get('/customer-price/{productCode}', [TestScraperController::class, 'testCustomerPrice'])->name('customer-price');
+        Route::get('/language-debug', [\App\Http\Controllers\LanguageDebugController::class, 'testLanguageControl'])->name('language-debug');
+        Route::get('/english-search-test', [\App\Http\Controllers\EnglishSearchTestController::class, 'testEnglishSearch'])->name('english-search-test');
+        Route::get('/authentication-test', [\App\Http\Controllers\AuthenticationTestController::class, 'testAuthentication'])->name('authentication-test');
+        Route::get('/language-flag-test', [\App\Http\Controllers\LanguageFlagTestController::class, 'testLanguageFlag'])->name('language-flag-test');
+        Route::get('/specific-product-test', [\App\Http\Controllers\SpecificProductTestController::class, 'testSpecificProduct'])->name('specific-product-test');
     });
 
     // Debug routes for testing supplier tables

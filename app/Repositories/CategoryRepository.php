@@ -147,8 +147,8 @@ class CategoryRepository
     public function getDescendantIds(string $categoryId): array
     {
         $category = $this->findById($categoryId);
-        
-        if (!$category) {
+
+        if (! $category) {
             return [];
         }
 
@@ -168,8 +168,8 @@ class CategoryRepository
     public function getBreadcrumbs(string $categoryId): array
     {
         $category = $this->findById($categoryId);
-        
-        if (!$category) {
+
+        if (! $category) {
             return [];
         }
 
@@ -180,7 +180,7 @@ class CategoryRepository
             array_unshift($breadcrumbs, [
                 'id' => $current->ID,
                 'name' => $current->NAME,
-                'url' => route('products.index', ['category' => $current->ID])
+                'url' => route('products.index', ['category' => $current->ID]),
             ]);
             $current = $current->parent;
         }

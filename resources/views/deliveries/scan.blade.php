@@ -3,8 +3,8 @@
         <div class="flex justify-between items-center">
             <h2 class="text-2xl font-bold">Delivery Scanning - {{ $delivery->delivery_number }}</h2>
             <div class="flex items-center gap-4">
-                <span class="text-sm text-gray-600">Supplier: {{ $delivery->supplier->Supplier ?? 'Unknown' }}</span>
-                <span class="text-sm text-gray-600">Date: {{ $delivery->delivery_date->format('d/m/Y') }}</span>
+                <span class="text-sm text-gray-600">Supplier: {{ $delivery->supplier?->Supplier ?? 'Unknown' }}</span>
+                <span class="text-sm text-gray-600">Date: {{ $delivery->delivery_date?->format('d/m/Y') ?? 'No Date' }}</span>
             </div>
         </div>
     </x-slot>
@@ -43,7 +43,7 @@
                         </div>
                         <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
                             <div class="bg-green-600 h-2 rounded-full transition-all duration-300" 
-                                 :style="{width: (stats.complete / stats.total * 100) + '%'}"></div>
+                                 :style="{width: stats.total > 0 ? (stats.complete / stats.total * 100) + '%' : '0%'}"></div>
                         </div>
                     </div>
                 </div>
@@ -84,27 +84,51 @@
                 <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                     <div class="flex items-center justify-between">
                         <h3 class="text-lg font-medium">Delivery Items</h3>
-                        <div class="flex gap-2">
-                            <button @click="filter = 'all'" 
-                                    :class="filter === 'all' ? 'bg-gray-200 dark:bg-gray-700' : ''"
-                                    class="px-3 py-1 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
-                                All
-                            </button>
-                            <button @click="filter = 'pending'" 
-                                    :class="filter === 'pending' ? 'bg-red-200 dark:bg-red-900/30' : ''"
-                                    class="px-3 py-1 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
-                                Missing
-                            </button>
-                            <button @click="filter = 'partial'" 
-                                    :class="filter === 'partial' ? 'bg-yellow-200 dark:bg-yellow-900/30' : ''"
-                                    class="px-3 py-1 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
-                                Partial
-                            </button>
-                            <button @click="filter = 'discrepancy'" 
-                                    :class="filter === 'discrepancy' ? 'bg-orange-200 dark:bg-orange-900/30' : ''"
-                                    class="px-3 py-1 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
-                                Discrepancies
-                            </button>
+                        <div class="flex items-center gap-4">
+                            <!-- Create New Product Link -->
+                            <a href="{{ route('products.create') }}" 
+                               class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-md transition-colors duration-200 flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                </svg>
+                                Create Product
+                            </a>
+                            
+                            <!-- Sort Dropdown -->
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm text-gray-600 dark:text-gray-400">Sort by:</span>
+                                <select x-model="sortBy" 
+                                        class="text-sm border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md">
+                                    <option value="new_first">New Products First</option>
+                                    <option value="code">Code</option>
+                                    <option value="description">Description</option>
+                                    <option value="status">Status</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Filter Buttons -->
+                            <div class="flex gap-2">
+                                <button @click="filter = 'all'" 
+                                        :class="filter === 'all' ? 'bg-gray-200 dark:bg-gray-700' : ''"
+                                        class="px-3 py-1 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+                                    All
+                                </button>
+                                <button @click="filter = 'pending'" 
+                                        :class="filter === 'pending' ? 'bg-red-200 dark:bg-red-900/30' : ''"
+                                        class="px-3 py-1 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+                                    Missing
+                                </button>
+                                <button @click="filter = 'partial'" 
+                                        :class="filter === 'partial' ? 'bg-yellow-200 dark:bg-yellow-900/30' : ''"
+                                        class="px-3 py-1 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+                                    Partial
+                                </button>
+                                <button @click="filter = 'discrepancy'" 
+                                        :class="filter === 'discrepancy' ? 'bg-orange-200 dark:bg-orange-900/30' : ''"
+                                        class="px-3 py-1 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+                                    Discrepancies
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -240,33 +264,10 @@
                 deliveryId: deliveryId,
                 barcode: '',
                 quantity: 1,
-                items: @json($delivery->items->map(function($item) use ($supplierService) {
-                    $itemData = $item->toArray();
-                    if ($item->product && $item->product->supplier) {
-                        $itemData['has_external_integration'] = $supplierService->hasExternalIntegration($item->product->supplier->SupplierID);
-                        $itemData['external_image_url'] = $supplierService->getExternalImageUrl($item->product);
-                        $itemData['product'] = [
-                            'id' => $item->product->ID,
-                            'name' => $item->product->NAME,
-                            'supplier' => $item->product->supplier ? $item->product->supplier->toArray() : null
-                        ];
-                    } else {
-                        // For new products, check if we have barcode and supplier integration
-                        if ($item->barcode && $item->is_new_product) {
-                            // Use delivery supplier ID for integration check
-                            $supplierId = $delivery->supplier_id;
-                            $itemData['has_external_integration'] = $supplierService->hasExternalIntegration($supplierId);
-                            $itemData['external_image_url'] = $supplierService->getExternalImageUrlByBarcode($supplierId, $item->barcode);
-                        } else {
-                            $itemData['has_external_integration'] = false;
-                            $itemData['external_image_url'] = null;
-                        }
-                        $itemData['product'] = null;
-                    }
-                    return $itemData;
-                })),
+                items: @json($processedItems),
                 lastScan: null,
                 filter: 'all',
+                sortBy: 'new_first', // new_first, code, description, status
                 stats: {
                     total: 0,
                     complete: 0,
@@ -282,11 +283,40 @@
                 },
                 
                 get filteredItems() {
-                    if (this.filter === 'all') return this.items;
-                    if (this.filter === 'discrepancy') {
-                        return this.items.filter(item => ['partial', 'pending', 'excess'].includes(item.status));
+                    let filtered = [];
+                    if (this.filter === 'all') {
+                        filtered = this.items;
+                    } else if (this.filter === 'discrepancy') {
+                        filtered = this.items.filter(item => ['partial', 'pending', 'excess'].includes(item.status));
+                    } else {
+                        filtered = this.items.filter(item => item.status === this.filter);
                     }
-                    return this.items.filter(item => item.status === this.filter);
+                    
+                    // Apply sorting
+                    return this.sortItems(filtered);
+                },
+                
+                sortItems(items) {
+                    switch (this.sortBy) {
+                        case 'new_first':
+                            return [...items].sort((a, b) => {
+                                // New products first, then by supplier code
+                                if (a.is_new_product && !b.is_new_product) return -1;
+                                if (!a.is_new_product && b.is_new_product) return 1;
+                                return (a.supplier_code || '').localeCompare(b.supplier_code || '');
+                            });
+                        case 'code':
+                            return [...items].sort((a, b) => (a.supplier_code || '').localeCompare(b.supplier_code || ''));
+                        case 'description':
+                            return [...items].sort((a, b) => (a.description || '').localeCompare(b.description || ''));
+                        case 'status':
+                            return [...items].sort((a, b) => {
+                                const statusOrder = { pending: 0, partial: 1, excess: 2, complete: 3 };
+                                return (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99);
+                            });
+                        default:
+                            return items;
+                    }
                 },
                 
                 async processScan() {

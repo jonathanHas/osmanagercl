@@ -200,53 +200,68 @@ class UdeaScrapingService
             'barcode' => null,
         ];
 
-        // Extract product name/title - try multiple patterns
-        // Pattern 1: Look for product name in h3 with prod-title class and span with title attribute
-        if (preg_match('/<h3[^>]*class="[^"]*prod-title[^"]*"[^>]*>.*?<span[^>]*title="([^"]*)"[^>]*>([^<]+)</', $html, $matches)) {
-            $data['description'] = trim($matches[1]); // Use title attribute first as it's more complete
-            if (empty($data['description'])) {
-                $data['description'] = trim($matches[2]); // Fallback to span content
-            }
-        }
-        // Pattern 2: Look for product name directly in prod-title
-        elseif (preg_match('/<h3[^>]*class="[^"]*prod-title[^"]*"[^>]*>([^<]+)</', $html, $matches)) {
-            $data['description'] = trim($matches[1]);
-        }
-        // Pattern 3: Look for "Agar-agar" or similar product names (hyphenated words)
-        elseif (preg_match('/>\s*([A-Za-z]+-[A-Za-z]+)\s*</', $html, $matches)) {
-            $data['description'] = trim($matches[1]);
-        }
-        // Pattern 4: Look for product names in title attributes more broadly
-        elseif (preg_match('/title="([^"]+)"[^>]*>([^<]+)</', $html, $matches)) {
-            // If title is more descriptive than content, use title
-            $title = trim($matches[1]);
-            $content = trim($matches[2]);
-            $data['description'] = strlen($title) > strlen($content) ? $title : $content;
-        }
-        // Pattern 5: Search for "Agar" anywhere in the HTML and extract surrounding context
-        elseif (preg_match('/([A-Za-z-]*[Aa]gar[A-Za-z-]*)/', $html, $matches)) {
-            $data['description'] = trim($matches[1]);
-        }
+        // NEW: Try to extract full product name using the .volume div structure first
+        $fullProductName = $this->extractFullProductName($html);
+        if ($fullProductName) {
+            $data['description'] = $fullProductName;
+            Log::info('Udea product name extraction - NEW method successful', [
+                'product_code' => $productCode,
+                'full_product_name' => $fullProductName,
+                'method' => 'volume_div_extraction',
+            ]);
+        } else {
+            // FALLBACK: Use legacy extraction logic if new method fails
+            Log::info('Udea product name extraction - falling back to legacy method', [
+                'product_code' => $productCode,
+            ]);
 
-        // If no description found yet but we know agar is in the HTML, try more patterns
-        if (empty($data['description']) && str_contains(strtolower($html), 'agar')) {
-            // Look for agar-agar specifically anywhere in the HTML
-            if (preg_match('/(agar-agar)/i', $html, $matches)) {
-                $data['description'] = 'Agar-agar';
+            // Pattern 1: Look for product name in h3 with prod-title class and span with title attribute
+            if (preg_match('/<h3[^>]*class="[^"]*prod-title[^"]*"[^>]*>.*?<span[^>]*title="([^"]*)"[^>]*>([^<]+)</', $html, $matches)) {
+                $data['description'] = trim($matches[1]); // Use title attribute first as it's more complete
+                if (empty($data['description'])) {
+                    $data['description'] = trim($matches[2]); // Fallback to span content
+                }
             }
-            // Look for any word containing agar
-            elseif (preg_match('/\b(\w*agar\w*)\b/i', $html, $matches)) {
-                $data['description'] = $matches[1];
+            // Pattern 2: Look for product name directly in prod-title
+            elseif (preg_match('/<h3[^>]*class="[^"]*prod-title[^"]*"[^>]*>([^<]+)</', $html, $matches)) {
+                $data['description'] = trim($matches[1]);
             }
-        }
+            // Pattern 3: Look for "Agar-agar" or similar product names (hyphenated words)
+            elseif (preg_match('/>\s*([A-Za-z]+-[A-Za-z]+)\s*</', $html, $matches)) {
+                $data['description'] = trim($matches[1]);
+            }
+            // Pattern 4: Look for product names in title attributes more broadly
+            elseif (preg_match('/title="([^"]+)"[^>]*>([^<]+)</', $html, $matches)) {
+                // If title is more descriptive than content, use title
+                $title = trim($matches[1]);
+                $content = trim($matches[2]);
+                $data['description'] = strlen($title) > strlen($content) ? $title : $content;
+            }
+            // Pattern 5: Search for "Agar" anywhere in the HTML and extract surrounding context
+            elseif (preg_match('/([A-Za-z-]*[Aa]gar[A-Za-z-]*)/', $html, $matches)) {
+                $data['description'] = trim($matches[1]);
+            }
 
-        // Log debug info for product name extraction
-        Log::info('Udea product name extraction debug', [
-            'product_code' => $productCode,
-            'description_found' => $data['description'] ?? 'NONE',
-            'html_contains_agar' => str_contains(strtolower($html), 'agar'),
-            'html_contains_agar_agar' => str_contains(strtolower($html), 'agar-agar'),
-        ]);
+            // If no description found yet but we know agar is in the HTML, try more patterns
+            if (empty($data['description']) && str_contains(strtolower($html), 'agar')) {
+                // Look for agar-agar specifically anywhere in the HTML
+                if (preg_match('/(agar-agar)/i', $html, $matches)) {
+                    $data['description'] = 'Agar-agar';
+                }
+                // Look for any word containing agar
+                elseif (preg_match('/\b(\w*agar\w*)\b/i', $html, $matches)) {
+                    $data['description'] = $matches[1];
+                }
+            }
+
+            // Log debug info for legacy product name extraction
+            Log::info('Udea product name extraction debug - legacy method', [
+                'product_code' => $productCode,
+                'description_found' => $data['description'] ?? 'NONE',
+                'html_contains_agar' => str_contains(strtolower($html), 'agar'),
+                'html_contains_agar_agar' => str_contains(strtolower($html), 'agar-agar'),
+            ]);
+        }
 
         // Extract brand from .volume-sub-title
         if (preg_match('/<div[^>]*class="[^"]*volume-sub-title[^"]*"[^>]*>\s*([^<\s]+)/', $html, $matches)) {
@@ -384,7 +399,7 @@ class UdeaScrapingService
                     $detailHtml = (string) $response->getBody();
 
                     // Extract EAN/barcode - Try multiple patterns
-                    
+
                     // Pattern 1: HTML table format - <td class="wt-semi">EAN</td><td>8711521021925</td>
                     if (preg_match('/<td[^>]*class="[^"]*wt-semi[^"]*"[^>]*>(?:EAN|Barcode|GTIN)<\/td>\s*<td[^>]*>(\d{8,13})<\/td>/i', $detailHtml, $barcodeMatches)) {
                         $barcode = $barcodeMatches[1];
@@ -397,7 +412,7 @@ class UdeaScrapingService
 
                         return $barcode;
                     }
-                    
+
                     // Pattern 2: Alternative table format - <td>EAN</td><td>8711521021925</td> (without class)
                     if (preg_match('/<td[^>]*>(?:EAN|Barcode|GTIN)<\/td>\s*<td[^>]*>(\d{8,13})<\/td>/i', $detailHtml, $barcodeMatches)) {
                         $barcode = $barcodeMatches[1];
@@ -410,7 +425,7 @@ class UdeaScrapingService
 
                         return $barcode;
                     }
-                    
+
                     // Pattern 3: Original format - "EAN: 8718976017046" or similar
                     if (preg_match('/(?:EAN|Barcode):\s*(\d{8,13})/', $detailHtml, $barcodeMatches)) {
                         $barcode = $barcodeMatches[1];
@@ -636,6 +651,136 @@ class UdeaScrapingService
         } else {
             Cache::flush();
         }
+    }
+
+    public function getProductDataForDeliveryItem(\App\Models\DeliveryItem $item): ?array
+    {
+        if (! $item->supplier_code) {
+            Log::info('UdeaScrapingService: No supplier code for delivery item', [
+                'delivery_item_id' => $item->id,
+            ]);
+
+            return null;
+        }
+
+        Log::info('UdeaScrapingService: Getting product data for delivery item', [
+            'delivery_item_id' => $item->id,
+            'supplier_code' => $item->supplier_code,
+        ]);
+
+        // Use existing getProductData method
+        return $this->getProductData($item->supplier_code);
+    }
+
+    /**
+     * Extract full product name from UDEA detail page HTML using prod-display-col-top structure
+     * Format: "Brand ProductName Size" (e.g. "Ice Cream Factory Almond Choc 120 ml")
+     */
+    private function extractFullProductName(string $html): ?string
+    {
+        // First, try to get the detail page if we have search results
+        $detailHtml = $this->getDetailPageHtml($html);
+        if (! $detailHtml) {
+            Log::info('UDEA name extraction: could not get detail page HTML');
+            return null;
+        }
+
+        $brand = null;
+        $productName = null;
+        $size = null;
+
+        // Extract product name from h2.prod-title (simple and reliable)
+        if (preg_match('/<h2[^>]*class="[^"]*prod-title[^"]*"[^>]*>\s*([^<]+?)\s*<\/h2>/is', $detailHtml, $nameMatches)) {
+            $productName = trim($nameMatches[1]);
+            Log::info('UDEA name extraction: product name found from h2.prod-title', [
+                'product_name' => $productName,
+            ]);
+        } else {
+            Log::info('UDEA name extraction: product name not found in h2.prod-title');
+        }
+
+        // Extract brand from detail-subtitle strong tag (clean and direct)
+        if (preg_match('/<div[^>]*class="[^"]*detail-subtitle[^"]*"[^>]*>.*?<strong>\s*([^<]+?)\s*<\/strong>/is', $detailHtml, $brandMatches)) {
+            $brand = trim($brandMatches[1]);
+            Log::info('UDEA name extraction: brand found from detail-subtitle', [
+                'brand' => $brand,
+            ]);
+        } else {
+            Log::info('UDEA name extraction: brand not found in detail-subtitle');
+        }
+
+        // Extract size from span.prod-qty (straightforward pattern)
+        if (preg_match('/<span[^>]*class="[^"]*prod-qty[^"]*"[^>]*>\s*([^<]+?)\s*<\/span>/is', $detailHtml, $sizeMatches)) {
+            $size = trim($sizeMatches[1]);
+            Log::info('UDEA name extraction: size found from span.prod-qty', [
+                'size' => $size,
+            ]);
+        } else {
+            Log::info('UDEA name extraction: size not found in span.prod-qty');
+        }
+
+        // Construct full name from available components
+        $components = array_filter([$brand, $productName, $size], function ($value) {
+            return ! empty($value);
+        });
+
+        if (empty($components)) {
+            Log::info('UDEA name extraction: no components found');
+            return null;
+        }
+
+        $fullName = implode(' ', $components);
+
+        Log::info('UDEA full product name extracted - SUCCESS (detail page method)', [
+            'brand' => $brand,
+            'product_name' => $productName,
+            'size' => $size,
+            'full_name' => $fullName,
+            'components_count' => count($components),
+        ]);
+
+        return $fullName;
+    }
+
+    /**
+     * Get detail page HTML from search results or use provided HTML if already detail page
+     */
+    private function getDetailPageHtml(string $searchHtml): ?string
+    {
+        // Check if this is already a detail page (contains prod-display-col-top)
+        if (strpos($searchHtml, 'prod-display-col-top') !== false) {
+            Log::info('UDEA name extraction: already on detail page');
+            return $searchHtml;
+        }
+
+        // Try to extract detail URL from search results and fetch detail page
+        try {
+            if (strpos($searchHtml, 'id="productsLists"') !== false) {
+                $productsListPos = strpos($searchHtml, 'id="productsLists"');
+                $searchFromPos = substr($searchHtml, $productsListPos);
+
+                // Look for detail link
+                if (preg_match('/<a[^>]*href="(https:\/\/www\.udea\.nl\/product(?:en|s)\/product\/[^"]+)"[^>]*class="[^"]*detail-image[^"]*"/', $searchFromPos, $matches)) {
+                    $detailUrl = $matches[1];
+                    
+                    Log::info('UDEA name extraction: fetching detail page', [
+                        'detail_url' => $detailUrl,
+                    ]);
+
+                    // Fetch the detail page
+                    $response = $this->client->get($detailUrl);
+                    $detailHtml = (string) $response->getBody();
+
+                    return $detailHtml;
+                }
+            }
+        } catch (Exception $e) {
+            Log::error('UDEA name extraction: failed to fetch detail page', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return null;
     }
 
     public function queueProductScraping(

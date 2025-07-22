@@ -147,7 +147,32 @@
             <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg overflow-hidden">
                 <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                     <div class="flex justify-between items-center">
-                        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Delivery Items</h3>
+                        <div class="flex items-center gap-4">
+                            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Delivery Items</h3>
+                            
+                            @if($delivery->status !== 'completed')
+                                <!-- Create New Product Button -->
+                                <button onclick="alert('New product creation is available in the scanning interface. Use the \'Continue Scanning\' button above.')" 
+                                        class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-md transition-colors duration-200 flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                    </svg>
+                                    New Product
+                                </button>
+                            @endif
+                            
+                            <!-- Sort Dropdown -->
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm text-gray-600 dark:text-gray-400">Sort by:</span>
+                                <select id="sortSelect" onchange="sortDeliveryItems()" 
+                                        class="text-sm border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md">
+                                    <option value="new_first">New Products First</option>
+                                    <option value="code">Code</option>
+                                    <option value="description">Description</option>
+                                    <option value="status">Status</option>
+                                </select>
+                            </div>
+                        </div>
                         <div class="flex gap-2">
                             <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded">
                                 {{ $delivery->items->where('status', 'pending')->count() }} Pending
@@ -309,14 +334,26 @@
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 text-right text-sm font-medium">
-                                        @if($item->is_new_product && !$item->barcode)
-                                            <button type="button" 
-                                                    onclick="refreshBarcode({{ $item->id }})"
-                                                    id="refresh-btn-{{ $item->id }}"
-                                                    class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 text-xs disabled:opacity-50 disabled:cursor-not-allowed">
-                                                🔄 Refresh Barcode
-                                            </button>
-                                        @endif
+                                        <div class="flex items-center justify-end space-x-2">
+                                            @if($item->is_new_product && !$item->barcode)
+                                                <button type="button" 
+                                                        onclick="refreshBarcode({{ $item->id }})"
+                                                        id="refresh-btn-{{ $item->id }}"
+                                                        class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 text-xs disabled:opacity-50 disabled:cursor-not-allowed">
+                                                    🔄 Refresh Barcode
+                                                </button>
+                                            @endif
+                                            
+                                            @if($item->is_new_product && $delivery->status !== 'completed')
+                                                <a href="{{ route('products.create', ['delivery_item' => $item->id]) }}" 
+                                                   class="inline-flex items-center px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors duration-200">
+                                                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                                    </svg>
+                                                    Add to POS
+                                                </a>
+                                            @endif
+                                        </div>
                                     </td>
                                 </tr>
                             @endforeach
@@ -351,6 +388,9 @@
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                         Time
                                     </th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Actions
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -369,6 +409,14 @@
                                         </td>
                                         <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                                             {{ $scan->created_at->format('H:i:s') }}
+                                        </td>
+                                        <td class="px-6 py-4 text-right text-sm font-medium">
+                                            @if($delivery->status !== 'completed')
+                                                <button onclick="convertScanToProduct('{{ $scan->barcode }}', {{ $scan->quantity }})" 
+                                                        class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 text-xs">
+                                                    Convert to Product
+                                                </button>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach
@@ -576,9 +624,110 @@
             }, 3000);
         }
 
+        // Sort delivery items function
+        function sortDeliveryItems() {
+            const select = document.getElementById('sortSelect');
+            const sortBy = select.value;
+            const tbody = document.querySelector('.delivery-items-table tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+
+            rows.sort((a, b) => {
+                switch (sortBy) {
+                    case 'new_first': {
+                        const aIsNew = a.querySelector('.bg-yellow-100') !== null; // New Product badge
+                        const bIsNew = b.querySelector('.bg-yellow-100') !== null;
+                        if (aIsNew && !bIsNew) return -1;
+                        if (!aIsNew && bIsNew) return 1;
+                        // If both new or both existing, sort by code
+                        const aCode = a.querySelector('td:nth-child(2) .font-medium')?.textContent || '';
+                        const bCode = b.querySelector('td:nth-child(2) .font-medium')?.textContent || '';
+                        return aCode.localeCompare(bCode);
+                    }
+                    case 'code': {
+                        const aCode = a.querySelector('td:nth-child(2) .font-medium')?.textContent || '';
+                        const bCode = b.querySelector('td:nth-child(2) .font-medium')?.textContent || '';
+                        return aCode.localeCompare(bCode);
+                    }
+                    case 'description': {
+                        const aDesc = a.querySelector('td:nth-child(2) .text-sm.font-medium')?.textContent || '';
+                        const bDesc = b.querySelector('td:nth-child(2) .text-sm.font-medium')?.textContent || '';
+                        return aDesc.localeCompare(bDesc);
+                    }
+                    case 'status': {
+                        const aStatus = a.querySelector('td:nth-child(6) .px-2')?.textContent.toLowerCase() || '';
+                        const bStatus = b.querySelector('td:nth-child(6) .px-2')?.textContent.toLowerCase() || '';
+                        const statusOrder = { pending: 0, partial: 1, excess: 2, complete: 3 };
+                        return (statusOrder[aStatus] || 99) - (statusOrder[bStatus] || 99);
+                    }
+                    default:
+                        return 0;
+                }
+            });
+
+            // Re-append sorted rows
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        // Convert unmatched scan to product
+        function convertScanToProduct(barcode, quantity) {
+            const deliveryId = {{ $delivery->id }};
+            const supplier = '{{ $delivery->supplier->Supplier ?? "Unknown" }}';
+            
+            // Pre-populate product data from scan
+            const description = prompt('Enter product description:', 'Product for barcode ' + barcode);
+            if (!description) return;
+            
+            const supplierCode = prompt('Enter supplier code:', '');
+            if (!supplierCode) return;
+            
+            const unitCost = parseFloat(prompt('Enter unit cost (€):', '0.00'));
+            if (isNaN(unitCost) || unitCost < 0) {
+                alert('Please enter a valid unit cost');
+                return;
+            }
+            
+            // Create the product
+            createProductFromScan(deliveryId, {
+                supplier_code: supplierCode,
+                description: description,
+                barcode: barcode,
+                ordered_quantity: quantity,
+                unit_cost: unitCost,
+                units_per_case: 1
+            });
+        }
+        
+        async function createProductFromScan(deliveryId, productData) {
+            try {
+                const response = await fetch(`/api/deliveries/${deliveryId}/items`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify(productData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage('Product created successfully! Refreshing page...', 'success');
+                    setTimeout(() => window.location.reload(), 2000);
+                } else {
+                    showMessage(data.message || 'Failed to create product', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to create product from scan:', error);
+                showMessage('Network error - please try again', 'error');
+            }
+        }
+
         // Start auto-refresh when page loads
         document.addEventListener('DOMContentLoaded', function() {
             startBarcodeAutoRefresh();
+            // Initial sort
+            sortDeliveryItems();
         });
     </script>
 
