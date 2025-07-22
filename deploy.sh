@@ -48,22 +48,74 @@ check_host_connectivity() {
     success "$PROD_HOST is reachable."
 }
 
+# Copy and validate environment file
+setup_environment() {
+    log "🔧 Setting up environment configuration..."
+    
+    cd "$DEPLOY_DIR" || exit 1
+    
+    # Copy .env from development directory if it doesn't exist
+    if [[ ! -f .env ]]; then
+        if [[ -f "$DEV_DIR/.env" ]]; then
+            log "Copying .env from development directory..."
+            cp "$DEV_DIR/.env" .env
+        else
+            error "No .env file found in development directory. Cannot proceed."
+            exit 1
+        fi
+    fi
+    
+    # Validate critical environment variables
+    log "Validating environment configuration..."
+    
+    if ! grep -q "^DB_CONNECTION=" .env; then
+        error "DB_CONNECTION not found in .env file."
+        exit 1
+    fi
+    
+    if ! grep -q "^DB_DATABASE=" .env; then
+        error "DB_DATABASE not found in .env file."
+        exit 1
+    fi
+    
+    DB_CONNECTION=$(grep "^DB_CONNECTION=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'")
+    
+    if [[ "$DB_CONNECTION" != "mysql" ]]; then
+        warning "Database connection is set to '$DB_CONNECTION', expected 'mysql'."
+    fi
+    
+    success "Environment configuration validated."
+}
+
 # Validate MySQL database connectivity
 check_database_connectivity() {
     log "🗄️ Checking MySQL database connectivity..."
     
     cd "$DEPLOY_DIR" || exit 1
     
-    if ! php artisan tinker --execute="DB::connection()->getPdo(); echo 'Main DB: Connected';" 2>/dev/null; then
+    # Test main database connection
+    log "Testing main database connection..."
+    if php artisan tinker --execute="try { DB::connection()->getPdo(); echo 'Main DB: Connected successfully'; } catch (Exception \$e) { echo 'Main DB Error: ' . \$e->getMessage(); throw \$e; }" 2>/dev/null; then
+        success "Main database connection verified."
+    else
         error "Cannot connect to main MySQL database. Check your .env configuration."
+        error "Database: $(grep '^DB_DATABASE=' .env | cut -d'=' -f2)"
+        error "Host: $(grep '^DB_HOST=' .env | cut -d'=' -f2)"
+        error "Username: $(grep '^DB_USERNAME=' .env | cut -d'=' -f2)"
         exit 1
     fi
     
-    if ! php artisan tinker --execute="DB::connection('pos')->getPdo(); echo 'POS DB: Connected';" 2>/dev/null; then
-        warning "Cannot connect to POS database. This may be expected if not configured."
+    # Test POS database connection (optional)
+    log "Testing POS database connection..."
+    if grep -q "^POS_DB_DATABASE=" .env && grep -q "^POS_DB_USERNAME=" .env; then
+        if php artisan tinker --execute="try { DB::connection('pos')->getPdo(); echo 'POS DB: Connected successfully'; } catch (Exception \$e) { echo 'POS DB: ' . \$e->getMessage(); }" 2>/dev/null | grep -q "Connected successfully"; then
+            success "POS database connection verified."
+        else
+            warning "POS database connection failed or not properly configured."
+        fi
+    else
+        log "POS database not configured, skipping connection test."
     fi
-    
-    success "Database connectivity verified."
 }
 
 # Run pre-deployment tests
@@ -163,7 +215,8 @@ main() {
     
     success "Dependencies installed."
     
-    # Step 5: Check database connectivity
+    # Step 5: Setup environment and check database connectivity
+    setup_environment
     check_database_connectivity
     
     # Step 6: Run tests
