@@ -13,6 +13,8 @@ use App\Repositories\ProductRepository;
 use App\Repositories\SalesRepository;
 use App\Services\SupplierService;
 use App\Services\UdeaScrapingService;
+use App\Services\LabelService;
+use App\Models\LabelLog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -47,6 +49,11 @@ class ProductController extends Controller
     protected UdeaScrapingService $udeaScrapingService;
 
     /**
+     * The label service instance.
+     */
+    protected LabelService $labelService;
+
+    /**
      * Create a new controller instance.
      */
     public function __construct(
@@ -54,13 +61,15 @@ class ProductController extends Controller
         CategoryRepository $categoryRepository,
         SalesRepository $salesRepository,
         SupplierService $supplierService,
-        UdeaScrapingService $udeaScrapingService
+        UdeaScrapingService $udeaScrapingService,
+        LabelService $labelService
     ) {
         $this->productRepository = $productRepository;
         $this->categoryRepository = $categoryRepository;
         $this->salesRepository = $salesRepository;
         $this->supplierService = $supplierService;
         $this->udeaScrapingService = $udeaScrapingService;
+        $this->labelService = $labelService;
     }
 
     /**
@@ -245,6 +254,9 @@ class ProductController extends Controller
         $product->update([
             'PRICESELL' => $request->net_price,
         ]);
+
+        // Log the price update event
+        LabelLog::logPriceUpdate($product->CODE);
 
         return redirect()
             ->route('products.show', $id)
@@ -441,6 +453,9 @@ class ProductController extends Controller
                     ]);
                 }
 
+                // Log the new product event
+                LabelLog::logNewProduct($request->code);
+
                 // If this product was created from a delivery item, link them
                 if ($request->delivery_item_id) {
                     $deliveryItem = \App\Models\DeliveryItem::findOrFail($request->delivery_item_id);
@@ -510,5 +525,27 @@ class ProductController extends Controller
                 'message' => 'Failed to fetch UDEA pricing: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Generate and print a label for a product.
+     */
+    public function printLabel(string $id)
+    {
+        $product = $this->productRepository->findById($id);
+
+        if (! $product) {
+            abort(404, 'Product not found');
+        }
+
+        // Log the label print event
+        LabelLog::logLabelPrint($product->CODE);
+
+        // Generate the label HTML
+        $labelHtml = $this->labelService->generateLabelHtml($product);
+
+        // Return the label HTML with appropriate headers for printing
+        return response($labelHtml)
+            ->header('Content-Type', 'text/html; charset=utf-8');
     }
 }

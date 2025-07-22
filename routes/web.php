@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DeliveryController;
+use App\Http\Controllers\LabelAreaController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TestScraperController;
@@ -34,6 +35,12 @@ Route::middleware('auth')->group(function () {
     Route::patch('/products/{id}/tax', [ProductController::class, 'updateTax'])->name('products.update-tax');
     Route::patch('/products/{id}/price', [ProductController::class, 'updatePrice'])->name('products.update-price');
     Route::patch('/products/{id}/cost', [ProductController::class, 'updateCost'])->name('products.update-cost');
+    Route::get('/products/{id}/print-label', [ProductController::class, 'printLabel'])->name('products.print-label');
+
+    // Label area routes
+    Route::get('/labels', [LabelAreaController::class, 'index'])->name('labels.index');
+    Route::post('/labels/print-a4', [LabelAreaController::class, 'printA4'])->name('labels.print-a4');
+    Route::get('/labels/preview/{productId}', [LabelAreaController::class, 'previewLabel'])->name('labels.preview');
 
     // Delivery management routes
     Route::resource('deliveries', DeliveryController::class);
