@@ -59,8 +59,8 @@ app/Repositories/
 ```
 
 ### 4. Dual Database Architecture
-- **Primary Database** (SQLite/MySQL): Application data, users, settings
-- **Secondary Database** (MySQL): Read-only POS integration
+- **Primary Database** (SQLite/MySQL): Application data, users, settings, F&V management
+- **Secondary Database** (MySQL): Read-only POS integration for products, categories, images
 
 ## Key Components
 
@@ -95,12 +95,20 @@ app/Repositories/
 - Read-only access to uniCenta database
 - Real-time stock level queries
 - Product and supplier data synchronization
+- F&V product data and images
+- Category and classification data
 
 #### Supplier Integration
 - Web scraping for price data
 - CDN integration for product images
 - Barcode extraction automation
 - Extensible supplier configuration
+
+#### Fruit & Vegetables Management
+- Dual database architecture for F&V data
+- Laravel database for availability, pricing, and print queue
+- POS database for product details, images, and categories
+- Country of origin management for organic certification
 
 ## Data Flow
 
@@ -122,6 +130,17 @@ Barcode Retrieval Jobs → Queue Processing → Update Items
 Scanning Interface → Real-time Updates → Progress Tracking
      ↓
 Completion → Stock Updates → POS Synchronization
+```
+
+### F&V Management Flow
+```
+Weekly Selection → Availability Updates → Label Queue
+     ↓
+Price Changes → Price History Logging → Auto Queue Addition
+     ↓
+Country/Display Updates → POS Data Updates → Label Regeneration
+     ↓
+Label Preview → Batch Printing → Queue Clearance
 ```
 
 ## Security Architecture

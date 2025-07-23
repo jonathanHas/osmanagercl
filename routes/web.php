@@ -12,6 +12,7 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+
 Route::get('/dashboard', function () {
     $productRepository = new \App\Repositories\ProductRepository;
     $statistics = $productRepository->getStatistics();

@@ -12,75 +12,30 @@
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            @if(session('success'))
-                <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6" role="alert">
-                    <span class="block sm:inline">{{ session('success') }}</span>
-                </div>
-            @endif
-
-            @if($errors->any())
-                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6" role="alert">
-                    @foreach($errors->all() as $error)
-                        <div>{{ $error }}</div>
-                    @endforeach
-                </div>
-            @endif
+            <x-alert type="success" :message="session('success')" />
+            <x-alert type="error" :messages="$errors->all()" />
 
             <!-- Quick Stats -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                    <div class="p-6">
-                        <div class="flex items-center">
-                            <div class="p-3 rounded-full bg-blue-100 dark:bg-blue-900">
-                                <svg class="w-6 h-6 text-blue-600 dark:text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2h4a1 1 0 110 2H3a1 1 0 110-2h4zM5 6v12a2 2 0 002 2h10a2 2 0 002-2V6H5z"/>
-                                </svg>
-                            </div>
-                            <div class="ml-4">
-                                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Products Needing Labels</p>
-                                <p class="text-2xl font-semibold text-gray-900 dark:text-gray-100">{{ count($productsNeedingLabels) }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                    <div class="p-6">
-                        <div class="flex items-center">
-                            <div class="p-3 rounded-full bg-green-100 dark:bg-green-900">
-                                <svg class="w-6 h-6 text-green-600 dark:text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
-                                </svg>
-                            </div>
-                            <div class="ml-4">
-                                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Labels Printed (7 days)</p>
-                                <p class="text-2xl font-semibold text-gray-900 dark:text-gray-100">{{ count($recentLabelPrints) }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                    <div class="p-6">
-                        <div class="flex items-center">
-                            <div class="p-3 rounded-full bg-purple-100 dark:bg-purple-900">
-                                <svg class="w-6 h-6 text-purple-600 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                </svg>
-                            </div>
-                            <div class="ml-4">
-                                <p class="text-sm font-medium text-gray-600 dark:text-gray-400">A4 Sheets Needed</p>
-                                <p class="text-2xl font-semibold text-gray-900 dark:text-gray-100" id="sheets-needed">
-                                    @if($defaultTemplate)
-                                        {{ ceil(count($productsNeedingLabels) / $defaultTemplate->labels_per_a4) }}
-                                    @else
-                                        {{ ceil(count($productsNeedingLabels) / 24) }}
-                                    @endif
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <x-stat-card 
+                    title="Products Needing Labels" 
+                    :value="count($productsNeedingLabels)" 
+                    icon="tag" 
+                    color="blue" />
+                    
+                <x-stat-card 
+                    title="Labels Printed" 
+                    :value="count($recentLabelPrints)" 
+                    subtitle="Last 7 days"
+                    icon="check-circle" 
+                    color="green" />
+                    
+                <x-stat-card 
+                    title="A4 Sheets Needed" 
+                    :value="$defaultTemplate ? ceil(count($productsNeedingLabels) / $defaultTemplate->labels_per_a4) : ceil(count($productsNeedingLabels) / 24)" 
+                    icon="document" 
+                    color="purple" 
+                    id="sheets-needed" />
             </div>
 
             <!-- Label Template Selector -->

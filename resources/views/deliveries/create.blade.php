@@ -15,15 +15,7 @@
     <div class="py-6">
         <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
             
-            @if ($errors->any())
-                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6" role="alert">
-                    <ul class="list-disc list-inside">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            @endif
+            <x-alert type="error" :messages="$errors->all()" />
 
             <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg">
                 <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">

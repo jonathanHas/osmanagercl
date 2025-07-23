@@ -16,16 +16,7 @@
 
     <div class="py-6">
         <div class="max-w-4xl mx-auto sm:px-6 lg:px-8">
-            @if ($errors->any())
-                <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-6" role="alert">
-                    <div class="font-bold">Please correct the following errors:</div>
-                    <ul class="mt-2 list-disc list-inside">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            @endif
+            <x-alert type="error" :messages="$errors->all()" />
 
             <form action="{{ route('products.store') }}" method="POST" class="space-y-6">
                 @csrf
