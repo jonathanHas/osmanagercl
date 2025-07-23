@@ -89,6 +89,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/authentication-test', [\App\Http\Controllers\AuthenticationTestController::class, 'testAuthentication'])->name('authentication-test');
         Route::get('/language-flag-test', [\App\Http\Controllers\LanguageFlagTestController::class, 'testLanguageFlag'])->name('language-flag-test');
         Route::get('/specific-product-test', [\App\Http\Controllers\SpecificProductTestController::class, 'testSpecificProduct'])->name('specific-product-test');
+        
+        // Phase 2 component testing
+        Route::get('/phase2-components', function () {
+            return view('test-phase2');
+        })->name('phase2-components');
     });
 
     // Debug routes for testing supplier tables

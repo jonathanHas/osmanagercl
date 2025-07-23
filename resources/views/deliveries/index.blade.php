@@ -100,24 +100,19 @@
                                             @endif
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <div class="flex justify-end gap-2">
-                                                <a href="{{ route('deliveries.show', $delivery) }}" 
-                                                   class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
-                                                    View
-                                                </a>
+                                            @php
+                                                $actions = [
+                                                    ['type' => 'link', 'route' => 'deliveries.show', 'params' => $delivery, 'label' => 'View', 'color' => 'primary']
+                                                ];
                                                 
-                                                @if($delivery->status === 'draft')
-                                                    <a href="{{ route('deliveries.scan', $delivery) }}" 
-                                                       class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300">
-                                                        Start
-                                                    </a>
-                                                @elseif($delivery->status === 'receiving')
-                                                    <a href="{{ route('deliveries.scan', $delivery) }}" 
-                                                       class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300">
-                                                        Continue
-                                                    </a>
-                                                @endif
-                                            </div>
+                                                if ($delivery->status === 'draft') {
+                                                    $actions[] = ['type' => 'link', 'route' => 'deliveries.scan', 'params' => $delivery, 'label' => 'Start', 'color' => 'success'];
+                                                } elseif ($delivery->status === 'receiving') {
+                                                    $actions[] = ['type' => 'link', 'route' => 'deliveries.scan', 'params' => $delivery, 'label' => 'Continue', 'color' => 'info'];
+                                                }
+                                            @endphp
+                                            
+                                            <x-action-buttons :actions="$actions" spacing="tight" />
                                         </td>
                                     </tr>
                                 @endforeach

@@ -274,9 +274,9 @@
                                             @endif
                                         </td>
                                         <td class="px-4 py-4 whitespace-nowrap text-sm font-medium">
-                                            <a href="{{ route('products.show', $product->ID) }}" class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-600">
-                                                View
-                                            </a>
+                                            <x-action-buttons :actions="[
+                                                ['type' => 'link', 'route' => 'products.show', 'params' => $product->ID, 'label' => 'View', 'color' => 'primary']
+                                            ]" />
                                         </td>
                                     </tr>
                                 @empty
