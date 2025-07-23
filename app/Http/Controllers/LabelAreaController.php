@@ -180,7 +180,7 @@ class LabelAreaController extends Controller
             // Product needs a label if:
             // 1. There's a recent event (new_product, price_update, or requeue_label)
             // 2. AND either no recent print OR the event is more recent than the print
-            if ($mostRecentEvent && (!$mostRecentPrint || $mostRecentEvent->created_at > $mostRecentPrint->created_at)) {
+            if ($mostRecentEvent && (! $mostRecentPrint || $mostRecentEvent->created_at > $mostRecentPrint->created_at)) {
                 $needsLabelsBarcodes->push($barcode);
             }
         }
@@ -218,14 +218,14 @@ class LabelAreaController extends Controller
     public function requeueProduct(Request $request)
     {
         $productId = $request->input('product_id');
-        
-        if (!$productId) {
+
+        if (! $productId) {
             return response()->json(['error' => 'Product ID required'], 400);
         }
 
         // Find the product
         $product = Product::find($productId);
-        if (!$product) {
+        if (! $product) {
             return response()->json(['error' => 'Product not found'], 404);
         }
 
@@ -234,7 +234,7 @@ class LabelAreaController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Added back to Products Needing Labels'
+            'message' => 'Added back to Products Needing Labels',
         ]);
     }
 }

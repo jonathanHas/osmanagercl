@@ -62,6 +62,8 @@ class Product extends Model
         'TAXCAT',
         'PRICESELL',
         'PRICEBUY',
+        'DISPLAY',
+        'IMAGE',
     ];
 
     /**
@@ -194,6 +196,35 @@ class Product extends Model
     public function stocking()
     {
         return $this->hasOne(Stocking::class, 'Barcode', 'CODE');
+    }
+
+    /**
+     * Get the veg details for this product.
+     */
+    public function vegDetails()
+    {
+        return $this->hasOne(VegDetails::class, 'product', 'CODE');
+    }
+
+    /**
+     * Get the product image as a base64 data URL for thumbnails.
+     */
+    public function getImageThumbnailAttribute(): ?string
+    {
+        if (! $this->IMAGE) {
+            return null;
+        }
+
+        // Assume JPEG format for simplicity - you might want to detect the actual format
+        return 'data:image/jpeg;base64,'.base64_encode($this->IMAGE);
+    }
+
+    /**
+     * Check if the product has an image.
+     */
+    public function hasImage(): bool
+    {
+        return ! empty($this->IMAGE);
     }
 
     /**

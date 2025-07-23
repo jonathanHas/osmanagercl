@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DeliveryController;
+use App\Http\Controllers\FruitVegController;
 use App\Http\Controllers\LabelAreaController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
@@ -42,9 +43,27 @@ Route::middleware('auth')->group(function () {
     Route::post('/labels/print-a4', [LabelAreaController::class, 'printA4'])->name('labels.print-a4');
     Route::get('/labels/preview-a4', [LabelAreaController::class, 'previewA4'])->name('labels.preview-a4');
     Route::get('/labels/preview/{productId}', [LabelAreaController::class, 'previewLabel'])->name('labels.preview');
-    
+
     // Requeue product route
     Route::post('/labels/requeue', [LabelAreaController::class, 'requeueProduct'])->name('labels.requeue');
+
+    // Fruit & Veg routes
+    Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
+        Route::get('/', [FruitVegController::class, 'index'])->name('index');
+        Route::get('/availability', [FruitVegController::class, 'availability'])->name('availability');
+        Route::post('/availability/toggle', [FruitVegController::class, 'toggleAvailability'])->name('availability.toggle');
+        Route::post('/availability/bulk', [FruitVegController::class, 'bulkAvailability'])->name('availability.bulk');
+        Route::get('/prices', [FruitVegController::class, 'prices'])->name('prices');
+        Route::post('/prices/update', [FruitVegController::class, 'updatePrice'])->name('prices.update');
+        Route::get('/labels', [FruitVegController::class, 'labels'])->name('labels');
+        Route::get('/labels/preview', [FruitVegController::class, 'previewLabels'])->name('labels.preview');
+        Route::post('/labels/printed', [FruitVegController::class, 'markLabelsPrinted'])->name('labels.printed');
+        Route::post('/display/update', [FruitVegController::class, 'updateDisplay'])->name('display.update');
+        Route::post('/country/update', [FruitVegController::class, 'updateCountry'])->name('country.update');
+        Route::get('/countries', [FruitVegController::class, 'getCountries'])->name('countries');
+        Route::get('/search', [FruitVegController::class, 'searchProducts'])->name('search');
+        Route::get('/product-image/{code}', [FruitVegController::class, 'productImage'])->name('product-image');
+    });
 
     // Delivery management routes
     Route::resource('deliveries', DeliveryController::class);
