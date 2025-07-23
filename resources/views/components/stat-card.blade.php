@@ -77,7 +77,7 @@
     <a href="{{ $href }}" class="block">
 @endif
 
-<div {{ $attributes->merge(['class' => 'bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg transition-shadow hover:shadow-md']) }}>
+<div {{ $attributes->except(['id'])->merge(['class' => 'bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg transition-shadow hover:shadow-md']) }}>
     <div class="p-6">
         <div class="flex items-center">
             <div class="p-3 rounded-full {{ $colors['bg'] }}">
@@ -89,7 +89,7 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm font-medium text-gray-600 dark:text-gray-400">{{ $title }}</p>
-                        <p class="text-2xl font-semibold text-gray-900 dark:text-gray-100">{{ $formattedValue }}</p>
+                        <p {{ $attributes->only(['id'])->merge(['class' => 'text-2xl font-semibold text-gray-900 dark:text-gray-100']) }}>{{ $formattedValue }}</p>
                         @if($subtitle)
                             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ $subtitle }}</p>
                         @endif

@@ -16,6 +16,12 @@
             <x-alert type="error" :messages="$errors->all()" />
 
             <!-- Quick Stats -->
+            @php
+                $sheetsNeeded = $defaultTemplate 
+                    ? ceil(count($productsNeedingLabels) / $defaultTemplate->labels_per_a4) 
+                    : ceil(count($productsNeedingLabels) / 24);
+            @endphp
+            
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <x-stat-card 
                     title="Products Needing Labels" 
@@ -32,7 +38,7 @@
                     
                 <x-stat-card 
                     title="A4 Sheets Needed" 
-                    :value="$defaultTemplate ? ceil(count($productsNeedingLabels) / $defaultTemplate->labels_per_a4) : ceil(count($productsNeedingLabels) / 24)" 
+                    :value="$sheetsNeeded" 
                     icon="document" 
                     color="purple" 
                     id="sheets-needed" />
