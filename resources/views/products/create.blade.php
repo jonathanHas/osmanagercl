@@ -4,13 +4,16 @@
             <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
                 Create New Product
             </h2>
-            <a href="{{ route('products.index') }}" 
-               class="inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-md transition-colors duration-200">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-                </svg>
-                Back to Products
-            </a>
+            <x-action-buttons :actions="[
+                [
+                    'type' => 'link',
+                    'route' => 'products.index',
+                    'label' => 'Back to Products',
+                    'color' => 'secondary',
+                    'class' => 'inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-md transition-colors duration-200',
+                    'icon' => 'M10 19l-7-7m0 0l7-7m-7 7h18'
+                ]
+            ]" size="lg" />
         </div>
     </x-slot>
 
@@ -39,24 +42,25 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <!-- Product Name -->
                         <div>
-                            <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Product Name *
-                                @if(isset($prefillData['delivery_name']))
-                                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                            @php
+                                $nameLabel = 'Product Name *';
+                                if(isset($prefillData['delivery_name'])) {
+                                    $nameLabel .= ' <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                                         <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                                             <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/>
                                         </svg>
                                         From Delivery
-                                    </span>
-                                @endif
-                            </label>
-                            <input type="text" 
-                                   id="name" 
-                                   name="name" 
-                                   value="{{ old('name', $prefillData['name'] ?? '') }}" 
-                                   required
-                                   class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:border-indigo-500 focus:ring-indigo-500"
-                                   placeholder="Enter product name">
+                                    </span>';
+                                }
+                            @endphp
+                            <x-form-group 
+                                name="name" 
+                                label="{!! $nameLabel !!}" 
+                                type="text" 
+                                :value="old('name', $prefillData['name'] ?? '')" 
+                                required 
+                                placeholder="Enter product name" 
+                                containerClass="" />
                             
                             @if(isset($prefillData['scraped_name']) && $prefillData['scraped_name'] !== $prefillData['name'])
                                 <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg dark:bg-green-900/20 dark:border-green-800">
@@ -90,30 +94,23 @@
                         </div>
 
                         <!-- Product Code/Barcode -->
-                        <div>
-                            <label for="code" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Product Code/Barcode *
-                            </label>
-                            <input type="text" 
-                                   id="code" 
-                                   name="code" 
-                                   value="{{ old('code', $prefillData['code'] ?? '') }}" 
-                                   required
-                                   class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:border-indigo-500 focus:ring-indigo-500"
-                                   placeholder="Enter product code or scan barcode">
-                        </div>
+                        <x-form-group 
+                            name="code" 
+                            label="Product Code/Barcode *" 
+                            type="text" 
+                            :value="old('code', $prefillData['code'] ?? '')" 
+                            required 
+                            placeholder="Enter product code or scan barcode" />
 
-                        <!-- Reference Code -->
+                        <!-- Reference Code -->  
                         <div class="md:col-span-2">
-                            <label for="reference" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Reference Code
-                            </label>
-                            <input type="text" 
-                                   id="reference" 
-                                   name="reference" 
-                                   value="{{ old('reference') }}"
-                                   class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:border-indigo-500 focus:ring-indigo-500"
-                                   placeholder="Optional reference code">
+                            <x-form-group 
+                                name="reference" 
+                                label="Reference Code" 
+                                type="text" 
+                                :value="old('reference')" 
+                                placeholder="Optional reference code" 
+                                containerClass="" />
                         </div>
                     </div>
                 </div>
@@ -127,19 +124,14 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <!-- Cost Price -->
-                        <div>
-                            <label for="price_buy" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Cost Price (€) *
-                            </label>
-                            <input type="number" 
-                                   id="price_buy" 
-                                   name="price_buy" 
-                                   value="{{ old('price_buy', $prefillData['price_buy'] ?? '') }}" 
-                                   step="0.01" 
-                                   min="0" 
-                                   required
-                                   class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:border-indigo-500 focus:ring-indigo-500">
-                        </div>
+                        <x-form-group 
+                            name="price_buy" 
+                            label="Cost Price (€) *" 
+                            type="number" 
+                            :value="old('price_buy', $prefillData['price_buy'] ?? '')" 
+                            required 
+                            step="0.01" 
+                            min="0" />
 
                         <!-- Selling Price -->
                         <div>

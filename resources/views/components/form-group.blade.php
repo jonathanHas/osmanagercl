@@ -35,7 +35,7 @@
 <div class="{{ $containerClasses }}">
     @if($label)
         <label for="{{ $fieldId }}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            {{ $label }}
+            {!! $label !!}
             @if($required)
                 <span class="text-red-500">*</span>
             @endif

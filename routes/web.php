@@ -94,6 +94,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/phase2-components', function () {
             return view('test-phase2');
         })->name('phase2-components');
+        
+        // Phase 3 tab group component testing
+        Route::get('/tab-group', function () {
+            return view('test-tab-group');
+        })->name('tab-group');
     });
 
     // Debug routes for testing supplier tables

@@ -28,17 +28,18 @@
             </p>
 
             <div class="mt-6">
-                <x-input-label for="password" value="{{ __('Password') }}" class="sr-only" />
-
-                <x-text-input
-                    id="password"
-                    name="password"
-                    type="password"
-                    class="mt-1 block w-3/4"
-                    placeholder="{{ __('Password') }}"
+                <x-form-group 
+                    name="password" 
+                    label="Password" 
+                    type="password" 
+                    placeholder="Password" 
+                    class="w-3/4"
+                    containerClass=""
                 />
-
-                <x-input-error :messages="$errors->userDeletion->get('password')" class="mt-2" />
+                <!-- Manual error display for custom error bag -->
+                @if($errors->userDeletion->has('password'))
+                    <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $errors->userDeletion->first('password') }}</p>
+                @endif
             </div>
 
             <div class="mt-6 flex justify-end">

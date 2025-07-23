@@ -4,13 +4,16 @@
             <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
                 {{ __('Products') }}
             </h2>
-            <a href="{{ route('products.create') }}" 
-               class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-md transition-colors duration-200">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                </svg>
-                Create New Product
-            </a>
+            <x-action-buttons :actions="[
+                [
+                    'type' => 'link',
+                    'route' => 'products.create',
+                    'label' => 'Create New Product',
+                    'color' => 'success',
+                    'class' => 'inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-md transition-colors duration-200',
+                    'icon' => 'M12 6v6m0 0v6m0-6h6m-6 0H6'
+                ]
+            ]" size="lg" />
         </div>
     </x-slot>
 
@@ -69,99 +72,77 @@
             </div>
 
             <!-- Search and Filter -->
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
-                <div class="p-6">
-                    <form method="GET" action="{{ route('products.index') }}" class="space-y-4">
-                        <div class="flex gap-4">
-                            <div class="flex-1">
-                                <input type="text" 
-                                       name="search" 
-                                       value="{{ $search }}" 
-                                       placeholder="Search by name, code, or reference..."
-                                       class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600">
-                            </div>
-                        </div>
-                        
-                        <div class="flex flex-wrap gap-4">
-                            <label class="inline-flex items-center">
-                                <input type="checkbox" 
-                                       name="active_only" 
-                                       value="1" 
-                                       {{ $activeOnly ? 'checked' : '' }}
-                                       class="rounded border-gray-300 dark:border-gray-700 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:focus:ring-indigo-600 dark:focus:ring-offset-gray-800">
-                                <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">Active only (non-service)</span>
-                            </label>
-                            
-                            <label class="inline-flex items-center">
-                                <input type="checkbox" 
-                                       name="stocked_only" 
-                                       value="1" 
-                                       {{ $stockedOnly ? 'checked' : '' }}
-                                       class="rounded border-gray-300 dark:border-gray-700 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:focus:ring-indigo-600 dark:focus:ring-offset-gray-800">
-                                <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">Stocked products</span>
-                            </label>
-                            
-                            <label class="inline-flex items-center">
-                                <input type="checkbox" 
-                                       name="in_stock_only" 
-                                       value="1" 
-                                       {{ $inStockOnly ? 'checked' : '' }}
-                                       class="rounded border-gray-300 dark:border-gray-700 text-green-600 shadow-sm focus:ring-green-500 dark:focus:ring-green-600 dark:focus:ring-offset-gray-800">
-                                <span class="ml-2 text-sm text-green-600 dark:text-green-400 font-medium">In stock only</span>
-                            </label>
+            <x-filter-form 
+                :action="route('products.index')"
+                searchName="search"
+                :searchValue="$search"
+                searchPlaceholder="Search by name, code, or reference..."
+                :showSubmit="true"
+                submitLabel="Search & Filter"
+                :filters="[
+                    [
+                        'name' => 'active_only',
+                        'label' => 'Active only (non-service)',
+                        'type' => 'checkbox',
+                        'checked' => $activeOnly
+                    ],
+                    [
+                        'name' => 'stocked_only',
+                        'label' => 'Stocked products',
+                        'type' => 'checkbox',
+                        'checked' => $stockedOnly
+                    ],
+                    [
+                        'name' => 'in_stock_only',
+                        'label' => 'In stock only',
+                        'type' => 'checkbox',
+                        'checked' => $inStockOnly
+                    ],
+                    [
+                        'name' => 'show_suppliers',
+                        'label' => 'Show suppliers',
+                        'type' => 'checkbox',
+                        'checked' => $showSuppliers
+                    ]
+                ]">
+                
+                @if($showSuppliers && $suppliers->count() > 0)
+                    <div class="mt-4">
+                        <label for="supplier_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Filter by Supplier</label>
+                        <select name="supplier_id" id="supplier_id" class="rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600">
+                            <option value="">All Suppliers</option>
+                            @foreach($suppliers as $supplier)
+                                <option value="{{ $supplier->SupplierID }}" {{ $supplierId == $supplier->SupplierID ? 'selected' : '' }}>
+                                    {{ $supplier->Supplier }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
 
-                            <label class="inline-flex items-center">
-                                <input type="checkbox" 
-                                       name="show_suppliers" 
-                                       value="1" 
-                                       {{ $showSuppliers ? 'checked' : '' }}
-                                       onchange="this.form.submit()"
-                                       class="rounded border-gray-300 dark:border-gray-700 text-blue-600 shadow-sm focus:ring-blue-500 dark:focus:ring-blue-600 dark:focus:ring-offset-gray-800">
-                                <span class="ml-2 text-sm text-blue-600 dark:text-blue-400 font-medium">Show suppliers</span>
-                            </label>
-                        </div>
-
-                        @if($showSuppliers && $suppliers->count() > 0)
-                            <div class="mt-4">
-                                <label for="supplier_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Filter by Supplier</label>
-                                <select name="supplier_id" id="supplier_id" class="rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600">
-                                    <option value="">All Suppliers</option>
-                                    @foreach($suppliers as $supplier)
-                                        <option value="{{ $supplier->SupplierID }}" {{ $supplierId == $supplier->SupplierID ? 'selected' : '' }}>
-                                            {{ $supplier->Supplier }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        @endif
-
-                        @if($categories->count() > 0)
-                            <div class="mt-4">
-                                <label for="category_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Filter by Category</label>
-                                <select name="category_id" id="category_id" class="rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600">
-                                    <option value="">All Categories</option>
-                                    @foreach($categories as $category)
-                                        <option value="{{ $category->ID }}" {{ $categoryId == $category->ID ? 'selected' : '' }}>
-                                            {{ $category->NAME }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        @endif
-                        
-                        <div class="flex gap-2">
-                            <button type="submit" class="inline-flex items-center px-4 py-2 bg-gray-800 dark:bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-white dark:text-gray-800 uppercase tracking-widest hover:bg-gray-700 dark:hover:bg-white focus:bg-gray-700 dark:focus:bg-white active:bg-gray-900 dark:active:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150">
-                                Search & Filter
-                            </button>
-                            @if($search || $activeOnly || $stockedOnly || $inStockOnly || $supplierId || $categoryId)
-                                <a href="{{ route('products.index') }}{{ $showSuppliers ? '?show_suppliers=1' : '' }}" class="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-500 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-25 transition ease-in-out duration-150">
-                                    Clear
-                                </a>
-                            @endif
-                        </div>
-                    </form>
-                </div>
-            </div>
+                @if($categories->count() > 0)
+                    <div class="mt-4">
+                        <label for="category_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Filter by Category</label>
+                        <select name="category_id" id="category_id" class="rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600">
+                            <option value="">All Categories</option>
+                            @foreach($categories as $category)
+                                <option value="{{ $category->ID }}" {{ $categoryId == $category->ID ? 'selected' : '' }}>
+                                    {{ $category->NAME }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
+                
+                @if($search || $activeOnly || $stockedOnly || $inStockOnly || $supplierId || $categoryId)
+                    <div class="flex justify-end mt-4">
+                        <a href="{{ route('products.index') }}{{ $showSuppliers ? '?show_suppliers=1' : '' }}" class="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-500 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-25 transition ease-in-out duration-150">
+                            Clear Filters
+                        </a>
+                    </div>
+                @endif
+                
+            </x-filter-form>
 
             <!-- Products Table -->
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">

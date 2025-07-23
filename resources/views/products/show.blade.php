@@ -10,39 +10,44 @@
                     @endif
                 </p>
             </div>
-            <div class="flex gap-2">
-                <button onclick="requeueProduct('{{ $product->ID }}', this)" 
-                        class="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold text-xs uppercase tracking-widest rounded-md transition">
-                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                    </svg>
-                    Add Back to Products Needing Labels
-                </button>
-                <a href="{{ route('products.print-label', $product->ID) }}" 
-                   target="_blank"
-                   class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs uppercase tracking-widest rounded-md transition">
-                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
-                    </svg>
-                    Print Label
-                </a>
-                <a href="{{ route('products.index') }}" class="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-500 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-25 transition ease-in-out duration-150">
-                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-                    </svg>
-                    Back to Products
-                </a>
-            </div>
+            @php
+                $productActions = [
+                    [
+                        'type' => 'button',
+                        'onclick' => "requeueProduct('{$product->ID}', this)",
+                        'label' => 'Add Back to Products Needing Labels',
+                        'color' => 'green',
+                        'class' => 'inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold text-xs uppercase tracking-widest rounded-md transition',
+                        'icon' => 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'
+                    ],
+                    [
+                        'type' => 'link',
+                        'route' => 'products.print-label',
+                        'params' => $product->ID,
+                        'label' => 'Print Label',
+                        'color' => 'indigo',
+                        'class' => 'inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs uppercase tracking-widest rounded-md transition',
+                        'icon' => 'M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z',
+                        'target' => '_blank'
+                    ],
+                    [
+                        'type' => 'link',
+                        'route' => 'products.index',
+                        'label' => 'Back to Products',
+                        'color' => 'secondary',
+                        'class' => 'inline-flex items-center px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-500 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-25 transition ease-in-out duration-150',
+                        'icon' => 'M10 19l-7-7m0 0l7-7m-7 7h18'
+                    ]
+                ];
+            @endphp
+            
+            <x-action-buttons :actions="$productActions" spacing="tight" size="lg" />
         </div>
     </x-slot>
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            @if(session('success'))
-                <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6" role="alert">
-                    <span class="block sm:inline">{{ session('success') }}</span>
-                </div>
-            @endif
+            <x-alert type="success" :message="session('success')" />
 
             <!-- Quick Stats Bar -->
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
@@ -141,31 +146,17 @@
                 </div>
             </div>
             
-            <!-- Tab Navigation -->
-            <div x-data="{ activeTab: 'overview' }" class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="border-b border-gray-200 dark:border-gray-700">
-                    <nav class="-mb-px flex" aria-label="Tabs">
-                        <button @click="activeTab = 'overview'" 
-                                :class="activeTab === 'overview' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'"
-                                class="whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors duration-200">
-                            Overview
-                        </button>
-                        <button @click="activeTab = 'sales'" 
-                                :class="activeTab === 'sales' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'"
-                                class="whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors duration-200">
-                            Sales History
-                        </button>
-                        <button @click="activeTab = 'stock'" 
-                                :class="activeTab === 'stock' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'"
-                                class="whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors duration-200">
-                            Stock Movement
-                        </button>
-                    </nav>
-                </div>
-
-                <div class="p-6 text-gray-900 dark:text-gray-100">
-                    <!-- Overview Tab -->
-                    <div x-show="activeTab === 'overview'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+            <!-- Product Details Tabs -->
+            <x-tab-group 
+                :tabs="[
+                    ['id' => 'overview', 'label' => 'Overview'],
+                    ['id' => 'sales', 'label' => 'Sales History'],
+                    ['id' => 'stock', 'label' => 'Stock Movement']
+                ]"
+                containerClass="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+                
+                <x-slot name="overview">
+                    <div class="p-6 text-gray-900 dark:text-gray-100">
                         <!-- Consolidated Pricing Section -->
                         <x-product-pricing-section :product="$product" :supplier-service="$supplierService" :udea-pricing="$udeaPricing" />
                         
@@ -211,7 +202,7 @@
                                                     ['field' => 'ISSCALE', 'label' => 'Sold by Weight', 'icon' => 'M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3'],
                                                     ['field' => 'ISKITCHEN', 'label' => 'Kitchen Item', 'icon' => 'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4'],
                                                     ['field' => 'PRINTKB', 'label' => 'Print to Kitchen', 'icon' => 'M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z'],
-                                                    ['field' => 'ISSERVICE', 'label' => 'Service Item', 'icon' => 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'],
+                                                    ['field' => 'ISSERVICE', 'label' => 'Service Item', 'icon' => 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'],
                                                 ];
                                             @endphp
                                             @foreach($posConfigs as $config)
@@ -302,9 +293,10 @@
                             </div>
                         @endif
                     </div>
-
-                    <!-- Sales History Tab -->
-                    <div x-show="activeTab === 'sales'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+                </x-slot>
+                
+                <x-slot name="sales">
+                    <div class="p-6 text-gray-900 dark:text-gray-100">
                         <!-- Product Info Header -->
                         <div class="mb-6 pb-6 border-b border-gray-200 dark:border-gray-700">
                             <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">{{ $product->NAME }}</h2>
@@ -316,19 +308,40 @@
                         </div>
 
                         <!-- Time Period Selection -->
-                        <div class="flex flex-wrap gap-2 mb-6" id="timePeriodButtons">
-                            <button onclick="loadSalesData(4)" class="period-btn active px-4 py-2 text-sm font-medium rounded-md bg-indigo-600 text-white">
-                                Last 4 Months
-                            </button>
-                            <button onclick="loadSalesData(6)" class="period-btn px-4 py-2 text-sm font-medium rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700">
-                                Last 6 Months
-                            </button>
-                            <button onclick="loadSalesData(12)" class="period-btn px-4 py-2 text-sm font-medium rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700">
-                                Last 12 Months
-                            </button>
-                            <button onclick="loadSalesData('ytd')" class="period-btn px-4 py-2 text-sm font-medium rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700">
-                                Year to Date
-                            </button>
+                        @php
+                            $timePeriodButtons = [
+                                [
+                                    'label' => 'Last 4 Months',
+                                    'action' => 'onclick=loadSalesData(4)',
+                                    'type' => 'button',
+                                    'color' => 'indigo',
+                                    'class' => 'period-btn active',
+                                ],
+                                [
+                                    'label' => 'Last 6 Months',
+                                    'action' => 'onclick=loadSalesData(6)',
+                                    'type' => 'button',
+                                    'color' => 'secondary',
+                                    'class' => 'period-btn',
+                                ],
+                                [
+                                    'label' => 'Last 12 Months',
+                                    'action' => 'onclick=loadSalesData(12)',
+                                    'type' => 'button',
+                                    'color' => 'secondary',
+                                    'class' => 'period-btn',
+                                ],
+                                [
+                                    'label' => 'Year to Date',
+                                    'action' => 'onclick=loadSalesData(\'ytd\')',
+                                    'type' => 'button',
+                                    'color' => 'secondary',
+                                    'class' => 'period-btn',
+                                ]
+                            ];
+                        @endphp
+                        <div class="mb-6" id="timePeriodButtons">
+                            <x-action-buttons :buttons="$timePeriodButtons" spacing="compact" />
                         </div>
 
                         <!-- Chart Container -->
@@ -432,9 +445,10 @@
                             </div>
                         @endif
                     </div>
-
-                    <!-- Stock Movement Tab -->
-                    <div x-show="activeTab === 'stock'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+                </x-slot>
+                
+                <x-slot name="stock">
+                    <div class="p-6 text-gray-900 dark:text-gray-100">
                         <div class="text-center py-12">
                             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
@@ -443,8 +457,8 @@
                             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Stock movement tracking coming soon.</p>
                         </div>
                     </div>
-                </div>
-            </div>
+                </x-slot>
+            </x-tab-group>
         </div>
     </div>
 
