@@ -102,6 +102,67 @@
                 </div>
             </div>
 
+            <!-- Featured Available Products -->
+            @if($featuredAvailable->count() > 0)
+            <div class="bg-white rounded-lg shadow mb-8">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-lg font-medium text-gray-900">Available This Week</h3>
+                        <a href="{{ route('fruit-veg.availability') }}" 
+                           class="text-sm text-green-600 hover:text-green-800 font-medium">
+                            Manage All Availability →
+                        </a>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+                        @foreach($featuredAvailable as $product)
+                        <a href="{{ route('fruit-veg.product.edit', $product->CODE) }}" 
+                           class="block bg-gray-50 rounded-lg p-3 text-center hover:bg-gray-100 hover:shadow-md transition cursor-pointer">
+                            <div class="aspect-square bg-white rounded-lg mb-2 overflow-hidden">
+                                <img src="{{ route('fruit-veg.product-image', $product->CODE) }}" 
+                                     alt="{{ $product->NAME }}"
+                                     class="w-full h-full object-cover"
+                                     loading="lazy">
+                            </div>
+                            <h4 class="text-sm font-medium text-gray-900 truncate" title="{{ strip_tags(html_entity_decode($product->NAME)) }}">
+                                @if($product->DISPLAY)
+                                    {!! nl2br(html_entity_decode($product->DISPLAY)) !!}
+                                @else
+                                    {{ strip_tags(html_entity_decode($product->NAME)) }}
+                                @endif
+                            </h4>
+                            <p class="text-xs text-gray-500 truncate">
+                                {{ $product->category->NAME ?? 'Unknown' }}
+                            </p>
+                            <div class="mt-2">
+                                <span class="text-sm font-semibold text-green-600">
+                                    €{{ number_format($product->current_price, 2) }}
+                                </span>
+                                @if($product->vegDetails && $product->vegDetails->country)
+                                <p class="text-xs text-gray-400 mt-1">
+                                    {{ $product->vegDetails->country->country }}
+                                </p>
+                                @endif
+                            </div>
+                        </a>
+                        @endforeach
+                    </div>
+                    @if($featuredAvailable->count() >= 12)
+                    <div class="mt-4 text-center">
+                        <a href="{{ route('fruit-veg.availability') }}" 
+                           class="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition">
+                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            View All Available Products
+                        </a>
+                    </div>
+                    @endif
+                </div>
+            </div>
+            @endif
+
             <!-- Recent Price Changes -->
             @if($recentPriceChanges->count() > 0)
             <div class="bg-white rounded-lg shadow">

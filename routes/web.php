@@ -63,6 +63,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/country/update', [FruitVegController::class, 'updateCountry'])->name('country.update');
         Route::get('/countries', [FruitVegController::class, 'getCountries'])->name('countries');
         Route::get('/search', [FruitVegController::class, 'searchProducts'])->name('search');
+        Route::get('/product/{code}', [FruitVegController::class, 'editProduct'])->name('product.edit');
+        Route::post('/product/{code}/update-image', [FruitVegController::class, 'updateProductImage'])->name('product.update-image');
         Route::get('/product-image/{code}', [FruitVegController::class, 'productImage'])->name('product-image');
     });
 

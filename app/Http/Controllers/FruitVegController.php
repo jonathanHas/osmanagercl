@@ -46,7 +46,10 @@ class FruitVegController extends Controller
                 return $change;
             });
 
-        return view('fruit-veg.index', compact('stats', 'recentPriceChanges'));
+        // Get featured available products
+        $featuredAvailable = $this->getFeaturedAvailableProducts();
+
+        return view('fruit-veg.index', compact('stats', 'recentPriceChanges', 'featuredAvailable'));
     }
 
     /**
@@ -494,5 +497,120 @@ class FruitVegController extends Controller
             ->whereIn('product_code', $productCodes)
             ->where('is_available', true)
             ->count();
+    }
+
+    /**
+     * Display product edit page.
+     */
+    public function editProduct($code)
+    {
+        $product = Product::where('CODE', $code)->firstOrFail();
+        
+        // Get F&V categories to verify this is a F&V product
+        $fruitCategory = Category::where('ID', 'SUB1')->first();
+        $vegCategories = Category::whereIn('ID', ['SUB2', 'SUB3'])->pluck('ID');
+        
+        $validCategories = array_merge(
+            [$fruitCategory->ID ?? 0],
+            $vegCategories->toArray()
+        );
+        
+        if (!in_array($product->CATEGORY, $validCategories)) {
+            abort(404, 'Product is not a fruit or vegetable.');
+        }
+
+        // Load relationships
+        $product->load(['category', 'vegDetails.country']);
+
+        // Get availability data
+        $availability = DB::table('veg_availability')
+            ->where('product_code', $code)
+            ->first();
+
+        $product->is_available = $availability->is_available ?? false;
+        $product->current_price = $availability->current_price ?? $product->getGrossPrice();
+
+        // Get all countries for dropdown
+        $countries = Country::orderBy('country')->get();
+
+        // Get price history for this product
+        $priceHistory = DB::table('veg_price_history')
+            ->where('product_code', $code)
+            ->orderBy('changed_at', 'desc')
+            ->limit(10)
+            ->get();
+
+        // Get basic sales data (simplified for now)
+        $salesStats = [
+            'total_sold' => 0, // Placeholder - implement when sales integration available
+            'revenue' => 0,
+            'avg_sale_price' => 0,
+        ];
+
+        return view('fruit-veg.product-edit', compact(
+            'product',
+            'countries', 
+            'priceHistory',
+            'salesStats'
+        ));
+    }
+
+    /**
+     * Update product image.
+     */
+    public function updateProductImage(Request $request, $code)
+    {
+        $request->validate([
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
+
+        $product = Product::where('CODE', $code)->firstOrFail();
+
+        if ($request->hasFile('image')) {
+            $imageData = file_get_contents($request->file('image')->path());
+            $product->update(['IMAGE' => $imageData]);
+
+            // Add to print queue since image changed
+            VegPrintQueue::addToQueue($code, 'image_updated');
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Get featured available products for the main dashboard.
+     */
+    private function getFeaturedAvailableProducts()
+    {
+        // Get F&V categories
+        $fruitCategory = Category::where('ID', 'SUB1')->first();
+        $vegCategories = Category::whereIn('ID', ['SUB2', 'SUB3'])->pluck('ID');
+
+        // Get available product codes
+        $availableProductCodes = DB::table('veg_availability')
+            ->where('is_available', true)
+            ->pluck('product_code');
+
+        // Get a selection of available products with full details
+        return Product::whereIn('CODE', $availableProductCodes)
+            ->whereIn('CATEGORY', array_merge(
+                [$fruitCategory->ID ?? 0],
+                $vegCategories->toArray()
+            ))
+            ->with(['category', 'vegDetails.country'])
+            ->orderBy('NAME')
+            ->limit(12)
+            ->get()
+            ->map(function ($product) {
+                // Get current price from availability table
+                $availability = DB::table('veg_availability')
+                    ->where('product_code', $product->CODE)
+                    ->first();
+
+                $product->current_price = $availability->current_price ?? $product->getGrossPrice();
+                $product->is_available = true; // We know these are available
+
+                return $product;
+            });
     }
 }

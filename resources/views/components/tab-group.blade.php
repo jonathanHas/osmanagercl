@@ -70,8 +70,20 @@
                  aria-labelledby="{{ $tabGroupId }}-tab-{{ $index }}"
                  id="{{ $tabGroupId }}-panel-{{ $index }}"
                  tabindex="0">
-                @if(isset($slots[$tab['id']]))
-                    {{ $slots[$tab['id']] }}
+                @php
+                    $slotName = $tab['id'];
+                    $hasSlot = false;
+                    $slotContent = null;
+                    
+                    // Check if slot exists and get its content
+                    if (isset($$slotName)) {
+                        $hasSlot = true;
+                        $slotContent = $$slotName;
+                    }
+                @endphp
+                
+                @if($hasSlot && $slotContent)
+                    {{ $slotContent }}
                 @else
                     <div class="p-4 text-gray-500 dark:text-gray-400 text-center">
                         <p>No content provided for "{{ $tab['label'] }}" tab.</p>

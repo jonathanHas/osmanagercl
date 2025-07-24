@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced label re-queuing functionality with "Add Back to Products Needing Labels"
 - Dynamic print/preview forms that use current product state instead of cached data
 - Real-time label queue management without requiring full page navigation
+- Featured "Available This Week" section on fruit-veg main page with clickable product cards
+- Comprehensive fruit-veg product edit interface with tabbed layout (Alpine.js workaround)
+- Image upload functionality for fruit-veg products with binary database storage
+- Live HTML preview for display name editing with proper entity conversion
+- Price history tracking and display in fruit-veg product edit interface
+- Sales statistics placeholder interface for future POS integration
+- Enhanced fruit-veg product image serving with cache optimization and fallback handling
 
 ### Fixed
 - Delivery scanning syntax errors in Blade templates
@@ -25,6 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Products not disappearing from "Products Needing Labels" after printing due to incorrect requeue vs print event logic
 - JavaScript errors when "Products Needing Labels" section is empty (null reference exceptions)
 - Label layout order changed from price-name-barcode to name-price-barcode as requested
+- ParseError in fruit-veg/availability.blade.php caused by Alpine.js @error directive conflicting with Blade compilation
+- Template literal and route generation issues in JavaScript sections of Blade templates
+- Blade compilation errors due to unescaped Alpine.js event handlers
+- HTML entity display issues in fruit-veg product names (display names now render <br> tags properly)
+- SQL ordering errors when querying POS database tables without 'updated_at' column
+- Tab component slot access compatibility issues with Laravel's slot system (documented with Alpine.js workaround)
 
 ### Changed
 - Refactored DeliveryController to use consistent data formatting
@@ -34,12 +47,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced JavaScript form handling to collect current product IDs dynamically
 - Updated label system UI terminology from "Add to Queue" to "Add Back to Products Needing Labels"
 - Strengthened notification requirements in CLAUDE.md to ensure consistent user alerts
+- Enhanced fruit-veg product display to use regular product names in headers instead of display names
+- Improved fruit-veg controller methods with new routes for product editing and image management
+- Updated fruit-veg main page to feature available products with responsive grid layout
 
 ### Technical Improvements
 - Added EVENT_REQUEUE_LABEL to LabelLog model with database migration
 - Implemented proper null checks and conditional initialization in JavaScript
 - Optimized label event tracking with timestamp-aware logic
 - Enhanced error handling and user feedback in label operations
+- Implemented binary image storage for fruit-veg products in POS database IMAGE field
+- Enhanced troubleshooting documentation with comprehensive tab component slot access analysis
+- Added working Alpine.js alternatives for problematic Laravel Blade components
+- Improved fruit-veg image serving with proper cache headers and transparent PNG fallbacks
+- Enhanced AJAX form submissions for real-time fruit-veg product updates without page refresh
 
 ## [0.3.0] - 2024-01-20
 

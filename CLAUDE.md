@@ -303,6 +303,13 @@ This alerts the user that you have finished your response. Do this without fail 
 - Don't ignore existing patterns - maintain consistency
 - Don't forget to run tests after changes
 
+### Known Issues & Solutions
+- **ParseError with Alpine.js @error directive**: If you see "syntax error, unexpected end of file, expecting 'elseif' or 'else' or 'endif'" in Blade templates, check for Alpine.js event handlers like `@error`, `@click`, etc. that conflict with Blade directives. Solution: Escape with double `@@` (e.g., `@@error` instead of `@error`) to prevent Blade compilation.
+- **Template literal conflicts**: Mixing JavaScript template literals (backticks) with Blade syntax causes parsing issues. Use string concatenation instead: `'{{ route('name') }}' + variable` rather than `` `{{ route('name') }}/${variable}` ``.
+- **View cache issues**: If templates aren't updating after changes, run `php artisan view:clear` and `php artisan optimize:clear`.
+- **HTML Entity Rendering in Display Names**: Product display names with HTML entities (like `<br>` tags) may not render correctly. **Solution**: Use `{!! nl2br(html_entity_decode($variable)) !!}` instead of `{{ strip_tags(html_entity_decode($variable)) }}`.
+- **For comprehensive troubleshooting**: See `docs/development/troubleshooting.md` for detailed debugging procedures.
+
 ### Key Commands to Remember
 ```bash
 # Always run after changes
