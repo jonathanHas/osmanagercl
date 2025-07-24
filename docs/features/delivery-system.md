@@ -202,6 +202,8 @@ Route::get('/deliveries/{delivery}/export-discrepancies', [DeliveryController::c
 Route::post('/delivery-items/{item}/refresh-barcode', [DeliveryController::class, 'refreshBarcode']);
 ```
 
+**Note**: The `Route::resource('deliveries', DeliveryController::class)` includes the `destroy` method for delivery deletion, accessible via `DELETE /deliveries/{delivery}` with safety restrictions.
+
 ### API Routes (`routes/api.php`)
 ```php
 Route::middleware('auth')->prefix('deliveries')->group(function () {
@@ -440,6 +442,28 @@ App\Models\Delivery::where('delivery_number', 'LIKE', 'DEL-%')->delete();
 - Monitor CSV import performance
 - Track scan success rates
 - Alert on unusual discrepancy patterns
+
+## Recent Enhancements (2025)
+
+### Interface Improvements
+1. **Prominent Supplier Display**: Enhanced supplier visibility throughout delivery interfaces
+   - **Larger Supplier Names**: Increased font size and visual prominence in delivery tables
+   - **Supplier Badges**: Color-coded supplier identification for quick recognition
+   - **Supplier Headers**: Prominent supplier information in delivery detail views
+   - **Visual Hierarchy**: Supplier information prioritized in layout design
+
+2. **Delivery Management Controls**: Complete delivery lifecycle management
+   - **Delete Functionality**: Ability to remove draft and cancelled deliveries
+   - **Safety Checks**: Confirmation dialogs prevent accidental deletion
+   - **Status Restrictions**: Only non-completed deliveries can be removed
+   - **Cascade Deletion**: Associated items and scans are properly cleaned up
+   - **Audit Trail**: Deletion events are logged for tracking
+
+### Enhanced User Experience
+- **Improved Navigation**: Clearer supplier identification reduces errors
+- **Better Organization**: Supplier-centric view helps manage multiple suppliers
+- **Flexible Management**: Ability to correct mistakes and remove test deliveries
+- **Safety Features**: Multiple confirmation steps prevent data loss
 
 ## Future Enhancements
 

@@ -2,9 +2,26 @@
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <div>
+                <div class="flex items-center space-x-3 mb-2">
+                    @php
+                        $supplierName = $delivery->supplier->Supplier ?? 'Unknown Supplier';
+                        $supplierBadgeClass = match(strtolower($supplierName)) {
+                            'udea' => 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+                            'ekoplaza' => 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+                            'bidfood' => 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
+                            default => 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                        };
+                    @endphp
+                    <span class="{{ $supplierBadgeClass }} inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold">
+                        {{ $supplierName }}
+                    </span>
+                    <span class="px-2 py-1 text-xs font-medium rounded-full {{ $delivery->status_badge_class }}">
+                        {{ ucfirst($delivery->status) }}
+                    </span>
+                </div>
                 <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Delivery {{ $delivery->delivery_number }}</h2>
                 <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    {{ $delivery->supplier->Supplier ?? 'Unknown Supplier' }} • {{ $delivery->delivery_date->format('d/m/Y') }}
+                    Delivered on {{ $delivery->delivery_date->format('l, d/m/Y') }}
                 </p>
             </div>
             @php
@@ -57,6 +74,21 @@
                         'color' => 'indigo',
                         'class' => 'inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md transition-colors duration-200',
                         'icon' => 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'
+                    ];
+                }
+                
+                // Add delete action for non-completed deliveries
+                if (in_array($delivery->status, ['draft', 'cancelled'])) {
+                    $deliveryActions[] = [
+                        'type' => 'form',
+                        'method' => 'DELETE',
+                        'route' => 'deliveries.destroy',
+                        'params' => $delivery,
+                        'label' => 'Delete Delivery',
+                        'color' => 'red',
+                        'class' => 'inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-md transition-colors duration-200',
+                        'icon' => 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16',
+                        'onclick' => "return confirm('Are you sure you want to delete this delivery? This action cannot be undone.')"
                     ];
                 }
             @endphp

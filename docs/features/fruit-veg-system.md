@@ -283,6 +283,7 @@ Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
 - Clickable cards navigate directly to product edit pages
 - Real-time pricing and availability status display
 - Proper HTML rendering for product display names
+- Removed "View All Products" button from quick actions for cleaner interface
 
 #### Comprehensive Product Edit Interface
 - Full product management page with tabbed layout
@@ -290,7 +291,12 @@ Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
 - Live HTML preview for display name editing
 - Price management with history tracking
 - Country of origin selection with validation
-- Sales statistics display (placeholder for future integration)
+- **Sales History Tab**: Full sales analytics matching general products functionality
+  - Interactive time period selection (4m, 6m, 12m, YTD)
+  - Dynamic sales charts with Chart.js integration
+  - Sales statistics cards (total, average, current month, trend)
+  - Monthly sales table with trend indicators
+  - AJAX-powered data loading without page refresh
 - Real-time AJAX form submissions without page refresh
 
 #### Enhanced Image Management

@@ -58,13 +58,29 @@
                                 @foreach($deliveries as $delivery)
                                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
                                         <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                            <div class="text-sm font-bold text-indigo-600 dark:text-indigo-400">
                                                 {{ $delivery->delivery_number }}
+                                            </div>
+                                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                                                {{ $delivery->created_at->format('H:i') }}
                                             </div>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm text-gray-900 dark:text-gray-100">
-                                                {{ $delivery->supplier->Supplier ?? 'Unknown' }}
+                                            <div class="flex items-center">
+                                                <div class="flex-shrink-0">
+                                                    @php
+                                                        $supplierName = $delivery->supplier->Supplier ?? 'Unknown';
+                                                        $supplierBadgeClass = match(strtolower($supplierName)) {
+                                                            'udea' => 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+                                                            'ekoplaza' => 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+                                                            'bidfood' => 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
+                                                            default => 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                                                        };
+                                                    @endphp
+                                                    <span class="{{ $supplierBadgeClass }} inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium">
+                                                        {{ $supplierName }}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
@@ -109,6 +125,19 @@
                                                     $actions[] = ['type' => 'link', 'route' => 'deliveries.scan', 'params' => $delivery, 'label' => 'Start', 'color' => 'success'];
                                                 } elseif ($delivery->status === 'receiving') {
                                                     $actions[] = ['type' => 'link', 'route' => 'deliveries.scan', 'params' => $delivery, 'label' => 'Continue', 'color' => 'info'];
+                                                }
+                                                
+                                                // Add delete button for non-completed deliveries
+                                                if (in_array($delivery->status, ['draft', 'cancelled'])) {
+                                                    $actions[] = [
+                                                        'type' => 'form', 
+                                                        'method' => 'DELETE',
+                                                        'route' => 'deliveries.destroy', 
+                                                        'params' => $delivery, 
+                                                        'label' => 'Delete', 
+                                                        'color' => 'danger',
+                                                        'onclick' => "return confirm('Are you sure you want to delete this delivery? This action cannot be undone.')"
+                                                    ];
                                                 }
                                             @endphp
                                             

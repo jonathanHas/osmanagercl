@@ -5,7 +5,9 @@ use App\Http\Controllers\FruitVegController;
 use App\Http\Controllers\LabelAreaController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\TestScraperController;
+use App\Http\Controllers\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -64,6 +66,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/countries', [FruitVegController::class, 'getCountries'])->name('countries');
         Route::get('/search', [FruitVegController::class, 'searchProducts'])->name('search');
         Route::get('/product/{code}', [FruitVegController::class, 'editProduct'])->name('product.edit');
+        Route::get('/product/{code}/sales-data', [FruitVegController::class, 'salesData'])->name('product.sales-data');
         Route::post('/product/{code}/update-image', [FruitVegController::class, 'updateProductImage'])->name('product.update-image');
         Route::get('/product-image/{code}', [FruitVegController::class, 'productImage'])->name('product-image');
     });
@@ -79,6 +82,14 @@ Route::middleware('auth')->group(function () {
     Route::post('/deliveries/{delivery}/cancel', [DeliveryController::class, 'cancel'])->name('deliveries.cancel');
     Route::get('/deliveries/{delivery}/export-discrepancies', [DeliveryController::class, 'exportDiscrepancies'])->name('deliveries.export-discrepancies');
     Route::post('/delivery-items/{item}/refresh-barcode', [DeliveryController::class, 'refreshBarcode'])->name('delivery-items.refresh-barcode');
+
+    // User Management routes
+    Route::resource('users', UserManagementController::class);
+
+    // Settings routes
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+    Route::post('/settings/clear-cache', [SettingsController::class, 'clearCache'])->name('settings.clear-cache');
+    Route::get('/settings/system-info', [SettingsController::class, 'systemInfo'])->name('settings.system-info');
 
     // Udea scraping test routes
     Route::prefix('tests')->name('tests.')->group(function () {

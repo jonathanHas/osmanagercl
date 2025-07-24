@@ -7,12 +7,26 @@ use App\Models\Country;
 use App\Models\Product;
 use App\Models\VegDetails;
 use App\Models\VegPrintQueue;
+use App\Repositories\SalesRepository;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class FruitVegController extends Controller
 {
+    /**
+     * The sales repository instance.
+     */
+    protected SalesRepository $salesRepository;
+
+    /**
+     * Create a new controller instance.
+     */
+    public function __construct(SalesRepository $salesRepository)
+    {
+        $this->salesRepository = $salesRepository;
+    }
+
     /**
      * Display the main F&V dashboard.
      */
@@ -540,19 +554,42 @@ class FruitVegController extends Controller
             ->limit(10)
             ->get();
 
-        // Get basic sales data (simplified for now)
-        $salesStats = [
-            'total_sold' => 0, // Placeholder - implement when sales integration available
-            'revenue' => 0,
-            'avg_sale_price' => 0,
-        ];
+        // Get sales data using the repository
+        $salesHistory = $this->salesRepository->getProductSalesHistory($product->ID, 4); // Last 4 months
+        $salesStats = $this->salesRepository->getProductSalesStatistics($product->ID);
 
         return view('fruit-veg.product-edit', compact(
             'product',
             'countries', 
             'priceHistory',
+            'salesHistory',
             'salesStats'
         ));
+    }
+
+    /**
+     * Get sales data for AJAX requests.
+     */
+    public function salesData(Request $request, string $code)
+    {
+        $product = Product::where('CODE', $code)->firstOrFail();
+
+        $period = $request->get('period', '4');
+
+        // Determine the number of months based on period
+        $months = match ($period) {
+            'ytd' => (int) date('n'), // Current month number
+            default => (int) $period
+        };
+
+        // Get sales history and statistics
+        $salesHistory = $this->salesRepository->getProductSalesHistory($product->ID, $months);
+        $salesStats = $this->salesRepository->getProductSalesStatistics($product->ID);
+
+        return response()->json([
+            'salesHistory' => array_values($salesHistory),
+            'salesStats' => $salesStats,
+        ]);
     }
 
     /**
