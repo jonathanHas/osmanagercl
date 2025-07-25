@@ -169,25 +169,80 @@
                                         <div x-data="{ 
                                                 editing: false, 
                                                 originalPrice: parseFloat(product.current_price).toFixed(2),
-                                                newPrice: parseFloat(product.current_price).toFixed(2)
+                                                newPrice: parseFloat(product.current_price).toFixed(2),
+                                                async savePrice() {
+                                                    try {
+                                                        const response = await fetch('{{ route('fruit-veg.prices.update') }}', {
+                                                            method: 'POST',
+                                                            headers: {
+                                                                'Content-Type': 'application/json',
+                                                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                                                            },
+                                                            body: JSON.stringify({
+                                                                product_code: product.CODE,
+                                                                new_price: parseFloat(this.newPrice)
+                                                            })
+                                                        });
+                                                        
+                                                        if (response.ok) {
+                                                            // Update local state
+                                                            product.current_price = this.newPrice;
+                                                            this.originalPrice = this.newPrice;
+                                                            this.editing = false;
+                                                            
+                                                            // Show success notification
+                                                            const notification = document.createElement('div');
+                                                            notification.className = 'fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white z-50 bg-green-600';
+                                                            notification.textContent = 'Price updated successfully!';
+                                                            document.body.appendChild(notification);
+                                                            setTimeout(() => notification.remove(), 3000);
+                                                        } else {
+                                                            const errorData = await response.json();
+                                                            console.error('Price update failed:', errorData);
+                                                            
+                                                            // Show error notification
+                                                            const notification = document.createElement('div');
+                                                            notification.className = 'fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white z-50 bg-red-600';
+                                                            notification.textContent = errorData.error || 'Failed to update price';
+                                                            document.body.appendChild(notification);
+                                                            setTimeout(() => notification.remove(), 3000);
+                                                        }
+                                                    } catch (error) {
+                                                        console.error('Error updating price:', error);
+                                                        
+                                                        // Show error notification
+                                                        const notification = document.createElement('div');
+                                                        notification.className = 'fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white z-50 bg-red-600';
+                                                        notification.textContent = 'An error occurred while updating price';
+                                                        document.body.appendChild(notification);
+                                                        setTimeout(() => notification.remove(), 3000);
+                                                    }
+                                                }
                                              }">
                                             <div x-show="!editing" 
-                                                 @click="editing = true" 
+                                                 @click="editing = true; $nextTick(() => $refs.priceInput.focus())" 
                                                  class="cursor-pointer hover:bg-yellow-50 px-2 py-1 rounded">
                                                 <span class="text-sm font-medium text-gray-900">
                                                     €<span x-text="parseFloat(product.current_price).toFixed(2)"></span>
                                                 </span>
                                                 <div class="text-xs text-blue-600 mt-1">Click to edit</div>
                                             </div>
-                                            <div x-show="editing" x-cloak class="flex items-center gap-2">
+                                            <div x-show="editing" x-cloak class="flex items-center gap-1">
                                                 <span class="text-sm">€</span>
                                                 <input type="number" 
                                                        x-model="newPrice" 
                                                        step="0.01"
-                                                       @keyup.enter="$root.updatePrice(product.CODE, newPrice); editing = false"
-                                                       @blur="$root.updatePrice(product.CODE, newPrice); editing = false"
-                                                       class="w-20 text-sm border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
+                                                       @keyup.enter="savePrice()"
+                                                       class="w-16 text-sm border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
                                                        x-ref="priceInput">
+                                                <button @click="savePrice()"
+                                                        class="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition">
+                                                    ✓
+                                                </button>
+                                                <button @click="newPrice = originalPrice; editing = false"
+                                                        class="px-2 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700 transition">
+                                                    ✕
+                                                </button>
                                             </div>
                                         </div>
                                         
@@ -270,6 +325,16 @@
                         <p class="mt-1 text-sm text-gray-500">Try adjusting your search or filter criteria.</p>
                     </div>
                 </div>
+                
+                <!-- Load More Button -->
+                <div x-show="hasMore && !searching" class="border-t border-gray-200 px-6 py-4 text-center">
+                    <button @click="loadMore()" 
+                            :disabled="loading"
+                            class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-50">
+                        <span x-show="!loading">Load More Products</span>
+                        <span x-show="loading">Loading...</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -285,6 +350,10 @@
                 categoryFilter: 'all',
                 availabilityFilter: 'all',
                 searching: false,
+                hasMore: true,
+                loading: false,
+                offset: 0,
+                limit: 50,
                 
                 init() {
                     // Restore saved filters from localStorage
@@ -330,6 +399,7 @@
                 
                 async performSearch() {
                     this.searching = true;
+                    this.offset = 0; // Reset pagination on new search
                     
                     // Save current filters to localStorage
                     this.saveFilters();
@@ -339,12 +409,20 @@
                             search: this.searchTerm,
                             category: this.categoryFilter,
                             availability: this.availabilityFilter,
+                            limit: this.limit,
+                            offset: this.offset
                         });
                         
-                        const response = await fetch('{{ route('fruit-veg.search') }}?' + params);
+                        const response = await fetch('{{ route('fruit-veg.manage') }}?' + params, {
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
                         const data = await response.json();
                         
-                        this.products = data.products;
+                        this.products = data.products || [];
+                        this.hasMore = data.hasMore || false;
                         this.selectedProducts = [];
                         this.selectAll = false;
                     } catch (error) {
@@ -520,6 +598,43 @@
                     } catch (error) {
                         console.error('Error:', error);
                         this.showNotification('An error occurred', 'error');
+                    }
+                },
+                
+                async loadMore() {
+                    if (this.loading || !this.hasMore) return;
+                    
+                    this.loading = true;
+                    this.offset += this.limit;
+                    
+                    try {
+                        const params = new URLSearchParams({
+                            search: this.searchTerm,
+                            category: this.categoryFilter,
+                            availability: this.availabilityFilter,
+                            limit: this.limit,
+                            offset: this.offset
+                        });
+                        
+                        const response = await fetch('{{ route('fruit-veg.manage') }}?' + params, {
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+                        const data = await response.json();
+                        
+                        // Append new products to existing list
+                        this.products = [...this.products, ...(data.products || [])];
+                        this.hasMore = data.hasMore || false;
+                        
+                    } catch (error) {
+                        console.error('Load more error:', error);
+                        this.showNotification('Failed to load more products', 'error');
+                        // Reset offset on error
+                        this.offset -= this.limit;
+                    } finally {
+                        this.loading = false;
                     }
                 },
                 

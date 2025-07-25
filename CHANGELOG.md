@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Combined management interface (/fruit-veg/manage) unifying availability and price management
+- Activity tracking system with product_activity_logs table for audit trail without modifying POS database
+- "Recently Added to Till" section on main dashboard with real-time updates
+- Progressive loading with "Load More" functionality for better performance
+- Database-level filtering for availability status to improve query efficiency
+- Real-time dashboard updates when products are added/removed via search
 - Till visibility management system replacing legacy veg_availability approach
 - Integration with POS database PRODUCTS_CAT table for real-time till synchronization
 - TillVisibilityService for centralized till management across product categories
@@ -35,6 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced fruit-veg product image serving with cache optimization and fallback handling
 
 ### Fixed
+- Price update functionality in manage screen failing due to Alpine.js `$root` scope issues (now uses self-contained savePrice method)
+- Price editing UX improved with explicit save/cancel buttons instead of auto-save on blur
+- Price update restrictions preventing updates to hidden products in manage screen (now allows all updates in manage, restricts only in prices page)
+- N+1 query performance issues in manage screen by implementing batch loading of price records
+- Availability filter not working in manage screen due to post-pagination filtering (now applied at database level)
 - Delivery scanning syntax errors in Blade templates
 - Division by zero in progress bar calculations
 - Null date handling in delivery views
@@ -49,8 +60,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HTML entity display issues in fruit-veg product names (display names now render <br> tags properly)
 - SQL ordering errors when querying POS database tables without 'updated_at' column
 - Tab component slot access compatibility issues with Laravel's slot system (documented with Alpine.js workaround)
+- Products removed from till reappearing in "Recently Added" section after page refresh
 
 ### Changed
+- Optimized TillVisibilityService to apply filters at database query level instead of post-processing
+- Enhanced manage screen performance with progressive loading and optimized queries
+- Replaced "Currently Visible on Till" section with dynamic "Recently Added to Till" on main dashboard
 - Refactored DeliveryController to use consistent data formatting
 - Moved complex PHP logic from Blade templates to controllers
 - Replaced session-based print queue with event-based re-queuing system

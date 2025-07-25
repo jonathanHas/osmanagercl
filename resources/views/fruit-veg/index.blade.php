@@ -116,70 +116,12 @@
                 </div>
             </div>
 
-            <!-- Featured Available Products -->
-            @if($featuredAvailable->count() > 0)
-            <div class="bg-white rounded-lg shadow mb-8">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <div class="flex justify-between items-center">
-                        <h3 class="text-lg font-medium text-gray-900">Currently Visible on Till</h3>
-                        <a href="{{ route('fruit-veg.availability') }}" 
-                           class="text-sm text-green-600 hover:text-green-800 font-medium">
-                            Manage All Till Visibility →
-                        </a>
-                    </div>
-                </div>
-                <div class="p-6">
-                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-                        @foreach($featuredAvailable as $product)
-                        <a href="{{ route('fruit-veg.product.edit', $product->CODE) }}" 
-                           class="block bg-gray-50 rounded-lg p-3 text-center hover:bg-gray-100 hover:shadow-md transition cursor-pointer">
-                            <div class="aspect-square bg-white rounded-lg mb-2 overflow-hidden">
-                                <img src="{{ route('fruit-veg.product-image', $product->CODE) }}" 
-                                     alt="{{ $product->NAME }}"
-                                     class="w-full h-full object-cover"
-                                     loading="lazy">
-                            </div>
-                            <h4 class="text-sm font-medium text-gray-900 truncate" title="{{ strip_tags(html_entity_decode($product->NAME)) }}">
-                                @if($product->DISPLAY)
-                                    {!! nl2br(html_entity_decode($product->DISPLAY)) !!}
-                                @else
-                                    {{ strip_tags(html_entity_decode($product->NAME)) }}
-                                @endif
-                            </h4>
-                            <p class="text-xs text-gray-500 truncate">
-                                {{ $product->category->NAME ?? 'Unknown' }}
-                            </p>
-                            <div class="mt-2">
-                                <span class="text-sm font-semibold text-green-600">
-                                    €{{ number_format($product->current_price, 2) }}
-                                </span>
-                                @if($product->vegDetails && $product->vegDetails->country)
-                                <p class="text-xs text-gray-400 mt-1">
-                                    {{ $product->vegDetails->country->country }}
-                                </p>
-                                @endif
-                            </div>
-                        </a>
-                        @endforeach
-                    </div>
-                    @if($featuredAvailable->count() >= 12)
-                    <div class="mt-4 text-center">
-                        <a href="{{ route('fruit-veg.availability') }}" 
-                           class="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition">
-                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            View All Available Products
-                        </a>
-                    </div>
-                    @endif
-                </div>
-            </div>
-            @endif
 
             <!-- Recently Added Products -->
-            @if($recentlyAdded->count() > 0)
-            <div class="bg-white rounded-lg shadow mb-8">
+            <div class="bg-white rounded-lg shadow mb-8" 
+                 x-data="recentlyAddedManager()" 
+                 @product-added-to-till.window="handleProductAdded($event.detail.product)"
+                 @product-removed-from-till.window="handleProductRemoved($event.detail.product)">
                 <div class="px-6 py-4 border-b border-gray-200">
                     <div class="flex justify-between items-center">
                         <h3 class="text-lg font-medium text-gray-900">Recently Added to Till</h3>
@@ -187,40 +129,44 @@
                     </div>
                 </div>
                 <div class="p-6">
-                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                        @foreach($recentlyAdded as $product)
-                        <a href="{{ route('fruit-veg.product.edit', $product->CODE) }}" 
-                           class="block bg-blue-50 rounded-lg p-3 text-center hover:bg-blue-100 hover:shadow-md transition cursor-pointer border border-blue-200">
-                            <div class="aspect-square bg-white rounded-lg mb-2 overflow-hidden">
-                                <img src="{{ route('fruit-veg.product-image', $product->CODE) }}" 
-                                     alt="{{ $product->NAME }}"
-                                     class="w-full h-full object-cover"
-                                     loading="lazy">
+                    <div x-show="recentProducts.length > 0" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                        <template x-for="product in recentProducts" :key="product.CODE">
+                            <div class="product-card-container">
+                                <a :href="'/fruit-veg/product/' + product.CODE" 
+                                   class="block bg-blue-50 rounded-lg p-3 text-center hover:bg-blue-100 hover:shadow-md transition cursor-pointer border border-blue-200"
+                                   :class="{ 'animate-slideIn': product.isNew }">
+                                    <div class="aspect-square bg-white rounded-lg mb-2 overflow-hidden">
+                                        <img :src="'/fruit-veg/product-image/' + product.CODE" 
+                                             :alt="product.NAME"
+                                             class="w-full h-full object-cover"
+                                             loading="lazy">
+                                    </div>
+                                    <h4 class="text-sm font-medium text-gray-900 truncate" :title="product.NAME">
+                                        <span x-show="product.DISPLAY" x-html="product.DISPLAY"></span>
+                                        <span x-show="!product.DISPLAY" x-text="product.NAME"></span>
+                                    </h4>
+                                    <p class="text-xs text-gray-500 truncate" x-text="product.category?.NAME || 'Unknown'"></p>
+                                    <div class="mt-2">
+                                        <span class="text-sm font-semibold text-green-600">
+                                            €<span x-text="parseFloat(product.current_price || 0).toFixed(2)"></span>
+                                        </span>
+                                        <p class="text-xs text-blue-600 mt-1" x-text="getTimeAgo(product.added_at)"></p>
+                                    </div>
+                                </a>
                             </div>
-                            <h4 class="text-sm font-medium text-gray-900 truncate" title="{{ strip_tags(html_entity_decode($product->NAME)) }}">
-                                @if($product->DISPLAY)
-                                    {!! nl2br(html_entity_decode($product->DISPLAY)) !!}
-                                @else
-                                    {{ strip_tags(html_entity_decode($product->NAME)) }}
-                                @endif
-                            </h4>
-                            <p class="text-xs text-gray-500 truncate">
-                                {{ $product->category->NAME ?? 'Unknown' }}
-                            </p>
-                            <div class="mt-2">
-                                <span class="text-sm font-semibold text-green-600">
-                                    €{{ number_format($product->current_price, 2) }}
-                                </span>
-                                <p class="text-xs text-blue-600 mt-1">
-                                    Added {{ $product->added_at->diffForHumans() }}
-                                </p>
-                            </div>
-                        </a>
-                        @endforeach
+                        </template>
+                    </div>
+                    
+                    <!-- Empty State -->
+                    <div x-show="recentProducts.length === 0" class="text-center py-8">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <h3 class="mt-2 text-sm font-medium text-gray-900">No recent additions</h3>
+                        <p class="mt-1 text-sm text-gray-500">Products added to till in the last 7 days will appear here.</p>
                     </div>
                 </div>
             </div>
-            @endif
 
             <!-- Recent Price Changes -->
             @if($recentPriceChanges->count() > 0)
@@ -273,4 +219,112 @@
             @endif
         </div>
     </div>
+
+    @push('styles')
+    <style>
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        
+        .animate-slideIn {
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        .product-card-container {
+            transition: all 0.3s ease;
+        }
+    </style>
+    @endpush
+
+    @push('scripts')
+    <script>
+        function recentlyAddedManager() {
+            return {
+                recentProducts: @json($recentlyAdded ?? []),
+                
+                init() {
+                    // Set added_at for existing products if not present
+                    this.recentProducts.forEach(product => {
+                        if (!product.added_at) {
+                            product.added_at = new Date();
+                        }
+                    });
+                },
+                
+                handleProductAdded(product) {
+                    // Check if product is already in the recent list
+                    const existingIndex = this.recentProducts.findIndex(p => p.CODE === product.CODE);
+                    
+                    if (existingIndex === -1) {
+                        // Add animation flag and timestamp
+                        product.isNew = true;
+                        product.added_at = new Date();
+                        
+                        // Add to the beginning of the list
+                        this.recentProducts.unshift(product);
+                        
+                        // Keep only the most recent 10 products
+                        if (this.recentProducts.length > 10) {
+                            this.recentProducts = this.recentProducts.slice(0, 10);
+                        }
+                        
+                        // Remove animation flag after animation completes
+                        setTimeout(() => {
+                            product.isNew = false;
+                        }, 300);
+                    } else {
+                        // Update timestamp for existing product
+                        this.recentProducts[existingIndex].added_at = new Date();
+                        this.recentProducts[existingIndex].isNew = true;
+                        
+                        // Move to front
+                        const [updatedProduct] = this.recentProducts.splice(existingIndex, 1);
+                        this.recentProducts.unshift(updatedProduct);
+                        
+                        // Remove animation flag after animation completes
+                        setTimeout(() => {
+                            updatedProduct.isNew = false;
+                        }, 300);
+                    }
+                },
+                
+                handleProductRemoved(product) {
+                    // Remove from recent list if present
+                    const index = this.recentProducts.findIndex(p => p.CODE === product.CODE);
+                    if (index !== -1) {
+                        this.recentProducts.splice(index, 1);
+                    }
+                },
+                
+                getTimeAgo(dateString) {
+                    if (!dateString) return 'Just now';
+                    
+                    const date = new Date(dateString);
+                    const now = new Date();
+                    const diffInSeconds = Math.floor((now - date) / 1000);
+                    
+                    if (diffInSeconds < 60) {
+                        return 'Just now';
+                    } else if (diffInSeconds < 3600) {
+                        const minutes = Math.floor(diffInSeconds / 60);
+                        return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+                    } else if (diffInSeconds < 86400) {
+                        const hours = Math.floor(diffInSeconds / 3600);
+                        return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+                    } else {
+                        const days = Math.floor(diffInSeconds / 86400);
+                        return `${days} day${days !== 1 ? 's' : ''} ago`;
+                    }
+                }
+            }
+        }
+    </script>
+    @endpush
 </x-admin-layout>

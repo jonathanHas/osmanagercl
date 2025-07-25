@@ -12,12 +12,16 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 - **Quick Search Component**: Instant visibility toggles from the main dashboard
 - **Bulk Operations**: Show/hide multiple products on till simultaneously
 - **Real-time Search**: AJAX-powered search across all F&V products (664 total)
-- **Advanced Filtering**: Filter by category (Fruits/Vegetables) and till visibility status
+- **Advanced Filtering**: Filter by category (Fruits/Vegetables) and till visibility status with database-level optimization
 - **Performance Optimized**: Pagination with "Load More" functionality for handling large datasets
+- **Combined Management Interface**: Unified screen combining availability and price management
+- **Activity Tracking**: Complete audit trail of product additions/removals without modifying POS database
 - **Reliable Interface**: Alpine.js integration with proper Blade template compatibility
 
 ### 2. Pricing Management
-- **Dynamic Pricing**: Update prices for F&V products visible on till
+- **Inline Price Editing**: Click-to-edit interface with save/cancel buttons for intuitive price updates
+- **Universal Price Updates**: Update prices for both visible and hidden products in manage screen
+- **Dedicated Price Management**: Separate prices page for visible-only products
 - **Price History**: Complete audit trail of all price changes stored in veg_price_history
 - **Automatic Label Queue**: Products automatically added to print queue when prices change
 - **VAT Calculations**: Integrated with existing tax system
@@ -35,12 +39,13 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 - **Product Images**: Full image management with upload, preview, and binary storage
 - **Comprehensive Edit Interface**: Dedicated product edit pages with tabbed layout
 
-### 5. Featured Products Dashboard
-- **Currently Visible on Till Section**: Prominently displays products visible on the till screen
+### 5. Dashboard Features
+- **Recently Added to Till Section**: Dynamic display of recently added products with real-time updates
 - **Quick Till Visibility Search**: Integrated search component for rapid visibility updates
 - **Clickable Product Cards**: Direct navigation to product edit pages from featured section
 - **Visual Product Grid**: Responsive grid layout with product images and pricing
-- **Real-time Visibility**: Cards reflect current till visibility status and pricing
+- **Real-time Updates**: Live addition/removal of products with smooth animations
+- **Instant Visibility Changes**: Products appear/disappear immediately based on till visibility changes
 
 ## Technical Implementation
 
@@ -57,6 +62,24 @@ PRODUCTS_CAT (
 
 #### F&V Specific Tables (Laravel Database)
 ```sql
+-- Activity tracking for audit trail (without modifying POS database)
+CREATE TABLE product_activity_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_id VARCHAR(255) NOT NULL,
+    product_code VARCHAR(255) NOT NULL,
+    activity_type VARCHAR(50) NOT NULL, -- 'added_to_till', 'removed_from_till'
+    category VARCHAR(50), -- 'fruit_veg', 'coffee', etc.
+    old_value JSON,
+    new_value JSON,
+    user_id INT,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
+    INDEX idx_product_activity (product_id),
+    INDEX idx_activity_type (activity_type),
+    INDEX idx_category (category),
+    INDEX idx_created_at (created_at)
+);
+
 -- Legacy table for availability (being phased out)
 CREATE TABLE veg_availability (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -128,15 +151,18 @@ $vegDetails->getClassNameAttribute();
 #### FruitVegController Key Methods
 
 **Dashboard & Statistics**
-- `index()` - Main F&V dashboard with statistics and featured products
+- `index()` - Main F&V dashboard with statistics and recently added products
 - `getAvailableCount()` - Helper for availability counts
 - `getFeaturedAvailableProducts()` - Get featured products for dashboard display
 
-**Availability Management**
-- `availability()` - Main availability page with pagination
+**Combined Management Interface**
+- `manage()` - Unified availability and price management with pagination
 - `toggleAvailability()` - Toggle single product availability
 - `bulkAvailability()` - Bulk update multiple products
-- `searchProducts()` - AJAX search endpoint
+- `searchProducts()` - AJAX search endpoint with performance optimizations
+
+**Legacy Availability Management**
+- `availability()` - Original availability page (still available)
 
 **Price Management**
 - `prices()` - Price management interface
@@ -162,6 +188,7 @@ All F&V routes are grouped under `/fruit-veg` prefix:
 ```php
 Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
     Route::get('/', [FruitVegController::class, 'index'])->name('index');
+    Route::get('/manage', [FruitVegController::class, 'manage'])->name('manage'); // Combined interface
     Route::get('/availability', [FruitVegController::class, 'availability'])->name('availability');
     Route::post('/availability/toggle', [FruitVegController::class, 'toggleAvailability'])->name('availability.toggle');
     Route::post('/availability/bulk', [FruitVegController::class, 'bulkAvailability'])->name('availability.bulk');
@@ -203,16 +230,19 @@ Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
 ## Performance Optimizations
 
 ### Database Queries
-- **Eager loading** relationships to prevent N+1 queries
+- **N+1 Query Prevention**: Batch loading of price records to avoid individual queries per product
+- **Database-level Filtering**: Visibility filters applied at query level before pagination
+- **Eager loading** relationships to prevent additional N+1 queries
 - **Indexed searches** on product codes and names
-- **Pagination** to limit initial load to 50 products
-- **EXISTS queries** for efficient filtering
+- **Efficient Pagination** with offset/limit handling up to 50 products per load
+- **Optimized EXISTS queries** replaced with IN/NOT IN clauses for better cross-database performance
 
 ### Frontend Performance
-- **Debounced search** to prevent excessive API calls
-- **Progressive loading** with "Load More" functionality
-- **Image caching** with appropriate cache headers
-- **Optimized JavaScript** with minimal DOM manipulation
+- **Debounced search** to prevent excessive API calls (500ms delay)
+- **Progressive loading** with "Load More" functionality for seamless user experience
+- **Image caching** with appropriate cache headers (24-hour cache)
+- **Optimized JavaScript** with minimal DOM manipulation and efficient state management
+- **Real-time Updates** without page refreshes using Alpine.js reactivity
 
 ## Workflow Examples
 
@@ -279,6 +309,9 @@ Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
 - **Improved template reliability** - Systematic approach to template literal conflicts
 
 ### Recent Bug Fixes (2024)
+- **Price Update Restrictions**: Fixed issue preventing price updates for hidden products in manage screen
+- **Alpine.js Scope Issues**: Resolved `$root` reference problems in nested components by implementing self-contained price editing
+- **Inline Editing UX**: Added explicit save/cancel buttons for better user experience in price editing
 - **ParseError Resolution**: Fixed "unexpected end of file" errors caused by Alpine.js `@error` directive conflicts with Blade compilation
 - **Template Compatibility**: Resolved JavaScript template literal issues with Blade route generation
 - **Compilation Stability**: Enhanced Blade template parsing for complex Alpine.js integrations
@@ -289,13 +322,20 @@ Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
 
 ### Recent Feature Additions (2024)
 
-#### Featured Products Dashboard Section
-- Added "Available This Week" section to main fruit-veg page
-- Displays 12 featured available products in responsive grid
-- Clickable cards navigate directly to product edit pages
-- Real-time pricing and availability status display
-- Proper HTML rendering for product display names
-- Removed "View All Products" button from quick actions for cleaner interface
+#### Combined Management Interface (July 2024)
+- **Unified Availability & Price Management**: Single screen combining previously separate functions
+- **Performance Optimized**: Fixed N+1 query issues with batch loading of price records
+- **Database-level Filtering**: Availability filters now applied at query level for better performance
+- **Progressive Loading**: Pagination with "Load More" functionality for seamless browsing
+- **Real-time Dashboard Updates**: Products appear/disappear on main dashboard immediately when added/removed
+
+#### Enhanced Dashboard Experience
+- **Recently Added to Till Section**: Replaced static featured products with dynamic recently added display
+- **Real-time Updates**: Live addition/removal with smooth CSS animations
+- **Activity Tracking**: Complete audit trail stored in Laravel database without modifying POS
+- **Instant Visibility**: Products appear on dashboard immediately when added via search
+- **Filter Persistence**: User selections maintained across navigation
+- **Proper HTML Rendering**: Fixed display name rendering to show `<br>` tags and entities correctly
 
 #### Comprehensive Product Edit Interface
 - Full product management page with tabbed layout

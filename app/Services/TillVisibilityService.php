@@ -78,7 +78,7 @@ class TillVisibilityService
     /**
      * Get all products for a category type with their till visibility status.
      */
-    public function getProductsWithVisibility(string $categoryType, array $filters = []): EloquentCollection
+    public function getProductsWithVisibility(string $categoryType, array $filters = [], int $limit = null, int $offset = 0): EloquentCollection
     {
         $categoryIds = self::CATEGORY_MAPPINGS[$categoryType] ?? [];
         
@@ -107,10 +107,36 @@ class TillVisibilityService
             }
         }
 
+        // Apply visibility filter at database level for better performance
+        if (!empty($filters['visibility']) && $filters['visibility'] !== 'all') {
+            if ($filters['visibility'] === 'visible') {
+                // Only get products that exist in PRODUCTS_CAT
+                $visibleProductIds = ProductsCat::pluck('PRODUCT')->toArray();
+                if (!empty($visibleProductIds)) {
+                    $query->whereIn('ID', $visibleProductIds);
+                } else {
+                    // No visible products, return empty result
+                    $query->whereRaw('1 = 0');
+                }
+            } elseif ($filters['visibility'] === 'hidden') {
+                // Only get products that DON'T exist in PRODUCTS_CAT
+                $visibleProductIds = ProductsCat::pluck('PRODUCT')->toArray();
+                if (!empty($visibleProductIds)) {
+                    $query->whereNotIn('ID', $visibleProductIds);
+                }
+                // If no visible products, all products are hidden (no additional filter needed)
+            }
+        }
+
+        // Apply pagination if limit is specified
+        if ($limit !== null) {
+            $query->skip($offset)->take($limit);
+        }
+
         // Get products
         $products = $query->orderBy('NAME')->get();
 
-        // Get visible product IDs
+        // Get visible product IDs for all products (needed for UI state)
         $visibleProductIds = ProductsCat::whereIn('PRODUCT', $products->pluck('ID'))
             ->pluck('PRODUCT')
             ->toArray();
@@ -119,15 +145,6 @@ class TillVisibilityService
         $products->each(function ($product) use ($visibleProductIds) {
             $product->is_visible_on_till = in_array($product->ID, $visibleProductIds);
         });
-
-        // Apply visibility filter
-        if (!empty($filters['visibility']) && $filters['visibility'] !== 'all') {
-            $products = $products->filter(function ($product) use ($filters) {
-                return $filters['visibility'] === 'visible' 
-                    ? $product->is_visible_on_till 
-                    : !$product->is_visible_on_till;
-            });
-        }
 
         return $products;
     }
@@ -189,6 +206,15 @@ class TillVisibilityService
             ->map(function ($productsCat) {
                 $product = $productsCat->product;
                 $product->is_visible_on_till = true;
+                
+                // Get current price from price history or product
+                $lastPriceRecord = DB::table('veg_price_history')
+                    ->where('product_code', $product->CODE)
+                    ->orderBy('changed_at', 'desc')
+                    ->first();
+                
+                $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
+                
                 return $product;
             });
     }
@@ -323,17 +349,22 @@ class TillVisibilityService
             if (!in_array($log->product_id, $addedProductIds) && $log->product) {
                 $product = $log->product;
                 $product->is_visible_on_till = $this->isVisibleOnTill($log->product_id);
-                $product->added_at = $log->created_at;
                 
-                // Get current price from price history or product
-                $lastPriceRecord = DB::table('veg_price_history')
-                    ->where('product_code', $product->CODE)
-                    ->orderBy('changed_at', 'desc')
-                    ->first();
+                // Only include products that are currently visible on till
+                if ($product->is_visible_on_till) {
+                    $product->added_at = $log->created_at;
+                    
+                    // Get current price from price history or product
+                    $lastPriceRecord = DB::table('veg_price_history')
+                        ->where('product_code', $product->CODE)
+                        ->orderBy('changed_at', 'desc')
+                        ->first();
+                    
+                    $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
+                    
+                    $products->push($product);
+                }
                 
-                $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
-                
-                $products->push($product);
                 $addedProductIds[] = $log->product_id;
             }
         }

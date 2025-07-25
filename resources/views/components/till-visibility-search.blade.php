@@ -193,6 +193,13 @@ function tillVisibilitySearch() {
                     product.is_visible_on_till = !product.is_visible_on_till;
                     product.is_available = product.is_visible_on_till; // Compatibility
                     
+                    // Emit custom events for dashboard integration
+                    if (product.is_visible_on_till) {
+                        this.$dispatch('product-added-to-till', { product: product });
+                    } else {
+                        this.$dispatch('product-removed-from-till', { product: product });
+                    }
+                    
                     this.showNotification(
                         product.is_visible_on_till 
                             ? `${product.NAME} is now visible on till` 

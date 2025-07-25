@@ -63,13 +63,10 @@ class FruitVegController extends Controller
                 return $change;
             });
 
-        // Get featured visible products
-        $featuredAvailable = $this->tillVisibilityService->getFeaturedVisibleProducts('fruit_veg', 12);
-
         // Get recently added products (last 7 days)
         $recentlyAdded = $this->tillVisibilityService->getRecentlyAddedProducts('fruit_veg', 7, 10);
 
-        return view('fruit-veg.index', compact('stats', 'recentPriceChanges', 'featuredAvailable', 'recentlyAdded'));
+        return view('fruit-veg.index', compact('stats', 'recentPriceChanges', 'recentlyAdded'));
     }
 
     /**
@@ -193,8 +190,12 @@ class FruitVegController extends Controller
 
         $product = Product::where('CODE', $request->product_code)->firstOrFail();
         
-        // Check if product is visible on till
-        if (!$this->tillVisibilityService->isVisibleOnTill($product->ID)) {
+        // For the dedicated prices page, only allow updates to visible products
+        // For the manage page, allow updates to all products
+        $referer = $request->headers->get('referer', '');
+        $isFromPricesPage = str_contains($referer, '/fruit-veg/prices');
+        
+        if ($isFromPricesPage && !$this->tillVisibilityService->isVisibleOnTill($product->ID)) {
             return response()->json(['error' => 'Product not visible on till'], 422);
         }
 
@@ -236,27 +237,42 @@ class FruitVegController extends Controller
         $filters = [
             'search' => $request->search,
             'category' => $request->category,
-            'visibility' => $request->availability, // Map old parameter name
+            'visibility' => $request->availability === 'available' ? 'visible' : 
+                          ($request->availability === 'unavailable' ? 'hidden' : 'all'),
         ];
 
-        $products = $this->tillVisibilityService->getProductsWithVisibility('fruit_veg', $filters);
+        // Pagination parameters
+        $limit = $request->get('limit', 50); // Default 50 products per page
+        $offset = $request->get('offset', 0);
 
-        // Add current prices from history
-        $products->each(function ($product) {
-            $lastPriceRecord = DB::table('veg_price_history')
-                ->where('product_code', $product->CODE)
-                ->orderBy('changed_at', 'desc')
-                ->first();
-            
-            $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
+        $products = $this->tillVisibilityService->getProductsWithVisibility('fruit_veg', $filters, $limit, $offset);
+
+        // Batch load all price records to avoid N+1 queries
+        $productCodes = $products->pluck('CODE')->toArray();
+        $priceRecords = DB::table('veg_price_history')
+            ->whereIn('product_code', $productCodes)
+            ->select('product_code', 'new_price', 'changed_at')
+            ->get()
+            ->groupBy('product_code')
+            ->map(function ($records) {
+                return $records->sortByDesc('changed_at')->first();
+            });
+
+        // Add current prices from batch-loaded data
+        $products->each(function ($product) use ($priceRecords) {
+            $priceRecord = $priceRecords->get($product->CODE);
+            $product->current_price = $priceRecord ? $priceRecord->new_price : $product->getGrossPrice();
             $product->is_available = $product->is_visible_on_till; // Maintain compatibility
         });
 
         // For AJAX requests, return JSON
         if ($request->wantsJson()) {
+            // Check if there are more products by trying to get one more
+            $hasMore = $this->tillVisibilityService->getProductsWithVisibility('fruit_veg', $filters, 1, $offset + $limit)->count() > 0;
+            
             return response()->json([
                 'products' => $products->values(),
-                'hasMore' => false, // Implement pagination if needed
+                'hasMore' => $hasMore,
             ]);
         }
 

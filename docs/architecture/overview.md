@@ -43,10 +43,11 @@ Laravel's Model-View-Controller pattern provides clear separation of concerns:
 Complex business logic is extracted into service classes:
 ```php
 app/Services/
-├── DeliveryService.php      # Delivery processing logic
-├── SupplierService.php      # Supplier integration
-├── UdeaScrapingService.php  # External data retrieval
-└── PricingService.php       # Price calculations
+├── DeliveryService.php       # Delivery processing logic
+├── SupplierService.php       # Supplier integration
+├── UdeaScrapingService.php   # External data retrieval
+├── PricingService.php        # Price calculations
+└── TillVisibilityService.php # Till management and product visibility
 ```
 
 ### 3. Repository Pattern
