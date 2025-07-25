@@ -22,7 +22,7 @@
                         <div class="ml-5">
                             <p class="text-gray-500 text-sm font-medium">Total Fruits</p>
                             <p class="text-2xl font-semibold text-gray-900">{{ $stats['total_fruits'] }}</p>
-                            <p class="text-sm text-green-600">{{ $stats['available_fruits'] }} available</p>
+                            <p class="text-sm text-green-600">{{ $stats['visible_fruits'] }} visible on till</p>
                         </div>
                     </div>
                 </div>
@@ -38,7 +38,7 @@
                         <div class="ml-5">
                             <p class="text-gray-500 text-sm font-medium">Total Vegetables</p>
                             <p class="text-2xl font-semibold text-gray-900">{{ $stats['total_vegetables'] }}</p>
-                            <p class="text-sm text-green-600">{{ $stats['available_vegetables'] }} available</p>
+                            <p class="text-sm text-green-600">{{ $stats['visible_vegetables'] }} visible on till</p>
                         </div>
                     </div>
                 </div>
@@ -60,19 +60,41 @@
                 </div>
             </div>
 
+            <!-- Quick Search for Till Visibility -->
+            <div class="bg-white rounded-lg shadow mb-8">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Quick Till Visibility Management</h3>
+                </div>
+                <div class="p-6">
+                    <x-till-visibility-search 
+                        category-type="fruit_veg" 
+                        :show-filters="true"
+                        placeholder="Search fruits & vegetables to manage till visibility..." />
+                </div>
+            </div>
+
             <!-- Quick Actions -->
             <div class="bg-white rounded-lg shadow mb-8">
                 <div class="px-6 py-4 border-b border-gray-200">
                     <h3 class="text-lg font-medium text-gray-900">Quick Actions</h3>
                 </div>
                 <div class="p-6">
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <a href="{{ route('fruit-veg.manage') }}" 
+                           class="flex items-center justify-center px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                            <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            Manage All
+                        </a>
+                        
                         <a href="{{ route('fruit-veg.availability') }}" 
                            class="flex items-center justify-center px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
                             <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            Manage Availability
+                            Till Visibility
                         </a>
                         
                         <a href="{{ route('fruit-veg.prices') }}" 
@@ -84,7 +106,7 @@
                         </a>
                         
                         <a href="{{ route('fruit-veg.labels') }}" 
-                           class="flex items-center justify-center px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                           class="flex items-center justify-center px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition">
                             <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                             </svg>
@@ -99,10 +121,10 @@
             <div class="bg-white rounded-lg shadow mb-8">
                 <div class="px-6 py-4 border-b border-gray-200">
                     <div class="flex justify-between items-center">
-                        <h3 class="text-lg font-medium text-gray-900">Available This Week</h3>
+                        <h3 class="text-lg font-medium text-gray-900">Currently Visible on Till</h3>
                         <a href="{{ route('fruit-veg.availability') }}" 
                            class="text-sm text-green-600 hover:text-green-800 font-medium">
-                            Manage All Availability →
+                            Manage All Till Visibility →
                         </a>
                     </div>
                 </div>
@@ -151,6 +173,51 @@
                         </a>
                     </div>
                     @endif
+                </div>
+            </div>
+            @endif
+
+            <!-- Recently Added Products -->
+            @if($recentlyAdded->count() > 0)
+            <div class="bg-white rounded-lg shadow mb-8">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-lg font-medium text-gray-900">Recently Added to Till</h3>
+                        <span class="text-sm text-gray-500">Last 7 days</span>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                        @foreach($recentlyAdded as $product)
+                        <a href="{{ route('fruit-veg.product.edit', $product->CODE) }}" 
+                           class="block bg-blue-50 rounded-lg p-3 text-center hover:bg-blue-100 hover:shadow-md transition cursor-pointer border border-blue-200">
+                            <div class="aspect-square bg-white rounded-lg mb-2 overflow-hidden">
+                                <img src="{{ route('fruit-veg.product-image', $product->CODE) }}" 
+                                     alt="{{ $product->NAME }}"
+                                     class="w-full h-full object-cover"
+                                     loading="lazy">
+                            </div>
+                            <h4 class="text-sm font-medium text-gray-900 truncate" title="{{ strip_tags(html_entity_decode($product->NAME)) }}">
+                                @if($product->DISPLAY)
+                                    {!! nl2br(html_entity_decode($product->DISPLAY)) !!}
+                                @else
+                                    {{ strip_tags(html_entity_decode($product->NAME)) }}
+                                @endif
+                            </h4>
+                            <p class="text-xs text-gray-500 truncate">
+                                {{ $product->category->NAME ?? 'Unknown' }}
+                            </p>
+                            <div class="mt-2">
+                                <span class="text-sm font-semibold text-green-600">
+                                    €{{ number_format($product->current_price, 2) }}
+                                </span>
+                                <p class="text-xs text-blue-600 mt-1">
+                                    Added {{ $product->added_at->diffForHumans() }}
+                                </p>
+                            </div>
+                        </a>
+                        @endforeach
+                    </div>
                 </div>
             </div>
             @endif

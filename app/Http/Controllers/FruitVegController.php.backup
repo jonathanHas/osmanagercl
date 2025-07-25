@@ -5,11 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use App\Models\Country;
 use App\Models\Product;
-use App\Models\ProductsCat;
 use App\Models\VegDetails;
 use App\Models\VegPrintQueue;
 use App\Repositories\SalesRepository;
-use App\Services\TillVisibilityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -22,17 +20,11 @@ class FruitVegController extends Controller
     protected SalesRepository $salesRepository;
 
     /**
-     * The till visibility service instance.
-     */
-    protected TillVisibilityService $tillVisibilityService;
-
-    /**
      * Create a new controller instance.
      */
-    public function __construct(SalesRepository $salesRepository, TillVisibilityService $tillVisibilityService)
+    public function __construct(SalesRepository $salesRepository)
     {
         $this->salesRepository = $salesRepository;
-        $this->tillVisibilityService = $tillVisibilityService;
     }
 
     /**
@@ -44,12 +36,17 @@ class FruitVegController extends Controller
         $fruitCategory = Category::where('ID', 'SUB1')->first();
         $vegCategories = Category::whereIn('ID', ['SUB2', 'SUB3'])->pluck('ID');
 
-        // Get statistics using the new service
-        $stats = $this->tillVisibilityService->getCategoryStats('fruit_veg');
-        $stats['needs_labels'] = VegPrintQueue::count();
-        $stats['recent_price_changes'] = DB::table('veg_price_history')
-            ->where('changed_at', '>=', now()->subDays(7))
-            ->count();
+        // Get statistics
+        $stats = [
+            'total_fruits' => Product::where('CATEGORY', $fruitCategory->ID ?? null)->count(),
+            'total_vegetables' => Product::whereIn('CATEGORY', $vegCategories)->count(),
+            'available_fruits' => $this->getAvailableCount($fruitCategory->ID ?? null),
+            'available_vegetables' => $this->getAvailableCountMultiple($vegCategories),
+            'needs_labels' => VegPrintQueue::count(),
+            'recent_price_changes' => DB::table('veg_price_history')
+                ->where('changed_at', '>=', now()->subDays(7))
+                ->count(),
+        ];
 
         // Get recent price changes
         $recentPriceChanges = DB::table('veg_price_history')
@@ -63,13 +60,10 @@ class FruitVegController extends Controller
                 return $change;
             });
 
-        // Get featured visible products
-        $featuredAvailable = $this->tillVisibilityService->getFeaturedVisibleProducts('fruit_veg', 12);
+        // Get featured available products
+        $featuredAvailable = $this->getFeaturedAvailableProducts();
 
-        // Get recently added products (last 7 days)
-        $recentlyAdded = $this->tillVisibilityService->getRecentlyAddedProducts('fruit_veg', 7, 10);
-
-        return view('fruit-veg.index', compact('stats', 'recentPriceChanges', 'featuredAvailable', 'recentlyAdded'));
+        return view('fruit-veg.index', compact('stats', 'recentPriceChanges', 'featuredAvailable'));
     }
 
     /**
@@ -77,28 +71,60 @@ class FruitVegController extends Controller
      */
     public function availability(Request $request)
     {
-        // Get products with till visibility status
-        $filters = [
-            'search' => $request->search,
-            'category' => $request->category,
-            'visibility' => $request->availability, // Map old parameter name
-        ];
+        // Get F&V categories
+        $fruitCategory = Category::where('ID', 'SUB1')->first();
+        $vegCategories = Category::whereIn('ID', ['SUB2', 'SUB3'])->pluck('ID');
 
-        $products = $this->tillVisibilityService->getProductsWithVisibility('fruit_veg', $filters);
+        // Build the query
+        $query = Product::whereIn('CATEGORY', array_merge(
+            [$fruitCategory->ID ?? 0],
+            $vegCategories->toArray()
+        ))->with(['category', 'vegDetails.country']);
 
-        // For AJAX requests, handle pagination differently
-        if ($request->ajax()) {
-            $perPage = $request->get('per_page', 50);
-            $paginatedProducts = $products->take($perPage);
-            
-            return response()->json([
-                'products' => $paginatedProducts->values(),
-                'hasMore' => $products->count() > $perPage,
-            ]);
+        // Apply search filter
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('NAME', 'like', '%'.$search.'%')
+                    ->orWhere('CODE', 'like', '%'.$search.'%')
+                    ->orWhere('DISPLAY', 'like', '%'.$search.'%');
+            });
         }
 
-        // For regular requests, just return the first batch
-        $products = $products->take(50);
+        // Apply category filter
+        if ($request->filled('category') && $request->category !== 'all') {
+            if ($request->category === 'fruit') {
+                $query->where('CATEGORY', $fruitCategory->ID ?? 0);
+            } elseif ($request->category === 'vegetables') {
+                $query->whereIn('CATEGORY', $vegCategories);
+            }
+        }
+
+        // Get paginated results
+        $perPage = $request->get('per_page', 50);
+        $products = $query->orderBy('CATEGORY')
+            ->orderBy('NAME')
+            ->take($perPage)
+            ->get()
+            ->map(function ($product) {
+                // Get availability status from our table
+                $availability = DB::table('veg_availability')
+                    ->where('product_code', $product->CODE)
+                    ->first();
+
+                $product->is_available = $availability->is_available ?? false;
+                $product->current_price = $availability->current_price ?? $product->getGrossPrice();
+
+                return $product;
+            });
+
+        // For AJAX requests, return JSON
+        if ($request->ajax()) {
+            return response()->json([
+                'products' => $products,
+                'hasMore' => $products->count() >= $perPage,
+            ]);
+        }
 
         return view('fruit-veg.availability', compact('products'));
     }
@@ -115,10 +141,17 @@ class FruitVegController extends Controller
 
         $product = Product::where('CODE', $request->product_code)->firstOrFail();
 
-        // Update till visibility
-        $this->tillVisibilityService->setVisibility($product->ID, $request->is_available, 'fruit_veg');
+        DB::table('veg_availability')->updateOrInsert(
+            ['product_code' => $request->product_code],
+            [
+                'is_available' => $request->is_available,
+                'current_price' => $product->getGrossPrice(),
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
 
-        // If making visible on till, add to print queue
+        // If making available, add to print queue
         if ($request->is_available) {
             VegPrintQueue::addToQueue($request->product_code, 'marked_available');
         }
@@ -136,20 +169,21 @@ class FruitVegController extends Controller
             'is_available' => 'required|boolean',
         ]);
 
-        // Get product IDs from codes
-        $products = Product::whereIn('CODE', $request->product_codes)
-            ->pluck('ID', 'CODE');
+        foreach ($request->product_codes as $code) {
+            $product = Product::where('CODE', $code)->first();
+            if ($product) {
+                DB::table('veg_availability')->updateOrInsert(
+                    ['product_code' => $code],
+                    [
+                        'is_available' => $request->is_available,
+                        'current_price' => $product->getGrossPrice(),
+                        'updated_at' => now(),
+                        'created_at' => now(),
+                    ]
+                );
 
-        // Update till visibility in bulk
-        $this->tillVisibilityService->bulkSetVisibility(
-            $products->values()->toArray(),
-            $request->is_available
-        );
-
-        // If making visible, add to print queue
-        if ($request->is_available) {
-            foreach ($request->product_codes as $code) {
-                if (isset($products[$code])) {
+                // If making available, add to print queue
+                if ($request->is_available) {
                     VegPrintQueue::addToQueue($code, 'marked_available');
                 }
             }
@@ -163,18 +197,19 @@ class FruitVegController extends Controller
      */
     public function prices()
     {
-        // Get visible F&V products from till
-        $visibleProducts = $this->tillVisibilityService->getVisibleProducts('fruit_veg');
-        
-        // Get products with their details
-        $productIds = $visibleProducts->pluck('product.ID');
-        $products = Product::whereIn('ID', $productIds)
+        // Get available F&V products
+        $availableProducts = DB::table('veg_availability')
+            ->where('is_available', true)
+            ->pluck('current_price', 'product_code');
+
+        $products = Product::whereIn('CODE', array_keys($availableProducts->toArray()))
             ->with(['category', 'vegDetails.country'])
             ->orderBy('CATEGORY')
             ->orderBy('NAME')
             ->get()
-            ->map(function ($product) {
-                $product->current_price = $product->getGrossPrice();
+            ->map(function ($product) use ($availableProducts) {
+                $product->current_price = $availableProducts[$product->CODE] ?? $product->getGrossPrice();
+
                 return $product;
             });
 
@@ -192,23 +227,27 @@ class FruitVegController extends Controller
         ]);
 
         $product = Product::where('CODE', $request->product_code)->firstOrFail();
-        
-        // Check if product is visible on till
-        if (!$this->tillVisibilityService->isVisibleOnTill($product->ID)) {
-            return response()->json(['error' => 'Product not visible on till'], 422);
+        $availability = DB::table('veg_availability')
+            ->where('product_code', $request->product_code)
+            ->first();
+
+        if (! $availability) {
+            return response()->json(['error' => 'Product not in availability list'], 422);
         }
 
-        // Get current price from veg_price_history or product
-        $lastPriceRecord = DB::table('veg_price_history')
-            ->where('product_code', $request->product_code)
-            ->orderBy('changed_at', 'desc')
-            ->first();
-        
-        $oldPrice = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
+        $oldPrice = $availability->current_price;
         $newPrice = $request->new_price;
 
         // Only proceed if price actually changed
         if ($oldPrice != $newPrice) {
+            // Update availability table
+            DB::table('veg_availability')
+                ->where('product_code', $request->product_code)
+                ->update([
+                    'current_price' => $newPrice,
+                    'updated_at' => now(),
+                ]);
+
             // Log price change
             DB::table('veg_price_history')->insert([
                 'product_code' => $request->product_code,
@@ -228,60 +267,21 @@ class FruitVegController extends Controller
     }
 
     /**
-     * Display combined availability and price management page.
-     */
-    public function manage(Request $request)
-    {
-        // Get products with till visibility status
-        $filters = [
-            'search' => $request->search,
-            'category' => $request->category,
-            'visibility' => $request->availability, // Map old parameter name
-        ];
-
-        $products = $this->tillVisibilityService->getProductsWithVisibility('fruit_veg', $filters);
-
-        // Add current prices from history
-        $products->each(function ($product) {
-            $lastPriceRecord = DB::table('veg_price_history')
-                ->where('product_code', $product->CODE)
-                ->orderBy('changed_at', 'desc')
-                ->first();
-            
-            $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
-            $product->is_available = $product->is_visible_on_till; // Maintain compatibility
-        });
-
-        // For AJAX requests, return JSON
-        if ($request->wantsJson()) {
-            return response()->json([
-                'products' => $products->values(),
-                'hasMore' => false, // Implement pagination if needed
-            ]);
-        }
-
-        return view('fruit-veg.manage', compact('products'));
-    }
-
-    /**
      * Display label printing page.
      */
     public function labels()
     {
         // Get products needing labels
         $printQueue = VegPrintQueue::getQueuedProductCodes();
-        
+        $availabilityData = DB::table('veg_availability')
+            ->whereIn('product_code', $printQueue)
+            ->pluck('current_price', 'product_code');
+
         $productsNeedingLabels = Product::whereIn('CODE', $printQueue)
             ->with(['category', 'vegDetails.country'])
             ->get()
-            ->map(function ($product) {
-                // Get current price from price history or product
-                $lastPriceRecord = DB::table('veg_price_history')
-                    ->where('product_code', $product->CODE)
-                    ->orderBy('changed_at', 'desc')
-                    ->first();
-                
-                $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
+            ->map(function ($product) use ($availabilityData) {
+                $product->current_price = $availabilityData[$product->CODE] ?? $product->getGrossPrice();
 
                 return $product;
             });
@@ -301,17 +301,15 @@ class FruitVegController extends Controller
             $productCodes = VegPrintQueue::getQueuedProductCodes();
         }
 
+        $availabilityData = DB::table('veg_availability')
+            ->whereIn('product_code', $productCodes)
+            ->pluck('current_price', 'product_code');
+
         $products = Product::whereIn('CODE', $productCodes)
             ->with(['category', 'vegDetails.country'])
             ->get()
-            ->map(function ($product) {
-                // Get current price from price history or product
-                $lastPriceRecord = DB::table('veg_price_history')
-                    ->where('product_code', $product->CODE)
-                    ->orderBy('changed_at', 'desc')
-                    ->first();
-                
-                $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
+            ->map(function ($product) use ($availabilityData) {
+                $product->current_price = $availabilityData[$product->CODE] ?? $product->getGrossPrice();
 
                 return $product;
             });
@@ -394,40 +392,55 @@ class FruitVegController extends Controller
     public function searchProducts(Request $request)
     {
         $request->validate([
-            'search' => 'nullable|string|min:2|max:100',
-            'category' => 'nullable|string|in:all,fruit,vegetables,veg_barcoded',
+            'search' => 'required|string|min:2|max:100',
+            'category' => 'nullable|string|in:all,fruit,vegetables',
             'availability' => 'nullable|string|in:all,available,unavailable',
             'offset' => 'nullable|integer|min:0',
             'limit' => 'nullable|integer|min:1|max:100',
         ]);
 
-        // Build filters
-        $filters = [
-            'search' => $request->search,
-            'category' => $request->category,
-            'visibility' => $request->availability === 'available' ? 'visible' : 
-                          ($request->availability === 'unavailable' ? 'hidden' : 'all'),
-        ];
+        // Get F&V categories
+        $fruitCategory = Category::where('ID', 'SUB1')->first();
+        $vegCategories = Category::whereIn('ID', ['SUB2', 'SUB3'])->pluck('ID');
 
-        // Get products with till visibility
-        $products = $this->tillVisibilityService->getProductsWithVisibility('fruit_veg', $filters);
+        $query = Product::whereIn('CATEGORY', array_merge(
+            [$fruitCategory->ID ?? 0],
+            $vegCategories->toArray()
+        ))->with(['category', 'vegDetails.country']);
 
-        // Apply pagination
+        // Apply search
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('NAME', 'like', '%'.$search.'%')
+                ->orWhere('CODE', 'like', '%'.$search.'%')
+                ->orWhere('DISPLAY', 'like', '%'.$search.'%');
+        });
+
+        // Apply category filter
+        if ($request->filled('category') && $request->category !== 'all') {
+            if ($request->category === 'fruit') {
+                $query->where('CATEGORY', $fruitCategory->ID ?? 0);
+            } elseif ($request->category === 'vegetables') {
+                $query->whereIn('CATEGORY', $vegCategories);
+            }
+        }
+
+        // Get results with pagination
         $offset = $request->get('offset', 0);
         $limit = $request->get('limit', 50);
-        
-        $products = $products->slice($offset, $limit)
+
+        $products = $query->orderBy('CATEGORY')
+            ->orderBy('NAME')
+            ->skip($offset)
+            ->take($limit)
+            ->get()
             ->map(function ($product) {
-                // Maintain compatibility with old field name
-                $product->is_available = $product->is_visible_on_till;
-                
-                // Get current price from price history or product
-                $lastPriceRecord = DB::table('veg_price_history')
+                $availability = DB::table('veg_availability')
                     ->where('product_code', $product->CODE)
-                    ->orderBy('changed_at', 'desc')
                     ->first();
-                
-                $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
+
+                $product->is_available = $availability->is_available ?? false;
+                $product->current_price = $availability->current_price ?? $product->getGrossPrice();
 
                 return $product;
             });
@@ -442,7 +455,7 @@ class FruitVegController extends Controller
         return response()->json([
             'products' => $products->values(),
             'hasMore' => $products->count() >= $limit,
-            'total' => $products->count(),
+            'total' => $query->count(),
         ]);
     }
 
@@ -479,7 +492,12 @@ class FruitVegController extends Controller
             return 0;
         }
 
-        return $this->tillVisibilityService->getVisibleCountForCategory($categoryId);
+        $productCodes = Product::where('CATEGORY', $categoryId)->pluck('CODE');
+
+        return DB::table('veg_availability')
+            ->whereIn('product_code', $productCodes)
+            ->where('is_available', true)
+            ->count();
     }
 
     /**
@@ -487,11 +505,12 @@ class FruitVegController extends Controller
      */
     private function getAvailableCountMultiple($categoryIds)
     {
-        $count = 0;
-        foreach ($categoryIds as $categoryId) {
-            $count += $this->tillVisibilityService->getVisibleCountForCategory($categoryId);
-        }
-        return $count;
+        $productCodes = Product::whereIn('CATEGORY', $categoryIds)->pluck('CODE');
+
+        return DB::table('veg_availability')
+            ->whereIn('product_code', $productCodes)
+            ->where('is_available', true)
+            ->count();
     }
 
     /**
@@ -517,17 +536,13 @@ class FruitVegController extends Controller
         // Load relationships
         $product->load(['category', 'vegDetails.country']);
 
-        // Get till visibility status
-        $product->is_visible_on_till = $this->tillVisibilityService->isVisibleOnTill($product->ID);
-        $product->is_available = $product->is_visible_on_till; // Maintain compatibility
-        
-        // Get current price from price history or product
-        $lastPriceRecord = DB::table('veg_price_history')
+        // Get availability data
+        $availability = DB::table('veg_availability')
             ->where('product_code', $code)
-            ->orderBy('changed_at', 'desc')
             ->first();
-        
-        $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
+
+        $product->is_available = $availability->is_available ?? false;
+        $product->current_price = $availability->current_price ?? $product->getGrossPrice();
 
         // Get all countries for dropdown
         $countries = Country::orderBy('country')->get();
@@ -604,17 +619,33 @@ class FruitVegController extends Controller
      */
     private function getFeaturedAvailableProducts()
     {
-        // Use the service to get featured visible products
-        return $this->tillVisibilityService->getFeaturedVisibleProducts('fruit_veg', 12)
+        // Get F&V categories
+        $fruitCategory = Category::where('ID', 'SUB1')->first();
+        $vegCategories = Category::whereIn('ID', ['SUB2', 'SUB3'])->pluck('ID');
+
+        // Get available product codes
+        $availableProductCodes = DB::table('veg_availability')
+            ->where('is_available', true)
+            ->pluck('product_code');
+
+        // Get a selection of available products with full details
+        return Product::whereIn('CODE', $availableProductCodes)
+            ->whereIn('CATEGORY', array_merge(
+                [$fruitCategory->ID ?? 0],
+                $vegCategories->toArray()
+            ))
+            ->with(['category', 'vegDetails.country'])
+            ->orderBy('NAME')
+            ->limit(12)
+            ->get()
             ->map(function ($product) {
-                // Get current price from price history or product
-                $lastPriceRecord = DB::table('veg_price_history')
+                // Get current price from availability table
+                $availability = DB::table('veg_availability')
                     ->where('product_code', $product->CODE)
-                    ->orderBy('changed_at', 'desc')
                     ->first();
-                
-                $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
-                $product->is_available = true; // Maintain compatibility
+
+                $product->current_price = $availability->current_price ?? $product->getGrossPrice();
+                $product->is_available = true; // We know these are available
 
                 return $product;
             });

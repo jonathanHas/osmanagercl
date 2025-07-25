@@ -2,21 +2,23 @@
 
 ## Overview
 
-The Fruit & Vegetables (F&V) system is a specialized module designed for organic produce management. It provides dedicated functionality for handling organic certification requirements, weekly availability management, pricing updates, and label printing for fresh produce.
+The Fruit & Vegetables (F&V) system is a specialized module designed for organic produce management. It provides dedicated functionality for handling organic certification requirements, till visibility management, pricing updates, and label printing for fresh produce. The system now integrates with the POS database's PRODUCTS_CAT table to control which products appear on the till screen.
 
 ## Features
 
-### 1. Availability Management
-- **Weekly Product Selection**: Manage which F&V products are available for sale each week
-- **Bulk Operations**: Mark multiple products as available/unavailable simultaneously
+### 1. Till Visibility Management
+- **Till Screen Control**: Manage which F&V products appear on the POS till screen
+- **PRODUCTS_CAT Integration**: Direct synchronization with POS database for immediate till updates
+- **Quick Search Component**: Instant visibility toggles from the main dashboard
+- **Bulk Operations**: Show/hide multiple products on till simultaneously
 - **Real-time Search**: AJAX-powered search across all F&V products (664 total)
-- **Advanced Filtering**: Filter by category (Fruits/Vegetables) and availability status
+- **Advanced Filtering**: Filter by category (Fruits/Vegetables) and till visibility status
 - **Performance Optimized**: Pagination with "Load More" functionality for handling large datasets
 - **Reliable Interface**: Alpine.js integration with proper Blade template compatibility
 
 ### 2. Pricing Management
-- **Dynamic Pricing**: Update prices for available F&V products
-- **Price History**: Complete audit trail of all price changes
+- **Dynamic Pricing**: Update prices for F&V products visible on till
+- **Price History**: Complete audit trail of all price changes stored in veg_price_history
 - **Automatic Label Queue**: Products automatically added to print queue when prices change
 - **VAT Calculations**: Integrated with existing tax system
 
@@ -34,18 +36,28 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 - **Comprehensive Edit Interface**: Dedicated product edit pages with tabbed layout
 
 ### 5. Featured Products Dashboard
-- **Available This Week Section**: Prominently displays currently available products on main dashboard
+- **Currently Visible on Till Section**: Prominently displays products visible on the till screen
+- **Quick Till Visibility Search**: Integrated search component for rapid visibility updates
 - **Clickable Product Cards**: Direct navigation to product edit pages from featured section
 - **Visual Product Grid**: Responsive grid layout with product images and pricing
-- **Real-time Availability**: Cards reflect current availability status and pricing
+- **Real-time Visibility**: Cards reflect current till visibility status and pricing
 
 ## Technical Implementation
 
 ### Database Structure
 
+#### POS Database Integration
+```sql
+-- Controls which products appear on the till (POS Database)
+PRODUCTS_CAT (
+    PRODUCT VARCHAR(255) PRIMARY KEY,  -- Links to PRODUCTS.ID
+    CATORDER INT                       -- Display order on till
+)
+```
+
 #### F&V Specific Tables (Laravel Database)
 ```sql
--- Tracks which products are available for sale
+-- Legacy table for availability (being phased out)
 CREATE TABLE veg_availability (
     id INT AUTO_INCREMENT PRIMARY KEY,
     product_code VARCHAR(255) NOT NULL UNIQUE,

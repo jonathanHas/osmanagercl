@@ -58,6 +58,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/availability/bulk', [FruitVegController::class, 'bulkAvailability'])->name('availability.bulk');
         Route::get('/prices', [FruitVegController::class, 'prices'])->name('prices');
         Route::post('/prices/update', [FruitVegController::class, 'updatePrice'])->name('prices.update');
+        Route::get('/manage', [FruitVegController::class, 'manage'])->name('manage');
         Route::get('/labels', [FruitVegController::class, 'labels'])->name('labels');
         Route::get('/labels/preview', [FruitVegController::class, 'previewLabels'])->name('labels.preview');
         Route::post('/labels/printed', [FruitVegController::class, 'markLabelsPrinted'])->name('labels.printed');

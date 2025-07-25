@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Till visibility management system replacing legacy veg_availability approach
+- Integration with POS database PRODUCTS_CAT table for real-time till synchronization
+- TillVisibilityService for centralized till management across product categories
+- ProductsCat model for POS database integration
+- Quick search component (till-visibility-search) for rapid product visibility updates
+- Till visibility search bar on F&V main dashboard for instant access
+- Reusable Blade components for consistent till visibility UI
+- Migration script to populate PRODUCTS_CAT from veg_availability data
+- Foundation for extending till visibility to Coffee, Lunch, and Cakes categories
+
+### Added
 - Comprehensive documentation restructuring with new organization system
 - CONTRIBUTING.md with coding standards and development guidelines
 - Project-focused README.md replacing Laravel boilerplate
@@ -48,6 +59,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated label system UI terminology from "Add to Queue" to "Add Back to Products Needing Labels"
 - Strengthened notification requirements in CLAUDE.md to ensure consistent user alerts
 - Enhanced fruit-veg product display to use regular product names in headers instead of display names
+- Updated all F&V views to use "till visibility" terminology instead of "availability"
+- Modified FruitVegController to use TillVisibilityService instead of direct DB queries
+- Replaced veg_availability table references with PRODUCTS_CAT integration
+- Enhanced pricing system to track history independently of till visibility
+- Improved statistics to show "visible on till" counts instead of "available" counts
 - Improved fruit-veg controller methods with new routes for product editing and image management
 - Updated fruit-veg main page to feature available products with responsive grid layout
 

@@ -23,7 +23,7 @@
                     <div class="ml-3">
                         <p class="text-sm text-blue-700">
                             Products with price changes will be automatically added to the label printing queue.
-                            Only available products are shown here.
+                            Only products visible on till are shown here.
                         </p>
                     </div>
                 </div>

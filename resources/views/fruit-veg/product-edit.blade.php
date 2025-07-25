@@ -14,12 +14,12 @@
             <div class="flex space-x-3">
                 <a href="{{ route('fruit-veg.availability') }}" 
                    class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">
-                    ← Back to Availability
+                    ← Back to Till Visibility
                 </a>
                 @if($product->is_available)
-                <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">Available</span>
+                <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">Visible on Till</span>
                 @else
-                <span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">Not Available</span>
+                <span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">Hidden from Till</span>
                 @endif
             </div>
         </div>
@@ -158,7 +158,7 @@
                                     
                                     <button onclick="toggleAvailability()" 
                                             class="px-4 py-2 rounded-lg transition {{ $product->is_available ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white' }}">
-                                        {{ $product->is_available ? 'Mark Unavailable' : 'Mark Available' }}
+                                        {{ $product->is_available ? 'Hide from Till' : 'Show on Till' }}
                                     </button>
                                 </div>
                             </div>
@@ -266,15 +266,15 @@
                                 @endif
                                 
                                 <div>
-                                    <dt class="text-sm font-medium text-gray-500">Availability Status</dt>
+                                    <dt class="text-sm font-medium text-gray-500">Till Visibility</dt>
                                     <dd class="text-sm">
                                         @if($product->is_available)
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                            Available
+                                            Visible on Till
                                         </span>
                                         @else
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                            Not Available
+                                            Hidden from Till
                                         </span>
                                         @endif
                                     </dd>
@@ -617,7 +617,7 @@
             });
         }
 
-        // Toggle Availability
+        // Toggle Till Visibility
         function toggleAvailability() {
             const isCurrentlyAvailable = {{ $product->is_available ? 'true' : 'false' }};
             
@@ -635,13 +635,13 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    showAlert('Availability updated successfully!', 'success');
+                    showAlert('Till visibility updated successfully!', 'success');
                     // Reload page to reflect changes
                     setTimeout(() => {
                         window.location.reload();
                     }, 1500);
                 } else {
-                    showAlert('Failed to update availability.', 'error');
+                    showAlert('Failed to update till visibility.', 'error');
                 }
             });
         }

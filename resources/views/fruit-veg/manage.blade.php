@@ -2,7 +2,7 @@
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                {{ __('Manage Fruit & Vegetable Availability') }}
+                {{ __('Manage Fruit & Vegetables') }}
             </h2>
             <a href="{{ route('fruit-veg.index') }}" class="text-blue-600 hover:text-blue-800">
                 ← Back to Dashboard
@@ -10,7 +10,7 @@
         </div>
     </x-slot>
 
-    <div class="py-6" x-data="availabilityManager()">
+    <div class="py-6" x-data="managementSystem()">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             
             <!-- Search and Filters -->
@@ -165,9 +165,32 @@
                                     
                                     <!-- Price & Origin -->
                                     <td class="px-4 py-4">
-                                        <div class="text-sm font-medium text-gray-900">
-                                            €<span x-text="parseFloat(product.current_price).toFixed(2)"></span>
+                                        <!-- Price Editing -->
+                                        <div x-data="{ 
+                                                editing: false, 
+                                                originalPrice: parseFloat(product.current_price).toFixed(2),
+                                                newPrice: parseFloat(product.current_price).toFixed(2)
+                                             }">
+                                            <div x-show="!editing" 
+                                                 @click="editing = true" 
+                                                 class="cursor-pointer hover:bg-yellow-50 px-2 py-1 rounded">
+                                                <span class="text-sm font-medium text-gray-900">
+                                                    €<span x-text="parseFloat(product.current_price).toFixed(2)"></span>
+                                                </span>
+                                                <div class="text-xs text-blue-600 mt-1">Click to edit</div>
+                                            </div>
+                                            <div x-show="editing" x-cloak class="flex items-center gap-2">
+                                                <span class="text-sm">€</span>
+                                                <input type="number" 
+                                                       x-model="newPrice" 
+                                                       step="0.01"
+                                                       @keyup.enter="$root.updatePrice(product.CODE, newPrice); editing = false"
+                                                       @blur="$root.updatePrice(product.CODE, newPrice); editing = false"
+                                                       class="w-20 text-sm border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
+                                                       x-ref="priceInput">
+                                            </div>
                                         </div>
+                                        
                                         <!-- Country Editing -->
                                         <div class="mt-1" 
                                              x-data="{ 
@@ -247,23 +270,13 @@
                         <p class="mt-1 text-sm text-gray-500">Try adjusting your search or filter criteria.</p>
                     </div>
                 </div>
-                
-                <!-- Load More Button -->
-                <div x-show="hasMore && !searching" class="border-t border-gray-200 px-6 py-4 text-center">
-                    <button @click="loadMore()" 
-                            :disabled="loading"
-                            class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-50">
-                        <span x-show="!loading">Load More Products</span>
-                        <span x-show="loading">Loading...</span>
-                    </button>
-                </div>
             </div>
         </div>
     </div>
 
     @push('scripts')
     <script>
-        function availabilityManager() {
+        function managementSystem() {
             return {
                 products: @json($products ?? []),
                 selectedProducts: [],
@@ -272,20 +285,14 @@
                 categoryFilter: 'all',
                 availabilityFilter: 'all',
                 searching: false,
-                loading: false,
-                hasMore: true,
-                offset: @json(count($products ?? [])),
                 
                 init() {
-                    // Initial setup
-                    this.hasMore = this.products.length >= 50;
-                    
                     // Restore saved filters from localStorage
                     this.restoreFilters();
                 },
                 
                 restoreFilters() {
-                    const savedFilters = localStorage.getItem('fruitVegFilters');
+                    const savedFilters = localStorage.getItem('fruitVegManageFilters');
                     if (savedFilters) {
                         try {
                             const filters = JSON.parse(savedFilters);
@@ -299,7 +306,7 @@
                             }
                         } catch (e) {
                             // If parsing fails, clear the stored data
-                            localStorage.removeItem('fruitVegFilters');
+                            localStorage.removeItem('fruitVegManageFilters');
                         }
                     }
                 },
@@ -310,7 +317,7 @@
                         categoryFilter: this.categoryFilter,
                         availabilityFilter: this.availabilityFilter
                     };
-                    localStorage.setItem('fruitVegFilters', JSON.stringify(filters));
+                    localStorage.setItem('fruitVegManageFilters', JSON.stringify(filters));
                 },
                 
                 toggleAllProducts() {
@@ -323,7 +330,6 @@
                 
                 async performSearch() {
                     this.searching = true;
-                    this.offset = 0;
                     
                     // Save current filters to localStorage
                     this.saveFilters();
@@ -333,16 +339,12 @@
                             search: this.searchTerm,
                             category: this.categoryFilter,
                             availability: this.availabilityFilter,
-                            offset: 0,
-                            limit: 50
                         });
                         
                         const response = await fetch('{{ route('fruit-veg.search') }}?' + params);
                         const data = await response.json();
                         
                         this.products = data.products;
-                        this.hasMore = data.hasMore;
-                        this.offset = this.products.length;
                         this.selectedProducts = [];
                         this.selectAll = false;
                     } catch (error) {
@@ -353,39 +355,13 @@
                     }
                 },
                 
-                async loadMore() {
-                    this.loading = true;
-                    
-                    try {
-                        const params = new URLSearchParams({
-                            search: this.searchTerm,
-                            category: this.categoryFilter,
-                            availability: this.availabilityFilter,
-                            offset: this.offset,
-                            limit: 50
-                        });
-                        
-                        const response = await fetch('{{ route('fruit-veg.search') }}?' + params);
-                        const data = await response.json();
-                        
-                        this.products = [...this.products, ...data.products];
-                        this.hasMore = data.hasMore;
-                        this.offset = this.products.length;
-                    } catch (error) {
-                        console.error('Load more error:', error);
-                        this.showNotification('Failed to load more products', 'error');
-                    } finally {
-                        this.loading = false;
-                    }
-                },
-                
                 clearFilters() {
                     this.searchTerm = '';
                     this.categoryFilter = 'all';
                     this.availabilityFilter = 'all';
                     
                     // Clear saved filters from localStorage
-                    localStorage.removeItem('fruitVegFilters');
+                    localStorage.removeItem('fruitVegManageFilters');
                     
                     this.performSearch();
                 },
@@ -453,6 +429,36 @@
                             this.showNotification('Updated ' + this.selectedProducts.length + ' products successfully!', 'success');
                         } else {
                             this.showNotification('Failed to update till visibility', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        this.showNotification('An error occurred', 'error');
+                    }
+                },
+                
+                async updatePrice(productCode, newPrice) {
+                    try {
+                        const response = await fetch('{{ route('fruit-veg.prices.update') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify({
+                                product_code: productCode,
+                                new_price: parseFloat(newPrice)
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            // Update local state
+                            const product = this.products.find(p => p.CODE === productCode);
+                            if (product) {
+                                product.current_price = newPrice;
+                            }
+                            this.showNotification('Price updated successfully!', 'success');
+                        } else {
+                            this.showNotification('Failed to update price', 'error');
                         }
                     } catch (error) {
                         console.error('Error:', error);
