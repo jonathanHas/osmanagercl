@@ -27,15 +27,19 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 - **VAT Calculations**: Integrated with existing tax system
 
 ### 3. Label Printing System
-- **Organic Certification Labels**: Specialized templates for organic produce compliance
-- **Country of Origin**: Required labeling for organic certification
+- **Modern Label Layout**: 2-column × 8-row layout with 16 labels per A4 page
+- **Optimized for Cutting**: Minimal gaps (0.5mm) between labels for easy cutting
+- **Professional Typography**: Modern font stack with Segoe UI, Roboto, Ubuntu fallbacks
+- **Auto-scaling Product Names**: Dynamic font sizing (8pt-40pt) to maximize space usage
+- **Compact Information Display**: Price with unit on same line, origin and class combined
 - **Print Queue Management**: Tracks products needing new labels
 - **Batch Printing**: Print labels for multiple products simultaneously
 
 ### 4. Product Information Management
 - **Display Name Editing**: Set custom display names for products with live HTML preview
-- **Country of Origin**: Select and update product origin countries
-- **Unit Information**: Display unit types (kg, pieces, etc.)
+- **Country of Origin**: Select and update product origin countries with dropdown
+- **Unit Management**: Edit unit types (kilogram, each, bunch, punnet, bag) with inline editing
+- **Quality Class Assignment**: Set produce quality classes (Extra, I, II, III) for certification
 - **Product Images**: Full image management with upload, preview, and binary storage
 - **Comprehensive Edit Interface**: Dedicated product edit pages with tabbed layout
 
@@ -62,6 +66,52 @@ PRODUCTS_CAT (
 
 #### F&V Specific Tables (Laravel Database)
 ```sql
+-- Countries master data for origin labeling
+CREATE TABLE countries (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    code VARCHAR(3) NOT NULL UNIQUE,
+    sort_order INT DEFAULT 0,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP
+);
+
+-- Vegetable/Fruit quality classes
+CREATE TABLE veg_classes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL, -- 'Extra', 'I', 'II', 'III'
+    description VARCHAR(255),
+    sort_order INT DEFAULT 0,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP
+);
+
+-- Unit types for produce (kg, each, bunch, etc.)
+CREATE TABLE veg_units (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL, -- 'kilogram', 'each', 'bunch'
+    abbreviation VARCHAR(10) NOT NULL, -- 'kg', 'ea', 'bn'
+    plural_name VARCHAR(100), -- 'kilograms', 'each', 'bunches'
+    sort_order INT DEFAULT 0,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP
+);
+
+-- Product details linking to countries, classes, and units
+CREATE TABLE veg_details (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_code VARCHAR(255) NOT NULL UNIQUE,
+    country_id INT,
+    class_id INT,
+    unit_id INT,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
+    FOREIGN KEY (country_id) REFERENCES countries(id),
+    FOREIGN KEY (class_id) REFERENCES veg_classes(id),
+    FOREIGN KEY (unit_id) REFERENCES veg_units(id),
+    INDEX idx_product_code (product_code)
+);
+
 -- Activity tracking for audit trail (without modifying POS database)
 CREATE TABLE product_activity_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -106,7 +156,7 @@ CREATE TABLE veg_price_history (
 CREATE TABLE veg_print_queue (
     id INT AUTO_INCREMENT PRIMARY KEY,
     product_code VARCHAR(255) NOT NULL UNIQUE,
-    reason VARCHAR(255), -- 'price_change', 'marked_available', etc.
+    reason VARCHAR(255), -- 'price_change', 'marked_available', 'unit_updated', 'class_updated', 'country_updated', etc.
     added_at TIMESTAMP,
     created_at TIMESTAMP,
     updated_at TIMESTAMP
@@ -115,9 +165,7 @@ CREATE TABLE veg_print_queue (
 
 #### POS Database Tables (Read-Only)
 - **PRODUCTS**: Main product data (name, code, price, category, images with BLOB IMAGE field)
-- **vegDetails**: Product details (country, class, unit information)
 - **CATEGORIES**: Product categories (SUB1=Fruits, SUB2=Vegetables, SUB3=Veg Barcoded)
-- **countries**: Country master data for origin labeling
 
 ### Models
 
@@ -140,10 +188,33 @@ $product->getGrossPrice(); // Price including VAT
 
 #### VegDetails
 ```php
-// Relationships to countries and product data
-$vegDetails->country;
-$vegDetails->getUnitNameAttribute();
-$vegDetails->getClassNameAttribute();
+// Relationships to countries, units, classes and product data
+$vegDetails->country;       // Country relationship
+$vegDetails->vegUnit;       // Unit relationship  
+$vegDetails->vegClass;      // Class relationship
+$vegDetails->product;       // Product relationship (cross-database)
+
+// Accessor methods for backward compatibility
+$vegDetails->getUnitNameAttribute();  // Returns unit abbreviation or 'kg'
+$vegDetails->getClassNameAttribute(); // Returns class name or empty string
+```
+
+#### Country Model
+```php
+// Master data for country of origin
+Country::orderBy('name')->get();
+```
+
+#### VegUnit Model  
+```php
+// Unit types (kg, each, bunch, punnet, bag)
+VegUnit::orderBy('sort_order')->get();
+```
+
+#### VegClass Model
+```php
+// Quality classes (Extra, I, II, III)
+VegClass::orderBy('sort_order')->get();
 ```
 
 ### Controller Methods
@@ -178,7 +249,11 @@ $vegDetails->getClassNameAttribute();
 - `updateProductImage()` - Handle image uploads with binary storage
 - `updateDisplay()` - Update product display names
 - `updateCountry()` - Update country of origin
+- `updateUnit()` - Update product unit type
+- `updateClass()` - Update product quality class
 - `getCountries()` - Country dropdown data
+- `getUnits()` - Unit dropdown data
+- `getClasses()` - Class dropdown data
 - `productImage()` - Serve product images from database with cache headers
 
 ### Routes
@@ -199,7 +274,11 @@ Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
     Route::post('/labels/printed', [FruitVegController::class, 'markLabelsPrinted'])->name('labels.printed');
     Route::post('/display/update', [FruitVegController::class, 'updateDisplay'])->name('display.update');
     Route::post('/country/update', [FruitVegController::class, 'updateCountry'])->name('country.update');
+    Route::post('/unit/update', [FruitVegController::class, 'updateUnit'])->name('unit.update');
+    Route::post('/class/update', [FruitVegController::class, 'updateClass'])->name('class.update');
     Route::get('/countries', [FruitVegController::class, 'getCountries'])->name('countries');
+    Route::get('/units', [FruitVegController::class, 'getUnits'])->name('units');
+    Route::get('/classes', [FruitVegController::class, 'getClasses'])->name('classes');
     Route::get('/search', [FruitVegController::class, 'searchProducts'])->name('search');
     Route::get('/product-image/{code}', [FruitVegController::class, 'productImage'])->name('product-image');
     Route::get('/product/{code}', [FruitVegController::class, 'editProduct'])->name('product.edit');
@@ -268,17 +347,25 @@ Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
 
 ## Organic Certification Compliance
 
+### Label Design Specifications
+- **Layout**: 2 columns × 8 rows = 16 labels per A4 page
+- **Dimensions**: 32mm height per label with minimal borders
+- **Spacing**: 0.5mm gaps between labels for easy cutting
+- **Typography**: Modern font stack (Segoe UI, Roboto, Ubuntu, Helvetica Neue)
+- **Product Names**: Left-aligned, auto-scaling 8pt-40pt for optimal space usage
+
 ### Required Label Information
-- **Product name** and display name
-- **Price per unit** with VAT
-- **Country of origin** (mandatory for organic certification)
-- **Unit type** (kg, pieces, bunches, etc.)
-- **Organic certification badge** (visual indicator)
+- **Product name** (using NAME field, not DISPLAY)
+- **Price per unit** with VAT (combined on single line)
+- **Country of origin** (left-aligned on bottom row)
+- **Quality class** (right-aligned on bottom row, same line as origin)
 
 ### Data Validation
 - Country of origin required for all F&V products in print queue
+- Unit type defaults to kilogram if not specified
+- Quality class optional but recommended for certification
 - Price validation ensures positive values
-- Display name optional but recommended for customer clarity
+- Product NAME field used instead of DISPLAY field for cleaner labels
 
 ## Integration Points
 
@@ -322,6 +409,16 @@ Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
 
 ### Recent Feature Additions (2024)
 
+#### Product Detail Management (July 2024)
+- **Complete Data Migration**: Moved countries, classes, and units from POS database to Laravel database
+- **Self-Contained Migrations**: Database migrations with hardcoded reference data for deployment independence
+- **Unit Editing**: Inline editing of unit types (kilogram, each, bunch, punnet, bag) in manage interface
+- **Class Editing**: Quality class assignment (Extra, I, II, III) with inline editing
+- **Relationship Loading**: Proper eager loading of vegDetails.country, vegDetails.vegUnit, vegDetails.vegClass
+- **Alpine.js Event System**: Clean component communication using $dispatch for unit/class updates
+- **API Endpoints**: RESTful endpoints for unit and class CRUD operations
+- **Database Normalization**: Foreign key relationships with proper constraints and indexing
+
 #### Combined Management Interface (July 2024)
 - **Unified Availability & Price Management**: Single screen combining previously separate functions
 - **Performance Optimized**: Fixed N+1 query issues with batch loading of price records
@@ -357,6 +454,16 @@ Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
 - Cache-optimized image serving with proper headers
 - Fallback transparent PNG for products without images
 - Image update triggers automatic addition to print queue
+
+#### Modern Label System Redesign (July 2024)
+- **Increased Density**: Changed from 4×4 to 2×8 layout for 16 labels per page
+- **Professional Typography**: Upgraded from Arial to modern font stack (Segoe UI, Roboto, Ubuntu)
+- **Optimized Spacing**: Reduced gaps from 5mm to 0.5mm for minimal cutting
+- **Smart Text Scaling**: Auto-scaling product names (8pt-40pt) based on content length
+- **Cleaner Data**: Use product NAME instead of DISPLAY field to avoid HTML formatting issues
+- **Compact Layout**: Combined price with unit on same line, origin and class on shared row
+- **Removed Organic Badge**: Simplified design by removing certification badge element
+- **Enhanced Readability**: Left-aligned product names with improved letter spacing
 
 ### Planned Enhancements
 - **Real-time updates** using WebSockets for multi-user environments
