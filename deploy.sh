@@ -220,7 +220,10 @@ EOF
 
 # Main deployment function
 main() {
+    # Create deployment log file
+    DEPLOY_LOG="deploy_$(date +%Y%m%d_%H%M%S).log"
     log "🚀 Starting OS Manager deployment to $PROD_HOST..."
+    log "📝 Deployment log will be saved to: $DEPLOY_LOG"
     
     # Step 1: Check connectivity
     check_host_connectivity
@@ -329,6 +332,12 @@ main() {
             fi
         fi
     fi
+    
+    # Verify deployment directory state
+    log "📋 Verifying deployment directory state..."
+    echo "Current branch: $(git branch --show-current)"
+    echo "Latest commit: $(git log --oneline -1)"
+    echo "Remote tracking: $(git branch -vv | grep '^\*')"
     
     success "Deployment directory updated to branch '$CURRENT_BRANCH'."
     
@@ -456,6 +465,11 @@ EOF
     ssh "$PROD_USER@$PROD_HOST" << EOF
         cd $PROD_PATH
         
+        echo "📋 Production server verification:"
+        echo "Current git branch: \$(git branch --show-current 2>/dev/null || echo 'Not a git repo')"
+        echo "Latest commit: \$(git log --oneline -1 2>/dev/null || echo 'No git history')"
+        echo "Application environment: \$(php artisan env 2>/dev/null || echo 'Unknown')"
+        
         echo "Testing database connectivity..."
         if php artisan tinker --execute="DB::connection()->getPdo(); echo 'Database: OK';" 2>/dev/null; then
             echo "✅ Database connection successful"
@@ -469,6 +483,9 @@ EOF
         else
             echo "❌ Application may have issues"
         fi
+        
+        echo "Checking file timestamps (last 5 modified files):"
+        find . -type f -name "*.php" -o -name "*.blade.php" | head -10 | xargs ls -la
 EOF
     
     success "Deployment verification completed."
@@ -538,10 +555,11 @@ usage() {
 # Handle script arguments
 case "${1:-deploy}" in
     "deploy")
-        main
+        # Redirect all output to both terminal and log file
+        main 2>&1 | tee "deploy_$(date +%Y%m%d_%H%M%S).log"
         ;;
     "rollback")
-        rollback
+        rollback 2>&1 | tee "rollback_$(date +%Y%m%d_%H%M%S).log"
         ;;
     *)
         usage
