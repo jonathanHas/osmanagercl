@@ -282,12 +282,55 @@ main() {
         mkdir -p "$DEPLOY_DIR"
         cd "$DEPLOY_DIR" || exit 1
         git clone "$DEV_DIR" .
+        git checkout "$CURRENT_BRANCH"
     else
         cd "$DEPLOY_DIR" || exit 1
-        git pull origin "$CURRENT_BRANCH"
+        
+        # Check current branch in deployment directory
+        DEPLOY_CURRENT_BRANCH=$(git branch --show-current)
+        
+        if [[ "$DEPLOY_CURRENT_BRANCH" != "$CURRENT_BRANCH" ]]; then
+            warning "Deployment directory is on branch '$DEPLOY_CURRENT_BRANCH', need to switch to '$CURRENT_BRANCH'"
+            
+            # Fetch latest changes first
+            git fetch origin
+            
+            # Check if target branch exists locally
+            if git branch | grep -q "^\s*$CURRENT_BRANCH$"; then
+                log "Switching to existing local branch '$CURRENT_BRANCH'..."
+                git checkout "$CURRENT_BRANCH"
+            else
+                log "Creating and switching to new local branch '$CURRENT_BRANCH'..."
+                git checkout -b "$CURRENT_BRANCH" "origin/$CURRENT_BRANCH"
+            fi
+        fi
+        
+        # Now pull the latest changes
+        log "Pulling latest changes from origin/$CURRENT_BRANCH..."
+        if ! git pull origin "$CURRENT_BRANCH"; then
+            error "Failed to pull from origin/$CURRENT_BRANCH"
+            warning "This might be due to conflicts. Offering to reset deployment directory..."
+            
+            echo
+            read -p "Reset deployment directory to clean state? [y/N] " RESET_DEPLOY
+            
+            if [[ $RESET_DEPLOY == "y" || $RESET_DEPLOY == "Y" ]]; then
+                log "Resetting deployment directory..."
+                cd "$(dirname "$DEPLOY_DIR")" || exit 1
+                rm -rf "$DEPLOY_DIR"
+                mkdir -p "$DEPLOY_DIR"
+                cd "$DEPLOY_DIR" || exit 1
+                git clone "$DEV_DIR" .
+                git checkout "$CURRENT_BRANCH"
+                success "Deployment directory reset and updated."
+            else
+                error "Cannot continue with conflicted deployment directory."
+                exit 1
+            fi
+        fi
     fi
     
-    success "Deployment directory updated."
+    success "Deployment directory updated to branch '$CURRENT_BRANCH'."
     
     # Step 4: Install production dependencies
     log "📦 Installing production dependencies..."
