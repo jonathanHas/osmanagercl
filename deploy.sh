@@ -225,6 +225,36 @@ main() {
     # Step 1: Check connectivity
     check_host_connectivity
     
+    # Step 1.5: Detect current branch
+    log "🌿 Detecting current git branch..."
+    cd "$DEV_DIR" || exit 1
+    
+    CURRENT_BRANCH=$(git branch --show-current)
+    if [[ -z "$CURRENT_BRANCH" ]]; then
+        error "Could not detect current git branch."
+        exit 1
+    fi
+    
+    success "Current branch: $CURRENT_BRANCH"
+    
+    # Check if branch exists on remote
+    if ! git ls-remote --heads origin "$CURRENT_BRANCH" | grep -q "$CURRENT_BRANCH"; then
+        error "Branch '$CURRENT_BRANCH' does not exist on remote origin."
+        log "Available remote branches:"
+        git ls-remote --heads origin
+        exit 1
+    fi
+    
+    # Confirm deployment branch with user
+    echo
+    warning "⚠️  You are about to deploy from branch: $CURRENT_BRANCH"
+    read -p "Continue with deployment from this branch? [y/N] " CONFIRM_BRANCH
+    
+    if [[ $CONFIRM_BRANCH != "y" && $CONFIRM_BRANCH != "Y" ]]; then
+        error "Deployment cancelled by user."
+        exit 1
+    fi
+    
     # Step 2: Git commit in DEV_DIR
     log "🔄 Committing latest changes from development directory..."
     cd "$DEV_DIR" || exit 1
@@ -240,7 +270,7 @@ main() {
     
     git add -A
     git commit -m "$COMMIT_MSG"
-    git push origin master
+    git push origin "$CURRENT_BRANCH"
     
     success "Changes committed and pushed."
     
@@ -254,7 +284,7 @@ main() {
         git clone "$DEV_DIR" .
     else
         cd "$DEPLOY_DIR" || exit 1
-        git pull origin master
+        git pull origin "$CURRENT_BRANCH"
     fi
     
     success "Deployment directory updated."
