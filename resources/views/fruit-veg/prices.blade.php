@@ -75,7 +75,7 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     @if($product->vegDetails && $product->vegDetails->country)
-                                        {{ $product->vegDetails->country->country ?? 'N/A' }}
+                                        {{ $product->vegDetails->country->name ?? 'N/A' }}
                                     @else
                                         N/A
                                     @endif

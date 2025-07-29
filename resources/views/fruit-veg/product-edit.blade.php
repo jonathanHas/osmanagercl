@@ -125,9 +125,9 @@
                                                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
                                             <option value="">Select Country</option>
                                             @foreach($countries as $country)
-                                            <option value="{{ $country->ID }}" 
-                                                    {{ ($product->vegDetails && $product->vegDetails->countryCode == $country->ID) ? 'selected' : '' }}>
-                                                {{ $country->country }}
+                                            <option value="{{ $country->id }}" 
+                                                    {{ ($product->vegDetails && $product->vegDetails->country_id == $country->id) ? 'selected' : '' }}>
+                                                {{ $country->name }}
                                             </option>
                                             @endforeach
                                         </select>
@@ -532,7 +532,7 @@
             }
             
             // Update country
-            if (countryId !== '{{ $product->vegDetails ? $product->vegDetails->countryCode : '' }}') {
+            if (countryId !== '{{ $product->vegDetails ? $product->vegDetails->country_id : '' }}') {
                 updateCountry(countryId);
             }
             

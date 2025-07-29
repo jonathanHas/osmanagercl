@@ -76,7 +76,10 @@ class VegPrintQueue extends Model
      */
     public static function clearQueue(): int
     {
-        return self::truncate();
+        $count = self::count();
+        self::truncate();
+
+        return $count;
     }
 
     /**

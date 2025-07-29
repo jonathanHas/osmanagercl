@@ -176,7 +176,7 @@
                                                     :alt="item.description"
                                                     class="w-10 h-10 object-cover rounded border border-gray-200 dark:border-gray-700 cursor-pointer"
                                                     loading="lazy"
-                                                    @error="$event.target.style.display='none'; $event.target.parentElement.style.display='none'"
+                                                    @@error="$event.target.style.display='none'; $event.target.parentElement.style.display='none'"
                                                 >
                                                 <!-- Hover preview - Clean image only -->
                                                 <div class="absolute left-0 bottom-full mb-2 z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">

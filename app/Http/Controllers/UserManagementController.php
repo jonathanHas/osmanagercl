@@ -4,15 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 class UserManagementController extends Controller
 {
     public function index()
     {
         $users = User::paginate(15);
-        
+
         return view('users.index', compact('users'));
     }
 
@@ -49,8 +49,8 @@ class UserManagementController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
-            'username' => 'nullable|string|max:255|unique:users,username,' . $user->id,
+            'email' => 'required|string|email|max:255|unique:users,email,'.$user->id,
+            'username' => 'nullable|string|max:255|unique:users,username,'.$user->id,
             'password' => 'nullable|string|min:8|confirmed',
         ]);
 

@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Product Detail Management System**: Complete unit and class editing functionality for fruit-veg products
+  - Unit editing with inline dropdown (kilogram, each, bunch, punnet, bag)
+  - Quality class assignment (Extra, I, II, III) with inline editing  
+  - Self-contained database migrations for countries, units, and classes
+  - Normalized veg_details table with proper foreign key relationships
+  - API endpoints for unit/class CRUD operations (/fruit-veg/units, /fruit-veg/classes)
+  - Alpine.js event dispatch system for clean component communication
 - Combined management interface (/fruit-veg/manage) unifying availability and price management
 - Activity tracking system with product_activity_logs table for audit trail without modifying POS database
 - "Recently Added to Till" section on main dashboard with real-time updates

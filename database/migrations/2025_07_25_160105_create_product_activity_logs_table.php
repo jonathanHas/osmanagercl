@@ -21,7 +21,7 @@ return new class extends Migration
             $table->json('new_value')->nullable();
             $table->string('user_id')->nullable();
             $table->timestamps();
-            
+
             // Indexes for performance
             $table->index('product_id');
             $table->index('activity_type');

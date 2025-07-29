@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -32,7 +31,8 @@ class SettingsController extends Controller
 
             return redirect()->route('settings.index')->with('success', 'All caches cleared successfully.');
         } catch (\Exception $e) {
-            Log::error('Cache clear failed: ' . $e->getMessage());
+            Log::error('Cache clear failed: '.$e->getMessage());
+
             return redirect()->route('settings.index')->with('error', 'Failed to clear caches.');
         }
     }
@@ -57,10 +57,10 @@ class SettingsController extends Controller
             Cache::put('test_key', 'test_value', 60);
             $value = Cache::get('test_key');
             Cache::forget('test_key');
-            
+
             return $value === 'test_value' ? 'Working' : 'Not Working';
         } catch (\Exception $e) {
-            return 'Error: ' . $e->getMessage();
+            return 'Error: '.$e->getMessage();
         }
     }
 
@@ -68,15 +68,17 @@ class SettingsController extends Controller
     {
         try {
             \DB::connection()->getPdo();
+
             return 'Connected';
         } catch (\Exception $e) {
-            return 'Error: ' . $e->getMessage();
+            return 'Error: '.$e->getMessage();
         }
     }
 
     private function getStorageStatus()
     {
         $storagePath = storage_path();
+
         return is_writable($storagePath) ? 'Writable' : 'Not Writable';
     }
 }

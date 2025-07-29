@@ -4,12 +4,12 @@ namespace App\Services;
 
 use App\Models\Category;
 use App\Models\Product;
-use App\Models\ProductsCat;
 use App\Models\ProductActivityLog;
+use App\Models\ProductsCat;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class TillVisibilityService
 {
@@ -34,27 +34,29 @@ class TillVisibilityService
     /**
      * Set product visibility on till.
      */
-    public function setVisibility(string $productId, bool $visible, string $categoryType = null): bool
+    public function setVisibility(string $productId, bool $visible, ?string $categoryType = null): bool
     {
         $wasVisible = $this->isVisibleOnTill($productId);
-        
+
         if ($visible) {
-            if (!$wasVisible) {
+            if (! $wasVisible) {
                 ProductsCat::addProduct($productId);
-                
+
                 // Log the activity
                 $this->logActivity($productId, ProductActivityLog::TYPE_ADDED_TO_TILL, $categoryType);
             }
+
             return true;
         } else {
             if ($wasVisible) {
                 $result = ProductsCat::removeProduct($productId);
-                
+
                 // Log the activity
                 $this->logActivity($productId, ProductActivityLog::TYPE_REMOVED_FROM_TILL, $categoryType);
-                
+
                 return $result;
             }
+
             return true;
         }
     }
@@ -78,10 +80,10 @@ class TillVisibilityService
     /**
      * Get all products for a category type with their till visibility status.
      */
-    public function getProductsWithVisibility(string $categoryType, array $filters = [], int $limit = null, int $offset = 0): EloquentCollection
+    public function getProductsWithVisibility(string $categoryType, array $filters = [], ?int $limit = null, int $offset = 0): EloquentCollection
     {
         $categoryIds = self::CATEGORY_MAPPINGS[$categoryType] ?? [];
-        
+
         if (empty($categoryIds)) {
             return collect();
         }
@@ -90,17 +92,17 @@ class TillVisibilityService
             ->with(['category', 'vegDetails.country']);
 
         // Apply search filter
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $search = $filters['search'];
             $query->where(function ($q) use ($search) {
                 $q->where('NAME', 'LIKE', "%{$search}%")
-                  ->orWhere('CODE', 'LIKE', "%{$search}%")
-                  ->orWhere('DISPLAY', 'LIKE', "%{$search}%");
+                    ->orWhere('CODE', 'LIKE', "%{$search}%")
+                    ->orWhere('DISPLAY', 'LIKE', "%{$search}%");
             });
         }
 
         // Apply specific category filter
-        if (!empty($filters['category']) && $filters['category'] !== 'all') {
+        if (! empty($filters['category']) && $filters['category'] !== 'all') {
             $specificCategory = $this->mapFilterToCategory($categoryType, $filters['category']);
             if ($specificCategory) {
                 $query->where('CATEGORY', $specificCategory);
@@ -108,11 +110,11 @@ class TillVisibilityService
         }
 
         // Apply visibility filter at database level for better performance
-        if (!empty($filters['visibility']) && $filters['visibility'] !== 'all') {
+        if (! empty($filters['visibility']) && $filters['visibility'] !== 'all') {
             if ($filters['visibility'] === 'visible') {
                 // Only get products that exist in PRODUCTS_CAT
                 $visibleProductIds = ProductsCat::pluck('PRODUCT')->toArray();
-                if (!empty($visibleProductIds)) {
+                if (! empty($visibleProductIds)) {
                     $query->whereIn('ID', $visibleProductIds);
                 } else {
                     // No visible products, return empty result
@@ -121,7 +123,7 @@ class TillVisibilityService
             } elseif ($filters['visibility'] === 'hidden') {
                 // Only get products that DON'T exist in PRODUCTS_CAT
                 $visibleProductIds = ProductsCat::pluck('PRODUCT')->toArray();
-                if (!empty($visibleProductIds)) {
+                if (! empty($visibleProductIds)) {
                     $query->whereNotIn('ID', $visibleProductIds);
                 }
                 // If no visible products, all products are hidden (no additional filter needed)
@@ -155,7 +157,7 @@ class TillVisibilityService
     public function getVisibleProducts(string $categoryType): EloquentCollection
     {
         $categoryIds = self::CATEGORY_MAPPINGS[$categoryType] ?? [];
-        
+
         if (empty($categoryIds)) {
             return collect();
         }
@@ -169,7 +171,7 @@ class TillVisibilityService
     public function getVisibleCount(string $categoryType): int
     {
         $categoryIds = self::CATEGORY_MAPPINGS[$categoryType] ?? [];
-        
+
         if (empty($categoryIds)) {
             return 0;
         }
@@ -195,7 +197,7 @@ class TillVisibilityService
     public function getFeaturedVisibleProducts(string $categoryType, int $limit = 12): EloquentCollection
     {
         $categoryIds = self::CATEGORY_MAPPINGS[$categoryType] ?? [];
-        
+
         if (empty($categoryIds)) {
             return collect();
         }
@@ -206,15 +208,15 @@ class TillVisibilityService
             ->map(function ($productsCat) {
                 $product = $productsCat->product;
                 $product->is_visible_on_till = true;
-                
+
                 // Get current price from price history or product
                 $lastPriceRecord = DB::table('veg_price_history')
                     ->where('product_code', $product->CODE)
                     ->orderBy('changed_at', 'desc')
                     ->first();
-                
+
                 $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
-                
+
                 return $product;
             });
     }
@@ -259,7 +261,7 @@ class TillVisibilityService
 
         try {
             foreach ($products as $code => $id) {
-                if (!ProductsCat::isProductVisible($id)) {
+                if (! ProductsCat::isProductVisible($id)) {
                     ProductsCat::addProduct($id);
                     $migrated++;
                 }
@@ -285,18 +287,18 @@ class TillVisibilityService
     public function getCategoryStats(string $categoryType): array
     {
         $stats = [];
-        
+
         if ($categoryType === 'fruit_veg') {
             // Fruit stats
             $totalFruits = Product::where('CATEGORY', 'SUB1')->count();
             $visibleFruits = $this->getVisibleCountForCategory('SUB1');
-            
+
             // Vegetable stats (SUB2 and SUB3)
             $totalVegetables = Product::whereIn('CATEGORY', ['SUB2', 'SUB3'])->count();
             $visibleVegetables = ProductsCat::whereHas('product', function ($query) {
                 $query->whereIn('CATEGORY', ['SUB2', 'SUB3']);
             })->count();
-            
+
             $stats = [
                 'total_fruits' => $totalFruits,
                 'visible_fruits' => $visibleFruits,
@@ -305,18 +307,18 @@ class TillVisibilityService
             ];
         }
         // Add stats for other category types as needed
-        
+
         return $stats;
     }
 
     /**
      * Log product activity.
      */
-    protected function logActivity(string $productId, string $activityType, string $categoryType = null, array $oldValue = null, array $newValue = null): void
+    protected function logActivity(string $productId, string $activityType, ?string $categoryType = null, ?array $oldValue = null, ?array $newValue = null): void
     {
         // Get product details
         $product = Product::find($productId);
-        if (!$product) {
+        if (! $product) {
             return;
         }
 
@@ -346,25 +348,25 @@ class TillVisibilityService
         $addedProductIds = [];
 
         foreach ($logs as $log) {
-            if (!in_array($log->product_id, $addedProductIds) && $log->product) {
+            if (! in_array($log->product_id, $addedProductIds) && $log->product) {
                 $product = $log->product;
                 $product->is_visible_on_till = $this->isVisibleOnTill($log->product_id);
-                
+
                 // Only include products that are currently visible on till
                 if ($product->is_visible_on_till) {
                     $product->added_at = $log->created_at;
-                    
+
                     // Get current price from price history or product
                     $lastPriceRecord = DB::table('veg_price_history')
                         ->where('product_code', $product->CODE)
                         ->orderBy('changed_at', 'desc')
                         ->first();
-                    
+
                     $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
-                    
+
                     $products->push($product);
                 }
-                
+
                 $addedProductIds[] = $log->product_id;
             }
         }

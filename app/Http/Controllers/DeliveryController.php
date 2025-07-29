@@ -285,18 +285,18 @@ class DeliveryController extends Controller
     public function destroy(Delivery $delivery): RedirectResponse
     {
         // Only allow deletion of draft or cancelled deliveries
-        if (!in_array($delivery->status, ['draft', 'cancelled'])) {
+        if (! in_array($delivery->status, ['draft', 'cancelled'])) {
             return back()->withErrors(['delivery' => 'Only draft or cancelled deliveries can be deleted.']);
         }
 
         try {
             // Get delivery number for success message before deletion
             $deliveryNumber = $delivery->delivery_number;
-            
+
             // Delete related records explicitly to ensure clean deletion
             $delivery->scans()->delete();
             $delivery->items()->delete();
-            
+
             // Delete the delivery itself
             $delivery->delete();
 
@@ -305,7 +305,7 @@ class DeliveryController extends Controller
                 ->with('success', "Delivery {$deliveryNumber} has been deleted successfully.");
 
         } catch (\Exception $e) {
-            return back()->withErrors(['delivery' => 'Failed to delete delivery: ' . $e->getMessage()]);
+            return back()->withErrors(['delivery' => 'Failed to delete delivery: '.$e->getMessage()]);
         }
     }
 

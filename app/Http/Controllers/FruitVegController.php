@@ -5,9 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use App\Models\Country;
 use App\Models\Product;
-use App\Models\ProductsCat;
+use App\Models\VegClass;
 use App\Models\VegDetails;
 use App\Models\VegPrintQueue;
+use App\Models\VegUnit;
 use App\Repositories\SalesRepository;
 use App\Services\TillVisibilityService;
 use Illuminate\Http\Request;
@@ -87,7 +88,7 @@ class FruitVegController extends Controller
         if ($request->ajax()) {
             $perPage = $request->get('per_page', 50);
             $paginatedProducts = $products->take($perPage);
-            
+
             return response()->json([
                 'products' => $paginatedProducts->values(),
                 'hasMore' => $products->count() > $perPage,
@@ -162,16 +163,17 @@ class FruitVegController extends Controller
     {
         // Get visible F&V products from till
         $visibleProducts = $this->tillVisibilityService->getVisibleProducts('fruit_veg');
-        
+
         // Get products with their details
         $productIds = $visibleProducts->pluck('product.ID');
         $products = Product::whereIn('ID', $productIds)
-            ->with(['category', 'vegDetails.country'])
+            ->with(['category', 'vegDetails.country', 'vegDetails.vegUnit', 'vegDetails.vegClass'])
             ->orderBy('CATEGORY')
             ->orderBy('NAME')
             ->get()
             ->map(function ($product) {
                 $product->current_price = $product->getGrossPrice();
+
                 return $product;
             });
 
@@ -189,13 +191,13 @@ class FruitVegController extends Controller
         ]);
 
         $product = Product::where('CODE', $request->product_code)->firstOrFail();
-        
+
         // For the dedicated prices page, only allow updates to visible products
         // For the manage page, allow updates to all products
         $referer = $request->headers->get('referer', '');
         $isFromPricesPage = str_contains($referer, '/fruit-veg/prices');
-        
-        if ($isFromPricesPage && !$this->tillVisibilityService->isVisibleOnTill($product->ID)) {
+
+        if ($isFromPricesPage && ! $this->tillVisibilityService->isVisibleOnTill($product->ID)) {
             return response()->json(['error' => 'Product not visible on till'], 422);
         }
 
@@ -204,7 +206,7 @@ class FruitVegController extends Controller
             ->where('product_code', $request->product_code)
             ->orderBy('changed_at', 'desc')
             ->first();
-        
+
         $oldPrice = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
         $newPrice = $request->new_price;
 
@@ -237,7 +239,7 @@ class FruitVegController extends Controller
         $filters = [
             'search' => $request->search,
             'category' => $request->category,
-            'visibility' => $request->availability === 'available' ? 'visible' : 
+            'visibility' => $request->availability === 'available' ? 'visible' :
                           ($request->availability === 'unavailable' ? 'hidden' : 'all'),
         ];
 
@@ -267,14 +269,20 @@ class FruitVegController extends Controller
 
         // For AJAX requests, return JSON
         if ($request->wantsJson()) {
+            // Make sure relationships are loaded for AJAX responses too
+            $products->load('vegDetails.country', 'vegDetails.vegUnit', 'vegDetails.vegClass');
+            
             // Check if there are more products by trying to get one more
             $hasMore = $this->tillVisibilityService->getProductsWithVisibility('fruit_veg', $filters, 1, $offset + $limit)->count() > 0;
-            
+
             return response()->json([
                 'products' => $products->values(),
                 'hasMore' => $hasMore,
             ]);
         }
+
+        // Make sure relationships are loaded for the view
+        $products->load('vegDetails.country', 'vegDetails.vegUnit', 'vegDetails.vegClass');
 
         return view('fruit-veg.manage', compact('products'));
     }
@@ -286,9 +294,9 @@ class FruitVegController extends Controller
     {
         // Get products needing labels
         $printQueue = VegPrintQueue::getQueuedProductCodes();
-        
+
         $productsNeedingLabels = Product::whereIn('CODE', $printQueue)
-            ->with(['category', 'vegDetails.country'])
+            ->with(['category', 'vegDetails.country', 'vegDetails.vegUnit', 'vegDetails.vegClass'])
             ->get()
             ->map(function ($product) {
                 // Get current price from price history or product
@@ -296,7 +304,7 @@ class FruitVegController extends Controller
                     ->where('product_code', $product->CODE)
                     ->orderBy('changed_at', 'desc')
                     ->first();
-                
+
                 $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
 
                 return $product;
@@ -318,7 +326,7 @@ class FruitVegController extends Controller
         }
 
         $products = Product::whereIn('CODE', $productCodes)
-            ->with(['category', 'vegDetails.country'])
+            ->with(['category', 'vegDetails.country', 'vegDetails.vegUnit', 'vegDetails.vegClass'])
             ->get()
             ->map(function ($product) {
                 // Get current price from price history or product
@@ -326,7 +334,7 @@ class FruitVegController extends Controller
                     ->where('product_code', $product->CODE)
                     ->orderBy('changed_at', 'desc')
                     ->first();
-                
+
                 $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
 
                 return $product;
@@ -351,6 +359,58 @@ class FruitVegController extends Controller
         }
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Clear all labels from print queue.
+     */
+    public function clearAllLabels()
+    {
+        VegPrintQueue::clearQueue();
+
+        return redirect()->route('fruit-veg.labels')->with('success', 'All labels cleared from print queue.');
+    }
+
+    /**
+     * Remove a single product from the labels print queue.
+     */
+    public function removeFromLabels(Request $request)
+    {
+        $productCode = $request->input('product_code');
+
+        if (! $productCode) {
+            return response()->json(['success' => false, 'message' => 'Product code is required.']);
+        }
+
+        $removed = VegPrintQueue::removeFromQueue($productCode);
+
+        if ($removed) {
+            return response()->json(['success' => true, 'message' => 'Product removed from print queue.']);
+        } else {
+            return response()->json(['success' => false, 'message' => 'Product not found in print queue.']);
+        }
+    }
+
+    /**
+     * Add a product to the labels print queue.
+     */
+    public function addToLabels(Request $request)
+    {
+        $productCode = $request->input('product_code');
+
+        if (! $productCode) {
+            return response()->json(['success' => false, 'message' => 'Product code is required.']);
+        }
+
+        // Verify product exists
+        $product = Product::where('CODE', $productCode)->first();
+        if (! $product) {
+            return response()->json(['success' => false, 'message' => 'Product not found.']);
+        }
+
+        VegPrintQueue::addToQueue($productCode, 'manual_add');
+
+        return response()->json(['success' => true, 'message' => 'Product added to print queue.']);
     }
 
     /**
@@ -379,13 +439,13 @@ class FruitVegController extends Controller
     {
         $request->validate([
             'product_code' => 'required|string',
-            'country_id' => 'required|integer|exists:App\Models\Country,ID',
+            'country_id' => 'required|integer|exists:App\Models\Country,id',
         ]);
 
         // Update or create vegDetails record
         VegDetails::updateOrCreate(
-            ['product' => $request->product_code],
-            ['countryCode' => $request->country_id]
+            ['product_code' => $request->product_code],
+            ['country_id' => $request->country_id]
         );
 
         // Add to print queue since origin changed
@@ -395,13 +455,77 @@ class FruitVegController extends Controller
     }
 
     /**
+     * Update product unit.
+     */
+    public function updateUnit(Request $request)
+    {
+        $request->validate([
+            'product_code' => 'required|string',
+            'unit_id' => 'required|integer|exists:App\Models\VegUnit,id',
+        ]);
+
+        // Update or create vegDetails record
+        VegDetails::updateOrCreate(
+            ['product_code' => $request->product_code],
+            ['unit_id' => $request->unit_id]
+        );
+
+        // Add to print queue since unit changed
+        VegPrintQueue::addToQueue($request->product_code, 'unit_updated');
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Update product class.
+     */
+    public function updateClass(Request $request)
+    {
+        $request->validate([
+            'product_code' => 'required|string',
+            'class_id' => 'required|integer|exists:App\Models\VegClass,id',
+        ]);
+
+        // Update or create vegDetails record
+        VegDetails::updateOrCreate(
+            ['product_code' => $request->product_code],
+            ['class_id' => $request->class_id]
+        );
+
+        // Add to print queue since class changed
+        VegPrintQueue::addToQueue($request->product_code, 'class_updated');
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
      * Get all countries for dropdown.
      */
     public function getCountries()
     {
-        $countries = Country::orderBy('country')->get();
+        $countries = Country::orderBy('name')->get();
 
         return response()->json($countries);
+    }
+
+    /**
+     * Get all units for dropdown.
+     */
+    public function getUnits()
+    {
+        $units = VegUnit::orderBy('sort_order')->get();
+
+        return response()->json($units);
+    }
+
+    /**
+     * Get all classes for dropdown.
+     */
+    public function getClasses()
+    {
+        $classes = VegClass::orderBy('sort_order')->get();
+
+        return response()->json($classes);
     }
 
     /**
@@ -421,7 +545,7 @@ class FruitVegController extends Controller
         $filters = [
             'search' => $request->search,
             'category' => $request->category,
-            'visibility' => $request->availability === 'available' ? 'visible' : 
+            'visibility' => $request->availability === 'available' ? 'visible' :
                           ($request->availability === 'unavailable' ? 'hidden' : 'all'),
         ];
 
@@ -431,19 +555,25 @@ class FruitVegController extends Controller
         // Apply pagination
         $offset = $request->get('offset', 0);
         $limit = $request->get('limit', 50);
-        
+
+        // Get print queue status for all products
+        $printQueueCodes = VegPrintQueue::getQueuedProductCodes();
+
         $products = $products->slice($offset, $limit)
-            ->map(function ($product) {
+            ->map(function ($product) use ($printQueueCodes) {
                 // Maintain compatibility with old field name
                 $product->is_available = $product->is_visible_on_till;
-                
+
                 // Get current price from price history or product
                 $lastPriceRecord = DB::table('veg_price_history')
                     ->where('product_code', $product->CODE)
                     ->orderBy('changed_at', 'desc')
                     ->first();
-                
+
                 $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
+
+                // Add print queue status
+                $product->in_print_queue = in_array($product->CODE, $printQueueCodes);
 
                 return $product;
             });
@@ -507,6 +637,7 @@ class FruitVegController extends Controller
         foreach ($categoryIds as $categoryId) {
             $count += $this->tillVisibilityService->getVisibleCountForCategory($categoryId);
         }
+
         return $count;
     }
 
@@ -516,37 +647,37 @@ class FruitVegController extends Controller
     public function editProduct($code)
     {
         $product = Product::where('CODE', $code)->firstOrFail();
-        
+
         // Get F&V categories to verify this is a F&V product
         $fruitCategory = Category::where('ID', 'SUB1')->first();
         $vegCategories = Category::whereIn('ID', ['SUB2', 'SUB3'])->pluck('ID');
-        
+
         $validCategories = array_merge(
             [$fruitCategory->ID ?? 0],
             $vegCategories->toArray()
         );
-        
-        if (!in_array($product->CATEGORY, $validCategories)) {
+
+        if (! in_array($product->CATEGORY, $validCategories)) {
             abort(404, 'Product is not a fruit or vegetable.');
         }
 
         // Load relationships
-        $product->load(['category', 'vegDetails.country']);
+        $product->load(['category', 'vegDetails.country', 'vegDetails.vegUnit', 'vegDetails.vegClass']);
 
         // Get till visibility status
         $product->is_visible_on_till = $this->tillVisibilityService->isVisibleOnTill($product->ID);
         $product->is_available = $product->is_visible_on_till; // Maintain compatibility
-        
+
         // Get current price from price history or product
         $lastPriceRecord = DB::table('veg_price_history')
             ->where('product_code', $code)
             ->orderBy('changed_at', 'desc')
             ->first();
-        
+
         $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
 
         // Get all countries for dropdown
-        $countries = Country::orderBy('country')->get();
+        $countries = Country::orderBy('name')->get();
 
         // Get price history for this product
         $priceHistory = DB::table('veg_price_history')
@@ -561,7 +692,7 @@ class FruitVegController extends Controller
 
         return view('fruit-veg.product-edit', compact(
             'product',
-            'countries', 
+            'countries',
             'priceHistory',
             'salesHistory',
             'salesStats'
@@ -628,7 +759,7 @@ class FruitVegController extends Controller
                     ->where('product_code', $product->CODE)
                     ->orderBy('changed_at', 'desc')
                     ->first();
-                
+
                 $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
                 $product->is_available = true; // Maintain compatibility
 

@@ -14,7 +14,6 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-
 Route::get('/dashboard', function () {
     $productRepository = new \App\Repositories\ProductRepository;
     $statistics = $productRepository->getStatistics();
@@ -62,9 +61,16 @@ Route::middleware('auth')->group(function () {
         Route::get('/labels', [FruitVegController::class, 'labels'])->name('labels');
         Route::get('/labels/preview', [FruitVegController::class, 'previewLabels'])->name('labels.preview');
         Route::post('/labels/printed', [FruitVegController::class, 'markLabelsPrinted'])->name('labels.printed');
+        Route::post('/labels/clear-all', [FruitVegController::class, 'clearAllLabels'])->name('labels.clear-all');
+        Route::post('/labels/remove', [FruitVegController::class, 'removeFromLabels'])->name('labels.remove');
+        Route::post('/labels/add', [FruitVegController::class, 'addToLabels'])->name('labels.add');
         Route::post('/display/update', [FruitVegController::class, 'updateDisplay'])->name('display.update');
         Route::post('/country/update', [FruitVegController::class, 'updateCountry'])->name('country.update');
+        Route::post('/unit/update', [FruitVegController::class, 'updateUnit'])->name('unit.update');
+        Route::post('/class/update', [FruitVegController::class, 'updateClass'])->name('class.update');
         Route::get('/countries', [FruitVegController::class, 'getCountries'])->name('countries');
+        Route::get('/units', [FruitVegController::class, 'getUnits'])->name('units');
+        Route::get('/classes', [FruitVegController::class, 'getClasses'])->name('classes');
         Route::get('/search', [FruitVegController::class, 'searchProducts'])->name('search');
         Route::get('/product/{code}', [FruitVegController::class, 'editProduct'])->name('product.edit');
         Route::get('/product/{code}/sales-data', [FruitVegController::class, 'salesData'])->name('product.sales-data');
@@ -103,12 +109,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/authentication-test', [\App\Http\Controllers\AuthenticationTestController::class, 'testAuthentication'])->name('authentication-test');
         Route::get('/language-flag-test', [\App\Http\Controllers\LanguageFlagTestController::class, 'testLanguageFlag'])->name('language-flag-test');
         Route::get('/specific-product-test', [\App\Http\Controllers\SpecificProductTestController::class, 'testSpecificProduct'])->name('specific-product-test');
-        
+
         // Phase 2 component testing
         Route::get('/phase2-components', function () {
             return view('test-phase2');
         })->name('phase2-components');
-        
+
         // Phase 3 tab group component testing
         Route::get('/tab-group', function () {
             return view('test-tab-group');

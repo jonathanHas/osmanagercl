@@ -123,9 +123,11 @@ class ProductsCat extends Model
     {
         if (self::isProductVisible($productId)) {
             self::removeProduct($productId);
+
             return false;
         } else {
             self::addProduct($productId);
+
             return true;
         }
     }
@@ -149,18 +151,18 @@ class ProductsCat extends Model
             // Add products that aren't already visible
             $existingProducts = self::whereIn('PRODUCT', $productIds)->pluck('PRODUCT')->toArray();
             $productsToAdd = array_diff($productIds, $existingProducts);
-            
-            if (!empty($productsToAdd)) {
+
+            if (! empty($productsToAdd)) {
                 $maxOrder = self::max('CATORDER') ?? 0;
                 $data = [];
-                
+
                 foreach ($productsToAdd as $index => $productId) {
                     $data[] = [
                         'PRODUCT' => $productId,
                         'CATORDER' => $maxOrder + $index + 1,
                     ];
                 }
-                
+
                 self::insert($data);
             }
         } else {

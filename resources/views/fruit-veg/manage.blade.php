@@ -10,7 +10,7 @@
         </div>
     </x-slot>
 
-    <div class="py-6" x-data="managementSystem()">
+    <div class="py-6" x-data="managementSystem()" @update-country="handleCountryUpdate($event)" @update-unit="handleUnitUpdate($event)" @update-class="handleClassUpdate($event)">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             
             <!-- Search and Filters -->
@@ -125,6 +125,9 @@
                                 </th>
                                 <th class="w-20 px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Available
+                                </th>
+                                <th class="w-24 px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Labels
                                 </th>
                             </tr>
                         </thead>
@@ -250,25 +253,99 @@
                                         <div class="mt-1" 
                                              x-data="{ 
                                                 editing: false, 
-                                                originalCountryId: product.veg_details?.country_code || null,
-                                                selectedCountryId: product.veg_details?.country_code || null,
-                                                countries: []
+                                                originalCountryId: product.veg_details?.country_id || null,
+                                                selectedCountryId: product.veg_details?.country_id || null,
+                                                countries: [],
+                                                async saveCountry() {
+                                                    // Convert both to integers for proper comparison
+                                                    const selectedId = parseInt(this.selectedCountryId);
+                                                    const originalId = parseInt(this.originalCountryId);
+                                                    
+                                                    if (selectedId !== originalId && !isNaN(selectedId) && selectedId > 0) {
+                                                        // Use $dispatch to communicate with parent component
+                                                        $dispatch('update-country', { productCode: product.CODE, countryId: selectedId });
+                                                        
+                                                        // Update the display after dispatching the event
+                                                        const selectedCountry = this.countries.find(c => c.id === selectedId);
+                                                        if (selectedCountry) {
+                                                            if (!product.veg_details) {
+                                                                product.veg_details = {};
+                                                            }
+                                                            product.veg_details.country_id = selectedCountry.id;
+                                                            product.veg_details.country = selectedCountry;
+                                                            this.originalCountryId = selectedId;
+                                                        }
+                                                    }
+                                                    this.editing = false;
+                                                }
                                              }"
                                              x-init="$nextTick(() => fetch('/fruit-veg/countries').then(response => response.json()).then(data => countries = data))">
                                             <div x-show="!editing" 
-                                                 @click="editing = true" 
+                                                 @click="editing = true; selectedCountryId = product.veg_details?.country_id || null;" 
                                                  class="cursor-pointer text-xs text-gray-600 hover:text-gray-800 hover:bg-gray-100 px-1 py-1 rounded">
-                                                <span x-show="product.veg_details?.country?.country" x-text="product.veg_details?.country?.country"></span>
-                                                <span x-show="!product.veg_details?.country?.country" class="text-gray-400 italic">Set origin</span>
+                                                <span x-show="product.veg_details?.country?.name" x-text="product.veg_details?.country?.name"></span>
+                                                <span x-show="!product.veg_details?.country?.name" class="text-gray-400 italic">Set origin</span>
                                             </div>
                                             <div x-show="editing" x-cloak class="mt-1">
                                                 <select x-model="selectedCountryId" 
-                                                        @change="$root.updateCountry(product.CODE, selectedCountryId); editing = false"
-                                                        @blur="editing = false"
+                                                        @blur="saveCountry()"
+                                                        @keydown.enter="saveCountry()"
+                                                        @keydown.escape="editing = false; selectedCountryId = originalCountryId"
                                                         class="w-full text-xs border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500">
                                                     <option value="">Select...</option>
-                                                    <template x-for="country in countries" :key="country.ID">
-                                                        <option :value="country.ID" x-text="country.country"></option>
+                                                    <template x-for="country in countries" :key="country.id">
+                                                        <option :value="country.id" x-text="country.name"></option>
+                                                    </template>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Class Editing -->
+                                        <div class="mt-1" 
+                                             x-data="{ 
+                                                editing: false, 
+                                                originalClassId: product.veg_details?.class_id || null,
+                                                selectedClassId: product.veg_details?.class_id || null,
+                                                classes: [],
+                                                async saveClass() {
+                                                    // Convert both to integers for proper comparison
+                                                    const selectedId = parseInt(this.selectedClassId);
+                                                    const originalId = parseInt(this.originalClassId);
+                                                    
+                                                    if (selectedId !== originalId && !isNaN(selectedId) && selectedId > 0) {
+                                                        // Use $dispatch to communicate with parent component
+                                                        $dispatch('update-class', { productCode: product.CODE, classId: selectedId });
+                                                        
+                                                        // Update the display after dispatching the event
+                                                        const selectedClass = this.classes.find(c => c.id === selectedId);
+                                                        if (selectedClass) {
+                                                            if (!product.veg_details) {
+                                                                product.veg_details = {};
+                                                            }
+                                                            product.veg_details.class_id = selectedClass.id;
+                                                            product.veg_details.class_name = selectedClass.name;
+                                                            this.originalClassId = selectedId;
+                                                        }
+                                                    }
+                                                    this.editing = false;
+                                                }
+                                             }"
+                                             x-init="$nextTick(() => fetch('/fruit-veg/classes').then(response => response.json()).then(data => classes = data))">
+                                            <div x-show="!editing" 
+                                                 @click="editing = true; selectedClassId = product.veg_details?.class_id || null;" 
+                                                 class="cursor-pointer text-xs text-gray-600 hover:text-gray-800 hover:bg-gray-100 px-1 py-1 rounded">
+                                                <span x-show="product.veg_details?.class_name" x-text="'Class: ' + product.veg_details?.class_name"></span>
+                                                <span x-show="!product.veg_details?.class_name" class="text-gray-400 italic">Set class</span>
+                                            </div>
+                                            <div x-show="editing" x-cloak class="mt-1">
+                                                <select x-model="selectedClassId" 
+                                                        @blur="saveClass()"
+                                                        @keydown.enter="saveClass()"
+                                                        @keydown.escape="editing = false; selectedClassId = originalClassId"
+                                                        class="w-full text-xs border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500">
+                                                    <option value="">Select...</option>
+                                                    <template x-for="class_ in classes" :key="class_.id">
+                                                        <option :value="class_.id" x-text="'Class ' + class_.name"></option>
                                                     </template>
                                                 </select>
                                             </div>
@@ -298,7 +375,55 @@
                                                        placeholder="Enter display name...">
                                             </div>
                                         </div>
-                                        <div class="text-xs text-gray-500 mt-1" x-text="product.veg_details?.unit_name || 'kg'"></div>
+                                        <!-- Unit Editing -->
+                                        <div class="mt-1" 
+                                             x-data="{ 
+                                                editing: false, 
+                                                originalUnitId: product.veg_details?.unit_id || null,
+                                                selectedUnitId: product.veg_details?.unit_id || null,
+                                                units: [],
+                                                async saveUnit() {
+                                                    // Convert both to integers for proper comparison
+                                                    const selectedId = parseInt(this.selectedUnitId);
+                                                    const originalId = parseInt(this.originalUnitId);
+                                                    
+                                                    if (selectedId !== originalId && !isNaN(selectedId) && selectedId > 0) {
+                                                        // Use $dispatch to communicate with parent component
+                                                        $dispatch('update-unit', { productCode: product.CODE, unitId: selectedId });
+                                                        
+                                                        // Update the display after dispatching the event
+                                                        const selectedUnit = this.units.find(u => u.id === selectedId);
+                                                        if (selectedUnit) {
+                                                            if (!product.veg_details) {
+                                                                product.veg_details = {};
+                                                            }
+                                                            product.veg_details.unit_id = selectedUnit.id;
+                                                            product.veg_details.unit_name = selectedUnit.abbreviation;
+                                                            this.originalUnitId = selectedId;
+                                                        }
+                                                    }
+                                                    this.editing = false;
+                                                }
+                                             }"
+                                             x-init="$nextTick(() => fetch('/fruit-veg/units').then(response => response.json()).then(data => units = data))">
+                                            <div x-show="!editing" 
+                                                 @click="editing = true; selectedUnitId = product.veg_details?.unit_id || null;" 
+                                                 class="cursor-pointer text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 px-1 py-1 rounded">
+                                                <span x-text="product.veg_details?.unit_name || 'kg'"></span>
+                                            </div>
+                                            <div x-show="editing" x-cloak class="mt-1">
+                                                <select x-model="selectedUnitId" 
+                                                        @blur="saveUnit()"
+                                                        @keydown.enter="saveUnit()"
+                                                        @keydown.escape="editing = false; selectedUnitId = originalUnitId"
+                                                        class="w-full text-xs border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500">
+                                                    <option value="">Select...</option>
+                                                    <template x-for="unit in units" :key="unit.id">
+                                                        <option :value="unit.id" x-text="unit.name + ' (' + unit.abbreviation + ')'"></option>
+                                                    </template>
+                                                </select>
+                                            </div>
+                                        </div>
                                     </td>
                                     
                                     <!-- Availability Toggle -->
@@ -310,6 +435,31 @@
                                             <span :class="product.is_available ? 'translate-x-6' : 'translate-x-1'"
                                                   class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" />
                                         </button>
+                                    </td>
+                                    
+                                    <!-- Labels Actions -->
+                                    <td class="px-4 py-4 text-center">
+                                        <div class="flex flex-col items-center gap-1">
+                                            <!-- Print Queue Indicator -->
+                                            <div x-show="product.in_print_queue" class="flex items-center gap-1 text-xs text-amber-600">
+                                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"/>
+                                                </svg>
+                                                Queued
+                                            </div>
+                                            
+                                            <!-- Add/Remove Button -->
+                                            <button x-show="!product.in_print_queue"
+                                                    @click="addToLabels(product.CODE)"
+                                                    class="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition">
+                                                Add to Labels
+                                            </button>
+                                            <button x-show="product.in_print_queue"
+                                                    @click="removeFromLabels(product.CODE)"
+                                                    class="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition">
+                                                Remove
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             </template>
@@ -560,14 +710,71 @@
                         
                         if (response.ok) {
                             this.showNotification('Country updated successfully!', 'success');
-                            // Refresh the specific product data
-                            setTimeout(() => window.location.reload(), 1000);
+                            return true;
                         } else {
                             this.showNotification('Failed to update country', 'error');
+                            return false;
                         }
                     } catch (error) {
-                        console.error('Error:', error);
+                        console.error('Error updating country:', error);
                         this.showNotification('An error occurred', 'error');
+                        return false;
+                    }
+                },
+
+                async updateUnit(productCode, unitId) {
+                    try {
+                        const response = await fetch('{{ route('fruit-veg.unit.update') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify({
+                                product_code: productCode,
+                                unit_id: parseInt(unitId)
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            this.showNotification('Unit updated successfully!', 'success');
+                            return true;
+                        } else {
+                            this.showNotification('Failed to update unit', 'error');
+                            return false;
+                        }
+                    } catch (error) {
+                        console.error('Error updating unit:', error);
+                        this.showNotification('An error occurred', 'error');
+                        return false;
+                    }
+                },
+
+                async updateClass(productCode, classId) {
+                    try {
+                        const response = await fetch('{{ route('fruit-veg.class.update') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify({
+                                product_code: productCode,
+                                class_id: parseInt(classId)
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            this.showNotification('Class updated successfully!', 'success');
+                            return true;
+                        } else {
+                            this.showNotification('Failed to update class', 'error');
+                            return false;
+                        }
+                    } catch (error) {
+                        console.error('Error updating class:', error);
+                        this.showNotification('An error occurred', 'error');
+                        return false;
                     }
                 },
                 
@@ -638,6 +845,68 @@
                     }
                 },
                 
+                async addToLabels(productCode) {
+                    try {
+                        const response = await fetch('{{ route('fruit-veg.labels.add') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify({
+                                product_code: productCode
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            // Update local state
+                            const product = this.products.find(p => p.CODE === productCode);
+                            if (product) {
+                                product.in_print_queue = true;
+                            }
+                            this.showNotification('Product added to print queue!', 'success');
+                        } else {
+                            this.showNotification(result.message || 'Failed to add product to print queue', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        this.showNotification('An error occurred', 'error');
+                    }
+                },
+                
+                async removeFromLabels(productCode) {
+                    try {
+                        const response = await fetch('{{ route('fruit-veg.labels.remove') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify({
+                                product_code: productCode
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            // Update local state
+                            const product = this.products.find(p => p.CODE === productCode);
+                            if (product) {
+                                product.in_print_queue = false;
+                            }
+                            this.showNotification('Product removed from print queue!', 'success');
+                        } else {
+                            this.showNotification(result.message || 'Failed to remove product from print queue', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        this.showNotification('An error occurred', 'error');
+                    }
+                },
+                
                 showNotification(message, type) {
                     const notification = document.createElement('div');
                     const bgColor = type === 'success' ? 'bg-green-600' : 'bg-red-600';
@@ -649,6 +918,21 @@
                     setTimeout(() => {
                         notification.remove();
                     }, 3000);
+                },
+
+                async handleCountryUpdate(event) {
+                    const { productCode, countryId } = event.detail;
+                    await this.updateCountry(productCode, countryId);
+                },
+
+                async handleUnitUpdate(event) {
+                    const { productCode, unitId } = event.detail;
+                    await this.updateUnit(productCode, unitId);
+                },
+
+                async handleClassUpdate(event) {
+                    const { productCode, classId } = event.detail;
+                    await this.updateClass(productCode, classId);
                 }
             }
         }

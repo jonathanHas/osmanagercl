@@ -38,9 +38,13 @@ class ProductActivityLog extends Model
      * Activity type constants
      */
     const TYPE_ADDED_TO_TILL = 'added_to_till';
+
     const TYPE_REMOVED_FROM_TILL = 'removed_from_till';
+
     const TYPE_PRICE_CHANGED = 'price_changed';
+
     const TYPE_DISPLAY_CHANGED = 'display_changed';
+
     const TYPE_COUNTRY_CHANGED = 'country_changed';
 
     /**
@@ -66,8 +70,8 @@ class ProductActivityLog extends Model
     public function scopeRecentlyAdded($query, $category = null, $days = 7)
     {
         $query->where('activity_type', self::TYPE_ADDED_TO_TILL)
-              ->where('created_at', '>=', now()->subDays($days))
-              ->orderBy('created_at', 'desc');
+            ->where('created_at', '>=', now()->subDays($days))
+            ->orderBy('created_at', 'desc');
 
         if ($category) {
             $query->where('category', $category);

@@ -7,46 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 class VegDetails extends Model
 {
     /**
-     * The connection name for the model.
-     *
-     * @var string
-     */
-    protected $connection = 'pos';
-
-    /**
      * The table associated with the model.
      *
      * @var string
      */
-    protected $table = 'vegDetails';
-
-    /**
-     * The primary key for the model.
-     *
-     * @var string
-     */
-    protected $primaryKey = 'product';
-
-    /**
-     * The "type" of the primary key ID.
-     *
-     * @var string
-     */
-    protected $keyType = 'string';
-
-    /**
-     * Indicates if the IDs are auto-incrementing.
-     *
-     * @var bool
-     */
-    public $incrementing = false;
-
-    /**
-     * Indicates if the model should be timestamped.
-     *
-     * @var bool
-     */
-    public $timestamps = false;
+    protected $table = 'veg_details';
 
     /**
      * The attributes that are mass assignable.
@@ -54,19 +19,25 @@ class VegDetails extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'ID',
-        'product',
-        'countryCode',
-        'classId',
-        'unitId',
+        'product_code',
+        'country_id',
+        'class_id',
+        'unit_id',
     ];
+
+    /**
+     * Indicates if the model should be timestamped.
+     *
+     * @var bool
+     */
+    public $timestamps = true;
 
     /**
      * Get the product that owns the veg details.
      */
     public function product()
     {
-        return $this->belongsTo(Product::class, 'product', 'CODE');
+        return $this->setConnection('pos')->belongsTo(Product::class, 'product_code', 'CODE');
     }
 
     /**
@@ -74,36 +45,38 @@ class VegDetails extends Model
      */
     public function country()
     {
-        return $this->belongsTo(Country::class, 'countryCode', 'ID');
+        return $this->belongsTo(Country::class, 'country_id');
     }
 
     /**
-     * Get the class name (Extra, I, II).
+     * Get the class for this veg detail.
+     */
+    public function vegClass()
+    {
+        return $this->belongsTo(VegClass::class, 'class_id');
+    }
+
+    /**
+     * Get the unit for this veg detail.
+     */
+    public function vegUnit()
+    {
+        return $this->belongsTo(VegUnit::class, 'unit_id');
+    }
+
+    /**
+     * Get the class name attribute for backward compatibility.
      */
     public function getClassNameAttribute()
     {
-        $classes = [
-            1 => 'Extra',
-            2 => 'I',
-            3 => 'II',
-        ];
-
-        return $classes[$this->classId] ?? '';
+        return $this->vegClass ? $this->vegClass->name : '';
     }
 
     /**
-     * Get the unit name (kg, each, bunch, etc).
+     * Get the unit name attribute for backward compatibility.
      */
     public function getUnitNameAttribute()
     {
-        $units = [
-            1 => 'kg',
-            2 => 'each',
-            3 => 'bunch',
-            4 => 'punnet',
-            5 => 'bag',
-        ];
-
-        return $units[$this->unitId] ?? 'kg';
+        return $this->vegUnit ? $this->vegUnit->abbreviation : 'kg';
     }
 }

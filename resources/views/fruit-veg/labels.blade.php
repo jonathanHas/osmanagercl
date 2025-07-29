@@ -41,6 +41,16 @@
                                 Print All Labels
                             </button>
                         </form>
+                        <form action="{{ route('fruit-veg.labels.clear-all') }}" method="POST" class="inline" onsubmit="return confirm('Are you sure you want to clear all labels from the print queue? This cannot be undone.')">
+                            @csrf
+                            <button type="submit" 
+                                    class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                                <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Clear All Labels
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -108,7 +118,7 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     @if($product->vegDetails && $product->vegDetails->country)
-                                        {{ $product->vegDetails->country->country ?? 'N/A' }}
+                                        {{ $product->vegDetails->country->name ?? 'N/A' }}
                                     @else
                                         N/A
                                     @endif
@@ -117,11 +127,17 @@
                                     {{ $product->vegDetails->class_name ?? '-' }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-center">
-                                    <a href="{{ route('fruit-veg.labels.preview', ['products' => [$product->CODE]]) }}" 
-                                       target="_blank"
-                                       class="text-indigo-600 hover:text-indigo-900 text-sm font-medium">
-                                        Preview
-                                    </a>
+                                    <div class="flex justify-center space-x-2">
+                                        <a href="{{ route('fruit-veg.labels.preview', ['products' => [$product->CODE]]) }}" 
+                                           target="_blank"
+                                           class="text-indigo-600 hover:text-indigo-900 text-sm font-medium">
+                                            Preview
+                                        </a>
+                                        <button onclick="removeFromQueue('{{ $product->CODE }}')"
+                                                class="text-red-600 hover:text-red-900 text-sm font-medium">
+                                            Remove
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                             @endforeach
@@ -143,4 +159,37 @@
             </div>
         </div>
     </div>
+
+    <script>
+        async function removeFromQueue(productCode) {
+            if (!confirm('Remove this product from the print queue?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('{{ route("fruit-veg.labels.remove") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({
+                        product_code: productCode
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Reload the page to update the list
+                    window.location.reload();
+                } else {
+                    alert(result.message || 'Failed to remove product from queue');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while removing the product');
+            }
+        }
+    </script>
 </x-admin-layout>

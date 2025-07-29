@@ -4,14 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Country extends Model
+class VegUnit extends Model
 {
     /**
      * The table associated with the model.
      *
      * @var string
      */
-    protected $table = 'countries';
+    protected $table = 'veg_units';
 
     /**
      * The attributes that are mass assignable.
@@ -20,15 +20,16 @@ class Country extends Model
      */
     protected $fillable = [
         'name',
-        'code',
+        'abbreviation',
+        'plural_name',
         'sort_order',
     ];
 
     /**
-     * Get the veg details for this country.
+     * Get the veg details for this unit.
      */
     public function vegDetails()
     {
-        return $this->hasMany(VegDetails::class, 'country_id');
+        return $this->hasMany(VegDetails::class, 'unit_id');
     }
 }

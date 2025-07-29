@@ -4,8 +4,8 @@ namespace App\View\Components;
 
 use Closure;
 use Illuminate\Contracts\View\View;
-use Illuminate\View\Component;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\View\Component;
 
 class DataTable extends Component
 {
@@ -74,7 +74,7 @@ class DataTable extends Component
             return count($this->rows) > 0;
         }
 
-        return !empty($this->rows);
+        return ! empty($this->rows);
     }
 
     /**
