@@ -140,13 +140,16 @@ class ProductController extends Controller
     /**
      * Display the specified product.
      */
-    public function show(string $id): View
+    public function show(string $id, Request $request): View
     {
         $product = $this->productRepository->findById($id);
 
         if (! $product) {
             abort(404, 'Product not found');
         }
+
+        // Check for delivery context
+        $fromDelivery = $request->query('from_delivery');
 
         $taxCategories = $this->productRepository->getAllTaxCategories();
 
@@ -179,6 +182,7 @@ class ProductController extends Controller
             'salesStats' => $salesStats,
             'supplierService' => $this->supplierService,
             'udeaPricing' => $udeaPricing,
+            'fromDelivery' => $fromDelivery,
         ]);
     }
 
@@ -467,6 +471,14 @@ class ProductController extends Controller
                     ]);
                 }
             });
+
+            // Determine redirect route with context
+            if ($request->delivery_item_id) {
+                $deliveryItem = \App\Models\DeliveryItem::findOrFail($request->delivery_item_id);
+                $redirectUrl = route('products.show', $productId) . '?from_delivery=' . $deliveryItem->delivery_id;
+                return redirect($redirectUrl)
+                    ->with('success', 'Product created successfully!');
+            }
 
             return redirect()
                 ->route('products.show', $productId)

@@ -29,16 +29,30 @@
                         'class' => 'inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs uppercase tracking-widest rounded-md transition',
                         'icon' => 'M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z',
                         'target' => '_blank'
-                    ],
-                    [
+                    ]
+                ];
+
+                // Add navigation button based on context
+                if ($fromDelivery) {
+                    $productActions[] = [
+                        'type' => 'link',
+                        'route' => 'deliveries.show',
+                        'params' => ['delivery' => $fromDelivery],
+                        'label' => 'Back to Delivery',
+                        'color' => 'secondary',
+                        'class' => 'inline-flex items-center px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-500 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-25 transition ease-in-out duration-150',
+                        'icon' => 'M10 19l-7-7m0 0l7-7m-7 7h18'
+                    ];
+                } else {
+                    $productActions[] = [
                         'type' => 'link',
                         'route' => 'products.index',
                         'label' => 'Back to Products',
                         'color' => 'secondary',
                         'class' => 'inline-flex items-center px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-500 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-25 transition ease-in-out duration-150',
                         'icon' => 'M10 19l-7-7m0 0l7-7m-7 7h18'
-                    ]
-                ];
+                    ];
+                }
             @endphp
             
             <x-action-buttons :actions="$productActions" spacing="tight" size="lg" />
