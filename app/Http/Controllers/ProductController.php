@@ -470,12 +470,28 @@ class ProductController extends Controller
                         'barcode' => $product->CODE,
                     ]);
                 }
+
+                // Add to stocking table if requested
+                if ($request->boolean('include_in_stocking', true)) {
+                    try {
+                        \App\Models\Stocking::create([
+                            'Barcode' => $product->CODE,
+                        ]);
+                    } catch (\Exception $e) {
+                        // Log the error but don't fail the product creation
+                        \Log::warning('Failed to add product to stocking table', [
+                            'product_code' => $product->CODE,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
             });
 
             // Determine redirect route with context
             if ($request->delivery_item_id) {
                 $deliveryItem = \App\Models\DeliveryItem::findOrFail($request->delivery_item_id);
-                $redirectUrl = route('products.show', $productId) . '?from_delivery=' . $deliveryItem->delivery_id;
+                $redirectUrl = route('products.show', $productId).'?from_delivery='.$deliveryItem->delivery_id;
+
                 return redirect($redirectUrl)
                     ->with('success', 'Product created successfully!');
             }
@@ -568,5 +584,53 @@ class ProductController extends Controller
         // Return the label HTML with appropriate headers for printing
         return response($labelHtml)
             ->header('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    /**
+     * Toggle stocking status for a product via AJAX.
+     */
+    public function toggleStocking(string $id, Request $request)
+    {
+        $request->validate([
+            'include_in_stocking' => 'required|boolean',
+        ]);
+
+        $product = $this->productRepository->findById($id);
+
+        if (! $product) {
+            return response()->json(['error' => 'Product not found'], 404);
+        }
+
+        $shouldInclude = $request->boolean('include_in_stocking');
+
+        try {
+            if ($shouldInclude) {
+                // Add to stocking table if not already present
+                \App\Models\Stocking::firstOrCreate(['Barcode' => $product->CODE]);
+                $message = 'Product added to stock management';
+            } else {
+                // Remove from stocking table
+                \App\Models\Stocking::where('Barcode', $product->CODE)->delete();
+                $message = 'Product removed from stock management';
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'is_stocked' => $shouldInclude,
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to toggle stocking status', [
+                'product_id' => $id,
+                'product_code' => $product->CODE,
+                'action' => $shouldInclude ? 'add' : 'remove',
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to update stocking status: '.$e->getMessage(),
+            ], 500);
+        }
     }
 }

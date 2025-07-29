@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use App\Models\VegDetails;
 
 class Product extends Model
 {
@@ -207,7 +206,7 @@ class Product extends Model
         // Force the relationship to use the default connection (not POS)
         $instance = new VegDetails;
         $instance->setConnection(config('database.default'));
-        
+
         return $this->newHasOne(
             $instance->newQuery(),
             $this,

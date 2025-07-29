@@ -49,6 +49,15 @@ class Stocking extends Model
     public $timestamps = false;
 
     /**
+     * The attributes that are mass assignable.
+     *
+     * @var array
+     */
+    protected $fillable = [
+        'Barcode',
+    ];
+
+    /**
      * Get the product for this stocking record.
      */
     public function product()

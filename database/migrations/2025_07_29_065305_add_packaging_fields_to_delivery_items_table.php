@@ -15,7 +15,7 @@ return new class extends Migration
             // Add new fields to clarify packaging structure
             $table->integer('units_per_retail_package')->nullable()->after('units_per_case')
                 ->comment('Number of individual items in each retail package');
-            
+
             $table->integer('retail_packages_per_case')->nullable()->after('units_per_retail_package')
                 ->comment('Number of retail packages in each wholesale case');
         });

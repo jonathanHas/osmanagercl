@@ -56,6 +56,9 @@ class StoreProductRequest extends FormRequest
             'supplier_code' => 'nullable|string|max:100',
             'units_per_case' => 'nullable|integer|min:1|max:9999',
             'supplier_cost' => 'nullable|numeric|min:0|max:999999.99',
+
+            // Stock Management
+            'include_in_stocking' => 'boolean',
         ];
     }
 
@@ -104,6 +107,7 @@ class StoreProductRequest extends FormRequest
             'print_kb' => $this->boolean('print_kb'),
             'send_status' => $this->boolean('send_status'),
             'is_com' => $this->boolean('is_com'),
+            'include_in_stocking' => $this->boolean('include_in_stocking'),
         ]);
 
         // Convert integer fields

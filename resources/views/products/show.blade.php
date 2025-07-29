@@ -66,7 +66,7 @@
             <!-- Quick Stats Bar -->
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
                 <div class="p-6">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <!-- Stock Status -->
                         <div>
                             <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Stock Status</h3>
@@ -109,6 +109,36 @@
                                     Uncategorized
                                 </span>
                             @endif
+                        </div>
+
+                        <!-- Stocking Status -->
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Stock Management</h3>
+                            <div class="flex items-center space-x-3">
+                                @if($product->stocking)
+                                    <span class="inline-flex items-center px-3 py-1 text-lg font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                        </svg>
+                                        Stocked
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center px-3 py-1 text-lg font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                                        </svg>
+                                        Not Stocked
+                                    </span>
+                                @endif
+                                <button type="button" 
+                                        onclick="toggleStocking('{{ $product->ID }}', {{ $product->stocking ? 'false' : 'true' }})"
+                                        class="inline-flex items-center px-2 py-1 text-xs font-medium rounded border {{ $product->stocking ? 'border-red-300 text-red-700 hover:bg-red-50 dark:border-red-600 dark:text-red-400 dark:hover:bg-red-900/20' : 'border-green-300 text-green-700 hover:bg-green-50 dark:border-green-600 dark:text-green-400 dark:hover:bg-green-900/20' }} transition-colors duration-200">
+                                    {{ $product->stocking ? 'Remove' : 'Add' }}
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                {{ $product->stocking ? 'Included in ordering operations' : 'Excluded from automated ordering' }}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -895,6 +925,44 @@
             .catch(error => {
                 console.error('Error:', error);
                 alert('Error adding product back to labels list');
+            });
+        }
+
+        // Toggle stocking status function
+        function toggleStocking(productId, includeInStocking) {
+            const button = event.target.closest('button');
+            const originalContent = button.innerHTML;
+            
+            // Show loading state
+            button.disabled = true;
+            button.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>';
+            
+            fetch(`/products/${productId}/toggle-stocking`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({ include_in_stocking: includeInStocking })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Reload the page to reflect changes
+                    window.location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to update stocking status'));
+                    // Restore button state
+                    button.disabled = false;
+                    button.innerHTML = originalContent;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Network error while updating stocking status. Please try again.');
+                // Restore button state
+                button.disabled = false;
+                button.innerHTML = originalContent;
             });
         }
     </script>

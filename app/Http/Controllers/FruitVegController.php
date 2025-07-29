@@ -271,7 +271,7 @@ class FruitVegController extends Controller
         if ($request->wantsJson()) {
             // Make sure relationships are loaded for AJAX responses too
             $products->load('vegDetails.country', 'vegDetails.vegUnit', 'vegDetails.vegClass');
-            
+
             // Check if there are more products by trying to get one more
             $hasMore = $this->tillVisibilityService->getProductsWithVisibility('fruit_veg', $filters, 1, $offset + $limit)->count() > 0;
 

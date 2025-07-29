@@ -223,6 +223,24 @@
                                            placeholder="Auto-filled from cost">
                                 </div>
                             </div>
+
+                            <!-- Stock Management Option -->
+                            <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                <div class="flex items-start">
+                                    <input type="checkbox" 
+                                           id="include_in_stocking" 
+                                           name="include_in_stocking" 
+                                           value="1" 
+                                           {{ old('include_in_stocking', '1') ? 'checked' : '' }}
+                                           class="mt-1 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                    <label for="include_in_stocking" class="ml-3 block text-sm text-gray-700 dark:text-gray-300">
+                                        <span class="font-medium">Include in Stock Management</span>
+                                        <span class="block text-xs text-gray-500 mt-1">
+                                            Add this product to stocking operations. Uncheck for one-time items that won't be regularly stocked.
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
                         </div>
 
                     </div>
