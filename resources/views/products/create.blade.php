@@ -403,6 +403,7 @@
                         <div>
                             <label for="units_per_case" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 Units per Case
+                                <span class="text-xs text-gray-500 block">Retail packages per wholesale case</span>
                             </label>
                             <input type="number" 
                                    id="units_per_case" 

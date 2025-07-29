@@ -48,6 +48,11 @@ Detailed documentation for each major feature.
 
 - **[Product Management](./features/product-management.md)** - Product catalog operations
   - CRUD operations with UUID support
+
+- **[Packaging Structure](./features/packaging-structure.md)** - Retail vs wholesale packaging
+  - Units per retail package vs packages per case
+  - CSV import handling
+  - Total units calculation
   - Supplier linking
   - Category management
   - Search and filtering

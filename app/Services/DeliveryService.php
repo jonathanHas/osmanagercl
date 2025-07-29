@@ -83,11 +83,9 @@ class DeliveryService
      */
     private function parseDeliveryRow(array $row): array
     {
-        // Extract units per case from content field (e.g., "1 kilogram", "4 pc")
-        $unitsPerCase = 1;
-        if (preg_match('/^(\d+)\s+(?:pc|stuks?)$/i', $row['Content'], $matches)) {
-            $unitsPerCase = (int) $matches[1];
-        }
+        // The SKU field contains the number of retail units per wholesale case
+        // For example: if SKU = 5 and Content = "19 pc", then we receive 5 retail packs per case
+        $unitsPerCase = (int) $row['SKU'];
 
         return [
             'code' => $row['Code'],
