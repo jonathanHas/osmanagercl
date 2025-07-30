@@ -7,11 +7,39 @@ use Illuminate\Database\Eloquent\Model;
 class VegDetails extends Model
 {
     /**
+     * The connection name for the model.
+     *
+     * @var string
+     */
+    protected $connection = 'pos';
+
+    /**
      * The table associated with the model.
      *
      * @var string
      */
-    protected $table = 'veg_details';
+    protected $table = 'vegDetails';
+
+    /**
+     * The primary key for the model.
+     *
+     * @var string
+     */
+    protected $primaryKey = 'ID';
+
+    /**
+     * The "type" of the auto-incrementing ID.
+     *
+     * @var string
+     */
+    protected $keyType = 'string';
+
+    /**
+     * Indicates if the IDs are auto-incrementing.
+     *
+     * @var bool
+     */
+    public $incrementing = false;
 
     /**
      * The attributes that are mass assignable.
@@ -19,10 +47,10 @@ class VegDetails extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'product_code',
-        'country_id',
-        'class_id',
-        'unit_id',
+        'product',
+        'countryCode',
+        'classId',
+        'unitId',
     ];
 
     /**
@@ -30,7 +58,7 @@ class VegDetails extends Model
      *
      * @var bool
      */
-    public $timestamps = true;
+    public $timestamps = false;
 
     /**
      * The accessors to append to the model's array form.
@@ -47,7 +75,7 @@ class VegDetails extends Model
      */
     public function product()
     {
-        return $this->setConnection('pos')->belongsTo(Product::class, 'product_code', 'CODE');
+        return $this->belongsTo(Product::class, 'product', 'CODE');
     }
 
     /**
@@ -55,7 +83,8 @@ class VegDetails extends Model
      */
     public function country()
     {
-        return $this->belongsTo(Country::class, 'country_id');
+        // Cross-database relationship: POS vegDetails.countryCode -> main DB countries.id
+        return $this->setConnection('mysql')->belongsTo(Country::class, 'countryCode', 'id');
     }
 
     /**
@@ -63,7 +92,7 @@ class VegDetails extends Model
      */
     public function vegClass()
     {
-        return $this->belongsTo(VegClass::class, 'class_id');
+        return $this->belongsTo(VegClass::class, 'classId', 'ID');
     }
 
     /**
@@ -71,7 +100,8 @@ class VegDetails extends Model
      */
     public function vegUnit()
     {
-        return $this->belongsTo(VegUnit::class, 'unit_id');
+        // Cross-database relationship: POS vegDetails.unitId -> main DB veg_units.id
+        return $this->setConnection('mysql')->belongsTo(VegUnit::class, 'unitId', 'id');
     }
 
     /**

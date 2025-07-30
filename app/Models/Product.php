@@ -203,16 +203,8 @@ class Product extends Model
      */
     public function vegDetails()
     {
-        // Force the relationship to use the default connection (not POS)
-        $instance = new VegDetails;
-        $instance->setConnection(config('database.default'));
-
-        return $this->newHasOne(
-            $instance->newQuery(),
-            $this,
-            'product_code',
-            'CODE'
-        );
+        // VegDetails now uses POS connection and 'product' field
+        return $this->hasOne(VegDetails::class, 'product', 'CODE');
     }
 
     /**
