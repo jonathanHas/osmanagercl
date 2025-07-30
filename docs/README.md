@@ -47,6 +47,9 @@ Detailed documentation for each major feature.
   - Smart product filtering based on print history
 
 - **[Product Management](./features/product-management.md)** - Product catalog operations
+  - Cross-database VegDetails integration with POS system
+  - Real-time class, country, and unit data synchronization
+  - Dual search system for availability management
   - CRUD operations with UUID support
   - Inline editing for product names, pricing, and tax categories
   - Stocking management with visual indicators

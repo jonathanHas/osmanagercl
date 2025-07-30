@@ -122,6 +122,10 @@ php artisan view:clear
 - `app/Models/` - Eloquent models
   - `User.php` - User authentication model
   - `Product.php` - POS product model (read-only, connects to 'pos' database)
+  - `VegDetails.php` - POS veg details model (connects to 'pos' database, uses vegDetails table)
+  - `VegClass.php` - POS class model (connects to 'pos' database, uses class table)
+  - `Country.php` - Countries model (main database)
+  - `VegUnit.php` - Units model (main database)
 - `app/Repositories/` - Repository pattern for data access
   - `ProductRepository.php` - Handles product data queries and statistics
 - `app/View/Components/` - Blade components (AppLayout, GuestLayout)
@@ -137,9 +141,11 @@ php artisan view:clear
 - **Authentication**: Laravel Breeze provides login, registration, password reset, and email verification
 - **User Management**: Profile editing and account deletion functionality
 - **Dual Database Support**: 
-  - Primary database (SQLite/MySQL) for application data
+  - Primary database (SQLite/MySQL) for application data and configuration
   - Secondary POS connection for uniCenta product data (read-only)
+  - Cross-database relationships for seamless data integration
 - **Product Management**: ProductRepository provides clean interface to POS products
+- **Veg Details Integration**: VegDetails model connects directly to POS database for real-time class, country, and unit data
 - **Frontend**: Server-side rendered Blade templates with Tailwind CSS styling
 - **Asset Pipeline**: Vite handles CSS and JavaScript compilation with hot reloading
 

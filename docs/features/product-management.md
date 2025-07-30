@@ -10,6 +10,8 @@ The Product Management system provides comprehensive CRUD operations for managin
 - **ProductController**: Handles HTTP requests for product operations
 - **ProductRepository**: Data access layer for product queries and statistics
 - **Product Model**: Eloquent model representing POS database products
+- **VegDetails Model**: Links to POS vegDetails table for fruit/vegetable metadata
+- **VegClass Model**: Connects to POS class table for quality classifications (I, II, III)
 - **Stocking Model**: Manages which products are included in stock operations
 - **StoreProductRequest**: Validates product creation/update requests
 
@@ -35,6 +37,24 @@ CREATE TABLE PRODUCTS (
 -- Stocking management table (POS database)
 CREATE TABLE stocking (
     Barcode VARCHAR(50) PRIMARY KEY
+);
+
+-- Vegetable details table (POS database)
+CREATE TABLE vegDetails (
+    ID VARCHAR(255) PRIMARY KEY,
+    product VARCHAR(50) NOT NULL,
+    countryCode INT,
+    classId INT,
+    unitId INT,
+    FOREIGN KEY (product) REFERENCES PRODUCTS(CODE),
+    FOREIGN KEY (classId) REFERENCES class(ID)
+);
+
+-- Class quality grades table (POS database)
+CREATE TABLE class (
+    ID INT PRIMARY KEY,
+    classNum INT NOT NULL,
+    class VARCHAR(10) NOT NULL  -- I, II, III
 );
 ```
 
@@ -65,6 +85,34 @@ CREATE TABLE stocking (
 3. PATCH request sent to specific update endpoint
 4. Controller validates and updates database
 5. User redirected with success message
+
+### Cross-Database Relationships
+
+The system implements sophisticated cross-database relationships to integrate POS data with application data:
+
+#### VegDetails Model Configuration
+```php
+// Connects to POS database
+protected $connection = 'pos';
+protected $table = 'vegDetails';
+
+// Cross-database relationships
+public function vegClass()
+{
+    return $this->belongsTo(VegClass::class, 'classId', 'ID');
+}
+
+public function country()
+{
+    // Cross-database: POS vegDetails -> main DB countries
+    return $this->setConnection('mysql')->belongsTo(Country::class, 'countryCode', 'id');
+}
+```
+
+#### Field Mappings
+- **POS Database**: Uses original uniCenta field names (`product`, `classId`, `countryCode`, `unitId`)
+- **Application Database**: Uses Laravel conventions (`country_id`, `class_id`, etc.)
+- **Accessors**: Bridge the gap for backward compatibility (`class_name`, `unit_name`)
 
 ## Configuration
 

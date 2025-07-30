@@ -36,8 +36,10 @@
                 box-shadow: none;
                 page-break-after: always;
             }
-            .no-print {
-                display: none;
+            .no-print,
+            .print-controls {
+                display: none !important;
+                visibility: hidden !important;
             }
         }
 
@@ -49,8 +51,7 @@
         }
 
         .label {
-            border: 1px solid #ccc;
-            padding: 2mm;
+            padding: 4mm;
             height: 32mm;
             display: flex;
             flex-direction: column;
@@ -114,12 +115,14 @@
             text-align: left;
             color: #666;
             letter-spacing: 0.01em;
+            margin-left: 2mm;
         }
 
         .class-info {
             text-align: right;
             color: #666;
             letter-spacing: 0.01em;
+            margin-right: 2mm;
         }
 
 
@@ -179,7 +182,7 @@
                 </div>
 
                 <div class="price-section">
-                    <div class="price">€{{ number_format($product->current_price, 2) }} <span class="price-unit">per {{ $product->vegDetails->unit_name ?? 'kg' }}</span></div>
+                    <div class="price">€{{ number_format($product->current_price, 2) }} <span class="price-unit">{{ ($product->vegDetails->unit_name ?? 'kg') === 'ea' ? 'each' : 'per ' . ($product->vegDetails->unit_name ?? 'kg') }}</span></div>
                 </div>
 
                 <div class="info-section">

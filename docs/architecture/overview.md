@@ -60,8 +60,9 @@ app/Repositories/
 ```
 
 ### 4. Dual Database Architecture
-- **Primary Database** (SQLite/MySQL): Application data, users, settings, F&V management
-- **Secondary Database** (MySQL): Read-only POS integration for products, categories, images
+- **Primary Database** (SQLite/MySQL): Application data, users, settings, countries, units
+- **Secondary Database** (MySQL): Read-only POS integration for products, categories, vegDetails, classes
+- **Cross-Database Relations**: VegDetails model bridges POS data with application configuration
 
 ## Key Components
 
@@ -81,6 +82,38 @@ app/Repositories/
 - **JSON Responses**: Consistent response format
 - **Validation**: Request validation using Form Requests
 - **Rate Limiting**: Built-in throttling
+
+### Data Model Architecture
+
+#### Cross-Database Model Relationships
+The system implements sophisticated cross-database relationships to maintain data integrity:
+
+```php
+// VegDetails Model (connects to POS database)
+class VegDetails extends Model
+{
+    protected $connection = 'pos';
+    protected $table = 'vegDetails';
+    
+    // Same-database relationship
+    public function vegClass()
+    {
+        return $this->belongsTo(VegClass::class, 'classId', 'ID');
+    }
+    
+    // Cross-database relationship  
+    public function country()
+    {
+        return $this->setConnection('mysql')
+               ->belongsTo(Country::class, 'countryCode', 'id');
+    }
+}
+```
+
+#### Model Connection Strategy
+- **POS Models**: Product, VegDetails, VegClass (uses `pos` connection)
+- **Application Models**: Country, VegUnit, User (uses default connection)
+- **Hybrid Access**: Relationships bridge databases for seamless data access
 
 ### Background Processing
 - **Laravel Queues**: Asynchronous job processing
