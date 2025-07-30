@@ -586,6 +586,16 @@
                 init() {
                     // Restore saved filters from localStorage
                     this.restoreFilters();
+                    
+                    // Listen for product availability changes from quick search
+                    window.addEventListener('productAvailabilityChanged', (event) => {
+                        const { productCode, isAvailable } = event.detail;
+                        const product = this.products.find(p => p.CODE === productCode);
+                        if (product) {
+                            product.is_available = isAvailable;
+                            product.is_visible_on_till = isAvailable;
+                        }
+                    });
                 },
                 
                 restoreFilters() {
@@ -691,7 +701,16 @@
                             const product = this.products.find(p => p.CODE === productCode);
                             if (product) {
                                 product.is_available = isAvailable;
+                                product.is_visible_on_till = isAvailable;
                             }
+                            
+                            // Dispatch event to notify other components
+                            window.dispatchEvent(new CustomEvent('productAvailabilityChanged', {
+                                detail: {
+                                    productCode: productCode,
+                                    isAvailable: isAvailable
+                                }
+                            }));
                         } else {
                             this.showNotification('Failed to update till visibility', 'error');
                         }
@@ -1022,6 +1041,17 @@
                 quickResults: [],
                 quickSearching: false,
                 showResults: false,
+                
+                init() {
+                    // Listen for product availability changes from main table
+                    window.addEventListener('productAvailabilityChanged', (event) => {
+                        const { productCode, isAvailable } = event.detail;
+                        const product = this.quickResults.find(p => p.CODE === productCode);
+                        if (product) {
+                            product.is_visible_on_till = isAvailable;
+                        }
+                    });
+                },
 
                 async performQuickSearch() {
                     if (this.quickSearchTerm.length < 2) {
@@ -1073,12 +1103,13 @@
                             // Update the product state in quick search results
                             product.is_visible_on_till = !product.is_visible_on_till;
                             
-                            // Also update in main table if the product is visible there
-                            const mainProduct = managementSystem().products.find(p => p.CODE === product.CODE);
-                            if (mainProduct) {
-                                mainProduct.is_visible_on_till = product.is_visible_on_till;
-                                mainProduct.is_available = product.is_visible_on_till;
-                            }
+                            // Dispatch custom event to update main table
+                            window.dispatchEvent(new CustomEvent('productAvailabilityChanged', {
+                                detail: {
+                                    productCode: product.CODE,
+                                    isAvailable: product.is_visible_on_till
+                                }
+                            }));
 
                             // Show notification
                             this.showNotification(

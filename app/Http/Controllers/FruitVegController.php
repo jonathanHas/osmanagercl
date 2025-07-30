@@ -523,7 +523,7 @@ class FruitVegController extends Controller
      */
     public function getClasses()
     {
-        $classes = VegClass::orderBy('sort_order')->get();
+        $classes = VegClass::orderBy('classNum')->get();
 
         return response()->json($classes);
     }
