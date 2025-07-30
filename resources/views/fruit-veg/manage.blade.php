@@ -13,6 +13,84 @@
     <div class="py-6" x-data="managementSystem()" @update-country="handleCountryUpdate($event)" @update-unit="handleUnitUpdate($event)" @update-class="handleClassUpdate($event)">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             
+            <!-- Quick Search Widget -->
+            <div class="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg shadow-sm mb-4 p-4" x-data="quickSearchWidget()">
+                <div class="flex items-center gap-4">
+                    <div class="flex-1">
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                </svg>
+                            </div>
+                            <input type="text" 
+                                   x-model="quickSearchTerm" 
+                                   @input.debounce.300ms="performQuickSearch()"
+                                   @focus="showResults = true"
+                                   placeholder="Quick search to add products (searches all products)..."
+                                   class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-500">
+                        <span x-show="!quickSearching && quickResults.length === 0 && quickSearchTerm.length === 0">
+                            Type to search across all products
+                        </span>
+                        <span x-show="quickSearching" class="text-indigo-600">
+                            Searching...
+                        </span>
+                        <span x-show="!quickSearching && quickResults.length > 0" class="text-green-600">
+                            Found <span x-text="quickResults.length"></span> products
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- Quick Search Results -->
+                <div x-show="showResults && quickResults.length > 0" 
+                     x-cloak 
+                     class="mt-4 bg-white rounded-md shadow-lg border border-gray-200 max-h-80 overflow-y-auto">
+                    <div class="p-2">
+                        <template x-for="product in quickResults" :key="product.CODE">
+                            <div class="flex items-center justify-between p-3 hover:bg-gray-50 rounded-md">
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                            <img :src="'/fruit-veg/product-image/' + product.CODE" 
+                                                 :alt="product.NAME"
+                                                 class="w-full h-full object-cover"
+                                                 @error="$el.style.display='none'; $el.nextElementSibling.style.display='flex'">
+                                            <div class="hidden w-full h-full items-center justify-center text-gray-400 text-xs">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                                </svg>
+                                            </div>
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-sm font-medium text-gray-900 truncate" x-text="product.NAME"></p>
+                                            <p class="text-xs text-gray-500" x-text="product.CODE"></p>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="text-sm font-medium text-gray-900" x-text="'€' + parseFloat(product.current_price || 0).toFixed(2)"></p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="ml-4 flex-shrink-0">
+                                    <button @click="toggleQuickAvailability(product)" 
+                                            :class="product.is_visible_on_till ? 
+                                                    'bg-red-100 text-red-800 hover:bg-red-200' : 
+                                                    'bg-green-100 text-green-800 hover:bg-green-200'"
+                                            class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium transition-colors">
+                                        <span x-text="product.is_visible_on_till ? 'Hide' : 'Show'"></span>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                
+                <!-- Click outside to close -->
+                <div x-show="showResults" @click="showResults = false" class="fixed inset-0 z-10" style="z-index: -1;"></div>
+            </div>
+            
             <!-- Search and Filters -->
             <div class="bg-white rounded-lg shadow mb-6 p-6">
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -933,6 +1011,100 @@
                 async handleClassUpdate(event) {
                     const { productCode, classId } = event.detail;
                     await this.updateClass(productCode, classId);
+                }
+            }
+        }
+
+        // Quick Search Widget Component
+        function quickSearchWidget() {
+            return {
+                quickSearchTerm: '',
+                quickResults: [],
+                quickSearching: false,
+                showResults: false,
+
+                async performQuickSearch() {
+                    if (this.quickSearchTerm.length < 2) {
+                        this.quickResults = [];
+                        return;
+                    }
+
+                    this.quickSearching = true;
+
+                    try {
+                        const params = new URLSearchParams({
+                            search: this.quickSearchTerm,
+                            limit: 10
+                        });
+
+                        const response = await fetch('{{ route('fruit-veg.quick-search') }}?' + params, {
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+
+                        const data = await response.json();
+                        this.quickResults = data.products || [];
+                        this.showResults = true;
+                    } catch (error) {
+                        console.error('Quick search error:', error);
+                        this.quickResults = [];
+                    } finally {
+                        this.quickSearching = false;
+                    }
+                },
+
+                async toggleQuickAvailability(product) {
+                    try {
+                        const response = await fetch('{{ route('fruit-veg.availability.toggle') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify({
+                                product_code: product.CODE,
+                                is_available: !product.is_visible_on_till
+                            })
+                        });
+
+                        if (response.ok) {
+                            // Update the product state in quick search results
+                            product.is_visible_on_till = !product.is_visible_on_till;
+                            
+                            // Also update in main table if the product is visible there
+                            const mainProduct = managementSystem().products.find(p => p.CODE === product.CODE);
+                            if (mainProduct) {
+                                mainProduct.is_visible_on_till = product.is_visible_on_till;
+                                mainProduct.is_available = product.is_visible_on_till;
+                            }
+
+                            // Show notification
+                            this.showNotification(
+                                `${product.NAME} ${product.is_visible_on_till ? 'added to' : 'removed from'} till`, 
+                                'success'
+                            );
+                        } else {
+                            throw new Error('Failed to toggle availability');
+                        }
+                    } catch (error) {
+                        console.error('Toggle error:', error);
+                        this.showNotification('Failed to toggle availability', 'error');
+                    }
+                },
+
+                showNotification(message, type) {
+                    const notification = document.createElement('div');
+                    const bgColor = type === 'success' ? 'bg-green-600' : 'bg-red-600';
+                    notification.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white z-50 ${bgColor}`;
+                    notification.textContent = message;
+                    
+                    document.body.appendChild(notification);
+                    
+                    setTimeout(() => {
+                        notification.remove();
+                    }, 3000);
                 }
             }
         }

@@ -375,6 +375,62 @@ class TillVisibilityService
     }
 
     /**
+     * Search across all products in a category type regardless of current filters.
+     * This is used when a search term is provided to find products across all availability states.
+     */
+    public function searchAllProductsWithVisibility(string $categoryType, string $searchTerm, array $displayFilters = []): EloquentCollection
+    {
+        $categoryIds = self::CATEGORY_MAPPINGS[$categoryType] ?? [];
+        if (empty($categoryIds)) {
+            return collect();
+        }
+
+        // Search across ALL products in the category type, ignoring display filters for search
+        $query = Product::whereIn('CATEGORY', $categoryIds)
+            ->with(['category', 'vegDetails.country']);
+
+        // Apply search filter across all products
+        $query->where(function ($q) use ($searchTerm) {
+            $q->where('NAME', 'LIKE', "%{$searchTerm}%")
+                ->orWhere('CODE', 'LIKE', "%{$searchTerm}%")
+                ->orWhere('DISPLAY', 'LIKE', "%{$searchTerm}%");
+        });
+
+        // Get all matching products first
+        $allProducts = $query->get();
+
+        // Add visibility status to each product
+        $visibleProductIds = ProductsCat::pluck('PRODUCT')->toArray();
+        $allProducts = $allProducts->map(function ($product) use ($visibleProductIds) {
+            $product->is_visible_on_till = in_array($product->ID, $visibleProductIds);
+
+            return $product;
+        });
+
+        // Now apply display filters to the search results
+        $filteredProducts = $allProducts;
+
+        // Apply specific category filter to results
+        if (! empty($displayFilters['category']) && $displayFilters['category'] !== 'all') {
+            $specificCategory = $this->mapFilterToCategory($categoryType, $displayFilters['category']);
+            if ($specificCategory) {
+                $filteredProducts = $filteredProducts->where('CATEGORY', $specificCategory);
+            }
+        }
+
+        // Apply visibility filter to results
+        if (! empty($displayFilters['visibility']) && $displayFilters['visibility'] !== 'all') {
+            if ($displayFilters['visibility'] === 'visible') {
+                $filteredProducts = $filteredProducts->where('is_visible_on_till', true);
+            } elseif ($displayFilters['visibility'] === 'hidden') {
+                $filteredProducts = $filteredProducts->where('is_visible_on_till', false);
+            }
+        }
+
+        return $filteredProducts->values();
+    }
+
+    /**
      * Get product activity history.
      */
     public function getProductActivityHistory(string $productId, int $limit = 10): Collection

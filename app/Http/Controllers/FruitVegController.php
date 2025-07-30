@@ -235,7 +235,7 @@ class FruitVegController extends Controller
      */
     public function manage(Request $request)
     {
-        // Get products with till visibility status
+        // Get products with till visibility status (original behavior - search within filters)
         $filters = [
             'search' => $request->search,
             'category' => $request->category,
@@ -541,16 +541,31 @@ class FruitVegController extends Controller
             'limit' => 'nullable|integer|min:1|max:100',
         ]);
 
-        // Build filters
-        $filters = [
-            'search' => $request->search,
-            'category' => $request->category,
-            'visibility' => $request->availability === 'available' ? 'visible' :
-                          ($request->availability === 'unavailable' ? 'hidden' : 'all'),
-        ];
+        // Use different approach based on whether we're searching or just filtering
+        if (! empty($request->search)) {
+            // When searching: search across ALL fruit-veg products, ignoring availability filter
+            // Only apply category filter to search results (not availability)
+            $displayFilters = [
+                'category' => $request->category,
+                'visibility' => 'all', // Always show all availability states when searching
+            ];
 
-        // Get products with till visibility
-        $products = $this->tillVisibilityService->getProductsWithVisibility('fruit_veg', $filters);
+            $products = $this->tillVisibilityService->searchAllProductsWithVisibility(
+                'fruit_veg',
+                $request->search,
+                $displayFilters
+            );
+        } else {
+            // When not searching: use existing filtering behavior
+            $filters = [
+                'search' => null,
+                'category' => $request->category,
+                'visibility' => $request->availability === 'available' ? 'visible' :
+                              ($request->availability === 'unavailable' ? 'hidden' : 'all'),
+            ];
+
+            $products = $this->tillVisibilityService->getProductsWithVisibility('fruit_veg', $filters);
+        }
 
         // Load vegDetails relationships for all products
         $productCodes = $products->pluck('CODE');
@@ -593,7 +608,8 @@ class FruitVegController extends Controller
             });
 
         // Apply availability filter after loading from DB (since it's in a separate table)
-        if ($request->filled('availability') && $request->availability !== 'all') {
+        // Only apply this filter when NOT searching (search should ignore availability filter)
+        if (empty($request->search) && $request->filled('availability') && $request->availability !== 'all') {
             $products = $products->filter(function ($product) use ($request) {
                 return $request->availability === 'available' ? $product->is_available : ! $product->is_available;
             });
@@ -602,6 +618,57 @@ class FruitVegController extends Controller
         return response()->json([
             'products' => $products->values(),
             'hasMore' => $products->count() >= $limit,
+            'total' => $products->count(),
+        ]);
+    }
+
+    /**
+     * Quick search across all fruit-veg products for visibility management.
+     * This is used by the quick search widget and always searches across all products.
+     */
+    public function quickSearch(Request $request)
+    {
+        $request->validate([
+            'search' => 'required|string|min:2|max:100',
+            'limit' => 'nullable|integer|min:1|max:20',
+        ]);
+
+        // Quick search always searches across ALL products, ignoring filters
+        $products = $this->tillVisibilityService->searchAllProductsWithVisibility(
+            'fruit_veg',
+            $request->search,
+            ['category' => 'all', 'visibility' => 'all'] // Always search all
+        );
+
+        // Limit results for quick search (smaller limit for performance)
+        $limit = $request->get('limit', 10);
+        $products = $products->take($limit);
+
+        // Load vegDetails relationships
+        $productCodes = $products->pluck('CODE');
+        $vegDetailsCollection = VegDetails::whereIn('product_code', $productCodes)
+            ->with(['country', 'vegUnit', 'vegClass'])
+            ->get()
+            ->keyBy('product_code');
+
+        // Attach vegDetails to each product
+        $products = $products->map(function ($product) use ($vegDetailsCollection) {
+            $product->veg_details = $vegDetailsCollection->get($product->CODE);
+
+            // Add current price
+            $lastPriceRecord = DB::table('veg_price_history')
+                ->where('product_code', $product->CODE)
+                ->orderBy('changed_at', 'desc')
+                ->first();
+
+            $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
+            $product->is_available = $product->is_visible_on_till; // Maintain compatibility
+
+            return $product;
+        });
+
+        return response()->json([
+            'products' => $products->values(),
             'total' => $products->count(),
         ]);
     }
