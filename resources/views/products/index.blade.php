@@ -106,19 +106,21 @@
                     ]
                 ]">
                 
-                @if($showSuppliers && $suppliers->count() > 0)
-                    <div class="mt-4">
-                        <label for="supplier_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Filter by Supplier</label>
-                        <select name="supplier_id" id="supplier_id" class="rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600">
-                            <option value="">All Suppliers</option>
+                <div id="supplier-dropdown" class="mt-4 {{ $showSuppliers ? '' : 'hidden' }}">
+                    <label for="supplier_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Filter by Supplier</label>
+                    <select name="supplier_id" id="supplier_id" class="rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600">
+                        <option value="">All Suppliers</option>
+                        @if($suppliers->count() > 0)
                             @foreach($suppliers as $supplier)
                                 <option value="{{ $supplier->SupplierID }}" {{ $supplierId == $supplier->SupplierID ? 'selected' : '' }}>
                                     {{ $supplier->Supplier }}
                                 </option>
                             @endforeach
-                        </select>
-                    </div>
-                @endif
+                        @else
+                            <option value="" disabled>No suppliers available</option>
+                        @endif
+                    </select>
+                </div>
 
                 @if($categories->count() > 0)
                     <div class="mt-4">
@@ -287,4 +289,30 @@
             </div>
         </div>
     </div>
+
+    @push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get the show suppliers checkbox and supplier dropdown
+            const showSuppliersCheckbox = document.querySelector('input[name="show_suppliers"]');
+            const supplierDropdown = document.getElementById('supplier-dropdown');
+            
+            if (showSuppliersCheckbox && supplierDropdown) {
+                // Add event listener to toggle supplier dropdown
+                showSuppliersCheckbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        supplierDropdown.classList.remove('hidden');
+                    } else {
+                        supplierDropdown.classList.add('hidden');
+                        // Reset supplier selection when hiding
+                        const supplierSelect = document.getElementById('supplier_id');
+                        if (supplierSelect) {
+                            supplierSelect.value = '';
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+    @endpush
 </x-admin-layout>

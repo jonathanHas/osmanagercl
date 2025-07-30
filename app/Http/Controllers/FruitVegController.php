@@ -552,6 +552,20 @@ class FruitVegController extends Controller
         // Get products with till visibility
         $products = $this->tillVisibilityService->getProductsWithVisibility('fruit_veg', $filters);
 
+        // Load vegDetails relationships for all products
+        $productCodes = $products->pluck('CODE');
+        $vegDetailsCollection = VegDetails::whereIn('product_code', $productCodes)
+            ->with(['country', 'vegUnit', 'vegClass'])
+            ->get()
+            ->keyBy('product_code');
+
+        // Attach vegDetails to each product
+        $products = $products->map(function ($product) use ($vegDetailsCollection) {
+            $product->veg_details = $vegDetailsCollection->get($product->CODE);
+
+            return $product;
+        });
+
         // Apply pagination
         $offset = $request->get('offset', 0);
         $limit = $request->get('limit', 50);

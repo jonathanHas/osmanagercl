@@ -16,6 +16,9 @@ class DatabaseSeeder extends Seeder
         // Create admin user for testing
         $this->call(AdminUserSeeder::class);
 
+        // Seed label templates
+        $this->call(LabelTemplateSeeder::class);
+
         // Create additional test users if needed
         // User::factory(10)->create();
 

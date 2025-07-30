@@ -35,6 +35,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/products/{id}/sales-data', [ProductController::class, 'salesData'])->name('products.sales-data');
     Route::get('/products/{id}/refresh-udea-pricing', [ProductController::class, 'refreshUdeaPricing'])->name('products.refresh-udea-pricing');
     Route::get('/products/udea-pricing', [ProductController::class, 'getUdeaPricing'])->name('products.udea-pricing');
+    Route::patch('/products/{id}/name', [ProductController::class, 'updateName'])->name('products.update-name');
     Route::patch('/products/{id}/tax', [ProductController::class, 'updateTax'])->name('products.update-tax');
     Route::patch('/products/{id}/price', [ProductController::class, 'updatePrice'])->name('products.update-price');
     Route::patch('/products/{id}/cost', [ProductController::class, 'updateCost'])->name('products.update-cost');

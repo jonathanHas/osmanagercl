@@ -1,8 +1,42 @@
 <x-admin-layout>
     <x-slot name="header">
         <div class="flex justify-between items-center">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">{{ $product->NAME }}</h1>
+            <div class="flex-1">
+                <div class="flex items-center gap-3">
+                    <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">{{ $product->NAME }}</h1>
+                    <button type="button" 
+                            onclick="toggleNameEdit()" 
+                            class="inline-flex items-center p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                        </svg>
+                    </button>
+                </div>
+                
+                <!-- Name Edit Form (Hidden by default) -->
+                <form method="POST" action="{{ route('products.update-name', $product->ID) }}" id="nameEditForm" class="hidden mt-2">
+                    @csrf
+                    @method('PATCH')
+                    <div class="flex items-center gap-2">
+                        <input type="text" 
+                               name="product_name" 
+                               id="productNameInput"
+                               value="{{ $product->NAME }}" 
+                               class="text-2xl font-bold bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-3 py-1 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                               maxlength="255"
+                               required>
+                        <button type="submit" 
+                                class="inline-flex items-center px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded transition-colors">
+                            Save
+                        </button>
+                        <button type="button" 
+                                onclick="toggleNameEdit()" 
+                                class="inline-flex items-center px-3 py-1 bg-gray-500 hover:bg-gray-600 text-white text-sm font-medium rounded transition-colors">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+                
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
                     SKU: {{ $product->CODE }} 
                     @if($product->REFERENCE)
@@ -144,51 +178,8 @@
                 </div>
             </div>
 
-            <!-- Price Edit Form (Hidden by default) -->
-            <div id="priceEditForm" class="hidden bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
-                <div class="p-6">
-                    <h3 class="text-lg font-semibold mb-4">Edit Product Price</h3>
-                    <form method="POST" action="{{ route('products.update-price', $product->ID) }}" onsubmit="return confirmPriceUpdate()">
-                        @csrf
-                        @method('PATCH')
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label for="net_price" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Net Price (excl. VAT)</label>
-                                <input type="number" 
-                                       name="net_price" 
-                                       id="net_price" 
-                                       value="{{ $product->PRICESELL }}" 
-                                       step="0.01" 
-                                       min="0" 
-                                       max="999999.99"
-                                       oninput="calculateGrossPrice()"
-                                       class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600"
-                                       required>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">VAT Amount</label>
-                                <p id="vatAmount" class="mt-1 px-3 py-2 text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-700 rounded-md">
-                                    €{{ number_format($product->getVatAmount(), 2) }}
-                                </p>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Gross Price (incl. VAT)</label>
-                                <p id="grossPrice" class="mt-1 px-3 py-2 text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-700 rounded-md font-semibold">
-                                    {{ $product->formatted_price_with_vat }}
-                                </p>
-                            </div>
-                        </div>
-                        <div class="mt-4 flex gap-2">
-                            <button type="submit" class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs uppercase tracking-widest rounded-md transition">
-                                Update Price
-                            </button>
-                            <button type="button" onclick="togglePriceEdit()" class="inline-flex items-center px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 font-semibold text-xs uppercase tracking-widest rounded-md transition">
-                                Cancel
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
+            <!-- Enhanced Price Editor Modal -->
+            <x-product-price-editor :product="$product" />
             
             <!-- Product Details Tabs -->
             <x-tab-group 
@@ -512,30 +503,45 @@
         const vatRate = {{ $product->getVatRate() }};
         
         function togglePriceEdit() {
-            const form = document.getElementById('priceEditForm');
-            form.classList.toggle('hidden');
-        }
-        
-        function calculateGrossPrice() {
-            const netPrice = parseFloat(document.getElementById('net_price').value) || 0;
-            const vatAmount = netPrice * vatRate;
-            const grossPrice = netPrice + vatAmount;
+            console.log('togglePriceEdit called');
             
-            document.getElementById('vatAmount').textContent = '€' + vatAmount.toFixed(2);
-            document.getElementById('grossPrice').textContent = '€' + grossPrice.toFixed(2);
-        }
-        
-        function confirmPriceUpdate() {
-            const originalPrice = {{ $product->PRICESELL }};
-            const newPrice = parseFloat(document.getElementById('net_price').value);
+            // Try to find the modal element
+            const modal = document.getElementById('priceEditModal');
+            console.log('Modal element found:', modal);
             
-            if (Math.abs(originalPrice - newPrice) < 0.01) {
-                alert('Price has not changed.');
-                return false;
+            if (modal) {
+                modal.classList.remove('hidden');
+                console.log('Modal should be visible now');
+                
+                // Focus on the appropriate input after a short delay
+                setTimeout(() => {
+                    const grossInput = document.getElementById('gross_price');
+                    if (grossInput) {
+                        grossInput.focus();
+                        console.log('Focused on gross price input');
+                    }
+                }, 100);
+            } else {
+                console.error('Price editor modal not found');
+                alert('Price editor modal not found. Please refresh the page.');
             }
-            
-            return confirm(`Update price from €${originalPrice.toFixed(2)} to €${newPrice.toFixed(2)}?`);
         }
+        
+        // Make sure togglePriceEdit is globally available  
+        window.togglePriceEdit = togglePriceEdit;
+        
+        function toggleNameEdit() {
+            const form = document.getElementById('nameEditForm');
+            const input = document.getElementById('productNameInput');
+            form.classList.toggle('hidden');
+            
+            // Focus the input field when showing the form
+            if (!form.classList.contains('hidden')) {
+                setTimeout(() => input.focus(), 50);
+            }
+        }
+        
+        // Legacy price functions removed - now using enhanced price editor modal
 
         let salesChart = null;
         const productId = '{{ $product->ID }}';
@@ -808,7 +814,7 @@
             form.submit();
         }
 
-        // Update Product Price
+        // Update Product Price (net price input)
         function updateProductPrice(newPrice) {
             if (!confirm(`Update product selling price to €${parseFloat(newPrice).toFixed(2)} (net)?`)) {
                 return;
@@ -832,6 +838,13 @@
             methodInput.name = '_method';
             methodInput.value = 'PATCH';
             form.appendChild(methodInput);
+            
+            // Add price input mode
+            const modeInput = document.createElement('input');
+            modeInput.type = 'hidden';
+            modeInput.name = 'price_input_mode';
+            modeInput.value = 'net';
+            form.appendChild(modeInput);
             
             // Add net price
             const priceInput = document.createElement('input');
@@ -879,12 +892,26 @@
             methodInput.value = 'PATCH';
             form.appendChild(methodInput);
             
-            // Add net price (calculated from gross) - use full precision
-            const priceInput = document.createElement('input');
-            priceInput.type = 'hidden';
-            priceInput.name = 'net_price';
-            priceInput.value = netPrice;
-            form.appendChild(priceInput);
+            // Add price input mode
+            const modeInput = document.createElement('input');
+            modeInput.type = 'hidden';
+            modeInput.name = 'price_input_mode';
+            modeInput.value = 'gross';
+            form.appendChild(modeInput);
+            
+            // Add gross price
+            const grossPriceInput = document.createElement('input');
+            grossPriceInput.type = 'hidden';
+            grossPriceInput.name = 'gross_price';
+            grossPriceInput.value = grossPrice;
+            form.appendChild(grossPriceInput);
+            
+            // Add calculated net price for validation
+            const netPriceInput = document.createElement('input');
+            netPriceInput.type = 'hidden';
+            netPriceInput.name = 'final_net_price';
+            netPriceInput.value = netPrice;
+            form.appendChild(netPriceInput);
             
             document.body.appendChild(form);
             form.submit();

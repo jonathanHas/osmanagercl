@@ -33,6 +33,16 @@ class VegDetails extends Model
     public $timestamps = true;
 
     /**
+     * The accessors to append to the model's array form.
+     *
+     * @var array<int, string>
+     */
+    protected $appends = [
+        'class_name',
+        'unit_name',
+    ];
+
+    /**
      * Get the product that owns the veg details.
      */
     public function product()

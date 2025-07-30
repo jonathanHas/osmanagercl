@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Enhanced Product Price Editor**: Complete redesign of product price editing interface
+  - Dual input modes: gross price (inc VAT) and net price (ex VAT) with toggle switching
+  - Real-time pricing breakdown showing cost, net price, VAT amount, gross price, and profit margins
+  - Color-coded margin analysis (red <10%, yellow 10-20%, green >20%)  
+  - Modal dialog interface replacing inline form for better UX
+  - Price change preview before submission
+  - Visual consistency with product creation form
+  - Improved validation and error handling
+  - Automatic VAT conversion using tax category rates
+- **Enhanced Product Search & Filtering**: Improved supplier filtering on products page
+  - Dynamic supplier dropdown that appears instantly when "Show suppliers" is checked
+  - No form submission required to populate dropdown options
+  - Suppliers always loaded for immediate availability
+  - Automatic dropdown reset when checkbox is unchecked
+  - Better performance with efficient loading strategy
+- **VAT Handling Improvements**: Fixed product creation and editing to properly handle VAT calculations
+  - Product creation now correctly converts VAT-inclusive prices to VAT-exclusive for database storage
+  - Enhanced price update methods support both gross and net price inputs
+  - Consistent VAT calculation throughout product management workflows
 - **Product Detail Management System**: Complete unit and class editing functionality for fruit-veg products
   - Unit editing with inline dropdown (kilogram, each, bunch, punnet, bag)
   - Quality class assignment (Extra, I, II, III) with inline editing  

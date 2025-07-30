@@ -244,6 +244,15 @@ For common issues and solutions, see [Troubleshooting Guide](./docs/development/
 
 ## Key Features
 
+### Product Management
+Comprehensive product catalog management with inline editing capabilities.
+- **Inline Editing**: Edit product names, tax categories, prices, and costs directly from product detail pages
+- **Stocking Management**: Toggle products in/out of stock management operations with visual indicators
+- **Delivery Integration**: Create products directly from delivery items with pre-populated data
+- **Smart Navigation**: Context-aware navigation maintaining delivery workflow state
+- **Validation & Error Handling**: Robust form validation with user-friendly error messages
+See [Product Management Documentation](./docs/features/product-management.md).
+
 ### Supplier Integration
 External supplier connectivity for images, pricing, and product data.
 See [Supplier Integration Documentation](./docs/features/supplier-integration.md).

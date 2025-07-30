@@ -88,12 +88,12 @@ class ProductController extends Controller
         $showSuppliers = $request->boolean('show_suppliers');
         $perPage = $request->get('per_page', 20);
 
-        // Get suppliers for dropdown if needed, filtered by current search criteria
-        $suppliers = $showSuppliers ? $this->productRepository->getAllSuppliersWithProducts(
+        // Get suppliers for dropdown (always load for immediate availability when checkbox is toggled)
+        $suppliers = $this->productRepository->getAllSuppliersWithProducts(
             stockedOnly: $stockedOnly,
             inStockOnly: $inStockOnly,
             activeOnly: $activeOnly
-        ) : collect();
+        );
 
         // Get categories for dropdown, filtered by current search criteria
         $categories = $this->productRepository->getAllCategoriesWithProducts(
@@ -187,6 +187,31 @@ class ProductController extends Controller
     }
 
     /**
+     * Update the name for a product.
+     */
+    public function updateName(Request $request, string $id): RedirectResponse
+    {
+        $request->validate([
+            'product_name' => 'required|string|max:255',
+        ]);
+
+        $product = $this->productRepository->findById($id);
+
+        if (! $product) {
+            abort(404, 'Product not found');
+        }
+
+        // Update the product's name in the POS database
+        $product->update([
+            'NAME' => trim($request->product_name),
+        ]);
+
+        return redirect()
+            ->route('products.show', $id)
+            ->with('success', 'Product name updated successfully.');
+    }
+
+    /**
      * Update the tax category for a product.
      */
     public function updateTax(Request $request, string $id): RedirectResponse
@@ -245,9 +270,23 @@ class ProductController extends Controller
      */
     public function updatePrice(Request $request, string $id): RedirectResponse
     {
-        $request->validate([
-            'net_price' => 'required|numeric|min:0|max:999999.9999',
-        ]);
+        // Validate based on input mode
+        $rules = [
+            'price_input_mode' => 'required|in:gross,net',
+        ];
+
+        if ($request->price_input_mode === 'gross') {
+            $rules['gross_price'] = 'required|numeric|min:0|max:999999.9999';
+        } else {
+            $rules['net_price'] = 'required|numeric|min:0|max:999999.9999';
+        }
+
+        // Also accept final_net_price as fallback (for JavaScript-calculated values)
+        if ($request->has('final_net_price')) {
+            $rules['final_net_price'] = 'required|numeric|min:0|max:999999.9999';
+        }
+
+        $request->validate($rules);
 
         $product = $this->productRepository->findById($id);
 
@@ -255,17 +294,33 @@ class ProductController extends Controller
             abort(404, 'Product not found');
         }
 
+        // Calculate net price based on input mode
+        if ($request->price_input_mode === 'gross') {
+            // User entered gross price, convert to net
+            $taxCategory = TaxCategory::with('primaryTax')->find($product->TAXCAT);
+            $vatRate = $taxCategory?->primaryTax?->RATE ?? 0.0;
+            $netPrice = $vatRate > 0 ? $request->gross_price / (1 + $vatRate) : $request->gross_price;
+        } elseif ($request->has('final_net_price')) {
+            // Use the JavaScript-calculated net price (most accurate)
+            $netPrice = $request->final_net_price;
+        } else {
+            // User entered net price directly
+            $netPrice = $request->net_price;
+        }
+
         // Update the product's net price (PRICESELL is stored without VAT)
         $product->update([
-            'PRICESELL' => $request->net_price,
+            'PRICESELL' => $netPrice,
         ]);
 
-        // Log the price update event
+        // Log the price update event with additional context
         LabelLog::logPriceUpdate($product->CODE);
+
+        $inputMode = $request->price_input_mode === 'gross' ? 'gross price' : 'net price';
 
         return redirect()
             ->route('products.show', $id)
-            ->with('success', 'Price updated successfully.');
+            ->with('success', "Price updated successfully from {$inputMode}.");
     }
 
     /**
@@ -434,6 +489,14 @@ class ProductController extends Controller
 
             DB::connection('pos')->transaction(function () use ($request, $productId) {
 
+                // Get VAT rate for the selected tax category to convert inclusive price to exclusive
+                $taxCategory = TaxCategory::with('primaryTax')->find($request->tax_category);
+                $vatRate = $taxCategory?->primaryTax?->RATE ?? 0.0;
+
+                // Convert VAT-inclusive price to VAT-exclusive price for storage
+                // PRICESELL should be stored ex-VAT as it's used in getGrossPrice() calculation
+                $priceExVat = $vatRate > 0 ? $request->price_sell / (1 + $vatRate) : $request->price_sell;
+
                 // Create the product with essential fields only
                 $product = Product::create([
                     'ID' => $productId,
@@ -442,7 +505,7 @@ class ProductController extends Controller
                     'REFERENCE' => $request->code, // Set reference same as barcode (CODE)
                     'CATEGORY' => $request->category,
                     'PRICEBUY' => $request->price_buy,
-                    'PRICESELL' => $request->price_sell,
+                    'PRICESELL' => $priceExVat, // Store ex-VAT price
                     'TAXCAT' => $request->tax_category,
                 ]);
 

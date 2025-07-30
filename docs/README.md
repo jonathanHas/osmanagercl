@@ -48,6 +48,10 @@ Detailed documentation for each major feature.
 
 - **[Product Management](./features/product-management.md)** - Product catalog operations
   - CRUD operations with UUID support
+  - Inline editing for product names, pricing, and tax categories
+  - Stocking management with visual indicators
+  - Delivery-integrated product creation workflows
+  - Smart context-aware navigation
 
 - **[Packaging Structure](./features/packaging-structure.md)** - Retail vs wholesale packaging
   - Units per retail package vs packages per case
@@ -75,6 +79,8 @@ Production deployment and operations.
 ### 🔌 API Reference
 Complete API documentation.
 
+- **[Product Endpoints](./api/product-endpoints.md)** - Product management API endpoints
+- **[Fruit & Veg Endpoints](./api/fruit-veg-endpoints.md)** - Specialized fruit and vegetable operations
 - **[API Endpoints](./api/endpoints.md)** - All available endpoints
 - **[Authentication](./api/authentication.md)** - API authentication methods
 - **[Webhooks](./api/webhooks.md)** - Webhook events and payloads
