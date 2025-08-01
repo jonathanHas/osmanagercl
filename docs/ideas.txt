@@ -1,0 +1,2 @@
+
+a udea product quick add feature that would allow the user to scan a products barcode or enter the udeas product code and would retrieve the relevant data to enter the product details by scrapping the info from the website. we already have the code for scrapping the info, and from what I can see the url that we make can take either the barcode or supplier code

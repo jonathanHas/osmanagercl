@@ -3,6 +3,7 @@
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\FruitVegController;
 use App\Http\Controllers\LabelAreaController;
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
@@ -79,6 +80,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/product/{code}/sales-data', [FruitVegController::class, 'salesData'])->name('product.sales-data');
         Route::post('/product/{code}/update-image', [FruitVegController::class, 'updateProductImage'])->name('product.update-image');
         Route::get('/product-image/{code}', [FruitVegController::class, 'productImage'])->name('product-image');
+        Route::get('/sales', [FruitVegController::class, 'sales'])->name('sales');
+        Route::get('/sales/data', [FruitVegController::class, 'getSalesData'])->name('sales.data');
     });
 
     // Delivery management routes
@@ -92,6 +95,19 @@ Route::middleware('auth')->group(function () {
     Route::post('/deliveries/{delivery}/cancel', [DeliveryController::class, 'cancel'])->name('deliveries.cancel');
     Route::get('/deliveries/{delivery}/export-discrepancies', [DeliveryController::class, 'exportDiscrepancies'])->name('deliveries.export-discrepancies');
     Route::post('/delivery-items/{item}/refresh-barcode', [DeliveryController::class, 'refreshBarcode'])->name('delivery-items.refresh-barcode');
+
+    // Order Management routes
+    Route::resource('orders', OrderController::class);
+    Route::post('/orders/{order}/complete', [OrderController::class, 'complete'])->name('orders.complete');
+    Route::post('/orders/{order}/duplicate', [OrderController::class, 'duplicate'])->name('orders.duplicate');
+    Route::get('/orders/{order}/export', [OrderController::class, 'export'])->name('orders.export');
+    Route::get('/orders/{order}/statistics', [OrderController::class, 'statistics'])->name('orders.statistics');
+    Route::patch('/order-items/{orderItem}/quantity', [OrderController::class, 'updateQuantity'])->name('order-items.update-quantity');
+    Route::patch('/order-items/{orderItem}/cases', [OrderController::class, 'updateCaseQuantity'])->name('order-items.update-cases');
+    Route::patch('/order-items/{orderItem}/cost', [OrderController::class, 'updateItemCost'])->name('order-items.update-cost');
+    Route::post('/orders/{order}/bulk-update', [OrderController::class, 'bulkUpdate'])->name('orders.bulk-update');
+    Route::post('/orders/{order}/auto-approve-safe', [OrderController::class, 'autoApproveSafeItems'])->name('orders.auto-approve-safe');
+    Route::post('/products/update-priority', [OrderController::class, 'updateProductPriority'])->name('products.update-priority');
 
     // User Management routes
     Route::resource('users', UserManagementController::class);

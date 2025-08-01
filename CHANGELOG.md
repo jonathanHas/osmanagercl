@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Enhanced Fruit & Veg Label Printing**: Improved label design and formatting
+  - Removed label borders for cleaner appearance when cutting
+  - Enhanced padding (4mm) and margins (2mm) for easier label cutting
+  - Smart unit display: shows "each" instead of "per ea" for per-unit items
+  - Left-aligned product names for better readability
+  - Print-optimized CSS to hide navigation buttons during printing
+  - Professional borderless design for retail use
 - **Enhanced Product Price Editor**: Complete redesign of product price editing interface
   - Dual input modes: gross price (inc VAT) and net price (ex VAT) with toggle switching
   - Real-time pricing breakdown showing cost, net price, VAT amount, gross price, and profit margins

@@ -137,4 +137,151 @@ class SalesRepository
             ->sales()
             ->exists();
     }
+
+    /**
+     * Get sales data for F&V products within a date range.
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    public function getFruitVegSalesByDateRange(Carbon $startDate, Carbon $endDate)
+    {
+        // Use efficient JOIN instead of whereHas() for much better performance
+        return DB::connection('pos')
+            ->table('STOCKDIARY as s')
+            ->join('PRODUCTS as p', 's.PRODUCT', '=', 'p.ID')
+            ->where('s.REASON', StockDiary::REASON_SALE)
+            ->whereBetween('s.DATENEW', [$startDate, $endDate])
+            ->whereIn('p.CATEGORY', ['SUB1', 'SUB2', 'SUB3'])
+            ->select(
+                's.PRODUCT',
+                'p.NAME as product_name',
+                'p.CODE as product_code',
+                'p.CATEGORY as product_category',
+                DB::raw('SUM(ABS(s.UNITS)) as total_units'),
+                DB::raw('SUM(ABS(s.UNITS) * s.PRICE) as total_revenue'),
+                DB::raw('DATE(s.DATENEW) as sale_date')
+            )
+            ->groupBy('s.PRODUCT', 'p.NAME', 'p.CODE', 'p.CATEGORY', 'sale_date')
+            ->orderBy('sale_date', 'asc') // Changed to asc for chronological order
+            ->orderBy('total_units', 'desc')
+            ->get();
+    }
+
+    /**
+     * Get aggregated F&V sales statistics for a date range.
+     *
+     * @return array
+     */
+    public function getFruitVegSalesStats(Carbon $startDate, Carbon $endDate)
+    {
+        // Single optimized query with JOIN for all statistics
+        $sales = DB::connection('pos')
+            ->table('STOCKDIARY as s')
+            ->join('PRODUCTS as p', 's.PRODUCT', '=', 'p.ID')
+            ->where('s.REASON', StockDiary::REASON_SALE)
+            ->whereBetween('s.DATENEW', [$startDate, $endDate])
+            ->whereIn('p.CATEGORY', ['SUB1', 'SUB2', 'SUB3'])
+            ->selectRaw('
+                SUM(ABS(s.UNITS)) as total_units,
+                SUM(ABS(s.UNITS) * s.PRICE) as total_revenue,
+                COUNT(DISTINCT s.PRODUCT) as unique_products,
+                COUNT(*) as total_transactions
+            ')
+            ->first();
+
+        // Get category breakdown in single query
+        $categoryBreakdown = DB::connection('pos')
+            ->table('STOCKDIARY as s')
+            ->join('PRODUCTS as p', 's.PRODUCT', '=', 'p.ID')
+            ->where('s.REASON', StockDiary::REASON_SALE)
+            ->whereBetween('s.DATENEW', [$startDate, $endDate])
+            ->whereIn('p.CATEGORY', ['SUB1', 'SUB2', 'SUB3'])
+            ->selectRaw('
+                p.CATEGORY,
+                SUM(ABS(s.UNITS)) as category_units,
+                SUM(ABS(s.UNITS) * s.PRICE) as category_revenue
+            ')
+            ->groupBy('p.CATEGORY')
+            ->get()
+            ->mapWithKeys(function ($item) {
+                $categoryName = match ($item->CATEGORY) {
+                    'SUB1' => 'Fruits',
+                    'SUB2' => 'Vegetables',
+                    'SUB3' => 'Veg Barcoded',
+                    default => 'Other'
+                };
+
+                return [$categoryName => [
+                    'units' => (float) $item->category_units,
+                    'revenue' => (float) $item->category_revenue,
+                ]];
+            });
+
+        return [
+            'total_units' => (float) ($sales->total_units ?? 0),
+            'total_revenue' => (float) ($sales->total_revenue ?? 0),
+            'unique_products' => (int) ($sales->unique_products ?? 0),
+            'total_transactions' => (int) ($sales->total_transactions ?? 0),
+            'category_breakdown' => $categoryBreakdown,
+        ];
+    }
+
+    /**
+     * Get top selling F&V products for a date range.
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    public function getTopFruitVegProducts(Carbon $startDate, Carbon $endDate, int $limit = 10)
+    {
+        // Optimized JOIN query - much faster than whereHas()
+        return DB::connection('pos')
+            ->table('STOCKDIARY as s')
+            ->join('PRODUCTS as p', 's.PRODUCT', '=', 'p.ID')
+            ->where('s.REASON', StockDiary::REASON_SALE)
+            ->whereBetween('s.DATENEW', [$startDate, $endDate])
+            ->whereIn('p.CATEGORY', ['SUB1', 'SUB2', 'SUB3'])
+            ->select(
+                's.PRODUCT',
+                'p.NAME as product_name',
+                'p.CODE as product_code',
+                'p.CATEGORY as product_category',
+                DB::raw('SUM(ABS(s.UNITS)) as total_units'),
+                DB::raw('SUM(ABS(s.UNITS) * s.PRICE) as total_revenue'),
+                DB::raw('AVG(s.PRICE) as avg_price')
+            )
+            ->groupBy('s.PRODUCT', 'p.NAME', 'p.CODE', 'p.CATEGORY')
+            ->orderByDesc('total_units')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Get daily sales breakdown for F&V products.
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    public function getFruitVegDailySales(Carbon $startDate, Carbon $endDate)
+    {
+        // Optimized JOIN query for daily sales
+        return DB::connection('pos')
+            ->table('STOCKDIARY as s')
+            ->join('PRODUCTS as p', 's.PRODUCT', '=', 'p.ID')
+            ->where('s.REASON', StockDiary::REASON_SALE)
+            ->whereBetween('s.DATENEW', [$startDate, $endDate])
+            ->whereIn('p.CATEGORY', ['SUB1', 'SUB2', 'SUB3'])
+            ->selectRaw('
+                DATE(s.DATENEW) as sale_date,
+                SUM(ABS(s.UNITS)) as daily_units,
+                SUM(ABS(s.UNITS) * s.PRICE) as daily_revenue,
+                COUNT(DISTINCT s.PRODUCT) as products_sold
+            ')
+            ->groupBy('sale_date')
+            ->orderBy('sale_date', 'asc') // Changed to asc for chronological order
+            ->get()
+            ->map(function ($item) {
+                $item->sale_date = Carbon::parse($item->sale_date);
+
+                return $item;
+            });
+    }
 }

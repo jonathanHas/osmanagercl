@@ -11,6 +11,7 @@ use App\Models\VegPrintQueue;
 use App\Models\VegUnit;
 use App\Repositories\SalesRepository;
 use App\Services\TillVisibilityService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -846,5 +847,141 @@ class FruitVegController extends Controller
 
                 return $product;
             });
+    }
+
+    /**
+     * Display the F&V sales page.
+     */
+    public function sales(Request $request)
+    {
+        // Default to last 7 days for faster loading
+        $startDate = $request->get('start_date')
+            ? Carbon::parse($request->get('start_date'))
+            : Carbon::now()->subDays(7)->startOfDay();
+
+        $endDate = $request->get('end_date')
+            ? Carbon::parse($request->get('end_date'))
+            : Carbon::now()->endOfDay();
+
+        // Load minimal data for fast initial page load - only basic stats
+        $stats = [
+            'total_units' => 0,
+            'total_revenue' => 0, 
+            'unique_products' => 0,
+            'total_transactions' => 0,
+            'category_breakdown' => []
+        ];
+        $dailySales = [];
+
+        // Don't load any heavy data on initial load - everything via AJAX
+        $initialSalesData = [];
+
+        return view('fruit-veg.sales', compact(
+            'stats',
+            'dailySales',
+            'startDate',
+            'endDate',
+            'initialSalesData'
+        ));
+    }
+
+    /**
+     * Get sales data for AJAX requests.
+     */
+    public function getSalesData(Request $request)
+    {
+        $startDate = $request->get('start_date')
+            ? Carbon::parse($request->get('start_date'))
+            : Carbon::now()->subDays(7)->startOfDay();
+
+        $endDate = $request->get('end_date')
+            ? Carbon::parse($request->get('end_date'))
+            : Carbon::now()->endOfDay();
+
+        $search = $request->get('search', '');
+        $limit = $request->get('limit', 50);
+
+        \Log::info('Sales data request', [
+            'start_date' => $startDate->toDateString(),
+            'end_date' => $endDate->toDateString(),
+            'search' => $search,
+            'limit' => $limit
+        ]);
+
+        try {
+            // Get sales data
+            $sales = $this->salesRepository->getFruitVegSalesByDateRange($startDate, $endDate);
+            \Log::info('Raw sales data retrieved', ['count' => $sales->count()]);
+
+            // Apply search filter if provided (now using optimized query results)
+            if ($search) {
+                $sales = $sales->filter(function ($sale) use ($search) {
+                    return stripos($sale->product_name, $search) !== false ||
+                            stripos($sale->product_code, $search) !== false;
+                });
+                \Log::info('Filtered sales data', ['count' => $sales->count(), 'search' => $search]);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error getting sales data', [
+                'error' => $e->getMessage(),
+                'start_date' => $startDate->toDateString(),
+                'end_date' => $endDate->toDateString()
+            ]);
+            return response()->json(['error' => 'Database error: ' . $e->getMessage()], 500);
+        }
+
+        // Group by product and aggregate (now using optimized query results)
+        $productSales = $sales->groupBy('PRODUCT')->map(function ($productGroup, $productId) {
+            $firstItem = $productGroup->first();
+            $totalUnits = $productGroup->sum('total_units');
+            $totalRevenue = $productGroup->sum('total_revenue');
+
+            return [
+                'product_id' => $productId,
+                'product_name' => $firstItem->product_name ?? 'Unknown Product',
+                'product_code' => $firstItem->product_code ?? $productId,
+                'category' => $firstItem->product_category ?? 'Unknown',
+                'category_name' => match ($firstItem->product_category ?? 'Unknown') {
+                    'SUB1' => 'Fruits',
+                    'SUB2' => 'Vegetables',
+                    'SUB3' => 'Veg Barcoded',
+                    default => 'Other'
+                },
+                'total_units' => (float) $totalUnits,
+                'total_revenue' => (float) $totalRevenue,
+                'avg_price' => $totalUnits > 0 ? $totalRevenue / $totalUnits : 0,
+                'daily_sales' => $productGroup->map(function ($sale) {
+                    return [
+                        'date' => $sale->sale_date,
+                        'units' => (float) $sale->total_units,
+                        'revenue' => (float) $sale->total_revenue,
+                    ];
+                })->sortBy('date')->values(), // Changed to sortBy for chronological order
+            ];
+        })->sortByDesc('total_units')->take($limit)->values();
+
+        // Get updated statistics
+        $stats = $this->salesRepository->getFruitVegSalesStats($startDate, $endDate);
+
+        // Get daily breakdown for charts
+        $dailySales = $this->salesRepository->getFruitVegDailySales($startDate, $endDate);
+
+        \Log::info('Sales data response', [
+            'raw_sales_count' => $sales->count(),
+            'product_sales_count' => $productSales->count(),
+            'stats_units' => $stats['total_units'],
+            'daily_sales_count' => $dailySales->count()
+        ]);
+
+        return response()->json([
+            'sales' => $productSales,
+            'stats' => $stats,
+            'daily_sales' => $dailySales,
+            'date_range' => [
+                'start' => $startDate->format('Y-m-d'),
+                'end' => $endDate->format('Y-m-d'),
+                'days' => $startDate->diffInDays($endDate) + 1,
+            ],
+        ]);
     }
 }

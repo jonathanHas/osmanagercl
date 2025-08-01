@@ -28,10 +28,13 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 
 ### 3. Label Printing System
 - **Modern Label Layout**: 2-column × 8-row layout with 16 labels per A4 page
-- **Optimized for Cutting**: Minimal gaps (0.5mm) between labels for easy cutting
+- **Optimized for Cutting**: Enhanced padding (4mm) and margins (2mm) for easy label cutting
+- **Clean Design**: Borderless labels with improved cutting margins for professional appearance
 - **Professional Typography**: Modern font stack with Segoe UI, Roboto, Ubuntu fallbacks
-- **Auto-scaling Product Names**: Dynamic font sizing (8pt-40pt) to maximize space usage
-- **Compact Information Display**: Price with unit on same line, origin and class combined
+- **Auto-scaling Product Names**: Dynamic font sizing (8pt-40pt) to maximize space usage, left-aligned for readability
+- **Smart Unit Display**: Shows "each" for per-unit items and "per kg" for weight-based items
+- **Compact Information Display**: Price with unit on same line, origin and class combined with proper margins
+- **Print-Optimized**: Navigation buttons hidden during printing with enhanced CSS rules
 - **Print Queue Management**: Tracks products needing new labels
 - **Batch Printing**: Print labels for multiple products simultaneously
 

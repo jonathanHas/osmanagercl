@@ -176,6 +176,14 @@ class Product extends Model
     }
 
     /**
+     * Get all supplier links for this product (plural for consistency).
+     */
+    public function supplierLinks()
+    {
+        return $this->hasMany(SupplierLink::class, 'Barcode', 'CODE');
+    }
+
+    /**
      * Get the supplier for this product through the supplier link.
      */
     public function supplier()
