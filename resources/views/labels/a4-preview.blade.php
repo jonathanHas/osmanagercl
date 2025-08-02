@@ -15,11 +15,25 @@
             $isGrid4x9 = isset($template->layout_config['type']) && $template->layout_config['type'] === 'grid_4x9';
         @endphp
         
+        /* CSS Reset for cross-environment consistency */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
         body {
             margin: 0;
             padding: 20px;
-            font-family: Arial, sans-serif;
+            font-family: Arial, Helvetica, sans-serif;
+            font-weight: 400;
+            font-style: normal;
+            font-size: 16px;
+            line-height: 1.2;
             background: #f5f5f5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
         }
         
         .preview-header {
@@ -128,13 +142,15 @@
         
         .labels-container {
             display: grid;
-            grid-template-columns: repeat({{ $labelsPerRow }}, 1fr);
+            grid-template-columns: repeat({{ $labelsPerRow }}, {{ $css['width'] }});
             gap: 0;
             width: 190mm;
             min-height: 277mm;
             border: 1px solid #ddd;
             padding: 10mm;
             background: white;
+            box-sizing: border-box;
+            justify-content: center;
         }
         
         .label {
@@ -144,10 +160,12 @@
             padding: {{ $css['margin'] }};
             display: flex;
             flex-direction: column;
+            font-family: Arial, Helvetica, sans-serif;
             font-size: 8pt;
             line-height: 1.2;
             box-sizing: border-box;
             overflow: hidden;
+            position: relative;
         }
         
         @if($isGrid4x9)
@@ -155,45 +173,105 @@
             position: relative;
             display: flex;
             flex-direction: column;
-            height: auto !important; /* Override fixed height */
-            min-height: {{ $css['height'] }}; /* Maintain minimum size */
-            overflow: visible !important; /* Allow large text to show */
+            height: {{ $css['height'] }};
+            overflow: hidden;
+            justify-content: space-between;
         }
         
         .label-name-4x9 {
             font-weight: 600;
-            font-size: {{ $css['font_size_name'] }};
+            font-size: 12pt;
             line-height: 1.15;
             overflow: hidden;
             word-break: break-word;
-            hyphens: auto;
-            display: block;
-            flex-grow: 1;
-            flex-shrink: 1;
+            hyphens: manual; /* Better control over hyphenation */
+            -webkit-hyphens: manual;
+            -moz-hyphens: manual;
+            display: -webkit-box;
+            -webkit-line-clamp: 4;
+            -webkit-box-orient: vertical;
+            flex: 1 1 auto;
             margin-bottom: 1px;
+            text-align: left;
+            height: calc(100% - 33px); /* Optimized for three rows: 22px middle + 10px bottom + 1px margins */
+            padding-right: 2px;
         }
         
-        .label-bottom-row-4x9 {
+        /* Responsive font sizes - maximizing space usage */
+        .label-name-4x9[data-length="extra-short"] {
+            font-size: 22pt; /* Very large for short names */
+            -webkit-line-clamp: 2;
+            line-height: 1.1;
+        }
+        
+        .label-name-4x9[data-length="short"] {
+            font-size: 18pt;
+            -webkit-line-clamp: 3;
+            line-height: 1.12;
+        }
+        
+        .label-name-4x9[data-length="medium"] {
+            font-size: 14pt;
+            -webkit-line-clamp: 3;
+            line-height: 1.15;
+        }
+        
+        .label-name-4x9[data-length="long"] {
+            font-size: 11pt;
+            -webkit-line-clamp: 4;
+            line-height: 1.15;
+        }
+        
+        .label-name-4x9[data-length="extra-long"] {
+            font-size: 9pt;
+            -webkit-line-clamp: 5; /* Allow more lines for very long text */
+            line-height: 1.12;
+        }
+        
+        /* Prevent single word on last line (orphans) */
+        .label-name-4x9 {
+            text-align-last: left;
+        }
+        
+        /* Better text rendering for small sizes */
+        .label-name-4x9[data-length="long"],
+        .label-name-4x9[data-length="extra-long"] {
+            letter-spacing: -0.02em; /* Slightly tighter spacing for long text */
+        }
+        
+        .label-middle-row-4x9 {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-shrink: 0;
-            height: auto;
-            min-height: 20px;
-            margin-top: auto;
+            flex: 0 0 auto;
+            height: 22px;
+            margin-top: 2px;
+        }
+        
+        .label-barcode-number-row-4x9 {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex: 0 0 auto;
+            height: 10px;
+            margin-top: 1px;
         }
         
         .label-barcode-4x9 {
             display: flex;
             flex-direction: column;
-            align-items: flex-start;
-            flex: 0 0 40%; /* Restore original barcode width */
-            padding-right: 1px;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 48%; /* Increased space for barcode */
+            padding-right: 2px;
+            overflow: hidden;
         }
         
         .barcode-visual-4x9 {
-            height: 10px;
-            margin-bottom: 1px;
+            height: 18px; /* Larger barcode */
+            width: 100%;
+            display: flex;
+            justify-content: center;
         }
         
         .barcode-visual-4x9 svg {
@@ -204,28 +282,61 @@
         
         .barcode-number-4x9 {
             font-family: monospace;
-            font-size: 5.5pt;
-            letter-spacing: 0.1px;
-            color: #666;
+            font-size: 7pt; /* Larger, more legible */
+            letter-spacing: 0.5px;
+            color: #444;
             line-height: 1;
+            text-align: center;
         }
         
-        .label .label-4x9 .label-price-4x9 {
-            font-size: {{ $css['font_size_price'] }} !important;
+        .label-price-4x9 {
+            font-size: 26pt !important; /* Maximum 26pt as requested */
             font-weight: 900 !important;
             color: #000 !important;
-            text-align: right; /* Back to right alignment */
-            line-height: 1.1 !important;
+            text-align: right;
+            line-height: 0.9 !important;
             display: flex;
             align-items: center;
             justify-content: flex-end;
-            flex: 0 0 60%; /* Restore original price width */
+            flex: 0 0 48%; /* Equal space with barcode */
             height: auto !important;
             max-height: none !important;
-            overflow: visible !important;
+            overflow: visible !important; /* Allow € symbol to show */
             font-family: Arial, sans-serif !important;
             white-space: nowrap;
-            padding-left: 1px;
+            padding-left: 2px;
+            padding-right: 0; /* No right padding to maximize space */
+        }
+        
+        /* Responsive sizing for longer prices */
+        .label-price-4x9[data-price-length="long"] {
+            font-size: 22pt !important;
+            padding-left: 4px; /* Extra padding for smaller text */
+        }
+        
+        .label-price-4x9[data-price-length="extra-long"] {
+            font-size: 18pt !important;
+            padding-left: 4px; /* Extra padding for smaller text */
+        }
+        
+        /* Debug: Add border to see element bounds */
+        .debug-mode .label-price-4x9 {
+            border: 1px solid red;
+        }
+        .debug-mode .label-name-4x9 {
+            border: 1px solid blue;
+        }
+        .debug-mode .label-barcode-4x9 {
+            border: 1px solid green;
+        }
+        .debug-mode .label-middle-row-4x9 {
+            border: 1px solid purple;
+        }
+        .debug-mode .label-barcode-number-row-4x9 {
+            border: 1px solid orange;
+        }
+        .debug-mode .label {
+            background: rgba(255, 255, 0, 0.05);
         }
         @endif
         
@@ -376,6 +487,10 @@
                 <button class="zoom-btn" onclick="zoomIn()">+</button>
             </div>
             
+            <button onclick="toggleDebug()" class="btn btn-secondary">Debug</button>
+            
+            <button onclick="showMeasurements()" class="btn btn-secondary">Measure</button>
+            
             <button onclick="window.print()" class="btn btn-primary">
                 <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
@@ -406,18 +521,42 @@
                                         $barcodeImage = $labelService->generateBarcode($product->CODE);
                                     @endphp
                                     @if($isGrid4x9)
-                                        <div class="label label-4x9">
-                                            <div class="label-name-4x9 auto-resize-text">{{ $product->NAME }}</div>
+                                        @php
+                                            $nameLength = mb_strlen($product->NAME);
+                                            // More granular thresholds for better space utilization
+                                            if ($nameLength <= 12) {
+                                                $lengthClass = 'extra-short';
+                                            } elseif ($nameLength <= 20) {
+                                                $lengthClass = 'short';
+                                            } elseif ($nameLength <= 30) {
+                                                $lengthClass = 'medium';
+                                            } elseif ($nameLength <= 45) {
+                                                $lengthClass = 'long';
+                                            } else {
+                                                $lengthClass = 'extra-long';
+                                            }
                                             
-                                            <div class="label-bottom-row-4x9">
+                                            $priceText = $product->getFormattedPriceWithVatAttribute();
+                                            // Use mb_strlen for accurate character count with UTF-8 (€ symbol)
+                                            $priceLength = mb_strlen($priceText);
+                                            // Adjusted thresholds: €9.99 = 5 chars, €15.95 = 6 chars
+                                            $priceLengthClass = $priceLength <= 5 ? 'normal' : ($priceLength <= 6 ? 'long' : 'extra-long');
+                                        @endphp
+                                        <div class="label label-4x9">
+                                            <div class="label-name-4x9" data-length="{{ $lengthClass }}">{{ $product->NAME }}</div>
+                                            
+                                            <div class="label-middle-row-4x9">
                                                 <div class="label-barcode-4x9">
                                                     <div class="barcode-visual-4x9">
                                                         {!! $barcodeImage !!}
                                                     </div>
-                                                    <div class="barcode-number-4x9">{{ $product->CODE }}</div>
                                                 </div>
                                                 
-                                                <div class="label-price-4x9" style="font-size: {{ $css['font_size_price'] }} !important; font-weight: 900 !important; color: #000 !important;">{{ $product->getFormattedPriceWithVatAttribute() }}</div>
+                                                <div class="label-price-4x9" data-price-length="{{ $priceLengthClass }}">{{ $priceText }}</div>
+                                            </div>
+                                            
+                                            <div class="label-barcode-number-row-4x9">
+                                                <div class="barcode-number-4x9">{{ $product->CODE }}</div>
                                             </div>
                                         </div>
                                     @else
@@ -448,74 +587,64 @@
     </div>
 
     <script>
-        function autoResizeText() {
-            @if($isGrid4x9)
-            document.querySelectorAll('.auto-resize-text').forEach(function(element) {
-                // Get the actual available height
-                const parentElement = element.closest('.label-4x9');
-                const bottomRow = parentElement.querySelector('.label-bottom-row-4x9');
-                const parentHeight = parentElement.offsetHeight;
-                const bottomRowHeight = bottomRow ? bottomRow.offsetHeight : 20;
-                const padding = parseInt(window.getComputedStyle(parentElement).paddingTop) + 
-                                parseInt(window.getComputedStyle(parentElement).paddingBottom);
-                const availableHeight = parentHeight - bottomRowHeight - padding - 4; // 4px safety margin
-                
-                const textLength = element.textContent.trim().length;
-                let fontSize;
-                
-                // Start with much larger font sizes
-                if (textLength <= 8) {
-                    fontSize = 24; // Very short text
-                } else if (textLength <= 15) {
-                    fontSize = 20; // Short text  
-                } else if (textLength <= 25) {
-                    fontSize = 16; // Medium text
-                } else if (textLength <= 35) {
-                    fontSize = 14; // Longer text
-                } else if (textLength <= 45) {
-                    fontSize = 12; // Long text
-                } else {
-                    fontSize = 10; // Very long text
-                }
-                
-                element.style.fontSize = fontSize + 'pt';
-                element.style.lineHeight = '1.15';
-                element.style.overflow = 'hidden';
-                element.style.height = 'auto';
-                element.style.maxHeight = availableHeight + 'px';
-                
-                // Aggressively increase font size to fill space
-                const maxFontSize = textLength <= 5 ? 32 : (textLength <= 10 ? 28 : (textLength <= 20 ? 24 : 20));
-                let attempts = 0;
-                while (fontSize < maxFontSize && element.scrollHeight < availableHeight - 2 && attempts < 20) {
-                    fontSize += 1;
-                    element.style.fontSize = fontSize + 'pt';
-                    attempts++;
-                }
-                
-                // Fine-tune downward if needed
-                while (element.scrollHeight > availableHeight && fontSize > 8) {
-                    fontSize -= 0.5;
-                    element.style.fontSize = fontSize + 'pt';
-                }
-                
-                // Final adjustment
-                if (element.scrollHeight > availableHeight) {
-                    element.style.fontSize = Math.max(8, fontSize - 1) + 'pt';
-                }
-            });
-            @endif
-        }
-
         let currentZoom = 100;
+        
+        function toggleDebug() {
+            document.body.classList.toggle('debug-mode');
+            console.log('Debug mode:', document.body.classList.contains('debug-mode') ? 'ON' : 'OFF');
+        }
+        
+        function showMeasurements() {
+            console.log('=== MEASUREMENTS ===');
+            
+            // Template values
+            console.log('Template:', {
+                labelWidth: '{{ $css['width'] ?? 'unknown' }}',
+                labelHeight: '{{ $css['height'] ?? 'unknown' }}',
+                margin: '{{ $css['margin'] ?? 'unknown' }}',
+                labelsPerRow: {{ $labelsPerRow ?? 'null' }}
+            });
+            
+            // Container actual size
+            const container = document.querySelector('.labels-container');
+            if (container) {
+                const rect = container.getBoundingClientRect();
+                console.log('Container actual:', {
+                    width: rect.width + 'px',
+                    cssWidth: window.getComputedStyle(container).width,
+                    padding: window.getComputedStyle(container).padding
+                });
+            }
+            
+            // First label analysis
+            const firstLabel = document.querySelector('.label');
+            if (firstLabel) {
+                const rect = firstLabel.getBoundingClientRect();
+                const style = window.getComputedStyle(firstLabel);
+                console.log('First label:', {
+                    actualWidth: rect.width + 'px',
+                    cssWidth: style.width,
+                    padding: style.padding,
+                    boxSizing: style.boxSizing
+                });
+                
+                // Calculate if 4 labels fit
+                const containerWidth = container ? container.getBoundingClientRect().width : 0;
+                const totalLabelWidth = rect.width * {{ $labelsPerRow ?? 4 }};
+                console.log('Width calculation:', {
+                    containerWidth: containerWidth + 'px',
+                    singleLabelWidth: rect.width + 'px',
+                    totalFor4Labels: totalLabelWidth + 'px',
+                    overflow: totalLabelWidth > containerWidth ? 'YES by ' + (totalLabelWidth - containerWidth) + 'px' : 'NO'
+                });
+            }
+        }
         
         function updateZoom() {
             const content = document.getElementById('scalable-content');
             const zoomLevel = document.getElementById('zoom-level');
             content.style.transform = `scale(${currentZoom / 100})`;
             zoomLevel.textContent = currentZoom + '%';
-            // Re-run auto-resize after zoom change
-            setTimeout(autoResizeText, 100);
         }
         
         function zoomIn() {
@@ -532,16 +661,145 @@
             }
         }
         
-        // Initialize auto-resize on page load
+        // Debug: Log label information
         document.addEventListener('DOMContentLoaded', function() {
-            autoResizeText();
+            console.log('=== Label Debugging Info ===');
             
-            // Run again after layout settles
-            setTimeout(function() {
-                autoResizeText();
-            }, 100);
+            // Debug container and label dimensions
+            const labelsContainer = document.querySelector('.labels-container');
+            if (labelsContainer) {
+                const containerRect = labelsContainer.getBoundingClientRect();
+                console.log('Labels Container:', {
+                    width: containerRect.width + 'px',
+                    computedWidth: window.getComputedStyle(labelsContainer).width,
+                    gridColumns: window.getComputedStyle(labelsContainer).gridTemplateColumns,
+                    gap: window.getComputedStyle(labelsContainer).gap
+                });
+            }
+            
+            // Debug individual labels
+            document.querySelectorAll('.label').forEach((label, idx) => {
+                const labelRect = label.getBoundingClientRect();
+                const computedStyle = window.getComputedStyle(label);
+                console.log(`Label ${idx + 1}:`, {
+                    width: labelRect.width + 'px',
+                    cssWidth: computedStyle.width,
+                    padding: computedStyle.padding,
+                    boxSizing: computedStyle.boxSizing,
+                    overflow: computedStyle.overflow
+                });
+                
+                // Check if label is overflowing container
+                if (labelsContainer) {
+                    const containerRect = labelsContainer.getBoundingClientRect();
+                    if (labelRect.right > containerRect.right) {
+                        console.error(`⚠️ Label ${idx + 1} is overflowing container by ${labelRect.right - containerRect.right}px`);
+                        label.style.border = '2px solid red';
+                    }
+                }
+            });
+            
+            // Debug middle row elements
+            document.querySelectorAll('.label-middle-row-4x9').forEach((row, idx) => {
+                const barcodeEl = row.querySelector('.label-barcode-4x9');
+                const priceEl = row.querySelector('.label-price-4x9');
+                
+                if (barcodeEl && priceEl) {
+                    const rowRect = row.getBoundingClientRect();
+                    const barcodeRect = barcodeEl.getBoundingClientRect();
+                    const priceRect = priceEl.getBoundingClientRect();
+                    
+                    console.log(`Middle Row ${idx + 1}:`, {
+                        rowWidth: rowRect.width + 'px',
+                        barcodeWidth: barcodeRect.width + 'px',
+                        priceWidth: priceRect.width + 'px',
+                        totalWidth: (barcodeRect.width + priceRect.width) + 'px',
+                        overflow: (barcodeRect.width + priceRect.width) > rowRect.width ? 'YES' : 'NO',
+                        barcodeFlex: window.getComputedStyle(barcodeEl).flex,
+                        priceFlex: window.getComputedStyle(priceEl).flex
+                    });
+                    
+                    // Visual indicator for overflow
+                    if ((barcodeRect.width + priceRect.width) > rowRect.width) {
+                        row.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
+                        console.error(`⚠️ Middle row ${idx + 1} content exceeds row width`);
+                    }
+                }
+            });
+            
+            // Focus on name debugging only
+            
+            // Check name elements
+            document.querySelectorAll('.label-name-4x9').forEach((el, idx) => {
+                const computedStyle = window.getComputedStyle(el);
+                const dataLength = el.getAttribute('data-length');
+                const text = el.textContent.trim();
+                console.log(`Name ${idx + 1}:`, {
+                    dataLength: dataLength,
+                    fontSize: computedStyle.fontSize,
+                    whiteSpace: computedStyle.whiteSpace,
+                    text: text.substring(0, 30) + (text.length > 30 ? '...' : ''),
+                    textLength: text.length
+                });
+            });
+            
+            // Check template values
+            console.log('Template info:', {
+                name: '{{ $template->name ?? 'null' }}',
+                isGrid4x9: {{ $isGrid4x9 ? 'true' : 'false' }},
+                @if(isset($css))
+                font_size_price: '{{ $css['font_size_price'] }}',
+                font_size_name: '{{ $css['font_size_name'] }}',
+                raw_font_size_price: {{ $template->font_size_price ?? 'null' }},
+                raw_font_size_name: {{ $template->font_size_name ?? 'null' }},
+                @endif
+            });
+            
+            // Environment info
+            console.log('Environment:', {
+                app_env: '{{ config('app.env') }}',
+                php_version: '{{ PHP_VERSION }}',
+                charset: document.characterSet,
+                userAgent: navigator.userAgent
+            });
+            
+            // Visual test for name scaling
+            setTimeout(() => {
+                document.querySelectorAll('.label-name-4x9').forEach(el => {
+                    const dataLength = el.getAttribute('data-length');
+                    const rect = el.getBoundingClientRect();
+                    const parentRect = el.parentElement.getBoundingClientRect();
+                    const isOverflowing = el.scrollWidth > el.clientWidth;
+                    
+                    const computedStyle = window.getComputedStyle(el);
+                    console.log(`Name analysis:`, {
+                        text: el.textContent.trim().substring(0, 40) + '...',
+                        category: dataLength,
+                        fontSize: computedStyle.fontSize,
+                        lineHeight: computedStyle.lineHeight,
+                        isOverflowing: isOverflowing,
+                        textWidth: el.scrollWidth,
+                        availableWidth: el.clientWidth,
+                        parentHeight: parentRect.height,
+                        nameHeight: rect.height,
+                        unusedHeight: parentRect.height - rect.height
+                    });
+                    
+                    // Add visual indicator for overflowing text
+                    if (isOverflowing) {
+                        el.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
+                    }
+                    
+                    // Check if text is being truncated with ellipsis
+                    const hasEllipsis = el.scrollHeight > el.clientHeight;
+                    if (hasEllipsis) {
+                        console.warn('Text truncated:', el.textContent.trim());
+                        el.style.border = '2px solid orange';
+                    }
+                });
+            }, 500);
         });
-
+        
         // Keyboard shortcuts
         document.addEventListener('keydown', function(e) {
             if (e.ctrlKey || e.metaKey) {

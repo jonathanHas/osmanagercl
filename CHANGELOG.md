@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Label Preview Layout Improvements**: Enhanced 4x9 grid label display for better readability
+  - Fixed € symbol clipping by restructuring layout from 2 rows to 3 rows
+  - Moved barcode number to dedicated bottom row for improved legibility (7pt from 5.5pt)
+  - Increased barcode and price horizontal space allocation (48% each from 42%/52%)
+  - Larger barcode visual height (18px from 10px) for better scanning
+- **Product Name Display Optimization**: Smarter text sizing for better space utilization  
+  - Implemented 5-tier responsive font sizing (extra-short to extra-long)
+  - Fixed character counting with mb_strlen() for proper UTF-8 support
+  - Changed hyphenation from auto to manual to prevent awkward breaks
+  - Added letter-spacing adjustments for long text
+  - Increased line-clamp for extra-long text (5 lines) to show more content
+
 ### Added
 
 - **🚀 Full Store Sales Data Import System**: Revolutionary performance improvement for complete store analytics

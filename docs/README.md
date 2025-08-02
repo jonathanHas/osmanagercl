@@ -46,8 +46,11 @@ Detailed documentation for each major feature.
   - Barcode extraction
   - Multi-supplier support
 
-- **[Label System](./features/label-system.md)** - Comprehensive label printing system
+- **[Label System](./features/label-system.md)** - Comprehensive label printing system *(Updated)*
   - Dynamic barcode generation with Code128 format
+  - Enhanced 4x9 grid layout with 3-row structure
+  - Smart responsive text sizing (5 tiers)
+  - Improved typography and € symbol handling
   - Template-based label layouts with A4 optimization
   - Event-driven re-queuing functionality
   - Real-time print queue management

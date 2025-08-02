@@ -33,6 +33,26 @@ The label system provides automated label generation and printing capabilities w
 - **Dynamic print forms** that collect current product states
 - **Print event logging** to track label generation history
 
+### 🎯 4x9 Grid Layout (Enhanced)
+- **Three-row structure** for optimal space utilization:
+  - **Top row**: Product name with responsive font sizing
+  - **Middle row**: Barcode visual and price side-by-side (48% each)
+  - **Bottom row**: Barcode number centered for better legibility
+- **Smart text sizing** with 5 categories:
+  - Extra-short (≤12 chars): 22pt for maximum impact
+  - Short (≤20 chars): 18pt
+  - Medium (≤30 chars): 14pt
+  - Long (≤45 chars): 11pt
+  - Extra-long (>45 chars): 9pt with 5-line clamp
+- **Typography improvements**:
+  - Manual hyphenation to prevent awkward breaks
+  - Letter-spacing adjustments for long text
+  - UTF-8 aware character counting
+- **Enhanced readability**:
+  - Larger barcode visual (18px height)
+  - Bigger barcode numbers (7pt from 5.5pt)
+  - No € symbol clipping with visible overflow
+
 ### 🔄 Re-queue Functionality
 - **"Add Back to Products Needing Labels"** buttons on:
   - Recent label prints table
@@ -203,5 +223,5 @@ Templates are stored in the database and can be managed through:
 
 ---
 
-**Last Updated**: July 2025  
-**Version**: 1.0.0
+**Last Updated**: August 2025  
+**Version**: 1.1.0
