@@ -20,7 +20,7 @@ return new class extends Migration
             'margin_mm' => 2,
             'font_size_name' => 9,
             'font_size_barcode' => 7,
-            'font_size_price' => 12,
+            'font_size_price' => 26,
             'barcode_height' => 15,
             'layout_config' => [
                 'type' => 'grid_4x9',
