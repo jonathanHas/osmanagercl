@@ -54,40 +54,59 @@
             position: relative;
             display: flex;
             flex-direction: column;
-            height: auto !important; /* Override fixed height */
-            min-height: {{ $css['height'] }}; /* Maintain minimum size */
-            overflow: visible !important; /* Allow large text to show */
+            height: {{ $css['height'] }};
+            overflow: hidden;
+            justify-content: space-between;
         }
         
         .label-name-4x9 {
             font-weight: 600;
-            font-size: {{ $css['font_size_name'] }};
-            line-height: 1.15;
+            font-size: 10pt;
+            line-height: 1.2;
             overflow: hidden;
             word-break: break-word;
-            hyphens: auto;
-            display: block;
-            flex-grow: 1;
-            flex-shrink: 1;
-            margin-bottom: 1px;
+            hyphens: manual;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            flex: 1 1 auto;
+            margin-bottom: 2px;
+            text-align: left;
+            max-height: calc(100% - 22px);
+        }
+        
+        /* Responsive font sizes for different text lengths */
+        .label-name-4x9[data-length="short"] {
+            font-size: 14pt;
+            -webkit-line-clamp: 1;
+        }
+        
+        .label-name-4x9[data-length="medium"] {
+            font-size: 11pt;
+            -webkit-line-clamp: 2;
+        }
+        
+        .label-name-4x9[data-length="long"] {
+            font-size: 9pt;
+            -webkit-line-clamp: 2;
         }
         
         .label-bottom-row-4x9 {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-shrink: 0;
-            height: auto;
-            min-height: 20px;
-            margin-top: auto;
+            flex: 0 0 auto;
+            height: 20px;
+            margin-top: 2px;
         }
         
         .label-barcode-4x9 {
             display: flex;
             flex-direction: column;
             align-items: flex-start;
-            flex: 0 0 40%; /* Restore original barcode width */
+            flex: 0 0 40%; /* Reduced to give more space to price */
             padding-right: 1px;
+            overflow: hidden;
         }
         
         .barcode-visual-4x9 {
@@ -109,22 +128,37 @@
             line-height: 1;
         }
         
-        .label .label-4x9 .label-price-4x9 {
-            font-size: {{ $css['font_size_price'] }} !important;
+        .label-price-4x9 {
+            font-size: 26pt !important;
             font-weight: 900 !important;
             color: #000 !important;
-            text-align: right; /* Back to right alignment */
-            line-height: 1.1 !important;
+            text-align: right;
+            line-height: 0.9 !important;
             display: flex;
             align-items: center;
             justify-content: flex-end;
-            flex: 0 0 60%; /* Restore original price width */
+            flex: 0 0 60%; /* Increased to give more space for 4-digit prices */
             height: auto !important;
             max-height: none !important;
-            overflow: visible !important;
+            overflow: hidden !important;
             font-family: Arial, sans-serif !important;
             white-space: nowrap;
             padding-left: 1px;
+            padding-right: 1px;
+        }
+        
+        /* Extra specificity to ensure it applies */
+        .label-4x9 .label-bottom-row-4x9 .label-price-4x9 {
+            font-size: 26pt !important;
+        }
+        
+        /* Responsive sizing for longer prices */
+        .label-price-4x9[data-price-length="long"] {
+            font-size: 22pt !important;
+        }
+        
+        .label-price-4x9[data-price-length="extra-long"] {
+            font-size: 20pt !important;
         }
         @endif
         
@@ -227,8 +261,16 @@
                     $barcodeImage = $labelService->generateBarcode($product->CODE);
                 @endphp
                 @if($isGrid4x9)
+                    @php
+                        $nameLength = strlen($product->NAME);
+                        $lengthClass = $nameLength <= 15 ? 'short' : ($nameLength <= 30 ? 'medium' : 'long');
+                        
+                        $priceText = $product->getFormattedPriceWithVatAttribute();
+                        $priceLength = strlen($priceText);
+                        $priceLengthClass = $priceLength <= 5 ? 'normal' : ($priceLength <= 7 ? 'long' : 'extra-long');
+                    @endphp
                     <div class="label label-4x9">
-                        <div class="label-name-4x9 auto-resize-text">{{ $product->NAME }}</div>
+                        <div class="label-name-4x9" data-length="{{ $lengthClass }}">{{ $product->NAME }}</div>
                         
                         <div class="label-bottom-row-4x9">
                             <div class="label-barcode-4x9">
@@ -238,7 +280,7 @@
                                 <div class="barcode-number-4x9">{{ $product->CODE }}</div>
                             </div>
                             
-                            <div class="label-price-4x9" style="font-size: {{ $css['font_size_price'] }} !important; font-weight: 900 !important; color: #000 !important;">{{ $product->getFormattedPriceWithVatAttribute() }}</div>
+                            <div class="label-price-4x9" data-price-length="{{ $priceLengthClass }}">{{ $priceText }}</div>
                         </div>
                     </div>
                 @else
@@ -264,78 +306,11 @@
     </div>
 
     <script>
-        function autoResizeText() {
-            @if($isGrid4x9)
-            document.querySelectorAll('.auto-resize-text').forEach(function(element) {
-                // Get the actual available height
-                const parentElement = element.closest('.label-4x9');
-                const bottomRow = parentElement.querySelector('.label-bottom-row-4x9');
-                const parentHeight = parentElement.offsetHeight;
-                const bottomRowHeight = bottomRow ? bottomRow.offsetHeight : 20;
-                const padding = parseInt(window.getComputedStyle(parentElement).paddingTop) + 
-                                parseInt(window.getComputedStyle(parentElement).paddingBottom);
-                const availableHeight = parentHeight - bottomRowHeight - padding - 4; // 4px safety margin
-                
-                const textLength = element.textContent.trim().length;
-                let fontSize;
-                
-                // Start with much larger font sizes
-                if (textLength <= 8) {
-                    fontSize = 24; // Very short text
-                } else if (textLength <= 15) {
-                    fontSize = 20; // Short text  
-                } else if (textLength <= 25) {
-                    fontSize = 16; // Medium text
-                } else if (textLength <= 35) {
-                    fontSize = 14; // Longer text
-                } else if (textLength <= 45) {
-                    fontSize = 12; // Long text
-                } else {
-                    fontSize = 10; // Very long text
-                }
-                
-                element.style.fontSize = fontSize + 'pt';
-                element.style.lineHeight = '1.15';
-                element.style.overflow = 'hidden';
-                element.style.height = 'auto';
-                element.style.maxHeight = availableHeight + 'px';
-                
-                // Aggressively increase font size to fill space
-                const maxFontSize = textLength <= 5 ? 32 : (textLength <= 10 ? 28 : (textLength <= 20 ? 24 : 20));
-                let attempts = 0;
-                while (fontSize < maxFontSize && element.scrollHeight < availableHeight - 2 && attempts < 20) {
-                    fontSize += 1;
-                    element.style.fontSize = fontSize + 'pt';
-                    attempts++;
-                }
-                
-                // Fine-tune downward if needed
-                while (element.scrollHeight > availableHeight && fontSize > 8) {
-                    fontSize -= 0.5;
-                    element.style.fontSize = fontSize + 'pt';
-                }
-                
-                // Final adjustment
-                if (element.scrollHeight > availableHeight) {
-                    element.style.fontSize = Math.max(8, fontSize - 1) + 'pt';
-                }
-            });
-            @endif
-        }
-
         window.onload = function() {
-            // Auto-resize text for 4x9 grid
-            autoResizeText();
-            
-            // Run again after layout settles
-            setTimeout(function() {
-                autoResizeText();
-            }, 100);
-            
             // Auto-print when page loads
             setTimeout(function() {
                 window.print();
-            }, 1200); // Increased delay to allow text resizing
+            }, 500);
         }
     </script>
 </body>
