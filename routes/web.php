@@ -6,6 +6,7 @@ use App\Http\Controllers\LabelAreaController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SalesImportController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\TestScraperController;
 use App\Http\Controllers\UserManagementController;
@@ -116,6 +117,24 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
     Route::post('/settings/clear-cache', [SettingsController::class, 'clearCache'])->name('settings.clear-cache');
     Route::get('/settings/system-info', [SettingsController::class, 'systemInfo'])->name('settings.system-info');
+
+    // Sales Import routes
+    Route::prefix('sales-import')->name('sales-import.')->group(function () {
+        Route::get('/', [SalesImportController::class, 'index'])->name('index');
+        Route::post('/daily', [SalesImportController::class, 'runDailyImport'])->name('run-daily');
+        Route::post('/monthly', [SalesImportController::class, 'runMonthlySummaries'])->name('run-monthly');
+        Route::post('/create-test-data', [SalesImportController::class, 'createTestData'])->name('create-test-data');
+        Route::post('/performance-test', [SalesImportController::class, 'performanceTest'])->name('performance-test');
+        Route::get('/logs', [SalesImportController::class, 'getImportLogs'])->name('logs');
+        Route::post('/clear-data', [SalesImportController::class, 'clearData'])->name('clear-data');
+        
+        // Validation routes
+        Route::get('/validation', [SalesImportController::class, 'validation'])->name('validation');
+        Route::post('/validate-data', [SalesImportController::class, 'validateData'])->name('validate-data');
+        Route::post('/comparison-data', [SalesImportController::class, 'getComparisonData'])->name('comparison-data');
+        Route::post('/daily-summary', [SalesImportController::class, 'getDailySummary'])->name('daily-summary');
+        Route::post('/category-validation', [SalesImportController::class, 'getCategoryValidation'])->name('category-validation');
+    });
 
     // Udea scraping test routes
     Route::prefix('tests')->name('tests.')->group(function () {

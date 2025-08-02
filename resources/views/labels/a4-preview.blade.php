@@ -12,6 +12,7 @@
             $labelsPerRow = floor($usableWidth / $template->width_mm);
             $labelsPerColumn = floor($usableHeight / $template->height_mm);
             $css = $template->css_dimensions;
+            $isGrid4x9 = isset($template->layout_config['type']) && $template->layout_config['type'] === 'grid_4x9';
         @endphp
         
         body {
@@ -148,6 +149,85 @@
             box-sizing: border-box;
             overflow: hidden;
         }
+        
+        @if($isGrid4x9)
+        .label-4x9 {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            height: auto !important; /* Override fixed height */
+            min-height: {{ $css['height'] }}; /* Maintain minimum size */
+            overflow: visible !important; /* Allow large text to show */
+        }
+        
+        .label-name-4x9 {
+            font-weight: 600;
+            font-size: {{ $css['font_size_name'] }};
+            line-height: 1.15;
+            overflow: hidden;
+            word-break: break-word;
+            hyphens: auto;
+            display: block;
+            flex-grow: 1;
+            flex-shrink: 1;
+            margin-bottom: 1px;
+        }
+        
+        .label-bottom-row-4x9 {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            height: auto;
+            min-height: 20px;
+            margin-top: auto;
+        }
+        
+        .label-barcode-4x9 {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            flex: 0 0 40%; /* Restore original barcode width */
+            padding-right: 1px;
+        }
+        
+        .barcode-visual-4x9 {
+            height: 10px;
+            margin-bottom: 1px;
+        }
+        
+        .barcode-visual-4x9 svg {
+            width: auto;
+            height: 100%;
+            max-width: 100%;
+        }
+        
+        .barcode-number-4x9 {
+            font-family: monospace;
+            font-size: 5.5pt;
+            letter-spacing: 0.1px;
+            color: #666;
+            line-height: 1;
+        }
+        
+        .label .label-4x9 .label-price-4x9 {
+            font-size: {{ $css['font_size_price'] }} !important;
+            font-weight: 900 !important;
+            color: #000 !important;
+            text-align: right; /* Back to right alignment */
+            line-height: 1.1 !important;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            flex: 0 0 60%; /* Restore original price width */
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+            font-family: Arial, sans-serif !important;
+            white-space: nowrap;
+            padding-left: 1px;
+        }
+        @endif
         
         .label-name {
             font-weight: 600;
@@ -325,20 +405,37 @@
                                         $labelService = app(\App\Services\LabelService::class);
                                         $barcodeImage = $labelService->generateBarcode($product->CODE);
                                     @endphp
-                                    <div class="label">
-                                        <div class="label-name">{{ $product->NAME }}</div>
-                                        
-                                        <div class="label-price-section">
-                                            <div class="label-price">{{ $product->getFormattedPriceWithVatAttribute() }}</div>
-                                        </div>
-                                        
-                                        <div class="label-barcode">
-                                            <div class="barcode-visual">
-                                                {!! $barcodeImage !!}
+                                    @if($isGrid4x9)
+                                        <div class="label label-4x9">
+                                            <div class="label-name-4x9 auto-resize-text">{{ $product->NAME }}</div>
+                                            
+                                            <div class="label-bottom-row-4x9">
+                                                <div class="label-barcode-4x9">
+                                                    <div class="barcode-visual-4x9">
+                                                        {!! $barcodeImage !!}
+                                                    </div>
+                                                    <div class="barcode-number-4x9">{{ $product->CODE }}</div>
+                                                </div>
+                                                
+                                                <div class="label-price-4x9" style="font-size: {{ $css['font_size_price'] }} !important; font-weight: 900 !important; color: #000 !important;">{{ $product->getFormattedPriceWithVatAttribute() }}</div>
                                             </div>
-                                            <div class="barcode-number">{{ $product->CODE }}</div>
                                         </div>
-                                    </div>
+                                    @else
+                                        <div class="label">
+                                            <div class="label-name">{{ $product->NAME }}</div>
+                                            
+                                            <div class="label-price-section">
+                                                <div class="label-price">{{ $product->getFormattedPriceWithVatAttribute() }}</div>
+                                            </div>
+                                            
+                                            <div class="label-barcode">
+                                                <div class="barcode-visual">
+                                                    {!! $barcodeImage !!}
+                                                </div>
+                                                <div class="barcode-number">{{ $product->CODE }}</div>
+                                            </div>
+                                        </div>
+                                    @endif
                                 @else
                                     <div class="empty-label"></div>
                                 @endif
@@ -351,6 +448,65 @@
     </div>
 
     <script>
+        function autoResizeText() {
+            @if($isGrid4x9)
+            document.querySelectorAll('.auto-resize-text').forEach(function(element) {
+                // Get the actual available height
+                const parentElement = element.closest('.label-4x9');
+                const bottomRow = parentElement.querySelector('.label-bottom-row-4x9');
+                const parentHeight = parentElement.offsetHeight;
+                const bottomRowHeight = bottomRow ? bottomRow.offsetHeight : 20;
+                const padding = parseInt(window.getComputedStyle(parentElement).paddingTop) + 
+                                parseInt(window.getComputedStyle(parentElement).paddingBottom);
+                const availableHeight = parentHeight - bottomRowHeight - padding - 4; // 4px safety margin
+                
+                const textLength = element.textContent.trim().length;
+                let fontSize;
+                
+                // Start with much larger font sizes
+                if (textLength <= 8) {
+                    fontSize = 24; // Very short text
+                } else if (textLength <= 15) {
+                    fontSize = 20; // Short text  
+                } else if (textLength <= 25) {
+                    fontSize = 16; // Medium text
+                } else if (textLength <= 35) {
+                    fontSize = 14; // Longer text
+                } else if (textLength <= 45) {
+                    fontSize = 12; // Long text
+                } else {
+                    fontSize = 10; // Very long text
+                }
+                
+                element.style.fontSize = fontSize + 'pt';
+                element.style.lineHeight = '1.15';
+                element.style.overflow = 'hidden';
+                element.style.height = 'auto';
+                element.style.maxHeight = availableHeight + 'px';
+                
+                // Aggressively increase font size to fill space
+                const maxFontSize = textLength <= 5 ? 32 : (textLength <= 10 ? 28 : (textLength <= 20 ? 24 : 20));
+                let attempts = 0;
+                while (fontSize < maxFontSize && element.scrollHeight < availableHeight - 2 && attempts < 20) {
+                    fontSize += 1;
+                    element.style.fontSize = fontSize + 'pt';
+                    attempts++;
+                }
+                
+                // Fine-tune downward if needed
+                while (element.scrollHeight > availableHeight && fontSize > 8) {
+                    fontSize -= 0.5;
+                    element.style.fontSize = fontSize + 'pt';
+                }
+                
+                // Final adjustment
+                if (element.scrollHeight > availableHeight) {
+                    element.style.fontSize = Math.max(8, fontSize - 1) + 'pt';
+                }
+            });
+            @endif
+        }
+
         let currentZoom = 100;
         
         function updateZoom() {
@@ -358,6 +514,8 @@
             const zoomLevel = document.getElementById('zoom-level');
             content.style.transform = `scale(${currentZoom / 100})`;
             zoomLevel.textContent = currentZoom + '%';
+            // Re-run auto-resize after zoom change
+            setTimeout(autoResizeText, 100);
         }
         
         function zoomIn() {
@@ -374,6 +532,38 @@
             }
         }
         
+        // Initialize auto-resize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Debug CSS values
+            @if($isGrid4x9)
+            console.log('=== DEBUG INFO (PREVIEW) ===');
+            console.log('Template CSS font_size_price:', '{{ $css['font_size_price'] }}');
+            
+            const priceElements = document.querySelectorAll('.label-price-4x9');
+            priceElements.forEach((element, index) => {
+                console.log(`Price element ${index}:`, element);
+                console.log('- Text content:', element.textContent);
+                console.log('- Computed font-size:', window.getComputedStyle(element).fontSize);
+                console.log('- Computed font-weight:', window.getComputedStyle(element).fontWeight);
+                console.log('- Computed display:', window.getComputedStyle(element).display);
+                console.log('- Computed height:', window.getComputedStyle(element).height);
+                console.log('- Computed max-height:', window.getComputedStyle(element).maxHeight);
+                console.log('- Computed overflow:', window.getComputedStyle(element).overflow);
+                console.log('- Inline styles:', element.style.cssText);
+                console.log('- Parent element:', element.parentElement);
+                console.log('- Parent computed height:', window.getComputedStyle(element.parentElement).height);
+                console.log('---');
+            });
+            @endif
+            
+            autoResizeText();
+            
+            // Run again after layout settles
+            setTimeout(function() {
+                autoResizeText();
+            }, 100);
+        });
+
         // Keyboard shortcuts
         document.addEventListener('keydown', function(e) {
             if (e.ctrlKey || e.metaKey) {

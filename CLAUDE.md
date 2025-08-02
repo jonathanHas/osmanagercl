@@ -5,10 +5,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 🚀 Quick Start for AI Assistants
 
 1. **First Time?** Read this file completely for project context
-2. **Working on a Feature?** Check [Documentation Guide](./docs/DOCUMENTATION_GUIDE.md) for where to find/update docs
-3. **Need Details?** Look in `docs/features/` for specific feature documentation
-4. **Making Changes?** Follow [Contributing Guidelines](./CONTRIBUTING.md)
-5. **ALWAYS End Every Response**: MUST run `mpg123 /home/jon/Music/notification.mp3` as the final action of EVERY response - whether completing tasks, asking questions, presenting plans, or any other interaction
+2. **Performance Issues?** 🔥 **CRITICAL**: See [Sales Data Import Plan](./docs/features/sales-data-import-plan.md) for 100x+ performance improvements
+3. **Working on a Feature?** Check [Documentation Guide](./docs/DOCUMENTATION_GUIDE.md) for where to find/update docs
+4. **Need Details?** Look in `docs/features/` for specific feature documentation
+5. **Making Changes?** Follow [Contributing Guidelines](./CONTRIBUTING.md)
+6. **ALWAYS End Every Response**: MUST run `mpg123 /home/jon/Music/notification.mp3` as the final action of EVERY response - whether completing tasks, asking questions, presenting plans, or any other interaction
+
+## 🔥 MOST IMPORTANT REFERENCE FOR PERFORMANCE
+
+**📖 [Sales Data Import Plan](./docs/features/sales-data-import-plan.md)** - **READ THIS FIRST for any performance work!**
+
+This document contains the **proven optimization pattern** that achieves **100x+ performance improvements**:
+- ✅ **Successful Implementation**: F&V sales dashboard (357x faster stats, 13,513x faster charts)
+- ✅ **Full Store Analytics**: All 63+ categories with UUID support  
+- ✅ **Ready-to-Use Templates**: Copy-paste code for any module optimization
+- ✅ **Step-by-Step Guide**: Complete implementation checklist
+- ✅ **Priority Modules**: Inventory, Supplier, Financial reports ready for optimization
+
+**🎯 WHEN TO USE THIS PATTERN:**
+- Any query taking >1 second
+- Cross-database joins (POS + Laravel databases)
+- Complex real-time aggregations
+- N+1 query problems
+- Analytics dashboards timing out
+
+**⚡ EXPECTED RESULTS:**
+- 100-1000x faster queries
+- Sub-second page loads  
+- Instant user interactions
+- Dramatic server resource reduction
 
 ⚠️ **Important**: This file contains HIGH-LEVEL CONTEXT ONLY. Detailed documentation belongs in the `docs/` folder.
 
@@ -305,6 +330,15 @@ This alerts the user that you have finished your response. Do this without fail 
 - **Use appropriate service/repository layers** for business logic
 - **Write tests** for new features
 
+### 🚀 Performance Optimization - PROACTIVELY SUGGEST WHEN:
+- **User mentions slow queries or timeouts** → Immediately reference Sales Data Import Plan
+- **Working on analytics/dashboards** → Suggest OptimizedSalesRepository pattern  
+- **Cross-database queries identified** → Recommend pre-aggregation approach
+- **Any module shows performance issues** → Apply proven 100x+ optimization pattern
+- **Building new reporting features** → Start with optimized architecture from day one
+
+**ALWAYS suggest performance improvements proactively - don't wait for user to ask!**
+
 ### Documentation
 - **Update documentation** when changing functionality
 - **Use the appropriate documentation file** based on the feature area
@@ -338,11 +372,20 @@ php artisan optimize:clear
 ```
 
 ### Where to Find Information
-- **Architecture decisions**: `docs/architecture/`
+- **🔥 PERFORMANCE OPTIMIZATION**: `docs/features/sales-data-import-plan.md` (MOST IMPORTANT!)
+- **Performance Guide**: `docs/development/performance-optimization-guide.md`
+- **Architecture decisions**: `docs/architecture/overview.md` (includes optimization patterns)
 - **Feature details**: `docs/features/`
 - **API documentation**: `docs/api/`
 - **Development guides**: `docs/development/`
 - **Planning documents**: `planning/`
+
+### 🎯 Quick Reference for Performance Work
+- **Analytics/Dashboards**: Use `OptimizedSalesRepository` patterns from F&V implementation
+- **Cross-database queries**: See sales data import system examples
+- **New reporting features**: Start with pre-aggregated table design
+- **Slow module optimization**: Follow the proven 6-step process in Performance Guide
+- **Integration templates**: Copy from `sales-data-import-plan.md` integration examples
 
 Remember: This file provides context for AI assistants. For detailed information about any feature or system, refer to the specific documentation files rather than adding it here.
 

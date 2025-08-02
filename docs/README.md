@@ -16,6 +16,13 @@ Core system architecture and design patterns.
 ### 🚀 Features
 Detailed documentation for each major feature.
 
+- **[Sales Data Import](./features/sales-data-import.md)** - 🚀 **NEW** Lightning-fast sales analytics system
+  - 100x+ performance improvement over cross-database queries
+  - Pre-aggregated daily and monthly sales data
+  - Automated data synchronization with POS system
+  - Sub-20ms response times for all analytics queries
+  - Complete CLI suite for data management
+
 - **[POS Integration](./features/pos-integration.md)** - uniCenta POS database integration
   - Product, Supplier, and Stock models
   - Real-time inventory synchronization
@@ -70,6 +77,7 @@ Guides for developers working on the project.
 - **[Setup Guide](./development/setup.md)** - Complete development environment setup
 - **[Testing Guide](./development/testing.md)** - Testing strategies and examples
 - **[Coding Standards](./development/coding-standards.md)** - Code style and best practices
+- **[Performance Optimization Guide](./development/performance-optimization-guide.md)** - 🚀 **NEW** Apply 100x+ performance improvements to any module
 - **[Troubleshooting](./development/troubleshooting.md)** - Common issues and solutions
 
 ### 🚢 Deployment

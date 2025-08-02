@@ -98,6 +98,15 @@
                             Users
                         </a>
 
+                        <!-- Sales Import -->
+                        <a href="{{ route('sales-import.index') }}" 
+                           class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('sales-import.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                            <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            🚀 Sales Import
+                        </a>
+
                         <!-- Settings -->
                         <a href="{{ route('settings.index') }}" 
                            class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('settings.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">

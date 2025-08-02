@@ -328,6 +328,367 @@ The issue has been fixed by using variable variables to access named slots:
 **If Similar Issues Occur:**
 If you encounter similar slot access issues in other components, you can use the variable variable approach shown above or implement direct Alpine.js as a fallback.
 
+## 🚀 Sales Data Import System Issues
+
+### Import Commands Failing
+
+**Symptoms:**
+- `php artisan sales:import-daily` fails with errors
+- Import logs show failed status
+- Data not importing from POS database
+
+**Common Causes & Solutions:**
+
+#### 1. POS Database Connection Issues
+```bash
+# Test POS database connection
+php artisan tinker --execute="DB::connection('pos')->table('STOCKDIARY')->count()"
+```
+
+**Solutions:**
+- Verify POS_DB_* environment variables in `.env`
+- Check POS database server is accessible
+- Ensure credentials have read access to POS database
+
+#### 2. Memory Exhaustion During Import
+**Error:** `Fatal error: Allowed memory size exhausted`
+
+**Solutions:**
+```bash
+# Use smaller chunk sizes
+php artisan sales:import-historical --chunk-days=7
+
+# Increase PHP memory limit temporarily
+php -d memory_limit=512M artisan sales:import-historical
+```
+
+#### 3. Import Taking Too Long
+**Solutions:**
+- Process during off-peak hours
+- Use smaller date ranges
+- Check database indexes are created properly
+
+### Performance Issues
+
+#### Slow Analytics Queries
+**Symptoms:**
+- Sales repository queries still taking seconds
+- Not seeing expected performance improvements
+
+**Debugging Steps:**
+```bash
+# Test repository performance
+php artisan sales:test-repository
+
+# Check if import data exists
+php artisan tinker --execute="App\Models\SalesDailySummary::count()"
+
+# Verify indexes are created
+php artisan migrate:status
+```
+
+**Solutions:**
+- Ensure migrations have run: `php artisan migrate`
+- Import historical data: `php artisan sales:import-historical`
+- Check if using OptimizedSalesRepository instead of legacy SalesRepository
+
+#### Scheduled Imports Not Running
+**Symptoms:**
+- No new data appearing in sales_daily_summary
+- Import logs showing no recent activity
+
+**Debugging:**
+```bash
+# Check scheduler configuration
+php artisan schedule:list
+
+# Test individual commands
+php artisan sales:import-daily --yesterday
+
+# Check cron is configured
+crontab -l | grep artisan
+```
+
+**Solutions:**
+- Ensure Laravel scheduler is configured in cron:
+  ```bash
+  * * * * * cd /path/to/project && php artisan schedule:run >> /dev/null 2>&1
+  ```
+- Check server timezone matches application timezone
+- Verify overlap protection isn't blocking imports
+
+### Data Integrity Issues
+
+#### Data Validation Failures
+**Symptoms:**
+- Import reports processed records but totals don't match POS
+- Missing data for certain products or dates
+
+**Debugging:**
+```bash
+# Compare imported vs POS totals for a specific date
+php artisan tinker --execute="
+\$date = '2025-07-30';
+\$imported = App\Models\SalesDailySummary::where('sale_date', \$date)->sum('total_revenue');
+\$pos = DB::connection('pos')->table('STOCKDIARY as s')
+    ->join('PRODUCTS as p', 's.PRODUCT', '=', 'p.ID')
+    ->where('s.REASON', -1)
+    ->whereDate('s.DATENEW', \$date)
+    ->whereIn('p.CATEGORY', ['SUB1', 'SUB2', 'SUB3'])
+    ->selectRaw('SUM(ABS(s.UNITS) * s.PRICE) as total')
+    ->value('total');
+echo \"Imported: {\$imported}, POS: {\$pos}\";
+"
+```
+
+**Solutions:**
+- Re-import specific date ranges: `php artisan sales:import-daily --start-date=2025-07-30 --end-date=2025-07-30`
+- Check POS database data quality
+- Verify category filters (SUB1, SUB2, SUB3) are correct
+
+### 🔍 Sales Data Validation System Issues
+
+#### Validation Interface Tabs Not Loading Data
+
+**Symptoms:**
+- Overview tab works but Daily, Category, Detailed tabs show no data
+- Console errors in browser developer tools
+- AJAX requests failing or returning empty results
+
+**Common Causes & Solutions:**
+
+##### 1. Key Matching Issues (Fixed in v1.0)
+**Problem:** Carbon date formatting causing validation service to return 0% accuracy
+```javascript
+// The issue was in keyBy operations:
+importedByKey = data.keyBy(item => item.product_id + '-' + item.sale_date); // ❌ Includes timestamp
+```
+
+**Solution:** Fixed in SalesValidationService.php:
+```php
+// ✅ FIXED: Proper date formatting
+$importedByKey = $imported->keyBy(function ($item) {
+    return $item->product_id . '-' . $item->sale_date->format('Y-m-d');
+});
+```
+
+##### 2. Daily Summary Aggregation Problems (Fixed in v1.0)
+**Problem:** MySQL DATE() function and GROUP BY issues causing missing daily data
+```php
+// ❌ WRONG: Basic groupBy didn't work with DATE() function
+->groupBy('sale_date')
+```
+
+**Solution:** Fixed with proper raw queries:
+```php
+// ✅ FIXED: Proper DATE() grouping
+->selectRaw('DATE(sale_date) as sale_date, SUM(total_revenue) as daily_revenue, ...')
+->groupByRaw('DATE(sale_date)')
+->keyBy(function ($item) {
+    return Carbon::parse($item->sale_date)->format('Y-m-d');
+});
+```
+
+##### 3. Tab Loading Dependencies (Fixed in v1.0)
+**Problem:** Other tabs couldn't load without running overview validation first
+```javascript
+// ❌ WRONG: All tabs required currentValidationData
+async function loadTabData(tab) {
+    if (!currentValidationData) return; // Blocked other tabs
+}
+```
+
+**Solution:** Made tabs independent:
+```javascript
+// ✅ FIXED: Independent tab loading
+async function loadTabData(tab) {
+    const formData = new FormData(document.getElementById('validation-form'));
+    switch (tab) {
+        case 'overview':
+            if (currentValidationData) loadOverviewTab(); // Only overview needs this
+            break;
+        case 'daily':
+            await loadDailyTab(formData); // Independent AJAX calls
+            break;
+        // ... other tabs work independently
+    }
+}
+```
+
+#### Debugging Validation Issues
+
+**Check Browser Console:**
+1. Open browser developer tools (F12)
+2. Go to Console tab
+3. Look for JavaScript errors or AJAX failures
+4. Console logs show: "Loading daily tab data...", "Daily tab response:", etc.
+
+**Test Backend Validation:**
+```bash
+# Test validation service directly
+php artisan tinker --execute="
+use App\Services\SalesValidationService;
+use Carbon\Carbon;
+\$service = new SalesValidationService();
+\$result = \$service->validateDateRange(Carbon::parse('2025-07-15'), Carbon::parse('2025-07-15'));
+echo 'Accuracy: ' . \$result['summary']['accuracy_percentage'] . '%';
+"
+```
+
+**Verify Routes:**
+```bash
+# Check validation routes exist
+php artisan route:list --name=sales-import
+```
+
+#### Test Data Cleanup Issues
+
+**Problem:** Mixed test data causing validation discrepancies
+
+**Solution:** Clean test data:
+```bash
+# Remove synthetic test records
+php artisan tinker --execute="
+use App\Models\SalesDailySummary;
+\$testProductIds = ['PROD001', 'PROD002', 'PROD003', 'PROD004', 'PROD005'];
+\$deleted = SalesDailySummary::whereIn('product_id', \$testProductIds)->delete();
+echo 'Deleted ' . \$deleted . ' test records';
+"
+```
+
+**Verification:** After cleanup, validation should show 100% accuracy with real POS data.
+
+### Development & Testing Issues
+
+#### Test Data Creation Fails
+**Error:** `sales:create-test-data` command fails
+
+**Solutions:**
+```bash
+# Check if tables exist
+php artisan migrate:status
+
+# Clear and rebuild
+php artisan migrate:fresh
+php artisan sales:create-test-data --days=30
+```
+
+#### Repository Performance Testing Shows Slow Results
+**Symptoms:**
+- `php artisan sales:test-repository` shows high execution times
+- Expected sub-20ms queries taking longer
+
+**Debugging:**
+```bash
+# Check index usage
+EXPLAIN SELECT * FROM sales_daily_summary 
+WHERE sale_date BETWEEN '2025-07-01' AND '2025-07-31' 
+AND category_id IN ('SUB1', 'SUB2', 'SUB3');
+```
+
+**Solutions:**
+- Ensure database has proper indexes
+- Check if using development vs production database
+- Verify sufficient test data exists
+
+### Console Command Issues
+
+#### Commands Not Found
+**Error:** `Command "sales:import-daily" is not defined`
+
+**Solutions:**
+```bash
+# Clear command cache
+php artisan optimize:clear
+
+# Register commands manually
+php artisan optimize
+
+# Check command is registered
+php artisan list sales
+```
+
+#### Permission Errors
+**Error:** Permission denied when running imports
+
+**Solutions:**
+- Check file permissions on storage directories
+- Ensure web server user can write to log files
+- Verify database connection permissions
+
+### Chart.js Errors in Daily Sales Overview
+
+#### "can't access property 'save', t is null" Error
+
+**Symptoms:**
+- Daily Sales Overview chart appears blank
+- Browser console shows Chart.js error about 'save' property
+- Chart creation/update failures
+- Error occurs during chart rendering
+
+**Root Causes:**
+1. **Canvas Context Issues**: Chart.js losing reference to canvas 2D context
+2. **Multiple Chart Instances**: Multiple charts created on same canvas element
+3. **Rapid Destroy/Create Cycles**: Chart destroyed and recreated too quickly
+4. **Memory Leaks**: Chart instances not properly cleaned up
+
+**Solutions:**
+
+**1. Check Chart Recreation Logic:**
+```javascript
+// Browser Console debugging
+console.log('Chart instance:', this.chart);
+console.log('Canvas element:', document.getElementById('dailySalesChart'));
+console.log('Canvas context:', document.getElementById('dailySalesChart').getContext('2d'));
+```
+
+**2. Verify Canvas Element:**
+```html
+<!-- Ensure canvas has unique ID and no conflicts -->
+<canvas id="dailySalesChart" style="height: 300px;"></canvas>
+```
+
+**3. Clear Browser Cache:**
+- Hard refresh (Ctrl+F5)
+- Clear browser cache and cookies
+- Disable browser extensions temporarily
+
+**4. Check Console Logs:**
+Look for these debug messages:
+- `📊 Chart needs recreation` - Chart update triggered
+- `📊 Creating chart with data` - Chart creation process
+- `✅ Chart created successfully` - Successful creation
+- `💥 Error creating chart` - Chart creation failed
+
+**Fixed Features:**
+- ✅ Smart chart recreation only when data changes
+- ✅ Proper canvas cleanup with Chart.getChart()
+- ✅ 100ms delay between destroy/create operations
+- ✅ Comprehensive error handling and recovery
+- ✅ Chart responds correctly to date range changes
+- ✅ Euro currency display throughout interface
+
+#### Chart Not Updating with Date Range Changes
+
+**Symptoms:**
+- Chart shows old data when date range changes
+- July data persists when selecting June dates
+- Chart doesn't respond to "Update" button clicks
+
+**Diagnosis:**
+```javascript
+// Check if date range changes are detected
+console.log('Current date range:', this.startDate, 'to', this.endDate);
+console.log('Daily sales count:', this.dailySales?.length);
+console.log('Sample data:', this.dailySales?.[0]);
+```
+
+**Solutions:**
+1. **Check AJAX Response**: Verify API returns correct data for selected dates
+2. **Verify Data Assignment**: Ensure `this.dailySales` updates with new data
+3. **Force Chart Recreation**: Chart will recreate automatically when data changes
+4. **Check Data Availability**: Some date ranges may have no F&V sales data
+
 ## 📞 Getting Help
 
 - Check Laravel Blade documentation

@@ -27,6 +27,25 @@ class LabelTemplateSeeder extends Seeder
                 'is_active' => true,
             ],
             [
+                'name' => 'Grid 4x9 (47x31mm)',
+                'description' => '4 columns x 9 rows grid layout - 36 labels per A4 sheet',
+                'width_mm' => 47.5,
+                'height_mm' => 30.8,
+                'margin_mm' => 2,
+                'font_size_name' => 9,
+                'font_size_barcode' => 7,
+                'font_size_price' => 12,
+                'barcode_height' => 15,
+                'layout_config' => [
+                    'type' => 'grid_4x9',
+                    'barcode_position' => 'bottom_left',
+                    'price_position' => 'bottom_right',
+                    'name_position' => 'top_full_width'
+                ],
+                'is_default' => false,
+                'is_active' => true,
+            ],
+            [
                 'name' => 'Small (38x21mm)',
                 'description' => 'Compact labels for small items or tight spaces',
                 'width_mm' => 38,

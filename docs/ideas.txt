@@ -1,2 +1,12 @@
 
 a udea product quick add feature that would allow the user to scan a products barcode or enter the udeas product code and would retrieve the relevant data to enter the product details by scrapping the info from the website. we already have the code for scrapping the info, and from what I can see the url that we make can take either the barcode or supplier code
+
+
+implement a users roles system so employees only have access to the features they need, managers have access to sales information etc and admins have complete access
+
+fruit and veg sales, /fruit-veg/sales
+change currency to €,
+Fix Daily Sales Overview, it has no data even though there are Product Sales Details for the sales period
+
+
+sort Products by name, add pictures, maybe add a hover or a sub detail (expands when a user clicks on it) feature that shows sales per day, this way it can retrieve daily sales as needed and not all at the start
