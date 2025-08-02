@@ -52,7 +52,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Smart Search**: Ultra-fast product search across F&V sales data
   - **Performance Monitoring**: Real-time performance metrics in API responses
   - **Backward Compatibility**: All existing F&V functionality maintained while dramatically faster
-- **Enhanced Fruit & Veg Label Printing**: Improved label design and formatting
+- **Enhanced Label Printing System**: Comprehensive improvements to label design and functionality
+  - **New 4x9 Grid Label Template**: Efficient 36 labels per A4 sheet (47.5×30.8mm each)
+    - Optimized layout with product name, barcode, and price positioning
+    - Intelligent price font sizing (26pt) for clear readability
+    - Fixed CSS syntax errors that prevented proper font size rendering
+    - Enhanced CSS specificity to override parent constraints
+    - Automatic text sizing for product names within available space
+    - Improved barcode positioning and sizing for better scanner recognition
+  - **Enhanced Label Template System**: Multiple templates with configurable dimensions
+  - **Improved Print Templates**: Consistent styling between preview and print modes
+  - **Debug Features**: Comprehensive CSS debugging and troubleshooting capabilities
+  - **Layout Optimization**: Flexible height management and overflow handling
   - Removed label borders for cleaner appearance when cutting
   - Enhanced padding (4mm) and margins (2mm) for easier label cutting
   - Smart unit display: shows "each" instead of "per ea" for per-unit items

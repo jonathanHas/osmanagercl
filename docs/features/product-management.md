@@ -212,6 +212,8 @@ public function toggleStocking() // Toggle stock management
 - Products can be queued for label printing
 - Print labels directly from product detail page
 - Re-queue products for label printing when needed
+- Support for multiple label templates including new 4x9 grid layout
+- Optimized price display sizing for clear readability
 
 #### Supplier Integration
 - Automatic price fetching from external suppliers (UDEA)
