@@ -534,28 +534,6 @@
         
         // Initialize auto-resize on page load
         document.addEventListener('DOMContentLoaded', function() {
-            // Debug CSS values
-            @if($isGrid4x9)
-            console.log('=== DEBUG INFO (PREVIEW) ===');
-            console.log('Template CSS font_size_price:', '{{ $css['font_size_price'] }}');
-            
-            const priceElements = document.querySelectorAll('.label-price-4x9');
-            priceElements.forEach((element, index) => {
-                console.log(`Price element ${index}:`, element);
-                console.log('- Text content:', element.textContent);
-                console.log('- Computed font-size:', window.getComputedStyle(element).fontSize);
-                console.log('- Computed font-weight:', window.getComputedStyle(element).fontWeight);
-                console.log('- Computed display:', window.getComputedStyle(element).display);
-                console.log('- Computed height:', window.getComputedStyle(element).height);
-                console.log('- Computed max-height:', window.getComputedStyle(element).maxHeight);
-                console.log('- Computed overflow:', window.getComputedStyle(element).overflow);
-                console.log('- Inline styles:', element.style.cssText);
-                console.log('- Parent element:', element.parentElement);
-                console.log('- Parent computed height:', window.getComputedStyle(element.parentElement).height);
-                console.log('---');
-            });
-            @endif
-            
             autoResizeText();
             
             // Run again after layout settles
