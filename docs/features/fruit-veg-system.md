@@ -81,7 +81,17 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
   - Sortable by units sold, revenue, or average price
   - Product search and filtering on pre-aggregated data
   - Export capabilities for external analysis
-  - Expandable daily sales breakdown per product
+  - **Expandable daily sales breakdown per product** with individual charts
+- **Individual Product Sales Charts (NEW! 🎯)**: Interactive Chart.js visualization for each product
+  - **Per-Product Daily Trends**: Click to expand any product row to see detailed daily sales chart
+  - **Compact Chart Design**: 200px height charts optimized for expanded sections
+  - **Dual-Axis Product Charts**: Revenue and units sold on same chart with proper scaling
+  - **Chart Instance Management**: Smart chart creation/destruction when expanding/collapsing products
+  - **Data Persistence**: Raw sales data cached for instant chart recreation on re-expansion
+  - **Consistent UI Pattern**: Same visual style as main overview chart but compact
+  - **Mobile Optimized**: Responsive charts that work well in mobile expanded sections
+  - **Loading States**: Individual loading indicators for each product chart
+  - **Error Handling**: Graceful fallback when product chart fails to load
 - **Optimized Data Source**: Powered by pre-aggregated `sales_daily_summary` tables
   - No more slow cross-database queries
   - 100% data accuracy with validation system
@@ -294,9 +304,13 @@ VegClass::orderBy('sort_order')->get();
 - `markLabelsPrinted()` - Clear items from print queue
 
 **Sales Analytics (Enhanced 2025)**
-- `sales()` - Enhanced sales dashboard with advanced navigation and chart
+- `sales()` - Enhanced sales dashboard with advanced navigation and overview chart
 - `getSalesData()` - Optimized AJAX endpoint for sales data with smart date defaults
-- `getProductDailySales()` - Daily sales breakdown for individual products
+- `getProductDailySales()` - Daily sales breakdown for individual products with chart data
+  - Returns structured JSON with daily sales data optimized for Chart.js
+  - Includes product summary statistics (total units, revenue, days with sales, averages)
+  - Supports both pre-aggregated and live POS data fallback
+  - Used by expandable product rows for individual product charts
 
 **Product Data Management**
 - `editProduct()` - Comprehensive product edit interface with tabbed layout
@@ -391,6 +405,11 @@ Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
 - **Image caching** with appropriate cache headers (24-hour cache)
 - **Optimized JavaScript** with minimal DOM manipulation and efficient state management
 - **Real-time Updates** without page refreshes using Alpine.js reactivity
+- **Efficient Chart Management**: Individual product charts created/destroyed on-demand
+  - Chart instances stored in `productCharts` object for lifecycle management
+  - Raw chart data cached in `dailySalesRawData` for instant recreation
+  - Chart.js instances properly destroyed to prevent memory leaks
+  - Compact chart configuration optimized for smaller display areas
 
 ## Workflow Examples
 
@@ -413,6 +432,17 @@ Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
 2. Review products needing labels
 3. Preview labels before printing
 4. Mark labels as printed to clear queue
+
+### Individual Product Sales Analysis
+1. Navigate to F&V Sales page
+2. Browse products in the Product Sales Details table
+3. Click the expand arrow (▼) next to any product name
+4. View detailed daily sales breakdown with:
+   - Summary statistics (total units, revenue, days with sales, daily average)
+   - Interactive Chart.js visualization showing daily trends
+   - Detailed daily sales table with trend bars
+5. Collapse any product to free up screen space and chart resources
+6. Multiple products can be expanded simultaneously for comparison
 
 ## Organic Certification Compliance
 
@@ -478,6 +508,20 @@ Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
 - **Sales Table Rendering**: Fixed critical Alpine.js template structure preventing Product Sales Details from displaying
 - **Chart Recursion Fix**: Resolved "too much recursion" error by storing Chart.js instance outside Alpine reactive scope
 - **Table Template Structure**: Fixed nested template issues in x-for loops that prevented data rendering
+- **Individual Product Charts**: Added Chart.js visualizations to expandable product rows in sales table
+
+### Recent Feature Additions (2025)
+
+#### Individual Product Sales Charts (January 2025)
+- **Interactive Product-Level Analytics**: Each product in the sales table can be expanded to show individual daily sales charts
+- **Chart.js Integration**: Compact 200px height charts with dual-axis display (revenue and units sold)
+- **Smart Chart Management**: Automatic chart creation/destruction when expanding/collapsing products
+- **Data Optimization**: Raw sales data cached for instant chart recreation on re-expansion
+- **Mobile Responsive**: Charts work seamlessly in mobile expanded sections
+- **Memory Efficient**: Chart instances properly destroyed to prevent memory leaks
+- **Consistent Design**: Same visual styling as main overview chart but optimized for compact display
+- **Error Handling**: Graceful fallback with error messages when charts fail to load
+- **Performance Optimized**: Charts only created when needed, minimizing resource usage
 
 ### Recent Feature Additions (2024)
 

@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **☕ Coffee Module Enhancements**: Advanced product management features (2025-08-04)
+  - **Inline Price Editing**: Click-to-edit pricing with VAT calculations
+  - **Display Name Management**: Set custom display names for till buttons
+  - **Clickable Product Names**: Navigate to product detail pages with context
+  - **Context-Aware Navigation**: Smart back button text based on referrer
+  - **Till Visibility Toggle**: Fixed invisible toggle switches using Alpine.js patterns
+  - **Alpine.js Directive Fix**: Resolved Blade/Alpine.js `@error` directive conflicts
+
+- **☕ Coffee Fresh Module**: New category-specific sales analytics module (2025-08-04)
+  - **Complete Implementation**: Full coffee sales tracking and analytics dashboard
+  - **Category Support**: Covers both "Coffee Hot" (080) and "Coffee Cold" (081) categories
+  - **Sales Analytics**: Comprehensive sales dashboard with charts and individual product breakdowns
+  - **Product Management**: Till visibility toggles and product listing
+  - **Individual Product Charts**: Expandable rows with Chart.js visualizations per product
+  - **Pattern Template**: Establishes simplified pattern for future category modules (Lunch, Cakes, etc.)
+  - **Performance**: Uses OptimizedSalesRepository for instant sub-20ms queries
+
 - **🎯 Enhanced F&V Sales Dashboard Navigation**: Advanced date range controls for sales analytics
   - **Week/Month Navigation**: Dedicated arrow buttons for intuitive week and month increments
   - **Quick Period Selector**: Pre-configured periods (Today, This Week, Last Month, Latest Data)
@@ -33,6 +50,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Enhanced logging**: Comprehensive debugging information for troubleshooting
 
 ### Fixed
+
+- **🔧 Alpine.js Template Tag Error in Coffee Sales**: Fixed "can't access property 'after', A is undefined" error (2025-08-04)
+  - **Root Cause**: Invalid `x-show` directive on `<template>` tags causing Alpine.js DOM manipulation failure
+  - **Solution**: Removed `<template x-show="...">` wrapper - template tags cannot use runtime directives
+  - **Impact**: Coffee sales table now displays product data correctly with pagination and search
+  - **Documentation**: Added troubleshooting guide entry and updated CLAUDE.md with prevention tips
 
 - **🔧 Critical F&V Sales Table Rendering**: Fixed Product Sales Details table not displaying data
   - **Alpine.js template structure**: Resolved nested template issues preventing x-for loop rendering

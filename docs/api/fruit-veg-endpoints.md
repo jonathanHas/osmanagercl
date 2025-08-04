@@ -606,3 +606,62 @@ curl -X GET "/fruit-veg/sales/data?start_date=2025-06-01&end_date=2025-06-30&lim
 - Falls back to live `TICKETLINES`/`RECEIPTS` queries when needed
 - Chart recreation logic prevents Chart.js canvas context errors
 - Smart date range validation with user-friendly feedback
+
+### GET /sales/product/{code}/daily
+**Description**: Get daily sales breakdown for a specific product (Powers individual product charts in expanded rows)
+
+**Path Parameters**:
+- `code` (required, string) - Product code
+
+**Query Parameters**:
+- `start_date` (optional, string) - Start date in Y-m-d format
+- `end_date` (optional, string) - End date in Y-m-d format
+
+**Response** (JSON):
+```json
+{
+  "success": true,
+  "product": {
+    "code": "F001",
+    "name": "Organic Apples"
+  },
+  "daily_sales": [
+    {
+      "sale_date": "2025-01-01",
+      "daily_units": 12.5,
+      "daily_revenue": 24.75,
+      "avg_price": 1.98,
+      "transaction_count": 3
+    },
+    {
+      "sale_date": "2025-01-02", 
+      "daily_units": 8.0,
+      "daily_revenue": 15.84,
+      "avg_price": 1.98,
+      "transaction_count": 2
+    }
+  ],
+  "summary": {
+    "total_units": 20.5,
+    "total_revenue": 40.59,
+    "days_with_sales": 2,
+    "avg_daily_units": 10.25
+  },
+  "date_range": {
+    "start": "2025-01-01",
+    "end": "2025-01-02"
+  }
+}
+```
+
+**Features**:
+- **Chart-Optimized Data**: Structured specifically for Chart.js integration
+- **Performance Optimized**: Uses pre-aggregated data when available with live fallback
+- **Summary Statistics**: Provides totals and averages for chart context
+- **Error Handling**: Returns structured error responses when product not found
+
+**Usage**:
+- Called when user expands product row in sales table
+- Data directly consumed by `createProductChart()` JavaScript method
+- Enables individual product daily trend visualization
+- Supports same date range as main sales dashboard

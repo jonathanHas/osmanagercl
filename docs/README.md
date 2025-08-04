@@ -4,6 +4,25 @@ Welcome to the comprehensive documentation for OSManager CL. This documentation 
 
 📚 **New to the docs?** Start with the [Documentation Usage Guide](./DOCUMENTATION_GUIDE.md) to understand how to navigate and contribute to documentation.
 
+## 🆕 Latest Updates (August 2025)
+
+### Independent Irish Health Foods Integration
+Complete delivery system integration for Irish suppliers with advanced VAT processing:
+
+- **🇮🇪 Irish VAT Support**: Automatic calculation and normalization of Irish VAT rates (0%, 9%, 13.5%, 23%)
+- **🏷️ Auto Tax Categories**: Intelligent tax category selection for POS integration
+- **📦 Case-to-Unit Conversion**: Smart pricing conversion from case to unit costs
+- **📋 Enhanced CSV Processing**: Multi-format support with automatic format detection
+- **✨ Visual UX**: Green indicators for auto-selected fields and smart form pre-population
+
+**Key Benefits**:
+- Eliminates manual tax category selection for Irish products
+- Ensures accurate unit pricing from case-based supplier data  
+- Reduces data entry errors with intelligent form pre-population
+- Streamlines Irish supplier delivery processing workflow
+
+See [Delivery System](./features/delivery-system.md) and [Supplier Integration](./features/supplier-integration.md) for complete details.
+
 ## 📚 Documentation Structure
 
 ### 🏗️ Architecture & Design
@@ -28,8 +47,10 @@ Detailed documentation for each major feature.
   - Real-time inventory synchronization
   - Read-only access patterns
 
-- **[Delivery System](./features/delivery-system.md)** - Comprehensive delivery verification
-  - CSV import and parsing
+- **[Delivery System](./features/delivery-system.md)** - Multi-format delivery verification *(Enhanced)*
+  - Multi-format CSV support (Udea & Independent Irish Health Foods)
+  - Automatic format detection and case-to-unit conversion
+  - Irish VAT rate calculation and tax category auto-selection
   - Mobile-optimized barcode scanning
   - Discrepancy tracking and reporting
   - Stock update automation
@@ -40,11 +61,12 @@ Detailed documentation for each major feature.
   - Margin analysis and optimization
   - Quick pricing actions
 
-- **[Supplier Integration](./features/supplier-integration.md)** - External supplier connectivity
+- **[Supplier Integration](./features/supplier-integration.md)** - Multi-supplier connectivity *(Enhanced)*
+  - Udea (Dutch): Full image CDN and price scraping integration
+  - Independent Irish Health Foods: Delivery system with VAT processing
   - Product image CDN integration
-  - Live price scraping
-  - Barcode extraction
-  - Multi-supplier support
+  - Live price scraping and barcode extraction
+  - Extensible architecture for additional suppliers
 
 - **[Label System](./features/label-system.md)** - Comprehensive label printing system *(Updated)*
   - Dynamic barcode generation with Code128 format
@@ -56,12 +78,13 @@ Detailed documentation for each major feature.
   - Real-time print queue management
   - Smart product filtering based on print history
 
-- **[Product Management](./features/product-management.md)** - Product catalog operations
+- **[Product Management](./features/product-management.md)** - Product catalog operations *(Enhanced)*
   - Cross-database VegDetails integration with POS system
   - Real-time class, country, and unit data synchronization
   - Dual search system for availability management
   - CRUD operations with UUID support
   - Inline editing for product names, pricing, and tax categories
+  - **Automatic tax category selection** for Irish VAT rates from delivery data
   - Stocking management with visual indicators
   - Delivery-integrated product creation workflows
   - Smart context-aware navigation
@@ -73,6 +96,13 @@ Detailed documentation for each major feature.
   - Supplier linking
   - Category management
   - Search and filtering
+
+- **[Coffee Module](./features/coffee-module.md)** - Coffee Fresh product management *(New)*
+  - Till visibility control via PRODUCTS_CAT
+  - Inline price and display name editing
+  - Optimized sales analytics with charts
+  - Context-aware navigation
+  - Alpine.js reactive UI components
 
 ### 💻 Development
 Guides for developers working on the project.
@@ -94,6 +124,7 @@ Production deployment and operations.
 Complete API documentation.
 
 - **[Product Endpoints](./api/product-endpoints.md)** - Product management API endpoints
+- **[Delivery Endpoints](./api/delivery-endpoints.md)** - Multi-format delivery processing API *(New)*
 - **[Fruit & Veg Endpoints](./api/fruit-veg-endpoints.md)** - Specialized fruit and vegetable operations
 - **[API Endpoints](./api/endpoints.md)** - All available endpoints
 - **[Authentication](./api/authentication.md)** - API authentication methods

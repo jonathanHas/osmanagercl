@@ -185,10 +185,10 @@ class DeliveryService
         // Extract product attributes from name
         $productName = trim($row['Product'] ?? '');
         $attributes = $this->extractIndependentProductAttributes($productName);
-        
+
         // Units per case - extract from product name
         $unitsPerCase = $this->extractUnitsFromProductName($productName);
-        
+
         // Calculate costs - Independent provides tax separately
         $caseCost = (float) ($row['Price'] ?? 0);  // Price is per case, not per unit
         $unitCost = $unitsPerCase > 0 ? $caseCost / $unitsPerCase : $caseCost;  // Convert to per-unit cost

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CoffeeController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\FruitVegController;
 use App\Http\Controllers\LabelAreaController;
@@ -84,6 +85,17 @@ Route::middleware('auth')->group(function () {
         Route::get('/sales', [FruitVegController::class, 'sales'])->name('sales');
         Route::get('/sales/data', [FruitVegController::class, 'getSalesData'])->name('sales.data');
         Route::get('/sales/product/{code}/daily', [FruitVegController::class, 'getProductDailySales'])->name('sales.product.daily');
+    });
+
+    // Coffee routes
+    Route::prefix('coffee')->name('coffee.')->group(function () {
+        Route::get('/', [CoffeeController::class, 'index'])->name('index');
+        Route::get('/products', [CoffeeController::class, 'products'])->name('products');
+        Route::post('/visibility/toggle', [CoffeeController::class, 'toggleVisibility'])->name('visibility.toggle');
+        Route::get('/sales', [CoffeeController::class, 'sales'])->name('sales');
+        Route::get('/sales/data', [CoffeeController::class, 'getSalesData'])->name('sales.data');
+        Route::get('/sales/product/{code}/daily', [CoffeeController::class, 'getProductDailySales'])->name('sales.product.daily');
+        Route::get('/product-image/{code}', [CoffeeController::class, 'productImage'])->name('product-image');
     });
 
     // Delivery management routes

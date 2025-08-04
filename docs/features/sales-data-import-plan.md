@@ -962,7 +962,81 @@ class FruitVegController {
 
 ### 🎯 Ready-to-Implement Integration Patterns
 
-#### 1. Inventory Analytics Module
+#### 1. Category-Specific Sales Modules (Coffee, Lunch, Cakes, etc.)
+
+**Simplified Pattern for Category-Only Analytics (Like Coffee Fresh):**
+
+```php
+// Step 1: Identify Category IDs in POS Database
+// Query: SELECT DISTINCT ID, NAME FROM CATEGORIES WHERE NAME LIKE '%Coffee%'
+// Result: ['080' => 'Coffee Hot', '081' => 'Coffee Cold']
+
+// Step 2: Create Controller with Core Methods
+class CoffeeController extends Controller {
+    const COFFEE_CATEGORIES = ['080', '081'];
+    
+    public function getSalesData(Request $request) {
+        // CRITICAL: Use getTopCoffeeProducts() NOT getCoffeeSalesByDateRange()
+        // The "Top" method returns grouped product data, not daily records
+        $sales = $this->optimizedSalesRepository->getTopCoffeeProducts($startDate, $endDate, $limit);
+        
+        // Add category names for frontend compatibility
+        $sales = $sales->map(function ($product) {
+            $categoryNames = [
+                '080' => 'Coffee Hot',
+                '081' => 'Coffee Cold'
+            ];
+            $product->category_name = $categoryNames[$product->category_id] ?? 'Coffee';
+            $product->category = $product->category_id; // For template compatibility
+            return $product;
+        });
+    }
+}
+
+// Step 3: Add Model Scopes
+// In SalesDailySummary.php and SalesMonthlySummary.php:
+public function scopeCoffee($query) {
+    return $query->whereIn('category_id', ['080', '081']);
+}
+
+// Step 4: Add Repository Methods (copy F&V pattern)
+public function getTopCoffeeProducts(Carbon $startDate, Carbon $endDate, int $limit = 50): Collection {
+    return SalesDailySummary::coffee()
+        ->forDateRange($startDate, $endDate)
+        ->selectRaw('
+            product_id, product_code, product_name, category_id,
+            SUM(total_units) as total_units,
+            SUM(total_revenue) as total_revenue,
+            AVG(avg_price) as avg_price
+        ')
+        ->groupBy('product_id', 'product_code', 'product_name', 'category_id')
+        ->orderByDesc('total_revenue')
+        ->limit($limit)
+        ->get();
+}
+
+// Step 5: Create Views (copy from coffee implementation)
+// - index.blade.php: Dashboard with statistics
+// - products.blade.php: Product listing with visibility toggles
+// - sales.blade.php: Full analytics with charts
+```
+
+**⚠️ CRITICAL ALPINE.JS FIX (2025-08-04):**
+```blade
+<!-- ❌ WRONG - Causes "can't access property 'after'" error -->
+<template x-show="!loading && filteredSales.length > 0">
+    <template x-for="sale in paginatedSales" :key="sale.product_id">
+        <tbody>...</tbody>
+    </template>
+</template>
+
+<!-- ✅ CORRECT - Template tags cannot use x-show -->
+<template x-for="sale in paginatedSales" :key="sale.product_id">
+    <tbody>...</tbody>
+</template>
+```
+
+#### 2. Inventory Analytics Module
 ```php
 // Create OptimizedInventoryRepository
 class OptimizedInventoryRepository {

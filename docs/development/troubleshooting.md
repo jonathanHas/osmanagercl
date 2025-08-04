@@ -48,6 +48,57 @@ Use a single `<template x-for>` that wraps both rows in a `<tbody>` element:
 - Alpine.js can properly scope the loop variable to both rows
 - Maintains proper table structure and row ordering
 
+### Alpine.js Template Tag Errors - "can't access property 'after', A is undefined" (FIXED 2025-08-04)
+
+**Symptoms:**
+- Table displays loading state but never shows data rows
+- Console error: `Uncaught TypeError: can't access property "after", A is undefined`
+- Data loads successfully (visible in console logs) but table remains empty
+- Error occurs in Alpine.js minified code during DOM manipulation
+
+**Root Cause:**
+Alpine.js `<template>` tags cannot use runtime directives like `x-show`. Templates are compile-time constructs that get removed from the DOM after processing.
+
+**Example of the Issue (Coffee Sales Implementation):**
+```blade
+<!-- ❌ WRONG - template tags cannot use x-show -->
+<template x-show="!loading && filteredSales.length > 0">
+    <template x-for="sale in paginatedSales" :key="sale.product_id">
+        <tbody>
+            <tr>...</tr>
+        </tbody>
+    </template>
+</template>
+
+<!-- ✅ CORRECT - No x-show on template -->
+<template x-for="sale in paginatedSales" :key="sale.product_id">
+    <tbody>
+        <tr>...</tr>
+    </tbody>
+</template>
+```
+
+**Why This Happened:**
+- Developer attempted to control visibility of the template
+- Confusion between `<template>` (Alpine.js construct) and regular HTML elements
+- Similar patterns work with `<div>` or `<tbody>` but not `<template>`
+
+**Solution:**
+1. Remove `x-show` from `<template>` tags
+2. Use separate `<tbody>` elements with `x-show` for loading/empty states
+3. Let the `x-for` template handle its own visibility based on the data
+
+**Debugging Steps:**
+1. Check browser console for Alpine.js errors
+2. Look for `<template x-show=...>` patterns in your code
+3. Verify data is loading correctly with console.log
+4. Ensure proper table structure without nested templates
+
+**Prevention Tips:**
+- Never use runtime directives (`x-show`, `x-if`) on `<template>` tags
+- Use `<template>` only for `x-for` and `x-if` directives
+- For visibility control, wrap content in `<div>` or appropriate HTML elements
+
 ### ParseError: "unexpected end of file, expecting 'elseif' or 'else' or 'endif'"
 
 **Symptoms:**
@@ -188,6 +239,28 @@ php -l storage/framework/views/compiled-file.php
 @json($products ?? [])
 ```
 
+### Alpine.js Directive Conflicts
+
+**Error:** `ParseError: syntax error, unexpected end of file, expecting 'elseif' or 'else' or 'endif'`
+
+**Cause:** Alpine.js directives starting with `@` are interpreted as Blade directives.
+
+**Solution:** Escape Alpine.js directives with double `@@`:
+```blade
+<!-- ❌ WRONG - Blade tries to parse @error -->
+<img src="image.jpg" @error="handleError()">
+
+<!-- ✅ CORRECT - Outputs @error for Alpine.js -->
+<img src="image.jpg" @@error="handleError()">
+
+<!-- Common Alpine.js directives to escape -->
+@@click="handler()"
+@@change="update()"
+@@submit="submit()"
+@@keyup="search()"
+@@error="fallback()"
+```
+
 ## 🧹 Cache Issues
 
 ### Views Not Updating
@@ -215,6 +288,122 @@ php artisan optimize:clear
 # Restart development server
 php artisan serve
 ```
+
+## 📦 Delivery System Issues
+
+### Independent Irish Health Foods CSV Format Problems
+
+**Symptoms:**
+- Unit costs showing as case prices (e.g., €21.44 instead of €1.79)
+- Tax calculations appearing incorrect
+- Product creation form showing wrong pricing
+- "Add to POS" button not auto-selecting tax category
+
+**Root Cause Analysis:**
+
+**Case vs Unit Pricing Issue (Fixed 2025-08-04)**:
+Independent CSV format uses **case pricing** in the Price field, not unit pricing like Udea format.
+
+```csv
+# Independent format - Price is per CASE
+Code,Product,Price,Qty
+19990B,Suma Hemp Oil & Vitamin E Soap 12x90g,21.44,1
+# 12 units per case → €21.44 ÷ 12 = €1.79 per unit
+```
+
+**Solutions Applied:**
+
+1. **Automatic Format Detection**:
+```php
+// DeliveryService detects format by headers and supplier ID
+private function detectIndependentCsvFormat(array $headers, int $supplierId): bool
+{
+    $independentConfig = config('suppliers.external_links.independent');
+    return in_array($supplierId, $independentConfig['supplier_ids'] ?? []);
+}
+```
+
+2. **Case-to-Unit Conversion**:
+```php
+// Extract units per case from product name
+$unitsPerCase = $this->extractUnitsFromProductName($productName); // "12x90g" = 12
+$unitCost = $unitsPerCase > 0 ? $caseCost / $unitsPerCase : $caseCost;
+```
+
+3. **VAT Rate Calculation & Normalization**:
+```php
+// Calculate Irish VAT rate: (Tax ÷ Value) × 100
+$taxRate = ($taxAmount / $lineValueExVat) * 100;
+$normalizedRate = $this->normalizeIrishVatRate($taxRate); // Maps to 0%, 9%, 13.5%, 23%
+```
+
+4. **Automatic Tax Category Selection**:
+```php
+// Map VAT rates to POS tax category IDs
+private function mapTaxRateToCategory(float $taxRate): ?string
+{
+    return match ($taxRate) {
+        0.0 => '000',    // Tax Zero
+        9.0 => '003',    // Tax Second Reduced
+        13.5 => '001',   // Tax Reduced  
+        23.0 => '002',   // Tax Standard
+        default => null
+    };
+}
+```
+
+**Debugging Steps:**
+```bash
+# Test CSV parsing for specific product
+php artisan tinker
+$testRow = [
+    'Code' => '19990B', 
+    'Product' => 'Suma Hemp Oil & Vitamin E Soap 12x90g',
+    'Price' => '21.44', 'Tax' => '4.93', 'Value' => '21.44'
+];
+$service = new App\Services\DeliveryService(app(App\Services\UdeaScrapingService::class));
+$result = $service->parseIndependentCsv($testRow);
+// Expected: unit_cost = 1.79, tax_rate = 23.02, normalized_tax_rate = 23.0
+```
+
+**Verification Checklist:**
+- ✅ Unit costs are calculated correctly (case price ÷ units per case)
+- ✅ VAT rates are calculated using (Tax ÷ Value) × 100
+- ✅ Tax categories are auto-selected in product creation form
+- ✅ Green styling appears on auto-selected tax category field
+- ✅ Delivery view shows correct unit costs with "per unit" label
+
+### CSV Import Failures
+
+**Symptoms:**
+- "Failed to import CSV" error messages
+- No delivery items created
+- Format detection not working
+
+**Debug Process:**
+```bash
+# 1. Check CSV file structure
+head -5 /path/to/file.csv
+
+# 2. Test format detection
+php artisan tinker
+$headers = ['Code', 'Product', 'RSP', 'Price', 'Tax', 'Value'];
+$supplierId = 1;
+// Should return true for Independent format
+
+# 3. Check supplier configuration
+config('suppliers.external_links.independent.supplier_ids')
+
+# 4. Verify file upload limits
+php -i | grep upload_max_filesize
+php -i | grep post_max_size
+```
+
+**Common Fixes:**
+- Ensure CSV has proper headers (first row)
+- Check file encoding (UTF-8 recommended)
+- Verify supplier ID exists in database
+- Increase PHP upload limits if needed
 
 ## 🔧 Development Tools
 

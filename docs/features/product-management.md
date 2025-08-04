@@ -207,6 +207,7 @@ public function toggleStocking() // Toggle stock management
 - Delivery context maintained through navigation
 - Pre-populated forms with supplier and cost information
 - Automatic barcode assignment from delivery data
+- **Automatic Tax Category Selection**: For Independent Irish Health Foods deliveries, tax categories are automatically selected based on calculated VAT rates
 
 #### Label System Integration
 - Products can be queued for label printing
@@ -271,6 +272,40 @@ if ($request->price_input_mode === 'gross') {
     $netPrice = $vatRate > 0 ? $request->gross_price / (1 + $vatRate) : $request->gross_price;
 }
 ```
+
+### Automatic Tax Category Selection
+
+**Overview**: When creating products from Independent Irish Health Foods delivery items, the system automatically pre-selects the appropriate tax category based on the calculated VAT rate from the delivery data.
+
+**Process**:
+1. **VAT Rate Calculation**: System calculates VAT rate using formula: `(Tax ÷ Value) × 100`
+2. **Irish VAT Normalization**: Calculated rates are normalized to standard Irish VAT rates
+3. **Tax Category Mapping**: Normalized rates are mapped to POS tax category IDs
+4. **Form Pre-population**: Tax category dropdown is automatically selected
+5. **Visual Feedback**: Green styling indicates auto-selected fields
+
+**VAT Rate Mappings**:
+```php
+// POS Tax Category Mapping
+return match ($taxRate) {
+    0.0 => '000',    // Tax Zero
+    9.0 => '003',    // Tax Second Reduced (9%)
+    13.5 => '001',   // Tax Reduced (13.5%)
+    23.0 => '002',   // Tax Standard (23%)
+    default => null, // Manual selection required
+};
+```
+
+**Supported Tax Rates**:
+- **0%**: Essential foods, books, medicines
+- **9%**: Tourism, restaurants, some services
+- **13.5%**: Fuel, electricity, building materials
+- **23%**: Standard rate for most goods and services
+
+**Visual Indicators**:
+- **Green Background**: Tax category field when auto-selected
+- **"Auto-selected" Label**: Displayed next to pre-filled dropdown
+- **Tooltip Information**: Shows source VAT rate and calculation details
 
 ### Enhanced Product Search & Filtering (2025)
 

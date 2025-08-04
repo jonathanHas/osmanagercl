@@ -18,7 +18,7 @@ class TillVisibilityService
      */
     const CATEGORY_MAPPINGS = [
         'fruit_veg' => ['SUB1', 'SUB2', 'SUB3'], // Fruits, Vegetables, Veg Barcoded
-        'coffee' => ['COFFEE', 'HOT_DRINKS'],     // To be defined based on actual categories
+        'coffee' => ['081'],                      // Coffee Fresh category
         'lunch' => ['SANDWICHES', 'SALADS'],      // To be defined based on actual categories
         'cakes' => ['CAKES', 'PASTRIES'],         // To be defined based on actual categories
     ];

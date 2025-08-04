@@ -43,13 +43,14 @@ Laravel's Model-View-Controller pattern provides clear separation of concerns:
 Complex business logic is extracted into service classes:
 ```php
 app/Services/
-├── DeliveryService.php       # Delivery processing logic
-├── SupplierService.php       # Supplier integration
-├── UdeaScrapingService.php   # External data retrieval
-├── PricingService.php        # Price calculations
-├── SalesImportService.php      # 🚀 Sales data import and synchronization
-├── SalesValidationService.php  # 🔍 Data validation and comparison
-└── TillVisibilityService.php   # Till management and product visibility
+├── DeliveryService.php          # Multi-format delivery processing (Udea/Independent)
+├── SupplierService.php          # Supplier integration and external connectivity
+├── UdeaScrapingService.php      # Dutch supplier data retrieval and pricing
+├── IndependentScrapingService.php # Irish supplier integration (planned)
+├── PricingService.php           # Price calculations and VAT handling
+├── SalesImportService.php       # 🚀 Sales data import and synchronization
+├── SalesValidationService.php   # 🔍 Data validation and comparison
+└── TillVisibilityService.php    # Till management and product visibility
 ```
 
 ### 3. Repository Pattern
@@ -261,13 +262,60 @@ class VegDetails extends Model
 
 ### Delivery Processing Flow
 ```
-CSV Upload → Parse & Import → Create Delivery Records
-     ↓
-Barcode Retrieval Jobs → Queue Processing → Update Items
-     ↓
+CSV Upload → Format Detection → Multi-Format Parsing → Create Delivery Records
+     ↓              ↓                    ↓
+  Headers     ┌─────────────┬─────────────┐
+  Analysis    │    Udea     │ Independent │
+              │   Format    │   Format    │
+              └─────────────┴─────────────┘
+                    ↓             ↓
+              Unit Pricing   Case→Unit Conversion
+                    ↓             ↓
+              Standard Tax   VAT Rate Calculation
+                         ↓
+              Barcode Retrieval Jobs → Queue Processing → Update Items
+                         ↓
 Scanning Interface → Real-time Updates → Progress Tracking
      ↓
 Completion → Stock Updates → POS Synchronization
+```
+
+### Multi-Format CSV Processing
+
+**Format Detection Strategy**:
+- **Header Analysis**: Compares CSV headers against known formats
+- **Supplier ID Matching**: Uses configured supplier IDs for format identification
+- **Format Prioritization**: Independent format takes precedence when both match
+
+**Format-Specific Processing**:
+
+**Udea Format**:
+- Unit-based pricing (Price = per unit)
+- Standard quantity notation
+- Direct cost calculations
+- Dutch supplier integration
+
+**Independent Irish Health Foods Format**:
+- Case-based pricing (Price = per case)
+- Case-to-unit conversion using product name parsing
+- VAT rate calculation: `(Tax ÷ Value) × 100`
+- Irish VAT normalization to standard rates (0%, 9%, 13.5%, 23%)
+- Automatic tax category mapping for POS integration
+- Quantity notation support: "ordered/received" (e.g., "6/5")
+
+**Technical Implementation**:
+```php
+// Format detection logic
+private function detectIndependentCsvFormat(array $headers, int $supplierId): bool
+{
+    // Check supplier ID configuration
+    $independentSuppliers = config('suppliers.external_links.independent.supplier_ids');
+    if (in_array($supplierId, $independentSuppliers)) return true;
+    
+    // Check header patterns
+    $expectedHeaders = ['Code', 'Product', 'RSP', 'Price', 'Tax', 'Value'];
+    return count(array_intersect($headers, $expectedHeaders)) >= 6;
+}
 ```
 
 ### F&V Management Flow

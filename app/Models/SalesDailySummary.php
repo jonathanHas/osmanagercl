@@ -32,6 +32,11 @@ class SalesDailySummary extends Model
         return $query->whereIn('category_id', ['SUB1', 'SUB2', 'SUB3']);
     }
 
+    public function scopeCoffee($query)
+    {
+        return $query->whereIn('category_id', ['081']); // Only Coffee Fresh, not retail packs
+    }
+
     public function scopeForCategory($query, $categoryId)
     {
         return $query->where('category_id', $categoryId);

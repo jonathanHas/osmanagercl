@@ -150,6 +150,9 @@ class ProductController extends Controller
 
         // Check for delivery context
         $fromDelivery = $request->query('from_delivery');
+        
+        // Check for referrer context
+        $from = $request->query('from');
 
         $taxCategories = $this->productRepository->getAllTaxCategories();
 
@@ -183,6 +186,7 @@ class ProductController extends Controller
             'supplierService' => $this->supplierService,
             'udeaPricing' => $udeaPricing,
             'fromDelivery' => $fromDelivery,
+            'from' => $from,
         ]);
     }
 
@@ -421,6 +425,7 @@ class ProductController extends Controller
 
         // Check if we're creating from a delivery item
         $deliveryItemId = $request->query('delivery_item');
+        $categoryId = $request->query('category'); // For category-specific creation (e.g., Coffee Fresh)
         $prefillData = null;
 
         if ($deliveryItemId) {
@@ -486,7 +491,7 @@ class ProductController extends Controller
             }
         }
 
-        return view('products.create', compact('taxCategories', 'categories', 'suppliers', 'prefillData', 'deliveryItemId'));
+        return view('products.create', compact('taxCategories', 'categories', 'suppliers', 'prefillData', 'deliveryItemId', 'categoryId'));
     }
 
     /**

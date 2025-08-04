@@ -2,12 +2,12 @@
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                {{ __('Fruit & Vegetables Sales') }}
+                {{ __('Coffee Sales Analytics') }}
             </h2>
         </div>
     </x-slot>
 
-    <div class="py-6" x-data="salesData()" x-init="init()">
+    <div class="py-6" x-data="coffeeSalesData()" x-init="init()">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             
             <!-- Enhanced Date Navigation -->
@@ -28,14 +28,14 @@
                         <div class="flex items-center bg-gray-50 rounded-lg p-1">
                             <span class="text-xs font-medium text-gray-600 px-2 hidden sm:inline">Week</span>
                             <button @click="navigateWeek(-1)" 
-                                    class="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-white rounded transition-colors"
+                                    class="p-1.5 text-gray-500 hover:text-amber-600 hover:bg-white rounded transition-colors"
                                     title="Previous Week">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                                 </svg>
                             </button>
                             <button @click="navigateWeek(1)" 
-                                    class="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-white rounded transition-colors"
+                                    class="p-1.5 text-gray-500 hover:text-amber-600 hover:bg-white rounded transition-colors"
                                     title="Next Week">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
@@ -47,14 +47,14 @@
                         <div class="flex items-center bg-gray-50 rounded-lg p-1">
                             <span class="text-xs font-medium text-gray-600 px-2 hidden sm:inline">Month</span>
                             <button @click="navigateMonth(-1)" 
-                                    class="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-white rounded transition-colors"
+                                    class="p-1.5 text-gray-500 hover:text-amber-600 hover:bg-white rounded transition-colors"
                                     title="Previous Month">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
                                 </svg>
                             </button>
                             <button @click="navigateMonth(1)" 
-                                    class="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-white rounded transition-colors"
+                                    class="p-1.5 text-gray-500 hover:text-amber-600 hover:bg-white rounded transition-colors"
                                     title="Next Month">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
@@ -64,7 +64,7 @@
                         
                         <!-- Quick Periods Dropdown -->
                         <select @change="setQuickPeriod($event.target.value)" 
-                                class="text-sm rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                class="text-sm rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring-amber-500">
                             <option value="">Quick Jump</option>
                             <option value="today">Today</option>
                             <option value="yesterday">Yesterday</option>
@@ -79,10 +79,10 @@
                         <!-- Manual Date Selection (Compact) -->
                         <div class="flex items-center gap-1 text-xs">
                             <input type="date" x-model="startDate" @change="loadSalesData()"
-                                   class="text-xs rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 w-24 sm:w-28">
+                                   class="text-xs rounded border-gray-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 w-24 sm:w-28">
                             <span class="text-gray-400 hidden sm:inline">–</span>
                             <input type="date" x-model="endDate" @change="loadSalesData()"
-                                   class="text-xs rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 w-24 sm:w-28">
+                                   class="text-xs rounded border-gray-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 w-24 sm:w-28">
                         </div>
                     </div>
                 </div>
@@ -121,13 +121,13 @@
                 
                 <div class="bg-white rounded-lg shadow p-6">
                     <div class="flex items-center">
-                        <div class="p-3 rounded-full bg-purple-100 text-purple-800">
+                        <div class="p-3 rounded-full bg-amber-100 text-amber-800">
                             <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                             </svg>
                         </div>
                         <div class="ml-5">
-                            <p class="text-gray-500 text-sm font-medium">Products Sold</p>
+                            <p class="text-gray-500 text-sm font-medium">Coffee Products Sold</p>
                             <p class="text-2xl font-semibold text-gray-900" x-text="stats.unique_products">0</p>
                         </div>
                     </div>
@@ -150,12 +150,12 @@
 
             <!-- Daily Sales Chart -->
             <div class="bg-white rounded-lg shadow p-6 mb-6">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">Daily Sales Overview</h3>
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Daily Coffee Sales Overview</h3>
                 <div class="relative" style="height: 300px;">
                     <canvas id="dailySalesChart"></canvas>
                     <div id="chartLoading" class="hidden absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center">
                         <div class="text-center">
-                            <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-amber-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
@@ -169,11 +169,11 @@
             <div class="bg-white rounded-lg shadow overflow-hidden">
                 <div class="px-6 py-4 border-b border-gray-200">
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <h3 class="text-lg font-medium text-gray-900">Product Sales Details</h3>
+                        <h3 class="text-lg font-medium text-gray-900">Coffee Product Sales Details</h3>
                         <div class="flex gap-2">
                             <input type="text" x-model="searchTerm" @input.debounce.500ms="filterSales()" 
-                                   placeholder="Search products..." 
-                                   class="block rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                   placeholder="Search coffee products..." 
+                                   class="block rounded-md border-gray-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 sm:text-sm">
                             <button @click="exportSales()" 
                                     class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
                                 Export CSV
@@ -187,11 +187,11 @@
                         <thead class="bg-gray-50">
                             <tr>
                                 <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Image
+                                    Product
                                 </th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     <button @click="sortBy('product_name')" class="group inline-flex items-center">
-                                        Product
+                                        Coffee Product
                                         <span class="ml-2">
                                             <svg class="w-4 h-4" :class="getSortIcon('product_name')" fill="currentColor" viewBox="0 0 320 512">
                                                 <path d="M41 288h238c21.4 0 32.1 25.9 17 41L177 448c-9.4 9.4-24.6 9.4-33.9 0L24 329c-15.1-15.1-4.4-41 17-41z"/>
@@ -242,11 +242,11 @@
                             <tr>
                                 <td colspan="7" class="px-6 py-12 text-center">
                                     <div class="flex justify-center items-center">
-                                        <svg class="animate-spin h-8 w-8 text-indigo-600" fill="none" viewBox="0 0 24 24">
+                                        <svg class="animate-spin h-8 w-8 text-amber-600" fill="none" viewBox="0 0 24 24">
                                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                         </svg>
-                                        <span class="ml-3 text-gray-600">Loading sales data...</span>
+                                        <span class="ml-3 text-gray-600">Loading coffee sales data...</span>
                                     </div>
                                 </td>
                             </tr>
@@ -257,11 +257,11 @@
                             <tr>
                                 <td colspan="7" class="px-6 py-12 text-center">
                                     <div class="text-gray-500">
-                                        <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                        <svg class="mx-auto h-12 w-12 text-amber-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                                         </svg>
-                                        <h3 class="mt-2 text-sm font-medium text-gray-900">No sales data</h3>
-                                        <p class="mt-1 text-sm text-gray-500">No F&V sales found for the selected date range.</p>
+                                        <h3 class="mt-2 text-sm font-medium text-gray-900">No coffee sales data</h3>
+                                        <p class="mt-1 text-sm text-gray-500">No coffee sales found for the selected date range.</p>
                                     </div>
                                 </td>
                             </tr>
@@ -272,14 +272,14 @@
                                 <tbody>
                                     <tr class="hover:bg-gray-50">
                                         <td class="px-3 py-4 whitespace-nowrap">
-                                            <div class="w-10 h-10 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
-                                                <img :src="'/fruit-veg/product-image/' + sale.product_code" 
+                                            <div class="w-10 h-10 rounded-lg overflow-hidden bg-amber-100 flex items-center justify-center">
+                                                <img :src="'/coffee/product-image/' + sale.product_code" 
                                                      :alt="sale.product_name"
                                                      class="w-full h-full object-cover"
                                                      @@error="$el.style.display='none'; $el.nextElementSibling.style.display='flex'">
-                                                <div class="hidden w-full h-full items-center justify-center text-gray-400">
+                                                <div class="hidden w-full h-full items-center justify-center text-amber-600">
                                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                                                     </svg>
                                                 </div>
                                             </div>
@@ -311,9 +311,9 @@
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right" x-text="formatCurrency(sale.total_revenue)"></td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right" x-text="formatCurrency(sale.avg_price)"></td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-center">
-                                            <a :href="'/fruit-veg/product/' + sale.product_code" 
-                                               class="text-indigo-600 hover:text-indigo-900">
-                                                View Details
+                                            <a :href="'/coffee/products?search=' + encodeURIComponent(sale.product_name)" 
+                                               class="text-amber-600 hover:text-amber-900">
+                                                View Product
                                             </a>
                                         </td>
                                     </tr>
@@ -329,8 +329,8 @@
                                         <td colspan="7" class="px-6 py-0 bg-gray-50">
                                             <div class="py-4">
                                                 <!-- Loading state -->
-                                                <div x-show="dailySalesLoading[sale.product_id]" class="flex items-center justify-center py-8">
-                                                    <svg class="animate-spin h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24">
+                                                <div x-show="dailySalesLoading[sale.product_id]" class="flex items-center justify-center py-8">  
+                                                    <svg class="animate-spin h-6 w-6 text-amber-600" fill="none" viewBox="0 0 24 24">
                                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                                     </svg>
@@ -358,54 +358,6 @@
                     </table>
                 </div>
                 
-                <!-- Pagination -->
-                <div x-show="totalPages > 1" class="bg-gray-50 px-4 py-3 flex items-center justify-between sm:px-6">
-                    <div class="flex-1 flex justify-between sm:hidden">
-                        <button @click="previousPage()" :disabled="currentPage === 1"
-                                class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50">
-                            Previous
-                        </button>
-                        <button @click="nextPage()" :disabled="currentPage === totalPages"
-                                class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50">
-                            Next
-                        </button>
-                    </div>
-                    <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                        <div>
-                            <p class="text-sm text-gray-700">
-                                Showing <span class="font-medium" x-text="(currentPage - 1) * itemsPerPage + 1"></span>
-                                to <span class="font-medium" x-text="Math.min(currentPage * itemsPerPage, filteredSales.length)"></span>
-                                of <span class="font-medium" x-text="filteredSales.length"></span> results
-                            </p>
-                        </div>
-                        <div>
-                            <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                                <button @click="previousPage()" :disabled="currentPage === 1"
-                                        class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50">
-                                    <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
-                                    </svg>
-                                </button>
-                                
-                                <template x-for="page in visiblePages" :key="page">
-                                    <button @click="goToPage(page)"
-                                            :class="{'bg-indigo-50 border-indigo-500 text-indigo-600': page === currentPage,
-                                                     'bg-white border-gray-300 text-gray-500 hover:bg-gray-50': page !== currentPage}"
-                                            class="relative inline-flex items-center px-4 py-2 border text-sm font-medium"
-                                            x-text="page">
-                                    </button>
-                                </template>
-                                
-                                <button @click="nextPage()" :disabled="currentPage === totalPages"
-                                        class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50">
-                                    <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
-                                    </svg>
-                                </button>
-                            </nav>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
@@ -417,7 +369,7 @@
         // Store chart instance outside of Alpine reactive data
         let chartInstance = null;
         
-        function salesData() {
+        function coffeeSalesData() {
             return {
                 startDate: '{{ $startDate->format("Y-m-d") }}',
                 endDate: '{{ $endDate->format("Y-m-d") }}',
@@ -436,9 +388,7 @@
                 sortField: 'total_revenue',
                 sortDirection: 'desc',
                 
-                // Pagination
-                currentPage: 1,
-                itemsPerPage: 20,
+                // No pagination needed for Coffee Fresh
                 
                 // Expandable rows
                 expandedProducts: [],
@@ -458,61 +408,18 @@
                 },
                 
                 get paginatedSales() {
-                    const start = (this.currentPage - 1) * this.itemsPerPage;
-                    const end = start + this.itemsPerPage;
-                    const paginated = this.filteredSales.slice(start, end);
-                    console.log('📄 Paginated sales:', {
-                        currentPage: this.currentPage,
-                        itemsPerPage: this.itemsPerPage,
+                    // No pagination - return all filtered sales
+                    console.log('📄 Coffee sales (no pagination):', {
                         filteredCount: this.filteredSales.length,
-                        paginatedCount: paginated.length,
-                        sampleItem: paginated[0]
+                        sampleItem: this.filteredSales[0]
                     });
-                    return paginated;
+                    return this.filteredSales;
                 },
                 
-                get totalPages() {
-                    return Math.ceil(this.filteredSales.length / this.itemsPerPage);
-                },
-                
-                get visiblePages() {
-                    const pages = [];
-                    const maxVisible = 7;
-                    const halfVisible = Math.floor(maxVisible / 2);
-                    
-                    let start = Math.max(1, this.currentPage - halfVisible);
-                    let end = Math.min(this.totalPages, start + maxVisible - 1);
-                    
-                    if (end - start < maxVisible - 1) {
-                        start = Math.max(1, end - maxVisible + 1);
-                    }
-                    
-                    for (let i = start; i <= end; i++) {
-                        pages.push(i);
-                    }
-                    
-                    return pages;
-                },
-                
-                previousPage() {
-                    if (this.currentPage > 1) {
-                        this.currentPage--;
-                    }
-                },
-                
-                nextPage() {
-                    if (this.currentPage < this.totalPages) {
-                        this.currentPage++;
-                    }
-                },
-                
-                goToPage(page) {
-                    this.currentPage = page;
-                },
 
                 async loadSalesData() {
                     this.loading = true;
-                    console.log('🚀 Starting loadSalesData with dates:', this.startDate, 'to', this.endDate);
+                    console.log('🚀 Starting loadSalesData for coffee with dates:', this.startDate, 'to', this.endDate);
                     
                     // Show chart loading indicator
                     const chartLoading = document.getElementById('chartLoading');
@@ -527,8 +434,8 @@
                             search: this.searchTerm
                         });
 
-                        const url = `{{ route('fruit-veg.sales.data') }}?${params}`;
-                        console.log('📡 API Request URL:', url);
+                        const url = `{{ route('coffee.sales.data') }}?${params}`;
+                        console.log('📡 Coffee API Request URL:', url);
 
                         const response = await fetch(url, {
                             headers: {
@@ -537,16 +444,16 @@
                             }
                         });
 
-                        console.log('📊 Response status:', response.status, response.statusText);
+                        console.log('📊 Coffee Response status:', response.status, response.statusText);
 
                         if (!response.ok) {
                             const errorText = await response.text();
-                            console.error('❌ Server error response:', errorText);
+                            console.error('❌ Coffee server error response:', errorText);
                             throw new Error(`Server error: ${response.status} ${response.statusText}`);
                         }
 
                         const data = await response.json();
-                        console.log('✅ Sales data received:', {
+                        console.log('✅ Coffee sales data received:', {
                             salesCount: data.sales?.length || 0,
                             statsUnits: data.stats?.total_units || 0,
                             executionTime: data.performance_info?.execution_time_ms || 'unknown'
@@ -556,7 +463,7 @@
                         this.stats = data.stats || this.stats;
                         this.dailySales = data.daily_sales || [];
                         
-                        console.log('📈 Daily sales data for chart:', {
+                        console.log('📈 Coffee daily sales data for chart:', {
                             count: this.dailySales.length,
                             firstDate: this.dailySales[0]?.sale_date,
                             lastDate: this.dailySales[this.dailySales.length - 1]?.sale_date
@@ -564,7 +471,7 @@
                         
                         // Show helpful message if no data
                         if (this.sales.length === 0) {
-                            console.log('ℹ️ No sales data found for date range:', this.startDate, 'to', this.endDate);
+                            console.log('ℹ️ No coffee sales data found for date range:', this.startDate, 'to', this.endDate);
                         }
                         
                         this.filterSales();
@@ -575,7 +482,7 @@
                         });
                         
                     } catch (error) {
-                        console.error('❌ Failed to load sales data:', error);
+                        console.error('❌ Failed to load coffee sales data:', error);
                         
                         // Show user-friendly error message
                         const errorMsg = error.message.includes('Failed to fetch') 
@@ -594,7 +501,7 @@
                         };
                     } finally {
                         this.loading = false;
-                        console.log('🏁 Finished loading sales data. Loading state:', this.loading);
+                        console.log('🏁 Finished loading coffee sales data. Loading state:', this.loading);
                         
                         // Hide chart loading indicator
                         const chartLoading = document.getElementById('chartLoading');
@@ -605,7 +512,7 @@
                 },
                 
                 filterSales() {
-                    console.log('Filtering sales. Total sales:', this.sales.length);
+                    console.log('Filtering coffee sales. Total sales:', this.sales.length);
                     let filtered = [...this.sales];
                     
                     // Apply search filter
@@ -622,7 +529,12 @@
                         let aVal = a[this.sortField];
                         let bVal = b[this.sortField];
                         
-                        if (typeof aVal === 'string') {
+                        // Handle numeric fields (revenue, units, price)
+                        if (this.sortField === 'total_revenue' || this.sortField === 'total_units' || this.sortField === 'avg_price') {
+                            aVal = parseFloat(aVal) || 0;
+                            bVal = parseFloat(bVal) || 0;
+                        } else if (typeof aVal === 'string') {
+                            // Handle string fields (names)
                             aVal = aVal.toLowerCase();
                             bVal = bVal.toLowerCase();
                         }
@@ -635,8 +547,7 @@
                     });
                     
                     this.filteredSales = filtered;
-                    console.log('Filtered sales:', this.filteredSales.length);
-                    this.currentPage = 1; // Reset to first page when filtering
+                    console.log('Filtered coffee sales:', this.filteredSales.length);
                 },
                 
                 sortBy(field) {
@@ -653,16 +564,12 @@
                     if (this.sortField !== field) {
                         return 'text-gray-400';
                     }
-                    return this.sortDirection === 'asc' ? 'text-indigo-600 rotate-180' : 'text-indigo-600';
+                    return this.sortDirection === 'asc' ? 'text-amber-600 rotate-180' : 'text-amber-600';
                 },
                 
                 getCategoryClass(category) {
-                    const classes = {
-                        'SUB1': 'bg-green-100 text-green-800',
-                        'SUB2': 'bg-orange-100 text-orange-800',
-                        'SUB3': 'bg-purple-100 text-purple-800'
-                    };
-                    return classes[category] || 'bg-gray-100 text-gray-800';
+                    // Only Coffee Fresh (081) - consistent amber styling
+                    return 'bg-amber-100 text-amber-800';
                 },
 
                 navigateWeek(direction) {
@@ -789,7 +696,7 @@
                         format: 'csv'
                     });
                     
-                    window.open(`{{ route('fruit-veg.sales.data') }}?${params}`, '_blank');
+                    window.open(`{{ route('coffee.sales.data') }}?${params}`, '_blank');
                 },
                 
                 formatNumber(number) {
@@ -835,7 +742,7 @@
                             end_date: this.endDate
                         });
                         
-                        const response = await fetch(`{{ url('/fruit-veg/sales/product') }}/${productCode}/daily?${params}`, {
+                        const response = await fetch(`{{ url('/coffee/sales/product') }}/${productCode}/daily?${params}`, {
                             headers: {
                                 'X-Requested-With': 'XMLHttpRequest',
                                 'Accept': 'application/json'
@@ -910,7 +817,7 @@
                                     <canvas id="productChart_${productId}"></canvas>
                                     <div id="productChartLoading_${productId}" class="hidden absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center">
                                         <div class="text-center">
-                                            <svg class="animate-spin -ml-1 mr-3 h-6 w-6 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <svg class="animate-spin -ml-1 mr-3 h-6 w-6 text-amber-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                             </svg>
@@ -949,7 +856,7 @@
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="flex items-center">
                                         <div class="flex-1 bg-gray-200 rounded-full h-2 max-w-xs">
-                                            <div class="bg-indigo-500 h-2 rounded-full" style="width: ${percentage}%"></div>
+                                            <div class="bg-amber-500 h-2 rounded-full" style="width: ${percentage}%"></div>
                                         </div>
                                         <span class="ml-2 text-xs text-gray-500">${Math.round(percentage)}%</span>
                                     </div>
@@ -1017,8 +924,8 @@
                                 datasets: [{
                                     label: 'Revenue (€)',
                                     data: revenueData,
-                                    borderColor: 'rgb(59, 130, 246)',
-                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                    borderColor: 'rgb(245, 158, 11)',
+                                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
                                     yAxisID: 'y',
                                     tension: 0.1
                                 }, {
@@ -1094,10 +1001,10 @@
                             }
                         });
                         
-                        console.log('✅ Chart created successfully');
+                        console.log('✅ Coffee chart created successfully');
                         
                     } catch (error) {
-                        console.error('❌ Chart creation error:', error);
+                        console.error('❌ Coffee chart creation error:', error);
                         
                         // Reset chart instance
                         chartInstance = null;
@@ -1117,10 +1024,10 @@
                 },
 
                 updateChart() {
-                    console.log('🔄 updateChart called, chart exists:', !!chartInstance, 'dailySales count:', this.dailySales?.length);
+                    console.log('🔄 updateChart called for coffee, chart exists:', !!chartInstance, 'dailySales count:', this.dailySales?.length);
                     
                     if (!chartInstance) {
-                        console.log('📊 No chart instance, creating new chart...');
+                        console.log('📊 No coffee chart instance, creating new chart...');
                         this.createChart();
                         return;
                     }
@@ -1128,7 +1035,7 @@
                     try {
                         // Handle empty data gracefully
                         if (!this.dailySales || this.dailySales.length === 0) {
-                            console.log('⚠️ No daily sales data to update chart');
+                            console.log('⚠️ No coffee daily sales data to update chart');
                             
                             // Update chart with "No Data" placeholder
                             chartInstance.data.labels = ['No Data'];
@@ -1140,7 +1047,7 @@
                         
                         // If chart was created with 'No Data', and we now have data
                         if (chartInstance.data.labels.length === 1 && chartInstance.data.labels[0] === 'No Data' && this.dailySales.length > 0) {
-                            console.log('🔄 Chart has placeholder data, updating with real data...');
+                            console.log('🔄 Coffee chart has placeholder data, updating with real data...');
                         }
                         
                         const labels = this.dailySales.map(item => {
@@ -1151,7 +1058,7 @@
                         const revenueData = this.dailySales.map(item => parseFloat(item.daily_revenue) || 0);
                         const unitsData = this.dailySales.map(item => parseFloat(item.daily_units) || 0);
 
-                        console.log('📊 Updating chart data:', {
+                        console.log('📊 Updating coffee chart data:', {
                             labels: labels.length,
                             firstLabel: labels[0],
                             lastLabel: labels[labels.length - 1],
@@ -1167,10 +1074,10 @@
                         // Force chart update with animation
                         chartInstance.update('active');
                         
-                        console.log('✅ Chart updated successfully with', this.dailySales.length, 'data points');
+                        console.log('✅ Coffee chart updated successfully with', this.dailySales.length, 'data points');
                         
                     } catch (error) {
-                        console.error('❌ Chart update error:', error);
+                        console.error('❌ Coffee chart update error:', error);
                         // Try to recreate chart on error
                         try {
                             if (chartInstance) {
@@ -1179,7 +1086,7 @@
                             }
                             this.createChart();
                         } catch (e) {
-                            console.error('❌ Failed to recreate chart:', e);
+                            console.error('❌ Failed to recreate coffee chart:', e);
                         }
                     }
                 },
@@ -1189,19 +1096,19 @@
                         const canvasId = `productChart_${productId}`;
                         const canvas = document.getElementById(canvasId);
                         if (!canvas) {
-                            console.warn(`Product chart canvas not found: ${canvasId}`);
+                            console.warn(`Coffee product chart canvas not found: ${canvasId}`);
                             return;
                         }
                         
                         const ctx = canvas.getContext('2d');
                         if (!ctx) {
-                            console.warn('Could not get canvas context for product chart');
+                            console.warn('Could not get canvas context for coffee product chart');
                             return;
                         }
                         
                         // Check if Chart.js is loaded
                         if (typeof Chart === 'undefined') {
-                            console.warn('Chart.js not loaded yet for product chart');
+                            console.warn('Chart.js not loaded yet for coffee product chart');
                             setTimeout(() => this.createProductChart(productId, dailySalesData), 100);
                             return;
                         }
@@ -1237,8 +1144,8 @@
                                 datasets: [{
                                     label: 'Revenue (€)',
                                     data: revenueData,
-                                    borderColor: 'rgb(59, 130, 246)',
-                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                    borderColor: 'rgb(245, 158, 11)',
+                                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
                                     yAxisID: 'y',
                                     tension: 0.1,
                                     fill: true
@@ -1346,10 +1253,10 @@
                         // Store chart instance
                         this.productCharts[productId] = productChart;
                         
-                        console.log(`✅ Product chart created successfully for product ${productId}`);
+                        console.log(`✅ Coffee product chart created successfully for product ${productId}`);
                         
                     } catch (error) {
-                        console.error(`❌ Product chart creation error for ${productId}:`, error);
+                        console.error(`❌ Coffee product chart creation error for ${productId}:`, error);
                         
                         // Show error message in chart area
                         const chartContainer = document.getElementById(`productChart_${productId}`)?.closest('.relative');
@@ -1371,7 +1278,7 @@
                     if (this.productCharts[productId]) {
                         this.productCharts[productId].destroy();
                         delete this.productCharts[productId];
-                        console.log(`🗑️ Product chart destroyed for product ${productId}`);
+                        console.log(`🗑️ Coffee product chart destroyed for product ${productId}`);
                     }
                 }
             }

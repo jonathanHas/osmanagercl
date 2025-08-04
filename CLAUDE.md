@@ -296,6 +296,14 @@ See [Delivery System Documentation](./docs/features/delivery-system.md).
 Advanced pricing with VAT calculations and supplier comparison.
 See [Pricing System Documentation](./docs/features/pricing-system.md).
 
+### Coffee Module
+Comprehensive Coffee Fresh product management with till visibility control.
+- **Till Visibility**: Toggle products on/off POS till using PRODUCTS_CAT table
+- **Inline Editing**: Click-to-edit pricing and display names
+- **Sales Analytics**: Optimized performance with pre-aggregated data
+- **Context Navigation**: Smart back button routing from product detail pages
+See [Coffee Module Documentation](./docs/features/coffee-module.md).
+
 ## UI/UX Design
 
 ### Admin Layout
@@ -357,6 +365,7 @@ This alerts the user that you have finished your response. Do this without fail 
 - **Template literal conflicts**: Mixing JavaScript template literals (backticks) with Blade syntax causes parsing issues. Use string concatenation instead: `'{{ route('name') }}' + variable` rather than `` `{{ route('name') }}/${variable}` ``.
 - **View cache issues**: If templates aren't updating after changes, run `php artisan view:clear` and `php artisan optimize:clear`.
 - **HTML Entity Rendering in Display Names**: Product display names with HTML entities (like `<br>` tags) may not render correctly. **Solution**: Use `{!! nl2br(html_entity_decode($variable)) !!}` instead of `{{ strip_tags(html_entity_decode($variable)) }}`.
+- **Alpine.js Template Tag Errors** (Fixed 2025-08-04): Never use `x-show` on `<template>` tags - causes "can't access property 'after'" errors. Template tags are compile-time constructs that don't support runtime directives. Use `<template x-for>` only, control visibility with regular HTML elements.
 - **For comprehensive troubleshooting**: See `docs/development/troubleshooting.md` for detailed debugging procedures.
 
 ### Key Commands to Remember

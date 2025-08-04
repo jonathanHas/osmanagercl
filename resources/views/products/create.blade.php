@@ -150,7 +150,7 @@
                                             class="w-full rounded-md border-2 border-red-300 dark:border-red-600 dark:bg-gray-700 focus:border-red-500 focus:ring-red-500 bg-red-50 dark:bg-red-900/20">
                                         <option value="" class="text-red-600 dark:text-red-300">⚠ Please select a category</option>
                                         @foreach($categories as $category)
-                                            <option value="{{ $category->ID }}" {{ old('category') === $category->ID ? 'selected' : '' }}>
+                                            <option value="{{ $category->ID }}" {{ (old('category') ?: $categoryId) === $category->ID ? 'selected' : '' }}>
                                                 {{ $category->NAME }}
                                             </option>
                                         @endforeach

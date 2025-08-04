@@ -362,4 +362,154 @@ class OptimizedSalesRepository
             ],
         ];
     }
+
+    // ============================================================================
+    // Coffee-Specific Methods
+    // ============================================================================
+
+    /**
+     * Get coffee sales by date range - optimized with pre-aggregated data
+     */
+    public function getCoffeeSalesByDateRange(Carbon $startDate, Carbon $endDate): Collection
+    {
+        return SalesDailySummary::coffee()
+            ->forDateRange($startDate, $endDate)
+            ->orderBy('sale_date', 'asc')
+            ->orderBy('total_units', 'desc')
+            ->get();
+    }
+
+    /**
+     * Get coffee sales statistics - instant response
+     */
+    public function getCoffeeSalesStats(Carbon $startDate, Carbon $endDate): array
+    {
+        $stats = SalesDailySummary::coffee()
+            ->forDateRange($startDate, $endDate)
+            ->selectRaw('
+                SUM(total_units) as total_units,
+                SUM(total_revenue) as total_revenue,
+                COUNT(DISTINCT product_id) as unique_products,
+                SUM(transaction_count) as total_transactions
+            ')
+            ->first();
+
+        // Get category breakdown for coffee types
+        $categoryBreakdown = SalesDailySummary::coffee()
+            ->forDateRange($startDate, $endDate)
+            ->selectRaw('
+                category_id,
+                SUM(total_units) as category_units,
+                SUM(total_revenue) as category_revenue
+            ')
+            ->groupBy('category_id')
+            ->get()
+            ->mapWithKeys(function ($item) {
+                $categoryName = match ($item->category_id) {
+                    '080' => 'Coffee',
+                    '081' => 'Coffee Fresh',
+                    default => 'Other Coffee'
+                };
+
+                return [$categoryName => [
+                    'units' => (float) $item->category_units,
+                    'revenue' => (float) $item->category_revenue,
+                ]];
+            });
+
+        return [
+            'total_units' => (float) ($stats->total_units ?? 0),
+            'total_revenue' => (float) ($stats->total_revenue ?? 0),
+            'unique_products' => (int) ($stats->unique_products ?? 0),
+            'total_transactions' => (int) ($stats->total_transactions ?? 0),
+            'category_breakdown' => $categoryBreakdown,
+        ];
+    }
+
+    /**
+     * Get daily coffee sales breakdown - optimized for charts
+     */
+    public function getCoffeeDailySales(Carbon $startDate, Carbon $endDate): Collection
+    {
+        return SalesDailySummary::coffee()
+            ->forDateRange($startDate, $endDate)
+            ->selectRaw('
+                sale_date,
+                SUM(total_units) as daily_units,
+                SUM(total_revenue) as daily_revenue,
+                COUNT(DISTINCT product_id) as products_sold
+            ')
+            ->groupBy('sale_date')
+            ->orderBy('sale_date', 'asc')
+            ->get();
+    }
+
+    /**
+     * Get top selling coffee products - instant response
+     */
+    public function getTopCoffeeProducts(Carbon $startDate, Carbon $endDate, int $limit = 10): Collection
+    {
+        return SalesDailySummary::coffee()
+            ->forDateRange($startDate, $endDate)
+            ->selectRaw('
+                product_id,
+                product_code,
+                product_name,
+                category_id,
+                SUM(total_units) as total_units,
+                SUM(total_revenue) as total_revenue,
+                AVG(avg_price) as avg_price
+            ')
+            ->groupBy('product_id', 'product_code', 'product_name', 'category_id')
+            ->orderByDesc('total_units')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Get monthly coffee sales trends - optimized using monthly summaries
+     */
+    public function getMonthlyCoffeeTrends(int $year): Collection
+    {
+        return SalesMonthlySummary::coffee()
+            ->where('year', $year)
+            ->selectRaw('
+                month,
+                SUM(total_units) as monthly_units,
+                SUM(total_revenue) as monthly_revenue,
+                COUNT(DISTINCT product_id) as unique_products
+            ')
+            ->groupBy('month')
+            ->orderBy('month')
+            ->get();
+    }
+
+    /**
+     * Get coffee category performance comparison
+     */
+    public function getCoffeeCategoryPerformance(Carbon $startDate, Carbon $endDate): Collection
+    {
+        return SalesDailySummary::coffee()
+            ->forDateRange($startDate, $endDate)
+            ->selectRaw('
+                category_id,
+                SUM(total_units) as total_units,
+                SUM(total_revenue) as total_revenue,
+                AVG(avg_price) as avg_price,
+                COUNT(DISTINCT product_id) as unique_products,
+                COUNT(DISTINCT sale_date) as active_days
+            ')
+            ->groupBy('category_id')
+            ->orderByDesc('total_revenue')
+            ->get()
+            ->map(function ($item) {
+                $item->category_name = match ($item->category_id) {
+                    '080' => 'Coffee',
+                    '081' => 'Coffee Fresh',
+                    default => 'Other Coffee'
+                };
+
+                return $item;
+            });
+    }
 }
