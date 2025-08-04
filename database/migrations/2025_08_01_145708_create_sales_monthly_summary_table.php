@@ -25,7 +25,7 @@ return new class extends Migration
             $table->decimal('avg_price', 8, 2)->default(0);
             $table->tinyInteger('days_with_sales')->default(0);
             $table->timestamps();
-            
+
             // Indexes for fast queries
             $table->index(['year', 'month', 'category_id']);
             $table->index(['product_id', 'year', 'month']);

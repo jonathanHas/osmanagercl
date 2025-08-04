@@ -40,7 +40,7 @@ class LabelTemplateSeeder extends Seeder
                     'type' => 'grid_4x9',
                     'barcode_position' => 'bottom_left',
                     'price_position' => 'bottom_right',
-                    'name_position' => 'top_full_width'
+                    'name_position' => 'top_full_width',
                 ],
                 'is_default' => false,
                 'is_active' => true,

@@ -23,7 +23,7 @@ return new class extends Migration
             $table->integer('transaction_count')->default(0);
             $table->decimal('avg_price', 8, 2)->default(0);
             $table->timestamps();
-            
+
             // Indexes for fast queries
             $table->index(['sale_date', 'category_id']);
             $table->index(['product_id', 'sale_date']);

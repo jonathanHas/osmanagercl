@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\SalesDailySummary;
-use App\Models\SalesMonthlySummary;
 use App\Models\SalesImportLog;
+use App\Models\SalesMonthlySummary;
 use App\Repositories\OptimizedSalesRepository;
 use App\Services\SalesImportService;
 use App\Services\SalesValidationService;
@@ -16,11 +16,13 @@ use Illuminate\Support\Facades\DB;
 class SalesImportController extends Controller
 {
     protected $optimizedRepository;
+
     protected $importService;
+
     protected $validationService;
 
     public function __construct(
-        OptimizedSalesRepository $optimizedRepository, 
+        OptimizedSalesRepository $optimizedRepository,
         SalesImportService $importService,
         SalesValidationService $validationService
     ) {
@@ -95,12 +97,12 @@ class SalesImportController extends Controller
                     'records_inserted' => $log->records_inserted,
                     'records_updated' => $log->records_updated,
                     'execution_time' => $log->execution_time_seconds,
-                ]
+                ],
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Import failed: ' . $e->getMessage()
+                'message' => 'Import failed: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -111,7 +113,7 @@ class SalesImportController extends Controller
     public function runMonthlySummaries(Request $request)
     {
         $request->validate([
-            'year' => 'required|integer|min:2020|max:' . (date('Y') + 1),
+            'year' => 'required|integer|min:2020|max:'.(date('Y') + 1),
             'month' => 'nullable|integer|min:1|max:12',
         ]);
 
@@ -129,12 +131,12 @@ class SalesImportController extends Controller
                     'records_inserted' => $log->records_inserted,
                     'records_updated' => $log->records_updated,
                     'execution_time' => $log->execution_time_seconds,
-                ]
+                ],
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Monthly summaries failed: ' . $e->getMessage()
+                'message' => 'Monthly summaries failed: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -150,24 +152,24 @@ class SalesImportController extends Controller
 
         try {
             $exitCode = Artisan::call('sales:create-test-data', [
-                '--days' => $request->days
+                '--days' => $request->days,
             ]);
 
             if ($exitCode === 0) {
                 return response()->json([
                     'success' => true,
-                    'message' => "Test data created for {$request->days} days!"
+                    'message' => "Test data created for {$request->days} days!",
                 ]);
             } else {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to create test data'
+                    'message' => 'Failed to create test data',
                 ], 500);
             }
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Test data creation failed: ' . $e->getMessage()
+                'message' => 'Test data creation failed: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -188,7 +190,7 @@ class SalesImportController extends Controller
             $tests['sales_stats'] = [
                 'name' => 'Sales Statistics',
                 'execution_time_ms' => round((microtime(true) - $startTime) * 1000, 2),
-                'data' => $stats
+                'data' => $stats,
             ];
 
             // Test 2: Daily Sales
@@ -197,7 +199,7 @@ class SalesImportController extends Controller
             $tests['daily_sales'] = [
                 'name' => 'Daily Sales Chart Data',
                 'execution_time_ms' => round((microtime(true) - $startTime) * 1000, 2),
-                'record_count' => $dailySales->count()
+                'record_count' => $dailySales->count(),
             ];
 
             // Test 3: Top Products
@@ -206,7 +208,7 @@ class SalesImportController extends Controller
             $tests['top_products'] = [
                 'name' => 'Top 5 Products',
                 'execution_time_ms' => round((microtime(true) - $startTime) * 1000, 2),
-                'data' => $topProducts->toArray()
+                'data' => $topProducts->toArray(),
             ];
 
             // Test 4: Category Performance
@@ -215,19 +217,19 @@ class SalesImportController extends Controller
             $tests['category_performance'] = [
                 'name' => 'Category Performance',
                 'execution_time_ms' => round((microtime(true) - $startTime) * 1000, 2),
-                'data' => $categoryPerformance->toArray()
+                'data' => $categoryPerformance->toArray(),
             ];
 
             return response()->json([
                 'success' => true,
                 'message' => 'Performance test completed successfully!',
                 'tests' => $tests,
-                'total_time_ms' => array_sum(array_column($tests, 'execution_time_ms'))
+                'total_time_ms' => array_sum(array_column($tests, 'execution_time_ms')),
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Performance test failed: ' . $e->getMessage()
+                'message' => 'Performance test failed: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -244,22 +246,22 @@ class SalesImportController extends Controller
                 return [
                     'id' => $log->id,
                     'type' => ucfirst($log->import_type),
-                    'date_range' => $log->start_date && $log->end_date 
-                        ? $log->start_date->format('M j') . ' - ' . $log->end_date->format('M j, Y')
+                    'date_range' => $log->start_date && $log->end_date
+                        ? $log->start_date->format('M j').' - '.$log->end_date->format('M j, Y')
                         : 'N/A',
                     'records_processed' => number_format($log->records_processed ?? 0),
                     'records_inserted' => number_format($log->records_inserted ?? 0),
                     'records_updated' => number_format($log->records_updated ?? 0),
-                    'execution_time' => $log->execution_time_seconds ? round($log->execution_time_seconds, 2) . 's' : 'N/A',
+                    'execution_time' => $log->execution_time_seconds ? round($log->execution_time_seconds, 2).'s' : 'N/A',
                     'status' => $log->status,
-                    'status_class' => match($log->status) {
+                    'status_class' => match ($log->status) {
                         'completed' => 'bg-green-100 text-green-800',
                         'failed' => 'bg-red-100 text-red-800',
                         'running' => 'bg-yellow-100 text-yellow-800',
                         default => 'bg-gray-100 text-gray-800'
                     },
                     'created_at' => $log->created_at->format('M j, Y g:i A'),
-                    'error_message' => $log->error_message
+                    'error_message' => $log->error_message,
                 ];
             });
 
@@ -280,12 +282,12 @@ class SalesImportController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'All imported data cleared successfully!'
+                'message' => 'All imported data cleared successfully!',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to clear data: ' . $e->getMessage()
+                'message' => 'Failed to clear data: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -321,12 +323,12 @@ class SalesImportController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $validation
+                'data' => $validation,
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Validation failed: ' . $e->getMessage()
+                'message' => 'Validation failed: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -349,12 +351,12 @@ class SalesImportController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $comparison
+                'data' => $comparison,
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Comparison failed: ' . $e->getMessage()
+                'message' => 'Comparison failed: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -377,12 +379,12 @@ class SalesImportController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $comparison
+                'data' => $comparison,
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Daily summary failed: ' . $e->getMessage()
+                'message' => 'Daily summary failed: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -405,12 +407,12 @@ class SalesImportController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $comparison
+                'data' => $comparison,
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Category validation failed: ' . $e->getMessage()
+                'message' => 'Category validation failed: '.$e->getMessage(),
             ], 500);
         }
     }

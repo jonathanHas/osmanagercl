@@ -7,7 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **🎯 Enhanced F&V Sales Dashboard Navigation**: Advanced date range controls for sales analytics
+  - **Week/Month Navigation**: Dedicated arrow buttons for intuitive week and month increments
+  - **Quick Period Selector**: Pre-configured periods (Today, This Week, Last Month, Latest Data)
+  - **Smart Date Defaults**: Automatically detects latest sales data period (June 18 - July 17, 2025)
+  - **Manual Date Inputs**: Compact date selectors for precise range control
+  - **Period Information Display**: Shows current range with duration (1 week, 30 days, etc.)
+  - **Mobile Responsive Design**: Compact controls optimized for all screen sizes
+
+- **📊 Daily Sales Chart Integration**: Interactive Chart.js visualization for F&V sales trends
+  - **Dual-axis display**: Revenue (€) on left axis, Units Sold on right axis
+  - **Real-time chart updates**: Chart correctly updates when navigating date ranges
+  - **Smooth animations**: Professional chart transitions with data changes
+  - **Currency formatting**: Proper Euro (€) display in tooltips and axis labels
+  - **Loading states**: Visual indicators during data fetching
+  - **Empty data handling**: Graceful "No Data" placeholders
+  - **Error recovery**: Automatic chart recreation on update failures
+
+- **🔧 Enhanced Sales Data API**: Improved backend support for sales analytics
+  - **Smart date detection**: getSalesData() automatically uses most recent 30-day period with data
+  - **Daily sales endpoint**: New getProductDailySales() method for individual product breakdowns
+  - **Optimized data flow**: Proper integration with OptimizedSalesRepository
+  - **Enhanced logging**: Comprehensive debugging information for troubleshooting
+
 ### Fixed
+
+- **🔧 Critical F&V Sales Table Rendering**: Fixed Product Sales Details table not displaying data
+  - **Alpine.js template structure**: Resolved nested template issues preventing x-for loop rendering
+  - **Table initialization**: Added missing x-init directive to trigger data loading on page load
+  - **Data flow debugging**: Enhanced logging to track API responses and data processing
+
+- **📊 Chart Recursion Error Resolution**: Fixed "too much recursion" error in daily sales chart
+  - **Non-reactive chart storage**: Moved Chart.js instance outside Alpine.js reactive scope
+  - **Update optimization**: Prevented infinite loops caused by Alpine reactivity watching chart internals
+  - **Error recovery**: Improved chart recreation logic for failed updates
+
 - **Label Preview Layout Improvements**: Enhanced 4x9 grid label display for better readability
   - Fixed € symbol clipping by restructuring layout from 2 rows to 3 rows
   - Moved barcode number to dedicated bottom row for improved legibility (7pt from 5.5pt)

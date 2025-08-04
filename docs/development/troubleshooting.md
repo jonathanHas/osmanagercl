@@ -4,6 +4,50 @@ This guide covers common issues and their solutions when developing OSManager CL
 
 ## 🚨 Common Errors
 
+### Alpine.js x-for with Table Rows - Expandable Rows Appearing at Bottom
+
+**Symptoms:**
+- Expandable table rows appear at the bottom of the table instead of under their parent row
+- All product rows render first, then all expandable rows render after
+- Alpine.js x-for loops through sorted data twice with separate templates
+
+**Root Cause:**
+HTML tables have strict structure requirements. When using two separate `<template x-for>` loops in a table:
+1. Alpine.js completes the first template loop entirely (all product rows)
+2. Then processes the second template loop (all expandable rows)
+3. The browser places all rows from the second loop after all rows from the first
+
+**Solution:**
+Use a single `<template x-for>` that wraps both rows in a `<tbody>` element:
+
+```blade
+<!-- ❌ WRONG - Two separate templates -->
+<tbody>
+    <template x-for="item in items" :key="item.id">
+        <tr><!-- Product row --></tr>
+    </template>
+    <template x-for="item in items" :key="'expand-' + item.id">
+        <tr x-show="expanded.includes(item.id)"><!-- Expandable row --></tr>
+    </template>
+</tbody>
+
+<!-- ✅ CORRECT - Single template with tbody wrapper -->
+<tbody>
+    <template x-for="item in items" :key="item.id">
+        <tbody>
+            <tr><!-- Product row --></tr>
+            <tr x-show="expanded.includes(item.id)"><!-- Expandable row --></tr>
+        </tbody>
+    </template>
+</tbody>
+```
+
+**Key Points:**
+- Multiple `<tbody>` elements are valid HTML
+- Each product and its expandable row stay together in the DOM
+- Alpine.js can properly scope the loop variable to both rows
+- Maintains proper table structure and row ordering
+
 ### ParseError: "unexpected end of file, expecting 'elseif' or 'else' or 'endif'"
 
 **Symptoms:**

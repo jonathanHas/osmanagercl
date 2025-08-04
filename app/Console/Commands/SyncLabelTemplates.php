@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
 use Database\Seeders\LabelTemplateSeeder;
+use Illuminate\Console\Command;
 
 class SyncLabelTemplates extends Command
 {
@@ -29,24 +29,26 @@ class SyncLabelTemplates extends Command
     {
         if ($this->option('show')) {
             $this->showCurrentTemplates();
+
             return Command::SUCCESS;
         }
 
         $this->info('Syncing label templates...');
-        
+
         try {
             // Run the label template seeder
-            $seeder = new LabelTemplateSeeder();
+            $seeder = new LabelTemplateSeeder;
             $seeder->run();
-            
+
             $this->info('✅ Label templates synced successfully!');
-            
+
             // Show what was synced
             $this->showCurrentTemplates();
-            
+
             return Command::SUCCESS;
         } catch (\Exception $e) {
-            $this->error('❌ Failed to sync label templates: ' . $e->getMessage());
+            $this->error('❌ Failed to sync label templates: '.$e->getMessage());
+
             return Command::FAILURE;
         }
     }
@@ -57,12 +59,13 @@ class SyncLabelTemplates extends Command
     private function showCurrentTemplates(): void
     {
         $templates = \App\Models\LabelTemplate::all(['name', 'font_size_price', 'font_size_name', 'font_size_barcode']);
-        
+
         if ($templates->isEmpty()) {
             $this->warn('No label templates found.');
+
             return;
         }
-        
+
         $this->info('Current label templates:');
         $this->table(
             ['Name', 'Price Font (pt)', 'Name Font (pt)', 'Barcode Font (pt)'],

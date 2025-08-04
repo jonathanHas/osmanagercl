@@ -83,6 +83,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/product-image/{code}', [FruitVegController::class, 'productImage'])->name('product-image');
         Route::get('/sales', [FruitVegController::class, 'sales'])->name('sales');
         Route::get('/sales/data', [FruitVegController::class, 'getSalesData'])->name('sales.data');
+        Route::get('/sales/product/{code}/daily', [FruitVegController::class, 'getProductDailySales'])->name('sales.product.daily');
     });
 
     // Delivery management routes
@@ -127,7 +128,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/performance-test', [SalesImportController::class, 'performanceTest'])->name('performance-test');
         Route::get('/logs', [SalesImportController::class, 'getImportLogs'])->name('logs');
         Route::post('/clear-data', [SalesImportController::class, 'clearData'])->name('clear-data');
-        
+
         // Validation routes
         Route::get('/validation', [SalesImportController::class, 'validation'])->name('validation');
         Route::post('/validate-data', [SalesImportController::class, 'validateData'])->name('validate-data');

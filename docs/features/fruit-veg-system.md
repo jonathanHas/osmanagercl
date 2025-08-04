@@ -54,24 +54,34 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 - **Real-time Updates**: Live addition/removal of products with smooth animations
 - **Instant Visibility Changes**: Products appear/disappear immediately based till visibility changes
 
-### 6. Sales Analytics & Performance (NEW! 🚀)
+### 6. Sales Analytics & Performance (Enhanced 2025! 🚀)
 - **Blazing-Fast Sales Dashboard**: Revolutionary performance improvement with 100x+ speed increase
 - **Sub-Second Queries**: Complete F&V sales analytics in under 20ms (previously 30+ seconds)
 - **Real-time Statistics**: Instant F&V sales summaries with category breakdowns
   - Total units sold, revenue, transactions, unique products
   - Category performance (Fruits, Vegetables, Veg Barcoded)
   - Daily averages and performance metrics
-- **Interactive Charts**: Lightning-fast daily sales visualization with Chart.js
-  - Dual-axis charts showing revenue and units trends
-  - **Real-time Date Range Updates**: Chart properly responds to date range changes
-  - **Smart Chart Recreation**: Optimized chart updates for data changes
-  - **Fallback Data Loading**: Live POS queries when aggregated data unavailable
-  - **Currency Display**: Full Euro (€) currency support throughout interface
-  - Professional styling with responsive design
+- **Advanced Navigation Controls**: Intuitive date range navigation for sales analysis
+  - **Week/Month Navigation**: Dedicated arrow buttons for week and month increments
+  - **Quick Period Selector**: Pre-configured periods (Today, This Week, Last Month, Latest Data)
+  - **Smart Date Defaults**: Automatically detects latest sales data period
+  - **Manual Date Inputs**: Compact date selectors for precise range control
+  - **Period Information Display**: Shows current range with duration (1 week, 30 days, etc.)
+  - **Mobile Responsive**: Compact controls that work on all screen sizes
+- **Interactive Daily Sales Chart**: Real-time Chart.js visualization with dual-axis display
+  - **Dual-axis charts**: Revenue (€) on left axis, Units Sold on right axis
+  - **Real-time Updates**: Chart updates correctly when navigating date ranges
+  - **Smooth Animations**: Professional chart transitions when data changes
+  - **Intelligent Error Recovery**: Automatic chart recreation on update failures
+  - **Non-reactive Chart Storage**: Prevents Alpine.js recursion issues
+  - **Currency Formatting**: Proper Euro (€) display in tooltips and axis labels
+  - **Loading States**: Visual indicators during data fetching
+  - **Empty Data Handling**: Graceful "No Data" placeholders
 - **Top Products Analysis**: Instant identification of best-selling F&V products
   - Sortable by units sold, revenue, or average price
   - Product search and filtering on pre-aggregated data
   - Export capabilities for external analysis
+  - Expandable daily sales breakdown per product
 - **Optimized Data Source**: Powered by pre-aggregated `sales_daily_summary` tables
   - No more slow cross-database queries
   - 100% data accuracy with validation system
@@ -283,6 +293,11 @@ VegClass::orderBy('sort_order')->get();
 - `previewLabels()` - Label preview functionality
 - `markLabelsPrinted()` - Clear items from print queue
 
+**Sales Analytics (Enhanced 2025)**
+- `sales()` - Enhanced sales dashboard with advanced navigation and chart
+- `getSalesData()` - Optimized AJAX endpoint for sales data with smart date defaults
+- `getProductDailySales()` - Daily sales breakdown for individual products
+
 **Product Data Management**
 - `editProduct()` - Comprehensive product edit interface with tabbed layout
 - `updateProductImage()` - Handle image uploads with binary storage
@@ -322,6 +337,9 @@ Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
     Route::get('/product-image/{code}', [FruitVegController::class, 'productImage'])->name('product-image');
     Route::get('/product/{code}', [FruitVegController::class, 'editProduct'])->name('product.edit');
     Route::post('/product/{code}/update-image', [FruitVegController::class, 'updateProductImage'])->name('product.update-image');
+    Route::get('/sales', [FruitVegController::class, 'sales'])->name('sales');
+    Route::get('/sales/data', [FruitVegController::class, 'getSalesData'])->name('sales.data');
+    Route::get('/sales/product/{code}/daily', [FruitVegController::class, 'getProductDailySales'])->name('sales.product.daily');
 });
 ```
 
@@ -446,7 +464,7 @@ Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
 - **Enhanced error handling** - Better debugging and troubleshooting documentation
 - **Improved template reliability** - Systematic approach to template literal conflicts
 
-### Recent Bug Fixes (2024)
+### Recent Bug Fixes (2024-2025)
 - **Price Update Restrictions**: Fixed issue preventing price updates for hidden products in manage screen
 - **Alpine.js Scope Issues**: Resolved `$root` reference problems in nested components by implementing self-contained price editing
 - **Inline Editing UX**: Added explicit save/cancel buttons for better user experience in price editing
@@ -457,6 +475,9 @@ Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
 - **SQL Query Optimization**: Fixed ordering errors when querying POS database tables
 - **Image Upload Integration**: Implemented comprehensive image management with binary storage
 - **Component Compatibility**: Identified and documented tab component slot access issues with working workarounds
+- **Sales Table Rendering**: Fixed critical Alpine.js template structure preventing Product Sales Details from displaying
+- **Chart Recursion Fix**: Resolved "too much recursion" error by storing Chart.js instance outside Alpine reactive scope
+- **Table Template Structure**: Fixed nested template issues in x-for loops that prevented data rendering
 
 ### Recent Feature Additions (2024)
 

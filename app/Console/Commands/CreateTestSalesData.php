@@ -4,8 +4,8 @@ namespace App\Console\Commands;
 
 use App\Models\SalesDailySummary;
 use Carbon\Carbon;
-use Illuminate\Console\Command;
 use Faker\Factory as Faker;
+use Illuminate\Console\Command;
 
 class CreateTestSalesData extends Command
 {
@@ -30,9 +30,9 @@ class CreateTestSalesData extends Command
     {
         $faker = Faker::create();
         $days = (int) $this->option('days');
-        
+
         $this->info("Creating test sales data for {$days} days...");
-        
+
         $products = [
             ['id' => 'PROD001', 'code' => 'APPLE001', 'name' => 'Organic Apples', 'category' => 'SUB1'],
             ['id' => 'PROD002', 'code' => 'BANANA001', 'name' => 'Fair Trade Bananas', 'category' => 'SUB1'],
@@ -40,12 +40,12 @@ class CreateTestSalesData extends Command
             ['id' => 'PROD004', 'code' => 'SPINACH001', 'name' => 'Baby Spinach', 'category' => 'SUB2'],
             ['id' => 'PROD005', 'code' => 'TOMATO001', 'name' => 'Cherry Tomatoes', 'category' => 'SUB3'],
         ];
-        
+
         $createdCount = 0;
-        
+
         for ($i = 0; $i < $days; $i++) {
             $date = Carbon::now()->subDays($i);
-            
+
             foreach ($products as $product) {
                 // Only create data for some products on some days
                 if ($faker->boolean(80)) { // 80% chance of sales
@@ -64,9 +64,9 @@ class CreateTestSalesData extends Command
                 }
             }
         }
-        
+
         $this->info("Created {$createdCount} test sales records!");
-        
+
         return 0;
     }
 }

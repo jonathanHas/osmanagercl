@@ -17,7 +17,7 @@ class Kernel extends ConsoleKernel
             ->dailyAt('06:00')
             ->onOneServer()
             ->withoutOverlapping(30); // 30 minute overlap protection
-            
+
         // Import last 7 days every Sunday to catch any missed data
         $schedule->command('sales:import-daily --last-week')
             ->weekly()

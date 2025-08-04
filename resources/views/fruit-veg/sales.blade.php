@@ -10,33 +10,80 @@
     <div class="py-6" x-data="salesData()" x-init="init()">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             
-            <!-- Date Range Controls -->
+            <!-- Enhanced Date Navigation -->
             <div class="bg-white rounded-lg shadow p-4 mb-6">
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                    <div class="flex items-center gap-4">
+                    <!-- Current Period Display -->
+                    <div class="flex items-center gap-3">
                         <h3 class="text-lg font-medium text-gray-900">Sales Period:</h3>
-                        <span class="text-sm text-gray-600 bg-gray-50 px-3 py-1 rounded-md" x-text="formatDateRange()"></span>
+                        <div class="flex items-center bg-gray-50 px-3 py-2 rounded-md">
+                            <span class="text-sm font-medium text-gray-700" x-text="formatDateRange()"></span>
+                            <span class="ml-2 text-xs text-gray-500" x-text="getPeriodInfo()"></span>
+                        </div>
                     </div>
                     
-                    <div class="flex flex-wrap items-center gap-2">
-                        <!-- Quick Periods -->
+                    <!-- Navigation Controls -->
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <!-- Week Navigation -->
+                        <div class="flex items-center bg-gray-50 rounded-lg p-1">
+                            <span class="text-xs font-medium text-gray-600 px-2 hidden sm:inline">Week</span>
+                            <button @click="navigateWeek(-1)" 
+                                    class="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-white rounded transition-colors"
+                                    title="Previous Week">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
+                            <button @click="navigateWeek(1)" 
+                                    class="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-white rounded transition-colors"
+                                    title="Next Week">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <!-- Month Navigation -->
+                        <div class="flex items-center bg-gray-50 rounded-lg p-1">
+                            <span class="text-xs font-medium text-gray-600 px-2 hidden sm:inline">Month</span>
+                            <button @click="navigateMonth(-1)" 
+                                    class="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-white rounded transition-colors"
+                                    title="Previous Month">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                                </svg>
+                            </button>
+                            <button @click="navigateMonth(1)" 
+                                    class="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-white rounded transition-colors"
+                                    title="Next Month">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <!-- Quick Periods Dropdown -->
                         <select @change="setQuickPeriod($event.target.value)" 
                                 class="text-sm rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                            <option value="">Quick Periods</option>
+                            <option value="">Quick Jump</option>
                             <option value="today">Today</option>
                             <option value="yesterday">Yesterday</option>
-                            <option value="last7">Last 7 Days</option>
-                            <option value="last30">Last 30 Days</option>
+                            <option value="thisWeek">This Week</option>
+                            <option value="lastWeek">Last Week</option>
                             <option value="thisMonth">This Month</option>
                             <option value="lastMonth">Last Month</option>
+                            <option value="last30">Last 30 Days</option>
+                            <option value="latest">Latest Data</option>
                         </select>
                         
-                        <!-- Date Inputs -->
-                        <input type="date" x-model="startDate" @change="loadSalesData()"
-                               class="text-sm rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                        <span class="text-gray-500">to</span>
-                        <input type="date" x-model="endDate" @change="loadSalesData()"
-                               class="text-sm rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <!-- Manual Date Selection (Compact) -->
+                        <div class="flex items-center gap-1 text-xs">
+                            <input type="date" x-model="startDate" @change="loadSalesData()"
+                                   class="text-xs rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 w-24 sm:w-28">
+                            <span class="text-gray-400 hidden sm:inline">–</span>
+                            <input type="date" x-model="endDate" @change="loadSalesData()"
+                                   class="text-xs rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 w-24 sm:w-28">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -96,6 +143,23 @@
                         <div class="ml-5">
                             <p class="text-gray-500 text-sm font-medium">Transactions</p>
                             <p class="text-2xl font-semibold text-gray-900" x-text="stats.total_transactions">0</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Daily Sales Chart -->
+            <div class="bg-white rounded-lg shadow p-6 mb-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Daily Sales Overview</h3>
+                <div class="relative" style="height: 300px;">
+                    <canvas id="dailySalesChart"></canvas>
+                    <div id="chartLoading" class="hidden absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center">
+                        <div class="text-center">
+                            <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <p class="mt-2 text-sm text-gray-600">Loading chart...</p>
                         </div>
                     </div>
                 </div>
@@ -346,7 +410,13 @@
         </div>
     </div>
 
+    <!-- Include Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <script>
+        // Store chart instance outside of Alpine reactive data
+        let chartInstance = null;
+        
         function salesData() {
             return {
                 startDate: '{{ $startDate->format("Y-m-d") }}',
@@ -375,9 +445,13 @@
                 dailySalesData: {},
                 dailySalesLoading: {},
                 dailySalesError: {},
+                
+                // Chart data
+                dailySales: [],
 
                 init() {
                     console.log('Initial dates:', this.startDate, 'to', this.endDate);
+                    this.createChart();
                     this.loadSalesData();
                 },
                 
@@ -438,6 +512,12 @@
                     this.loading = true;
                     console.log('🚀 Starting loadSalesData with dates:', this.startDate, 'to', this.endDate);
                     
+                    // Show chart loading indicator
+                    const chartLoading = document.getElementById('chartLoading');
+                    if (chartLoading) {
+                        chartLoading.classList.remove('hidden');
+                    }
+                    
                     try {
                         const params = new URLSearchParams({
                             start_date: this.startDate,
@@ -472,6 +552,13 @@
                         
                         this.sales = data.sales || [];
                         this.stats = data.stats || this.stats;
+                        this.dailySales = data.daily_sales || [];
+                        
+                        console.log('📈 Daily sales data for chart:', {
+                            count: this.dailySales.length,
+                            firstDate: this.dailySales[0]?.sale_date,
+                            lastDate: this.dailySales[this.dailySales.length - 1]?.sale_date
+                        });
                         
                         // Show helpful message if no data
                         if (this.sales.length === 0) {
@@ -479,6 +566,11 @@
                         }
                         
                         this.filterSales();
+                        
+                        // Ensure chart updates with new data
+                        this.$nextTick(() => {
+                            this.updateChart();
+                        });
                         
                     } catch (error) {
                         console.error('❌ Failed to load sales data:', error);
@@ -501,6 +593,12 @@
                     } finally {
                         this.loading = false;
                         console.log('🏁 Finished loading sales data. Loading state:', this.loading);
+                        
+                        // Hide chart loading indicator
+                        const chartLoading = document.getElementById('chartLoading');
+                        if (chartLoading) {
+                            chartLoading.classList.add('hidden');
+                        }
                     }
                 },
                 
@@ -565,6 +663,47 @@
                     return classes[category] || 'bg-gray-100 text-gray-800';
                 },
 
+                navigateWeek(direction) {
+                    const start = new Date(this.startDate);
+                    const end = new Date(this.endDate);
+                    const days = direction * 7;
+                    
+                    start.setDate(start.getDate() + days);
+                    end.setDate(end.getDate() + days);
+                    
+                    this.startDate = start.toISOString().split('T')[0];
+                    this.endDate = end.toISOString().split('T')[0];
+                    this.loadSalesData();
+                },
+                
+                navigateMonth(direction) {
+                    const start = new Date(this.startDate);
+                    const end = new Date(this.endDate);
+                    
+                    start.setMonth(start.getMonth() + direction);
+                    end.setMonth(end.getMonth() + direction);
+                    
+                    this.startDate = start.toISOString().split('T')[0];
+                    this.endDate = end.toISOString().split('T')[0];
+                    this.loadSalesData();
+                },
+                
+                getPeriodInfo() {
+                    const start = new Date(this.startDate);
+                    const end = new Date(this.endDate);
+                    const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                    
+                    if (days === 1) {
+                        return '1 day';
+                    } else if (days === 7) {
+                        return '1 week';  
+                    } else if (days >= 28 && days <= 31) {
+                        return '1 month';
+                    } else {
+                        return `${days} days`;
+                    }
+                },
+
                 setQuickPeriod(period) {
                     if (!period) return;
                     
@@ -580,10 +719,23 @@
                             start.setDate(start.getDate() - 1);
                             end.setDate(end.getDate() - 1);
                             break;
-                        case 'last7':
-                            end = new Date();
-                            start = new Date();
-                            start.setDate(start.getDate() - 6);
+                        case 'thisWeek':
+                            // Start of this week (Monday)
+                            start = new Date(today);
+                            const dayOfWeek = start.getDay();
+                            const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                            start.setDate(start.getDate() - daysToMonday);
+                            end = new Date(start);
+                            end.setDate(end.getDate() + 6);
+                            break;
+                        case 'lastWeek':
+                            // Start of last week (Monday)
+                            start = new Date(today);
+                            const lastWeekDay = start.getDay();
+                            const daysToLastMonday = lastWeekDay === 0 ? 13 : lastWeekDay + 6;
+                            start.setDate(start.getDate() - daysToLastMonday);
+                            end = new Date(start);
+                            end.setDate(end.getDate() + 6);
                             break;
                         case 'last30':
                             end = new Date();
@@ -598,11 +750,20 @@
                             start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
                             end = new Date(today.getFullYear(), today.getMonth(), 0);
                             break;
+                        case 'latest':
+                            // Use the default smart dates (most recent 30 days with data)
+                            this.startDate = '{{ $startDate->format("Y-m-d") }}';
+                            this.endDate = '{{ $endDate->format("Y-m-d") }}';
+                            this.loadSalesData();
+                            return;
                     }
                     
                     this.startDate = start.toISOString().split('T')[0];
                     this.endDate = end.toISOString().split('T')[0];
                     this.loadSalesData();
+                    
+                    // Reset the dropdown
+                    event.target.value = '';
                 },
                 
                 formatDateRange() {
@@ -772,6 +933,224 @@
                         </div>`;
                     
                     return html;
+                },
+                
+                createChart() {
+                    try {
+                        const canvas = document.getElementById('dailySalesChart');
+                        if (!canvas) {
+                            console.warn('Chart canvas not found');
+                            return;
+                        }
+                        
+                        const ctx = canvas.getContext('2d');
+                        if (!ctx) {
+                            console.warn('Could not get canvas context');
+                            return;
+                        }
+                        
+                        // Check if Chart.js is loaded
+                        if (typeof Chart === 'undefined') {
+                            console.warn('Chart.js not loaded yet');
+                            setTimeout(() => this.createChart(), 100);
+                            return;
+                        }
+                        
+                        // Clear any existing chart on this canvas
+                        const existingChart = Chart.getChart(canvas);
+                        if (existingChart) {
+                            existingChart.destroy();
+                        }
+                        
+                        // Handle empty data gracefully on initial chart creation
+                        let labels, revenueData, unitsData;
+                        
+                        if (!this.dailySales || this.dailySales.length === 0) {
+                            labels = ['No Data'];
+                            revenueData = [0];
+                            unitsData = [0];
+                        } else {
+                            labels = this.dailySales.map(item => {
+                                const date = new Date(item.sale_date);
+                                return date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
+                            });
+                            
+                            revenueData = this.dailySales.map(item => parseFloat(item.daily_revenue) || 0);
+                            unitsData = this.dailySales.map(item => parseFloat(item.daily_units) || 0);
+                        }
+
+                        chartInstance = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: 'Revenue (€)',
+                                    data: revenueData,
+                                    borderColor: 'rgb(59, 130, 246)',
+                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                    yAxisID: 'y',
+                                    tension: 0.1
+                                }, {
+                                    label: 'Units Sold',
+                                    data: unitsData,
+                                    borderColor: 'rgb(16, 185, 129)',
+                                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                    yAxisID: 'y1',
+                                    tension: 0.1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                interaction: {
+                                    mode: 'index',
+                                    intersect: false,
+                                },
+                                plugins: {
+                                    legend: {
+                                        position: 'top',
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(context) {
+                                                let label = context.dataset.label || '';
+                                                if (label) {
+                                                    label += ': ';
+                                                }
+                                                if (context.parsed.y !== null) {
+                                                    if (context.dataset.label === 'Revenue (€)') {
+                                                        label += new Intl.NumberFormat('en-GB', {
+                                                            style: 'currency',
+                                                            currency: 'EUR'
+                                                        }).format(context.parsed.y);
+                                                    } else {
+                                                        label += new Intl.NumberFormat('en-GB').format(context.parsed.y);
+                                                    }
+                                                }
+                                                return label;
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        type: 'linear',
+                                        display: true,
+                                        position: 'left',
+                                        title: {
+                                            display: true,
+                                            text: 'Revenue (€)'
+                                        },
+                                        ticks: {
+                                            callback: function(value) {
+                                                return '€' + value.toLocaleString();
+                                            }
+                                        }
+                                    },
+                                    y1: {
+                                        type: 'linear',
+                                        display: true,
+                                        position: 'right',
+                                        title: {
+                                            display: true,
+                                            text: 'Units Sold'
+                                        },
+                                        grid: {
+                                            drawOnChartArea: false,
+                                        },
+                                    }
+                                }
+                            }
+                        });
+                        
+                        console.log('✅ Chart created successfully');
+                        
+                    } catch (error) {
+                        console.error('❌ Chart creation error:', error);
+                        
+                        // Reset chart instance
+                        chartInstance = null;
+                        
+                        // Show error message in chart area
+                        const chartContainer = document.querySelector('#dailySalesChart')?.closest('.bg-white');
+                        if (chartContainer) {
+                            const errorMsg = document.createElement('div');
+                            errorMsg.className = 'text-center text-red-600 p-4';
+                            errorMsg.innerHTML = `
+                                <p>Chart Error: ${error.message}</p>
+                                <p class="text-sm mt-2">Please refresh the page or try a different date range.</p>
+                            `;
+                            chartContainer.appendChild(errorMsg);
+                        }
+                    }
+                },
+
+                updateChart() {
+                    console.log('🔄 updateChart called, chart exists:', !!chartInstance, 'dailySales count:', this.dailySales?.length);
+                    
+                    if (!chartInstance) {
+                        console.log('📊 No chart instance, creating new chart...');
+                        this.createChart();
+                        return;
+                    }
+                    
+                    try {
+                        // Handle empty data gracefully
+                        if (!this.dailySales || this.dailySales.length === 0) {
+                            console.log('⚠️ No daily sales data to update chart');
+                            
+                            // Update chart with "No Data" placeholder
+                            chartInstance.data.labels = ['No Data'];
+                            chartInstance.data.datasets[0].data = [0];
+                            chartInstance.data.datasets[1].data = [0];
+                            chartInstance.update();
+                            return;
+                        }
+                        
+                        // If chart was created with 'No Data', and we now have data
+                        if (chartInstance.data.labels.length === 1 && chartInstance.data.labels[0] === 'No Data' && this.dailySales.length > 0) {
+                            console.log('🔄 Chart has placeholder data, updating with real data...');
+                        }
+                        
+                        const labels = this.dailySales.map(item => {
+                            const date = new Date(item.sale_date);
+                            return date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
+                        });
+                        
+                        const revenueData = this.dailySales.map(item => parseFloat(item.daily_revenue) || 0);
+                        const unitsData = this.dailySales.map(item => parseFloat(item.daily_units) || 0);
+
+                        console.log('📊 Updating chart data:', {
+                            labels: labels.length,
+                            firstLabel: labels[0],
+                            lastLabel: labels[labels.length - 1],
+                            totalRevenue: revenueData.reduce((a, b) => a + b, 0).toFixed(2),
+                            totalUnits: unitsData.reduce((a, b) => a + b, 0)
+                        });
+
+                        // Update chart data
+                        chartInstance.data.labels = labels;
+                        chartInstance.data.datasets[0].data = revenueData;
+                        chartInstance.data.datasets[1].data = unitsData;
+                        
+                        // Force chart update with animation
+                        chartInstance.update('active');
+                        
+                        console.log('✅ Chart updated successfully with', this.dailySales.length, 'data points');
+                        
+                    } catch (error) {
+                        console.error('❌ Chart update error:', error);
+                        // Try to recreate chart on error
+                        try {
+                            if (chartInstance) {
+                                chartInstance.destroy();
+                                chartInstance = null;
+                            }
+                            this.createChart();
+                        } catch (e) {
+                            console.error('❌ Failed to recreate chart:', e);
+                        }
+                    }
                 }
             }
         }

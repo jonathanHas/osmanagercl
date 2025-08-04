@@ -694,7 +694,6 @@
                     const containerRect = labelsContainer.getBoundingClientRect();
                     if (labelRect.right > containerRect.right) {
                         console.error(`⚠️ Label ${idx + 1} is overflowing container by ${labelRect.right - containerRect.right}px`);
-                        label.style.border = '2px solid red';
                     }
                 }
             });
@@ -719,9 +718,8 @@
                         priceFlex: window.getComputedStyle(priceEl).flex
                     });
                     
-                    // Visual indicator for overflow
+                    // Check for overflow (console only, no visual indicator)
                     if ((barcodeRect.width + priceRect.width) > rowRect.width) {
-                        row.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
                         console.error(`⚠️ Middle row ${idx + 1} content exceeds row width`);
                     }
                 }
@@ -785,16 +783,15 @@
                         unusedHeight: parentRect.height - rect.height
                     });
                     
-                    // Add visual indicator for overflowing text
+                    // Log overflowing text (console only, no visual indicator)
                     if (isOverflowing) {
-                        el.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
+                        console.warn('Text overflowing:', el.textContent.trim().substring(0, 40) + '...');
                     }
                     
                     // Check if text is being truncated with ellipsis
                     const hasEllipsis = el.scrollHeight > el.clientHeight;
                     if (hasEllipsis) {
                         console.warn('Text truncated:', el.textContent.trim());
-                        el.style.border = '2px solid orange';
                     }
                 });
             }, 500);

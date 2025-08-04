@@ -23,7 +23,7 @@ return new class extends Migration
             $table->enum('status', ['running', 'completed', 'failed'])->default('running')->index();
             $table->text('error_message')->nullable();
             $table->timestamps();
-            
+
             // Indexes for fast queries
             $table->index(['import_type', 'status']);
             $table->index(['start_date', 'end_date']);

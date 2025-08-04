@@ -5,7 +5,6 @@ namespace App\Repositories;
 use App\Models\SalesDailySummary;
 use App\Models\SalesMonthlySummary;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 
 class OptimizedSalesRepository
@@ -20,7 +19,7 @@ class OptimizedSalesRepository
             ->orderBy('total_revenue', 'desc')
             ->get();
     }
-    
+
     /**
      * Get aggregated ALL STORE sales statistics - instant response
      */
@@ -59,7 +58,7 @@ class OptimizedSalesRepository
             'category_breakdown' => $categoryBreakdown,
         ];
     }
-    
+
     /**
      * Get ALL STORE daily sales for charts - instant response
      */
@@ -77,7 +76,7 @@ class OptimizedSalesRepository
             ->orderBy('sale_date', 'asc')
             ->get();
     }
-    
+
     /**
      * Get top selling ALL STORE products - instant response
      */
@@ -100,6 +99,7 @@ class OptimizedSalesRepository
             ->get()
             ->map(function ($product) {
                 $product->category_name = $this->getCategoryName($product->category_id);
+
                 return $product;
             });
     }
@@ -123,25 +123,27 @@ class OptimizedSalesRepository
             ->get()
             ->map(function ($category) {
                 $category->category_name = $this->getCategoryName($category->category_id);
+
                 return $category;
             });
     }
-    
+
     /**
      * Get category name mapping
      */
     private function getCategoryName(string $categoryId): string
     {
-        return match($categoryId) {
+        return match ($categoryId) {
             'SUB1' => 'Fruits',
-            'SUB2' => 'Vegetables', 
+            'SUB2' => 'Vegetables',
             'SUB3' => 'Veg Barcoded',
-            default => 'Category ' . $categoryId
+            default => 'Category '.$categoryId
         };
     }
 
     /**
      * Get F&V sales data for date range - 100x faster than cross-database queries
+     *
      * @deprecated Use getAllSalesByDateRange for full store data
      */
     public function getFruitVegSalesByDateRange(Carbon $startDate, Carbon $endDate): Collection
@@ -152,7 +154,7 @@ class OptimizedSalesRepository
             ->orderBy('total_units', 'desc')
             ->get();
     }
-    
+
     /**
      * Get aggregated F&V sales statistics - instant response
      */
@@ -167,7 +169,7 @@ class OptimizedSalesRepository
                 SUM(transaction_count) as total_transactions
             ')
             ->first();
-            
+
         $categoryBreakdown = SalesDailySummary::fruitVeg()
             ->forDateRange($startDate, $endDate)
             ->selectRaw('
@@ -180,17 +182,17 @@ class OptimizedSalesRepository
             ->mapWithKeys(function ($item) {
                 $categoryName = match ($item->category_id) {
                     'SUB1' => 'Fruits',
-                    'SUB2' => 'Vegetables', 
+                    'SUB2' => 'Vegetables',
                     'SUB3' => 'Veg Barcoded',
                     default => 'Other'
                 };
-                
+
                 return [$categoryName => [
                     'units' => (float) $item->category_units,
                     'revenue' => (float) $item->category_revenue,
                 ]];
             });
-        
+
         return [
             'total_units' => (float) ($stats->total_units ?? 0),
             'total_revenue' => (float) ($stats->total_revenue ?? 0),
@@ -199,7 +201,7 @@ class OptimizedSalesRepository
             'category_breakdown' => $categoryBreakdown,
         ];
     }
-    
+
     /**
      * Get daily sales breakdown - optimized for charts
      */
@@ -217,7 +219,7 @@ class OptimizedSalesRepository
             ->orderBy('sale_date', 'asc')
             ->get();
     }
-    
+
     /**
      * Get top selling F&V products - instant response
      */
@@ -239,7 +241,7 @@ class OptimizedSalesRepository
             ->limit($limit)
             ->get();
     }
-    
+
     /**
      * Get monthly sales trends - optimized using monthly summaries
      */
@@ -257,7 +259,7 @@ class OptimizedSalesRepository
             ->orderBy('month')
             ->get();
     }
-    
+
     /**
      * Get category performance comparison
      */
@@ -283,10 +285,11 @@ class OptimizedSalesRepository
                     'SUB3' => 'Veg Barcoded',
                     default => 'Other'
                 };
+
                 return $item;
             });
     }
-    
+
     /**
      * Get product performance over time
      */
@@ -298,7 +301,19 @@ class OptimizedSalesRepository
             ->orderBy('sale_date')
             ->get();
     }
-    
+
+    /**
+     * Get daily sales data for a specific product
+     */
+    public function getProductDailySales(string $productId, Carbon $startDate, Carbon $endDate): Collection
+    {
+        return SalesDailySummary::where('product_id', $productId)
+            ->forDateRange($startDate, $endDate)
+            ->select('sale_date', 'total_units as daily_units', 'total_revenue as daily_revenue', 'avg_price', 'transaction_count')
+            ->orderBy('sale_date')
+            ->get();
+    }
+
     /**
      * Get sales summary for date range with totals
      */
@@ -315,7 +330,7 @@ class OptimizedSalesRepository
                 AVG(avg_price) as overall_avg_price
             ')
             ->first();
-            
+
         $dailyAverage = $summary->active_days > 0 ? [
             'daily_units' => $summary->total_units / $summary->active_days,
             'daily_revenue' => $summary->total_revenue / $summary->active_days,
@@ -325,7 +340,7 @@ class OptimizedSalesRepository
             'daily_revenue' => 0,
             'daily_transactions' => 0,
         ];
-        
+
         return [
             'period' => [
                 'start_date' => $startDate->toDateString(),
@@ -344,7 +359,7 @@ class OptimizedSalesRepository
                 'units' => round($dailyAverage['daily_units'], 2),
                 'revenue' => round($dailyAverage['daily_revenue'], 2),
                 'transactions' => round($dailyAverage['daily_transactions'], 2),
-            ]
+            ],
         ];
     }
 }
