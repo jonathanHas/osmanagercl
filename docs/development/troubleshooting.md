@@ -733,6 +733,48 @@ console.log('Sample data:', this.dailySales?.[0]);
 3. **Force Chart Recreation**: Chart will recreate automatically when data changes
 4. **Check Data Availability**: Some date ranges may have no F&V sales data
 
+## 🚛 Delivery System Authentication Issues
+
+### "Unauthenticated" Error During Barcode Scanning
+
+**Symptoms:**
+- Users get "unauthenticated" error when scanning barcodes in delivery scan interface
+- Scanning interface loads correctly but scan operations fail
+- Error occurs on routes like `/deliveries/3/scan`
+- JavaScript console shows 401 Unauthorized responses
+
+**Root Cause:**
+JavaScript code was calling API routes (`/api/deliveries/{delivery}/scan`) which expect token-based authentication (Sanctum), while users only have session-based authentication from web login.
+
+**Solution (Fixed 2025-08-04):**
+Updated the scan.blade.php file to use web routes instead of API routes:
+
+```javascript
+// ❌ WRONG - API routes require token auth
+const response = await fetch(`/api/deliveries/${this.deliveryId}/scan`, {...});
+
+// ✅ CORRECT - Web routes use session auth  
+const response = await fetch(`/deliveries/${this.deliveryId}/scan`, {...});
+```
+
+**Files Modified:**
+- `/resources/views/deliveries/scan.blade.php` - Updated JavaScript fetch URLs
+
+**Prevention:**
+- Use web routes for frontend JavaScript that relies on session authentication
+- Reserve API routes for external integrations that provide proper tokens
+- When adding new AJAX functionality, prefer web routes over API routes for consistency
+
+**Debugging Steps:**
+1. Check browser console for 401/403 errors
+2. Verify user is logged in to web interface
+3. Test if web route is accessible: `curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:8000/deliveries/1/scan"`
+4. Should return 302 (redirect to login) if not authenticated, not 401
+
+**Related Documentation:**
+- See [Delivery System Documentation](../features/delivery-system.md) for full scanning workflow
+- Authentication patterns are documented in delivery system API section
+
 ## 📞 Getting Help
 
 - Check Laravel Blade documentation

@@ -327,8 +327,12 @@
                                             class="w-full rounded-md border-2 border-red-300 dark:border-red-600 dark:bg-gray-700 focus:border-red-500 focus:ring-red-500 bg-red-50 dark:bg-red-900/20">
                                         <option value="" class="text-red-600 dark:text-red-300">⚠ Please select tax category</option>
                                         @foreach($taxCategories as $taxCategory)
-                                            <option value="{{ $taxCategory->ID }}" {{ old('tax_category') === $taxCategory->ID ? 'selected' : '' }}>
+                                            <option value="{{ $taxCategory->ID }}" 
+                                                {{ (old('tax_category') ?: ($prefillData['tax_category'] ?? '')) === $taxCategory->ID ? 'selected' : '' }}>
                                                 {{ $taxCategory->NAME }}
+                                                @if($prefillData && isset($prefillData['tax_category']) && $prefillData['tax_category'] === $taxCategory->ID)
+                                                    (Auto-selected)
+                                                @endif
                                             </option>
                                         @endforeach
                                     </select>
@@ -629,7 +633,10 @@
         
         document.getElementById('price_sell').addEventListener('input', updatePricingBreakdown);
         document.getElementById('has_delivery_cost').addEventListener('change', updatePricingBreakdown);
-        document.getElementById('tax_category').addEventListener('change', updatePricingBreakdown);
+        document.getElementById('tax_category').addEventListener('change', function() {
+            updatePricingBreakdown();
+            updateTaxCategoryFieldStyling(this, this.value !== '');
+        });
 
         // Auto-fill supplier cost from cost price
         document.getElementById('price_buy').addEventListener('input', function() {
@@ -660,16 +667,51 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('DOM loaded, initializing...');
             
-            // Set default tax category to Tax aZero (0%) if none selected
+            // Set default tax category to Tax aZero (0%) if none selected and not prefilled
             const taxCategorySelect = document.getElementById('tax_category');
             if (taxCategorySelect) {
                 console.log('Current tax category:', taxCategorySelect.value);
-                if (!taxCategorySelect.value) {
+                
+                // If tax category is already selected (prefilled), update styling
+                if (taxCategorySelect.value) {
+                    updateTaxCategoryFieldStyling(taxCategorySelect, true);
+                    console.log('Tax category prefilled:', taxCategorySelect.value);
+                } else {
+                    // Only set default if no value is prefilled
                     taxCategorySelect.value = '000'; // Tax aZero (0%)
                     console.log('Set default tax category to 000 (Tax aZero)');
                 }
             } else {
                 console.error('Tax category select not found');
+            }
+            
+            // Function to update tax category field styling
+            function updateTaxCategoryFieldStyling(field, isSelected) {
+                if (isSelected) {
+                    // Change to success styling when tax category is selected
+                    field.className = field.className
+                        .replace('border-red-300 dark:border-red-600', 'border-green-300 dark:border-green-600')
+                        .replace('focus:border-red-500 focus:ring-red-500', 'focus:border-green-500 focus:ring-green-500')
+                        .replace('bg-red-50 dark:bg-red-900/20', 'bg-green-50 dark:bg-green-900/20');
+                    
+                    // Hide the warning indicator
+                    const indicator = field.parentElement.querySelector('.animate-pulse');
+                    if (indicator) {
+                        indicator.style.display = 'none';
+                    }
+                } else {
+                    // Reset to warning styling
+                    field.className = field.className
+                        .replace('border-green-300 dark:border-green-600', 'border-red-300 dark:border-red-600')
+                        .replace('focus:border-green-500 focus:ring-green-500', 'focus:border-red-500 focus:ring-red-500')
+                        .replace('bg-green-50 dark:bg-green-900/20', 'bg-red-50 dark:bg-red-900/20');
+                    
+                    // Show the warning indicator
+                    const indicator = field.parentElement.querySelector('.animate-pulse');
+                    if (indicator) {
+                        indicator.style.display = 'block';
+                    }
+                }
             }
             
             // Add color change functionality for required fields

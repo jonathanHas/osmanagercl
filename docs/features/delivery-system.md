@@ -99,7 +99,7 @@ The delivery verification system provides a complete workflow for handling suppl
    - Visual status indicators (complete, partial, missing, excess)
 
 2. **Scan Processing**: Real-time barcode verification
-   - API: `POST /api/deliveries/{delivery}/scan`
+   - Route: `POST /deliveries/{delivery}/scan` (uses session authentication)
    - Matches barcodes to expected items
    - Updates received quantities and item status
    - Records all scans (matched and unmatched)
@@ -212,6 +212,8 @@ Route::middleware('auth')->prefix('deliveries')->group(function () {
     Route::patch('/{delivery}/items/{item}/quantity', [DeliveryController::class, 'adjustQuantity']);
 });
 ```
+
+**Authentication Note**: The frontend scanning interface uses web routes (session authentication) rather than API routes (token authentication) to ensure compatibility with the existing login system. API routes are available for external integrations.
 
 ## Key Features
 
@@ -326,10 +328,11 @@ App\Models\SupplierLink::where('SupplierCode', '115')->first();
 **Symptoms**:
 - "Unknown product" for all scans
 - Scans not registering in interface
+- "Unauthenticated" errors when scanning
 
 **Potential Causes**:
 - Missing barcodes in delivery items
-- Network connectivity issues with API
+- Authentication issues with API routes
 - JavaScript errors in browser console
 - CSRF token problems
 
@@ -342,6 +345,12 @@ $delivery->items->whereNull('barcode')->count();
 
 # Refresh barcodes manually if needed
 ```
+
+**Authentication Issue Fix (2025-08-04)**:
+If you get "unauthenticated" errors when scanning barcodes, this was caused by JavaScript calling API routes (`/api/deliveries/{delivery}/scan`) while using session-based authentication. The fix ensures JavaScript uses web routes instead:
+- ✅ Uses `/deliveries/{delivery}/scan` (web route with session auth)
+- ✅ Uses `/deliveries/{delivery}/items/{item}/quantity` (web route)
+- ❌ Avoid `/api/deliveries/...` routes (require token auth)
 
 #### 4. Image Display Issues
 **Symptoms**:

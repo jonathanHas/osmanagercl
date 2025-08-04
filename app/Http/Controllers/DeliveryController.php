@@ -58,6 +58,9 @@ class DeliveryController extends Controller
             'csv_file' => 'required|file|mimes:csv,txt|max:10240',
         ]);
 
+        // Additional validation for CSV format
+        $this->validateCsvFormat($request->file('csv_file'), $request->supplier_id);
+
         try {
             // Validate that file upload was successful
             $uploadedFile = $request->file('csv_file');
@@ -479,5 +482,67 @@ class DeliveryController extends Controller
         }
 
         return $itemData;
+    }
+
+    /**
+     * Validate CSV format based on supplier and headers
+     */
+    private function validateCsvFormat($file, int $supplierId): void
+    {
+        $tempPath = $file->getPathname();
+
+        try {
+            $csv = \League\Csv\Reader::createFromPath($tempPath, 'r');
+            $csv->setHeaderOffset(0);
+            $headers = $csv->getHeader();
+
+            // Get supplier configuration
+            $independentConfig = config('suppliers.external_links.independent');
+            $isIndependentSupplier = $independentConfig && in_array($supplierId, $independentConfig['supplier_ids'] ?? []);
+
+            // Detect format based on headers
+            $independentHeaders = ['Code', 'Product', 'Ordered', 'Qty', 'RSP', 'Price', 'Tax', 'Value'];
+            $udeaHeaders = ['Code', 'Description', 'SKU', 'Content', 'Ordered', 'Qty', 'Price', 'Sale', 'Total'];
+
+            $matchingIndependentHeaders = array_intersect($headers, $independentHeaders);
+            $matchingUdeaHeaders = array_intersect($headers, $udeaHeaders);
+
+            // Validate Independent format
+            if ($isIndependentSupplier || count($matchingIndependentHeaders) >= 6) {
+                $missingHeaders = array_diff($independentHeaders, $headers);
+                if (! empty($missingHeaders)) {
+                    throw new \Exception('Independent CSV format missing required headers: '.implode(', ', $missingHeaders));
+                }
+
+                // Validate at least one row of data
+                $records = iterator_to_array($csv->getRecords());
+                if (empty($records)) {
+                    throw new \Exception('CSV file contains no data rows');
+                }
+
+                // Validate first row has required fields
+                $firstRow = reset($records);
+                if (empty($firstRow['Code']) || empty($firstRow['Product'])) {
+                    throw new \Exception('Independent CSV format requires Code and Product fields to be populated');
+                }
+            }
+            // Validate Udea format
+            elseif (count($matchingUdeaHeaders) >= 6) {
+                $requiredUdeaHeaders = ['Code', 'Description', 'Ordered', 'Qty', 'Price', 'Total'];
+                $missingHeaders = array_diff($requiredUdeaHeaders, $headers);
+                if (! empty($missingHeaders)) {
+                    throw new \Exception('Udea CSV format missing required headers: '.implode(', ', $missingHeaders));
+                }
+            }
+            // Unknown format
+            else {
+                throw new \Exception('CSV format not recognized. Expected Independent Health Foods format with headers: '.
+                                   implode(', ', $independentHeaders).' OR Udea format with headers: '.
+                                   implode(', ', $udeaHeaders));
+            }
+
+        } catch (\Exception $e) {
+            throw new \Exception('CSV validation failed: '.$e->getMessage());
+        }
     }
 }

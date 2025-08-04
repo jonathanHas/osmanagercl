@@ -16,9 +16,12 @@ class DeliveryService
 {
     private UdeaScrapingService $udeaService;
 
-    public function __construct(UdeaScrapingService $udeaService)
+    private ?IndependentScrapingService $independentService;
+
+    public function __construct(UdeaScrapingService $udeaService, ?IndependentScrapingService $independentService = null)
     {
         $this->udeaService = $udeaService;
+        $this->independentService = $independentService;
     }
 
     /**
@@ -30,27 +33,37 @@ class DeliveryService
         $csv->setHeaderOffset(0);
 
         return DB::transaction(function () use ($csv, $supplierId, $deliveryDate, $filePath) {
+            // Detect CSV format based on headers and supplier
+            $headers = $csv->getHeader();
+            $isIndependentFormat = $this->detectIndependentCsvFormat($headers, $supplierId);
+
             // Create delivery header
             $delivery = Delivery::create([
                 'delivery_number' => 'DEL-'.date('Ymd-His'),
                 'supplier_id' => $supplierId,
                 'delivery_date' => $deliveryDate ? \Carbon\Carbon::parse($deliveryDate) : now(),
                 'status' => 'draft',
-                'import_data' => ['filename' => basename($filePath), 'imported_at' => now()],
+                'import_data' => [
+                    'filename' => basename($filePath),
+                    'imported_at' => now(),
+                    'format' => $isIndependentFormat ? 'independent' : 'udea',
+                ],
             ]);
 
             $totalExpected = 0;
             $records = $csv->getRecords();
 
             foreach ($records as $record) {
-                // Parse CSV row
-                $item = $this->parseDeliveryRow($record);
+                // Parse CSV row based on detected format
+                $item = $isIndependentFormat
+                    ? $this->parseIndependentCsv($record)
+                    : $this->parseDeliveryRow($record);
 
                 // Check if product exists in our system
                 $product = $this->findProductBySupplierCode($item['code'], $supplierId);
 
-                // Create delivery item
-                $deliveryItem = DeliveryItem::create([
+                // Create delivery item with format-specific fields
+                $deliveryItemData = [
                     'delivery_id' => $delivery->id,
                     'supplier_code' => $item['code'],
                     'sku' => $item['sku'],
@@ -62,13 +75,27 @@ class DeliveryService
                     'product_id' => $product?->ID,
                     'is_new_product' => ! $product,
                     'barcode' => $product?->CODE, // Use existing barcode if available
-                ]);
+                ];
+
+                // Add Independent-specific pricing fields if available
+                if ($isIndependentFormat) {
+                    $deliveryItemData = array_merge($deliveryItemData, [
+                        'sale_price' => $item['sale_price'] ?? null,
+                        'tax_amount' => $item['tax_amount'] ?? null,
+                        'tax_rate' => $item['tax_rate'] ?? null,
+                        'normalized_tax_rate' => $item['normalized_tax_rate'] ?? null,
+                        'line_value_ex_vat' => $item['line_value_ex_vat'] ?? null,
+                        'unit_cost_including_tax' => $item['unit_cost_including_tax'] ?? null,
+                    ]);
+                }
+
+                $deliveryItem = DeliveryItem::create($deliveryItemData);
 
                 $totalExpected += $item['total_cost'];
 
                 // If new product, queue barcode retrieval
                 if (! $product) {
-                    $this->queueBarcodeRetrieval($deliveryItem);
+                    $this->queueBarcodeRetrieval($deliveryItem, $isIndependentFormat);
                 }
             }
 
@@ -76,6 +103,27 @@ class DeliveryService
 
             return $delivery;
         });
+    }
+
+    /**
+     * Detect if CSV is in Independent Health Foods format
+     */
+    private function detectIndependentCsvFormat(array $headers, int $supplierId): bool
+    {
+        // Get Independent supplier configuration
+        $independentConfig = config('suppliers.external_links.independent');
+
+        // Check if supplier ID matches Independent suppliers
+        if ($independentConfig && in_array($supplierId, $independentConfig['supplier_ids'] ?? [])) {
+            return true;
+        }
+
+        // Check headers match Independent format
+        $expectedHeaders = ['Code', 'Product', 'Ordered', 'Qty', 'RSP', 'Price', 'Tax', 'Value'];
+        $matchingHeaders = array_intersect($headers, $expectedHeaders);
+
+        // Consider it Independent format if most key headers match
+        return count($matchingHeaders) >= 6; // At least 6 out of 8 headers match
     }
 
     /**
@@ -102,6 +150,189 @@ class DeliveryService
     }
 
     /**
+     * Parse Independent Health Foods CSV row into structured data
+     */
+    private function parseIndependentCsv(array $row): array
+    {
+        // Parse quantity field which can be:
+        // - Simple number: "6"
+        // - Ordered/Received format: "6/5" (ordered 6, received 5)
+        // - Zero ordered: "0/1" (ordered 0, received 1)
+        $orderedQuantity = 0;
+        $receivedQuantity = 0;
+
+        $qtyField = trim($row['Qty'] ?? '0');
+        $orderedField = trim($row['Ordered'] ?? '0');
+
+        // First check if Ordered field contains "x/y" notation
+        if (str_contains($orderedField, '/')) {
+            [$orderedQuantity, $receivedQuantity] = explode('/', $orderedField, 2);
+            $orderedQuantity = (int) trim($orderedQuantity);
+            $receivedQuantity = (int) trim($receivedQuantity);
+        }
+        // Then check if Qty field contains "x/y" notation
+        elseif (str_contains($qtyField, '/')) {
+            [$orderedQuantity, $receivedQuantity] = explode('/', $qtyField, 2);
+            $orderedQuantity = (int) trim($orderedQuantity);
+            $receivedQuantity = (int) trim($receivedQuantity);
+        }
+        // Simple quantity in Qty field
+        else {
+            $orderedQuantity = (int) $orderedField;
+            $receivedQuantity = (int) $qtyField;
+        }
+
+        // Extract product attributes from name
+        $productName = trim($row['Product'] ?? '');
+        $attributes = $this->extractIndependentProductAttributes($productName);
+        
+        // Units per case - extract from product name
+        $unitsPerCase = $this->extractUnitsFromProductName($productName);
+        
+        // Calculate costs - Independent provides tax separately
+        $caseCost = (float) ($row['Price'] ?? 0);  // Price is per case, not per unit
+        $unitCost = $unitsPerCase > 0 ? $caseCost / $unitsPerCase : $caseCost;  // Convert to per-unit cost
+        $taxAmount = (float) ($row['Tax'] ?? 0);  // Total tax for the line
+        $rsp = (float) ($row['RSP'] ?? 0);
+        $lineValueExVat = (float) ($row['Value'] ?? 0);  // Total line value ex-VAT
+
+        // Calculate tax rate using correct formula: (Tax / Value) * 100
+        $taxRate = null;
+        $normalizedTaxRate = null;
+        if ($lineValueExVat > 0) {
+            $taxRate = ($taxAmount / $lineValueExVat) * 100;
+            $taxRate = round($taxRate, 2); // Round to 2 decimal places
+
+            // Normalize to standard Irish VAT rates
+            $normalizedTaxRate = $this->normalizeIrishVatRate($taxRate);
+        }
+
+        // Calculate per-unit tax amount
+        $unitTaxAmount = $receivedQuantity > 0 ? $taxAmount / $receivedQuantity : 0;
+
+        // Calculate unit cost including tax
+        $unitCostIncludingTax = $unitCost + $unitTaxAmount;
+
+        // Units per case already calculated above
+
+        // Log unusual tax rates for review
+        if ($taxRate !== null && ($taxRate > 50 || $taxRate < 0)) {
+            Log::info('Unusual tax rate detected in Independent CSV', [
+                'code' => trim($row['Code'] ?? ''),
+                'description' => $productName,
+                'tax_rate' => $taxRate,
+                'tax_amount' => $taxAmount,
+                'line_value_ex_vat' => $lineValueExVat,
+                'might_be_deposit' => $taxRate > 100,
+            ]);
+        }
+
+        return [
+            'code' => trim($row['Code'] ?? ''),
+            'ordered_quantity' => $orderedQuantity,
+            'quantity' => $receivedQuantity, // Use received quantity as the main quantity
+            'description' => $productName,
+            'unit_cost' => $unitCost, // Correct: Price column = unit price
+            'sale_price' => $rsp,
+            'tax_amount' => $taxAmount,
+            'tax_rate' => $taxRate,
+            'normalized_tax_rate' => $normalizedTaxRate,
+            'line_value_ex_vat' => $lineValueExVat,
+            'unit_cost_including_tax' => $unitCostIncludingTax,
+            'total_cost' => $lineValueExVat, // Use CSV Value field as authoritative total cost
+            'units_per_case' => $unitsPerCase,
+            'attributes' => $attributes,
+            'sku' => $unitsPerCase, // Use units per case as SKU for consistency
+            'content' => $this->formatContentString($unitsPerCase),
+            // Legacy fields for backward compatibility
+            'rsp' => $rsp,
+            'unit_cost_including_tax_legacy' => $unitCost + $unitTaxAmount,
+        ];
+    }
+
+    /**
+     * Extract product attributes from Independent product names
+     * Example: "All About KombuchaRaspberry Can (Org)(DRS) 1x330ml"
+     */
+    private function extractIndependentProductAttributes(string $productName): array
+    {
+        $attributes = [];
+
+        // Extract organic indicator
+        if (preg_match('/\(Org\)/', $productName)) {
+            $attributes['organic'] = true;
+        }
+
+        // Extract deposit return scheme
+        if (preg_match('/\(DRS\)/', $productName)) {
+            $attributes['deposit_return_scheme'] = true;
+        }
+
+        // Extract packaging size (e.g., "1x330ml", "6x250g")
+        if (preg_match('/(\d+)x(\d+(?:\.\d+)?)(ml|g|kg|l|litre)/', $productName, $matches)) {
+            $attributes['package_quantity'] = (int) $matches[1];
+            $attributes['package_size'] = $matches[2];
+            $attributes['package_unit'] = $matches[3];
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * Extract units per case from product name
+     */
+    private function extractUnitsFromProductName(string $productName): int
+    {
+        // Look for patterns like "1x330ml", "6x250g", etc.
+        if (preg_match('/(\d+)x\d+(?:\.\d+)?(?:ml|g|kg|l|litre)/', $productName, $matches)) {
+            return (int) $matches[1];
+        }
+
+        // Default to 1 if no clear indication
+        return 1;
+    }
+
+    /**
+     * Format content string for Independent products
+     */
+    private function formatContentString(int $unitsPerCase): string
+    {
+        return $unitsPerCase === 1 ? '1 unit' : "{$unitsPerCase} units";
+    }
+
+    /**
+     * Normalize calculated tax rate to standard Irish VAT rates
+     */
+    private function normalizeIrishVatRate(?float $calculatedRate): ?float
+    {
+        if (is_null($calculatedRate)) {
+            return null;
+        }
+
+        // Irish VAT rates as of 2025
+        $standardRates = [
+            0.0,    // Zero rate (essential foods, books, etc.)
+            4.8,    // Reduced rate (newspapers, magazines)
+            9.0,    // Reduced rate (tourism, restaurants)
+            13.5,   // Reduced rate (fuel, electricity, building materials)
+            23.0,   // Standard rate (most goods and services)
+        ];
+
+        // Find the closest standard rate within a reasonable tolerance
+        $tolerance = 1.0; // Allow 1.0% variation for rounding differences
+
+        foreach ($standardRates as $standardRate) {
+            if (abs($calculatedRate - $standardRate) <= $tolerance) {
+                return $standardRate;
+            }
+        }
+
+        // If no standard rate matches, return the calculated rate
+        // This handles special cases like deposits or unusual items
+        return $calculatedRate;
+    }
+
+    /**
      * Find product by supplier code
      */
     private function findProductBySupplierCode(string $code, int $supplierId): ?Product
@@ -120,12 +351,20 @@ class DeliveryService
     /**
      * Queue barcode retrieval for new products
      */
-    private function queueBarcodeRetrieval(DeliveryItem $item): void
+    private function queueBarcodeRetrieval(DeliveryItem $item, bool $isIndependentFormat = false): void
     {
         // Dispatch proper Laravel job with retry mechanism
-        RetrieveBarcodeJob::dispatch($item)
-            ->delay(now()->addSeconds(5)) // Small delay to let the response finish first
-            ->onQueue('barcode-retrieval'); // Use dedicated queue for barcode jobs
+        $jobClass = $isIndependentFormat ? 'RetrieveIndependentBarcodeJob' : 'RetrieveBarcodeJob';
+
+        if ($isIndependentFormat && class_exists('\App\Jobs\RetrieveIndependentBarcodeJob')) {
+            \App\Jobs\RetrieveIndependentBarcodeJob::dispatch($item)
+                ->delay(now()->addSeconds(5))
+                ->onQueue('barcode-retrieval');
+        } else {
+            RetrieveBarcodeJob::dispatch($item)
+                ->delay(now()->addSeconds(5))
+                ->onQueue('barcode-retrieval');
+        }
     }
 
     /**
@@ -297,10 +536,21 @@ class DeliveryService
     /**
      * Retrieve barcode for a specific supplier code
      */
-    public function retrieveBarcode(string $supplierCode): ?string
+    public function retrieveBarcode(string $supplierCode, ?int $supplierId = null): ?string
     {
         try {
-            $productData = $this->udeaService->getProductData($supplierCode);
+            // Determine which service to use based on supplier
+            $isIndependentSupplier = false;
+            if ($supplierId) {
+                $independentConfig = config('suppliers.external_links.independent');
+                $isIndependentSupplier = $independentConfig && in_array($supplierId, $independentConfig['supplier_ids'] ?? []);
+            }
+
+            if ($isIndependentSupplier && $this->independentService) {
+                $productData = $this->independentService->getProductData($supplierCode);
+            } else {
+                $productData = $this->udeaService->getProductData($supplierCode);
+            }
 
             if ($productData && isset($productData['barcode'])) {
                 return $productData['barcode'];
@@ -311,6 +561,7 @@ class DeliveryService
         } catch (\Exception $e) {
             Log::error('Failed to retrieve barcode for '.$supplierCode, [
                 'error' => $e->getMessage(),
+                'supplier_id' => $supplierId,
             ]);
 
             return null;

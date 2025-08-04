@@ -19,6 +19,12 @@ class DeliveryItem extends Model
         'description',
         'units_per_case',
         'unit_cost',
+        'sale_price',
+        'tax_amount',
+        'tax_rate',
+        'normalized_tax_rate',
+        'line_value_ex_vat',
+        'unit_cost_including_tax',
         'ordered_quantity',
         'received_quantity',
         'total_cost',
@@ -32,6 +38,12 @@ class DeliveryItem extends Model
 
     protected $casts = [
         'unit_cost' => 'decimal:4',
+        'sale_price' => 'decimal:4',
+        'tax_amount' => 'decimal:4',
+        'tax_rate' => 'decimal:2',
+        'normalized_tax_rate' => 'decimal:2',
+        'line_value_ex_vat' => 'decimal:2',
+        'unit_cost_including_tax' => 'decimal:4',
         'total_cost' => 'decimal:2',
         'is_new_product' => 'boolean',
         'barcode_retrieval_failed' => 'boolean',
@@ -130,5 +142,65 @@ class DeliveryItem extends Model
     public function scopeNewProducts($query)
     {
         return $query->where('is_new_product', true);
+    }
+
+    /**
+     * Get formatted tax rate for display
+     */
+    public function getFormattedTaxRateAttribute(): ?string
+    {
+        if (is_null($this->tax_rate)) {
+            return null;
+        }
+
+        return number_format($this->tax_rate, 2).'%';
+    }
+
+    /**
+     * Get formatted normalized tax rate for display
+     */
+    public function getFormattedNormalizedTaxRateAttribute(): ?string
+    {
+        if (is_null($this->normalized_tax_rate)) {
+            return null;
+        }
+
+        return number_format($this->normalized_tax_rate, 1).'%';
+    }
+
+    /**
+     * Get the tax rate that should be used for product creation
+     */
+    public function getRecommendedTaxRateAttribute(): ?float
+    {
+        return $this->normalized_tax_rate ?? $this->tax_rate;
+    }
+
+    /**
+     * Get per-unit tax amount
+     */
+    public function getUnitTaxAmountAttribute(): ?float
+    {
+        if (is_null($this->tax_amount) || $this->ordered_quantity <= 0) {
+            return null;
+        }
+
+        return $this->tax_amount / $this->ordered_quantity;
+    }
+
+    /**
+     * Check if this item has Independent pricing data
+     */
+    public function hasIndependentPricingData(): bool
+    {
+        return ! is_null($this->sale_price) || ! is_null($this->tax_rate);
+    }
+
+    /**
+     * Check if tax rate indicates this might be a deposit scheme item
+     */
+    public function isPotentialDepositScheme(): bool
+    {
+        return ! is_null($this->tax_rate) && $this->tax_rate > 50;
     }
 }

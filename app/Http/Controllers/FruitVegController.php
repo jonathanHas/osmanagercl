@@ -862,12 +862,12 @@ class FruitVegController extends Controller
     public function sales(Request $request)
     {
         // Smart default dates: use the most recent period with sales data
-        if (!$request->get('start_date') && !$request->get('end_date')) {
+        if (! $request->get('start_date') && ! $request->get('end_date')) {
             // Find the latest sales date and default to last 30 days from that point
             $latestSaleDate = DB::table('sales_daily_summary')
                 ->whereIn('category_id', ['SUB1', 'SUB2', 'SUB3'])
                 ->max('sale_date');
-            
+
             if ($latestSaleDate) {
                 $endDate = Carbon::parse($latestSaleDate)->endOfDay();
                 $startDate = $endDate->copy()->subDays(29)->startOfDay();
@@ -928,11 +928,11 @@ class FruitVegController extends Controller
     public function getSalesData(Request $request)
     {
         // Use smart defaults matching the sales() method
-        if (!$request->get('start_date') && !$request->get('end_date')) {
+        if (! $request->get('start_date') && ! $request->get('end_date')) {
             $latestSaleDate = DB::table('sales_daily_summary')
                 ->whereIn('category_id', ['SUB1', 'SUB2', 'SUB3'])
                 ->max('sale_date');
-            
+
             if ($latestSaleDate) {
                 $endDate = Carbon::parse($latestSaleDate)->endOfDay();
                 $startDate = $endDate->copy()->subDays(29)->startOfDay();

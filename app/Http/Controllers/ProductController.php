@@ -473,9 +473,35 @@ class ProductController extends Controller
                 $prefillData['price_sell_suggested'] = $deliveryItem->unit_cost * 1.3;
                 $prefillData['price_source'] = 'calculated';
             }
+
+            // Auto-select tax category based on delivery item's normalized tax rate
+            if ($deliveryItem->hasIndependentPricingData() && $deliveryItem->recommended_tax_rate !== null) {
+                $prefillData['tax_category'] = $this->mapTaxRateToCategory($deliveryItem->recommended_tax_rate);
+            }
+
+            // Use RSP as suggested selling price if available and better than calculated
+            if ($deliveryItem->sale_price && $deliveryItem->sale_price > 0) {
+                $prefillData['price_sell_suggested'] = $deliveryItem->sale_price;
+                $prefillData['price_source'] = 'independent_rsp';
+            }
         }
 
         return view('products.create', compact('taxCategories', 'categories', 'suppliers', 'prefillData', 'deliveryItemId'));
+    }
+
+    /**
+     * Map a tax rate percentage to the corresponding POS tax category ID
+     */
+    private function mapTaxRateToCategory(float $taxRate): ?string
+    {
+        // Map normalized tax rates to POS tax category IDs
+        return match ($taxRate) {
+            0.0 => '000',    // Tax Zero
+            9.0 => '003',    // Tax Second Reduced (9%)
+            13.5 => '001',   // Tax Reduced (13.5%)
+            23.0 => '002',   // Tax Standard (23%)
+            default => null, // Unknown rate, let user select
+        };
     }
 
     /**

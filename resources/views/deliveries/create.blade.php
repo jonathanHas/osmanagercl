@@ -89,15 +89,32 @@
 
                     <!-- CSV Format Information -->
                     <div class="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
-                        <h4 class="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">Expected CSV Format</h4>
-                        <p class="text-sm text-blue-700 dark:text-blue-300 mb-2">
-                            The CSV file should contain the following columns:
+                        <h4 class="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">Supported CSV Formats</h4>
+                        <p class="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                            The system automatically detects and supports multiple supplier formats:
                         </p>
-                        <div class="text-xs font-mono bg-blue-100 dark:bg-blue-900/40 p-2 rounded border">
-                            Code,Ordered,Qty,SKU,Content,Description,Price,Sale,Total
+                        
+                        <!-- Udea Format -->
+                        <div class="mb-3">
+                            <p class="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">Udea Format:</p>
+                            <div class="text-xs font-mono bg-blue-100 dark:bg-blue-900/40 p-2 rounded border">
+                                Code,Ordered,Qty,SKU,Content,Description,Price,Sale,Total
+                            </div>
                         </div>
-                        <p class="text-xs text-blue-600 dark:text-blue-400 mt-2">
-                            This matches the standard Udea delivery export format.
+                        
+                        <!-- Independent Format -->
+                        <div class="mb-3">
+                            <p class="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">Independent Health Foods Format:</p>
+                            <div class="text-xs font-mono bg-blue-100 dark:bg-blue-900/40 p-2 rounded border">
+                                Code,Product,Ordered,Qty,RSP,Price,Tax,Value
+                            </div>
+                            <p class="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                                Supports "x/y" quantity notation (ordered/received) and separate tax column
+                            </p>
+                        </div>
+                        
+                        <p class="text-xs text-blue-600 dark:text-blue-400">
+                            The format will be automatically detected based on the CSV headers and selected supplier.
                         </p>
                     </div>
 

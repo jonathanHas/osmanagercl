@@ -323,7 +323,7 @@
                     if (!this.barcode) return;
                     
                     try {
-                        const response = await fetch(`/api/deliveries/${this.deliveryId}/scan`, {
+                        const response = await fetch(`/deliveries/${this.deliveryId}/scan`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -373,7 +373,7 @@
                 
                 async updateItemQuantity(itemId, quantity) {
                     try {
-                        const response = await fetch(`/api/deliveries/${this.deliveryId}/items/${itemId}/quantity`, {
+                        const response = await fetch(`/deliveries/${this.deliveryId}/items/${itemId}/quantity`, {
                             method: 'PATCH',
                             headers: {
                                 'Content-Type': 'application/json',

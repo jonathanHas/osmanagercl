@@ -30,6 +30,33 @@ return [
             // Enable/disable this integration
             'enabled' => true,
         ],
+
+        'independent' => [
+            // Supplier IDs in the database for Independent Health Foods
+            'supplier_ids' => [], // To be configured based on actual supplier IDs
+
+            // External image URL template (if available)
+            // {CODE} will be replaced with the product CODE/barcode
+            'image_url' => null, // To be configured if Independent provides image URLs
+
+            // Supplier website search URL template
+            // {SUPPLIER_CODE} will be replaced with the supplier's product code
+            'website_search' => 'https://www.independenthealthfoods.ie/search?q={SUPPLIER_CODE}',
+
+            // Display name for the supplier
+            'display_name' => 'Independent Health Foods',
+
+            // Enable/disable this integration
+            'enabled' => true,
+
+            // CSV format configuration
+            'csv_format' => [
+                'headers' => ['Code', 'Product', 'Ordered', 'Qty', 'RSP', 'Price', 'Tax', 'Value'],
+                'quantity_notation' => 'supports_ordered_received', // Supports "x/y" format
+                'tax_handling' => 'separate_column', // Tax is provided as separate column
+                'price_includes_tax' => false, // Price excludes tax
+            ],
+        ],
     ],
 
     /*

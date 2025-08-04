@@ -252,6 +252,12 @@
                                     Cost
                                 </th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    RSP
+                                </th>
+                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Tax Rate
+                                </th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Actions
                                 </th>
                             </tr>
@@ -344,12 +350,50 @@
                                     </td>
                                     <td class="px-6 py-4 text-right text-sm">
                                         <div class="text-gray-900 dark:text-gray-100">
-                                            €{{ number_format($item->unit_cost * $item->ordered_quantity, 2) }}
+                                            €{{ number_format($item->unit_cost, 2) }}
                                         </div>
-                                        @if($item->received_quantity > 0)
-                                            <div class="text-xs text-gray-500">
-                                                Received: €{{ number_format($item->unit_cost * $item->received_quantity, 2) }}
+                                        <div class="text-xs text-gray-500">
+                                            per unit
+                                        </div>
+                                        @if($item->ordered_quantity > 1)
+                                            <div class="text-xs text-gray-500 mt-1">
+                                                Total: €{{ number_format($item->unit_cost * $item->ordered_quantity, 2) }}
                                             </div>
+                                        @endif
+                                    </td>
+                                    <td class="px-6 py-4 text-right text-sm">
+                                        @if($item->sale_price)
+                                            <div class="text-gray-900 dark:text-gray-100">
+                                                €{{ number_format($item->sale_price, 2) }}
+                                            </div>
+                                            <div class="text-xs text-gray-500">
+                                                per unit
+                                            </div>
+                                        @else
+                                            <span class="text-gray-400 dark:text-gray-500 text-xs">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-6 py-4 text-center text-sm">
+                                        @if($item->tax_rate !== null)
+                                            @if($item->normalized_tax_rate !== null && $item->normalized_tax_rate != $item->tax_rate)
+                                                <div class="text-gray-900 dark:text-gray-100 font-medium">
+                                                    {{ $item->formatted_normalized_tax_rate }}
+                                                </div>
+                                                <div class="text-xs text-gray-500">
+                                                    (calc: {{ $item->formatted_tax_rate }})
+                                                </div>
+                                            @else
+                                                <div class="text-gray-900 dark:text-gray-100">
+                                                    {{ $item->formatted_tax_rate }}
+                                                </div>
+                                            @endif
+                                            @if($item->isPotentialDepositScheme())
+                                                <div class="text-xs text-orange-600 dark:text-orange-400">
+                                                    Deposit?
+                                                </div>
+                                            @endif
+                                        @else
+                                            <span class="text-gray-400 dark:text-gray-500 text-xs">—</span>
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 text-right text-sm font-medium">
