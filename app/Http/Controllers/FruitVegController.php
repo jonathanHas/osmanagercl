@@ -9,8 +9,8 @@ use App\Models\VegClass;
 use App\Models\VegDetails;
 use App\Models\VegPrintQueue;
 use App\Models\VegUnit;
-use App\Repositories\SalesRepository;
 use App\Repositories\OptimizedSalesRepository;
+use App\Repositories\SalesRepository;
 use App\Services\TillVisibilityService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -861,24 +861,40 @@ class FruitVegController extends Controller
      */
     public function sales(Request $request)
     {
-        // Default to a period with actual F&V sales data (July 1-17, 2025)
-        $startDate = $request->get('start_date')
-            ? Carbon::parse($request->get('start_date'))
-            : Carbon::parse('2025-07-01')->startOfDay();
+        // Smart default dates: use the most recent period with sales data
+        if (!$request->get('start_date') && !$request->get('end_date')) {
+            // Find the latest sales date and default to last 30 days from that point
+            $latestSaleDate = DB::table('sales_daily_summary')
+                ->whereIn('category_id', ['SUB1', 'SUB2', 'SUB3'])
+                ->max('sale_date');
+            
+            if ($latestSaleDate) {
+                $endDate = Carbon::parse($latestSaleDate)->endOfDay();
+                $startDate = $endDate->copy()->subDays(29)->startOfDay();
+            } else {
+                // Fallback to known good dates if no data found
+                $startDate = Carbon::parse('2025-07-01')->startOfDay();
+                $endDate = Carbon::parse('2025-07-17')->endOfDay();
+            }
+        } else {
+            $startDate = $request->get('start_date')
+                ? Carbon::parse($request->get('start_date'))
+                : Carbon::now()->subDays(29)->startOfDay();
 
-        $endDate = $request->get('end_date')
-            ? Carbon::parse($request->get('end_date'))
-            : Carbon::parse('2025-07-17')->endOfDay();
+            $endDate = $request->get('end_date')
+                ? Carbon::parse($request->get('end_date'))
+                : Carbon::now()->endOfDay();
+        }
 
         // Load initial daily sales data for chart rendering
         try {
             $dailySalesData = $this->optimizedSalesRepository->getFruitVegDailySales($startDate, $endDate);
-            
+
             // If no aggregated data, use live queries
             if ($dailySalesData->isEmpty()) {
                 $dailySalesData = $this->getLiveFruitVegDailySales($startDate, $endDate);
             }
-            
+
             $dailySales = $dailySalesData;
         } catch (\Exception $e) {
             \Log::error('Error loading initial daily sales data', ['error' => $e->getMessage()]);
@@ -888,10 +904,10 @@ class FruitVegController extends Controller
         // Load minimal stats for display
         $stats = [
             'total_units' => 0,
-            'total_revenue' => 0, 
+            'total_revenue' => 0,
             'unique_products' => 0,
             'total_transactions' => 0,
-            'category_breakdown' => []
+            'category_breakdown' => [],
         ];
 
         // Don't load heavy product data on initial load - only daily sales for chart
@@ -911,13 +927,28 @@ class FruitVegController extends Controller
      */
     public function getSalesData(Request $request)
     {
-        $startDate = $request->get('start_date')
-            ? Carbon::parse($request->get('start_date'))
-            : Carbon::parse('2025-07-01')->startOfDay();
+        // Use smart defaults matching the sales() method
+        if (!$request->get('start_date') && !$request->get('end_date')) {
+            $latestSaleDate = DB::table('sales_daily_summary')
+                ->whereIn('category_id', ['SUB1', 'SUB2', 'SUB3'])
+                ->max('sale_date');
+            
+            if ($latestSaleDate) {
+                $endDate = Carbon::parse($latestSaleDate)->endOfDay();
+                $startDate = $endDate->copy()->subDays(29)->startOfDay();
+            } else {
+                $startDate = Carbon::parse('2025-07-01')->startOfDay();
+                $endDate = Carbon::parse('2025-07-17')->endOfDay();
+            }
+        } else {
+            $startDate = $request->get('start_date')
+                ? Carbon::parse($request->get('start_date'))
+                : Carbon::parse('2025-07-01')->startOfDay();
 
-        $endDate = $request->get('end_date')
-            ? Carbon::parse($request->get('end_date'))
-            : Carbon::parse('2025-07-17')->endOfDay();
+            $endDate = $request->get('end_date')
+                ? Carbon::parse($request->get('end_date'))
+                : Carbon::parse('2025-07-17')->endOfDay();
+        }
 
         $search = $request->get('search', '');
         $limit = $request->get('limit', 50);
@@ -926,7 +957,7 @@ class FruitVegController extends Controller
             'start_date' => $startDate->toDateString(),
             'end_date' => $endDate->toDateString(),
             'search' => $search,
-            'limit' => $limit
+            'limit' => $limit,
         ]);
 
         $startTime = microtime(true);
@@ -941,9 +972,9 @@ class FruitVegController extends Controller
             if ($dailySales->isEmpty()) {
                 \Log::info('📊 No aggregated data found, falling back to live POS queries', [
                     'start_date' => $startDate->format('Y-m-d'),
-                    'end_date' => $endDate->format('Y-m-d')
+                    'end_date' => $endDate->format('Y-m-d'),
                 ]);
-                
+
                 // Use direct POS database queries (TICKETLINES/RECEIPTS instead of STOCKDIARY)
                 $stats = $this->getLiveFruitVegStats($startDate, $endDate);
                 $dailySales = $this->getLiveFruitVegDailySales($startDate, $endDate);
@@ -953,36 +984,36 @@ class FruitVegController extends Controller
             // Apply search filter if provided (on pre-aggregated data)
             if ($search) {
                 $allSales = $this->optimizedSalesRepository->getFruitVegSalesByDateRange($startDate, $endDate);
-                
+
                 $productSales = $allSales->filter(function ($sale) use ($search) {
                     return stripos($sale->product_name, $search) !== false ||
                            stripos($sale->product_code, $search) !== false;
                 })
-                ->groupBy('product_id')
-                ->map(function ($productGroup) {
-                    $firstItem = $productGroup->first();
-                    $totalUnits = $productGroup->sum('total_units');
-                    $totalRevenue = $productGroup->sum('total_revenue');
-                    
-                    return [
-                        'product_id' => $firstItem->product_id,
-                        'product_name' => $firstItem->product_name,
-                        'product_code' => $firstItem->product_code,
-                        'category' => $firstItem->category_id,
-                        'category_name' => match ($firstItem->category_id) {
-                            'SUB1' => 'Fruits',
-                            'SUB2' => 'Vegetables',
-                            'SUB3' => 'Veg Barcoded',
-                            default => 'Other'
-                        },
-                        'total_units' => (float) $totalUnits,
-                        'total_revenue' => (float) $totalRevenue,
-                        'avg_price' => $totalUnits > 0 ? $totalRevenue / $totalUnits : 0,
-                    ];
-                })
-                ->sortByDesc('total_units')
-                ->take($limit)
-                ->values();
+                    ->groupBy('product_id')
+                    ->map(function ($productGroup) {
+                        $firstItem = $productGroup->first();
+                        $totalUnits = $productGroup->sum('total_units');
+                        $totalRevenue = $productGroup->sum('total_revenue');
+
+                        return [
+                            'product_id' => $firstItem->product_id,
+                            'product_name' => $firstItem->product_name,
+                            'product_code' => $firstItem->product_code,
+                            'category' => $firstItem->category_id,
+                            'category_name' => match ($firstItem->category_id) {
+                                'SUB1' => 'Fruits',
+                                'SUB2' => 'Vegetables',
+                                'SUB3' => 'Veg Barcoded',
+                                default => 'Other'
+                            },
+                            'total_units' => (float) $totalUnits,
+                            'total_revenue' => (float) $totalRevenue,
+                            'avg_price' => $totalUnits > 0 ? $totalRevenue / $totalUnits : 0,
+                        ];
+                    })
+                    ->sortByDesc('total_units')
+                    ->take($limit)
+                    ->values();
             } else {
                 // Use top products directly (already optimized)
                 $productSales = $topProducts->map(function ($product) {
@@ -1011,7 +1042,7 @@ class FruitVegController extends Controller
                 'product_sales_count' => $productSales->count(),
                 'stats_units' => $stats['total_units'],
                 'daily_sales_count' => $dailySales->count(),
-                'performance_gain' => 'Previously took 5-30 seconds, now sub-second!'
+                'performance_gain' => 'Previously took 5-30 seconds, now sub-second!',
             ]);
 
             return response()->json([
@@ -1026,17 +1057,18 @@ class FruitVegController extends Controller
                 'performance_info' => [
                     'execution_time_ms' => round($executionTime * 1000, 2),
                     'data_source' => 'optimized_pre_aggregated',
-                    'performance_improvement' => '100x+ faster than previous implementation'
-                ]
+                    'performance_improvement' => '100x+ faster than previous implementation',
+                ],
             ]);
 
         } catch (\Exception $e) {
             \Log::error('❌ Error getting optimized sales data', [
                 'error' => $e->getMessage(),
                 'start_date' => $startDate->toDateString(),
-                'end_date' => $endDate->toDateString()
+                'end_date' => $endDate->toDateString(),
             ]);
-            return response()->json(['error' => 'Database error: ' . $e->getMessage()], 500);
+
+            return response()->json(['error' => 'Database error: '.$e->getMessage()], 500);
         }
     }
 
@@ -1079,7 +1111,7 @@ class FruitVegController extends Controller
                     'SUB3' => 'Veg Barcoded',
                     default => 'Other'
                 };
-                
+
                 return [$categoryName => [
                     'units' => (float) $item->category_units,
                     'revenue' => (float) $item->category_revenue,
@@ -1141,5 +1173,81 @@ class FruitVegController extends Controller
             ->orderByDesc('total_units')
             ->limit($limit)
             ->get();
+    }
+
+    /**
+     * Get daily sales data for a specific product
+     */
+    public function getProductDailySales(Request $request, string $code)
+    {
+        $product = Product::where('CODE', $code)->firstOrFail();
+
+        // Get date range from request or use current sales page range
+        $startDate = $request->get('start_date')
+            ? Carbon::parse($request->get('start_date'))
+            : Carbon::parse('2025-07-01')->startOfDay();
+
+        $endDate = $request->get('end_date')
+            ? Carbon::parse($request->get('end_date'))
+            : Carbon::parse('2025-07-17')->endOfDay();
+
+        try {
+            // Try optimized repository first
+            $dailySales = $this->optimizedSalesRepository->getProductDailySales($product->ID, $startDate, $endDate);
+
+            // If no optimized data, use live POS queries
+            if ($dailySales->isEmpty()) {
+                $dailySales = DB::connection('pos')
+                    ->table('TICKETLINES as tl')
+                    ->join('RECEIPTS as r', 'tl.TICKET', '=', 'r.ID')
+                    ->join('PRODUCTS as p', 'tl.PRODUCT', '=', 'p.ID')
+                    ->where('p.CODE', $code)
+                    ->whereBetween('r.DATENEW', [$startDate, $endDate])
+                    ->selectRaw('
+                        DATE(r.DATENEW) as sale_date,
+                        SUM(tl.UNITS) as daily_units,
+                        SUM(tl.UNITS * tl.PRICE) as daily_revenue,
+                        AVG(tl.PRICE) as avg_price,
+                        COUNT(DISTINCT r.ID) as transactions
+                    ')
+                    ->groupBy('sale_date')
+                    ->orderBy('sale_date', 'asc')
+                    ->get();
+            }
+
+            // Calculate totals
+            $totalUnits = $dailySales->sum('daily_units');
+            $totalRevenue = $dailySales->sum('daily_revenue');
+
+            return response()->json([
+                'success' => true,
+                'product' => [
+                    'code' => $product->CODE,
+                    'name' => $product->NAME,
+                ],
+                'daily_sales' => $dailySales,
+                'summary' => [
+                    'total_units' => (float) $totalUnits,
+                    'total_revenue' => (float) $totalRevenue,
+                    'days_with_sales' => $dailySales->count(),
+                    'avg_daily_units' => $dailySales->count() > 0 ? $totalUnits / $dailySales->count() : 0,
+                ],
+                'date_range' => [
+                    'start' => $startDate->format('Y-m-d'),
+                    'end' => $endDate->format('Y-m-d'),
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error getting product daily sales', [
+                'product_code' => $code,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to load daily sales data',
+            ], 500);
+        }
     }
 }
