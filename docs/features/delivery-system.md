@@ -75,11 +75,13 @@ The delivery verification system provides a complete workflow for handling suppl
 
 ## Complete Workflow
 
-### 1. Pre-Delivery Setup
+### 1. Pre-Delivery Setup  
 1. **CSV Import**: Upload supplier delivery docket
    - Route: `POST /deliveries` (upload CSV file)
-   - Parses standard Udea format: Code, Ordered, Qty, SKU, Content, Description, Price, Sale, Total
-   - Creates delivery header and individual items
+   - **Multi-Format Support**: Automatic detection of CSV format based on headers and supplier
+   - **Udea Format**: Code, Ordered, Qty, SKU, Content, Description, Price, Sale, Total
+   - **Independent Irish Health Foods Format**: Code, Product, Ordered, Qty, RSP, Price, Tax, Value
+   - Creates delivery header and individual items with format-specific parsing
 
 2. **Product Matching**: Automatic product identification
    - Uses existing `SupplierLink` model to match supplier codes
@@ -240,6 +242,15 @@ Route::middleware('auth')->prefix('deliveries')->group(function () {
 - **Fallback Logic**: Gracefully falls back to 30% markup if scraping fails
 - **Performance**: Cached scraping results with 1-hour TTL for efficiency
 
+### Independent Irish Health Foods Integration
+- **VAT Rate Calculation**: Automatic calculation using formula: (Tax ÷ Value) × 100
+- **Irish VAT Normalization**: Maps calculated rates to standard Irish VAT rates (0%, 9%, 13.5%, 23%)
+- **Automatic Tax Category Selection**: Pre-selects appropriate POS tax category when creating products
+- **Case-to-Unit Conversion**: Converts case prices to unit prices using product name parsing
+- **RSP Integration**: Uses Recommended Selling Price for intelligent pricing suggestions
+- **Quantity Notation Support**: Handles "ordered/received" format for partial deliveries
+- **Visual Tax Indicators**: Green highlighting shows auto-selected tax categories
+
 ### Discrepancy Management
 - **Comprehensive Tracking**: Missing, partial, excess, and unknown items
 - **Value Impact**: Financial implications of discrepancies
@@ -267,12 +278,29 @@ Route::middleware('auth')->prefix('deliveries')->group(function () {
 
 ## Configuration
 
-### CSV Format
-Expected Udea delivery CSV format:
+### CSV Formats
+
+#### Udea Format
+Standard Dutch supplier format:
 ```csv
 Code,Ordered,Qty,SKU,Content,Description,Price,Sale,Total
 115,1,1,6,"1 kilogram","Broccoli, . Biologisch Klasse I NL",3.17,6.98,19.02
 ```
+
+#### Independent Irish Health Foods Format  
+Irish supplier format with VAT calculations:
+```csv
+Code,Product,Ordered,Qty,RSP,Price,Tax,Value
+49036A,All About KombuchaRaspberry Can (Org)(DRS) 1x330ml,6,6,3.7,2.15,2.97,12.9
+19990B,Suma Hemp Oil & Vitamin E Soap 12x90g,1/0,1/0,3.08,21.44,4.93,21.44
+```
+
+**Key Differences**:
+- **Price Field**: Independent format uses **case price**, Udea uses **unit price**  
+- **Unit Cost Calculation**: Independent divides Price by units per case (extracted from product name)
+- **Tax Information**: Independent provides separate Tax amount and calculated VAT rates
+- **Quantity Notation**: Independent supports "ordered/received" format (e.g., "6/5", "1/0")
+- **RSP Field**: Recommended selling price for automatic pricing suggestions
 
 ### File Uploads
 - **Maximum Size**: 10MB
@@ -373,7 +401,31 @@ $service->hasExternalIntegration($product->supplier->SupplierID);
 $service->getExternalImageUrl($product);
 ```
 
-#### 5. Performance Issues
+#### 5. Unit Cost Display Issues (Independent Format)
+**Symptoms**:
+- Unit costs showing as case prices (e.g., €21.44 instead of €1.79)
+- "Add to POS" form shows incorrect pricing
+- Tax calculations appear wrong
+
+**Root Cause**: 
+Independent Irish Health Foods CSV format uses **case prices** in the Price field, not unit prices.
+
+**Solution Applied (2025-08-04)**:
+- **Automatic Detection**: System detects Independent format by headers and supplier ID
+- **Case-to-Unit Conversion**: Extracts units per case from product name (e.g., "12x90g" = 12 units)
+- **Correct Calculation**: Unit cost = Case price ÷ Units per case
+- **Example**: €21.44 case price ÷ 12 units = €1.79 per unit
+
+**Debug Steps**:
+```bash
+php artisan tinker
+# Test specific product parsing
+$row = ['Code' => '19990B', 'Product' => 'Suma Hemp Oil & Vitamin E Soap 12x90g', 'Price' => '21.44'];
+$service = new App\Services\DeliveryService(app(App\Services\UdeaScrapingService::class));
+# Expected: €1.79 unit cost, not €21.44
+```
+
+#### 6. Performance Issues
 **Symptoms**:
 - Slow page loading on large deliveries
 - Timeouts during CSV import

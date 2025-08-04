@@ -13,26 +13,33 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <!-- Scan Input Section -->
             <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg p-6 mb-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Scan Barcode or Enter Code
                         </label>
-                        <div class="flex gap-2">
+                        <!-- Mobile-first: Stack inputs vertically on small screens -->
+                        <div class="flex flex-col sm:flex-row gap-2">
                             <input type="text" 
                                    x-model="barcode"
-                                   @keydown.enter="processScan"
+                                   @keydown.enter="handleBarcodeScan"
                                    x-ref="barcodeInput"
                                    placeholder="Scan or type barcode..."
                                    class="flex-1 rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
-                            <input type="number" 
-                                   x-model="quantity"
-                                   min="1"
-                                   class="w-20 rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                            <button @click="processScan" 
-                                    class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
-                                Add
-                            </button>
+                            <div class="flex gap-2">
+                                <input type="number" 
+                                       x-model="quantity"
+                                       x-ref="quantityInput"
+                                       @keydown.enter="processScan"
+                                       @input="cancelAutoScan"
+                                       @focus="cancelAutoScan"
+                                       min="1"
+                                       class="w-20 rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                <button @click="processScan" 
+                                        class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium min-h-[42px] touch-manipulation">
+                                    Add
+                                </button>
+                            </div>
                         </div>
                     </div>
                     
@@ -52,6 +59,24 @@
                 <div x-show="lastScan" x-transition class="mt-4 p-3 rounded-md"
                      :class="lastScan?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
                     <span x-text="lastScan?.message"></span>
+                </div>
+                
+                <!-- Auto-scan Countdown -->
+                <div x-show="autoScanCountdown > 0" 
+                     x-transition 
+                     class="mt-2 p-3 bg-yellow-50 text-yellow-800 rounded-md text-sm flex items-center justify-between">
+                    <span>🕐 Auto-adding in <span x-text="autoScanCountdown"></span> seconds...</span>
+                    <button @click="cancelAutoScan" 
+                            class="px-2 py-1 bg-yellow-200 hover:bg-yellow-300 text-yellow-800 rounded text-xs">
+                        Cancel
+                    </button>
+                </div>
+                
+                <!-- Quantity Adjustment Hint (shown when quantity input is focused) -->
+                <div x-show="$refs.quantityInput && document.activeElement === $refs.quantityInput && autoScanCountdown === 0" 
+                     x-transition 
+                     class="mt-2 p-2 bg-blue-50 text-blue-700 rounded-md text-sm">
+                    💡 Adjust quantity then press Enter or tap Add
                 </div>
             </div>
 
@@ -266,6 +291,8 @@
                 quantity: 1,
                 items: @json($processedItems),
                 lastScan: null,
+                autoScanCountdown: 0,
+                autoScanTimer: null,
                 filter: 'all',
                 sortBy: 'new_first', // new_first, code, description, status
                 stats: {
@@ -280,6 +307,43 @@
                 init() {
                     this.updateStats();
                     this.$refs.barcodeInput.focus();
+                },
+                
+                handleBarcodeScan() {
+                    if (!this.barcode) return;
+                    
+                    // Clear any existing timer
+                    if (this.autoScanTimer) {
+                        clearInterval(this.autoScanTimer);
+                        this.autoScanTimer = null;
+                    }
+                    
+                    // Focus quantity input to allow quick adjustment
+                    this.$refs.quantityInput.focus();
+                    this.$refs.quantityInput.select();
+                    
+                    // Start countdown for auto-process
+                    this.autoScanCountdown = 3;
+                    this.autoScanTimer = setInterval(() => {
+                        this.autoScanCountdown--;
+                        if (this.autoScanCountdown <= 0) {
+                            clearInterval(this.autoScanTimer);
+                            this.autoScanTimer = null;
+                            this.autoScanCountdown = 0;
+                            // Only auto-process if quantity input doesn't have focus
+                            if (document.activeElement !== this.$refs.quantityInput) {
+                                this.processScan();
+                            }
+                        }
+                    }, 1000);
+                },
+                
+                cancelAutoScan() {
+                    if (this.autoScanTimer) {
+                        clearInterval(this.autoScanTimer);
+                        this.autoScanTimer = null;
+                        this.autoScanCountdown = 0;
+                    }
                 },
                 
                 get filteredItems() {
@@ -350,6 +414,7 @@
                         this.updateStats();
                         this.barcode = '';
                         this.quantity = 1;
+                        this.cancelAutoScan(); // Clear any pending auto-scan
                         this.$refs.barcodeInput.focus();
                         
                     } catch (error) {

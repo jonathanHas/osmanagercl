@@ -58,11 +58,17 @@ return [
         ]
     ],
     'independent' => [
-        'supplier_ids' => [/* IDs */],
+        'supplier_ids' => [/* Configured supplier IDs */],
         'image_url' => 'https://iihealthfoods.com/images/{CODE}.jpg',
         'website_search' => 'https://iihealthfoods.com/search?q={SUPPLIER_CODE}',
-        'display_name' => 'Independent',
-        'enabled' => false
+        'display_name' => 'Independent Irish Health Foods',
+        'enabled' => true,
+        'csv_format' => [
+            'headers' => ['Code', 'Product', 'Ordered', 'Qty', 'RSP', 'Price', 'Tax', 'Value'],
+            'price_type' => 'case', // Price field is per case, not per unit
+            'supports_vat' => true,
+            'quantity_notation' => 'ordered/received' // Supports "6/5" format
+        ]
     ]
 ];
 ```
@@ -83,6 +89,33 @@ return [
 - **`extractBarcodeFromDetail($html)`**: Extract product barcode from detail page
 - **Session Management**: Handles authentication and cookies
 - **Error Handling**: Graceful degradation on scraping failures
+
+## Supported Suppliers
+
+### Udea (Ekoplaza) - Full Integration
+- **Image CDN**: High-quality product images
+- **Website Scraping**: Live pricing and barcode extraction  
+- **Delivery Integration**: Automatic product matching and pricing
+- **Status**: ✅ Fully Operational
+
+### Independent Irish Health Foods - Delivery Integration
+- **CSV Import**: Specialized format with VAT calculations
+- **Tax Integration**: Automatic Irish VAT rate detection and normalization
+- **Product Creation**: Auto-populated tax categories based on VAT rates
+- **Case-to-Unit Conversion**: Handles case pricing with automatic unit cost calculation
+- **RSP Support**: Recommended selling price integration
+- **Status**: ✅ Delivery System Operational (Images/Scraping: Planned)
+
+**Key Features**:
+- **VAT Rate Calculation**: Formula (Tax ÷ Value) × 100 with normalization to Irish rates
+- **Standard Irish VAT Rates**: 0%, 9%, 13.5%, 23% with automatic POS tax category mapping
+- **Quantity Notation**: "ordered/received" format support (e.g., "6/5", "1/0")
+- **Smart Unit Pricing**: Extracts units per case from product names (e.g., "12x90g" = 12 units)
+- **Tax Category Auto-Selection**: Maps normalized VAT rates to POS tax categories:
+  - 0% → Tax Zero (ID: 000)
+  - 9% → Tax Second Reduced (ID: 003)  
+  - 13.5% → Tax Reduced (ID: 001)
+  - 23% → Tax Standard (ID: 002)
 
 ## Implementation Details
 
