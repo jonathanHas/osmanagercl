@@ -1,172 +1,129 @@
 <x-admin-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="text-2xl font-bold">Delivery Scanning - {{ $delivery->delivery_number }}</h2>
-            <div class="flex items-center gap-4">
-                <span class="text-sm text-gray-600">Supplier: {{ $delivery->supplier?->Supplier ?? 'Unknown' }}</span>
-                <span class="text-sm text-gray-600">Date: {{ $delivery->delivery_date?->format('d/m/Y') ?? 'No Date' }}</span>
+        <div class="flex justify-between items-center py-2">
+            <div class="flex items-center gap-3">
+                <h2 class="text-lg font-semibold">📦 {{ $delivery->delivery_number }}</h2>
+                <span class="text-sm text-gray-600 hidden sm:inline">{{ $delivery->supplier?->Supplier ?? 'Unknown' }}</span>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-gray-500">
+                <span class="hidden md:inline">{{ $delivery->delivery_date?->format('d/m/Y') ?? 'No Date' }}</span>
+                <a href="{{ route('deliveries.show', $delivery) }}" 
+                   class="px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs">
+                    Details
+                </a>
             </div>
         </div>
     </x-slot>
 
-    <div x-data="deliveryScanner({{ $delivery->id }})" class="py-6">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <!-- Scan Input Section -->
-            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg p-6 mb-6">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Scan Barcode or Enter Code
-                        </label>
-                        <!-- Mobile-first: Stack inputs vertically on small screens -->
-                        <div class="flex flex-col sm:flex-row gap-2">
-                            <input type="text" 
-                                   x-model="barcode"
-                                   @keydown.enter="handleBarcodeScan"
-                                   x-ref="barcodeInput"
-                                   placeholder="Scan or type barcode..."
-                                   class="flex-1 rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
-                            <div class="flex gap-2">
-                                <input type="number" 
-                                       x-model="quantity"
-                                       x-ref="quantityInput"
-                                       @keydown.enter="processScan"
-                                       @input="cancelAutoScan"
-                                       @focus="cancelAutoScan"
-                                       min="1"
-                                       class="w-20 rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                                <button @click="processScan" 
-                                        class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium min-h-[42px] touch-manipulation">
-                                    Add
-                                </button>
-                            </div>
-                        </div>
+    <div x-data="deliveryScanner({{ $delivery->id }})" class="py-2">
+        <div class="max-w-7xl mx-auto px-2 sm:px-4">
+            <!-- Compact Progress Header - Always Visible -->
+            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-3">
+                <div class="flex items-center justify-between">
+                    <div class="text-sm font-medium text-blue-900 dark:text-blue-100">
+                        <span x-text="stats.complete"></span>/<span x-text="stats.total"></span> items
+                        (<span x-text="stats.total > 0 ? Math.round((stats.complete / stats.total) * 100) : 0"></span>%)
                     </div>
-                    
-                    <div class="text-right">
-                        <div class="text-sm text-gray-600 dark:text-gray-400 mb-2">Progress</div>
-                        <div class="text-2xl font-bold">
-                            <span x-text="stats.complete"></span> / <span x-text="stats.total"></span> items
-                        </div>
-                        <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
-                            <div class="bg-green-600 h-2 rounded-full transition-all duration-300" 
-                                 :style="{width: stats.total > 0 ? (stats.complete / stats.total * 100) + '%' : '0%'}"></div>
-                        </div>
+                    <div class="flex gap-1 text-xs">
+                        <span class="bg-red-100 text-red-800 px-2 py-1 rounded" x-text="stats.missing"></span>
+                        <span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded" x-text="stats.partial"></span>
+                        <span class="bg-green-100 text-green-800 px-2 py-1 rounded" x-text="stats.complete"></span>
                     </div>
                 </div>
+                <div class="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-1.5 mt-2">
+                    <div class="bg-blue-600 h-1.5 rounded-full transition-all duration-300" 
+                         :style="{width: stats.total > 0 ? (stats.complete / stats.total * 100) + '%' : '0%'}"></div>
+                </div>
+            </div>
+
+            <!-- Compact Scan Input Section -->
+            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg p-3 mb-3">
+                <div class="flex gap-2">
+                    <input type="text" 
+                           x-model="barcode"
+                           @keydown.enter="handleBarcodeScan"
+                           x-ref="barcodeInput"
+                           placeholder="Scan barcode..."
+                           class="flex-1 text-lg rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
+                    <input type="number" 
+                           x-model="quantity"
+                           x-ref="quantityInput"
+                           @keydown.enter="processScan"
+                           @input="cancelAutoScan"
+                           @focus="cancelAutoScan"
+                           min="1"
+                           placeholder="Qty"
+                           class="w-16 text-center rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                    <button @click="processScan" 
+                            class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium touch-manipulation">
+                        Add
+                    </button>
+                </div>
                 
-                <!-- Recent Scan Feedback -->
-                <div x-show="lastScan" x-transition class="mt-4 p-3 rounded-md"
+                <!-- Compact Recent Scan Feedback -->
+                <div x-show="lastScan" x-transition class="mt-2 p-2 rounded text-sm"
                      :class="lastScan?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
                     <div class="flex items-center justify-between">
-                        <span x-text="lastScan?.message"></span>
-                        <div x-show="lastScan?.success && lastScan?.scan_type" class="ml-3 text-xs">
-                            <span x-show="lastScan?.scan_type === 'case'" 
-                                  class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                                📦 Case Scan
-                            </span>
-                            <span x-show="lastScan?.scan_type === 'unit'" 
-                                  class="bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
-                                📱 Unit Scan
-                            </span>
+                        <div class="flex items-center gap-2">
+                            <span x-show="lastScan?.scan_type === 'case'" class="text-blue-600">📦</span>
+                            <span x-show="lastScan?.scan_type === 'unit'" class="text-purple-600">📱</span>
+                            <span x-text="lastScan?.message" class="text-xs"></span>
                         </div>
-                    </div>
-                    <div x-show="lastScan?.success && lastScan?.units_added" class="text-xs mt-1 opacity-75">
-                        Added <span x-text="lastScan?.units_added"></span> units to total
+                        <span x-show="lastScan?.success && lastScan?.units_added" 
+                              class="text-xs font-semibold">
+                            +<span x-text="lastScan?.units_added"></span>
+                        </span>
                     </div>
                 </div>
                 
                 <!-- Auto-scan Countdown -->
                 <div x-show="autoScanCountdown > 0" 
                      x-transition 
-                     class="mt-2 p-3 bg-yellow-50 text-yellow-800 rounded-md text-sm flex items-center justify-between">
-                    <span>🕐 Auto-adding in <span x-text="autoScanCountdown"></span> seconds...</span>
+                     class="mt-2 p-2 bg-yellow-50 text-yellow-800 rounded text-sm flex items-center justify-between">
+                    <span>Auto-adding in <span x-text="autoScanCountdown"></span>s...</span>
                     <button @click="cancelAutoScan" 
                             class="px-2 py-1 bg-yellow-200 hover:bg-yellow-300 text-yellow-800 rounded text-xs">
                         Cancel
                     </button>
                 </div>
-                
-                <!-- Quantity Adjustment Hint (shown when quantity input is focused) -->
-                <div x-show="$refs.quantityInput && document.activeElement === $refs.quantityInput && autoScanCountdown === 0" 
-                     x-transition 
-                     class="mt-2 p-2 bg-blue-50 text-blue-700 rounded-md text-sm">
-                    💡 Adjust quantity then press Enter or tap Add
-                </div>
-            </div>
-
-            <!-- Status Summary Cards -->
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-                <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 text-center">
-                    <div class="text-2xl font-bold text-green-600" x-text="stats.complete"></div>
-                    <div class="text-sm text-gray-600 dark:text-gray-400">Complete</div>
-                </div>
-                <div class="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4 text-center">
-                    <div class="text-2xl font-bold text-yellow-600" x-text="stats.partial"></div>
-                    <div class="text-sm text-gray-600 dark:text-gray-400">Partial</div>
-                </div>
-                <div class="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 text-center">
-                    <div class="text-2xl font-bold text-red-600" x-text="stats.missing"></div>
-                    <div class="text-sm text-gray-600 dark:text-gray-400">Missing</div>
-                </div>
-                <div class="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 text-center">
-                    <div class="text-2xl font-bold text-purple-600" x-text="stats.excess"></div>
-                    <div class="text-sm text-gray-600 dark:text-gray-400">Excess</div>
-                </div>
-                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-center">
-                    <div class="text-2xl font-bold text-gray-600" x-text="stats.unmatched"></div>
-                    <div class="text-sm text-gray-600 dark:text-gray-400">Unknown</div>
-                </div>
             </div>
 
             <!-- Delivery Items Table -->
             <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div class="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-lg font-medium">Delivery Items</h3>
-                        <div class="flex items-center gap-4">
-                            <!-- Create New Product Link -->
+                        <div class="flex items-center gap-3">
+                            <h3 class="text-sm font-medium">Items</h3>
+                            <select x-model="sortBy" 
+                                    class="text-xs border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded px-2 py-1">
+                                <option value="new_first">New First</option>
+                                <option value="code">Code</option>
+                                <option value="description">Name</option>
+                                <option value="status">Status</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2">
                             <a href="{{ route('products.create') }}" 
-                               class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-md transition-colors duration-200 flex items-center gap-2">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                                </svg>
-                                Create Product
+                               class="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors">
+                                + Product
                             </a>
                             
-                            <!-- Sort Dropdown -->
-                            <div class="flex items-center gap-2">
-                                <span class="text-sm text-gray-600 dark:text-gray-400">Sort by:</span>
-                                <select x-model="sortBy" 
-                                        class="text-sm border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md">
-                                    <option value="new_first">New Products First</option>
-                                    <option value="code">Code</option>
-                                    <option value="description">Description</option>
-                                    <option value="status">Status</option>
-                                </select>
-                            </div>
-                            
-                            <!-- Filter Buttons -->
-                            <div class="flex gap-2">
+                            <!-- Compact Filter Buttons -->
+                            <div class="flex gap-1">
                                 <button @click="filter = 'all'" 
                                         :class="filter === 'all' ? 'bg-gray-200 dark:bg-gray-700' : ''"
-                                        class="px-3 py-1 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+                                        class="px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-700">
                                     All
                                 </button>
                                 <button @click="filter = 'pending'" 
                                         :class="filter === 'pending' ? 'bg-red-200 dark:bg-red-900/30' : ''"
-                                        class="px-3 py-1 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+                                        class="px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-700">
                                     Missing
                                 </button>
                                 <button @click="filter = 'partial'" 
                                         :class="filter === 'partial' ? 'bg-yellow-200 dark:bg-yellow-900/30' : ''"
-                                        class="px-3 py-1 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+                                        class="px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-700">
                                     Partial
-                                </button>
-                                <button @click="filter = 'discrepancy'" 
-                                        :class="filter === 'discrepancy' ? 'bg-orange-200 dark:bg-orange-900/30' : ''"
-                                        class="px-3 py-1 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
-                                    Discrepancies
                                 </button>
                             </div>
                         </div>
@@ -174,29 +131,29 @@
                 </div>
                 
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
                         <thead class="bg-gray-50 dark:bg-gray-700">
                             <tr>
-                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Image
+                                <th class="px-2 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                                    Img
                                 </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Code / Barcode
+                                <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                                    Code
                                 </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                                     Description
                                 </th>
-                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Ordered
+                                <th class="px-2 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                                    Ord
                                 </th>
-                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Received
+                                <th class="px-2 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                                    Rec
                                 </th>
-                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                <th class="px-2 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                                     Status
                                 </th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Actions
+                                <th class="px-2 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                                    +/-
                                 </th>
                             </tr>
                         </thead>
@@ -208,75 +165,68 @@
                                     'bg-red-50 dark:bg-red-900/10': item.status === 'pending',
                                     'bg-purple-50 dark:bg-purple-900/10': item.status === 'excess'
                                 }">
-                                    <td class="px-6 py-4 text-center">
+                                    <td class="px-2 py-2 text-center">
                                         <template x-if="item.product && item.product.supplier && item.has_external_integration">
-                                            <div class="relative w-10 h-10 mx-auto group">
+                                            <div class="relative w-8 h-8 mx-auto group">
                                                 <img 
                                                     :src="item.external_image_url" 
                                                     :alt="item.description"
-                                                    class="w-10 h-10 object-cover rounded border border-gray-200 dark:border-gray-700 cursor-pointer"
+                                                    class="w-8 h-8 object-cover rounded border border-gray-200 dark:border-gray-700 cursor-pointer"
                                                     loading="lazy"
                                                     @@error="$event.target.style.display='none'; $event.target.parentElement.style.display='none'"
                                                 >
-                                                <!-- Hover preview - Clean image only -->
+                                                <!-- Hover preview -->
                                                 <div class="absolute left-0 bottom-full mb-2 z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
                                                     <img 
                                                         :src="item.external_image_url" 
                                                         :alt="item.description"
-                                                        class="w-64 h-64 object-contain rounded-lg border-2 border-white dark:border-gray-600 shadow-xl bg-white"
+                                                        class="w-48 h-48 object-contain rounded-lg border-2 border-white dark:border-gray-600 shadow-xl bg-white"
                                                         loading="lazy"
                                                     >
                                                 </div>
                                             </div>
                                         </template>
                                         <template x-if="!item.product || !item.product.supplier || !item.has_external_integration">
-                                            <div class="w-10 h-10 mx-auto bg-gray-100 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600 flex items-center justify-center">
-                                                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <div class="w-8 h-8 mx-auto bg-gray-100 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600 flex items-center justify-center">
+                                                <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                                                 </svg>
                                             </div>
                                         </template>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                    <td class="px-2 py-2 text-xs">
                                         <div class="font-medium text-gray-900 dark:text-gray-100" x-text="item.supplier_code"></div>
-                                        <div class="text-xs text-gray-500">
-                                            <div x-text="item.barcode || 'No unit barcode'"></div>
-                                            <div x-show="item.outer_code" class="text-blue-600">
-                                                📦 <span x-text="item.outer_code"></span>
-                                            </div>
-                                        </div>
+                                        <div class="text-xs text-gray-500 truncate max-w-20" x-text="item.barcode || 'No barcode'"></div>
+                                        <div x-show="item.outer_code" class="text-blue-600 text-xs">📦</div>
                                     </td>
-                                    <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                                        <div x-text="item.description"></div>
-                                        <div class="text-xs text-gray-500">
-                                            <span x-show="item.is_new_product" class="text-orange-600">New Product</span>
-                                        </div>
+                                    <td class="px-2 py-2 text-xs text-gray-900 dark:text-gray-100">
+                                        <div class="truncate max-w-32" x-text="item.description" :title="item.description"></div>
+                                        <span x-show="item.is_new_product" class="text-orange-600 text-xs">New</span>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-center font-medium">
+                                    <td class="px-2 py-2 text-xs text-center font-medium">
                                         <div x-text="item.total_ordered_units || item.ordered_quantity"></div>
-                                        <div class="text-xs text-gray-500" x-show="item.formatted_ordered_quantity" x-text="item.formatted_ordered_quantity"></div>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-center">
+                                    <td class="px-2 py-2 text-xs text-center">
                                         <div class="font-medium" x-text="item.total_received_units || item.received_quantity"></div>
-                                        <div class="text-xs text-gray-500" x-show="item.formatted_received_quantity" x-text="item.formatted_received_quantity"></div>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-center">
-                                        <span class="px-2 py-1 text-xs font-medium rounded-full"
+                                    <td class="px-2 py-2 text-center">
+                                        <span class="w-2 h-2 rounded-full inline-block"
                                               :class="{
-                                                  'bg-green-100 text-green-800': item.status === 'complete',
-                                                  'bg-yellow-100 text-yellow-800': item.status === 'partial',
-                                                  'bg-red-100 text-red-800': item.status === 'pending',
-                                                  'bg-purple-100 text-purple-800': item.status === 'excess'
-                                              }"
-                                              x-text="item.status">
+                                                  'bg-green-500': item.status === 'complete',
+                                                  'bg-yellow-500': item.status === 'partial',
+                                                  'bg-red-500': item.status === 'pending',
+                                                  'bg-purple-500': item.status === 'excess'
+                                              }">
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-right">
-                                        <button @click="adjustQuantity(item.id, 1)" 
-                                                class="text-green-600 hover:text-green-900 mr-2">+1</button>
-                                        <button @click="adjustQuantity(item.id, -1)" 
-                                                :disabled="item.received_quantity === 0"
-                                                class="text-red-600 hover:text-red-900 disabled:opacity-50">-1</button>
+                                    <td class="px-2 py-2 text-center">
+                                        <div class="flex gap-1">
+                                            <button @click="adjustQuantity(item.id, 1)" 
+                                                    class="text-green-600 hover:text-green-900 text-xs px-1">+</button>
+                                            <button @click="adjustQuantity(item.id, -1)" 
+                                                    :disabled="item.received_quantity === 0"
+                                                    class="text-red-600 hover:text-red-900 disabled:opacity-50 text-xs px-1">-</button>
+                                        </div>
                                     </td>
                                 </tr>
                             </template>
@@ -285,21 +235,21 @@
                 </div>
             </div>
 
-            <!-- Action Buttons -->
-            <div class="mt-6 flex justify-between">
+            <!-- Compact Action Buttons -->
+            <div class="mt-3 flex justify-between gap-2">
                 <button @click="showSummary" 
-                        class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700">
-                    View Summary
+                        class="px-3 py-2 bg-gray-600 text-white rounded text-sm hover:bg-gray-700">
+                    Summary
                 </button>
-                <div class="flex gap-3">
+                <div class="flex gap-2">
                     <button @click="saveProgress" 
-                            class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-                        Save Progress
+                            class="px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
+                        Save
                     </button>
                     <button @click="completeDelivery" 
                             :disabled="stats.missing > 0"
-                            class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                        Complete & Update Stock
+                            class="px-3 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                        Complete
                     </button>
                 </div>
             </div>
