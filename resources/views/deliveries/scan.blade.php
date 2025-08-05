@@ -17,7 +17,56 @@
 
     <div x-data="deliveryScanner({{ $delivery->id }})" class="py-2">
         <div class="max-w-7xl mx-auto px-2 sm:px-4">
-            <!-- Compact Progress Header - Always Visible -->
+            <!-- Priority: Scan Input Section First -->
+            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg p-4 mb-3">
+                <div class="space-y-3">
+                    <!-- Barcode Input - Full Width -->
+                    <input type="text" 
+                           x-model="barcode"
+                           @keydown.enter="handleBarcodeScan"
+                           x-ref="barcodeInput"
+                           placeholder="Scan barcode..."
+                           class="w-full text-xl py-3 px-4 rounded-lg border-2 border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                    
+                    <!-- Quantity and Add Button Row -->
+                    <div class="flex gap-3">
+                        <div class="flex-1">
+                            <label class="block text-xs text-gray-600 mb-1">Quantity</label>
+                            <input type="number" 
+                                   x-model="quantity"
+                                   x-ref="quantityInput"
+                                   @keydown.enter="processScan"
+                                   min="1"
+                                   class="w-full text-center text-lg py-2 rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-xs text-gray-600 mb-1">&nbsp;</label>
+                            <button @click="processScan" 
+                                    class="w-full py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium text-lg touch-manipulation">
+                                Add
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Compact Recent Scan Feedback -->
+                <div x-show="lastScan" x-transition class="mt-3 p-2 rounded text-sm"
+                     :class="lastScan?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span x-show="lastScan?.scan_type === 'case'" class="text-blue-600">📦</span>
+                            <span x-show="lastScan?.scan_type === 'unit'" class="text-purple-600">📱</span>
+                            <span x-text="lastScan?.message" class="text-sm"></span>
+                        </div>
+                        <span x-show="lastScan?.success && lastScan?.units_added" 
+                              class="text-sm font-semibold text-green-700">
+                            +<span x-text="lastScan?.units_added"></span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress and Delivery Info - Moved Below Scanning -->
             <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-3">
                 <div class="flex items-center justify-between">
                     <div class="text-sm font-medium text-blue-900 dark:text-blue-100">
@@ -30,61 +79,9 @@
                         <span class="bg-green-100 text-green-800 px-2 py-1 rounded" x-text="stats.complete"></span>
                     </div>
                 </div>
-                <div class="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-1.5 mt-2">
-                    <div class="bg-blue-600 h-1.5 rounded-full transition-all duration-300" 
+                <div class="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2 mt-2">
+                    <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" 
                          :style="{width: stats.total > 0 ? (stats.complete / stats.total * 100) + '%' : '0%'}"></div>
-                </div>
-            </div>
-
-            <!-- Compact Scan Input Section -->
-            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg p-3 mb-3">
-                <div class="flex gap-2">
-                    <input type="text" 
-                           x-model="barcode"
-                           @keydown.enter="handleBarcodeScan"
-                           x-ref="barcodeInput"
-                           placeholder="Scan barcode..."
-                           class="flex-1 text-lg rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
-                    <input type="number" 
-                           x-model="quantity"
-                           x-ref="quantityInput"
-                           @keydown.enter="processScan"
-                           @input="cancelAutoScan"
-                           @focus="cancelAutoScan"
-                           min="1"
-                           placeholder="Qty"
-                           class="w-16 text-center rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                    <button @click="processScan" 
-                            class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium touch-manipulation">
-                        Add
-                    </button>
-                </div>
-                
-                <!-- Compact Recent Scan Feedback -->
-                <div x-show="lastScan" x-transition class="mt-2 p-2 rounded text-sm"
-                     :class="lastScan?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <span x-show="lastScan?.scan_type === 'case'" class="text-blue-600">📦</span>
-                            <span x-show="lastScan?.scan_type === 'unit'" class="text-purple-600">📱</span>
-                            <span x-text="lastScan?.message" class="text-xs"></span>
-                        </div>
-                        <span x-show="lastScan?.success && lastScan?.units_added" 
-                              class="text-xs font-semibold">
-                            +<span x-text="lastScan?.units_added"></span>
-                        </span>
-                    </div>
-                </div>
-                
-                <!-- Auto-scan Countdown -->
-                <div x-show="autoScanCountdown > 0" 
-                     x-transition 
-                     class="mt-2 p-2 bg-yellow-50 text-yellow-800 rounded text-sm flex items-center justify-between">
-                    <span>Auto-adding in <span x-text="autoScanCountdown"></span>s...</span>
-                    <button @click="cancelAutoScan" 
-                            class="px-2 py-1 bg-yellow-200 hover:bg-yellow-300 text-yellow-800 rounded text-xs">
-                        Cancel
-                    </button>
                 </div>
             </div>
 
@@ -220,12 +217,12 @@
                                         </span>
                                     </td>
                                     <td class="px-2 py-2 text-center">
-                                        <div class="flex gap-1">
+                                        <div class="flex gap-1 justify-center">
                                             <button @click="adjustQuantity(item.id, 1)" 
-                                                    class="text-green-600 hover:text-green-900 text-xs px-1">+</button>
+                                                    class="bg-green-100 text-green-700 hover:bg-green-200 text-sm px-2 py-1 rounded touch-manipulation">+</button>
                                             <button @click="adjustQuantity(item.id, -1)" 
-                                                    :disabled="item.received_quantity === 0"
-                                                    class="text-red-600 hover:text-red-900 disabled:opacity-50 text-xs px-1">-</button>
+                                                    :disabled="(item.total_received_units || item.received_quantity || 0) === 0"
+                                                    class="bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm px-2 py-1 rounded touch-manipulation">-</button>
                                         </div>
                                     </td>
                                 </tr>
@@ -286,38 +283,8 @@
                 handleBarcodeScan() {
                     if (!this.barcode) return;
                     
-                    // Clear any existing timer
-                    if (this.autoScanTimer) {
-                        clearInterval(this.autoScanTimer);
-                        this.autoScanTimer = null;
-                    }
-                    
-                    // Focus quantity input to allow quick adjustment
-                    this.$refs.quantityInput.focus();
-                    this.$refs.quantityInput.select();
-                    
-                    // Start countdown for auto-process
-                    this.autoScanCountdown = 3;
-                    this.autoScanTimer = setInterval(() => {
-                        this.autoScanCountdown--;
-                        if (this.autoScanCountdown <= 0) {
-                            clearInterval(this.autoScanTimer);
-                            this.autoScanTimer = null;
-                            this.autoScanCountdown = 0;
-                            // Only auto-process if quantity input doesn't have focus
-                            if (document.activeElement !== this.$refs.quantityInput) {
-                                this.processScan();
-                            }
-                        }
-                    }, 1000);
-                },
-                
-                cancelAutoScan() {
-                    if (this.autoScanTimer) {
-                        clearInterval(this.autoScanTimer);
-                        this.autoScanTimer = null;
-                        this.autoScanCountdown = 0;
-                    }
+                    // Auto-process scan immediately - no countdown
+                    this.processScan();
                 },
                 
                 get filteredItems() {
@@ -404,9 +371,11 @@
                     const item = this.items.find(i => i.id === itemId);
                     if (!item) return;
                     
-                    const newQty = Math.max(0, item.received_quantity + delta);
+                    // Use total_received_units if available, otherwise fallback to received_quantity
+                    const currentQty = item.total_received_units || item.received_quantity || 0;
+                    const newQty = Math.max(0, currentQty + delta);
                     
-                    // Update via API
+                    // Update via API - the controller will handle the legacy quantity update
                     await this.updateItemQuantity(itemId, newQty);
                 },
                 
