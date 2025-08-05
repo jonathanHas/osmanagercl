@@ -459,6 +459,15 @@ class DeliveryController extends Controller
     private function formatDeliveryItem($item, $delivery)
     {
         $itemData = $item->toArray();
+
+        // Add enhanced quantity information
+        $itemData['total_ordered_units'] = $item->total_ordered_units;
+        $itemData['total_received_units'] = $item->total_received_units;
+        $itemData['effective_case_units'] = $item->getEffectiveCaseUnits();
+        $itemData['has_case_barcode'] = $item->hasCaseBarcode();
+        $itemData['formatted_ordered_quantity'] = $item->formatted_ordered_quantity;
+        $itemData['formatted_received_quantity'] = $item->formatted_received_quantity;
+
         if ($item->product && $item->product->supplier) {
             $itemData['has_external_integration'] = $this->supplierService->hasExternalIntegration($item->product->supplier->SupplierID);
             $itemData['external_image_url'] = $this->supplierService->getExternalImageUrl($item->product);

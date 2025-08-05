@@ -127,6 +127,38 @@ Update a product's name.
 
 **Response:** Redirect to product detail page with success message
 
+#### `PATCH /products/{id}/display`
+Update a product's display name used for labels and customer-facing displays.
+
+**Request Body:**
+```json
+{
+    "display": "Custom Display Name<br>With Line Breaks"
+}
+```
+
+**Features:**
+- **HTML Support**: Supports `<br>` tags for multi-line display names
+- **Nullable Field**: Can be set to empty string to use default product name
+- **Label Integration**: Updated display names are automatically used in label generation
+- **Real-time Updates**: AJAX endpoint provides immediate feedback
+
+**Validation:** Optional string, max 255 characters
+
+**Response:** JSON response
+```json
+{
+    "success": true
+}
+```
+
+**Error Response:**
+```json
+{
+    "error": "Product not found"
+}
+```
+
 #### `PATCH /products/{id}/tax`
 Update a product's tax category.
 
@@ -347,6 +379,14 @@ curl -X PATCH /products/123e4567-e89b-12d3-a456-426614174000/name \
   -H "Content-Type: application/json" \
   -H "X-CSRF-TOKEN: csrf-token-here" \
   -d '{"product_name": "Premium Organic Apples"}'
+```
+
+### Updating Display Name
+```bash
+curl -X PATCH /products/123e4567-e89b-12d3-a456-426614174000/display \
+  -H "Content-Type: application/json" \
+  -H "X-CSRF-TOKEN: csrf-token-here" \
+  -d '{"display": "Fresh Organic Apples<br>Class I - Ireland"}'
 ```
 
 ### Toggle Stocking Status

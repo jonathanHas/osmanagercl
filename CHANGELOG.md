@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **🏷️ Product Display Name Management**: Universal display name editing across all products (2025-08-05)
+  - **Inline Editing**: Click-to-edit display names on all product detail pages
+  - **HTML Support**: Support for `<br>` tags and HTML formatting in display names
+  - **Consistent UX**: Same editing pattern as fruit-veg module for unified experience
+  - **AJAX Updates**: Real-time saving with loading states and success feedback
+  - **Label Integration**: Display names automatically used in label generation
+  - **Cross-Module**: Works for all product categories, not just F&V products
+  - **API Endpoint**: New `PATCH /products/{id}/display` endpoint with JSON responses
+
 - **☕ Coffee Module Enhancements**: Advanced product management features (2025-08-04)
   - **Inline Price Editing**: Click-to-edit pricing with VAT calculations
   - **Display Name Management**: Set custom display names for till buttons

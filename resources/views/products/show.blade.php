@@ -320,25 +320,65 @@
                         </div>
 
                         <!-- Additional Information -->
-                        @if($product->TEXTTIP || $product->DISPLAY)
-                            <div class="mt-6 bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
-                                <h3 class="text-lg font-semibold mb-4">Additional Information</h3>
-                                <dl class="space-y-3">
-                                    @if($product->TEXTTIP)
-                                        <div>
-                                            <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Text Tip</dt>
-                                            <dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{{ $product->TEXTTIP }}</dd>
+                        <div class="mt-6 bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+                            <h3 class="text-lg font-semibold mb-4">Additional Information</h3>
+                            <dl class="space-y-3">
+                                @if($product->TEXTTIP)
+                                    <div>
+                                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Text Tip</dt>
+                                        <dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{{ $product->TEXTTIP }}</dd>
+                                    </div>
+                                @endif
+                                <div>
+                                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                                        Display Name
+                                        <button type="button" 
+                                                onclick="toggleDisplayEdit()" 
+                                                class="ml-2 inline-flex items-center p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                            </svg>
+                                        </button>
+                                    </dt>
+                                    <dd class="mt-1">
+                                        <!-- Display Value (default view) -->
+                                        <div id="displayValue" class="text-sm text-gray-900 dark:text-gray-100">
+                                            @if($product->DISPLAY)
+                                                {!! nl2br(html_entity_decode($product->DISPLAY)) !!}
+                                            @else
+                                                <span class="text-gray-500 dark:text-gray-400 italic">No custom display name set</span>
+                                            @endif
                                         </div>
-                                    @endif
-                                    @if($product->DISPLAY)
-                                        <div>
-                                            <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Display</dt>
-                                            <dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{{ $product->DISPLAY }}</dd>
+                                        
+                                        <!-- Display Edit Form (hidden by default) -->
+                                        <div id="displayEditForm" class="hidden">
+                                            <div class="flex items-start gap-2">
+                                                <textarea id="displayInput" 
+                                                         rows="3"
+                                                         class="flex-1 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+                                                         placeholder="Enter custom display name (supports HTML like &lt;br&gt; for line breaks)"
+                                                         maxlength="255">{{ $product->DISPLAY }}</textarea>
+                                                <div class="flex flex-col gap-1">
+                                                    <button type="button" 
+                                                            onclick="saveDisplayName()" 
+                                                            class="inline-flex items-center px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded transition-colors">
+                                                        Save
+                                                    </button>
+                                                    <button type="button" 
+                                                            onclick="cancelDisplayEdit()" 
+                                                            class="inline-flex items-center px-2 py-1 bg-gray-500 hover:bg-gray-600 text-white text-xs font-medium rounded transition-colors">
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                Used on labels and displays. Leave empty to use product name.
+                                            </p>
                                         </div>
-                                    @endif
-                                </dl>
-                            </div>
-                        @endif
+                                    </dd>
+                                </div>
+                            </dl>
+                        </div>
                     </div>
                 </x-slot>
                 
@@ -1002,6 +1042,116 @@
                 // Restore button state
                 button.disabled = false;
                 button.innerHTML = originalContent;
+            });
+        }
+
+        // Display name editing functions
+        let originalDisplayValue = '';
+        
+        function toggleDisplayEdit() {
+            const displayValue = document.getElementById('displayValue');
+            const displayEditForm = document.getElementById('displayEditForm');
+            const displayInput = document.getElementById('displayInput');
+            
+            // Store original value for cancel functionality
+            originalDisplayValue = displayInput.value;
+            
+            // Toggle visibility
+            displayValue.classList.add('hidden');
+            displayEditForm.classList.remove('hidden');
+            
+            // Focus on textarea and position cursor at end
+            setTimeout(() => {
+                displayInput.focus();
+                displayInput.setSelectionRange(displayInput.value.length, displayInput.value.length);
+            }, 50);
+        }
+        
+        function cancelDisplayEdit() {
+            const displayValue = document.getElementById('displayValue');
+            const displayEditForm = document.getElementById('displayEditForm');
+            const displayInput = document.getElementById('displayInput');
+            
+            // Restore original value
+            displayInput.value = originalDisplayValue;
+            
+            // Toggle visibility
+            displayEditForm.classList.add('hidden');
+            displayValue.classList.remove('hidden');
+        }
+        
+        function saveDisplayName() {
+            const displayInput = document.getElementById('displayInput');
+            const displayValue = displayInput.value.trim();
+            
+            // Disable the save button during request
+            const saveButton = event.target;
+            const originalText = saveButton.textContent;
+            saveButton.disabled = true;
+            saveButton.textContent = 'Saving...';
+            
+            fetch(`/products/${productId}/display`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({ display: displayValue })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update the display value in the view
+                    const displayValueDiv = document.getElementById('displayValue');
+                    if (displayValue) {
+                        // Convert HTML entities and newlines to proper HTML for display
+                        let htmlValue = displayValue
+                            .replace(/&lt;/g, '<')
+                            .replace(/&gt;/g, '>')
+                            .replace(/&amp;/g, '&')
+                            .replace(/&quot;/g, '"')
+                            .replace(/&#39;/g, "'");
+                        
+                        // Convert <br> tags and newlines to line breaks
+                        htmlValue = htmlValue
+                            .replace(/\n/g, '<br>')
+                            .replace(/<br\s*\/?>/gi, '<br>');
+                        
+                        displayValueDiv.innerHTML = htmlValue;
+                    } else {
+                        displayValueDiv.innerHTML = '<span class="text-gray-500 dark:text-gray-400 italic">No custom display name set</span>';
+                    }
+                    
+                    // Hide edit form and show display value
+                    document.getElementById('displayEditForm').classList.add('hidden');
+                    document.getElementById('displayValue').classList.remove('hidden');
+                    
+                    // Update original value
+                    originalDisplayValue = displayValue;
+                    
+                    // Show brief success indication
+                    const successMessage = document.createElement('div');
+                    successMessage.className = 'inline-flex items-center ml-2 text-green-600 text-xs';
+                    successMessage.innerHTML = '<svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>Saved!';
+                    displayValueDiv.appendChild(successMessage);
+                    
+                    setTimeout(() => {
+                        if (successMessage.parentNode) {
+                            successMessage.remove();
+                        }
+                    }, 2000);
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to update display name'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Network error while updating display name. Please try again.');
+            })
+            .finally(() => {
+                // Restore button state
+                saveButton.disabled = false;
+                saveButton.textContent = originalText;
             });
         }
     </script>

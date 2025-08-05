@@ -58,7 +58,22 @@
                 <!-- Recent Scan Feedback -->
                 <div x-show="lastScan" x-transition class="mt-4 p-3 rounded-md"
                      :class="lastScan?.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
-                    <span x-text="lastScan?.message"></span>
+                    <div class="flex items-center justify-between">
+                        <span x-text="lastScan?.message"></span>
+                        <div x-show="lastScan?.success && lastScan?.scan_type" class="ml-3 text-xs">
+                            <span x-show="lastScan?.scan_type === 'case'" 
+                                  class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                                📦 Case Scan
+                            </span>
+                            <span x-show="lastScan?.scan_type === 'unit'" 
+                                  class="bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
+                                📱 Unit Scan
+                            </span>
+                        </div>
+                    </div>
+                    <div x-show="lastScan?.success && lastScan?.units_added" class="text-xs mt-1 opacity-75">
+                        Added <span x-text="lastScan?.units_added"></span> units to total
+                    </div>
                 </div>
                 
                 <!-- Auto-scan Countdown -->
@@ -224,7 +239,12 @@
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm">
                                         <div class="font-medium text-gray-900 dark:text-gray-100" x-text="item.supplier_code"></div>
-                                        <div class="text-xs text-gray-500" x-text="item.barcode || 'No barcode'"></div>
+                                        <div class="text-xs text-gray-500">
+                                            <div x-text="item.barcode || 'No unit barcode'"></div>
+                                            <div x-show="item.outer_code" class="text-blue-600">
+                                                📦 <span x-text="item.outer_code"></span>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
                                         <div x-text="item.description"></div>
@@ -232,9 +252,13 @@
                                             <span x-show="item.is_new_product" class="text-orange-600">New Product</span>
                                         </div>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-center font-medium" x-text="item.ordered_quantity"></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-center font-medium">
+                                        <div x-text="item.total_ordered_units || item.ordered_quantity"></div>
+                                        <div class="text-xs text-gray-500" x-show="item.formatted_ordered_quantity" x-text="item.formatted_ordered_quantity"></div>
+                                    </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-center">
-                                        <span class="font-medium" x-text="item.received_quantity"></span>
+                                        <div class="font-medium" x-text="item.total_received_units || item.received_quantity"></div>
+                                        <div class="text-xs text-gray-500" x-show="item.formatted_received_quantity" x-text="item.formatted_received_quantity"></div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-center">
                                         <span class="px-2 py-1 text-xs font-medium rounded-full"

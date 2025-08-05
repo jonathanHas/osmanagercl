@@ -66,7 +66,7 @@ class CoffeeController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('NAME', 'like', "%{$search}%")
-                  ->orWhere('CODE', 'like', "%{$search}%");
+                    ->orWhere('CODE', 'like', "%{$search}%");
             });
         }
 
@@ -84,17 +84,19 @@ class CoffeeController extends Controller
         // Add visibility status to each product
         $products->transform(function ($product) {
             $product->is_visible = $this->tillVisibilityService->isVisibleOnTill($product->ID);
+
             return $product;
         });
 
         // Return JSON for AJAX requests
         if ($request->ajax()) {
             return response()->json([
-                'products' => $products->map(function($product) {
+                'products' => $products->map(function ($product) {
                     $product->is_available = $product->is_visible;
                     $product->current_price = $product->PRICESELL * (1 + $product->getVatRate());
+
                     return $product;
-                })
+                }),
             ]);
         }
 
@@ -137,7 +139,7 @@ class CoffeeController extends Controller
      */
     public function getSalesData(Request $request)
     {
-        $startDate = $request->get('start_date') 
+        $startDate = $request->get('start_date')
             ? Carbon::parse($request->get('start_date'))->startOfDay()
             : Carbon::now()->subDays(29)->startOfDay();
 
@@ -157,6 +159,7 @@ class CoffeeController extends Controller
                 // Since we only show Coffee Fresh (081), we can simplify this
                 $product->category_name = 'Coffee Fresh';
                 $product->category = $product->category_id; // For template compatibility
+
                 return $product;
             });
 
@@ -180,8 +183,8 @@ class CoffeeController extends Controller
                 ],
                 'performance_info' => [
                     'execution_time_ms' => round(microtime(true) * 1000 - ($_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true)) * 1000, 2),
-                    'data_source' => 'optimized_pre_aggregated'
-                ]
+                    'data_source' => 'optimized_pre_aggregated',
+                ],
             ]);
 
         } catch (\Exception $e) {
@@ -193,7 +196,7 @@ class CoffeeController extends Controller
 
             return response()->json([
                 'error' => 'Failed to load coffee sales data',
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
@@ -207,6 +210,7 @@ class CoffeeController extends Controller
         if (! $product || ! $product->IMAGE) {
             // Return a simple 1x1 transparent PNG
             $transparentPng = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAFBHrE9YAAAAABJRU5ErkJggg==');
+
             return response($transparentPng, 200, [
                 'Content-Type' => 'image/png',
                 'Cache-Control' => 'public, max-age=86400',

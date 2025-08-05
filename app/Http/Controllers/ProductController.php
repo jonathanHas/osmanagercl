@@ -150,7 +150,7 @@ class ProductController extends Controller
 
         // Check for delivery context
         $fromDelivery = $request->query('from_delivery');
-        
+
         // Check for referrer context
         $from = $request->query('from');
 
@@ -678,6 +678,26 @@ class ProductController extends Controller
         // Return the label HTML with appropriate headers for printing
         return response($labelHtml)
             ->header('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    /**
+     * Update product display field.
+     */
+    public function updateDisplay(Request $request, string $id)
+    {
+        $request->validate([
+            'display' => 'nullable|string|max:255',
+        ]);
+
+        $product = $this->productRepository->findById($id);
+
+        if (! $product) {
+            return response()->json(['error' => 'Product not found'], 404);
+        }
+
+        $product->update(['DISPLAY' => $request->display]);
+
+        return response()->json(['success' => true]);
     }
 
     /**

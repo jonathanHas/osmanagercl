@@ -59,22 +59,49 @@ class DeliveryService
                     ? $this->parseIndependentCsv($record)
                     : $this->parseDeliveryRow($record);
 
-                // Check if product exists in our system
+                // Check if product exists in our system and get SupplierLink data
                 $product = $this->findProductBySupplierCode($item['code'], $supplierId);
+                $supplierLink = SupplierLink::where('SupplierID', $supplierId)
+                    ->where('SupplierCode', $item['code'])
+                    ->first();
 
-                // Create delivery item with format-specific fields
+                // Determine quantity type based on supplier format
+                $quantityType = $isIndependentFormat ? 'case' : 'case'; // Most suppliers use case quantities
+
+                // Calculate case and unit quantities
+                $unitsPerCase = $item['units_per_case'];
+                $orderedCases = $item['ordered_quantity']; // CSV typically contains case quantities
+                $orderedUnits = $orderedCases * $unitsPerCase;
+
+                // Validate against SupplierLink if available
+                $supplierCaseUnits = $supplierLink?->CaseUnits;
+                if ($supplierCaseUnits && $supplierCaseUnits !== $unitsPerCase) {
+                    Log::warning('Case units mismatch for delivery import', [
+                        'supplier_code' => $item['code'],
+                        'csv_units_per_case' => $unitsPerCase,
+                        'supplier_link_case_units' => $supplierCaseUnits,
+                        'delivery_id' => $delivery->id,
+                    ]);
+                }
+
+                // Create delivery item with enhanced quantity fields
                 $deliveryItemData = [
                     'delivery_id' => $delivery->id,
                     'supplier_code' => $item['code'],
                     'sku' => $item['sku'],
                     'description' => $item['description'],
-                    'units_per_case' => $item['units_per_case'],
+                    'units_per_case' => $unitsPerCase,
+                    'supplier_case_units' => $supplierCaseUnits,
                     'unit_cost' => $item['unit_cost'],
-                    'ordered_quantity' => $item['ordered_quantity'],
+                    'ordered_quantity' => $orderedCases, // Legacy field
+                    'case_ordered_quantity' => $orderedCases,
+                    'unit_ordered_quantity' => 0, // Pure case orders don't have individual unit orders
+                    'quantity_type' => $quantityType,
                     'total_cost' => $item['total_cost'],
                     'product_id' => $product?->ID,
                     'is_new_product' => ! $product,
-                    'barcode' => $product?->CODE, // Use existing barcode if available
+                    'barcode' => $product?->CODE, // Individual unit barcode
+                    'outer_code' => $supplierLink?->OuterCode, // Case barcode
                 ];
 
                 // Add Independent-specific pricing fields if available
@@ -349,6 +376,60 @@ class DeliveryService
     }
 
     /**
+     * Find product and supplier link using outer case barcode
+     */
+    private function findProductByOuterCode(string $outerCode, int $supplierId): ?array
+    {
+        $supplierLink = SupplierLink::where('SupplierID', $supplierId)
+            ->where('OuterCode', $outerCode)
+            ->first();
+
+        if ($supplierLink && $supplierLink->product) {
+            return [
+                'product' => $supplierLink->product,
+                'supplier_link' => $supplierLink,
+                'case_units' => $supplierLink->CaseUnits ?? 1,
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * Find delivery item by barcode (individual unit) or outer code (case)
+     */
+    private function findDeliveryItemByBarcode(int $deliveryId, string $barcode): ?array
+    {
+        // First try to find by individual unit barcode
+        $item = DeliveryItem::where('delivery_id', $deliveryId)
+            ->where('barcode', $barcode)
+            ->first();
+
+        if ($item) {
+            return [
+                'item' => $item,
+                'scan_type' => 'unit',
+                'quantity_per_scan' => 1,
+            ];
+        }
+
+        // Then try to find by case barcode (outer_code)
+        $item = DeliveryItem::where('delivery_id', $deliveryId)
+            ->where('outer_code', $barcode)
+            ->first();
+
+        if ($item) {
+            return [
+                'item' => $item,
+                'scan_type' => 'case',
+                'quantity_per_scan' => $item->getEffectiveCaseUnits(),
+            ];
+        }
+
+        return null;
+    }
+
+    /**
      * Queue barcode retrieval for new products
      */
     private function queueBarcodeRetrieval(DeliveryItem $item, bool $isIndependentFormat = false): void
@@ -368,39 +449,60 @@ class DeliveryService
     }
 
     /**
-     * Process barcode scan during delivery
+     * Process barcode scan during delivery - supports both unit and case barcodes
      */
     public function processScan(int $deliveryId, string $barcode, int $quantity = 1, ?string $scannedBy = null): array
     {
         $delivery = Delivery::findOrFail($deliveryId);
 
-        // Try to find matching delivery item by barcode only
-        // Note: Supplier codes cannot be scanned as they are internal codes only
-        $item = DeliveryItem::where('delivery_id', $deliveryId)
-            ->where('barcode', $barcode)
-            ->first();
+        // Use enhanced barcode finder that checks both unit and case barcodes
+        $scanResult = $this->findDeliveryItemByBarcode($deliveryId, $barcode);
 
-        if ($item) {
-            // Update received quantity
-            $newQuantity = $item->received_quantity + $quantity;
-            $item->update([
-                'received_quantity' => $newQuantity,
-                'status' => $this->calculateItemStatus($item->ordered_quantity, $newQuantity),
-            ]);
+        if ($scanResult) {
+            $item = $scanResult['item'];
+            $scanType = $scanResult['scan_type'];
+            $unitsPerScan = $scanResult['quantity_per_scan'];
 
-            // Record scan
+            // Calculate total units being added
+            $totalUnitsAdded = $quantity * $unitsPerScan;
+
+            if ($scanType === 'case') {
+                // Case barcode scanned - add to case quantity
+                $item->addCaseScan($quantity, $scannedBy);
+                $message = "Case scanned: {$item->description} (+{$quantity} cases = {$totalUnitsAdded} units)";
+                $scanTypeMessage = 'case';
+            } else {
+                // Unit barcode scanned - add to unit quantity
+                $item->addUnitScan($totalUnitsAdded, $scannedBy);
+                $message = "Unit scanned: {$item->description} (+{$totalUnitsAdded} units)";
+                $scanTypeMessage = 'unit';
+            }
+
+            // Record scan in delivery_scans table
             $scan = $delivery->scans()->create([
                 'delivery_item_id' => $item->id,
                 'barcode' => $barcode,
                 'quantity' => $quantity,
                 'matched' => true,
                 'scanned_by' => $scannedBy ?? 'System',
+                'metadata' => [
+                    'scan_type' => $scanType,
+                    'units_per_scan' => $unitsPerScan,
+                    'total_units_added' => $totalUnitsAdded,
+                    'case_units' => $item->getEffectiveCaseUnits(),
+                ],
             ]);
+
+            // Get updated quantities for display
+            $totalReceived = $item->fresh()->total_received_units;
+            $totalOrdered = $item->total_ordered_units;
 
             return [
                 'success' => true,
                 'item' => $item->fresh(),
-                'message' => "Scanned: {$item->description} (Total: {$newQuantity}/{$item->ordered_quantity})",
+                'scan_type' => $scanTypeMessage,
+                'units_added' => $totalUnitsAdded,
+                'message' => "{$message} (Total: {$totalReceived}/{$totalOrdered} units)",
             ];
         } else {
             // Record unmatched scan
@@ -409,12 +511,17 @@ class DeliveryService
                 'quantity' => $quantity,
                 'matched' => false,
                 'scanned_by' => $scannedBy ?? 'System',
+                'metadata' => [
+                    'scan_type' => 'unknown',
+                    'delivery_supplier_id' => $delivery->supplier_id,
+                ],
             ]);
 
             return [
                 'success' => false,
-                'message' => "Unknown product: {$barcode}",
+                'message' => "Unknown barcode: {$barcode} (not found in delivery items)",
                 'barcode' => $barcode,
+                'scan_type' => 'unknown',
             ];
         }
     }

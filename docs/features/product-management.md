@@ -147,6 +147,7 @@ POS_DB_PASSWORD=pos_password
 1. Navigate to product detail page
 2. Click the **edit icon** next to any editable field:
    - **Product Name**: Click pencil icon in header
+   - **Display Name**: Click edit icon in Additional Information section
    - **Tax Category**: Use dropdown in Tax Configuration section
    - **Selling Price**: Use Quick Price Update or detailed form
    - **Cost Price**: Use cost update form
@@ -183,6 +184,7 @@ public function show($id)   // Product detail page
 public function create()    // Create form
 public function store()     // Save new product
 public function updateName() // Update product name
+public function updateDisplay() // Update display name
 public function updateTax()  // Update tax category
 public function updatePrice() // Update selling price
 public function updateCost()  // Update cost price
@@ -195,6 +197,7 @@ public function toggleStocking() // Toggle stock management
 - `POST /products` - Create new product
 - `GET /products/{id}` - Show product details
 - `PATCH /products/{id}/name` - Update product name
+- `PATCH /products/{id}/display` - Update display name
 - `PATCH /products/{id}/tax` - Update tax category
 - `PATCH /products/{id}/price` - Update selling price
 - `PATCH /products/{id}/cost` - Update cost price
@@ -307,6 +310,112 @@ return match ($taxRate) {
 - **"Auto-selected" Label**: Displayed next to pre-filled dropdown
 - **Tooltip Information**: Shows source VAT rate and calculation details
 
+### Display Name Management (2025)
+
+The product management system now supports inline editing of display names for all products, providing consistent functionality across the entire application.
+
+#### Overview
+
+Display names (stored in the `DISPLAY` field) are used on labels and displays as an alternative to the main product name. This feature allows for customized product presentation without changing the core product name used for inventory tracking.
+
+#### Key Features
+
+1. **Inline Editing Interface**
+   - Click-to-edit functionality with pencil icon
+   - Multi-line textarea with HTML support
+   - Save/Cancel buttons for user control
+   - Visual feedback on save operations
+
+2. **HTML Support**
+   - Supports `<br>` tags for line breaks in display names
+   - Automatic HTML entity handling and conversion
+   - Real-time preview of formatting changes
+   - Safe HTML rendering in display areas
+
+3. **User Experience**
+   - Consistent with fruit-veg module editing patterns
+   - Auto-focus on textarea when editing begins
+   - Loading states and success indicators
+   - Error handling with user-friendly messages
+
+#### Technical Implementation
+
+**Frontend Components:**
+```html
+<!-- Display Name Editor -->
+<div>
+    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+        Display Name
+        <button onclick="toggleDisplayEdit()" class="ml-2 inline-flex items-center p-1">
+            <!-- Edit icon -->
+        </button>
+    </dt>
+    <dd class="mt-1">
+        <!-- Display value (default view) -->
+        <div id="displayValue">
+            <!-- Current display name or placeholder -->
+        </div>
+        
+        <!-- Edit form (hidden by default) -->
+        <div id="displayEditForm" class="hidden">
+            <textarea id="displayInput" rows="3" placeholder="Enter custom display name...">
+            </textarea>
+            <button onclick="saveDisplayName()">Save</button>
+            <button onclick="cancelDisplayEdit()">Cancel</button>
+        </div>
+    </dd>
+</div>
+```
+
+**Backend API:**
+```php
+/**
+ * Update product display field.
+ */
+public function updateDisplay(Request $request, string $id)
+{
+    $request->validate([
+        'display' => 'nullable|string|max:255',
+    ]);
+
+    $product = $this->productRepository->findById($id);
+    $product->update(['DISPLAY' => $request->display]);
+
+    return response()->json(['success' => true]);
+}
+```
+
+**JavaScript Functions:**
+- `toggleDisplayEdit()` - Shows edit form and focuses textarea
+- `cancelDisplayEdit()` - Cancels editing and restores original value  
+- `saveDisplayName()` - Saves via AJAX with loading states and feedback
+
+#### Usage Examples
+
+**Setting a Display Name:**
+1. Navigate to any product detail page
+2. Scroll to "Additional Information" section
+3. Click the edit icon next to "Display Name"
+4. Enter custom display text (supports `<br>` for line breaks)
+5. Click "Save" to persist changes
+
+**HTML Formatting:**
+```
+Fresh Organic Apples<br>Class I - Ireland
+```
+Will display as:
+```
+Fresh Organic Apples
+Class I - Ireland
+```
+
+#### Integration Benefits
+
+- **Consistent UX**: Same editing pattern as fruit-veg products
+- **Label System**: Display names automatically used in label generation
+- **Backward Compatible**: Empty display names fall back to product name
+- **Cross-Module**: Works for all product categories, not just F&V
+
 ### Enhanced Product Search & Filtering (2025)
 
 The product listing page has been improved with better supplier filtering capabilities.
@@ -368,14 +477,29 @@ public function user_can_update_product_name()
     $response->assertRedirect();
     $this->assertEquals('Updated Name', $product->fresh()->NAME);
 }
+
+/** @test */
+public function user_can_update_product_display_name()
+{
+    $product = Product::factory()->create();
+    
+    $response = $this->patch("/products/{$product->ID}/display", [
+        'display' => 'Custom Display<br>Line 2'
+    ]);
+    
+    $response->assertOk();
+    $response->assertJson(['success' => true]);
+    $this->assertEquals('Custom Display<br>Line 2', $product->fresh()->DISPLAY);
+}
 ```
 
 ### Manual Testing
 1. **Product Creation**: Test form validation, database insertion, and redirect
 2. **Product Updates**: Test each update endpoint with valid/invalid data
-3. **Stocking Toggle**: Verify database changes and UI feedback
-4. **Search/Filtering**: Test product listing with various filter combinations
-5. **Delivery Integration**: Create products from delivery items and verify context
+3. **Display Name Editing**: Test inline editing with HTML content and validation
+4. **Stocking Toggle**: Verify database changes and UI feedback
+5. **Search/Filtering**: Test product listing with various filter combinations
+6. **Delivery Integration**: Create products from delivery items and verify context
 
 ## Troubleshooting
 

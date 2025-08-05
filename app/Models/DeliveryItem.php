@@ -16,8 +16,11 @@ class DeliveryItem extends Model
         'supplier_code',
         'sku',
         'barcode',
+        'outer_code',
+        'quantity_type',
         'description',
         'units_per_case',
+        'supplier_case_units',
         'unit_cost',
         'sale_price',
         'tax_amount',
@@ -27,6 +30,10 @@ class DeliveryItem extends Model
         'unit_cost_including_tax',
         'ordered_quantity',
         'received_quantity',
+        'case_ordered_quantity',
+        'case_received_quantity',
+        'unit_ordered_quantity',
+        'unit_received_quantity',
         'total_cost',
         'status',
         'product_id',
@@ -94,19 +101,6 @@ class DeliveryItem extends Model
         }
 
         return min(100, ($this->received_quantity / $this->ordered_quantity) * 100);
-    }
-
-    public function updateStatus(): void
-    {
-        $status = match (true) {
-            $this->received_quantity == 0 => 'pending',
-            $this->received_quantity < $this->ordered_quantity => 'partial',
-            $this->received_quantity == $this->ordered_quantity => 'complete',
-            $this->received_quantity > $this->ordered_quantity => 'excess',
-            default => 'pending'
-        };
-
-        $this->update(['status' => $status]);
     }
 
     public function addScan(int $quantity, ?string $scannedBy = null): void
@@ -202,5 +196,206 @@ class DeliveryItem extends Model
     public function isPotentialDepositScheme(): bool
     {
         return ! is_null($this->tax_rate) && $this->tax_rate > 50;
+    }
+
+    /**
+     * Get the effective case units for conversions
+     * Prefers supplier_case_units from SupplierLink, falls back to units_per_case from CSV
+     */
+    public function getEffectiveCaseUnits(): int
+    {
+        return $this->supplier_case_units ?? $this->units_per_case ?? 1;
+    }
+
+    /**
+     * Convert case quantity to unit quantity using effective case units
+     */
+    public function casesToUnits(int $caseQuantity): int
+    {
+        return $caseQuantity * $this->getEffectiveCaseUnits();
+    }
+
+    /**
+     * Convert unit quantity to case quantity using effective case units
+     */
+    public function unitsToCases(int $unitQuantity): int
+    {
+        $caseUnits = $this->getEffectiveCaseUnits();
+
+        return $caseUnits > 0 ? intval($unitQuantity / $caseUnits) : 0;
+    }
+
+    /**
+     * Get total ordered quantity in units (handles mixed case/unit orders)
+     */
+    public function getTotalOrderedUnitsAttribute(): int
+    {
+        $caseUnits = $this->casesToUnits($this->case_ordered_quantity ?? 0);
+        $individualUnits = $this->unit_ordered_quantity ?? 0;
+
+        // Fallback to legacy ordered_quantity converted to units if new fields are empty
+        if ($caseUnits === 0 && $individualUnits === 0 && $this->ordered_quantity) {
+            return $this->quantity_type === 'case'
+                ? $this->casesToUnits($this->ordered_quantity)
+                : $this->ordered_quantity;
+        }
+
+        return $caseUnits + $individualUnits;
+    }
+
+    /**
+     * Get total received quantity in units (handles mixed case/unit scanning)
+     */
+    public function getTotalReceivedUnitsAttribute(): int
+    {
+        $caseUnits = $this->casesToUnits($this->case_received_quantity ?? 0);
+        $individualUnits = $this->unit_received_quantity ?? 0;
+
+        // Fallback to legacy received_quantity if new fields are empty
+        if ($caseUnits === 0 && $individualUnits === 0 && $this->received_quantity) {
+            return $this->quantity_type === 'case'
+                ? $this->casesToUnits($this->received_quantity)
+                : $this->received_quantity;
+        }
+
+        return $caseUnits + $individualUnits;
+    }
+
+    /**
+     * Get quantity difference in units
+     */
+    public function getQuantityDifferenceInUnitsAttribute(): int
+    {
+        return $this->total_received_units - $this->total_ordered_units;
+    }
+
+    /**
+     * Update legacy quantity fields for backward compatibility
+     */
+    public function updateLegacyQuantities(): void
+    {
+        // Update ordered_quantity based on primary quantity type
+        if ($this->quantity_type === 'case') {
+            $this->ordered_quantity = $this->case_ordered_quantity ?? 0;
+            $this->received_quantity = $this->case_received_quantity ?? 0;
+        } else {
+            $this->ordered_quantity = $this->total_ordered_units;
+            $this->received_quantity = $this->total_received_units;
+        }
+    }
+
+    /**
+     * Add a case scan to this item
+     */
+    public function addCaseScan(int $caseQuantity = 1, ?string $scannedBy = null): void
+    {
+        $this->increment('case_received_quantity', $caseQuantity);
+        $this->updateLegacyQuantities();
+        $this->updateStatus();
+
+        // Add to scan history
+        $scanHistory = $this->scan_history ?? [];
+        $scanHistory[] = [
+            'type' => 'case',
+            'quantity' => $caseQuantity,
+            'units_equivalent' => $this->casesToUnits($caseQuantity),
+            'scanned_by' => $scannedBy,
+            'scanned_at' => now()->toISOString(),
+        ];
+
+        $this->update(['scan_history' => $scanHistory]);
+    }
+
+    /**
+     * Add a unit scan to this item
+     */
+    public function addUnitScan(int $unitQuantity = 1, ?string $scannedBy = null): void
+    {
+        $this->increment('unit_received_quantity', $unitQuantity);
+        $this->updateLegacyQuantities();
+        $this->updateStatus();
+
+        // Add to scan history
+        $scanHistory = $this->scan_history ?? [];
+        $scanHistory[] = [
+            'type' => 'unit',
+            'quantity' => $unitQuantity,
+            'units_equivalent' => $unitQuantity,
+            'scanned_by' => $scannedBy,
+            'scanned_at' => now()->toISOString(),
+        ];
+
+        $this->update(['scan_history' => $scanHistory]);
+    }
+
+    /**
+     * Update status based on unit quantities for accurate comparison
+     */
+    public function updateStatus(): void
+    {
+        $orderedUnits = $this->total_ordered_units;
+        $receivedUnits = $this->total_received_units;
+
+        $status = match (true) {
+            $receivedUnits == 0 => 'pending',
+            $receivedUnits < $orderedUnits => 'partial',
+            $receivedUnits == $orderedUnits => 'complete',
+            $receivedUnits > $orderedUnits => 'excess',
+            default => 'pending'
+        };
+
+        $this->update(['status' => $status]);
+    }
+
+    /**
+     * Check if this item has case barcode for case scanning
+     */
+    public function hasCaseBarcode(): bool
+    {
+        return ! empty($this->outer_code);
+    }
+
+    /**
+     * Get formatted quantity display based on quantity type
+     */
+    public function getFormattedOrderedQuantityAttribute(): string
+    {
+        if ($this->quantity_type === 'case') {
+            $cases = $this->case_ordered_quantity ?? 0;
+            $units = $this->casesToUnits($cases);
+
+            return "{$cases} cases ({$units} units)";
+        } elseif ($this->quantity_type === 'mixed') {
+            $cases = $this->case_ordered_quantity ?? 0;
+            $units = $this->unit_ordered_quantity ?? 0;
+            $totalUnits = $this->casesToUnits($cases) + $units;
+
+            return "{$cases} cases + {$units} units = {$totalUnits} units";
+        } else {
+            return "{$this->unit_ordered_quantity} units";
+        }
+    }
+
+    /**
+     * Get formatted received quantity display
+     */
+    public function getFormattedReceivedQuantityAttribute(): string
+    {
+        $caseQty = $this->case_received_quantity ?? 0;
+        $unitQty = $this->unit_received_quantity ?? 0;
+
+        if ($caseQty > 0 && $unitQty > 0) {
+            $totalUnits = $this->total_received_units;
+
+            return "{$caseQty} cases + {$unitQty} units = {$totalUnits} units";
+        } elseif ($caseQty > 0) {
+            $units = $this->casesToUnits($caseQty);
+
+            return "{$caseQty} cases ({$units} units)";
+        } elseif ($unitQty > 0) {
+            return "{$unitQty} units";
+        } else {
+            return '0';
+        }
     }
 }
