@@ -47,6 +47,7 @@ class VegDetails extends Model
      * @var array<int, string>
      */
     protected $fillable = [
+        'ID',
         'product',
         'countryCode',
         'classId',

@@ -28,22 +28,102 @@
                            placeholder="Scan barcode..."
                            class="w-full text-xl py-3 px-4 rounded-lg border-2 border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-blue-500 focus:ring-blue-500">
                     
+                    <!-- Helper text -->
+                    <div class="text-xs text-gray-500 mt-1" x-show="!barcode">
+                        📱 Step 1: Scan barcode, then choose quantity and press Add
+                    </div>
+                    <div class="text-xs text-green-700 mt-1" x-show="barcode">
+                        ✓ Barcode ready! Adjust quantity if needed, then press Add
+                    </div>
+                    
+                    <!-- Item Progress Info -->
+                    <div x-show="barcode" class="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 border">
+                        <template x-if="scannedItem">
+                            <div>
+                                <div class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1" x-text="scannedItem.product?.name || scannedItem.description"></div>
+                                <div class="flex items-center justify-between text-xs">
+                                    <div class="text-gray-600">
+                                        <span class="font-medium">Code:</span> <span x-text="scannedItem.supplier_code"></span>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="font-medium" :class="{
+                                            'text-green-600': scannedItem.status === 'complete',
+                                            'text-yellow-600': scannedItem.status === 'partial', 
+                                            'text-red-600': scannedItem.status === 'pending',
+                                            'text-purple-600': scannedItem.status === 'excess'
+                                        }">
+                                            <span x-text="scannedItem.total_received_units || scannedItem.received_quantity || 0"></span> / 
+                                            <span x-text="scannedItem.total_ordered_units || scannedItem.ordered_quantity || 0"></span> units
+                                        </div>
+                                        <div class="text-gray-500" x-text="scannedItem.status === 'complete' ? 'Complete' : 
+                                            scannedItem.status === 'partial' ? 'Partial' :
+                                            scannedItem.status === 'pending' ? 'Missing' : 
+                                            scannedItem.status === 'excess' ? 'Excess' : 'Unknown'">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Progress Bar - Clean single scope approach -->
+                                <div class="mt-2">
+                                    <div class="flex items-center justify-between text-xs mb-1">
+                                        <span class="text-gray-600">Progress</span>
+                                        <span x-text="Math.round(progressPercent) + '%'"></span>
+                                    </div>
+
+                                    <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                                        <div
+                                        class="h-3 bg-yellow-500 transition-all duration-500"
+                                        :class="{
+                                            'bg-green-500':  scannedItem?.status?.toLowerCase() === 'complete',
+                                            'bg-yellow-500': scannedItem?.status?.toLowerCase() === 'partial',
+                                            'bg-red-500':    scannedItem?.status?.toLowerCase() === 'pending',
+                                            'bg-purple-500': scannedItem?.status?.toLowerCase() === 'excess'
+                                        }"
+                                        :style="`width: ${progressPercent}%`"
+                                        ></div>
+                                    </div>
+                                
+                                <!-- Case info if available -->
+                                <div x-show="scannedItem.outer_code && scannedItem.outer_code === barcode" class="mt-2 text-xs text-blue-600">
+                                    📦 Case scan - <span x-text="scannedItem.effective_case_units || scannedItem.units_per_case || 1"></span> units per case
+                                </div>
+                                <div x-show="scannedItem.barcode && scannedItem.barcode === barcode" class="mt-2 text-xs text-purple-600">
+                                    📱 Unit scan - 1 unit per scan
+                                </div>
+                            </div>
+                        </template>
+                        <template x-if="!scannedItem">
+                            <div class="text-sm text-red-600">
+                                ❌ Barcode not found in this delivery
+                            </div>
+                        </template>
+                    </div>
+                    
                     <!-- Quantity and Add Button Row -->
                     <div class="flex gap-3">
                         <div class="flex-1">
                             <label class="block text-xs text-gray-600 mb-1">Quantity</label>
-                            <input type="number" 
-                                   x-model="quantity"
-                                   x-ref="quantityInput"
-                                   @keydown.enter="processScan"
-                                   min="1"
-                                   class="w-full text-center text-lg py-2 rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                            <div class="flex items-center gap-1">
+                                <button @click="quantity = Math.max(1, quantity - 1)" 
+                                        class="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-md text-lg font-bold">-</button>
+                                <input type="number" 
+                                       x-model="quantity"
+                                       x-ref="quantityInput"
+                                       @keydown.enter="processScan"
+                                       min="1"
+                                       class="flex-1 text-center text-lg py-2 rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                <button @click="quantity = parseInt(quantity) + 1" 
+                                        class="px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-md text-lg font-bold">+</button>
+                            </div>
                         </div>
                         <div class="flex-1">
                             <label class="block text-xs text-gray-600 mb-1">&nbsp;</label>
                             <button @click="processScan" 
-                                    class="w-full py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium text-lg touch-manipulation">
-                                Add
+                                    :disabled="!barcode"
+                                    :class="barcode ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'"
+                                    class="w-full py-2 text-white rounded-md transition-colors font-medium text-lg touch-manipulation disabled:opacity-50">
+                                <span x-show="!barcode">Scan First</span>
+                                <span x-show="barcode">Add <span x-text="quantity"></span></span>
                             </button>
                         </div>
                     </div>
@@ -193,11 +273,11 @@
                                     </td>
                                     <td class="px-2 py-2 text-xs">
                                         <div class="font-medium text-gray-900 dark:text-gray-100" x-text="item.supplier_code"></div>
-                                        <div class="text-xs text-gray-500 truncate max-w-20" x-text="item.barcode || 'No barcode'"></div>
+                                        <div class="text-xs text-gray-500 break-all" x-text="item.barcode || 'No barcode'"></div>
                                         <div x-show="item.outer_code" class="text-blue-600 text-xs">📦</div>
                                     </td>
                                     <td class="px-2 py-2 text-xs text-gray-900 dark:text-gray-100">
-                                        <div class="truncate max-w-32" x-text="item.description" :title="item.description"></div>
+                                        <div class="break-words leading-tight" x-text="item.product?.name || item.description" :title="item.product?.name || item.description"></div>
                                         <span x-show="item.is_new_product" class="text-orange-600 text-xs">New</span>
                                     </td>
                                     <td class="px-2 py-2 text-xs text-center font-medium">
@@ -283,8 +363,25 @@
                 handleBarcodeScan() {
                     if (!this.barcode) return;
                     
-                    // Auto-process scan immediately - no countdown
-                    this.processScan();
+                    // Focus quantity input so user can adjust if needed
+                    this.$refs.quantityInput.focus();
+                    this.$refs.quantityInput.select();
+                },
+                
+                get scannedItem() {
+                    if (!this.barcode) return null;
+                    return this.items.find(item => item.barcode === this.barcode || item.outer_code === this.barcode);
+                },
+                
+                get progressPercent() {
+                    if (!this.scannedItem) return 0;
+                    const received = this.scannedItem.total_received_units
+                                   ?? this.scannedItem.received_quantity
+                                   ?? 0;
+                    const ordered = this.scannedItem.total_ordered_units
+                                  ?? this.scannedItem.ordered_quantity
+                                  ?? 1;
+                    return Math.min(100, Math.max(0, (received / ordered) * 100));
                 },
                 
                 get filteredItems() {
@@ -328,18 +425,36 @@
                     if (!this.barcode) return;
                     
                     try {
+                        // Get CSRF token - ensure it exists
+                        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+                        if (!csrfToken) {
+                            throw new Error('CSRF token not found');
+                        }
+                        
                         const response = await fetch(`/deliveries/${this.deliveryId}/scan`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
                                 'Accept': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                                'X-CSRF-TOKEN': csrfToken
                             },
                             body: JSON.stringify({
                                 barcode: this.barcode,
                                 quantity: parseInt(this.quantity)
                             })
                         });
+                        
+                        // Check if the response is ok
+                        if (!response.ok) {
+                            if (response.status === 419) {
+                                throw new Error('Session expired - please refresh the page');
+                            } else if (response.status === 422) {
+                                const errorData = await response.json();
+                                throw new Error(errorData.message || 'Validation error');
+                            } else {
+                                throw new Error(`Server error: ${response.status}`);
+                            }
+                        }
                         
                         const data = await response.json();
                         this.lastScan = data;
@@ -350,19 +465,19 @@
                             if (index !== -1) {
                                 this.items[index] = data.item;
                             }
+                            
                         }
                         
                         this.updateStats();
                         this.barcode = '';
                         this.quantity = 1;
-                        this.cancelAutoScan(); // Clear any pending auto-scan
                         this.$refs.barcodeInput.focus();
                         
                     } catch (error) {
                         console.error('Scan error:', error);
                         this.lastScan = {
                             success: false,
-                            message: 'Network error - please try again'
+                            message: error.message || 'Network error - please try again'
                         };
                     }
                 },
@@ -381,12 +496,19 @@
                 
                 async updateItemQuantity(itemId, quantity) {
                     try {
+                        // Get CSRF token - ensure it exists
+                        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+                        if (!csrfToken) {
+                            console.error('CSRF token not found');
+                            return;
+                        }
+                        
                         const response = await fetch(`/deliveries/${this.deliveryId}/items/${itemId}/quantity`, {
                             method: 'PATCH',
                             headers: {
                                 'Content-Type': 'application/json',
                                 'Accept': 'application/json',
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                                'X-CSRF-TOKEN': csrfToken
                             },
                             body: JSON.stringify({ quantity: quantity })
                         });
@@ -398,6 +520,8 @@
                                 this.items[index] = data.item;
                                 this.updateStats();
                             }
+                        } else if (response.status === 419) {
+                            console.error('Session expired - please refresh the page');
                         }
                     } catch (error) {
                         console.error('Failed to update quantity:', error);

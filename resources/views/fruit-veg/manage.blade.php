@@ -45,11 +45,11 @@
                 </div>
                 
                 <!-- Quick Search Results -->
-                <div x-show="showResults && quickResults.length > 0" 
+                <div x-show="showResults && quickResults && quickResults.length > 0" 
                      x-cloak 
                      class="mt-4 bg-white rounded-md shadow-lg border border-gray-200 max-h-80 overflow-y-auto">
                     <div class="p-2">
-                        <template x-for="product in quickResults" :key="product.CODE">
+                        <template x-for="product in (quickResults || [])" :key="product.CODE">
                             <div class="flex items-center justify-between p-3 hover:bg-gray-50 rounded-md">
                                 <div class="flex-1 min-w-0">
                                     <div class="flex items-center gap-3">
@@ -57,7 +57,9 @@
                                             <img :src="'/fruit-veg/product-image/' + product.CODE" 
                                                  :alt="product.NAME"
                                                  class="w-full h-full object-cover"
-                                                 @@error="$el.style.display='none'; $el.nextElementSibling.style.display='flex'">
+                                                 loading="lazy"
+                                                 @@error="$el.style.display='none'; $el.nextElementSibling.style.display='flex'"
+                                                 @@load="if($el.naturalWidth === 1 && $el.naturalHeight === 1) { $el.style.display='none'; $el.nextElementSibling.style.display='flex'; }">
                                             <div class="hidden w-full h-full items-center justify-center text-gray-400 text-xs">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
@@ -210,7 +212,7 @@
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                            <template x-for="product in products" :key="product.CODE">
+                            <template x-for="product in (products || [])" :key="product.CODE">
                                 <tr :class="{ 'bg-gray-50': selectedProducts.includes(product.CODE) }">
                                     <!-- Checkbox -->
                                     <td class="px-3 py-4">
@@ -226,7 +228,9 @@
                                             <img :src="'/fruit-veg/product-image/' + product.CODE" 
                                                  :alt="product.NAME"
                                                  class="w-full h-full object-cover"
-                                                 @@error="$el.style.display='none'; $el.nextElementSibling.style.display='flex'">
+                                                 loading="lazy"
+                                                 @@error="$el.style.display='none'; $el.nextElementSibling.style.display='flex'"
+                                                 @@load="if($el.naturalWidth === 1 && $el.naturalHeight === 1) { $el.style.display='none'; $el.nextElementSibling.style.display='flex'; }">
                                             <div class="hidden w-full h-full items-center justify-center text-gray-400 text-xs">
                                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
@@ -589,11 +593,34 @@
                     
                     // Listen for product availability changes from quick search
                     window.addEventListener('productAvailabilityChanged', (event) => {
-                        const { productCode, isAvailable } = event.detail;
-                        const product = this.products.find(p => p.CODE === productCode);
-                        if (product) {
-                            product.is_available = isAvailable;
-                            product.is_visible_on_till = isAvailable;
+                        const { productCode, isAvailable, productData } = event.detail;
+                        const existingProductIndex = this.products.findIndex(p => p.CODE === productCode);
+                        
+                        if (existingProductIndex !== -1) {
+                            // Update existing product
+                            this.products[existingProductIndex].is_available = isAvailable;
+                            this.products[existingProductIndex].is_visible_on_till = isAvailable;
+                            
+                            // Remove from table if it no longer matches filters
+                            if (!this.productMatchesFilters(this.products[existingProductIndex])) {
+                                this.products.splice(existingProductIndex, 1);
+                                this.showNotification(`${productData.NAME} removed from table (doesn't match current filters)`, 'info');
+                            }
+                        } else if (isAvailable && productData) {
+                            // Add new product to the table if it matches current filters
+                            const matchesFilters = this.productMatchesFilters(productData);
+                            
+                            if (matchesFilters) {
+                                // Prepare product data to match table format
+                                productData.is_available = isAvailable;
+                                productData.in_print_queue = false; // Default to not in print queue
+                                
+                                // Add to the beginning of the products array
+                                this.products.unshift(productData);
+                                
+                                // Show notification
+                                this.showNotification(`${productData.NAME} added to the table`, 'success');
+                            }
                         }
                     });
                 },
@@ -680,6 +707,35 @@
                     localStorage.removeItem('fruitVegManageFilters');
                     
                     this.performSearch();
+                },
+                
+                productMatchesFilters(product) {
+                    // Check search term
+                    if (this.searchTerm) {
+                        const searchLower = this.searchTerm.toLowerCase();
+                        const matchesSearch = (
+                            product.NAME.toLowerCase().includes(searchLower) ||
+                            product.CODE.toLowerCase().includes(searchLower) ||
+                            (product.DISPLAY && product.DISPLAY.toLowerCase().includes(searchLower))
+                        );
+                        if (!matchesSearch) return false;
+                    }
+                    
+                    // Check category filter
+                    if (this.categoryFilter !== 'all') {
+                        const categoryId = product.CATEGORY || (product.category && product.category.ID);
+                        if (this.categoryFilter === 'fruit' && categoryId !== '001') return false;
+                        if (this.categoryFilter === 'vegetables' && categoryId !== '002') return false;
+                        if (this.categoryFilter === 'veg_barcoded' && categoryId !== '126') return false;
+                    }
+                    
+                    // Check availability filter
+                    if (this.availabilityFilter !== 'all') {
+                        if (this.availabilityFilter === 'available' && !product.is_visible_on_till) return false;
+                        if (this.availabilityFilter === 'unavailable' && product.is_visible_on_till) return false;
+                    }
+                    
+                    return true;
                 },
                 
                 async toggleProductAvailability(productCode, isAvailable) {
@@ -1006,7 +1062,9 @@
                 
                 showNotification(message, type) {
                     const notification = document.createElement('div');
-                    const bgColor = type === 'success' ? 'bg-green-600' : 'bg-red-600';
+                    const bgColor = type === 'success' ? 'bg-green-600' : 
+                                   type === 'error' ? 'bg-red-600' : 
+                                   'bg-blue-600'; // info type
                     notification.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white z-50 ${bgColor}`;
                     notification.textContent = message;
                     
@@ -1107,7 +1165,8 @@
                             window.dispatchEvent(new CustomEvent('productAvailabilityChanged', {
                                 detail: {
                                     productCode: product.CODE,
-                                    isAvailable: product.is_visible_on_till
+                                    isAvailable: product.is_visible_on_till,
+                                    productData: product  // Include full product data
                                 }
                             }));
 
@@ -1127,7 +1186,9 @@
 
                 showNotification(message, type) {
                     const notification = document.createElement('div');
-                    const bgColor = type === 'success' ? 'bg-green-600' : 'bg-red-600';
+                    const bgColor = type === 'success' ? 'bg-green-600' : 
+                                   type === 'error' ? 'bg-red-600' : 
+                                   'bg-blue-600'; // info type
                     notification.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white z-50 ${bgColor}`;
                     notification.textContent = message;
                     

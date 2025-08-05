@@ -556,9 +556,63 @@ App\Models\Delivery::where('delivery_number', 'LIKE', 'DEL-%')->delete();
 - Discrepancy calculation accuracy
 - Image loading and error handling
 
+## Recent Updates
+
+### 2025-08-05 - Quantity Management & UI Enhancements
+
+#### Fixed +/- Button Quantity Adjustment Issues
+**Problem Resolved**: The manual quantity adjustment buttons (+/-) were inconsistent across different products due to a mismatch between frontend and backend quantity field handling.
+
+**Root Cause**: 
+- Frontend reading from new enhanced quantity fields (`total_received_units`, `case_received_quantity`, `unit_received_quantity`)
+- Backend `adjustQuantity()` method only updating legacy `received_quantity` field
+- Resulted in buttons appearing non-functional for products using the new quantity system
+
+**Solution Implemented**:
+- Enhanced `DeliveryController::adjustQuantity()` method to properly handle both quantity systems:
+  - **Case-based products**: Converts total units to appropriate case + unit combinations
+  - **Unit-based products**: Updates unit quantities directly
+  - **Legacy compatibility**: Maintains backward compatibility via `updateLegacyQuantities()`
+  - **Accurate status calculation**: Uses proper status update logic
+
+**Code Enhancement**:
+```php
+// New logic handles both case and unit quantity types
+if ($item->quantity_type === 'case' && $item->getEffectiveCaseUnits() > 1) {
+    $caseUnits = $item->getEffectiveCaseUnits();
+    $cases = intval($newQuantity / $caseUnits);
+    $units = $newQuantity % $caseUnits;
+    $item->update([
+        'case_received_quantity' => $cases,
+        'unit_received_quantity' => $units,
+    ]);
+} else {
+    $item->update([
+        'unit_received_quantity' => $newQuantity,
+        'case_received_quantity' => 0,
+    ]);
+}
+$item->updateLegacyQuantities();
+$item->updateStatus();
+```
+
+#### UI/UX Improvements
+1. **Removed Debug Section**: Cleaned up scanning interface by removing testing/debug progress bar alternatives
+2. **Fixed Text Truncation**: 
+   - **Barcode display**: Changed from `truncate max-w-20` to `break-all` for full barcode visibility
+   - **Product names**: Changed from `truncate max-w-32` to `break-words leading-tight` for complete name display
+   - **Result**: No more ellipsis (...) cutting off important product information
+
+#### Impact
+- ✅ **Universal +/- Button Functionality**: All products now support manual quantity adjustments
+- ✅ **Improved Data Accuracy**: Proper quantity field synchronization between new and legacy systems  
+- ✅ **Enhanced User Experience**: Full text visibility without truncation
+- ✅ **Backward Compatibility**: Existing deliveries continue to work seamlessly
+
 ---
 
-**Last Updated**: 2025-01-20  
+**Last Updated**: 2025-08-05  
 **System Status**: ✅ Fully Operational  
 **Test Coverage**: Manual testing completed  
-**Performance**: Tested with 292-item deliveries
+**Performance**: Tested with 292-item deliveries  
+**Recent Fix**: Quantity adjustment consistency across all product types

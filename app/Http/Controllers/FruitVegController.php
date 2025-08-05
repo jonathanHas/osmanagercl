@@ -451,10 +451,23 @@ class FruitVegController extends Controller
         ]);
 
         // Update or create vegDetails record
-        VegDetails::updateOrCreate(
-            ['product_code' => $request->product_code],
-            ['country_id' => $request->country_id]
-        );
+        $existingDetail = VegDetails::where('product', $request->product_code)->first();
+        
+        if ($existingDetail) {
+            $existingDetail->update(['countryCode' => $request->country_id]);
+        } else {
+            // Generate new ID for vegDetails
+            $maxId = VegDetails::max('ID');
+            $newId = $maxId ? ((int)$maxId + 1) : 1;
+            
+            VegDetails::create([
+                'ID' => (string)$newId,
+                'product' => $request->product_code,
+                'countryCode' => $request->country_id,
+                'classId' => 1, // Default class
+                'unitId' => 1   // Default unit (kg)
+            ]);
+        }
 
         // Add to print queue since origin changed
         VegPrintQueue::addToQueue($request->product_code, 'country_updated');
@@ -473,10 +486,23 @@ class FruitVegController extends Controller
         ]);
 
         // Update or create vegDetails record
-        VegDetails::updateOrCreate(
-            ['product_code' => $request->product_code],
-            ['unit_id' => $request->unit_id]
-        );
+        $existingDetail = VegDetails::where('product', $request->product_code)->first();
+        
+        if ($existingDetail) {
+            $existingDetail->update(['unitId' => $request->unit_id]);
+        } else {
+            // Generate new ID for vegDetails
+            $maxId = VegDetails::max('ID');
+            $newId = $maxId ? ((int)$maxId + 1) : 1;
+            
+            VegDetails::create([
+                'ID' => (string)$newId,
+                'product' => $request->product_code,
+                'countryCode' => 1, // Default country
+                'classId' => 1,     // Default class
+                'unitId' => $request->unit_id
+            ]);
+        }
 
         // Add to print queue since unit changed
         VegPrintQueue::addToQueue($request->product_code, 'unit_updated');
@@ -495,10 +521,23 @@ class FruitVegController extends Controller
         ]);
 
         // Update or create vegDetails record
-        VegDetails::updateOrCreate(
-            ['product_code' => $request->product_code],
-            ['class_id' => $request->class_id]
-        );
+        $existingDetail = VegDetails::where('product', $request->product_code)->first();
+        
+        if ($existingDetail) {
+            $existingDetail->update(['classId' => $request->class_id]);
+        } else {
+            // Generate new ID for vegDetails
+            $maxId = VegDetails::max('ID');
+            $newId = $maxId ? ((int)$maxId + 1) : 1;
+            
+            VegDetails::create([
+                'ID' => (string)$newId,
+                'product' => $request->product_code,
+                'countryCode' => 1, // Default country
+                'classId' => $request->class_id,
+                'unitId' => 1       // Default unit (kg)
+            ]);
+        }
 
         // Add to print queue since class changed
         VegPrintQueue::addToQueue($request->product_code, 'class_updated');
@@ -577,10 +616,10 @@ class FruitVegController extends Controller
 
         // Load vegDetails relationships for all products
         $productCodes = $products->pluck('CODE');
-        $vegDetailsCollection = VegDetails::whereIn('product_code', $productCodes)
+        $vegDetailsCollection = VegDetails::whereIn('product', $productCodes)
             ->with(['country', 'vegUnit', 'vegClass'])
             ->get()
-            ->keyBy('product_code');
+            ->keyBy('product');
 
         // Attach vegDetails to each product
         $products = $products->map(function ($product) use ($vegDetailsCollection) {
@@ -654,10 +693,10 @@ class FruitVegController extends Controller
 
         // Load vegDetails relationships
         $productCodes = $products->pluck('CODE');
-        $vegDetailsCollection = VegDetails::whereIn('product_code', $productCodes)
+        $vegDetailsCollection = VegDetails::whereIn('product', $productCodes)
             ->with(['country', 'vegUnit', 'vegClass'])
             ->get()
-            ->keyBy('product_code');
+            ->keyBy('product');
 
         // Attach vegDetails to each product
         $products = $products->map(function ($product) use ($vegDetailsCollection) {

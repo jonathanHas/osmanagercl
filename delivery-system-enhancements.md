@@ -139,8 +139,39 @@ echo $link->OuterCode; // Case barcode
 echo $link->CaseUnits; // Units per case
 ```
 
+## Recent Updates
+
+### 2025-08-05 - UI and Backend Fixes
+
+#### Fixed +/- Button Quantity Adjustment Issues
+- **Problem**: +/- buttons inconsistent across different products due to backend only updating legacy `received_quantity` field
+- **Root Cause**: Frontend reading from new quantity fields (`total_received_units`) but backend updating old fields
+- **Solution**: Enhanced `DeliveryController::adjustQuantity()` method to:
+  - Properly handle case-based vs unit-based products
+  - Update correct `case_received_quantity` and `unit_received_quantity` fields
+  - Maintain legacy compatibility via `updateLegacyQuantities()`
+  - Use accurate status calculation
+
+#### UI Improvements
+- **Removed Debug Section**: Cleaned up delivery scan interface by removing testing/debug progress bars
+- **Fixed Text Truncation**: Updated barcode and product name display to use `break-all` and `break-words` instead of `truncate` to show full text without ellipsis
+
+#### Backend Enhancement Details
+```php
+// New adjustQuantity logic handles both quantity types
+if ($item->quantity_type === 'case' && $item->getEffectiveCaseUnits() > 1) {
+    // Case-based: convert total units to cases + units
+    $caseUnits = $item->getEffectiveCaseUnits();
+    $cases = intval($newQuantity / $caseUnits);
+    $units = $newQuantity % $caseUnits;
+    // Update both case_received_quantity and unit_received_quantity
+} else {
+    // Unit-based: update unit_received_quantity directly
+}
+```
+
 ---
 
 **Implementation Date**: 2025-08-05  
 **Status**: ✅ Complete and Tested  
-**Impact**: Resolves fundamental quantity handling issues and adds case scanning capability
+**Impact**: Resolves fundamental quantity handling issues, adds case scanning capability, and fixes UI/UX inconsistencies

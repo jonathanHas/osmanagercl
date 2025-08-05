@@ -214,7 +214,29 @@ class DeliveryController extends Controller
             'quantity' => 'required|integer|min:0|max:9999',
         ]);
 
-        $item->update(['received_quantity' => $request->quantity]);
+        $newQuantity = $request->quantity;
+
+        // Update the new quantity fields based on quantity type
+        if ($item->quantity_type === 'case' && $item->getEffectiveCaseUnits() > 1) {
+            // For case-based items, convert total units to cases and units
+            $caseUnits = $item->getEffectiveCaseUnits();
+            $cases = intval($newQuantity / $caseUnits);
+            $units = $newQuantity % $caseUnits;
+            
+            $item->update([
+                'case_received_quantity' => $cases,
+                'unit_received_quantity' => $units,
+            ]);
+        } else {
+            // For unit-based items, update unit quantity directly
+            $item->update([
+                'unit_received_quantity' => $newQuantity,
+                'case_received_quantity' => 0,
+            ]);
+        }
+
+        // Update legacy fields and status
+        $item->updateLegacyQuantities();
         $item->updateStatus();
 
         return response()->json([
