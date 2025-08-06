@@ -6,6 +6,24 @@ Welcome to the comprehensive documentation for OSManager CL. This documentation 
 
 ## 🆕 Latest Updates (August 2025)
 
+### Universal Categories Management System
+Complete category management system that generalizes the Coffee Fresh module to work with ALL categories:
+
+- **📂 Universal Interface**: Manage any category with the same powerful tools
+- **📊 Sales Analytics**: Pre-aggregated data for instant performance metrics across all categories
+- **👁️ Till Visibility Control**: Toggle products on/off POS per category
+- **✏️ Inline Product Management**: Edit prices and display names without page refresh
+- **🔍 Advanced Search & Filter**: Find products and categories quickly
+- **📈 Performance Optimized**: Sub-second response times with optimized repository patterns
+
+**Key Benefits**:
+- Consistent management interface across all product types
+- No need for separate modules per category
+- Scalable to unlimited categories
+- Maintains backward compatibility with existing modules
+
+See [Categories Management](./features/categories-management.md) for complete details.
+
 ### Independent Irish Health Foods Integration
 Complete delivery system integration for Irish suppliers with advanced VAT processing:
 
@@ -35,7 +53,15 @@ Core system architecture and design patterns.
 ### 🚀 Features
 Detailed documentation for each major feature.
 
-- **[Sales Data Import](./features/sales-data-import.md)** - 🚀 **NEW** Lightning-fast sales analytics system
+- **[Categories Management](./features/categories-management.md)** - 🆕 Universal category management system
+  - Works with any product category in the POS system
+  - Consistent interface for sales analytics and product management
+  - Till visibility control per category
+  - Inline editing of prices and display names
+  - Subcategory navigation support
+  - Performance optimized with pre-aggregated data
+
+- **[Sales Data Import](./features/sales-data-import.md)** - 🚀 Lightning-fast sales analytics system
   - 100x+ performance improvement over cross-database queries
   - Pre-aggregated daily and monthly sales data
   - Automated data synchronization with POS system

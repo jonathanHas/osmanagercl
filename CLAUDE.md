@@ -275,6 +275,16 @@ For common issues and solutions, see [Troubleshooting Guide](./docs/development/
 
 ## Key Features
 
+### Categories Management System
+Universal category management interface for all product categories.
+- **Universal Interface**: Manage any category with consistent tools
+- **Sales Analytics**: Pre-aggregated data for instant performance metrics
+- **Till Visibility Control**: Toggle products on/off POS per category
+- **Product Management**: Inline editing of prices and display names
+- **Subcategory Support**: Navigate category hierarchies
+- **Search & Filter**: Find products and categories quickly
+See [Categories Management Documentation](./docs/features/categories-management.md).
+
 ### Product Management
 Comprehensive product catalog management with inline editing capabilities.
 - **Inline Editing**: Edit product names, tax categories, prices, and costs directly from product detail pages

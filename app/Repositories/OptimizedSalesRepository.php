@@ -512,4 +512,108 @@ class OptimizedSalesRepository
                 return $item;
             });
     }
+
+    /**
+     * Generic category sales statistics - works with any category
+     */
+    public function getCategorySalesStats(array $categoryIds, Carbon $startDate, Carbon $endDate): array
+    {
+        $stats = SalesDailySummary::whereIn('category_id', $categoryIds)
+            ->forDateRange($startDate, $endDate)
+            ->selectRaw('
+                SUM(total_units) as total_units,
+                SUM(total_revenue) as total_revenue,
+                COUNT(DISTINCT product_id) as unique_products,
+                SUM(transaction_count) as total_transactions
+            ')
+            ->first();
+
+        return [
+            'total_units' => (float) ($stats->total_units ?? 0),
+            'total_revenue' => (float) ($stats->total_revenue ?? 0),
+            'unique_products' => (int) ($stats->unique_products ?? 0),
+            'total_transactions' => (int) ($stats->total_transactions ?? 0),
+            'avg_transaction_value' => $stats->total_transactions > 0
+                ? round($stats->total_revenue / $stats->total_transactions, 2)
+                : 0,
+        ];
+    }
+
+    /**
+     * Get top selling products for any category
+     */
+    public function getTopCategoryProducts(array $categoryIds, Carbon $startDate, Carbon $endDate, int $limit = 50): Collection
+    {
+        return SalesDailySummary::whereIn('category_id', $categoryIds)
+            ->forDateRange($startDate, $endDate)
+            ->selectRaw('
+                product_id,
+                product_code,
+                product_name,
+                category_id,
+                SUM(total_units) as total_units,
+                SUM(total_revenue) as total_revenue,
+                AVG(avg_price) as avg_price
+            ')
+            ->groupBy('product_id', 'product_code', 'product_name', 'category_id')
+            ->orderByDesc('total_units')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Get daily sales breakdown for any category
+     */
+    public function getCategoryDailySales(array $categoryIds, Carbon $startDate, Carbon $endDate): Collection
+    {
+        return SalesDailySummary::whereIn('category_id', $categoryIds)
+            ->forDateRange($startDate, $endDate)
+            ->selectRaw('
+                sale_date,
+                SUM(total_units) as daily_units,
+                SUM(total_revenue) as daily_revenue,
+                COUNT(DISTINCT product_id) as products_sold
+            ')
+            ->groupBy('sale_date')
+            ->orderBy('sale_date')
+            ->get();
+    }
+
+    /**
+     * Get monthly trends for any category
+     */
+    public function getMonthlyCategoryTrends(array $categoryIds, int $year): Collection
+    {
+        return SalesMonthlySummary::whereIn('category_id', $categoryIds)
+            ->where('year', $year)
+            ->selectRaw('
+                month,
+                SUM(total_units) as monthly_units,
+                SUM(total_revenue) as monthly_revenue,
+                COUNT(DISTINCT product_id) as unique_products
+            ')
+            ->groupBy('month')
+            ->orderBy('month')
+            ->get();
+    }
+
+    /**
+     * Get category performance comparison across multiple categories
+     */
+    public function getCategoryPerformanceComparison(array $categoryIds, Carbon $startDate, Carbon $endDate): Collection
+    {
+        return SalesDailySummary::whereIn('category_id', $categoryIds)
+            ->forDateRange($startDate, $endDate)
+            ->selectRaw('
+                category_id,
+                SUM(total_units) as total_units,
+                SUM(total_revenue) as total_revenue,
+                AVG(avg_price) as avg_price,
+                COUNT(DISTINCT product_id) as unique_products,
+                COUNT(DISTINCT sale_date) as active_days
+            ')
+            ->groupBy('category_id')
+            ->orderByDesc('total_revenue')
+            ->get();
+    }
 }
