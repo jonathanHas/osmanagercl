@@ -9,6 +9,9 @@ The Coffee module provides comprehensive management for Coffee Fresh products (c
 ### 1. Product Management
 
 - **Till Visibility Control**: Toggle products on/off the POS till using the PRODUCTS_CAT table
+- **Alphabetical Ordering**: Products on the till are automatically ordered alphabetically by name
+  - New products added to till have CATORDER set to NULL for consistent alphabetical sorting
+  - Manual ordering functionality preserved for future implementation
 - **Inline Price Editing**: Click-to-edit pricing with immediate updates to the POS database
 - **Display Name Management**: Set custom display names for till buttons
 - **Context-Aware Navigation**: Smart back navigation when accessing products from Coffee module

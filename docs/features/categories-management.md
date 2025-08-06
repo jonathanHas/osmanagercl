@@ -50,6 +50,9 @@ The Categories Management System provides a universal interface for managing all
 
 ### Product Management
 - **Till Visibility Toggle**: Control which products appear on POS
+- **Alphabetical Ordering**: Products on till are automatically sorted alphabetically by name
+  - New products added to till have NULL CATORDER for consistent alphabetical sorting
+  - Manual ordering capability preserved for future implementation
 - **Inline Editing**: 
   - Price adjustments with click-to-edit
   - Display name management

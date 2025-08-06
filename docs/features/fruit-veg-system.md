@@ -9,6 +9,7 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 ### 1. Till Visibility Management
 - **Till Screen Control**: Manage which F&V products appear on the POS till screen
 - **PRODUCTS_CAT Integration**: Direct synchronization with POS database for immediate till updates
+- **Alphabetical Ordering**: Products on till automatically sorted alphabetically by name (CATORDER set to NULL)
 - **Quick Search Component**: Instant visibility toggles from the main dashboard
 - **Bulk Operations**: Show/hide multiple products on till simultaneously
 - **Real-time Search**: AJAX-powered search across all F&V products (664 total)
@@ -119,9 +120,11 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 -- Controls which products appear on the till (POS Database)
 PRODUCTS_CAT (
     PRODUCT VARCHAR(255) PRIMARY KEY,  -- Links to PRODUCTS.ID
-    CATORDER INT                       -- Display order on till
+    CATORDER INT                       -- Display order on till (nullable)
 )
 ```
+
+**Note:** As of August 2025, CATORDER is set to NULL for new products to enable alphabetical sorting by product name. Products on the till are automatically sorted alphabetically rather than by CATORDER values. Manual ordering functionality is preserved for future implementation.
 
 #### F&V Specific Tables (Laravel Database)
 ```sql

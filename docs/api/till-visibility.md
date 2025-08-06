@@ -94,7 +94,9 @@ The service manages the `PRODUCTS_CAT` table in the POS database:
 | Column | Type | Description |
 |--------|------|-------------|
 | PRODUCT | VARCHAR(255) | Product UUID (Primary Key) |
-| CATORDER | INT | Display order on till |
+| CATORDER | INT (Nullable) | Optional display order - NULL for alphabetical sorting |
+
+**Note:** As of August 2025, CATORDER is set to NULL for new products to enable alphabetical sorting by product name. The field is preserved for future manual ordering functionality.
 
 ## HTTP Endpoints
 

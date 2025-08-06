@@ -65,7 +65,7 @@ class ProductsCat extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'CATORDER' => 'integer',
+        // CATORDER left as nullable for future manual ordering
     ];
 
     /**
@@ -77,11 +77,14 @@ class ProductsCat extends Model
     }
 
     /**
-     * Scope to order by display order.
+     * Scope to order by product name alphabetically.
+     * This replaces CATORDER-based sorting to rely on alphabetical order.
      */
     public function scopeOrdered($query)
     {
-        return $query->orderBy('CATORDER');
+        return $query->join('PRODUCTS', 'PRODUCTS_CAT.PRODUCT', '=', 'PRODUCTS.ID')
+            ->orderBy('PRODUCTS.NAME')
+            ->select('PRODUCTS_CAT.*');
     }
 
     /**
@@ -94,17 +97,13 @@ class ProductsCat extends Model
 
     /**
      * Add a product to till visibility.
+     * CATORDER is left as NULL to rely on alphabetical sorting.
      */
     public static function addProduct(string $productId, ?int $order = null): self
     {
-        if ($order === null) {
-            // Get the highest order and add 1
-            $order = self::max('CATORDER') + 1 ?? 1;
-        }
-
         return self::create([
             'PRODUCT' => $productId,
-            'CATORDER' => $order,
+            'CATORDER' => $order, // Only set if explicitly provided, otherwise NULL
         ]);
     }
 
@@ -144,6 +143,7 @@ class ProductsCat extends Model
 
     /**
      * Bulk update visibility for multiple products.
+     * CATORDER is left as NULL to rely on alphabetical sorting.
      */
     public static function bulkUpdateVisibility(array $productIds, bool $visible): void
     {
@@ -153,13 +153,12 @@ class ProductsCat extends Model
             $productsToAdd = array_diff($productIds, $existingProducts);
 
             if (! empty($productsToAdd)) {
-                $maxOrder = self::max('CATORDER') ?? 0;
                 $data = [];
 
-                foreach ($productsToAdd as $index => $productId) {
+                foreach ($productsToAdd as $productId) {
                     $data[] = [
                         'PRODUCT' => $productId,
-                        'CATORDER' => $maxOrder + $index + 1,
+                        'CATORDER' => null, // Leave as NULL for alphabetical sorting
                     ];
                 }
 
@@ -173,10 +172,13 @@ class ProductsCat extends Model
 
     /**
      * Reorder products by updating CATORDER.
+     * This method is preserved for future manual ordering functionality.
+     * Pass NULL as order value to reset to alphabetical sorting.
      */
     public static function reorderProducts(array $productIdToOrder): void
     {
         foreach ($productIdToOrder as $productId => $order) {
+            // Allow NULL values to reset to alphabetical sorting
             self::where('PRODUCT', $productId)->update(['CATORDER' => $order]);
         }
     }
