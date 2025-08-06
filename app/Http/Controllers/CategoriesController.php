@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductMetadata;
 use App\Models\ProductsCat;
 use App\Repositories\OptimizedSalesRepository;
 use App\Services\TillVisibilityService;
@@ -124,24 +125,29 @@ class CategoriesController extends Controller
      */
     public function show(Category $category)
     {
-        // Get basic category statistics
+        // Get basic category statistics (fast queries only)
         $totalProducts = $category->products()->count();
         $visibleProducts = $this->getVisibleProductCount($category->ID);
         
-        // Get featured products (recently added to till)
-        $featuredProducts = $this->getFeaturedCategoryProducts($category->ID);
+        // Product Health Dashboard data will be loaded via AJAX for better performance
+        // These are no longer needed as we load everything via AJAX
+        $goodSellersGoneSilent = collect();
+        $slowMovers = collect();
+        $stagnantStock = collect();
+        $inventoryAlerts = collect();
         
-        // Get latest products (most recently added)
+        // Get latest products - simple query for now
         $latestProducts = $category->products()
-            ->orderByRaw('LENGTH(ID) DESC, ID DESC')  // Assuming newer products have longer/higher IDs
+            ->orderBy('NAME')
             ->limit(10)
             ->get();
         
         // Get top 10 sellers for last 30 days
         $startDate = Carbon::now()->subDays(30);
         $endDate = Carbon::now();
+        $categoryIds = $this->getCategoryIdsWithChildren($category);
         $topSellers = $this->optimizedSalesRepository->getTopCategoryProducts(
-            [$category->ID], 
+            $categoryIds, 
             $startDate, 
             $endDate, 
             10
@@ -154,7 +160,10 @@ class CategoriesController extends Controller
             'category', 
             'totalProducts', 
             'visibleProducts', 
-            'featuredProducts',
+            'goodSellersGoneSilent',
+            'slowMovers',
+            'stagnantStock',
+            'inventoryAlerts',
             'latestProducts',
             'topSellers',
             'subcategories'
@@ -309,6 +318,49 @@ class CategoriesController extends Controller
     }
 
     /**
+     * Get Product Health Dashboard data via AJAX for progressive loading.
+     */
+    public function getDashboardData(Request $request, Category $category)
+    {
+        $section = $request->get('section', 'good-sellers-silent');
+        $categoryIds = $this->getCategoryIdsWithChildren($category);
+
+        try {
+            $data = match($section) {
+                'good-sellers-silent' => $this->optimizedSalesRepository->getGoodSellersGoneSilent($categoryIds),
+                'slow-movers' => $this->optimizedSalesRepository->getSlowMovingProducts($categoryIds),
+                'stagnant-stock' => $this->optimizedSalesRepository->getStagnantStock($categoryIds),
+                'inventory-alerts' => $this->optimizedSalesRepository->getInventoryAlerts($categoryIds),
+                default => collect()
+            };
+
+            return response()->json([
+                'success' => true,
+                'section' => $section,
+                'data' => $data,
+                'count' => $data->count(),
+                'performance_info' => [
+                    'execution_time_ms' => round(microtime(true) * 1000 - ($_SERVER['REQUEST_TIME_FLOAT'] ?? microtime(true)) * 1000, 2),
+                    'data_source' => 'optimized_pre_aggregated',
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error loading dashboard data', [
+                'category_id' => $category->ID,
+                'section' => $section,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to load dashboard data',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Serve product image from POS database.
      */
     public function productImage($code)
@@ -422,22 +474,6 @@ class CategoriesController extends Controller
             ->count();
     }
 
-    /**
-     * Get featured products for category dashboard.
-     */
-    private function getFeaturedCategoryProducts(string $categoryId)
-    {
-        return Product::where('CATEGORY', $categoryId)
-            ->whereExists(function ($query) {
-                $query->select(DB::raw(1))
-                    ->from('PRODUCTS_CAT')
-                    ->whereColumn('PRODUCTS_CAT.PRODUCT', 'PRODUCTS.ID');
-            })
-            ->with(['category'])
-            ->orderBy('NAME')
-            ->limit(8)
-            ->get();
-    }
 
     /**
      * Get category IDs including all children.

@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\LabelLog;
 use App\Models\LabelTemplate;
 use App\Models\Product;
+use App\Models\ProductMetadata;
 use App\Models\Supplier;
 use App\Models\SupplierLink;
 use App\Models\TaxCategory;
@@ -19,6 +20,7 @@ use App\Services\TillVisibilityService;
 use App\Services\UdeaScrapingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -568,6 +570,19 @@ class ProductController extends Controller
                 if ($request->boolean('show_on_till', true)) {
                     $this->tillVisibilityService->setVisibility($product->ID, true, 'category');
                 }
+
+                // Create product metadata for creation tracking
+                ProductMetadata::createForProduct(
+                    $product->ID,
+                    $product->CODE,
+                    Auth::id(),
+                    [
+                        'source' => 'manual_creation',
+                        'delivery_item_id' => $request->delivery_item_id,
+                        'has_display_name' => !empty($request->display_name),
+                        'initial_till_visibility' => $request->boolean('show_on_till', true),
+                    ]
+                );
 
                 // If this product was created from a delivery item, link them
                 if ($request->delivery_item_id) {

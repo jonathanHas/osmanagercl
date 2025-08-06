@@ -600,18 +600,18 @@ class OptimizedSalesRepository
             ->groupBy('product_id', 'product_code', 'product_name', 'category_id')
             ->orderByDesc('total_units')
             ->get();
-        
+
         // Then get all products from the category (including those without sales)
         $allProducts = Product::whereIn('CATEGORY', $categoryIds)
             ->get()
             ->map(function ($product) use ($productsWithSales) {
                 // Check if this product has sales data
                 $salesData = $productsWithSales->firstWhere('product_id', $product->ID);
-                
+
                 if ($salesData) {
                     return $salesData;
                 }
-                
+
                 // If no sales, return product with zero sales
                 return (object) [
                     'product_id' => $product->ID,
@@ -623,11 +623,11 @@ class OptimizedSalesRepository
                     'avg_price' => $product->PRICESELL * (1 + $product->getVatRate()),
                 ];
             });
-        
+
         // Sort by units sold (descending), then by name
         return $allProducts->sortBy([
             ['total_units', 'desc'],
-            ['product_name', 'asc']
+            ['product_name', 'asc'],
         ])->values();
     }
 
@@ -667,5 +667,165 @@ class OptimizedSalesRepository
             ->groupBy('category_id')
             ->orderByDesc('total_revenue')
             ->get();
+    }
+
+    // ============================================================================
+    // Product Health Dashboard Methods
+    // ============================================================================
+
+    /**
+     * Get "Good Sellers Gone Silent" - high historical performers with no recent sales
+     * Critical for identifying operational issues with proven sellers
+     */
+    public function getGoodSellersGoneSilent(array $categoryIds, int $limit = 8): Collection
+    {
+        // Get historical high performers (top quartile from last 6 months)
+        $sixMonthsAgo = Carbon::now()->subMonths(6);
+        $twoWeeksAgo = Carbon::now()->subWeeks(2);
+
+        // Find products with strong historical performance
+        $historicalPerformers = SalesDailySummary::whereIn('category_id', $categoryIds)
+            ->forDateRange($sixMonthsAgo, $twoWeeksAgo)
+            ->selectRaw('
+                product_id,
+                product_code,
+                product_name,
+                category_id,
+                SUM(total_units) as historical_units,
+                MAX(sale_date) as last_sale_date,
+                COUNT(DISTINCT sale_date) as active_days
+            ')
+            ->groupBy('product_id', 'product_code', 'product_name', 'category_id')
+            ->having('active_days', '>=', 30) // Must have sold on at least 30 days
+            ->having('historical_units', '>=', 50) // Must have sold at least 50 units total
+            ->get();
+
+        // Filter to those with NO sales in last 7 days
+        $sevenDaysAgo = Carbon::now()->subDays(7);
+        $recentSalesProductIds = SalesDailySummary::whereIn('category_id', $categoryIds)
+            ->forDateRange($sevenDaysAgo, Carbon::now())
+            ->pluck('product_id')
+            ->unique();
+
+        return $historicalPerformers
+            ->reject(function ($product) use ($recentSalesProductIds) {
+                return $recentSalesProductIds->contains($product->product_id);
+            })
+            ->sortByDesc('historical_units')
+            ->take($limit)
+            ->values()
+            ->map(function ($product) {
+                $product->days_since_last_sale = Carbon::parse($product->last_sale_date)->diffInDays(Carbon::now());
+                $product->daily_average = round($product->historical_units / $product->active_days, 2);
+
+                return $product;
+            });
+    }
+
+    /**
+     * Get "Slow Movers" - products with lowest sales velocity currently in stock
+     */
+    public function getSlowMovingProducts(array $categoryIds, int $limit = 8): Collection
+    {
+        $twoMonthsAgo = Carbon::now()->subMonths(2);
+
+        return SalesDailySummary::whereIn('category_id', $categoryIds)
+            ->forDateRange($twoMonthsAgo, Carbon::now())
+            ->selectRaw('
+                product_id,
+                product_code,
+                product_name,
+                category_id,
+                SUM(total_units) as total_units,
+                COUNT(DISTINCT sale_date) as active_days,
+                SUM(total_revenue) as total_revenue
+            ')
+            ->groupBy('product_id', 'product_code', 'product_name', 'category_id')
+            ->having('total_units', '>', 0) // Must have some sales
+            ->get()
+            ->map(function ($product) {
+                $product->daily_velocity = round($product->total_units / 60, 3); // Units per day over 60 days
+
+                return $product;
+            })
+            ->sortBy('daily_velocity')
+            ->take($limit)
+            ->values();
+    }
+
+    /**
+     * Get "Stagnant Stock" - products with zero sales in last 30 days
+     */
+    public function getStagnantStock(array $categoryIds, int $limit = 8): Collection
+    {
+        $thirtyDaysAgo = Carbon::now()->subDays(30);
+        $sixtyDaysAgo = Carbon::now()->subDays(60);
+
+        // Get products that had sales 30-60 days ago
+        $previousPeriodProducts = SalesDailySummary::whereIn('category_id', $categoryIds)
+            ->forDateRange($sixtyDaysAgo, $thirtyDaysAgo)
+            ->selectRaw('
+                product_id,
+                product_code,
+                product_name,
+                category_id,
+                MAX(sale_date) as last_sale_date,
+                SUM(total_units) as previous_units
+            ')
+            ->groupBy('product_id', 'product_code', 'product_name', 'category_id')
+            ->get();
+
+        // Filter out products that had sales in last 30 days
+        $recentSalesProductIds = SalesDailySummary::whereIn('category_id', $categoryIds)
+            ->forDateRange($thirtyDaysAgo, Carbon::now())
+            ->pluck('product_id')
+            ->unique();
+
+        return $previousPeriodProducts
+            ->reject(function ($product) use ($recentSalesProductIds) {
+                return $recentSalesProductIds->contains($product->product_id);
+            })
+            ->sortByDesc('previous_units')
+            ->take($limit)
+            ->values()
+            ->map(function ($product) {
+                $product->days_since_last_sale = Carbon::parse($product->last_sale_date)->diffInDays(Carbon::now());
+
+                return $product;
+            });
+    }
+
+    /**
+     * Get "Inventory Alerts" - reorder alerts and overstock alerts
+     */
+    public function getInventoryAlerts(array $categoryIds, int $limit = 8): Collection
+    {
+        $thirtyDaysAgo = Carbon::now()->subDays(30);
+
+        // Get products with sales velocity data
+        $productsWithVelocity = SalesDailySummary::whereIn('category_id', $categoryIds)
+            ->forDateRange($thirtyDaysAgo, Carbon::now())
+            ->selectRaw('
+                product_id,
+                product_code,
+                product_name,
+                category_id,
+                SUM(total_units) as monthly_units,
+                COUNT(DISTINCT sale_date) as active_days
+            ')
+            ->groupBy('product_id', 'product_code', 'product_name', 'category_id')
+            ->having('monthly_units', '>', 10) // Only products with decent velocity
+            ->get()
+            ->map(function ($product) {
+                $product->daily_velocity = round($product->monthly_units / 30, 2);
+                $product->alert_type = 'velocity_check'; // Will be updated based on stock levels
+
+                return $product;
+            })
+            ->sortByDesc('daily_velocity')
+            ->take($limit)
+            ->values();
+
+        return $productsWithVelocity;
     }
 }

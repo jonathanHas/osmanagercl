@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Product extends Model
 {
@@ -435,5 +436,43 @@ class Product extends Model
     public function salesEntries()
     {
         return $this->hasMany(StockDiary::class, 'PRODUCT', 'ID')->where('REASON', StockDiary::REASON_SALE);
+    }
+
+    /**
+     * Get the metadata for this product from the Laravel database.
+     */
+    public function metadata(): HasOne
+    {
+        return $this->hasOne(ProductMetadata::class, 'product_id', 'ID');
+    }
+
+    /**
+     * Get the creation date for this product.
+     * 
+     * @return \Illuminate\Support\Carbon|null
+     */
+    public function getCreatedAtAttribute()
+    {
+        return $this->metadata?->created_at;
+    }
+
+    /**
+     * Get the user who created this product.
+     * 
+     * @return \App\Models\User|null
+     */
+    public function getCreatedByAttribute()
+    {
+        return $this->metadata?->user;
+    }
+
+    /**
+     * Check if this product has creation metadata.
+     * 
+     * @return bool
+     */
+    public function hasCreationMetadata(): bool
+    {
+        return $this->metadata !== null;
     }
 }

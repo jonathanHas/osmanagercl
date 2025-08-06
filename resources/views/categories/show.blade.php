@@ -182,34 +182,115 @@
                 </div>
             </div>
 
-            <!-- Featured Products -->
-            @if($featuredProducts->count() > 0)
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-semibold">Featured Products</h3>
+            <!-- Product Health Dashboard (Auto-loading) -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6" 
+                 x-data="productHealthDashboard('{{ $category->ID }}')" 
+                 x-cloak>
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">Product Health Dashboard</h3>
+                    <div class="flex items-center gap-2">
+                        <span x-show="!loading['good-sellers-silent'] && !loading['slow-movers'] && !loading['stagnant-stock'] && !loading['inventory-alerts'] && !hasAnyIssues()" 
+                              class="text-sm text-green-600">
+                            ✅ All systems healthy
+                        </span>
                         <a href="{{ route('categories.products', $category) }}" 
                            class="text-sm text-blue-600 hover:text-blue-700">
-                            View all →
+                            View all products →
                         </a>
                     </div>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        @foreach($featuredProducts as $product)
-                            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                                <div class="flex items-center justify-between mb-2">
-                                    <span class="text-xs font-medium text-gray-500">{{ $product->CODE }}</span>
-                                    @if($product->is_visible)
-                                        <span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">On Till</span>
-                                    @endif
-                                </div>
-                                <p class="font-medium text-sm mb-1">{{ Str::limit($product->NAME, 50) }}</p>
-                                <p class="text-lg font-bold text-blue-600">
-                                    €{{ number_format($product->PRICESELL * (1 + $product->getVatRate()), 2) }}
-                                </p>
-                            </div>
-                        @endforeach
-                    </div>
                 </div>
-            @endif
+
+                <!-- Tab Navigation -->
+                <div class="border-b border-gray-200 dark:border-gray-700 mb-4">
+                    <nav class="-mb-px flex space-x-8">
+                        <button @click="activeTab = 'good-sellers-silent'"
+                                :class="{ 
+                                    'border-red-500 text-red-600': activeTab === 'good-sellers-silent',
+                                    'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300': activeTab !== 'good-sellers-silent'
+                                }"
+                                class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors">
+                            🚨 Gone Silent
+                            <span x-show="loading['good-sellers-silent']" class="ml-2">
+                                <svg class="animate-spin h-3 w-3 text-gray-500 inline" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </span>
+                            <span x-show="!loading['good-sellers-silent'] && counts['good-sellers-silent'] > 0" 
+                                  class="ml-2 bg-red-100 text-red-800 text-xs font-medium px-2.5 py-0.5 rounded-full"
+                                  x-text="counts['good-sellers-silent']"></span>
+                        </button>
+                        <button @click="activeTab = 'slow-movers'"
+                                :class="{ 
+                                    'border-orange-500 text-orange-600': activeTab === 'slow-movers',
+                                    'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300': activeTab !== 'slow-movers'
+                                }"
+                                class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors">
+                            🐌 Slow Movers
+                            <span x-show="loading['slow-movers']" class="ml-2">
+                                <svg class="animate-spin h-3 w-3 text-gray-500 inline" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </span>
+                            <span x-show="!loading['slow-movers'] && counts['slow-movers'] > 0" 
+                                  class="ml-2 bg-orange-100 text-orange-800 text-xs font-medium px-2.5 py-0.5 rounded-full"
+                                  x-text="counts['slow-movers']"></span>
+                        </button>
+                        <button @click="activeTab = 'stagnant-stock'"
+                                :class="{ 
+                                    'border-yellow-500 text-yellow-600': activeTab === 'stagnant-stock',
+                                    'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300': activeTab !== 'stagnant-stock'
+                                }"
+                                class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors">
+                            ⚠️ Stagnant Stock
+                            <span x-show="loading['stagnant-stock']" class="ml-2">
+                                <svg class="animate-spin h-3 w-3 text-gray-500 inline" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </span>
+                            <span x-show="!loading['stagnant-stock'] && counts['stagnant-stock'] > 0" 
+                                  class="ml-2 bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded-full"
+                                  x-text="counts['stagnant-stock']"></span>
+                        </button>
+                        <button @click="activeTab = 'inventory-alerts'"
+                                :class="{ 
+                                    'border-blue-500 text-blue-600': activeTab === 'inventory-alerts',
+                                    'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300': activeTab !== 'inventory-alerts'
+                                }"
+                                class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors">
+                            📊 Inventory Alerts
+                            <span x-show="loading['inventory-alerts']" class="ml-2">
+                                <svg class="animate-spin h-3 w-3 text-gray-500 inline" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </span>
+                            <span x-show="!loading['inventory-alerts'] && counts['inventory-alerts'] > 0" 
+                                  class="ml-2 bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full"
+                                  x-text="counts['inventory-alerts']"></span>
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Tab Content Container -->
+                <div class="min-h-[200px]">
+                    <!-- Loading State for Current Tab -->
+                    <div x-show="loading[activeTab]" class="flex items-center justify-center py-12">
+                        <div class="text-center">
+                            <svg class="animate-spin h-8 w-8 text-gray-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <p class="text-gray-500 text-sm">Loading <span x-text="activeTab.replace(/-/g, ' ')"></span> data...</p>
+                        </div>
+                    </div>
+
+                    <!-- Content will be dynamically inserted here -->
+                    <div x-show="!loading[activeTab]" x-html="tabContent[activeTab]"></div>
+                </div>
+            </div>
 
             <!-- Quick Stats -->
             <div class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -232,4 +313,193 @@
             </div>
         </div>
     </div>
+
+    <script>
+        function productHealthDashboard(categoryId) {
+            return {
+                categoryId: categoryId,
+                activeTab: 'good-sellers-silent',
+                dashboardLoaded: false,
+                loading: {
+                    'good-sellers-silent': false,
+                    'slow-movers': false,
+                    'stagnant-stock': false,
+                    'inventory-alerts': false
+                },
+                counts: {
+                    'good-sellers-silent': 0,
+                    'slow-movers': 0,
+                    'stagnant-stock': 0,
+                    'inventory-alerts': 0
+                },
+                tabContent: {
+                    'good-sellers-silent': '',
+                    'slow-movers': '',
+                    'stagnant-stock': '',
+                    'inventory-alerts': ''
+                },
+
+                init() {
+                    // Set all tabs to loading state initially
+                    this.loading['good-sellers-silent'] = true;
+                    this.loading['slow-movers'] = true;
+                    this.loading['stagnant-stock'] = true;
+                    this.loading['inventory-alerts'] = true;
+                    this.dashboardLoaded = true;
+                    
+                    // Start loading all tabs immediately
+                    this.loadTab('good-sellers-silent');
+                    this.loadTab('slow-movers');
+                    this.loadTab('stagnant-stock');
+                    this.loadTab('inventory-alerts');
+                },
+
+                loadDashboard() {
+                    // This method is now only used for manual refresh if needed
+                    this.dashboardLoaded = true;
+                    this.loadTab('good-sellers-silent');
+                    this.loadTab('slow-movers');
+                    this.loadTab('stagnant-stock');
+                    this.loadTab('inventory-alerts');
+                },
+
+                async loadTab(tabName) {
+                    // Don't set loading to true if already loading (from init)
+                    if (!this.loading[tabName]) {
+                        this.loading[tabName] = true;
+                    }
+                    
+                    try {
+                        const response = await fetch(`/categories/${this.categoryId}/dashboard-data?section=${tabName}`, {
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+
+                        if (!response.ok) throw new Error('Failed to load');
+
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            this.counts[tabName] = result.count || 0;
+                            this.tabContent[tabName] = this.renderTabContent(tabName, result.data || []);
+                        }
+                    } catch (error) {
+                        console.error(`Error loading ${tabName}:`, error);
+                        this.tabContent[tabName] = '<div class="text-center py-8 text-red-500">Failed to load data</div>';
+                    } finally {
+                        this.loading[tabName] = false;
+                    }
+                },
+
+                renderTabContent(tabName, data) {
+                    if (!data || data.length === 0) {
+                        return this.renderEmptyState(tabName);
+                    }
+
+                    let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">';
+                    
+                    data.forEach(product => {
+                        html += this.renderProductCard(tabName, product);
+                    });
+                    
+                    html += '</div>';
+                    return html;
+                },
+
+                renderProductCard(tabName, product) {
+                    const themes = {
+                        'good-sellers-silent': 'red',
+                        'slow-movers': 'orange',
+                        'stagnant-stock': 'yellow',
+                        'inventory-alerts': 'blue'
+                    };
+                    const theme = themes[tabName] || 'gray';
+                    
+                    return `
+                        <div class="bg-${theme}-50 dark:bg-${theme}-900/20 border border-${theme}-200 dark:border-${theme}-800 rounded-lg p-4">
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">
+                                        ${product.product_name || 'Unknown Product'}
+                                    </p>
+                                    <p class="text-xs text-gray-500">${product.product_code || ''}</p>
+                                </div>
+                                ${this.renderBadge(tabName, product)}
+                            </div>
+                            ${this.renderMetrics(tabName, product)}
+                        </div>
+                    `;
+                },
+
+                renderBadge(tabName, product) {
+                    if (tabName === 'good-sellers-silent') {
+                        return `<span class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full">${product.days_since_last_sale}d ago</span>`;
+                    } else if (tabName === 'slow-movers') {
+                        return `<span class="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">${product.daily_velocity}/day</span>`;
+                    } else if (tabName === 'stagnant-stock') {
+                        return `<span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">${product.days_since_last_sale}d ago</span>`;
+                    } else {
+                        return `<span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">${product.daily_velocity}/day</span>`;
+                    }
+                },
+
+                renderMetrics(tabName, product) {
+                    if (tabName === 'good-sellers-silent') {
+                        return `
+                            <div class="flex justify-between text-xs text-gray-600">
+                                <span>Avg: ${product.daily_average}/day</span>
+                                <span>Historical: ${this.formatNumber(product.historical_units)} units</span>
+                            </div>
+                        `;
+                    } else if (tabName === 'slow-movers') {
+                        return `
+                            <div class="flex justify-between text-xs text-gray-600">
+                                <span>60-day: ${this.formatNumber(product.total_units)}</span>
+                                <span>Revenue: €${this.formatNumber(product.total_revenue)}</span>
+                            </div>
+                        `;
+                    } else if (tabName === 'stagnant-stock') {
+                        return `
+                            <div class="flex justify-between text-xs text-gray-600">
+                                <span>Previous: ${this.formatNumber(product.previous_units)} units</span>
+                                <span>Last sale: ${product.last_sale_date ? new Date(product.last_sale_date).toLocaleDateString('en-IE', {month: 'short', day: 'numeric'}) : 'Unknown'}</span>
+                            </div>
+                        `;
+                    } else {
+                        return `
+                            <div class="flex justify-between text-xs text-gray-600">
+                                <span>30-day: ${this.formatNumber(product.monthly_units)}</span>
+                                <span>Active: ${product.active_days}/30 days</span>
+                            </div>
+                        `;
+                    }
+                },
+
+                renderEmptyState(tabName) {
+                    const messages = {
+                        'good-sellers-silent': '✅ No issues found! All good sellers are active.',
+                        'slow-movers': '🚀 Great! No slow-moving products detected.',
+                        'stagnant-stock': '🔄 Excellent! No stagnant stock found.',
+                        'inventory-alerts': '📊 No significant inventory alerts.'
+                    };
+                    
+                    return `
+                        <div class="text-center py-8">
+                            <p class="text-gray-500">${messages[tabName]}</p>
+                        </div>
+                    `;
+                },
+
+                formatNumber(num) {
+                    return new Intl.NumberFormat().format(num || 0);
+                },
+
+                hasAnyIssues() {
+                    return Object.values(this.counts).reduce((sum, count) => sum + count, 0) > 0;
+                }
+            }
+        }
+    </script>
 </x-admin-layout>

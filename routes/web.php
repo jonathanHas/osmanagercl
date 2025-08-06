@@ -108,6 +108,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/{category}/sales', [CategoriesController::class, 'sales'])->name('sales');
         Route::get('/{category}/sales/data', [CategoriesController::class, 'getSalesData'])->name('sales.data');
         Route::get('/{category}/sales/product/{code}/daily', [CategoriesController::class, 'getProductDailySales'])->name('sales.product.daily');
+        Route::get('/{category}/dashboard-data', [CategoriesController::class, 'getDashboardData'])->name('dashboard.data');
         Route::post('/visibility/toggle', [CategoriesController::class, 'toggleVisibility'])->name('visibility.toggle');
         Route::get('/product-image/{code}', [CategoriesController::class, 'productImage'])->name('product-image');
     });
