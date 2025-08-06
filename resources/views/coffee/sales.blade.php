@@ -950,6 +950,22 @@
                                     },
                                     tooltip: {
                                         callbacks: {
+                                            title: function(context) {
+                                                // Get the date from the original data
+                                                const index = context[0].dataIndex;
+                                                const dateStr = this.dailySales[index]?.sale_date;
+                                                if (dateStr) {
+                                                    const date = new Date(dateStr);
+                                                    const dayName = date.toLocaleDateString('en-GB', { weekday: 'long' });
+                                                    const formattedDate = date.toLocaleDateString('en-GB', { 
+                                                        day: 'numeric',
+                                                        month: 'short',
+                                                        year: 'numeric'
+                                                    });
+                                                    return `${dayName}, ${formattedDate}`;
+                                                }
+                                                return context[0].label;
+                                            }.bind(this),
                                             label: function(context) {
                                                 let label = context.dataset.label || '';
                                                 if (label) {
@@ -1178,6 +1194,22 @@
                                     },
                                     tooltip: {
                                         callbacks: {
+                                            title: function(context) {
+                                                // Get the date from the original data
+                                                const index = context[0].dataIndex;
+                                                const dateStr = dailySalesData[index]?.sale_date;
+                                                if (dateStr) {
+                                                    const date = new Date(dateStr);
+                                                    const dayName = date.toLocaleDateString('en-GB', { weekday: 'long' });
+                                                    const formattedDate = date.toLocaleDateString('en-GB', { 
+                                                        day: 'numeric',
+                                                        month: 'short',
+                                                        year: 'numeric'
+                                                    });
+                                                    return `${dayName}, ${formattedDate}`;
+                                                }
+                                                return context[0].label;
+                                            },
                                             label: function(context) {
                                                 let label = context.dataset.label || '';
                                                 if (label) {
