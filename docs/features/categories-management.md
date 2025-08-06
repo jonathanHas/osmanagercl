@@ -38,7 +38,13 @@ The Categories Management System provides a universal interface for managing all
 ### Category Dashboard
 - **Quick Actions**: Jump to products, sales, or management
 - **Statistics Overview**: Product counts, visibility metrics
-- **Featured Products**: Preview of top products in category
+- **Latest Products**: Recently added products in the category
+- **Top Sellers**: Best performing products in last 30 days
+- **Product Health Dashboard**: Auto-loading comprehensive health metrics
+  - **Good Sellers Gone Silent**: High performers with no recent sales (critical alerts)
+  - **Slow Movers**: Products with lowest sales velocity
+  - **Stagnant Stock**: Products with zero sales in last 30 days
+  - **Inventory Alerts**: Velocity-based stock management insights
 - **Subcategories**: Navigate category hierarchies
 - **Category Metadata**: ID, parent, display settings
 
@@ -81,6 +87,46 @@ The Categories Management System provides a universal interface for managing all
   - Multiple products can be expanded simultaneously
 - **Product Search**: Filter sales data by product name or code
 
+## Product Health Dashboard
+
+### Overview
+The Product Health Dashboard provides instant insights into product performance issues and opportunities. It auto-loads when viewing a category and displays four critical metrics tabs.
+
+### Dashboard Sections
+
+#### Good Sellers Gone Silent
+- Identifies products with strong historical sales that haven't sold recently
+- Critical for spotting operational issues (stock-outs, display problems)
+- Shows days since last sale and historical daily average
+- Products must have 30+ active days and 50+ historical units to qualify
+
+#### Slow Movers
+- Products with lowest sales velocity over the last 60 days
+- Helps identify candidates for promotions or discontinuation
+- Displays units per day velocity and total revenue
+- Only includes products with at least some sales
+
+#### Stagnant Stock
+- Products with zero sales in the last 30 days
+- Had sales 30-60 days ago but now completely stagnant
+- Shows previous period units and last sale date
+- Useful for identifying forgotten or misplaced products
+
+#### Inventory Alerts
+- High-velocity products requiring stock attention
+- Shows daily velocity and active selling days
+- Helps prevent stock-outs on fast-moving items
+- Only includes products with 10+ monthly units
+
+### Features
+- **Auto-loading**: Dashboard loads immediately on page load
+- **Parallel Data Fetching**: All tabs load simultaneously for speed
+- **Product Links**: Click any product name to edit
+- **Stock Levels**: Current stock displayed for each product
+- **Visual Indicators**: Color-coded badges and cards by severity
+- **Loading States**: Smooth loading animations per tab
+- **Empty States**: Positive feedback when no issues found
+
 ## Routes
 
 ```php
@@ -92,6 +138,7 @@ Route::prefix('categories')->name('categories.')->group(function () {
     Route::get('/{category}/sales', [CategoriesController::class, 'sales'])->name('sales');
     Route::get('/{category}/sales/data', [CategoriesController::class, 'getSalesData'])->name('sales.data');
     Route::get('/{category}/sales/product/{code}/daily', [CategoriesController::class, 'getProductDailySales'])->name('sales.product.daily');
+    Route::get('/{category}/dashboard-data', [CategoriesController::class, 'getDashboardData'])->name('dashboard.data');
     Route::post('/visibility/toggle', [CategoriesController::class, 'toggleVisibility'])->name('visibility.toggle');
     Route::get('/product-image/{code}', [CategoriesController::class, 'productImage'])->name('product-image');
 });
@@ -136,6 +183,27 @@ getMonthlyCategoryTrends(array $categoryIds, int $year): Collection
 // Compare category performance
 getCategoryPerformanceComparison(array $categoryIds, Carbon $startDate, Carbon $endDate): Collection
 ```
+
+### Product Health Dashboard Methods
+```php
+// Get products with high historical sales but no recent activity
+getGoodSellersGoneSilent(array $categoryIds, int $limit = 8): Collection
+
+// Get products with lowest sales velocity
+getSlowMovingProducts(array $categoryIds, int $limit = 8): Collection
+
+// Get products with zero sales in last 30 days
+getStagnantStock(array $categoryIds, int $limit = 8): Collection
+
+// Get high-velocity products for inventory management
+getInventoryAlerts(array $categoryIds, int $limit = 8): Collection
+```
+
+All dashboard methods now include:
+- Current stock levels for each product
+- Product IDs for direct linking
+- Formatted metrics for display
+- Automatic date calculations
 
 ## Performance Optimization
 

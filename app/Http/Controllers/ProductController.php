@@ -188,6 +188,9 @@ class ProductController extends Controller
             }
         }
 
+        // Check if product is visible on till
+        $isVisibleOnTill = $this->tillVisibilityService->isVisibleOnTill($id);
+
         return view('products.show', [
             'product' => $product,
             'taxCategories' => $taxCategories,
@@ -197,6 +200,7 @@ class ProductController extends Controller
             'udeaPricing' => $udeaPricing,
             'fromDelivery' => $fromDelivery,
             'from' => $from,
+            'isVisibleOnTill' => $isVisibleOnTill,
         ]);
     }
 
@@ -773,6 +777,50 @@ class ProductController extends Controller
 
             return response()->json([
                 'error' => 'Failed to update stocking status: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Toggle till visibility for a product via AJAX.
+     */
+    public function toggleTillVisibility(string $id, Request $request)
+    {
+        $request->validate([
+            'visible' => 'required|boolean',
+        ]);
+
+        $product = $this->productRepository->findById($id);
+
+        if (! $product) {
+            return response()->json(['error' => 'Product not found'], 404);
+        }
+
+        $makeVisible = $request->boolean('visible');
+
+        try {
+            // Set visibility using the TillVisibilityService
+            $success = $this->tillVisibilityService->setVisibility($id, $makeVisible);
+            
+            // Get the current visibility status
+            $isVisible = $this->tillVisibilityService->isVisibleOnTill($id);
+
+            return response()->json([
+                'success' => $success,
+                'is_visible' => $isVisible,
+                'message' => $isVisible ? 'Product is now visible on till' : 'Product is now hidden from till',
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to toggle till visibility', [
+                'product_id' => $id,
+                'product_code' => $product->CODE,
+                'action' => $makeVisible ? 'show' : 'hide',
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to update till visibility: '.$e->getMessage(),
             ], 500);
         }
     }

@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **🚨 Product Health Dashboard**: Auto-loading dashboard with critical product insights (2025-01-06)
+  - **Good Sellers Gone Silent**: Identifies high performers with no recent sales
+  - **Slow Movers**: Products with lowest sales velocity over 60 days
+  - **Stagnant Stock**: Products with zero sales in last 30 days
+  - **Inventory Alerts**: High-velocity products needing stock attention
+  - **Auto-Loading**: Dashboard loads immediately on page view
+  - **Stock Levels**: Current stock displayed for all dashboard products
+  - **Product Links**: Click any product name to navigate to edit page
+  - **Parallel Loading**: All tabs fetch data simultaneously for speed
+  - **Visual Design**: Color-coded cards by severity (red, orange, yellow, blue)
+  - **Empty States**: Positive feedback when no issues found
+  - **Performance**: Sub-second load times with pre-aggregated data
+
 - **📊 Categories Sales Analytics Enhancements**: Major improvements to sales analytics interface (2025-01-06)
   - **Fixed Daily Sales Chart**: Resolved chart initialization preventing graph display
   - **Enhanced Tooltips**: Added day of week to chart tooltips (e.g., "Monday, 1 Mar 2025")

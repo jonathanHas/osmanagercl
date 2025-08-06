@@ -329,6 +329,44 @@
                                         <dd class="mt-1 text-sm text-gray-900 dark:text-gray-100">{{ $product->TEXTTIP }}</dd>
                                     </div>
                                 @endif
+                                <!-- Till Visibility Toggle -->
+                                <div>
+                                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Till Visibility</dt>
+                                    <dd class="mt-1">
+                                        <div class="flex items-center space-x-3">
+                                            <span id="tillVisibilityStatus" class="text-sm text-gray-900 dark:text-gray-100">
+                                                @if($isVisibleOnTill)
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                                        </svg>
+                                                        Visible on Till
+                                                    </span>
+                                                @else
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                                                        </svg>
+                                                        Hidden from Till
+                                                    </span>
+                                                @endif
+                                            </span>
+                                            <button type="button" 
+                                                    onclick="toggleTillVisibility('{{ $product->ID }}', {{ $isVisibleOnTill ? 'false' : 'true' }})"
+                                                    class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 {{ $isVisibleOnTill ? 'bg-green-600' : 'bg-gray-200' }}"
+                                                    role="switch" 
+                                                    aria-checked="{{ $isVisibleOnTill ? 'true' : 'false' }}">
+                                                <span class="sr-only">Toggle till visibility</span>
+                                                <span aria-hidden="true" 
+                                                      class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out {{ $isVisibleOnTill ? 'translate-x-5' : 'translate-x-0' }}">
+                                                </span>
+                                            </button>
+                                        </div>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                            {{ $isVisibleOnTill ? 'Product is visible and can be sold on the POS till' : 'Product is hidden from the POS till' }}
+                                        </p>
+                                    </dd>
+                                </div>
                                 <div>
                                     <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
                                         Display Name
@@ -1042,6 +1080,88 @@
                 // Restore button state
                 button.disabled = false;
                 button.innerHTML = originalContent;
+            });
+        }
+
+        // Toggle till visibility function
+        function toggleTillVisibility(productId, makeVisible) {
+            const button = event.target.closest('button');
+            const statusSpan = document.getElementById('tillVisibilityStatus');
+            const originalHtml = statusSpan.innerHTML;
+            
+            // Show loading state
+            button.disabled = true;
+            statusSpan.innerHTML = '<svg class="w-4 h-4 animate-spin inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Updating...';
+            
+            fetch(`/products/${productId}/toggle-till-visibility`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({ visible: makeVisible })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update the UI based on new state
+                    const isVisible = data.is_visible;
+                    
+                    // Update status display
+                    if (isVisible) {
+                        statusSpan.innerHTML = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                            </svg>
+                            Visible on Till
+                        </span>`;
+                        button.classList.remove('bg-gray-200');
+                        button.classList.add('bg-green-600');
+                        button.querySelector('span[aria-hidden]').classList.remove('translate-x-0');
+                        button.querySelector('span[aria-hidden]').classList.add('translate-x-5');
+                    } else {
+                        statusSpan.innerHTML = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                            </svg>
+                            Hidden from Till
+                        </span>`;
+                        button.classList.remove('bg-green-600');
+                        button.classList.add('bg-gray-200');
+                        button.querySelector('span[aria-hidden]').classList.remove('translate-x-5');
+                        button.querySelector('span[aria-hidden]').classList.add('translate-x-0');
+                    }
+                    
+                    // Update button onclick
+                    button.setAttribute('onclick', `toggleTillVisibility('${productId}', ${!isVisible})`);
+                    button.setAttribute('aria-checked', isVisible.toString());
+                    
+                    // Update description text
+                    const description = button.parentElement.nextElementSibling;
+                    if (description) {
+                        description.textContent = isVisible ? 
+                            'Product is visible and can be sold on the POS till' : 
+                            'Product is hidden from the POS till';
+                    }
+                    
+                    // Show success message
+                    const successMsg = document.createElement('span');
+                    successMsg.className = 'ml-2 text-xs text-green-600 dark:text-green-400';
+                    successMsg.textContent = '✓ Updated';
+                    statusSpan.appendChild(successMsg);
+                    setTimeout(() => successMsg.remove(), 2000);
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to update till visibility'));
+                    statusSpan.innerHTML = originalHtml;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Network error while updating till visibility');
+                statusSpan.innerHTML = originalHtml;
+            })
+            .finally(() => {
+                button.disabled = false;
             });
         }
 

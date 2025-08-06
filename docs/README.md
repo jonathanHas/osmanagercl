@@ -4,7 +4,19 @@ Welcome to the comprehensive documentation for OSManager CL. This documentation 
 
 📚 **New to the docs?** Start with the [Documentation Usage Guide](./DOCUMENTATION_GUIDE.md) to understand how to navigate and contribute to documentation.
 
-## 🆕 Latest Updates (August 2025)
+## 🆕 Latest Updates (January 2025)
+
+### Product Health Dashboard (2025-01-06)
+Auto-loading dashboard with critical product performance insights:
+
+- **🚨 Good Sellers Gone Silent**: Identifies high performers with no recent sales
+- **🐌 Slow Movers**: Products with lowest sales velocity over 60 days  
+- **⚠️ Stagnant Stock**: Products with zero sales in last 30 days
+- **📊 Inventory Alerts**: High-velocity products needing stock attention
+- **📦 Real-time Stock Levels**: Current stock displayed for all dashboard products
+- **🔗 Direct Product Links**: Click any product name to navigate to edit page
+- **⚡ Auto-Loading**: Dashboard starts fetching data immediately on page load
+- **🎨 Visual Indicators**: Color-coded cards by severity (red, orange, yellow, blue)
 
 ### Universal Categories Management System
 Complete category management system that generalizes the Coffee Fresh module to work with ALL categories:
@@ -56,6 +68,9 @@ Detailed documentation for each major feature.
 - **[Categories Management](./features/categories-management.md)** - 🆕 Universal category management system *(Enhanced 2025-01-06)*
   - Works with any product category in the POS system
   - Consistent interface for sales analytics and product management
+  - **Product Health Dashboard** with auto-loading critical insights
+  - Good Sellers Gone Silent, Slow Movers, Stagnant Stock alerts
+  - Real-time stock levels and product links in dashboard
   - Till visibility control per category
   - Inline editing of prices and display names
   - Subcategory navigation support
