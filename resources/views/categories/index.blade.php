@@ -7,7 +7,7 @@
                 <span class="text-sm text-gray-500">•</span>
                 <span class="text-sm text-gray-500">{{ $totalProducts }} products</span>
                 <span class="text-sm text-gray-500">•</span>
-                <span class="text-sm text-green-600">{{ $visibleProducts }} visible</span>
+                <span class="text-sm text-green-600">€{{ number_format($totalRevenue, 0) }} total revenue</span>
             </div>
         </div>
     </x-slot>
@@ -24,7 +24,7 @@
                                placeholder="Search categories..." 
                                class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
                     </div>
-                    <div class="flex items-center">
+                    <div class="flex items-center gap-4">
                         <label class="flex items-center gap-2">
                             <input type="checkbox" 
                                    name="show_empty" 
@@ -33,6 +33,20 @@
                                    class="rounded border-gray-300 dark:border-gray-700">
                             <span class="text-sm text-gray-600 dark:text-gray-400">Show empty categories</span>
                         </label>
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm text-gray-600 dark:text-gray-400">Revenue Period:</label>
+                            <select name="period" class="rounded border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 text-sm">
+                                <option value="week" {{ $period === 'week' ? 'selected' : '' }}>Last Week</option>
+                                <option value="month" {{ $period === 'month' ? 'selected' : '' }}>Last Month</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="text-sm text-gray-600 dark:text-gray-400">Sort by:</label>
+                            <select name="sort" class="rounded border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 text-sm">
+                                <option value="revenue" {{ $sortBy === 'revenue' ? 'selected' : '' }}>Revenue (High to Low)</option>
+                                <option value="name" {{ $sortBy === 'name' ? 'selected' : '' }}>Name (A-Z)</option>
+                            </select>
+                        </div>
                     </div>
                     <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
                         Filter
@@ -62,19 +76,19 @@
                                 <span class="font-medium">{{ $category->total_products }}</span>
                             </div>
                             <div class="flex justify-between">
-                                <span>Visible:</span>
-                                <span class="font-medium text-green-600">{{ $category->visible_products }}</span>
+                                <span>Revenue ({{ ucfirst($period) }}):</span>
+                                <span class="font-medium text-green-600">€{{ number_format($category->revenue, 0) }}</span>
                             </div>
                             
-                            <!-- Visibility Progress Bar -->
+                            <!-- Revenue Progress Bar -->
                             <div class="mt-3">
                                 <div class="flex justify-between text-xs mb-1">
-                                    <span>Till Visibility</span>
-                                    <span>{{ $category->visibility_percentage }}%</span>
+                                    <span>Revenue Contribution</span>
+                                    <span>{{ $category->revenue_percentage }}%</span>
                                 </div>
                                 <div class="w-full bg-gray-200 rounded-full h-2">
-                                    <div class="bg-green-600 h-2 rounded-full" 
-                                         style="width: {{ $category->visibility_percentage }}%"></div>
+                                    <div class="bg-blue-600 h-2 rounded-full" 
+                                         style="width: {{ $category->revenue_percentage }}%"></div>
                                 </div>
                             </div>
                         </div>
@@ -111,25 +125,25 @@
                         @endif
                     </div>
                     <div>
-                        <p class="text-sm text-gray-600 dark:text-gray-400">Best Visibility</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Top Revenue</p>
                         @php
-                            $bestVisibility = $categories->where('total_products', '>', 0)->sortByDesc('visibility_percentage')->first();
+                            $topRevenue = $categories->where('revenue', '>', 0)->sortByDesc('revenue')->first();
                         @endphp
-                        @if($bestVisibility)
-                            <p class="text-lg font-medium">{{ $bestVisibility->NAME }}</p>
-                            <p class="text-sm text-green-600">{{ $bestVisibility->visibility_percentage }}% visible</p>
+                        @if($topRevenue)
+                            <p class="text-lg font-medium">{{ $topRevenue->NAME }}</p>
+                            <p class="text-sm text-green-600">€{{ number_format($topRevenue->revenue, 0) }}</p>
                         @endif
                     </div>
                     <div>
-                        <p class="text-sm text-gray-600 dark:text-gray-400">Needs Attention</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Low Performers</p>
                         @php
-                            $needsAttention = $categories->where('total_products', '>', 0)->sortBy('visibility_percentage')->first();
+                            $lowPerformer = $categories->where('total_products', '>', 0)->where('revenue', '>', 0)->sortBy('revenue')->first();
                         @endphp
-                        @if($needsAttention && $needsAttention->visibility_percentage < 50)
-                            <p class="text-lg font-medium">{{ $needsAttention->NAME }}</p>
-                            <p class="text-sm text-red-600">Only {{ $needsAttention->visibility_percentage }}% visible</p>
+                        @if($lowPerformer && $lowPerformer->revenue < ($totalRevenue * 0.05))
+                            <p class="text-lg font-medium">{{ $lowPerformer->NAME }}</p>
+                            <p class="text-sm text-orange-600">€{{ number_format($lowPerformer->revenue, 0) }} revenue</p>
                         @else
-                            <p class="text-sm text-gray-500">All categories well managed</p>
+                            <p class="text-sm text-gray-500">All categories performing well</p>
                         @endif
                     </div>
                 </div>

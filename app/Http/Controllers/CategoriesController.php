@@ -39,6 +39,8 @@ class CategoriesController extends Controller
     {
         $search = $request->get('search', '');
         $showEmpty = $request->get('show_empty', false);
+        $period = $request->get('period', 'month'); // 'week' or 'month'
+        $sortBy = $request->get('sort', 'revenue'); // 'name' or 'revenue'
         
         $query = Category::query()
             ->withCount('products')
@@ -54,29 +56,66 @@ class CategoriesController extends Controller
         
         $categories = $query->get();
         
-        // Add visibility stats for each category
-        $categories->transform(function ($category) {
-            $category->visible_products = $this->getVisibleProductCount($category->ID);
-            $category->total_products = $category->products_count;
-            $category->visibility_percentage = $category->total_products > 0 
-                ? round(($category->visible_products / $category->total_products) * 100) 
+        // Set date range based on period
+        $endDate = Carbon::now();
+        $startDate = $period === 'week' 
+            ? Carbon::now()->subWeek() 
+            : Carbon::now()->subMonth();
+        
+        // Get revenue data for each category
+        $categoryRevenues = collect();
+        $totalRevenue = 0;
+        
+        foreach ($categories as $category) {
+            $categoryIds = $this->getCategoryIdsWithChildren($category);
+            $stats = $this->optimizedSalesRepository->getCategorySalesStats($categoryIds, $startDate, $endDate);
+            
+            $revenue = (float) $stats['total_revenue'];
+            $categoryRevenues->push([
+                'id' => $category->ID,
+                'revenue' => $revenue
+            ]);
+            $totalRevenue += $revenue;
+        }
+        
+        // Add revenue stats to each category
+        $categories->transform(function ($category) use ($categoryRevenues, $totalRevenue) {
+            $categoryRevenue = $categoryRevenues->firstWhere('id', $category->ID);
+            $revenue = $categoryRevenue['revenue'] ?? 0;
+            
+            $category->revenue = $revenue;
+            $category->revenue_percentage = $totalRevenue > 0 
+                ? round(($revenue / $totalRevenue) * 100, 1)
                 : 0;
             
             return $category;
         });
         
+        // Apply sorting based on user selection
+        if ($sortBy === 'name') {
+            $categories = $categories->sortBy('NAME')->values();
+        } else {
+            // Sort by revenue (highest first) - default
+            $categories = $categories->sortByDesc('revenue')->values();
+        }
+        
         // Get overall stats
         $totalCategories = $categories->count();
         $totalProducts = Product::count();
-        $visibleProducts = ProductsCat::distinct('PRODUCT')->count();
+        $categoriesWithRevenue = $categories->where('revenue', '>', 0)->count();
         
         return view('categories.index', compact(
             'categories', 
             'search', 
-            'showEmpty', 
+            'showEmpty',
+            'period',
+            'sortBy',
             'totalCategories', 
             'totalProducts',
-            'visibleProducts'
+            'totalRevenue',
+            'categoriesWithRevenue',
+            'startDate',
+            'endDate'
         ));
     }
 
