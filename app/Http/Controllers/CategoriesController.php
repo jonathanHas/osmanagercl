@@ -92,6 +92,22 @@ class CategoriesController extends Controller
         // Get featured products (recently added to till)
         $featuredProducts = $this->getFeaturedCategoryProducts($category->ID);
         
+        // Get latest products (most recently added)
+        $latestProducts = $category->products()
+            ->orderByRaw('LENGTH(ID) DESC, ID DESC')  // Assuming newer products have longer/higher IDs
+            ->limit(10)
+            ->get();
+        
+        // Get top 10 sellers for last 30 days
+        $startDate = Carbon::now()->subDays(30);
+        $endDate = Carbon::now();
+        $topSellers = $this->optimizedSalesRepository->getTopCategoryProducts(
+            [$category->ID], 
+            $startDate, 
+            $endDate, 
+            10
+        );
+        
         // Get subcategories if any
         $subcategories = $category->children()->withCount('products')->get();
         
@@ -100,6 +116,8 @@ class CategoriesController extends Controller
             'totalProducts', 
             'visibleProducts', 
             'featuredProducts',
+            'latestProducts',
+            'topSellers',
             'subcategories'
         ));
     }
@@ -181,9 +199,8 @@ class CategoriesController extends Controller
             // Get all category IDs (including subcategories if needed)
             $categoryIds = $this->getCategoryIdsWithChildren($category);
             
-            // Get sales data using optimized repository
-            $limit = $request->get('limit', 50);
-            $sales = $this->optimizedSalesRepository->getTopCategoryProducts($categoryIds, $startDate, $endDate, $limit);
+            // Get all products with sales data for this category
+            $sales = $this->optimizedSalesRepository->getAllCategoryProductsSales($categoryIds, $startDate, $endDate);
             $stats = $this->optimizedSalesRepository->getCategorySalesStats($categoryIds, $startDate, $endDate);
             $dailySales = $this->optimizedSalesRepository->getCategoryDailySales($categoryIds, $startDate, $endDate);
             

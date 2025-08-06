@@ -63,9 +63,23 @@ The Categories Management System provides a universal interface for managing all
   - Total revenue
   - Unique products sold
   - Transaction count
-- **Visual Charts**: Daily sales trend line chart
-- **Top Products Table**: Sortable list with revenue and units
-- **Product Search**: Filter sales data by product
+- **Visual Charts**: 
+  - Daily sales trend line chart
+  - Interactive tooltips with day of week and date
+  - Responsive design with Chart.js
+- **Top Products Table**: 
+  - Sortable columns (Product, Units Sold, Revenue, Avg Price)
+  - Click column headers to sort ascending/descending
+  - Visual sort indicators
+  - Real-time search filtering
+- **Expandable Daily Sales**:
+  - Dropdown arrow for each product
+  - Individual product daily sales breakdown
+  - Mini chart showing revenue and units trends
+  - Summary statistics per product
+  - Daily data table with visual trend bars
+  - Multiple products can be expanded simultaneously
+- **Product Search**: Filter sales data by product name or code
 
 ## Routes
 
@@ -133,6 +147,34 @@ getCategoryPerformanceComparison(array $categoryIds, Carbon $startDate, Carbon $
 ### Efficient Queries
 - Single query for category statistics
 - Batch loading of related data
+
+## Recent Enhancements (2025-01-06)
+
+### Chart Improvements
+- **Fixed Daily Sales Trend Graph**: Resolved initialization issues preventing chart display
+- **Day of Week in Tooltips**: Enhanced tooltips show full date with day name (e.g., "Monday, 1 Mar 2025")
+- **Proper Chart Lifecycle**: Separate chart creation and update methods for reliability
+- **Error Handling**: Graceful fallback for missing or invalid data
+
+### Table Structure Fixes
+- **Column Alignment**: Fixed header/column alignment issues with expandable rows
+- **Proper HTML Structure**: Corrected tbody wrapper for template iterations
+- **Loading States**: Separate loading and empty data states with appropriate messages
+
+### Data Handling
+- **Numeric Parsing**: All monetary values properly parsed as floats to prevent JavaScript errors
+- **Format Functions**: Enhanced formatCurrency() and formatNumber() to handle edge cases
+- **Consistent Data Types**: Ensured numeric fields are always numbers, not strings
+
+### User Experience Improvements
+- **Column Sorting**: Click-to-sort functionality on all table columns
+- **Sort Indicators**: Visual arrows showing current sort column and direction
+- **Expandable Daily Sales**: 
+  - Each product row has a dropdown arrow
+  - Shows individual product performance metrics
+  - Includes mini chart and daily breakdown table
+- **Responsive Design**: Proper mobile layout for tables and charts
+- **Performance**: Lazy loading of expanded product data
 - Optimized indexes on category_id fields
 
 ### Caching Strategy

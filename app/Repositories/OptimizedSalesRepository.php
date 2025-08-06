@@ -2,6 +2,7 @@
 
 namespace App\Repositories;
 
+use App\Models\Product;
 use App\Models\SalesDailySummary;
 use App\Models\SalesMonthlySummary;
 use Carbon\Carbon;
@@ -577,6 +578,57 @@ class OptimizedSalesRepository
             ->groupBy('sale_date')
             ->orderBy('sale_date')
             ->get();
+    }
+
+    /**
+     * Get all products with sales data for a category (not just top sellers)
+     */
+    public function getAllCategoryProductsSales(array $categoryIds, Carbon $startDate, Carbon $endDate): Collection
+    {
+        // First get products with sales
+        $productsWithSales = SalesDailySummary::whereIn('category_id', $categoryIds)
+            ->forDateRange($startDate, $endDate)
+            ->selectRaw('
+                product_id,
+                product_code,
+                product_name,
+                category_id,
+                SUM(total_units) as total_units,
+                SUM(total_revenue) as total_revenue,
+                AVG(avg_price) as avg_price
+            ')
+            ->groupBy('product_id', 'product_code', 'product_name', 'category_id')
+            ->orderByDesc('total_units')
+            ->get();
+        
+        // Then get all products from the category (including those without sales)
+        $allProducts = Product::whereIn('CATEGORY', $categoryIds)
+            ->get()
+            ->map(function ($product) use ($productsWithSales) {
+                // Check if this product has sales data
+                $salesData = $productsWithSales->firstWhere('product_id', $product->ID);
+                
+                if ($salesData) {
+                    return $salesData;
+                }
+                
+                // If no sales, return product with zero sales
+                return (object) [
+                    'product_id' => $product->ID,
+                    'product_code' => $product->CODE,
+                    'product_name' => $product->NAME,
+                    'category_id' => $product->CATEGORY,
+                    'total_units' => 0,
+                    'total_revenue' => 0,
+                    'avg_price' => $product->PRICESELL * (1 + $product->getVatRate()),
+                ];
+            });
+        
+        // Sort by units sold (descending), then by name
+        return $allProducts->sortBy([
+            ['total_units', 'desc'],
+            ['product_name', 'asc']
+        ])->values();
     }
 
     /**

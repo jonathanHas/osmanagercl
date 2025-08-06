@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **📊 Categories Sales Analytics Enhancements**: Major improvements to sales analytics interface (2025-01-06)
+  - **Fixed Daily Sales Chart**: Resolved chart initialization preventing graph display
+  - **Enhanced Tooltips**: Added day of week to chart tooltips (e.g., "Monday, 1 Mar 2025")
+  - **Expandable Product Details**: Dropdown arrows show individual product daily sales
+  - **Product Mini Charts**: Each expanded product shows revenue/units trend chart
+  - **Column Sorting**: Click headers to sort by Product, Units, Revenue, or Avg Price
+  - **Sort Indicators**: Visual arrows show current sort column and direction
+  - **Table Structure Fix**: Corrected alignment issues with expandable rows
+  - **Data Type Handling**: Fixed formatCurrency() errors with proper float parsing
+  - **Loading States**: Separate states for loading, empty, and data display
+  - **Performance**: Lazy loading of expanded product data for efficiency
+
 - **📂 Universal Categories Management System**: Complete category management for all product types (2025-08-05)
   - **Universal Interface**: Single system works with any product category
   - **Category Index**: Grid view with product counts, visibility stats, and progress bars

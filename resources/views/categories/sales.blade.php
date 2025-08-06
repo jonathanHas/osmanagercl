@@ -168,11 +168,11 @@
                 </div>
             </div>
 
-            <!-- Top Products Table -->
+            <!-- Products Sales Table -->
             <div class="bg-white rounded-lg shadow overflow-hidden">
                 <div class="px-6 py-4 border-b border-gray-200">
                     <div class="flex justify-between items-center">
-                        <h3 class="text-lg font-medium text-gray-900">Top Selling Products</h3>
+                        <h3 class="text-lg font-medium text-gray-900">Product Sales Details</h3>
                         <input type="text" 
                                x-model="searchTerm" 
                                @input.debounce.300ms="filterProducts()"
@@ -184,6 +184,9 @@
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
+                                <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Image
+                                </th>
                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     <button @click="sortBy('product_name')" class="group inline-flex items-center">
                                         Product
@@ -230,7 +233,7 @@
                         <!-- Loading state -->
                         <tbody x-show="loading" class="bg-white divide-y divide-gray-200">
                             <tr>
-                                <td colspan="4" class="px-6 py-12 text-center">
+                                <td colspan="5" class="px-6 py-12 text-center">
                                     <div class="flex justify-center items-center">
                                         <svg class="animate-spin h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24">
                                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -245,7 +248,7 @@
                         <!-- No data state -->
                         <tbody x-show="!loading && filteredProducts.length === 0" class="bg-white divide-y divide-gray-200">
                             <tr>
-                                <td colspan="4" class="px-6 py-12 text-center">
+                                <td colspan="5" class="px-6 py-12 text-center">
                                     <div class="text-gray-500">
                                         <svg class="mx-auto h-12 w-12 text-blue-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -261,6 +264,19 @@
                         <template x-for="product in filteredProducts" :key="product.product_id">
                             <tbody>
                                 <tr class="hover:bg-gray-50">
+                                    <td class="px-3 py-4 whitespace-nowrap">
+                                        <div class="w-10 h-10 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
+                                            <img :src="'/categories/product-image/' + product.product_code" 
+                                                 alt=""
+                                                 class="w-full h-full object-cover"
+                                                 @@error="$event.target.style.display='none'; $event.target.nextElementSibling.style.display='flex'">
+                                            <div class="hidden w-full h-full items-center justify-center text-gray-400">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                    </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="flex items-center justify-between">
                                             <div>
@@ -291,7 +307,7 @@
                                     x-transition:leave="transition ease-in duration-150"
                                     x-transition:leave-start="opacity-100"
                                     x-transition:leave-end="opacity-0">
-                                    <td colspan="4" class="px-6 py-0 bg-gray-50">
+                                    <td colspan="5" class="px-6 py-0 bg-gray-50">
                                         <div class="py-4">
                                             <!-- Loading state -->
                                             <div x-show="dailySalesLoading[product.product_id]" class="flex items-center justify-center py-8">  

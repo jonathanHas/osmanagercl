@@ -53,12 +53,14 @@ Core system architecture and design patterns.
 ### 🚀 Features
 Detailed documentation for each major feature.
 
-- **[Categories Management](./features/categories-management.md)** - 🆕 Universal category management system
+- **[Categories Management](./features/categories-management.md)** - 🆕 Universal category management system *(Enhanced 2025-01-06)*
   - Works with any product category in the POS system
   - Consistent interface for sales analytics and product management
   - Till visibility control per category
   - Inline editing of prices and display names
   - Subcategory navigation support
+  - **Enhanced Sales Analytics**: Fixed charts, sortable columns, expandable product details
+  - **Interactive Charts**: Day of week tooltips, responsive design
   - Performance optimized with pre-aggregated data
 
 - **[Sales Data Import](./features/sales-data-import.md)** - 🚀 Lightning-fast sales analytics system

@@ -9,10 +9,16 @@
                 </nav>
                 <h2 class="text-xl font-semibold">{{ $category->NAME }} Management</h2>
             </div>
-            <div class="flex items-center gap-2">
-                <span class="text-sm text-gray-500">{{ $totalProducts }} products</span>
-                <span class="text-sm text-gray-500">•</span>
-                <span class="text-sm text-green-600">{{ $visibleProducts }} visible</span>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-500">{{ $totalProducts }} products</span>
+                    <span class="text-sm text-gray-500">•</span>
+                    <span class="text-sm text-green-600">{{ $visibleProducts }} visible</span>
+                </div>
+                <a href="{{ route('products.create') }}?category={{ $category->ID }}" 
+                   class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium">
+                    + Create Product
+                </a>
             </div>
         </div>
     </x-slot>
@@ -87,9 +93,98 @@
                 </div>
             @endif
 
+            <!-- Two Column Layout for Latest and Top Sellers -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <!-- Latest Products -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">Latest Products</h3>
+                        <a href="{{ route('categories.products', $category) }}" 
+                           class="text-sm text-blue-600 hover:text-blue-700">
+                            View all →
+                        </a>
+                    </div>
+                    @if($latestProducts->count() > 0)
+                        <div class="space-y-3">
+                            @foreach($latestProducts->take(5) as $product)
+                                <div class="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded">
+                                    <div class="w-10 h-10 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                        <img src="{{ route('categories.product-image', $product->CODE) }}" 
+                                             alt=""
+                                             class="w-full h-full object-cover rounded"
+                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+                                        <div class="hidden w-full h-full items-center justify-center text-gray-400">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                            {{ $product->NAME }}
+                                        </p>
+                                        <p class="text-xs text-gray-500">{{ $product->CODE }}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-sm font-semibold text-blue-600">
+                                            €{{ number_format($product->PRICESELL * (1 + $product->getVatRate()), 2) }}
+                                        </p>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <p class="text-gray-500 text-sm">No products in this category yet.</p>
+                    @endif
+                </div>
+
+                <!-- Top 10 Sellers -->
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">Top Sellers (Last 30 Days)</h3>
+                        <a href="{{ route('categories.sales', $category) }}" 
+                           class="text-sm text-blue-600 hover:text-blue-700">
+                            View analytics →
+                        </a>
+                    </div>
+                    @if($topSellers->count() > 0)
+                        <div class="space-y-3">
+                            @foreach($topSellers->take(5) as $index => $product)
+                                <div class="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded">
+                                    <div class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                                        {{ $index + 1 }}
+                                    </div>
+                                    <div class="w-10 h-10 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                        <img src="{{ route('categories.product-image', $product->product_code) }}" 
+                                             alt=""
+                                             class="w-full h-full object-cover rounded"
+                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+                                        <div class="hidden w-full h-full items-center justify-center text-gray-400">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                            {{ $product->product_name }}
+                                        </p>
+                                        <p class="text-xs text-gray-500">
+                                            {{ number_format($product->total_units) }} units • €{{ number_format($product->total_revenue, 2) }}
+                                        </p>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <p class="text-gray-500 text-sm">No sales data available for the last 30 days.</p>
+                    @endif
+                </div>
+            </div>
+
             <!-- Featured Products -->
             @if($featuredProducts->count() > 0)
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-lg font-semibold">Featured Products</h3>
                         <a href="{{ route('categories.products', $category) }}" 
