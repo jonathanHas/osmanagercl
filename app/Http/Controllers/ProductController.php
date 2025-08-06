@@ -190,6 +190,9 @@ class ProductController extends Controller
 
         // Check if product is visible on till
         $isVisibleOnTill = $this->tillVisibilityService->isVisibleOnTill($id);
+        
+        // Get all categories for the category selector
+        $allCategories = $this->getAllCategoriesForDropdown();
 
         return view('products.show', [
             'product' => $product,
@@ -201,6 +204,7 @@ class ProductController extends Controller
             'fromDelivery' => $fromDelivery,
             'from' => $from,
             'isVisibleOnTill' => $isVisibleOnTill,
+            'allCategories' => $allCategories,
         ]);
     }
 
@@ -823,5 +827,57 @@ class ProductController extends Controller
                 'error' => 'Failed to update till visibility: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Update the category for a product.
+     */
+    public function updateCategory(Request $request, string $id): RedirectResponse
+    {
+        $request->validate([
+            'category_id' => 'nullable|string|exists:pos.CATEGORIES,ID',
+        ]);
+
+        $product = $this->productRepository->findById($id);
+
+        if (! $product) {
+            abort(404, 'Product not found');
+        }
+
+        // Update the product's category in the POS database
+        $product->update([
+            'CATEGORY' => $request->category_id ?: null,
+        ]);
+
+        return redirect()
+            ->route('products.show', $id)
+            ->with('success', 'Product category updated successfully.');
+    }
+
+    /**
+     * Get all categories formatted for dropdown.
+     */
+    private function getAllCategoriesForDropdown()
+    {
+        // Get all categories with their parent relationships
+        $categories = Category::with('parent')
+            ->orderBy('NAME')
+            ->get()
+            ->map(function ($category) {
+                // Build the category path for hierarchical display
+                $path = $category->NAME;
+                $parent = $category->parent;
+                
+                while ($parent) {
+                    $path = $parent->NAME . ' > ' . $path;
+                    $parent = $parent->parent;
+                }
+                
+                $category->category_path = $path;
+                return $category;
+            })
+            ->sortBy('category_path');
+
+        return $categories;
     }
 }

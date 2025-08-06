@@ -139,22 +139,72 @@
                         <!-- Category -->
                         <div>
                             <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Category</h3>
-                            @if($product->category)
-                                <div class="space-y-1">
-                                    <span class="inline-flex items-center px-3 py-1 text-lg font-semibold rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                                        {{ $product->category->NAME }}
-                                    </span>
-                                    @if($product->category->parent)
-                                        <p class="text-sm text-gray-500 dark:text-gray-400">
-                                            Path: {{ $product->category_path }}
-                                        </p>
-                                    @endif
-                                </div>
-                            @else
-                                <span class="inline-flex items-center px-3 py-1 text-lg font-semibold rounded-full bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
-                                    Uncategorized
-                                </span>
-                            @endif
+                            <div id="categoryDisplay">
+                                @if($product->category)
+                                    <div class="space-y-1">
+                                        <div class="flex items-center gap-2">
+                                            <span class="inline-flex items-center px-3 py-1 text-lg font-semibold rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                                {{ $product->category->NAME }}
+                                            </span>
+                                            <button type="button" 
+                                                    onclick="toggleCategoryEdit()" 
+                                                    class="inline-flex items-center p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                        @if($product->category->parent)
+                                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                                                Path: {{ $product->category_path }}
+                                            </p>
+                                        @endif
+                                    </div>
+                                @else
+                                    <div class="flex items-center gap-2">
+                                        <span class="inline-flex items-center px-3 py-1 text-lg font-semibold rounded-full bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                                            Uncategorized
+                                        </span>
+                                        <button type="button" 
+                                                onclick="toggleCategoryEdit()" 
+                                                class="inline-flex items-center p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                @endif
+                            </div>
+                            
+                            <!-- Category Edit Form (Hidden by default) -->
+                            <div id="categoryEditForm" class="hidden mt-2">
+                                <form method="POST" action="{{ route('products.update-category', $product->ID) }}" class="flex items-end gap-2">
+                                    @csrf
+                                    @method('PATCH')
+                                    <div class="flex-1">
+                                        <select name="category_id" 
+                                                id="categorySelect" 
+                                                class="block w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600 text-sm">
+                                            <option value="">-- No Category --</option>
+                                            @foreach($allCategories as $category)
+                                                <option value="{{ $category->ID }}" 
+                                                        {{ $product->CATEGORY == $category->ID ? 'selected' : '' }}>
+                                                    {{ $category->category_path ?? $category->NAME }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <button type="submit" 
+                                            class="inline-flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded transition-colors">
+                                        Save
+                                    </button>
+                                    <button type="button" 
+                                            onclick="toggleCategoryEdit()" 
+                                            class="inline-flex items-center px-3 py-2 bg-gray-500 hover:bg-gray-600 text-white text-sm font-medium rounded transition-colors">
+                                        Cancel
+                                    </button>
+                                </form>
+                            </div>
                         </div>
 
                         <!-- Stocking Status -->
@@ -628,6 +678,20 @@
             // Focus the input field when showing the form
             if (!form.classList.contains('hidden')) {
                 setTimeout(() => input.focus(), 50);
+            }
+        }
+        
+        function toggleCategoryEdit() {
+            const display = document.getElementById('categoryDisplay');
+            const form = document.getElementById('categoryEditForm');
+            const select = document.getElementById('categorySelect');
+            
+            display.classList.toggle('hidden');
+            form.classList.toggle('hidden');
+            
+            // Focus the select field when showing the form
+            if (!form.classList.contains('hidden')) {
+                setTimeout(() => select.focus(), 50);
             }
         }
         
