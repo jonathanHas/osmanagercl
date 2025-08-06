@@ -6,7 +6,6 @@ use App\Models\LabelLog;
 use App\Models\Product;
 use App\Models\ProductMetadata;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 
 class BackfillProductMetadata extends Command
 {
@@ -30,7 +29,7 @@ class BackfillProductMetadata extends Command
     public function handle(): int
     {
         $isDryRun = $this->option('dry-run');
-        
+
         if ($isDryRun) {
             $this->info('🔍 DRY RUN MODE - No data will be modified');
         }
@@ -46,13 +45,14 @@ class BackfillProductMetadata extends Command
 
         if ($productsWithoutMetadata->isEmpty()) {
             $this->info('✅ All products already have metadata!');
+
             return self::SUCCESS;
         }
 
         $created = 0;
         $withCreationLog = 0;
         $withoutCreationLog = 0;
-        
+
         $progressBar = $this->output->createProgressBar($productsWithoutMetadata->count());
         $progressBar->start();
 
@@ -65,14 +65,14 @@ class BackfillProductMetadata extends Command
 
             $createdAt = $creationLog?->created_at ?? now()->subYears(10);
             $createdBy = $creationLog?->user_id;
-            
+
             if ($creationLog) {
                 $withCreationLog++;
             } else {
                 $withoutCreationLog++;
             }
 
-            if (!$isDryRun) {
+            if (! $isDryRun) {
                 // Create metadata record with proper timestamps
                 $metadata = new ProductMetadata([
                     'product_id' => $product->ID,
@@ -84,13 +84,13 @@ class BackfillProductMetadata extends Command
                         'backfilled_at' => now()->toISOString(),
                     ],
                 ]);
-                
+
                 // Set custom timestamps
                 $metadata->created_at = $createdAt;
                 $metadata->updated_at = $createdAt;
                 $metadata->save();
             }
-            
+
             $created++;
             $progressBar->advance();
         }
@@ -99,28 +99,28 @@ class BackfillProductMetadata extends Command
         $this->newLine(2);
 
         // Summary
-        $this->info("📈 Backfill Summary:");
+        $this->info('📈 Backfill Summary:');
         $this->line("  • Products processed: {$productsWithoutMetadata->count()}");
         $this->line("  • With creation logs: {$withCreationLog}");
         $this->line("  • Without creation logs: {$withoutCreationLog}");
-        
+
         if ($isDryRun) {
             $this->info("🔍 DRY RUN: {$created} metadata records would be created");
-            $this->line("Run without --dry-run to actually create the records");
+            $this->line('Run without --dry-run to actually create the records');
         } else {
             $this->info("✅ Created {$created} metadata records successfully!");
         }
 
         // Show some examples
-        if (!$isDryRun && $created > 0) {
+        if (! $isDryRun && $created > 0) {
             $this->newLine();
-            $this->info("📋 Latest products by creation date:");
-            
+            $this->info('📋 Latest products by creation date:');
+
             $latestMetadata = ProductMetadata::with('product')
                 ->orderBy('created_at', 'DESC')
                 ->limit(5)
                 ->get();
-            
+
             $latestProducts = $latestMetadata->map(function ($metadata) {
                 return (object) [
                     'CODE' => $metadata->product_code,
@@ -128,9 +128,9 @@ class BackfillProductMetadata extends Command
                     'metadata_created_at' => $metadata->created_at,
                 ];
             });
-            
+
             foreach ($latestProducts as $product) {
-                $createdDate = $product->metadata_created_at 
+                $createdDate = $product->metadata_created_at
                     ? \Carbon\Carbon::parse($product->metadata_created_at)->format('Y-m-d H:i:s')
                     : 'No metadata';
                 $this->line("  • {$product->CODE}: {$product->NAME} (Created: {$createdDate})");

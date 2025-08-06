@@ -181,7 +181,8 @@
 
             <!-- Products Table -->
             <div class="bg-white rounded-lg shadow overflow-hidden">
-                <div class="overflow-x-auto">
+                <!-- Desktop Table (md: and larger) -->
+                <div class="hidden md:block overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
@@ -548,7 +549,356 @@
                         </tbody>
                     </table>
                     
-                    <!-- Empty State -->
+                    <!-- Empty State for Desktop -->
+                    <div x-show="!searching && products.length === 0" class="text-center py-12">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 11-2 0 1 1 0 012 0z" />
+                        </svg>
+                        <h3 class="mt-2 text-sm font-medium text-gray-900">No products found</h3>
+                        <p class="mt-1 text-sm text-gray-500">Try adjusting your search or filter criteria.</p>
+                    </div>
+                </div>
+
+                <!-- Mobile Card Layout (below md:) -->
+                <div class="md:hidden">
+                    <!-- Mobile Products -->
+                    <div x-show="products.length > 0" class="divide-y divide-gray-200">
+                        <template x-for="product in (products || [])" :key="product.CODE">
+                            <div class="p-4 space-y-4" :class="{ 'bg-gray-50': selectedProducts.includes(product.CODE) }">
+                                
+                                <!-- Header: Checkbox, Image, Product Name -->
+                                <div class="flex items-start space-x-3">
+                                    <input type="checkbox" 
+                                           :value="product.CODE"
+                                           x-model="selectedProducts"
+                                           class="mt-1 rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                                    
+                                    <div class="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                        <img :src="'/fruit-veg/product-image/' + product.CODE" 
+                                             :alt="product.NAME"
+                                             class="w-full h-full object-cover"
+                                             loading="lazy"
+                                             @@error="$el.style.display='none'; $el.nextElementSibling.style.display='flex'"
+                                             @@load="if($el.naturalWidth === 1 && $el.naturalHeight === 1) { $el.style.display='none'; $el.nextElementSibling.style.display='flex'; }">
+                                        <div class="hidden w-full h-full items-center justify-center text-gray-400 text-xs">
+                                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-base font-medium text-blue-600 hover:text-blue-800 cursor-pointer" 
+                                             @click="window.location.href = '/fruit-veg/product/' + product.CODE"
+                                             x-text="product.NAME"></div>
+                                        <div class="text-sm text-gray-500" x-text="product.CODE"></div>
+                                        <div class="text-sm text-gray-400" x-text="product.category?.NAME"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Price Section -->
+                                <div class="bg-gray-50 rounded-lg p-3 space-y-3">
+                                    <!-- Price Editing -->
+                                    <div x-data="{ 
+                                            editing: false, 
+                                            originalPrice: parseFloat(product.current_price).toFixed(2),
+                                            newPrice: parseFloat(product.current_price).toFixed(2),
+                                            async savePrice() {
+                                                try {
+                                                    const response = await fetch('{{ route('fruit-veg.prices.update') }}', {
+                                                        method: 'POST',
+                                                        headers: {
+                                                            'Content-Type': 'application/json',
+                                                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                                                        },
+                                                        body: JSON.stringify({
+                                                            product_code: product.CODE,
+                                                            new_price: parseFloat(this.newPrice)
+                                                        })
+                                                    });
+                                                    
+                                                    if (response.ok) {
+                                                        product.current_price = this.newPrice;
+                                                        this.originalPrice = this.newPrice;
+                                                        this.editing = false;
+                                                        
+                                                        const notification = document.createElement('div');
+                                                        notification.className = 'fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white z-50 bg-green-600';
+                                                        notification.textContent = 'Price updated successfully!';
+                                                        document.body.appendChild(notification);
+                                                        setTimeout(() => notification.remove(), 3000);
+                                                    } else {
+                                                        const errorData = await response.json();
+                                                        console.error('Price update failed:', errorData);
+                                                        
+                                                        const notification = document.createElement('div');
+                                                        notification.className = 'fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white z-50 bg-red-600';
+                                                        notification.textContent = errorData.error || 'Failed to update price';
+                                                        document.body.appendChild(notification);
+                                                        setTimeout(() => notification.remove(), 3000);
+                                                    }
+                                                } catch (error) {
+                                                    console.error('Error updating price:', error);
+                                                    
+                                                    const notification = document.createElement('div');
+                                                    notification.className = 'fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white z-50 bg-red-600';
+                                                    notification.textContent = 'An error occurred while updating price';
+                                                    document.body.appendChild(notification);
+                                                    setTimeout(() => notification.remove(), 3000);
+                                                }
+                                            }
+                                         }">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-medium text-gray-700">Price:</span>
+                                            <div x-show="!editing" 
+                                                 @click="editing = true; $nextTick(() => $refs.priceInput.focus())" 
+                                                 class="cursor-pointer hover:bg-white px-2 py-1 rounded">
+                                                <span class="text-base font-semibold text-gray-900">
+                                                    €<span x-text="parseFloat(product.current_price).toFixed(2)"></span>
+                                                </span>
+                                                <div class="text-xs text-blue-600">Tap to edit</div>
+                                            </div>
+                                            <div x-show="editing" x-cloak class="flex items-center gap-2">
+                                                <span class="text-base font-semibold">€</span>
+                                                <input type="number" 
+                                                       x-model="newPrice" 
+                                                       step="0.01"
+                                                       @keyup.enter="savePrice()"
+                                                       class="w-20 text-base border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
+                                                       x-ref="priceInput">
+                                                <button @click="savePrice()"
+                                                        class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition">
+                                                    Save
+                                                </button>
+                                                <button @click="newPrice = originalPrice; editing = false"
+                                                        class="px-3 py-1 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition">
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Country Editing -->
+                                    <div x-data="{ 
+                                            editing: false, 
+                                            originalCountryId: product.veg_details?.country_id || null,
+                                            selectedCountryId: product.veg_details?.country_id || null,
+                                            countries: [],
+                                            async saveCountry() {
+                                                const selectedId = parseInt(this.selectedCountryId);
+                                                const originalId = parseInt(this.originalCountryId);
+                                                
+                                                if (selectedId !== originalId && !isNaN(selectedId) && selectedId > 0) {
+                                                    $dispatch('update-country', { productCode: product.CODE, countryId: selectedId });
+                                                    
+                                                    const selectedCountry = this.countries.find(c => c.id === selectedId);
+                                                    if (selectedCountry) {
+                                                        if (!product.veg_details) {
+                                                            product.veg_details = {};
+                                                        }
+                                                        product.veg_details.country_id = selectedCountry.id;
+                                                        product.veg_details.country = selectedCountry;
+                                                        this.originalCountryId = selectedId;
+                                                    }
+                                                }
+                                                this.editing = false;
+                                            }
+                                         }"
+                                         x-init="$nextTick(() => fetch('/fruit-veg/countries').then(response => response.json()).then(data => countries = data))">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-medium text-gray-700">Origin:</span>
+                                            <div x-show="!editing" 
+                                                 @click="editing = true; selectedCountryId = product.veg_details?.country_id || null;" 
+                                                 class="cursor-pointer text-sm text-gray-900 hover:text-gray-700 hover:bg-white px-2 py-1 rounded min-h-[32px] flex items-center">
+                                                <span x-show="product.veg_details?.country?.name" x-text="product.veg_details?.country?.name"></span>
+                                                <span x-show="!product.veg_details?.country?.name" class="text-gray-400 italic">Tap to set origin</span>
+                                            </div>
+                                            <div x-show="editing" x-cloak class="flex-1 max-w-32">
+                                                <select x-model="selectedCountryId" 
+                                                        @blur="saveCountry()"
+                                                        @keydown.enter="saveCountry()"
+                                                        @keydown.escape="editing = false; selectedCountryId = originalCountryId"
+                                                        class="w-full text-sm border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500">
+                                                    <option value="">Select...</option>
+                                                    <template x-for="country in countries" :key="country.id">
+                                                        <option :value="country.id" x-text="country.name"></option>
+                                                    </template>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Class Editing -->
+                                    <div x-data="{ 
+                                            editing: false, 
+                                            originalClassId: product.veg_details?.class_id || null,
+                                            selectedClassId: product.veg_details?.class_id || null,
+                                            classes: [],
+                                            async saveClass() {
+                                                const selectedId = parseInt(this.selectedClassId);
+                                                const originalId = parseInt(this.originalClassId);
+                                                
+                                                if (selectedId !== originalId && !isNaN(selectedId) && selectedId > 0) {
+                                                    $dispatch('update-class', { productCode: product.CODE, classId: selectedId });
+                                                    
+                                                    const selectedClass = this.classes.find(c => c.id === selectedId);
+                                                    if (selectedClass) {
+                                                        if (!product.veg_details) {
+                                                            product.veg_details = {};
+                                                        }
+                                                        product.veg_details.class_id = selectedClass.id;
+                                                        product.veg_details.class_name = selectedClass.name;
+                                                        this.originalClassId = selectedId;
+                                                    }
+                                                }
+                                                this.editing = false;
+                                            }
+                                         }"
+                                         x-init="$nextTick(() => fetch('/fruit-veg/classes').then(response => response.json()).then(data => classes = data))">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-medium text-gray-700">Class:</span>
+                                            <div x-show="!editing" 
+                                                 @click="editing = true; selectedClassId = product.veg_details?.class_id || null;" 
+                                                 class="cursor-pointer text-sm text-gray-900 hover:text-gray-700 hover:bg-white px-2 py-1 rounded min-h-[32px] flex items-center">
+                                                <span x-show="product.veg_details?.class_name" x-text="'Class ' + product.veg_details?.class_name"></span>
+                                                <span x-show="!product.veg_details?.class_name" class="text-gray-400 italic">Tap to set class</span>
+                                            </div>
+                                            <div x-show="editing" x-cloak class="flex-1 max-w-32">
+                                                <select x-model="selectedClassId" 
+                                                        @blur="saveClass()"
+                                                        @keydown.enter="saveClass()"
+                                                        @keydown.escape="editing = false; selectedClassId = originalClassId"
+                                                        class="w-full text-sm border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500">
+                                                    <option value="">Select...</option>
+                                                    <template x-for="class_ in classes" :key="class_.id">
+                                                        <option :value="class_.id" x-text="'Class ' + class_.name"></option>
+                                                    </template>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Display Name & Unit Section -->
+                                <div class="bg-blue-50 rounded-lg p-3 space-y-3">
+                                    <!-- Display Name Editing -->
+                                    <div x-data="{ 
+                                            editing: false, 
+                                            originalDisplay: product.DISPLAY || '',
+                                            newDisplay: product.DISPLAY || ''
+                                         }">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-medium text-gray-700">Display Name:</span>
+                                            <div x-show="!editing" 
+                                                 @click="editing = true; $nextTick(() => $refs.displayInput.focus())" 
+                                                 class="cursor-pointer text-sm text-gray-900 hover:bg-white px-2 py-1 rounded min-h-[32px] flex items-center flex-1 max-w-48">
+                                                <span x-show="product.DISPLAY" x-text="product.DISPLAY" class="truncate"></span>
+                                                <span x-show="!product.DISPLAY" class="text-gray-400 italic">Tap to set display name</span>
+                                            </div>
+                                            <div x-show="editing" x-cloak class="flex-1 max-w-48">
+                                                <input type="text" 
+                                                       x-model="newDisplay" 
+                                                       @keyup.enter="$root.updateDisplay(product.CODE, newDisplay); editing = false"
+                                                       @blur="$root.updateDisplay(product.CODE, newDisplay); editing = false"
+                                                       class="w-full text-sm border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
+                                                       placeholder="Enter display name..."
+                                                       x-ref="displayInput">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Unit Editing -->
+                                    <div x-data="{ 
+                                            editing: false, 
+                                            originalUnitId: product.veg_details?.unit_id || null,
+                                            selectedUnitId: product.veg_details?.unit_id || null,
+                                            units: [],
+                                            async saveUnit() {
+                                                const selectedId = parseInt(this.selectedUnitId);
+                                                const originalId = parseInt(this.originalUnitId);
+                                                
+                                                if (selectedId !== originalId && !isNaN(selectedId) && selectedId > 0) {
+                                                    $dispatch('update-unit', { productCode: product.CODE, unitId: selectedId });
+                                                    
+                                                    const selectedUnit = this.units.find(u => u.id === selectedId);
+                                                    if (selectedUnit) {
+                                                        if (!product.veg_details) {
+                                                            product.veg_details = {};
+                                                        }
+                                                        product.veg_details.unit_id = selectedUnit.id;
+                                                        product.veg_details.unit_name = selectedUnit.abbreviation;
+                                                        this.originalUnitId = selectedId;
+                                                    }
+                                                }
+                                                this.editing = false;
+                                            }
+                                         }"
+                                         x-init="$nextTick(() => fetch('/fruit-veg/units').then(response => response.json()).then(data => units = data))">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm font-medium text-gray-700">Unit:</span>
+                                            <div x-show="!editing" 
+                                                 @click="editing = true; selectedUnitId = product.veg_details?.unit_id || null;" 
+                                                 class="cursor-pointer text-sm text-gray-900 hover:bg-white px-2 py-1 rounded min-h-[32px] flex items-center">
+                                                <span x-text="product.veg_details?.unit_name || 'kg'"></span>
+                                            </div>
+                                            <div x-show="editing" x-cloak class="flex-1 max-w-32">
+                                                <select x-model="selectedUnitId" 
+                                                        @blur="saveUnit()"
+                                                        @keydown.enter="saveUnit()"
+                                                        @keydown.escape="editing = false; selectedUnitId = originalUnitId"
+                                                        class="w-full text-sm border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500">
+                                                    <option value="">Select...</option>
+                                                    <template x-for="unit in units" :key="unit.id">
+                                                        <option :value="unit.id" x-text="unit.name + ' (' + unit.abbreviation + ')'"></option>
+                                                    </template>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Actions Section -->
+                                <div class="flex items-center justify-between pt-2 border-t border-gray-200">
+                                    <!-- Availability Toggle -->
+                                    <div class="flex items-center space-x-3">
+                                        <span class="text-sm font-medium text-gray-700">Available:</span>
+                                        <button @click="toggleProductAvailability(product.CODE, !product.is_available)"
+                                                class="relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                                :class="product.is_available ? 'bg-green-600' : 'bg-gray-200'">
+                                            <span class="sr-only">Toggle availability</span>
+                                            <span :class="product.is_available ? 'translate-x-6' : 'translate-x-1'"
+                                                  class="inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md" />
+                                        </button>
+                                    </div>
+
+                                    <!-- Labels Actions -->
+                                    <div class="flex flex-col items-end space-y-1">
+                                        <!-- Print Queue Indicator -->
+                                        <div x-show="product.in_print_queue" class="flex items-center gap-1 text-xs text-amber-600">
+                                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"/>
+                                            </svg>
+                                            Queued for Print
+                                        </div>
+                                        
+                                        <!-- Add/Remove Button -->
+                                        <button x-show="!product.in_print_queue"
+                                                @click="addToLabels(product.CODE)"
+                                                class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                                            Add to Labels
+                                        </button>
+                                        <button x-show="product.in_print_queue"
+                                                @click="removeFromLabels(product.CODE)"
+                                                class="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                                            Remove from Labels
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    
+                    <!-- Empty State for Mobile -->
                     <div x-show="!searching && products.length === 0" class="text-center py-12">
                         <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 11-2 0 1 1 0 012 0z" />

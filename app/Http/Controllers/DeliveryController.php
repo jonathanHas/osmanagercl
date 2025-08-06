@@ -222,7 +222,7 @@ class DeliveryController extends Controller
             $caseUnits = $item->getEffectiveCaseUnits();
             $cases = intval($newQuantity / $caseUnits);
             $units = $newQuantity % $caseUnits;
-            
+
             $item->update([
                 'case_received_quantity' => $cases,
                 'unit_received_quantity' => $units,

@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Product;
-use App\Models\ProductMetadata;
 use App\Models\ProductsCat;
 use App\Repositories\OptimizedSalesRepository;
 use App\Services\TillVisibilityService;
@@ -42,56 +41,56 @@ class CategoriesController extends Controller
         $showEmpty = $request->get('show_empty', false);
         $period = $request->get('period', 'month'); // 'week' or 'month'
         $sortBy = $request->get('sort', 'revenue'); // 'name' or 'revenue'
-        
+
         $query = Category::query()
             ->withCount('products')
             ->orderBy('NAME');
-        
+
         if ($search) {
             $query->where('NAME', 'like', "%{$search}%");
         }
-        
-        if (!$showEmpty) {
+
+        if (! $showEmpty) {
             $query->having('products_count', '>', 0);
         }
-        
+
         $categories = $query->get();
-        
+
         // Set date range based on period
         $endDate = Carbon::now();
-        $startDate = $period === 'week' 
-            ? Carbon::now()->subWeek() 
+        $startDate = $period === 'week'
+            ? Carbon::now()->subWeek()
             : Carbon::now()->subMonth();
-        
+
         // Get revenue data for each category
         $categoryRevenues = collect();
         $totalRevenue = 0;
-        
+
         foreach ($categories as $category) {
             $categoryIds = $this->getCategoryIdsWithChildren($category);
             $stats = $this->optimizedSalesRepository->getCategorySalesStats($categoryIds, $startDate, $endDate);
-            
+
             $revenue = (float) $stats['total_revenue'];
             $categoryRevenues->push([
                 'id' => $category->ID,
-                'revenue' => $revenue
+                'revenue' => $revenue,
             ]);
             $totalRevenue += $revenue;
         }
-        
+
         // Add revenue stats to each category
         $categories->transform(function ($category) use ($categoryRevenues, $totalRevenue) {
             $categoryRevenue = $categoryRevenues->firstWhere('id', $category->ID);
             $revenue = $categoryRevenue['revenue'] ?? 0;
-            
+
             $category->revenue = $revenue;
-            $category->revenue_percentage = $totalRevenue > 0 
+            $category->revenue_percentage = $totalRevenue > 0
                 ? round(($revenue / $totalRevenue) * 100, 1)
                 : 0;
-            
+
             return $category;
         });
-        
+
         // Apply sorting based on user selection
         if ($sortBy === 'name') {
             $categories = $categories->sortBy('NAME')->values();
@@ -99,19 +98,19 @@ class CategoriesController extends Controller
             // Sort by revenue (highest first) - default
             $categories = $categories->sortByDesc('revenue')->values();
         }
-        
+
         // Get overall stats
         $totalCategories = $categories->count();
         $totalProducts = Product::count();
         $categoriesWithRevenue = $categories->where('revenue', '>', 0)->count();
-        
+
         return view('categories.index', compact(
-            'categories', 
-            'search', 
+            'categories',
+            'search',
             'showEmpty',
             'period',
             'sortBy',
-            'totalCategories', 
+            'totalCategories',
             'totalProducts',
             'totalRevenue',
             'categoriesWithRevenue',
@@ -128,38 +127,38 @@ class CategoriesController extends Controller
         // Get basic category statistics (fast queries only)
         $totalProducts = $category->products()->count();
         $visibleProducts = $this->getVisibleProductCount($category->ID);
-        
+
         // Product Health Dashboard data will be loaded via AJAX for better performance
         // These are no longer needed as we load everything via AJAX
         $goodSellersGoneSilent = collect();
         $slowMovers = collect();
         $stagnantStock = collect();
         $inventoryAlerts = collect();
-        
+
         // Get latest products - simple query for now
         $latestProducts = $category->products()
             ->orderBy('NAME')
             ->limit(10)
             ->get();
-        
+
         // Get top 10 sellers for last 30 days
         $startDate = Carbon::now()->subDays(30);
         $endDate = Carbon::now();
         $categoryIds = $this->getCategoryIdsWithChildren($category);
         $topSellers = $this->optimizedSalesRepository->getTopCategoryProducts(
-            $categoryIds, 
-            $startDate, 
-            $endDate, 
+            $categoryIds,
+            $startDate,
+            $endDate,
             10
         );
-        
+
         // Get subcategories if any
         $subcategories = $category->children()->withCount('products')->get();
-        
+
         return view('categories.show', compact(
-            'category', 
-            'totalProducts', 
-            'visibleProducts', 
+            'category',
+            'totalProducts',
+            'visibleProducts',
             'goodSellersGoneSilent',
             'slowMovers',
             'stagnantStock',
@@ -177,16 +176,16 @@ class CategoriesController extends Controller
     {
         $search = $request->get('search', '');
         $availability = $request->get('availability', 'all');
-        
+
         $query = $category->products()->with(['category']);
-        
+
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('NAME', 'like', "%{$search}%")
                     ->orWhere('CODE', 'like', "%{$search}%");
             });
         }
-        
+
         // Apply availability filter
         if ($availability === 'available') {
             $visibleIds = ProductsCat::pluck('PRODUCT')->toArray();
@@ -195,26 +194,28 @@ class CategoriesController extends Controller
             $visibleIds = ProductsCat::pluck('PRODUCT')->toArray();
             $query->whereNotIn('ID', $visibleIds);
         }
-        
+
         $products = $query->orderBy('NAME')->get();
-        
+
         // Add visibility status to each product
         $products->transform(function ($product) {
             $product->is_visible = $this->tillVisibilityService->isVisibleOnTill($product->ID);
+
             return $product;
         });
-        
+
         // Return JSON for AJAX requests
         if ($request->ajax()) {
             return response()->json([
                 'products' => $products->map(function ($product) {
                     $product->is_available = $product->is_visible;
                     $product->current_price = $product->PRICESELL * (1 + $product->getVatRate());
+
                     return $product;
                 }),
             ]);
         }
-        
+
         return view('categories.products', compact('category', 'products', 'search', 'availability'));
     }
 
@@ -226,7 +227,7 @@ class CategoriesController extends Controller
         // Set smart date defaults - last 30 days
         $endDate = Carbon::now();
         $startDate = Carbon::now()->subDays(29);
-        
+
         return view('categories.sales', compact('category', 'startDate', 'endDate'));
     }
 
@@ -238,27 +239,28 @@ class CategoriesController extends Controller
         $startDate = $request->get('start_date')
             ? Carbon::parse($request->get('start_date'))->startOfDay()
             : Carbon::now()->subDays(29)->startOfDay();
-        
+
         $endDate = $request->get('end_date')
             ? Carbon::parse($request->get('end_date'))->endOfDay()
             : Carbon::now()->endOfDay();
-        
+
         try {
             // Get all category IDs (including subcategories if needed)
             $categoryIds = $this->getCategoryIdsWithChildren($category);
-            
+
             // Get all products with sales data for this category
             $sales = $this->optimizedSalesRepository->getAllCategoryProductsSales($categoryIds, $startDate, $endDate);
             $stats = $this->optimizedSalesRepository->getCategorySalesStats($categoryIds, $startDate, $endDate);
             $dailySales = $this->optimizedSalesRepository->getCategoryDailySales($categoryIds, $startDate, $endDate);
-            
+
             // Add category names for frontend compatibility
             $sales = $sales->map(function ($product) use ($category) {
                 $product->category_name = $category->NAME;
                 $product->category = $product->category_id;
+
                 return $product;
             });
-            
+
             // Apply search filter if provided
             $searchTerm = $request->get('search', '');
             if ($searchTerm) {
@@ -267,7 +269,7 @@ class CategoriesController extends Controller
                            stripos($sale->product_code, $searchTerm) !== false;
                 });
             }
-            
+
             return response()->json([
                 'sales' => $sales->values(),
                 'stats' => $stats,
@@ -282,7 +284,7 @@ class CategoriesController extends Controller
                     'data_source' => 'optimized_pre_aggregated',
                 ],
             ]);
-            
+
         } catch (\Exception $e) {
             \Log::error('Error loading category sales data', [
                 'category_id' => $category->ID,
@@ -290,7 +292,7 @@ class CategoriesController extends Controller
                 'start_date' => $startDate->format('Y-m-d'),
                 'end_date' => $endDate->format('Y-m-d'),
             ]);
-            
+
             return response()->json([
                 'error' => 'Failed to load sales data',
                 'message' => $e->getMessage(),
@@ -307,13 +309,13 @@ class CategoriesController extends Controller
             'product_id' => 'required|string',
             'visible' => 'required|boolean',
         ]);
-        
+
         $success = $this->tillVisibilityService->setVisibility(
             $request->product_id,
             $request->visible,
             'category'
         );
-        
+
         return response()->json(['success' => $success]);
     }
 
@@ -326,7 +328,7 @@ class CategoriesController extends Controller
         $categoryIds = $this->getCategoryIdsWithChildren($category);
 
         try {
-            $data = match($section) {
+            $data = match ($section) {
                 'good-sellers-silent' => $this->optimizedSalesRepository->getGoodSellersGoneSilent($categoryIds),
                 'slow-movers' => $this->optimizedSalesRepository->getSlowMovingProducts($categoryIds),
                 'stagnant-stock' => $this->optimizedSalesRepository->getStagnantStock($categoryIds),
@@ -366,16 +368,16 @@ class CategoriesController extends Controller
     public function productImage($code)
     {
         $product = Product::where('CODE', $code)->first();
-        if (!$product || !$product->IMAGE) {
+        if (! $product || ! $product->IMAGE) {
             // Return a simple 1x1 transparent PNG
             $transparentPng = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAFBHrE9YAAAAABJRU5ErkJggg==');
-            
+
             return response($transparentPng, 200, [
                 'Content-Type' => 'image/png',
                 'Cache-Control' => 'public, max-age=86400',
             ]);
         }
-        
+
         return response($product->IMAGE, 200, [
             'Content-Type' => 'image/jpeg',
             'Cache-Control' => 'public, max-age=86400',
@@ -390,20 +392,20 @@ class CategoriesController extends Controller
         $product = Product::where('CODE', $code)
             ->where('CATEGORY', $category->ID)
             ->firstOrFail();
-        
+
         // Get date range from request
         $startDate = $request->get('start_date')
             ? Carbon::parse($request->get('start_date'))
             : Carbon::now()->subDays(29)->startOfDay();
-        
+
         $endDate = $request->get('end_date')
             ? Carbon::parse($request->get('end_date'))
             : Carbon::now()->endOfDay();
-        
+
         try {
             // Try optimized repository first
             $dailySales = $this->optimizedSalesRepository->getProductDailySales($product->ID, $startDate, $endDate);
-            
+
             // If no optimized data, use live POS queries
             if ($dailySales->isEmpty()) {
                 $dailySales = DB::connection('pos')
@@ -423,11 +425,11 @@ class CategoriesController extends Controller
                     ->orderBy('sale_date', 'asc')
                     ->get();
             }
-            
+
             // Calculate totals
             $totalUnits = $dailySales->sum('daily_units');
             $totalRevenue = $dailySales->sum('daily_revenue');
-            
+
             return response()->json([
                 'success' => true,
                 'product' => [
@@ -446,13 +448,13 @@ class CategoriesController extends Controller
                     'end' => $endDate->format('Y-m-d'),
                 ],
             ]);
-            
+
         } catch (\Exception $e) {
             \Log::error('Error getting product daily sales', [
                 'product_code' => $code,
                 'error' => $e->getMessage(),
             ]);
-            
+
             return response()->json([
                 'success' => false,
                 'error' => 'Failed to load daily sales data',
@@ -474,19 +476,18 @@ class CategoriesController extends Controller
             ->count();
     }
 
-
     /**
      * Get category IDs including all children.
      */
     private function getCategoryIdsWithChildren(Category $category): array
     {
         $ids = [$category->ID];
-        
+
         // Add all descendant category IDs
         foreach ($category->descendants() as $child) {
             $ids[] = $child->ID;
         }
-        
+
         return $ids;
     }
 }

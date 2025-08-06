@@ -18,13 +18,13 @@ return new class extends Migration
             $table->unsignedBigInteger('created_by')->nullable()->comment('User who created the product');
             $table->json('metadata')->nullable()->comment('Additional metadata for future extensibility');
             $table->timestamps();
-            
+
             // Foreign key to users table
             $table->foreign('created_by')->references('id')->on('users')->onDelete('set null');
-            
+
             // Composite index for efficient latest products queries
             $table->index(['created_at', 'product_id'], 'idx_created_product');
-            
+
             // Index for product code lookups
             $table->index('product_code', 'idx_product_code');
         });

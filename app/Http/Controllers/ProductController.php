@@ -190,7 +190,7 @@ class ProductController extends Controller
 
         // Check if product is visible on till
         $isVisibleOnTill = $this->tillVisibilityService->isVisibleOnTill($id);
-        
+
         // Get all categories for the category selector
         $allCategories = $this->getAllCategoriesForDropdown();
 
@@ -587,7 +587,7 @@ class ProductController extends Controller
                     [
                         'source' => 'manual_creation',
                         'delivery_item_id' => $request->delivery_item_id,
-                        'has_display_name' => !empty($request->display_name),
+                        'has_display_name' => ! empty($request->display_name),
                         'initial_till_visibility' => $request->boolean('show_on_till', true),
                     ]
                 );
@@ -805,7 +805,7 @@ class ProductController extends Controller
         try {
             // Set visibility using the TillVisibilityService
             $success = $this->tillVisibilityService->setVisibility($id, $makeVisible);
-            
+
             // Get the current visibility status
             $isVisible = $this->tillVisibilityService->isVisibleOnTill($id);
 
@@ -867,13 +867,14 @@ class ProductController extends Controller
                 // Build the category path for hierarchical display
                 $path = $category->NAME;
                 $parent = $category->parent;
-                
+
                 while ($parent) {
-                    $path = $parent->NAME . ' > ' . $path;
+                    $path = $parent->NAME.' > '.$path;
                     $parent = $parent->parent;
                 }
-                
+
                 $category->category_path = $path;
+
                 return $category;
             })
             ->sortBy('category_path');

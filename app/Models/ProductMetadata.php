@@ -48,9 +48,6 @@ class ProductMetadata extends Model
 
     /**
      * Get product metadata by product ID.
-     *
-     * @param string $productId
-     * @return ProductMetadata|null
      */
     public static function findByProductId(string $productId): ?ProductMetadata
     {
@@ -59,9 +56,6 @@ class ProductMetadata extends Model
 
     /**
      * Get product metadata by product code.
-     *
-     * @param string $productCode
-     * @return ProductMetadata|null
      */
     public static function findByProductCode(string $productCode): ?ProductMetadata
     {
@@ -70,12 +64,6 @@ class ProductMetadata extends Model
 
     /**
      * Create metadata for a product.
-     *
-     * @param string $productId
-     * @param string $productCode
-     * @param int|null $createdBy
-     * @param array|null $additionalMetadata
-     * @return ProductMetadata
      */
     public static function createForProduct(
         string $productId,

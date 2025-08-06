@@ -452,20 +452,20 @@ class FruitVegController extends Controller
 
         // Update or create vegDetails record
         $existingDetail = VegDetails::where('product', $request->product_code)->first();
-        
+
         if ($existingDetail) {
             $existingDetail->update(['countryCode' => $request->country_id]);
         } else {
             // Generate new ID for vegDetails
             $maxId = VegDetails::max('ID');
-            $newId = $maxId ? ((int)$maxId + 1) : 1;
-            
+            $newId = $maxId ? ((int) $maxId + 1) : 1;
+
             VegDetails::create([
-                'ID' => (string)$newId,
+                'ID' => (string) $newId,
                 'product' => $request->product_code,
                 'countryCode' => $request->country_id,
                 'classId' => 1, // Default class
-                'unitId' => 1   // Default unit (kg)
+                'unitId' => 1,   // Default unit (kg)
             ]);
         }
 
@@ -487,20 +487,20 @@ class FruitVegController extends Controller
 
         // Update or create vegDetails record
         $existingDetail = VegDetails::where('product', $request->product_code)->first();
-        
+
         if ($existingDetail) {
             $existingDetail->update(['unitId' => $request->unit_id]);
         } else {
             // Generate new ID for vegDetails
             $maxId = VegDetails::max('ID');
-            $newId = $maxId ? ((int)$maxId + 1) : 1;
-            
+            $newId = $maxId ? ((int) $maxId + 1) : 1;
+
             VegDetails::create([
-                'ID' => (string)$newId,
+                'ID' => (string) $newId,
                 'product' => $request->product_code,
                 'countryCode' => 1, // Default country
                 'classId' => 1,     // Default class
-                'unitId' => $request->unit_id
+                'unitId' => $request->unit_id,
             ]);
         }
 
@@ -522,20 +522,20 @@ class FruitVegController extends Controller
 
         // Update or create vegDetails record
         $existingDetail = VegDetails::where('product', $request->product_code)->first();
-        
+
         if ($existingDetail) {
             $existingDetail->update(['classId' => $request->class_id]);
         } else {
             // Generate new ID for vegDetails
             $maxId = VegDetails::max('ID');
-            $newId = $maxId ? ((int)$maxId + 1) : 1;
-            
+            $newId = $maxId ? ((int) $maxId + 1) : 1;
+
             VegDetails::create([
-                'ID' => (string)$newId,
+                'ID' => (string) $newId,
                 'product' => $request->product_code,
                 'countryCode' => 1, // Default country
                 'classId' => $request->class_id,
-                'unitId' => 1       // Default unit (kg)
+                'unitId' => 1,       // Default unit (kg)
             ]);
         }
 

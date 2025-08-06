@@ -448,7 +448,7 @@ class Product extends Model
 
     /**
      * Get the creation date for this product.
-     * 
+     *
      * @return \Illuminate\Support\Carbon|null
      */
     public function getCreatedAtAttribute()
@@ -458,7 +458,7 @@ class Product extends Model
 
     /**
      * Get the user who created this product.
-     * 
+     *
      * @return \App\Models\User|null
      */
     public function getCreatedByAttribute()
@@ -468,8 +468,6 @@ class Product extends Model
 
     /**
      * Check if this product has creation metadata.
-     * 
-     * @return bool
      */
     public function hasCreationMetadata(): bool
     {
