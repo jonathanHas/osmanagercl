@@ -717,6 +717,10 @@ class OptimizedSalesRepository
             ->map(function ($product) {
                 $product->days_since_last_sale = Carbon::parse($product->last_sale_date)->diffInDays(Carbon::now());
                 $product->daily_average = round($product->historical_units / $product->active_days, 2);
+                
+                // Add stock level
+                $productModel = Product::find($product->product_id);
+                $product->current_stock = $productModel ? $productModel->getCurrentStock() : null;
 
                 return $product;
             });
@@ -745,6 +749,10 @@ class OptimizedSalesRepository
             ->get()
             ->map(function ($product) {
                 $product->daily_velocity = round($product->total_units / 60, 3); // Units per day over 60 days
+                
+                // Add stock level
+                $productModel = Product::find($product->product_id);
+                $product->current_stock = $productModel ? $productModel->getCurrentStock() : null;
 
                 return $product;
             })
@@ -790,6 +798,10 @@ class OptimizedSalesRepository
             ->values()
             ->map(function ($product) {
                 $product->days_since_last_sale = Carbon::parse($product->last_sale_date)->diffInDays(Carbon::now());
+                
+                // Add stock level
+                $productModel = Product::find($product->product_id);
+                $product->current_stock = $productModel ? $productModel->getCurrentStock() : null;
 
                 return $product;
             });
@@ -819,6 +831,10 @@ class OptimizedSalesRepository
             ->map(function ($product) {
                 $product->daily_velocity = round($product->monthly_units / 30, 2);
                 $product->alert_type = 'velocity_check'; // Will be updated based on stock levels
+                
+                // Add stock level
+                $productModel = Product::find($product->product_id);
+                $product->current_stock = $productModel ? $productModel->getCurrentStock() : null;
 
                 return $product;
             })

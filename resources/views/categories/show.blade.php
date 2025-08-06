@@ -417,14 +417,25 @@
                     };
                     const theme = themes[tabName] || 'gray';
                     
+                    // Generate product URL
+                    const productUrl = `/products/${product.product_id}`;
+                    
+                    // Format stock level
+                    const stockDisplay = product.current_stock !== null && product.current_stock !== undefined
+                        ? `Stock: ${product.current_stock}`
+                        : 'Stock: N/A';
+                    
                     return `
-                        <div class="bg-${theme}-50 dark:bg-${theme}-900/20 border border-${theme}-200 dark:border-${theme}-800 rounded-lg p-4">
+                        <div class="bg-${theme}-50 dark:bg-${theme}-900/20 border border-${theme}-200 dark:border-${theme}-800 rounded-lg p-4 hover:shadow-md transition-shadow">
                             <div class="flex justify-between items-start mb-2">
                                 <div class="flex-1 min-w-0">
-                                    <p class="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">
+                                    <a href="${productUrl}" class="font-medium text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 truncate block">
                                         ${product.product_name || 'Unknown Product'}
-                                    </p>
-                                    <p class="text-xs text-gray-500">${product.product_code || ''}</p>
+                                    </a>
+                                    <div class="flex items-center gap-3 text-xs text-gray-500 mt-1">
+                                        <span>${product.product_code || ''}</span>
+                                        <span class="font-medium">${stockDisplay}</span>
+                                    </div>
                                 </div>
                                 ${this.renderBadge(tabName, product)}
                             </div>
@@ -435,43 +446,49 @@
 
                 renderBadge(tabName, product) {
                     if (tabName === 'good-sellers-silent') {
-                        return `<span class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full">${product.days_since_last_sale}d ago</span>`;
+                        return `<span class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full whitespace-nowrap">${product.days_since_last_sale}d ago</span>`;
                     } else if (tabName === 'slow-movers') {
-                        return `<span class="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">${product.daily_velocity}/day</span>`;
+                        const velocity = parseFloat(product.daily_velocity).toFixed(2);
+                        return `<span class="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full whitespace-nowrap">${velocity}/day</span>`;
                     } else if (tabName === 'stagnant-stock') {
-                        return `<span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">${product.days_since_last_sale}d ago</span>`;
+                        return `<span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full whitespace-nowrap">${product.days_since_last_sale}d ago</span>`;
                     } else {
-                        return `<span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">${product.daily_velocity}/day</span>`;
+                        const velocity = parseFloat(product.daily_velocity).toFixed(1);
+                        return `<span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full whitespace-nowrap">${velocity}/day</span>`;
                     }
                 },
 
                 renderMetrics(tabName, product) {
                     if (tabName === 'good-sellers-silent') {
+                        const avgFormatted = parseFloat(product.daily_average).toFixed(1);
                         return `
-                            <div class="flex justify-between text-xs text-gray-600">
-                                <span>Avg: ${product.daily_average}/day</span>
-                                <span>Historical: ${this.formatNumber(product.historical_units)} units</span>
+                            <div class="flex justify-between text-xs text-gray-600 dark:text-gray-400">
+                                <span>Avg: ${avgFormatted}/day</span>
+                                <span>Total: ${this.formatNumber(product.historical_units)}</span>
                             </div>
                         `;
                     } else if (tabName === 'slow-movers') {
                         return `
-                            <div class="flex justify-between text-xs text-gray-600">
-                                <span>60-day: ${this.formatNumber(product.total_units)}</span>
-                                <span>Revenue: €${this.formatNumber(product.total_revenue)}</span>
+                            <div class="flex justify-between text-xs text-gray-600 dark:text-gray-400">
+                                <span>60d: ${this.formatNumber(product.total_units)} units</span>
+                                <span>€${this.formatNumber(product.total_revenue)}</span>
                             </div>
                         `;
                     } else if (tabName === 'stagnant-stock') {
+                        const lastSale = product.last_sale_date 
+                            ? new Date(product.last_sale_date).toLocaleDateString('en-IE', {month: 'short', day: 'numeric'})
+                            : 'Unknown';
                         return `
-                            <div class="flex justify-between text-xs text-gray-600">
-                                <span>Previous: ${this.formatNumber(product.previous_units)} units</span>
-                                <span>Last sale: ${product.last_sale_date ? new Date(product.last_sale_date).toLocaleDateString('en-IE', {month: 'short', day: 'numeric'}) : 'Unknown'}</span>
+                            <div class="flex justify-between text-xs text-gray-600 dark:text-gray-400">
+                                <span>Prev: ${this.formatNumber(product.previous_units)}</span>
+                                <span>Last: ${lastSale}</span>
                             </div>
                         `;
                     } else {
                         return `
-                            <div class="flex justify-between text-xs text-gray-600">
-                                <span>30-day: ${this.formatNumber(product.monthly_units)}</span>
-                                <span>Active: ${product.active_days}/30 days</span>
+                            <div class="flex justify-between text-xs text-gray-600 dark:text-gray-400">
+                                <span>30d: ${this.formatNumber(product.monthly_units)}</span>
+                                <span>Active: ${product.active_days}d</span>
                             </div>
                         `;
                     }
