@@ -560,11 +560,11 @@
                 </div>
 
                 <!-- Mobile Card Layout (below md:) -->
-                <div class="md:hidden">
+                <div class="md:hidden bg-gray-100 p-4">
                     <!-- Mobile Products -->
-                    <div x-show="products.length > 0" class="divide-y divide-gray-200">
+                    <div x-show="products.length > 0" class="space-y-4">
                         <template x-for="product in (products || [])" :key="product.CODE">
-                            <div class="p-4 space-y-4" :class="{ 'bg-gray-50': selectedProducts.includes(product.CODE) }">
+                            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 space-y-4" :class="{ 'bg-gray-50': selectedProducts.includes(product.CODE) }">
                                 
                                 <!-- Header: Checkbox, Image, Product Name -->
                                 <div class="flex items-start space-x-3">
