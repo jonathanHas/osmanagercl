@@ -59,6 +59,10 @@ class StoreProductRequest extends FormRequest
 
             // Stock Management
             'include_in_stocking' => 'boolean',
+
+            // Display Settings
+            'display_name' => 'nullable|string|max:255',
+            'show_on_till' => 'boolean',
         ];
     }
 
@@ -91,6 +95,7 @@ class StoreProductRequest extends FormRequest
             'price_sell' => 'selling price',
             'tax_category' => 'tax category',
             'initial_stock' => 'initial stock quantity',
+            'display_name' => 'display name',
         ];
     }
 
@@ -108,6 +113,7 @@ class StoreProductRequest extends FormRequest
             'send_status' => $this->boolean('send_status'),
             'is_com' => $this->boolean('is_com'),
             'include_in_stocking' => $this->boolean('include_in_stocking'),
+            'show_on_till' => $this->boolean('show_on_till'),
         ]);
 
         // Convert integer fields

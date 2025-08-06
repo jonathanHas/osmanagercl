@@ -423,7 +423,68 @@
                             </div>
                         </div>
 
+                        <!-- Till Display Settings -->
+                        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+                            <div class="border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Till Display Settings</h3>
+                                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                    Optional custom display name for products that need till buttons (products without barcodes)
+                                </p>
+                            </div>
 
+                            <div class="space-y-6">
+                                <!-- Display Name Input -->
+                                <div>
+                                    <label for="display_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Display Name
+                                    </label>
+                                    <input type="text" 
+                                           id="display_name" 
+                                           name="display_name"
+                                           value="{{ old('display_name') }}" 
+                                           class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:border-indigo-500 focus:ring-indigo-500"
+                                           placeholder="Custom display name (leave empty to use product name)">
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        Used on till buttons and displays. Supports line breaks with &lt;br&gt; tags.
+                                    </p>
+                                </div>
+
+                                <!-- Till Visibility Toggle -->
+                                <div class="flex items-start">
+                                    <input type="checkbox" 
+                                           id="show_on_till" 
+                                           name="show_on_till" 
+                                           value="1" 
+                                           {{ old('show_on_till', '1') ? 'checked' : '' }}
+                                           class="mt-1 rounded border-gray-300 text-green-600 focus:ring-green-500">
+                                    <label for="show_on_till" class="ml-3 block text-sm text-gray-700 dark:text-gray-300">
+                                        <span class="font-medium">Show on Till</span>
+                                        <span class="block text-xs text-gray-500 mt-1">
+                                            Make this product visible on the POS till. Uncheck to hide from till buttons.
+                                        </span>
+                                    </label>
+                                </div>
+
+                                <!-- Display Name Preview -->
+                                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">Till Button Preview</h4>
+                                        <span class="text-xs text-gray-500 dark:text-gray-400">How it will appear on POS</span>
+                                    </div>
+                                    
+                                    <!-- Mock Till Button -->
+                                    <div id="till-button-preview" class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg p-4 text-center shadow-sm max-w-xs mx-auto">
+                                        <div id="display-preview" class="text-sm font-medium text-gray-900 dark:text-gray-100 min-h-[2.5rem] flex items-center justify-center">
+                                            <span class="text-gray-400 dark:text-gray-500 italic" id="preview-placeholder">Enter display name above</span>
+                                        </div>
+                                        <div class="mt-2 flex items-center justify-center gap-2">
+                                            <div id="visibility-indicator" class="w-2 h-2 rounded-full bg-green-500"></div>
+                                            <span class="text-xs text-gray-500 dark:text-gray-400" id="visibility-text">Visible on Till</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
                     </div>
                 </div>
@@ -435,6 +496,9 @@
     <script>
         // Track if we have scraped pricing data
         const hasScrapedPrice = @json(isset($prefillData['price_source']) && $prefillData['price_source'] === 'udea_scraped');
+        
+        // Track if user has manually entered a selling price
+        let userHasSetSellingPrice = false;
         
         // Scraped product name functionality
         @if(isset($prefillData['scraped_name']))
@@ -607,6 +671,15 @@
             }
         }
         
+        // Track when user manually enters selling price
+        document.getElementById('price_sell').addEventListener('input', function() {
+            // Mark that user has manually set a selling price
+            if (this.value && this.value.trim() !== '') {
+                userHasSetSellingPrice = true;
+            }
+            updatePricingBreakdown();
+        });
+
         document.getElementById('price_buy').addEventListener('input', function() {
             const costPrice = parseFloat(this.value);
             const sellPriceField = document.getElementById('price_sell');
@@ -615,8 +688,12 @@
             const taxRate = taxRates[taxCategoryId] || 0.00; // Default to 0% VAT (Tax aZero)
             
             if (!isNaN(costPrice) && costPrice > 0) {
-                // Only auto-update selling price if no scraped price or if field is empty
-                if (!hasScrapedPrice || !sellPriceField.value) {
+                // Only auto-update selling price if:
+                // 1. No scraped price AND field is empty, OR
+                // 2. User hasn't manually set a selling price yet
+                const shouldAutoUpdate = (!hasScrapedPrice && !sellPriceField.value) || !userHasSetSellingPrice;
+                
+                if (shouldAutoUpdate) {
                     // Calculate total cost including delivery
                     const deliveryCost = hasDeliveryCost ? costPrice * 0.15 : 0;
                     const totalCost = costPrice + deliveryCost;
@@ -630,8 +707,6 @@
             }
             updatePricingBreakdown();
         });
-        
-        document.getElementById('price_sell').addEventListener('input', updatePricingBreakdown);
         document.getElementById('has_delivery_cost').addEventListener('change', updatePricingBreakdown);
         document.getElementById('tax_category').addEventListener('change', function() {
             updatePricingBreakdown();
@@ -761,6 +836,18 @@
                     updateUdeaLink(this.value);
                 });
             }
+
+            // Check if selling price is already prefilled (e.g., from scraped data)
+            const sellPriceField = document.getElementById('price_sell');
+            if (sellPriceField && sellPriceField.value && sellPriceField.value.trim() !== '') {
+                userHasSetSellingPrice = true;
+            }
+
+            // Initialize display name preview
+            initializeDisplayNamePreview();
+            
+            // Initialize till visibility preview
+            initializeTillVisibilityPreview();
         });
         
         function updateUdeaLink(supplierCode) {
@@ -791,5 +878,117 @@
         @if(isset($prefillData['price_source']) && $prefillData['price_source'] === 'udea_scraped')
             document.getElementById('price_sell').title = "This price was automatically retrieved from UDEA website. You can still modify it if needed.";
         @endif
+
+        // Display Name Preview Functionality
+        function initializeDisplayNamePreview() {
+            const displayNameField = document.getElementById('display_name');
+            const productNameField = document.getElementById('name');
+            
+            if (!displayNameField) return;
+            
+            // Live preview update on display name input
+            displayNameField.addEventListener('input', function() {
+                updateDisplayPreview();
+            });
+            
+            // Also update when product name changes (for fallback)
+            if (productNameField) {
+                productNameField.addEventListener('input', function() {
+                    updateDisplayPreview();
+                });
+            }
+            
+            // Initial update
+            updateDisplayPreview();
+        }
+
+        function updateDisplayPreview() {
+            const displayNameField = document.getElementById('display_name');
+            const productNameField = document.getElementById('name');
+            const preview = document.getElementById('display-preview');
+            const placeholder = document.getElementById('preview-placeholder');
+            
+            if (!displayNameField || !preview) return;
+            
+            const displayName = displayNameField.value.trim();
+            const productName = productNameField ? productNameField.value.trim() : '';
+            
+            if (displayName) {
+                // Hide placeholder and show formatted display name
+                if (placeholder) {
+                    placeholder.style.display = 'none';
+                }
+                
+                // Convert HTML entities and handle <br> tags
+                let formattedName = displayName
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>')
+                    .replace(/&amp;/g, '&')
+                    .replace(/&quot;/g, '"')
+                    .replace(/&#39;/g, "'");
+                
+                // Convert <br> tags and newlines to line breaks
+                formattedName = formattedName
+                    .replace(/\n/g, '<br>')
+                    .replace(/<br\s*\/?>/gi, '<br>');
+                
+                preview.innerHTML = formattedName;
+                preview.className = 'text-sm font-medium text-gray-900 dark:text-gray-100 min-h-[2.5rem] flex items-center justify-center';
+            } else if (productName) {
+                // Show product name as fallback
+                if (placeholder) {
+                    placeholder.style.display = 'none';
+                }
+                preview.innerHTML = productName;
+                preview.className = 'text-sm font-medium text-gray-500 dark:text-gray-400 min-h-[2.5rem] flex items-center justify-center italic';
+            } else {
+                // Show placeholder
+                if (placeholder) {
+                    placeholder.style.display = 'inline';
+                }
+                preview.innerHTML = '<span class="text-gray-400 dark:text-gray-500 italic" id="preview-placeholder">Enter display name above</span>';
+                preview.className = 'text-sm font-medium text-gray-900 dark:text-gray-100 min-h-[2.5rem] flex items-center justify-center';
+            }
+        }
+
+        // Till Visibility Preview Functionality
+        function initializeTillVisibilityPreview() {
+            const showOnTillCheckbox = document.getElementById('show_on_till');
+            
+            if (!showOnTillCheckbox) return;
+            
+            // Update preview when checkbox changes
+            showOnTillCheckbox.addEventListener('change', function() {
+                updateTillVisibilityPreview();
+            });
+            
+            // Initial update
+            updateTillVisibilityPreview();
+        }
+
+        function updateTillVisibilityPreview() {
+            const showOnTillCheckbox = document.getElementById('show_on_till');
+            const tillButtonPreview = document.getElementById('till-button-preview');
+            const visibilityIndicator = document.getElementById('visibility-indicator');
+            const visibilityText = document.getElementById('visibility-text');
+            
+            if (!showOnTillCheckbox || !tillButtonPreview || !visibilityIndicator || !visibilityText) return;
+            
+            const isVisible = showOnTillCheckbox.checked;
+            
+            if (isVisible) {
+                // Show as visible
+                tillButtonPreview.className = 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg p-4 text-center shadow-sm max-w-xs mx-auto';
+                visibilityIndicator.className = 'w-2 h-2 rounded-full bg-green-500';
+                visibilityText.textContent = 'Visible on Till';
+                visibilityText.className = 'text-xs text-gray-500 dark:text-gray-400';
+            } else {
+                // Show as hidden
+                tillButtonPreview.className = 'bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg p-4 text-center shadow-sm max-w-xs mx-auto opacity-60';
+                visibilityIndicator.className = 'w-2 h-2 rounded-full bg-red-500';
+                visibilityText.textContent = 'Hidden from Till';
+                visibilityText.className = 'text-xs text-red-600 dark:text-red-400';
+            }
+        }
     </script>
 </x-admin-layout>

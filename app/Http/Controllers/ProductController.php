@@ -15,6 +15,7 @@ use App\Repositories\ProductRepository;
 use App\Repositories\SalesRepository;
 use App\Services\LabelService;
 use App\Services\SupplierService;
+use App\Services\TillVisibilityService;
 use App\Services\UdeaScrapingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -55,6 +56,11 @@ class ProductController extends Controller
     protected LabelService $labelService;
 
     /**
+     * The till visibility service instance.
+     */
+    protected TillVisibilityService $tillVisibilityService;
+
+    /**
      * Create a new controller instance.
      */
     public function __construct(
@@ -63,7 +69,8 @@ class ProductController extends Controller
         SalesRepository $salesRepository,
         SupplierService $supplierService,
         UdeaScrapingService $udeaScrapingService,
-        LabelService $labelService
+        LabelService $labelService,
+        TillVisibilityService $tillVisibilityService
     ) {
         $this->productRepository = $productRepository;
         $this->categoryRepository = $categoryRepository;
@@ -71,6 +78,7 @@ class ProductController extends Controller
         $this->supplierService = $supplierService;
         $this->udeaScrapingService = $udeaScrapingService;
         $this->labelService = $labelService;
+        $this->tillVisibilityService = $tillVisibilityService;
     }
 
     /**
@@ -538,6 +546,7 @@ class ProductController extends Controller
                     'PRICEBUY' => $request->price_buy,
                     'PRICESELL' => $priceExVat, // Store ex-VAT price
                     'TAXCAT' => $request->tax_category,
+                    'DISPLAY' => $request->display_name, // Optional display name for till buttons
                 ]);
 
                 // Create supplier link if supplier information provided
@@ -554,6 +563,11 @@ class ProductController extends Controller
 
                 // Log the new product event
                 LabelLog::logNewProduct($request->code);
+
+                // Set till visibility if requested
+                if ($request->boolean('show_on_till', true)) {
+                    $this->tillVisibilityService->setVisibility($product->ID, true, 'category');
+                }
 
                 // If this product was created from a delivery item, link them
                 if ($request->delivery_item_id) {
