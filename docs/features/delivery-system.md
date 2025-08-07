@@ -133,7 +133,35 @@ The delivery verification system provides a complete workflow for handling suppl
    - **Supplier Linking**: Automatic SupplierLink creation with delivery supplier data
    - **Status Update**: Delivery items updated from "new product" to matched product
 
-### 4. Verification & Completion
+### 4. Price Comparison & Cost Management
+1. **Enhanced Delivery View**: Full-width price comparison interface
+   - **Price Columns**: Delivery Cost, Current Cost, RSP, Current Sell with difference highlighting
+   - **Smart Highlighting**: Color-coded price differences with configurable thresholds
+   - **Margin Analysis**: VAT-exclusive margin calculations with zero/negative margin warnings
+   - **Price Legend**: Visual guide for price difference colors and margin warnings
+
+2. **Bulk Cost Updates**: Automated cost synchronization
+   - Route: `POST /deliveries/{delivery}/update-costs`
+   - **Threshold Control**: Only update products with significant price differences (default 5%)
+   - **Safety Features**: Automatic detection and warnings for zero-cost items (not delivered)
+   - **Progress Feedback**: Real-time update counts and detailed completion messages
+   - **Error Handling**: Comprehensive error reporting for failed updates
+
+3. **Quick Price Editing**: Individual product price management
+   - Route: `PATCH /deliveries/{delivery}/items/{item}/price`
+   - **Modal Interface**: Clean modal with gross/net price input modes
+   - **Real-time Calculations**: Live margin updates as user types prices
+   - **VAT Handling**: Automatic conversion between gross and net prices based on tax categories
+   - **Label Integration**: Automatic addition to label queue for immediate shelf price updates
+   - **Clickable Prices**: Current Sell prices are clickable with hover edit icons
+
+4. **Enhanced Table Sorting**: Professional data organization
+   - **Sortable Columns**: Product, Status, Margin, Actions with click-to-sort functionality
+   - **Visual Indicators**: Sort direction arrows and active column highlighting
+   - **Smart Sorting**: Margin sorts by percentage values, Actions prioritizes "New Product" items
+   - **Direction Toggle**: Click to reverse sort order with visual feedback
+
+### 5. Verification & Completion
 1. **Summary Generation**: Comprehensive discrepancy analysis
    - Route: `GET /deliveries/{delivery}/summary`
    - Complete vs partial vs missing items breakdown
@@ -202,6 +230,8 @@ Route::post('/deliveries/{delivery}/complete', [DeliveryController::class, 'comp
 Route::post('/deliveries/{delivery}/cancel', [DeliveryController::class, 'cancel']);
 Route::get('/deliveries/{delivery}/export-discrepancies', [DeliveryController::class, 'exportDiscrepancies']);
 Route::post('/delivery-items/{item}/refresh-barcode', [DeliveryController::class, 'refreshBarcode']);
+Route::patch('/deliveries/{delivery}/items/{item}/price', [DeliveryController::class, 'updateItemPrice']);
+Route::post('/deliveries/{delivery}/update-costs', [DeliveryController::class, 'updateCosts']);
 ```
 
 **Note**: The `Route::resource('deliveries', DeliveryController::class)` includes the `destroy` method for delivery deletion, accessible via `DELETE /deliveries/{delivery}` with safety restrictions.
@@ -218,6 +248,19 @@ Route::middleware('auth')->prefix('deliveries')->group(function () {
 **Authentication Note**: The frontend scanning interface uses web routes (session authentication) rather than API routes (token authentication) to ensure compatibility with the existing login system. API routes are available for external integrations.
 
 ## Key Features
+
+### Advanced Price Management
+- **Price Comparison Matrix**: Side-by-side comparison of delivery vs current costs and selling prices
+- **Smart Cost Updates**: Bulk update product costs with configurable difference thresholds
+- **Margin Analysis**: Real-time margin calculations with VAT-exclusive pricing
+- **Quick Price Editor**: Modal interface for instant price adjustments with automatic label queue integration
+- **Visual Price Indicators**: Color-coded highlighting for significant price differences and margin warnings
+
+### Professional Table Interface
+- **Full-Width Design**: Utilizes complete screen width for maximum data visibility
+- **Sortable Columns**: Click-to-sort functionality for Product, Status, Margin, and Actions
+- **Visual Feedback**: Active sort indicators and direction arrows
+- **Responsive Layout**: Mobile-friendly design with touch-optimized interactions
 
 ### Real-Time Scanning
 - **Mobile Optimized**: Touch-friendly interface for warehouse use
@@ -558,6 +601,83 @@ App\Models\Delivery::where('delivery_number', 'LIKE', 'DEL-%')->delete();
 
 ## Recent Updates
 
+### 2025-08-07 - Price Management & Table Enhancement System
+
+#### Comprehensive Price Comparison Features
+**Enhancement**: Complete price analysis and management system for delivery verification.
+
+**New Features Implemented**:
+1. **Full-Width Price Comparison Table**:
+   - Changed from `max-w-7xl` to `max-w-full` for complete screen utilization
+   - Added Delivery Cost, Current Cost, RSP, and Current Sell columns
+   - Smart highlighting system for significant price differences
+   - Professional color-coded legend for price difference interpretation
+
+2. **VAT-Exclusive Margin Calculation System**:
+   ```php
+   // Margin calculation with proper VAT handling
+   $taxRate = $item->product->taxCategory->primaryTax->RATE ?? 0;
+   $vatExclusiveSellPrice = $currentSell / (1 + $taxRate);
+   $margin = $vatExclusiveSellPrice - $item->unit_cost;
+   $marginPercent = ($margin / $vatExclusiveSellPrice) * 100;
+   ```
+   - Accurate margin calculations excluding VAT for true profitability analysis
+   - Zero and negative margin warnings with visual indicators
+   - Percentage-based margin display with euro amounts
+
+3. **Bulk Cost Update System**:
+   - Route: `POST /deliveries/{delivery}/update-costs`
+   - Configurable difference threshold (default 5%)
+   - Zero-cost item detection and protection
+   - Comprehensive progress reporting and error handling
+   - Safety confirmation dialogs with affected item counts
+
+4. **Quick Price Edit Modal**:
+   - Route: `PATCH /deliveries/{delivery}/items/{item}/price`
+   - Dual input modes: Gross price and Net price
+   - Real-time margin calculation as user types
+   - Automatic VAT conversion based on product tax categories
+   - Integration with `LabelLog` for automatic label queue addition
+   - Clickable Current Sell prices with hover edit icons
+
+5. **Professional Table Sorting**:
+   - Clickable column headers for Product, Status, Margin, and Actions
+   - Visual sort indicators with direction arrows
+   - Smart sorting logic:
+     - **Product**: Alphabetical by description
+     - **Status**: Priority order (missing, partial, complete, excess)
+     - **Margin**: Numerical by percentage values
+     - **Actions**: Prioritizes "New Product" items for POS addition
+   - Active column highlighting and sort direction toggling
+
+#### Technical Implementation Details
+**Enhanced Controller Methods**:
+- `updateItemPrice()`: Individual price updates with validation and label logging
+- `updateCosts()`: Bulk cost updates with threshold controls and safety checks
+- Enhanced eager loading: `items.product.taxCategory.primaryTax` for VAT calculations
+
+**JavaScript Enhancements**:
+- Real-time margin calculations with VAT-aware pricing
+- Professional table sorting with visual feedback
+- Modal price editor with dual input mode support
+- Bulk update confirmation system with detailed progress reporting
+
+**UI/UX Improvements**:
+- Compact header design combining progress and legend information
+- Professional price comparison matrix with color-coded differences
+- Clickable prices with intuitive hover indicators
+- Mobile-responsive design maintaining functionality across devices
+
+#### Impact & Benefits
+- ✅ **Complete Price Visibility**: Side-by-side comparison of all relevant prices
+- ✅ **Accurate Margin Analysis**: VAT-exclusive calculations for true profitability
+- ✅ **Efficient Cost Management**: Bulk updates with safety controls
+- ✅ **Instant Price Adjustments**: Quick edit functionality with label integration
+- ✅ **Professional Data Organization**: Sortable columns with visual feedback
+- ✅ **Enhanced User Experience**: Intuitive interface with comprehensive functionality
+
+---
+
 ### 2025-08-05 - Quantity Management & UI Enhancements
 
 #### Fixed +/- Button Quantity Adjustment Issues
@@ -611,8 +731,9 @@ $item->updateStatus();
 
 ---
 
-**Last Updated**: 2025-08-05  
+**Last Updated**: 2025-08-07  
 **System Status**: ✅ Fully Operational  
 **Test Coverage**: Manual testing completed  
 **Performance**: Tested with 292-item deliveries  
-**Recent Fix**: Quantity adjustment consistency across all product types
+**Recent Enhancement**: Complete price management and table sorting system  
+**New Features**: Price comparison matrix, bulk cost updates, quick price editing, professional table sorting

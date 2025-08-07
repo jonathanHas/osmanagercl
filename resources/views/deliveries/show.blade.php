@@ -238,9 +238,11 @@
                                 <select id="sortSelect" onchange="sortDeliveryItems()" 
                                         class="text-sm border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md">
                                     <option value="new_first">New Products First</option>
+                                    <option value="product">Product Name</option>
                                     <option value="code">Code</option>
                                     <option value="description">Description</option>
                                     <option value="status">Status</option>
+                                    <option value="margin">Margin</option>
                                 </select>
                             </div>
                         </div>
@@ -268,8 +270,14 @@
                                 <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Image
                                 </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Product
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                                    onclick="sortDeliveryItems('product')" title="Sort by Product">
+                                    <div class="flex items-center justify-between">
+                                        <span>Product</span>
+                                        <svg id="sort-icon-product" class="w-3 h-3 text-gray-400 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>
+                                        </svg>
+                                    </div>
                                 </th>
                                 <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Barcode
@@ -280,8 +288,14 @@
                                 <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Received
                                 </th>
-                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Status
+                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                                    onclick="sortDeliveryItems('status')" title="Sort by Status">
+                                    <div class="flex items-center justify-center gap-1">
+                                        <span>Status</span>
+                                        <svg id="sort-icon-status" class="w-3 h-3 text-gray-400 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>
+                                        </svg>
+                                    </div>
                                 </th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Delivery Cost
@@ -295,14 +309,26 @@
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Current Sell
                                 </th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Margin
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                                    onclick="sortDeliveryItems('margin')" title="Sort by Margin">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <span>Margin</span>
+                                        <svg id="sort-icon-margin" class="w-3 h-3 text-gray-400 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>
+                                        </svg>
+                                    </div>
                                 </th>
                                 <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Tax Rate
                                 </th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Actions
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                                    onclick="sortDeliveryItems('actions')" title="Sort by Actions (New Products First)">
+                                    <div class="flex items-center justify-end gap-1">
+                                        <span>Actions</span>
+                                        <svg id="sort-icon-actions" class="w-3 h-3 text-gray-400 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>
+                                        </svg>
+                                    </div>
                                 </th>
                             </tr>
                         </thead>
@@ -463,7 +489,35 @@
                                                 }
                                             }
                                         @endphp
-                                        @if($item->product)
+                                        @if($item->product && $delivery->status !== 'completed')
+                                            @php
+                                                $taxRate = 0;
+                                                if ($item->product->taxCategory && $item->product->taxCategory->primaryTax) {
+                                                    $taxRate = $item->product->taxCategory->primaryTax->RATE;
+                                                }
+                                            @endphp
+                                            <div class="{{ $sellHighlight }} rounded px-2 py-1 cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all group"
+                                                 onclick="openPriceEditor({{ $item->id }}, '{{ $item->product->CODE }}', '{{ addslashes($item->description) }}', {{ $item->product->PRICESELL }}, {{ $item->unit_cost }}, {{ $taxRate }})"
+                                                 title="Click to edit price">
+                                                <div class="flex items-center justify-between">
+                                                    <div>
+                                                        <div class="text-gray-900 dark:text-gray-100 font-medium">
+                                                            €{{ number_format($currentSell, 2) }}
+                                                        </div>
+                                                        @if($sellDifference !== null && abs($sellDifference) > 0.01)
+                                                            <div class="text-xs {{ $sellDifference > 0 ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400' }}">
+                                                                vs RSP: {{ $sellDifference > 0 ? '+' : '' }}€{{ number_format($sellDifference, 2) }}
+                                                            </div>
+                                                        @endif
+                                                    </div>
+                                                    <svg class="w-3 h-3 text-gray-400 group-hover:text-blue-500 transition-colors opacity-0 group-hover:opacity-100" 
+                                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                                              d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                                    </svg>
+                                                </div>
+                                            </div>
+                                        @elseif($item->product)
                                             <div class="{{ $sellHighlight }} rounded px-2 py-1">
                                                 <div class="text-gray-900 dark:text-gray-100 font-medium">
                                                     €{{ number_format($currentSell, 2) }}
@@ -564,6 +618,7 @@
                                                     Add to POS
                                                 </a>
                                             @endif
+                                            
                                         </div>
                                     </td>
                                 </tr>
@@ -836,43 +891,131 @@
         }
 
         // Sort delivery items function
-        function sortDeliveryItems() {
-            const select = document.getElementById('sortSelect');
-            const sortBy = select.value;
+        // Sort state tracking
+        let currentSort = { column: 'new_first', direction: 'asc' };
+
+        function sortDeliveryItems(column = null) {
+            // If called from dropdown, use dropdown value
+            if (!column) {
+                const select = document.getElementById('sortSelect');
+                column = select.value;
+                currentSort = { column: column, direction: 'asc' };
+            } else {
+                // If called from column header, toggle direction
+                if (currentSort.column === column) {
+                    currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    currentSort.column = column;
+                    currentSort.direction = 'asc';
+                }
+                
+                // Update dropdown to match
+                const select = document.getElementById('sortSelect');
+                if (column === 'actions') {
+                    select.value = 'new_first'; // Map actions to new_first in dropdown
+                } else {
+                    select.value = column;
+                }
+            }
+
+            updateSortIcons();
+            performSort();
+        }
+
+        function updateSortIcons() {
+            // Reset all icons
+            document.querySelectorAll('[id^="sort-icon-"]').forEach(icon => {
+                icon.className = 'w-3 h-3 text-gray-400 opacity-50';
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>';
+            });
+
+            // Highlight active sort column
+            const activeIcon = document.getElementById(`sort-icon-${currentSort.column}`);
+            if (activeIcon) {
+                activeIcon.className = 'w-3 h-3 text-blue-500 opacity-100';
+                if (currentSort.direction === 'asc') {
+                    activeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"/>';
+                } else {
+                    activeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4"/>';
+                }
+            }
+        }
+
+        function performSort() {
             const tbody = document.querySelector('.delivery-items-table tbody');
             const rows = Array.from(tbody.querySelectorAll('tr'));
 
             rows.sort((a, b) => {
-                switch (sortBy) {
-                    case 'new_first': {
-                        const aIsNew = a.querySelector('.bg-yellow-100') !== null; // New Product badge
-                        const bIsNew = b.querySelector('.bg-yellow-100') !== null;
-                        if (aIsNew && !bIsNew) return -1;
-                        if (!aIsNew && bIsNew) return 1;
-                        // If both new or both existing, sort by code
-                        const aCode = a.querySelector('td:nth-child(2) .font-medium')?.textContent || '';
-                        const bCode = b.querySelector('td:nth-child(2) .font-medium')?.textContent || '';
-                        return aCode.localeCompare(bCode);
+                let result = 0;
+                
+                switch (currentSort.column) {
+                    case 'new_first':
+                    case 'actions': {
+                        // Check for "New Product" badge in Product column (column 2)
+                        const aIsNewBadge = a.querySelector('td:nth-child(2) .bg-yellow-100') !== null;
+                        const bIsNewBadge = b.querySelector('td:nth-child(2) .bg-yellow-100') !== null;
+                        
+                        // Debug logging (remove after testing)
+                        if (currentSort.column === 'actions') {
+                            const aDesc = a.querySelector('td:nth-child(2) .font-medium')?.textContent || 'Unknown';
+                            const bDesc = b.querySelector('td:nth-child(2) .font-medium')?.textContent || 'Unknown';
+                            console.log('Actions sort (New Product badges):', { 
+                                aDesc, bDesc, 
+                                aIsNewBadge, bIsNewBadge
+                            });
+                        }
+                        
+                        if (aIsNewBadge && !bIsNewBadge) result = -1;
+                        else if (!aIsNewBadge && bIsNewBadge) result = 1;
+                        else {
+                            // If both new or both existing, sort by code
+                            const aCode = a.querySelector('td:nth-child(2) .font-medium')?.textContent || '';
+                            const bCode = b.querySelector('td:nth-child(2) .font-medium')?.textContent || '';
+                            result = aCode.localeCompare(bCode);
+                        }
+                        break;
                     }
+                    case 'product':
                     case 'code': {
                         const aCode = a.querySelector('td:nth-child(2) .font-medium')?.textContent || '';
                         const bCode = b.querySelector('td:nth-child(2) .font-medium')?.textContent || '';
-                        return aCode.localeCompare(bCode);
+                        result = aCode.localeCompare(bCode);
+                        break;
                     }
                     case 'description': {
                         const aDesc = a.querySelector('td:nth-child(2) .text-sm.font-medium')?.textContent || '';
                         const bDesc = b.querySelector('td:nth-child(2) .text-sm.font-medium')?.textContent || '';
-                        return aDesc.localeCompare(bDesc);
+                        result = aDesc.localeCompare(bDesc);
+                        break;
                     }
                     case 'status': {
                         const aStatus = a.querySelector('td:nth-child(6) .px-2')?.textContent.toLowerCase() || '';
                         const bStatus = b.querySelector('td:nth-child(6) .px-2')?.textContent.toLowerCase() || '';
-                        const statusOrder = { pending: 0, partial: 1, excess: 2, complete: 3 };
-                        return (statusOrder[aStatus] || 99) - (statusOrder[bStatus] || 99);
+                        const statusOrder = { 'pending': 1, 'partial': 2, 'complete': 3, 'excess': 4 };
+                        const aOrder = statusOrder[aStatus] || 999;
+                        const bOrder = statusOrder[bStatus] || 999;
+                        result = aOrder - bOrder;
+                        break;
+                    }
+                    case 'margin': {
+                        // Get margin percentage from nested structure: .text-right > .text-xs 
+                        const aMarginPercentText = a.querySelector('td:nth-child(11) .text-right .text-xs')?.textContent || '0.0%';
+                        const bMarginPercentText = b.querySelector('td:nth-child(11) .text-right .text-xs')?.textContent || '0.0%';
+                        const aMarginPercent = parseFloat(aMarginPercentText.replace('%', '')) || 0;
+                        const bMarginPercent = parseFloat(bMarginPercentText.replace('%', '')) || 0;
+                        
+                        // Debug logging (remove after testing)
+                        console.log('Margin % sort:', { aMarginPercentText, bMarginPercentText, aMarginPercent, bMarginPercent });
+                        
+                        result = aMarginPercent - bMarginPercent;
+                        break;
                     }
                     default:
-                        return 0;
+                        result = 0;
                 }
+
+                // Apply sort direction
+                return currentSort.direction === 'desc' ? -result : result;
             });
 
             // Re-append sorted rows
@@ -1036,11 +1179,151 @@
             }
         }
 
+        // Price editor functionality
+        let currentEditingItem = null;
+
+        function openPriceEditor(itemId, productCode, description, currentNetPrice, deliveryCost, taxRate = 0) {
+            currentEditingItem = {
+                itemId: itemId,
+                productCode: productCode,
+                description: description,
+                currentNetPrice: parseFloat(currentNetPrice),
+                deliveryCost: parseFloat(deliveryCost),
+                taxRate: parseFloat(taxRate)
+            };
+            
+            // Show modal
+            document.getElementById('priceEditorModal').classList.remove('hidden');
+            document.getElementById('modalProductName').textContent = description;
+            document.getElementById('modalProductCode').textContent = productCode;
+            document.getElementById('modalCurrentPrice').textContent = '€' + currentNetPrice;
+            document.getElementById('modalDeliveryCost').textContent = '€' + deliveryCost.toFixed(2);
+            
+            // Set initial values
+            document.getElementById('grossPriceInput').value = '';
+            document.getElementById('netPriceInput').value = currentNetPrice;
+            document.getElementById('priceInputMode').value = 'net';
+            
+            // Calculate initial margin
+            updateMarginDisplay();
+        }
+
+        function closePriceEditor() {
+            document.getElementById('priceEditorModal').classList.add('hidden');
+            currentEditingItem = null;
+        }
+
+        function updateMarginDisplay() {
+            if (!currentEditingItem) return;
+            
+            const mode = document.getElementById('priceInputMode').value;
+            const grossInput = parseFloat(document.getElementById('grossPriceInput').value) || 0;
+            const netInput = parseFloat(document.getElementById('netPriceInput').value) || 0;
+            
+            let netPrice = mode === 'gross' ? grossInput / (1 + currentEditingItem.taxRate) : netInput;
+            let margin = netPrice - currentEditingItem.deliveryCost;
+            let marginPercent = netPrice > 0 ? (margin / netPrice) * 100 : 0;
+            
+            // Update margin display
+            const marginDisplay = document.getElementById('marginDisplay');
+            const marginPercentDisplay = document.getElementById('marginPercentDisplay');
+            
+            marginDisplay.textContent = '€' + margin.toFixed(2);
+            marginPercentDisplay.textContent = marginPercent.toFixed(1) + '%';
+            
+            // Color coding
+            const container = document.getElementById('marginContainer');
+            container.className = 'p-3 rounded-lg border-2 ';
+            
+            if (margin <= 0) {
+                container.className += 'border-red-300 bg-red-50';
+                marginDisplay.className = 'font-medium text-red-600';
+                marginPercentDisplay.className = 'text-sm text-red-500';
+            } else if (marginPercent < 20) {
+                container.className += 'border-yellow-300 bg-yellow-50';
+                marginDisplay.className = 'font-medium text-yellow-700';
+                marginPercentDisplay.className = 'text-sm text-yellow-600';
+            } else {
+                container.className += 'border-green-300 bg-green-50';
+                marginDisplay.className = 'font-medium text-green-600';
+                marginPercentDisplay.className = 'text-sm text-green-500';
+            }
+        }
+
+        function togglePriceMode() {
+            const mode = document.getElementById('priceInputMode').value;
+            const grossContainer = document.getElementById('grossPriceContainer');
+            const netContainer = document.getElementById('netPriceContainer');
+            
+            if (mode === 'gross') {
+                grossContainer.classList.remove('hidden');
+                netContainer.classList.add('hidden');
+            } else {
+                grossContainer.classList.add('hidden');
+                netContainer.classList.remove('hidden');
+            }
+            
+            updateMarginDisplay();
+        }
+
+        async function savePriceUpdate() {
+            if (!currentEditingItem) return;
+            
+            const mode = document.getElementById('priceInputMode').value;
+            const grossPrice = parseFloat(document.getElementById('grossPriceInput').value);
+            const netPrice = parseFloat(document.getElementById('netPriceInput').value);
+            
+            const formData = {
+                price_input_mode: mode
+            };
+            
+            if (mode === 'gross') {
+                formData.gross_price = grossPrice;
+            } else {
+                formData.net_price = netPrice;
+            }
+            
+            try {
+                const response = await fetch(`/deliveries/{{ $delivery->id }}/items/${currentEditingItem.itemId}/price`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    closePriceEditor();
+                    
+                    // Refresh the page to show updated prices and margins
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    showMessage(data.message || 'Failed to update price', 'error');
+                }
+                
+            } catch (error) {
+                console.error('Price update failed:', error);
+                showMessage('Network error occurred during price update', 'error');
+            }
+        }
+
         // Start auto-refresh when page loads
         document.addEventListener('DOMContentLoaded', function() {
             startBarcodeAutoRefresh();
             // Initial sort
             sortDeliveryItems();
+            
+            // Add event listeners for price inputs
+            document.getElementById('grossPriceInput').addEventListener('input', updateMarginDisplay);
+            document.getElementById('netPriceInput').addEventListener('input', updateMarginDisplay);
+            document.getElementById('priceInputMode').addEventListener('change', togglePriceMode);
         });
     </script>
 
@@ -1092,4 +1375,82 @@
             pointer-events: none !important;
         }
     </style>
+
+    <!-- Price Editor Modal -->
+    <div id="priceEditorModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Edit Price</h3>
+                    <button type="button" onclick="closePriceEditor()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="px-6 py-4">
+                <!-- Product Info -->
+                <div class="mb-4">
+                    <h4 id="modalProductName" class="font-medium text-gray-900 dark:text-gray-100"></h4>
+                    <p id="modalProductCode" class="text-sm text-gray-500 dark:text-gray-400"></p>
+                </div>
+                
+                <!-- Current Info -->
+                <div class="grid grid-cols-2 gap-4 mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                    <div>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">Current Price (Net)</span>
+                        <div id="modalCurrentPrice" class="font-medium text-gray-900 dark:text-gray-100"></div>
+                    </div>
+                    <div>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">Delivery Cost</span>
+                        <div id="modalDeliveryCost" class="font-medium text-gray-900 dark:text-gray-100"></div>
+                    </div>
+                </div>
+                
+                <!-- Price Input Mode -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Input Mode</label>
+                    <select id="priceInputMode" class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700">
+                        <option value="net">Net Price (excluding VAT)</option>
+                        <option value="gross">Gross Price (including VAT)</option>
+                    </select>
+                </div>
+                
+                <!-- Price Inputs -->
+                <div id="netPriceContainer" class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Net Price (€)</label>
+                    <input type="number" id="netPriceInput" step="0.01" min="0" 
+                           class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700">
+                </div>
+                
+                <div id="grossPriceContainer" class="mb-4 hidden">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Gross Price (€)</label>
+                    <input type="number" id="grossPriceInput" step="0.01" min="0" 
+                           class="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700">
+                </div>
+                
+                <!-- Margin Preview -->
+                <div id="marginContainer" class="p-3 rounded-lg border-2 border-gray-300 bg-gray-50">
+                    <div class="text-center">
+                        <div class="text-sm text-gray-600 dark:text-gray-400">Predicted Margin</div>
+                        <div id="marginDisplay" class="font-medium text-gray-900">€0.00</div>
+                        <div id="marginPercentDisplay" class="text-sm text-gray-500">0.0%</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3">
+                <button type="button" onclick="closePriceEditor()" 
+                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500 rounded-md">
+                    Cancel
+                </button>
+                <button type="button" onclick="savePriceUpdate()" 
+                        class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md">
+                    Update Price & Add to Labels
+                </button>
+            </div>
+        </div>
+    </div>
 </x-admin-layout>

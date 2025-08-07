@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Delivery;
 use App\Models\DeliveryItem;
+use App\Models\LabelLog;
 use App\Models\Supplier;
 use App\Services\DeliveryService;
 use App\Services\SupplierService;
@@ -244,6 +245,76 @@ class DeliveryController extends Controller
             'item' => $this->formatDeliveryItem($item->fresh(['product.supplier']), $delivery),
             'message' => 'Quantity updated successfully',
         ]);
+    }
+
+    /**
+     * Update price for a delivery item's product
+     */
+    public function updateItemPrice(Request $request, Delivery $delivery, DeliveryItem $item): JsonResponse
+    {
+        $request->validate([
+            'price_input_mode' => 'required|in:gross,net',
+            'gross_price' => 'required_if:price_input_mode,gross|nullable|numeric|min:0|max:999999.99',
+            'net_price' => 'required_if:price_input_mode,net|nullable|numeric|min:0|max:999999.99',
+            'final_net_price' => 'nullable|numeric|min:0|max:999999.99', // JavaScript-calculated fallback
+        ]);
+
+        // Check if item has a product
+        if (!$item->product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot update price for items without linked products',
+            ], 422);
+        }
+
+        try {
+            // Calculate net price based on input mode
+            if ($request->price_input_mode === 'gross') {
+                // Get tax rate for conversion
+                $taxRate = 0;
+                if ($item->product->taxCategory && $item->product->taxCategory->primaryTax) {
+                    $taxRate = $item->product->taxCategory->primaryTax->RATE;
+                }
+                $netPrice = $request->gross_price / (1 + $taxRate);
+            } elseif ($request->has('final_net_price')) {
+                // Use JavaScript-calculated net price (most accurate)
+                $netPrice = $request->final_net_price;
+            } else {
+                // User entered net price directly
+                $netPrice = $request->net_price;
+            }
+
+            // Update the product's price
+            $item->product->update([
+                'PRICESELL' => $netPrice,
+            ]);
+
+            // Log the price update for label printing
+            LabelLog::logPriceUpdate($item->product->CODE);
+
+            // Calculate new margin for response
+            $deliveryCost = $item->unit_cost;
+            $margin = $netPrice - $deliveryCost;
+            $marginPercent = $netPrice > 0 ? ($margin / $netPrice) * 100 : 0;
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Price updated successfully and added to label queue',
+                'data' => [
+                    'new_net_price' => number_format($netPrice, 2),
+                    'new_gross_price' => number_format($netPrice * (1 + ($taxRate ?? 0)), 2),
+                    'margin' => number_format($margin, 2),
+                    'margin_percent' => number_format($marginPercent, 1),
+                    'added_to_labels' => true,
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update price: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**

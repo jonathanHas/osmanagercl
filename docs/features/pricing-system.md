@@ -84,6 +84,21 @@ $request->validate([
 - Maintains existing functionality
 - Used for non-supplier products
 
+### 2. Delivery-Based Price Management
+**Enhanced Feature**: Complete price management during delivery verification.
+
+**Key Capabilities**:
+- **Bulk Cost Updates**: Update multiple product costs based on delivery pricing with configurable thresholds
+- **Individual Price Editing**: Quick price adjustments with real-time margin feedback
+- **VAT-Exclusive Margin Analysis**: Accurate profitability calculations excluding VAT
+- **Safety Controls**: Zero-cost item detection and protection during bulk updates
+- **Label Integration**: Automatic addition to label queue for immediate shelf price updates
+
+**Usage Context**:
+- Triggered during delivery verification when price differences are detected
+- Provides immediate cost adjustment capabilities without leaving delivery workflow
+- Supports both emergency price fixes and planned repricing during stock receipt
+
 ### Delivery-Based Pricing (UDEA Integration)
 - **Automatic Detection**: Recognizes UDEA suppliers during product creation from deliveries
 - **Scraped Customer Prices**: Uses real UDEA retail prices instead of calculated markup
@@ -113,20 +128,37 @@ When creating products from UDEA delivery items, the system now provides:
 - **Visual Feedback**: Button animation and field highlighting when name is updated
 - **Non-Disruptive**: Only appears when scraped name differs from delivery description
 
-### 2. VAT-Inclusive Selling Price
+### 3. VAT-Inclusive Selling Price
 - **Input**: Final selling price including VAT
 - **Calculation**: Automatic net price calculation using product's VAT rate
 - **Storage**: Full precision net price stored
 - **Display**: Shows calculated net price below input
 
-### 3. Supplier-Based Updates
+### 4. Supplier-Based Updates
 Quick action buttons for supplier-driven pricing:
 - **Update Cost**: Match Udea unit cost
 - **Match Customer**: Set price to Udea's retail price
 - **Competitive (+10%)**: Udea price + 10% margin
 - **Optimal Price**: Cost + transport + 35% margin
 
-### 4. Advanced Pricing Options
+### 4. Delivery-Based Quick Price Editing
+**New Feature**: Integrated price management directly from delivery verification interface.
+
+**Features**:
+- **Modal Price Editor**: Clean interface for instant price adjustments during delivery processing
+- **Dual Input Modes**: Support for both gross price (VAT-inclusive) and net price entry
+- **Real-time Margin Calculation**: Live updates showing margin impact as prices are adjusted
+- **Automatic Label Queue Integration**: Price updates automatically added to label printing queue
+- **VAT-Aware Calculations**: Uses product's tax category for accurate gross/net conversions
+- **Clickable Price Interface**: Current sell prices are clickable with hover edit indicators
+
+**Implementation**:
+- Route: `PATCH /deliveries/{delivery}/items/{item}/price`
+- Controller: `DeliveryController@updateItemPrice()`
+- Integration: Automatic `LabelLog::logPriceUpdate()` for shelf price updates
+- Validation: Supports both gross and net price inputs with proper tax calculations
+
+### 5. Advanced Pricing Options
 Collapsible section with additional strategies:
 - Industry average pricing (30% margin)
 - Break-even price calculations

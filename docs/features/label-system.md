@@ -23,9 +23,11 @@ The label system provides automated label generation and printing capabilities w
 - **Intelligent detection** of products requiring new labels based on:
   - New product creation events
   - Price update events  
+  - **Delivery-based price updates** (automatic integration)
   - Manual re-queue requests
 - **Smart filtering** excludes recently printed products (7-day window)
 - **Real-time updates** when products are added back to the queue
+- **Delivery Integration**: Price updates during delivery verification automatically trigger label requirements
 
 ### 🖨️ Printing System
 - **Single label printing** for individual products
@@ -79,7 +81,9 @@ const EVENT_REQUEUE_LABEL = 'requeue_label';
 
 // Key Methods
 LabelLog::logLabelPrint($barcode);
+LabelLog::logPriceUpdate($barcode);  // New: Automatic from delivery price updates
 LabelLog::logRequeueLabel($barcode);
+LabelLog::logNewProduct($barcode);
 ```
 
 #### LabelTemplate
@@ -146,6 +150,50 @@ This ensures:
 - **Print All**: Collects current visible products dynamically (not cached)
 - **Preview All**: Uses live product list for accurate previews
 - **Real-time updates**: No need to navigate away and back after re-queuing
+
+## Delivery System Integration
+
+### Automatic Label Queue Management
+**New Feature**: Seamless integration between delivery price management and label printing workflow.
+
+**Key Capabilities**:
+- **Automatic Price Update Logging**: When prices are updated during delivery verification, products are automatically added to the label queue
+- **Quick Edit Integration**: The delivery price edit modal automatically triggers `LabelLog::logPriceUpdate()` 
+- **Bulk Update Support**: Mass price updates during delivery processing add all affected products to label queue
+- **Real-time Feedback**: Users receive confirmation that updated products have been "added to label queue"
+- **Immediate Availability**: Updated products appear in label dashboard without manual intervention
+
+**Technical Implementation**:
+```php
+// Delivery price update automatically triggers label requirement
+public function updateItemPrice(Request $request, Delivery $delivery, DeliveryItem $item)
+{
+    // Update product price...
+    $item->product->update(['PRICESELL' => $netPrice]);
+    
+    // Automatic label queue integration
+    LabelLog::logPriceUpdate($item->product->CODE);
+    
+    return response()->json([
+        'message' => 'Price updated successfully and added to label queue',
+        'added_to_labels' => true,
+    ]);
+}
+```
+
+**User Experience Benefits**:
+- **Streamlined Workflow**: Price updates during delivery processing automatically queue shelf price updates
+- **No Manual Steps**: Eliminates need to remember to manually add products to label queue
+- **Immediate Action**: Users can process labels immediately after delivery completion
+- **Visual Confirmation**: Clear feedback confirming label queue addition in delivery interface
+
+### Integration Points
+1. **Delivery Price Edit Modal**: Automatic logging on individual price updates
+2. **Bulk Cost Update System**: Mass logging for threshold-based cost updates  
+3. **Product Creation from Deliveries**: New products automatically queued for initial labels
+4. **Label Dashboard**: Enhanced to show delivery-triggered updates with context
+
+This integration ensures that pricing changes made during delivery verification immediately translate to actionable shelf price update tasks, maintaining pricing accuracy across the entire retail operation.
 
 ### Responsive Design
 - **Mobile-optimized** template selection
