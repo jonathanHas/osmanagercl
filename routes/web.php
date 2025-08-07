@@ -33,6 +33,7 @@ Route::middleware('auth')->group(function () {
     // Product routes
     Route::get('/products', [ProductController::class, 'index'])->name('products.index');
     Route::get('/products/create', [ProductController::class, 'create'])->name('products.create');
+    Route::get('/products/independent-test', [\App\Http\Controllers\IndependentTestController::class, 'index'])->name('products.independent-test');
     Route::post('/products', [ProductController::class, 'store'])->name('products.store');
     Route::get('/products/suppliers', [ProductController::class, 'suppliersIndex'])->name('products.suppliers');
     Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show');

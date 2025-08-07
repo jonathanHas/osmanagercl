@@ -120,6 +120,64 @@
                                             </a>
                                         </div>
                                     @endif
+                                    
+                                    <!-- Independent Test Link - Only show for Independent supplier -->
+                                    @if((isset($prefillData['supplier_code']) || old('supplier_code')) && 
+                                        isset($prefillData['supplier_id']) && 
+                                        $prefillData['supplier_id'] == 37)
+                                        <div class="mt-3 flex gap-2">
+                                            <a href="{{ route('products.independent-test', ['supplier_code' => $prefillData['supplier_code'] ?? old('supplier_code')]) }}" 
+                                               target="_blank" 
+                                               class="inline-flex items-center px-3 py-2 border border-purple-300 shadow-sm text-sm font-medium rounded-md text-purple-700 bg-purple-50 hover:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 dark:bg-purple-900/20 dark:text-purple-200 dark:border-purple-600 dark:hover:bg-purple-800/30 transition-colors duration-200">
+                                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                                </svg>
+                                                Test Independent Product Lookup
+                                            </a>
+                                            <a href="https://iihealthfoods.com/search?q={{ urlencode($prefillData['supplier_code'] ?? old('supplier_code')) }}" 
+                                               target="_blank" 
+                                               class="inline-flex items-center px-3 py-2 border border-green-300 shadow-sm text-sm font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 dark:bg-green-900/20 dark:text-green-200 dark:border-green-600 dark:hover:bg-green-800/30 transition-colors duration-200">
+                                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                                                </svg>
+                                                View on Independent Website
+                                            </a>
+                                        </div>
+                                        
+                                        <!-- Independent Product Image Preview -->
+                                        <div id="independent-product-image" class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg dark:bg-green-900/20 dark:border-green-800" style="display: none;">
+                                            <div class="flex items-start">
+                                                <div class="flex-shrink-0 mr-3">
+                                                    <img id="independent-image" 
+                                                         src="" 
+                                                         alt="Product image from Independent" 
+                                                         class="w-24 h-24 object-contain rounded border border-green-300 dark:border-green-700 bg-white cursor-pointer hover:opacity-80 transition-opacity"
+                                                         onclick="openImageModal(this.src.replace('?width=533', ''), '{{ $prefillData['supplier_code'] ?? '' }}')"
+                                                         onerror="this.parentElement.parentElement.parentElement.style.display='none';">
+                                                </div>
+                                                <div class="flex-1">
+                                                    <div class="flex items-center mb-2">
+                                                        <svg class="w-4 h-4 text-green-600 dark:text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                                        </svg>
+                                                        <h4 class="text-sm font-semibold text-green-800 dark:text-green-200">Product Image from Independent</h4>
+                                                    </div>
+                                                    <p class="text-sm text-green-700 dark:text-green-300">
+                                                        This image is retrieved from Independent Health Foods website.
+                                                    </p>
+                                                    <p class="text-xs text-green-600 dark:text-green-400 mt-1">
+                                                        Click image to view full size
+                                                    </p>
+                                                    <a id="independent-image-link" 
+                                                       href="" 
+                                                       target="_blank"
+                                                       class="text-xs text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 mt-1 inline-block">
+                                                        View full size →
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endif
                                 </div>
 
                                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -669,20 +727,25 @@
         }
         
         // Track when user manually enters selling price
-        document.getElementById('price_sell').addEventListener('input', function() {
-            // Mark that user has manually set a selling price
-            if (this.value && this.value.trim() !== '') {
-                userHasSetSellingPrice = true;
-            }
-            updatePricingBreakdown();
-        });
+        const priceSellEl = document.getElementById('price_sell');
+        if (priceSellEl) {
+            priceSellEl.addEventListener('input', function() {
+                // Mark that user has manually set a selling price
+                if (this.value && this.value.trim() !== '') {
+                    userHasSetSellingPrice = true;
+                }
+                updatePricingBreakdown();
+            });
+        }
 
-        document.getElementById('price_buy').addEventListener('input', function() {
-            const costPrice = parseFloat(this.value);
-            const sellPriceField = document.getElementById('price_sell');
-            const hasDeliveryCost = document.getElementById('has_delivery_cost').checked;
-            const taxCategoryId = document.getElementById('tax_category').value;
-            const taxRate = taxCategoryId && taxRates[taxCategoryId] !== undefined ? parseFloat(taxRates[taxCategoryId]) : 0.00;
+        const priceBuyEl = document.getElementById('price_buy');
+        if (priceBuyEl) {
+            priceBuyEl.addEventListener('input', function() {
+                const costPrice = parseFloat(this.value);
+                const sellPriceField = document.getElementById('price_sell');
+                const hasDeliveryCost = document.getElementById('has_delivery_cost').checked;
+                const taxCategoryId = document.getElementById('tax_category').value;
+                const taxRate = taxCategoryId && taxRates[taxCategoryId] !== undefined ? parseFloat(taxRates[taxCategoryId]) : 0.00;
             
             if (!isNaN(costPrice) && costPrice > 0) {
                 // Only auto-update selling price if:
@@ -704,36 +767,58 @@
             }
             updatePricingBreakdown();
         });
-        document.getElementById('has_delivery_cost').addEventListener('change', updatePricingBreakdown);
-        document.getElementById('tax_category').addEventListener('change', function() {
-            updatePricingBreakdown();
-            updateTaxCategoryFieldStyling(this, this.value !== '');
-        });
+        }
+        
+        const hasDeliveryCostEl = document.getElementById('has_delivery_cost');
+        if (hasDeliveryCostEl) {
+            hasDeliveryCostEl.addEventListener('change', updatePricingBreakdown);
+        }
+        
+        const taxCategoryEl = document.getElementById('tax_category');
+        if (taxCategoryEl) {
+            taxCategoryEl.addEventListener('change', function() {
+                updatePricingBreakdown();
+                updateTaxCategoryFieldStyling(this, this.value !== '');
+            });
+        }
 
         // Auto-fill supplier cost from cost price
-        document.getElementById('price_buy').addEventListener('input', function() {
-            const costPrice = parseFloat(this.value);
-            if (!isNaN(costPrice) && costPrice > 0) {
-                const supplierCostField = document.getElementById('supplier_cost');
-                if (!supplierCostField.value) {
-                    supplierCostField.value = costPrice.toFixed(2);
+        if (priceBuyEl) {
+            priceBuyEl.addEventListener('input', function() {
+                const costPrice = parseFloat(this.value);
+                if (!isNaN(costPrice) && costPrice > 0) {
+                    const supplierCostField = document.getElementById('supplier_cost');
+                    if (supplierCostField && !supplierCostField.value) {
+                        supplierCostField.value = costPrice.toFixed(2);
+                    }
                 }
-            }
-        });
+            });
+        }
 
         // Auto-calculate stock cost from cost price and initial stock
         function updateStockCost() {
-            const costPrice = parseFloat(document.getElementById('price_buy').value) || 0;
-            const initialStock = parseFloat(document.getElementById('initial_stock').value) || 0;
+            const priceBuyField = document.getElementById('price_buy');
+            const initialStockField = document.getElementById('initial_stock');
             const stockCostField = document.getElementById('stock_cost');
+            
+            if (!priceBuyField || !initialStockField || !stockCostField) return;
+            
+            const costPrice = parseFloat(priceBuyField.value) || 0;
+            const initialStock = parseFloat(initialStockField.value) || 0;
             
             if (costPrice > 0 && initialStock > 0 && !stockCostField.value) {
                 stockCostField.value = (costPrice * initialStock).toFixed(2);
             }
         }
 
-        document.getElementById('price_buy').addEventListener('input', updateStockCost);
-        document.getElementById('initial_stock').addEventListener('input', updateStockCost);
+        if (priceBuyEl) {
+            priceBuyEl.addEventListener('input', updateStockCost);
+        }
+        
+        const initialStockEl = document.getElementById('initial_stock');
+        if (initialStockEl) {
+            initialStockEl.addEventListener('input', updateStockCost);
+        }
         
         // Initialize pricing breakdown
         document.addEventListener('DOMContentLoaded', function() {
@@ -829,19 +914,30 @@
                 updatePricingBreakdown();
             }, 100);
             
-            // Add UDEA link update functionality
+            // Add UDEA and Independent link update functionality
             const supplierCodeField = document.getElementById('supplier_code');
             const supplierIdField = document.getElementById('supplier_id');
             if (supplierCodeField) {
                 supplierCodeField.addEventListener('input', function() {
-                    updateUdeaLink(this.value);
+                    updateSupplierLinks(this.value);
+                    updateIndependentImage(this.value);
                 });
             }
             if (supplierIdField) {
                 supplierIdField.addEventListener('change', function() {
                     const supplierCode = document.getElementById('supplier_code').value;
-                    updateUdeaLink(supplierCode);
+                    updateSupplierLinks(supplierCode);
+                    updateIndependentImage(supplierCode);
                 });
+            }
+            
+            // Load Independent image on page load if applicable
+            if (supplierIdField && supplierCodeField) {
+                const initialSupplierId = parseInt(supplierIdField.value);
+                const initialSupplierCode = supplierCodeField.value;
+                if (initialSupplierId === 37 && initialSupplierCode) {
+                    updateIndependentImage(initialSupplierCode);
+                }
             }
 
             // Check if selling price is already prefilled (e.g., from scraped data)
@@ -850,30 +946,43 @@
                 userHasSetSellingPrice = true;
             }
 
-            // Initialize display name preview
-            initializeDisplayNamePreview();
+            // Initialize display name preview (with error handling)
+            try {
+                initializeDisplayNamePreview();
+            } catch (e) {
+                console.log('Display name preview initialization skipped:', e.message);
+            }
             
-            // Initialize till visibility preview
-            initializeTillVisibilityPreview();
+            // Initialize till visibility preview (with error handling)
+            try {
+                initializeTillVisibilityPreview();
+            } catch (e) {
+                console.log('Till visibility preview initialization skipped:', e.message);
+            }
         });
         
         // UDEA supplier IDs from PHP
         const udeaSupplierIds = @json($udeaSupplierIds);
         
-        function updateUdeaLink(supplierCode) {
-            const existingLink = document.querySelector('.udea-website-link');
-            if (existingLink) {
-                existingLink.remove();
+        function updateSupplierLinks(supplierCode) {
+            // Remove existing supplier links
+            const existingLinks = document.querySelector('.supplier-website-links');
+            if (existingLinks) {
+                existingLinks.remove();
             }
             
-            // Check if current supplier is a UDEA supplier
-            const supplierId = document.getElementById('supplier_id').value;
-            const isUdeaSupplier = supplierId && udeaSupplierIds.includes(parseInt(supplierId));
+            const supplierId = parseInt(document.getElementById('supplier_id').value);
+            if (!supplierId || !supplierCode.trim()) {
+                return;
+            }
             
-            if (supplierCode.trim() && isUdeaSupplier) {
-                const nameFieldContainer = document.getElementById('name').closest('div');
-                const linkHtml = `
-                    <div class="mt-3 udea-website-link">
+            const nameFieldContainer = document.getElementById('name').closest('div');
+            let linkHtml = '';
+            
+            // Check if current supplier is a UDEA supplier
+            if (udeaSupplierIds.includes(supplierId)) {
+                linkHtml = `
+                    <div class="mt-3 supplier-website-links">
                         <a href="https://www.udea.nl/search/?qry=${encodeURIComponent(supplierCode)}" 
                            target="_blank" 
                            class="inline-flex items-center px-3 py-2 border border-blue-300 shadow-sm text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-900/20 dark:text-blue-200 dark:border-blue-600 dark:hover:bg-blue-800/30 transition-colors duration-200">
@@ -884,7 +993,178 @@
                         </a>
                     </div>
                 `;
+            }
+            // Check if current supplier is Independent (ID 37)
+            else if (supplierId === 37) {
+                linkHtml = `
+                    <div class="mt-3 supplier-website-links flex gap-2">
+                        <a href="/products/independent-test?supplier_code=${encodeURIComponent(supplierCode)}" 
+                           target="_blank" 
+                           class="inline-flex items-center px-3 py-2 border border-purple-300 shadow-sm text-sm font-medium rounded-md text-purple-700 bg-purple-50 hover:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 dark:bg-purple-900/20 dark:text-purple-200 dark:border-purple-600 dark:hover:bg-purple-800/30 transition-colors duration-200">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                            </svg>
+                            Test Independent Product Lookup
+                        </a>
+                        <a href="https://iihealthfoods.com/search?q=${encodeURIComponent(supplierCode)}" 
+                           target="_blank" 
+                           class="inline-flex items-center px-3 py-2 border border-green-300 shadow-sm text-sm font-medium rounded-md text-green-700 bg-green-50 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 dark:bg-green-900/20 dark:text-green-200 dark:border-green-600 dark:hover:bg-green-800/30 transition-colors duration-200">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                            </svg>
+                            View on Independent Website
+                        </a>
+                    </div>
+                `;
+            }
+            
+            if (linkHtml) {
                 nameFieldContainer.insertAdjacentHTML('afterend', linkHtml);
+            }
+        }
+        
+        // Function to update Independent product image
+        function updateIndependentImage(supplierCode) {
+            const supplierIdField = document.getElementById('supplier_id');
+            if (!supplierIdField) {
+                console.log('Supplier ID field not found');
+                return;
+            }
+            
+            const supplierId = parseInt(supplierIdField.value);
+            const imageContainer = document.getElementById('independent-product-image');
+            
+            console.log('updateIndependentImage called:', {
+                supplierCode: supplierCode,
+                supplierId: supplierId,
+                isIndependent: supplierId === 37,
+                hasContainer: !!imageContainer
+            });
+            
+            // Only proceed if it's Independent supplier (ID 37)
+            if (supplierId !== 37 || !supplierCode || !supplierCode.trim()) {
+                if (imageContainer) {
+                    imageContainer.style.display = 'none';
+                }
+                return;
+            }
+            
+            // Create a dynamic container if it doesn't exist (for dynamic links)
+            if (!imageContainer) {
+                const nameFieldContainer = document.getElementById('name').closest('div');
+                const imageHtml = `
+                    <div id="independent-product-image" class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg dark:bg-green-900/20 dark:border-green-800" style="display: none;">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 mr-3">
+                                <img id="independent-image" 
+                                     src="" 
+                                     alt="Product image from Independent" 
+                                     class="w-24 h-24 object-contain rounded border border-green-300 dark:border-green-700 bg-white cursor-pointer hover:opacity-80 transition-opacity"
+                                     onerror="this.parentElement.parentElement.parentElement.style.display='none';">
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex items-center mb-2">
+                                    <svg class="w-4 h-4 text-green-600 dark:text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <h4 class="text-sm font-semibold text-green-800 dark:text-green-200">Product Image from Independent</h4>
+                                </div>
+                                <p class="text-sm text-green-700 dark:text-green-300">
+                                    This image is retrieved from Independent Health Foods website.
+                                </p>
+                                <p class="text-xs text-green-600 dark:text-green-400 mt-1">
+                                    Click image to view full size
+                                </p>
+                                <a id="independent-image-link" 
+                                   href="" 
+                                   target="_blank"
+                                   class="text-xs text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 mt-1 inline-block">
+                                    View full size →
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // Find where to insert the image container
+                const existingLinks = document.querySelector('.supplier-website-links');
+                if (existingLinks) {
+                    existingLinks.insertAdjacentHTML('afterend', imageHtml);
+                } else {
+                    nameFieldContainer.insertAdjacentHTML('afterend', imageHtml);
+                }
+            }
+            
+            const updatedContainer = document.getElementById('independent-product-image');
+            const imageElement = document.getElementById('independent-image');
+            const imageLinkElement = document.getElementById('independent-image-link');
+            
+            if (updatedContainer && imageElement && imageLinkElement) {
+                // Try multiple image paths and formats
+                const imagePaths = [
+                    {
+                        thumb: `https://iihealthfoods.com/cdn/shop/files/${supplierCode}_1.webp?width=533`,
+                        full: `https://iihealthfoods.com/cdn/shop/files/${supplierCode}_1.webp`,
+                        type: 'files/webp'
+                    },
+                    {
+                        thumb: `https://iihealthfoods.com/cdn/shop/products/${supplierCode}_1.jpg?width=533`,
+                        full: `https://iihealthfoods.com/cdn/shop/products/${supplierCode}_1.jpg`,
+                        type: 'products/jpg'
+                    },
+                    {
+                        thumb: `https://iihealthfoods.com/cdn/shop/files/${supplierCode}_1.jpg?width=533`,
+                        full: `https://iihealthfoods.com/cdn/shop/files/${supplierCode}_1.jpg`,
+                        type: 'files/jpg'
+                    }
+                ];
+                
+                console.log('Trying Independent image paths for:', supplierCode);
+                
+                // Function to try loading images in sequence
+                function tryLoadImage(index) {
+                    if (index >= imagePaths.length) {
+                        console.log('No working image found for:', supplierCode);
+                        updatedContainer.style.display = 'none';
+                        return;
+                    }
+                    
+                    const currentPath = imagePaths[index];
+                    const testImage = new Image();
+                    
+                    testImage.onload = function() {
+                        console.log('Independent image loaded successfully:', currentPath.type);
+                        
+                        // Update image source and link
+                        imageElement.src = currentPath.thumb;
+                        imageLinkElement.href = currentPath.full;
+                        
+                        // Add click handler for modal
+                        imageElement.onclick = function() {
+                            openImageModal(currentPath.full, supplierCode);
+                        };
+                        
+                        // Show the container
+                        updatedContainer.style.display = 'block';
+                    };
+                    
+                    testImage.onerror = function() {
+                        console.log('Failed to load image from:', currentPath.type);
+                        // Try next path
+                        tryLoadImage(index + 1);
+                    };
+                    
+                    testImage.src = currentPath.thumb;
+                }
+                
+                // Start trying to load images
+                tryLoadImage(0);
+            } else {
+                console.log('Missing elements:', {
+                    container: !!updatedContainer,
+                    image: !!imageElement,
+                    link: !!imageLinkElement
+                });
             }
         }
         
@@ -1004,5 +1284,74 @@
                 visibilityText.className = 'text-xs text-red-600 dark:text-red-400';
             }
         }
+        
+        // Modal Functions
+        function openImageModal(imageUrl, supplierCode) {
+            const modal = document.getElementById('imageModal');
+            const modalImage = document.getElementById('modalImage');
+            const modalSupplierCode = document.getElementById('modalSupplierCode');
+            const modalImageLink = document.getElementById('modalImageLink');
+            
+            if (modal && modalImage) {
+                modalImage.src = imageUrl;
+                modalSupplierCode.textContent = supplierCode || 'Product';
+                modalImageLink.href = imageUrl;
+                modal.classList.remove('hidden');
+                
+                // Prevent body scroll when modal is open
+                document.body.style.overflow = 'hidden';
+            }
+        }
+        
+        function closeImageModal() {
+            const modal = document.getElementById('imageModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                // Restore body scroll
+                document.body.style.overflow = '';
+            }
+        }
+        
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeImageModal();
+            }
+        });
     </script>
+    
+    <!-- Image Modal -->
+    <div id="imageModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <!-- Background overlay -->
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="closeImageModal()"></div>
+
+            <!-- Modal panel -->
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+                <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-gray-100 mb-4" id="modal-title">
+                                Product Image - <span id="modalSupplierCode"></span>
+                            </h3>
+                            <div class="mt-2">
+                                <img id="modalImage" src="" alt="Full size product image" class="w-full h-auto max-h-[70vh] object-contain">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button" onclick="closeImageModal()" 
+                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-gray-600 text-base font-medium text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        Close
+                    </button>
+                    <a id="modalImageLink" href="" target="_blank" 
+                       class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white dark:bg-gray-600 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        Open in New Tab
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 </x-admin-layout>

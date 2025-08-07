@@ -33,15 +33,16 @@ return [
 
         'independent' => [
             // Supplier IDs in the database for Independent Health Foods
-            'supplier_ids' => [], // To be configured based on actual supplier IDs
+            'supplier_ids' => [37], // Independent supplier ID
 
-            // External image URL template (if available)
-            // {CODE} will be replaced with the product CODE/barcode
-            'image_url' => null, // To be configured if Independent provides image URLs
+            // External image URL template
+            // {SUPPLIER_CODE} will be replaced with the supplier's product code
+            // Note: Independent uses supplier code, not barcode for images
+            'image_url' => 'https://iihealthfoods.com/cdn/shop/files/{SUPPLIER_CODE}_1.webp?width=533',
 
             // Supplier website search URL template
             // {SUPPLIER_CODE} will be replaced with the supplier's product code
-            'website_search' => 'https://www.independenthealthfoods.ie/search?q={SUPPLIER_CODE}',
+            'website_search' => 'https://iihealthfoods.com/search?q={SUPPLIER_CODE}',
 
             // Display name for the supplier
             'display_name' => 'Independent Health Foods',
