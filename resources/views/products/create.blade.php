@@ -105,8 +105,10 @@
                                         </div>
                                     @endif
                                     
-                                    <!-- UDEA Website Link -->
-                                    @if(isset($prefillData['supplier_code']) || old('supplier_code'))
+                                    <!-- UDEA Website Link - Only show for UDEA suppliers -->
+                                    @if((isset($prefillData['supplier_code']) || old('supplier_code')) && 
+                                        isset($prefillData['supplier_id']) && 
+                                        in_array($prefillData['supplier_id'], $udeaSupplierIds))
                                         <div class="mt-3">
                                             <a href="https://www.udea.nl/search/?qry={{ urlencode($prefillData['supplier_code'] ?? old('supplier_code')) }}" 
                                                target="_blank" 
@@ -455,7 +457,7 @@
                                            id="show_on_till" 
                                            name="show_on_till" 
                                            value="1" 
-                                           {{ old('show_on_till', '1') ? 'checked' : '' }}
+                                           {{ old('show_on_till') ? 'checked' : '' }}
                                            class="mt-1 rounded border-gray-300 text-green-600 focus:ring-green-500">
                                     <label for="show_on_till" class="ml-3 block text-sm text-gray-700 dark:text-gray-300">
                                         <span class="font-medium">Show on Till</span>
@@ -547,13 +549,8 @@
             });
         @endif
         
-        // Tax rates mapping
-        const taxRates = {
-            '000': 0.00,    // Tax aZero
-            '001': 0.135,   // Tax Reduced (13.5%)
-            '002': 0.23,    // Tax Standard (23%)
-            '003': 0.09     // Tax Second Reduced (9%)
-        };
+        // Tax rates mapping from PHP (actual database values)
+        const taxRates = @json($taxRates);
         
         console.log('Script loaded, tax rates:', taxRates);
         
@@ -597,8 +594,8 @@
             const hasDeliveryCost = deliveryCostEl.checked;
             const taxCategoryId = taxCategoryEl.value;
             console.log('Selected tax category ID:', taxCategoryId);
-            // Default to 0% VAT (Tax aZero) if no category selected
-            const taxRate = taxCategoryId ? (taxRates[taxCategoryId] !== undefined ? taxRates[taxCategoryId] : 0.00) : 0.00;
+            // Get tax rate from the PHP-provided rates, convert string to float
+            const taxRate = taxCategoryId && taxRates[taxCategoryId] !== undefined ? parseFloat(taxRates[taxCategoryId]) : 0.00;
             console.log('Applied tax rate:', taxRate);
             
             // Calculate delivery cost
@@ -685,7 +682,7 @@
             const sellPriceField = document.getElementById('price_sell');
             const hasDeliveryCost = document.getElementById('has_delivery_cost').checked;
             const taxCategoryId = document.getElementById('tax_category').value;
-            const taxRate = taxRates[taxCategoryId] || 0.00; // Default to 0% VAT (Tax aZero)
+            const taxRate = taxCategoryId && taxRates[taxCategoryId] !== undefined ? parseFloat(taxRates[taxCategoryId]) : 0.00;
             
             if (!isNaN(costPrice) && costPrice > 0) {
                 // Only auto-update selling price if:
@@ -827,13 +824,23 @@
             const marginPercentage = document.getElementById('margin-percentage');
             console.log('Margin elements found:', {marginAmount, marginPercentage});
             
-            updatePricingBreakdown();
+            // Call pricing breakdown update after a small delay to ensure all fields are initialized
+            setTimeout(() => {
+                updatePricingBreakdown();
+            }, 100);
             
             // Add UDEA link update functionality
             const supplierCodeField = document.getElementById('supplier_code');
+            const supplierIdField = document.getElementById('supplier_id');
             if (supplierCodeField) {
                 supplierCodeField.addEventListener('input', function() {
                     updateUdeaLink(this.value);
+                });
+            }
+            if (supplierIdField) {
+                supplierIdField.addEventListener('change', function() {
+                    const supplierCode = document.getElementById('supplier_code').value;
+                    updateUdeaLink(supplierCode);
                 });
             }
 
@@ -850,13 +857,20 @@
             initializeTillVisibilityPreview();
         });
         
+        // UDEA supplier IDs from PHP
+        const udeaSupplierIds = @json($udeaSupplierIds);
+        
         function updateUdeaLink(supplierCode) {
             const existingLink = document.querySelector('.udea-website-link');
             if (existingLink) {
                 existingLink.remove();
             }
             
-            if (supplierCode.trim()) {
+            // Check if current supplier is a UDEA supplier
+            const supplierId = document.getElementById('supplier_id').value;
+            const isUdeaSupplier = supplierId && udeaSupplierIds.includes(parseInt(supplierId));
+            
+            if (supplierCode.trim() && isUdeaSupplier) {
                 const nameFieldContainer = document.getElementById('name').closest('div');
                 const linkHtml = `
                     <div class="mt-3 udea-website-link">

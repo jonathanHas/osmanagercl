@@ -283,7 +283,7 @@
                                     Barcode
                                 </th>
                                 <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Ordered
+                                    Invoiced
                                 </th>
                                 <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Received
@@ -334,7 +334,14 @@
                         </thead>
                         <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                             @foreach($delivery->items as $item)
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                @php
+                                    // Check if this item wasn't on the delivery (0 invoiced quantity)
+                                    $notOnDelivery = $item->ordered_quantity == 0;
+                                    $rowClass = $notOnDelivery 
+                                        ? 'bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30' 
+                                        : 'hover:bg-gray-50 dark:hover:bg-gray-700';
+                                @endphp
+                                <tr class="{{ $rowClass }}">
                                     <td class="px-6 py-4 text-center">
                                         <div id="image-cell-{{ $item->id }}" class="mx-auto">
                                             @if($item->product)
@@ -402,8 +409,11 @@
                                             @endif
                                         </div>
                                     </td>
-                                    <td class="px-6 py-4 text-center text-sm text-gray-900 dark:text-gray-100">
+                                    <td class="px-6 py-4 text-center text-sm {{ $item->ordered_quantity == 0 ? 'text-amber-700 dark:text-amber-400 font-medium' : 'text-gray-900 dark:text-gray-100' }}">
                                         {{ $item->ordered_quantity }}
+                                        @if($item->ordered_quantity == 0)
+                                            <span class="block text-xs text-amber-600 dark:text-amber-500">Not invoiced</span>
+                                        @endif
                                     </td>
                                     <td class="px-6 py-4 text-center text-sm text-gray-900 dark:text-gray-100">
                                         {{ $item->received_quantity }}

@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Models\ProductMetadata;
 use App\Models\Supplier;
 use App\Models\SupplierLink;
+use App\Models\Tax;
 use App\Models\TaxCategory;
 use App\Repositories\CategoryRepository;
 use App\Repositories\ProductRepository;
@@ -440,6 +441,12 @@ class ProductController extends Controller
         $taxCategories = TaxCategory::orderBy('NAME')->get();
         $categories = Category::orderBy('NAME')->get();
         $suppliers = Supplier::orderBy('Supplier')->get();
+        
+        // Get tax rates for JavaScript pricing calculations
+        $taxRates = Tax::pluck('RATE', 'CATEGORY')->toArray();
+        
+        // Get UDEA supplier IDs from config
+        $udeaSupplierIds = config('suppliers.external_links.udea.supplier_ids', [5, 44, 85]);
 
         // Check if we're creating from a delivery item
         $deliveryItemId = $request->query('delivery_item');
@@ -509,7 +516,7 @@ class ProductController extends Controller
             }
         }
 
-        return view('products.create', compact('taxCategories', 'categories', 'suppliers', 'prefillData', 'deliveryItemId', 'categoryId'));
+        return view('products.create', compact('taxCategories', 'categories', 'suppliers', 'prefillData', 'deliveryItemId', 'categoryId', 'taxRates', 'udeaSupplierIds'));
     }
 
     /**
