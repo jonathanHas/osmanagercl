@@ -98,7 +98,7 @@
     </x-slot>
 
     <div class="py-6">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
             
             <x-alert type="success" :message="session('success')" />
             <x-alert type="error" :message="session('error')" />
@@ -166,27 +166,62 @@
                 </div>
             </div>
 
-            <!-- Progress Bar -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
-                <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Delivery Progress</h3>
-                <div class="w-full bg-gray-200 rounded-full h-4 mb-2">
-                    <div class="bg-green-600 h-4 rounded-full transition-all duration-300" 
-                         style="width: {{ $delivery->completion_percentage }}%"></div>
+            <!-- Progress Bar with Price Legend -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-4">
+                        <h3 class="text-base font-medium text-gray-900 dark:text-gray-100">Progress</h3>
+                        <div class="flex-1 max-w-md">
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-green-600 h-2 rounded-full transition-all duration-300" 
+                                     style="width: {{ $delivery->completion_percentage }}%"></div>
+                            </div>
+                        </div>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">
+                            {{ $delivery->items->where('status', '!=', 'pending')->count() }}/{{ $delivery->items->count() }} 
+                            ({{ number_format($delivery->completion_percentage, 0) }}%)
+                        </span>
+                    </div>
                 </div>
-                <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-                    <span>{{ $delivery->items->where('status', '!=', 'pending')->count() }} of {{ $delivery->items->count() }} items processed</span>
-                    <span>{{ number_format($delivery->completion_percentage, 1) }}% complete</span>
+                
+                <div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <div class="flex items-center gap-4">
+                        <div class="flex items-center gap-2">
+                            <span class="font-medium">Price Changes:</span>
+                            <div class="flex gap-2">
+                                <span class="px-1.5 py-0.5 bg-green-100 dark:bg-green-900/30 rounded text-xs">-10%+</span>
+                                <span class="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 rounded text-xs">-5%</span>
+                                <span class="px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 rounded text-xs">+5%</span>
+                                <span class="px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 rounded text-xs">+10%+</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <svg class="w-3 h-3 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                            </svg>
+                            <span class="text-red-600 dark:text-red-400 font-medium">Zero/Negative Margin</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Items Table -->
-            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg overflow-hidden">
+            <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg">
                 <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                     <div class="flex justify-between items-center">
                         <div class="flex items-center gap-4">
                             <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Delivery Items</h3>
                             
                             @if($delivery->status !== 'completed')
+                                <!-- Auto Update Costs Button -->
+                                <button onclick="autoUpdateCosts()" id="autoUpdateBtn"
+                                        class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors duration-200 flex items-center gap-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                    </svg>
+                                    Auto Update Costs
+                                </button>
+                                
                                 <!-- Create New Product Button -->
                                 <button onclick="alert('New product creation is available in the scanning interface. Use the \'Continue Scanning\' button above.')" 
                                         class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-md transition-colors duration-200 flex items-center gap-2">
@@ -226,9 +261,9 @@
                     </div>
                 </div>
                 
-                <div class="overflow-x-auto" style="overflow-y: visible;">
+                <div class="relative overflow-x-auto max-h-[calc(100vh-24rem)] overflow-y-auto">
                     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 delivery-items-table">
-                        <thead class="bg-gray-50 dark:bg-gray-700">
+                        <thead class="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                             <tr>
                                 <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Image
@@ -249,10 +284,19 @@
                                     Status
                                 </th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Cost
+                                    Delivery Cost
+                                </th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Current Cost
                                 </th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     RSP
+                                </th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Current Sell
+                                </th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Margin
                                 </th>
                                 <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Tax Rate
@@ -349,16 +393,44 @@
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 text-right text-sm">
-                                        <div class="text-gray-900 dark:text-gray-100">
-                                            €{{ number_format($item->unit_cost, 2) }}
-                                        </div>
-                                        <div class="text-xs text-gray-500">
-                                            per unit
-                                        </div>
-                                        @if($item->ordered_quantity > 1)
-                                            <div class="text-xs text-gray-500 mt-1">
-                                                Total: €{{ number_format($item->unit_cost * $item->ordered_quantity, 2) }}
+                                        @php
+                                            // Calculate cost difference if product exists
+                                            $currentCost = $item->product ? $item->product->PRICEBUY : null;
+                                            $costDifference = $currentCost !== null ? $item->unit_cost - $currentCost : null;
+                                            $costPercentChange = $currentCost > 0 ? ($costDifference / $currentCost * 100) : null;
+                                            
+                                            // Determine highlighting based on percentage change
+                                            $costHighlight = '';
+                                            if ($costPercentChange !== null) {
+                                                if (abs($costPercentChange) >= 10) {
+                                                    $costHighlight = $costPercentChange > 0 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-green-100 dark:bg-green-900/30';
+                                                } elseif (abs($costPercentChange) >= 5) {
+                                                    $costHighlight = $costPercentChange > 0 ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-blue-100 dark:bg-blue-900/30';
+                                                }
+                                            }
+                                        @endphp
+                                        <div class="{{ $costHighlight }} rounded px-2 py-1">
+                                            <div class="text-gray-900 dark:text-gray-100 font-medium">
+                                                €{{ number_format($item->unit_cost, 2) }}
                                             </div>
+                                            @if($costDifference !== null && abs($costDifference) > 0.01)
+                                                <div class="text-xs {{ $costDifference > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400' }}">
+                                                    {{ $costDifference > 0 ? '+' : '' }}€{{ number_format($costDifference, 2) }}
+                                                    ({{ $costDifference > 0 ? '+' : '' }}{{ number_format($costPercentChange, 1) }}%)
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 text-right text-sm">
+                                        @if($item->product)
+                                            <div class="text-gray-900 dark:text-gray-100">
+                                                €{{ number_format($item->product->PRICEBUY, 2) }}
+                                            </div>
+                                            <div class="text-xs text-gray-500">
+                                                in POS
+                                            </div>
+                                        @else
+                                            <span class="text-gray-400 dark:text-gray-500 text-xs">New Product</span>
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 text-right text-sm">
@@ -367,7 +439,83 @@
                                                 €{{ number_format($item->sale_price, 2) }}
                                             </div>
                                             <div class="text-xs text-gray-500">
-                                                per unit
+                                                RSP
+                                            </div>
+                                        @else
+                                            <span class="text-gray-400 dark:text-gray-500 text-xs">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-6 py-4 text-right text-sm">
+                                        @php
+                                            // Calculate sell price difference if product exists
+                                            $currentSell = $item->product ? $item->product->PRICESELL : null;
+                                            $rsp = $item->sale_price;
+                                            $sellDifference = ($currentSell !== null && $rsp !== null) ? $rsp - $currentSell : null;
+                                            $sellPercentChange = $currentSell > 0 ? ($sellDifference / $currentSell * 100) : null;
+                                            
+                                            // Determine highlighting for sell price
+                                            $sellHighlight = '';
+                                            if ($sellPercentChange !== null) {
+                                                if (abs($sellPercentChange) >= 10) {
+                                                    $sellHighlight = $sellPercentChange < 0 ? 'bg-orange-100 dark:bg-orange-900/30' : 'bg-green-100 dark:bg-green-900/30';
+                                                } elseif (abs($sellPercentChange) >= 5) {
+                                                    $sellHighlight = 'bg-yellow-100 dark:bg-yellow-900/30';
+                                                }
+                                            }
+                                        @endphp
+                                        @if($item->product)
+                                            <div class="{{ $sellHighlight }} rounded px-2 py-1">
+                                                <div class="text-gray-900 dark:text-gray-100 font-medium">
+                                                    €{{ number_format($currentSell, 2) }}
+                                                </div>
+                                                @if($sellDifference !== null && abs($sellDifference) > 0.01)
+                                                    <div class="text-xs {{ $sellDifference > 0 ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400' }}">
+                                                        vs RSP: {{ $sellDifference > 0 ? '+' : '' }}€{{ number_format($sellDifference, 2) }}
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        @else
+                                            <span class="text-gray-400 dark:text-gray-500 text-xs">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-6 py-4 text-right text-sm">
+                                        @php
+                                            // Calculate margin using delivery cost and VAT-exclusive current sell price
+                                            $margin = null;
+                                            $marginPercent = null;
+                                            $showWarning = false;
+                                            
+                                            if ($item->product && $item->unit_cost > 0 && $currentSell > 0) {
+                                                // Get the tax rate from the tax category
+                                                $taxRate = 0; // Default to 0% if no tax rate
+                                                if ($item->product->taxCategory && $item->product->taxCategory->primaryTax) {
+                                                    $taxRate = $item->product->taxCategory->primaryTax->RATE; // This is already a decimal (e.g., 0.20 for 20%)
+                                                }
+                                                
+                                                // Calculate VAT-exclusive sell price
+                                                $vatExclusiveSellPrice = $currentSell / (1 + $taxRate);
+                                                
+                                                // Calculate margin using VAT-exclusive price
+                                                $margin = $vatExclusiveSellPrice - $item->unit_cost;
+                                                $marginPercent = ($margin / $vatExclusiveSellPrice) * 100;
+                                                $showWarning = $margin <= 0;
+                                            }
+                                        @endphp
+                                        @if($margin !== null)
+                                            <div class="flex items-center justify-end gap-1">
+                                                @if($showWarning)
+                                                    <svg class="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" title="Zero or negative margin">
+                                                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                                    </svg>
+                                                @endif
+                                                <div class="text-right">
+                                                    <div class="text-gray-900 dark:text-gray-100 font-medium {{ $showWarning ? 'text-red-600 dark:text-red-400' : '' }}">
+                                                        €{{ number_format($margin, 2) }}
+                                                    </div>
+                                                    <div class="text-xs text-gray-500 dark:text-gray-400 {{ $showWarning ? 'text-red-500 dark:text-red-400' : '' }}">
+                                                        {{ number_format($marginPercent, 1) }}%
+                                                    </div>
+                                                </div>
                                             </div>
                                         @else
                                             <span class="text-gray-400 dark:text-gray-500 text-xs">—</span>
@@ -783,6 +931,108 @@
             } catch (error) {
                 console.error('Failed to create product from scan:', error);
                 showMessage('Network error - please try again', 'error');
+            }
+        }
+
+        // Auto update costs functionality
+        async function autoUpdateCosts() {
+            const button = document.getElementById('autoUpdateBtn');
+            const deliveryId = {{ $delivery->id }};
+            
+            // Show confirmation dialog
+            const threshold = prompt(
+                'Update costs for items with price differences above what percentage?\n' +
+                '(Enter a number between 0-100, default is 5%)', 
+                '5'
+            );
+            
+            if (threshold === null) return; // User cancelled
+            
+            const thresholdNum = parseFloat(threshold);
+            if (isNaN(thresholdNum) || thresholdNum < 0 || thresholdNum > 100) {
+                alert('Please enter a valid percentage between 0 and 100');
+                return;
+            }
+            
+            // Count delivery items with price differences (only in delivery cost column - now 8th column)
+            const deliveryCostCells = document.querySelectorAll('.delivery-items-table tbody tr td:nth-child(8) .bg-red-100, .delivery-items-table tbody tr td:nth-child(8) .bg-yellow-100, .delivery-items-table tbody tr td:nth-child(8) .bg-green-100, .delivery-items-table tbody tr td:nth-child(8) .bg-blue-100');
+            const highlightedItemsCount = deliveryCostCells.length;
+            
+            // Check for zero cost items in delivery
+            const zeroCostItems = [];
+            const tableRows = document.querySelectorAll('.delivery-items-table tbody tr');
+            tableRows.forEach(row => {
+                const deliveryCostCell = row.querySelector('td:nth-child(8)'); // Delivery Cost column (now 8th)
+                if (deliveryCostCell) {
+                    const costText = deliveryCostCell.textContent.trim();
+                    if (costText.includes('€0.00')) {
+                        const productCell = row.querySelector('td:nth-child(2) .text-sm.font-medium');
+                        if (productCell) {
+                            zeroCostItems.push(productCell.textContent.trim());
+                        }
+                    }
+                }
+            });
+            
+            // Build warning message
+            let warningMessage = `This will update costs for products with price differences of ${thresholdNum}% or more.\n\n`;
+            warningMessage += `Approximately ${highlightedItemsCount} items may be affected.\n\n`;
+            
+            if (zeroCostItems.length > 0) {
+                warningMessage += `⚠️  WARNING: ${zeroCostItems.length} items have €0.00 delivery cost (likely not delivered):\n`;
+                warningMessage += zeroCostItems.slice(0, 3).map(name => `• ${name.substring(0, 40)}${name.length > 40 ? '...' : ''}`).join('\n');
+                if (zeroCostItems.length > 3) {
+                    warningMessage += `\n• ...and ${zeroCostItems.length - 3} more`;
+                }
+                warningMessage += `\n\nThese items will be automatically SKIPPED during the update.\n\n`;
+            }
+            
+            warningMessage += `Are you sure you want to continue?`;
+                                 
+            if (!confirm(warningMessage)) return;
+            
+            // Disable button and show loading
+            button.disabled = true;
+            const originalText = button.innerHTML;
+            button.innerHTML = `
+                <svg class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Updating...
+            `;
+            
+            try {
+                const response = await fetch(`/deliveries/${deliveryId}/update-costs`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({ threshold: thresholdNum })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    
+                    // Refresh the page to show updated costs
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    showMessage(data.message || 'Cost update failed', 'error');
+                }
+                
+            } catch (error) {
+                console.error('Cost update failed:', error);
+                showMessage('Network error occurred during cost update', 'error');
+            } finally {
+                // Re-enable button
+                button.disabled = false;
+                button.innerHTML = originalText;
             }
         }
 

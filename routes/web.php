@@ -125,6 +125,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/deliveries/{delivery}/complete', [DeliveryController::class, 'complete'])->name('deliveries.complete');
     Route::post('/deliveries/{delivery}/cancel', [DeliveryController::class, 'cancel'])->name('deliveries.cancel');
     Route::get('/deliveries/{delivery}/export-discrepancies', [DeliveryController::class, 'exportDiscrepancies'])->name('deliveries.export-discrepancies');
+    Route::post('/deliveries/{delivery}/update-costs', [DeliveryController::class, 'updateCosts'])->name('deliveries.update-costs');
     Route::post('/delivery-items/{item}/refresh-barcode', [DeliveryController::class, 'refreshBarcode'])->name('delivery-items.refresh-barcode');
 
     // Order Management routes

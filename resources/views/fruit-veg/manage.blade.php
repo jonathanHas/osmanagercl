@@ -358,6 +358,9 @@
                                                             product.veg_details.country = selectedCountry;
                                                             this.originalCountryId = selectedId;
                                                         }
+                                                    } else {
+                                                        // Reset to original value if no valid change
+                                                        this.selectedCountryId = this.originalCountryId;
                                                     }
                                                     this.editing = false;
                                                 }
@@ -409,6 +412,9 @@
                                                             product.veg_details.class_name = selectedClass.name;
                                                             this.originalClassId = selectedId;
                                                         }
+                                                    } else {
+                                                        // Reset to original value if no valid change
+                                                        this.selectedClassId = this.originalClassId;
                                                     }
                                                     this.editing = false;
                                                 }
@@ -484,6 +490,9 @@
                                                             product.veg_details.unit_name = selectedUnit.abbreviation;
                                                             this.originalUnitId = selectedId;
                                                         }
+                                                    } else {
+                                                        // Reset to original value if no valid change
+                                                        this.selectedUnitId = this.originalUnitId;
                                                     }
                                                     this.editing = false;
                                                 }
@@ -700,6 +709,9 @@
                                                         product.veg_details.country = selectedCountry;
                                                         this.originalCountryId = selectedId;
                                                     }
+                                                } else {
+                                                    // Reset to original value if no valid change
+                                                    this.selectedCountryId = this.originalCountryId;
                                                 }
                                                 this.editing = false;
                                             }
@@ -750,6 +762,9 @@
                                                         product.veg_details.class_name = selectedClass.name;
                                                         this.originalClassId = selectedId;
                                                     }
+                                                } else {
+                                                    // Reset to original value if no valid change
+                                                    this.selectedClassId = this.originalClassId;
                                                 }
                                                 this.editing = false;
                                             }
@@ -829,6 +844,9 @@
                                                         product.veg_details.unit_name = selectedUnit.abbreviation;
                                                         this.originalUnitId = selectedId;
                                                     }
+                                                } else {
+                                                    // Reset to original value if no valid change
+                                                    this.selectedUnitId = this.originalUnitId;
                                                 }
                                                 this.editing = false;
                                             }

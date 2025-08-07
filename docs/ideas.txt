@@ -4,6 +4,9 @@ a udea product quick add feature that would allow the user to scan a products ba
 
 implement a users roles system so employees only have access to the features they need, managers have access to sales information etc and admins have complete access
 
-fruit and veg sales, /fruit-veg/sales
+Fuit and Veg
+quick review section, make a handy and simple mobile page that the user can select which products need a label and change the country of origin if needed
 
-sort Products by name, add pictures, maybe add a hover or a sub detail (expands when a user clicks on it) feature that shows sales per day, this way it can retrieve daily sales as needed and not all at the start
+
+Price changes
+we need to be ablel

@@ -49,12 +49,23 @@ return [
             // Enable/disable this integration
             'enabled' => true,
 
-            // CSV format configuration
+            // Enhanced CSV format configuration
             'csv_format' => [
-                'headers' => ['Code', 'Product', 'Ordered', 'Qty', 'RSP', 'Price', 'Tax', 'Value'],
-                'quantity_notation' => 'supports_ordered_received', // Supports "x/y" format
+                // Enhanced format headers with detailed unit breakdown
+                'headers' => [
+                    'Filename', 'Code', 'Product', 'Ordered', 'Qty',
+                    'Ordered_Cases', 'Ordered_Units', 'Delivered_Cases', 'Delivered_Units',
+                    'Case_Size', 'Total_Ordered_Units', 'Total_Delivered_Units',
+                    'RSP', 'Price', 'Unit_Cost', 'Tax', 'Value',
+                    'Price_Valid', 'Calc_Method', 'Expected_Value'
+                ],
+                'primary_quantity_field' => 'Total_Delivered_Units', // What we're being charged for
+                'case_size_field' => 'Case_Size', // Units per case
+                'quantity_notation' => 'supports_ordered_received', // Supports "x/y" format in Ordered/Qty fields
                 'tax_handling' => 'separate_column', // Tax is provided as separate column
                 'price_includes_tax' => false, // Price excludes tax
+                'has_validation' => true, // Price_Valid column for data integrity
+                'format_version' => 'enhanced', // Using enhanced format with detailed breakdown
             ],
         ],
     ],

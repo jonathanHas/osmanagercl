@@ -145,12 +145,21 @@ class DeliveryService
             return true;
         }
 
-        // Check headers match Independent format
-        $expectedHeaders = ['Code', 'Product', 'Ordered', 'Qty', 'RSP', 'Price', 'Tax', 'Value'];
-        $matchingHeaders = array_intersect($headers, $expectedHeaders);
+        // Check for enhanced CSV format headers first
+        $enhancedHeaders = ['Total_Ordered_Units', 'Total_Delivered_Units', 'Case_Size', 'Unit_Cost', 'Price_Valid'];
+        $matchingEnhanced = array_intersect($headers, $enhancedHeaders);
+        
+        if (count($matchingEnhanced) >= 3) {
+            // This is the enhanced format
+            return true;
+        }
+
+        // Fall back to checking original format headers
+        $originalHeaders = ['Code', 'Product', 'Ordered', 'Qty', 'RSP', 'Price', 'Tax', 'Value'];
+        $matchingOriginal = array_intersect($headers, $originalHeaders);
 
         // Consider it Independent format if most key headers match
-        return count($matchingHeaders) >= 6; // At least 6 out of 8 headers match
+        return count($matchingOriginal) >= 6; // At least 6 out of 8 headers match
     }
 
     /**
@@ -177,100 +186,81 @@ class DeliveryService
     }
 
     /**
-     * Parse Independent Health Foods CSV row into structured data
+     * Parse Independent Health Foods Enhanced CSV row into structured data
      */
     private function parseIndependentCsv(array $row): array
     {
-        // Parse quantity field which can be:
-        // - Simple number: "6"
-        // - Ordered/Received format: "6/5" (ordered 6, received 5)
-        // - Zero ordered: "0/1" (ordered 0, received 1)
-        $orderedQuantity = 0;
-        $receivedQuantity = 0;
-
-        $qtyField = trim($row['Qty'] ?? '0');
-        $orderedField = trim($row['Ordered'] ?? '0');
-
-        // First check if Ordered field contains "x/y" notation
-        if (str_contains($orderedField, '/')) {
-            [$orderedQuantity, $receivedQuantity] = explode('/', $orderedField, 2);
-            $orderedQuantity = (int) trim($orderedQuantity);
-            $receivedQuantity = (int) trim($receivedQuantity);
-        }
-        // Then check if Qty field contains "x/y" notation
-        elseif (str_contains($qtyField, '/')) {
-            [$orderedQuantity, $receivedQuantity] = explode('/', $qtyField, 2);
-            $orderedQuantity = (int) trim($orderedQuantity);
-            $receivedQuantity = (int) trim($receivedQuantity);
-        }
-        // Simple quantity in Qty field
-        else {
-            $orderedQuantity = (int) $orderedField;
-            $receivedQuantity = (int) $qtyField;
-        }
-
-        // Extract product attributes from name
+        // Enhanced CSV format with clearer unit breakdown
+        $productCode = trim($row['Code'] ?? '');
         $productName = trim($row['Product'] ?? '');
-        $attributes = $this->extractIndependentProductAttributes($productName);
-
-        // Units per case - extract from product name
-        $unitsPerCase = $this->extractUnitsFromProductName($productName);
-
-        // Calculate costs - Independent provides tax separately
-        $caseCost = (float) ($row['Price'] ?? 0);  // Price is per case, not per unit
-        $unitCost = $unitsPerCase > 0 ? $caseCost / $unitsPerCase : $caseCost;  // Convert to per-unit cost
-        $taxAmount = (float) ($row['Tax'] ?? 0);  // Total tax for the line
-        $rsp = (float) ($row['RSP'] ?? 0);
-        $lineValueExVat = (float) ($row['Value'] ?? 0);  // Total line value ex-VAT
-
-        // Calculate tax rate using correct formula: (Tax / Value) * 100
-        $taxRate = null;
-        $normalizedTaxRate = null;
-        if ($lineValueExVat > 0) {
-            $taxRate = ($taxAmount / $lineValueExVat) * 100;
-            $taxRate = round($taxRate, 2); // Round to 2 decimal places
-
-            // Normalize to standard Irish VAT rates
-            $normalizedTaxRate = $this->normalizeIrishVatRate($taxRate);
+        
+        // Use the pre-calculated total units from the enhanced CSV
+        $totalOrderedUnits = (float) ($row['Total_Ordered_Units'] ?? 0);
+        $totalDeliveredUnits = (float) ($row['Total_Delivered_Units'] ?? 0);
+        
+        // Case size information (units per case)
+        $caseSize = (int) ($row['Case_Size'] ?? 1);
+        if ($caseSize == 0) {
+            $caseSize = 1; // Default to 1 if not specified
         }
-
-        // Calculate per-unit tax amount
-        $unitTaxAmount = $receivedQuantity > 0 ? $taxAmount / $receivedQuantity : 0;
-
-        // Calculate unit cost including tax
-        $unitCostIncludingTax = $unitCost + $unitTaxAmount;
-
-        // Units per case already calculated above
-
-        // Log unusual tax rates for review
-        if ($taxRate !== null && ($taxRate > 50 || $taxRate < 0)) {
-            Log::info('Unusual tax rate detected in Independent CSV', [
-                'code' => trim($row['Code'] ?? ''),
-                'description' => $productName,
-                'tax_rate' => $taxRate,
-                'tax_amount' => $taxAmount,
-                'line_value_ex_vat' => $lineValueExVat,
-                'might_be_deposit' => $taxRate > 100,
+        
+        // Check for DRS (Deposit Return Scheme) items
+        $isDrsItem = str_contains($productName, '(DRS)') || str_ends_with($productCode, 'D');
+        $isDrsDeposit = str_contains($productName, 'Deposit') || str_contains($productName, 'DRS-1');
+        
+        if ($isDrsItem || $isDrsDeposit) {
+            Log::warning('DRS item detected in Independent delivery - requires special handling', [
+                'code' => $productCode,
+                'product' => $productName,
+                'is_deposit' => $isDrsDeposit,
+                'total_units' => $totalDeliveredUnits,
             ]);
         }
-
+        
+        // Extract product attributes from name
+        $attributes = $this->extractIndependentProductAttributes($productName);
+        
+        // Pricing information
+        $unitCost = (float) ($row['Unit_Cost'] ?? $row['Price'] ?? 0);
+        $taxAmount = (float) ($row['Tax'] ?? 0);
+        $rsp = (float) ($row['RSP'] ?? 0);
+        $lineValue = (float) ($row['Value'] ?? 0);
+        
+        // Calculate tax rate if needed
+        $taxRate = null;
+        $normalizedTaxRate = null;
+        if ($lineValue > 0 && $taxAmount > 0) {
+            $taxRate = ($taxAmount / $lineValue) * 100;
+            $taxRate = round($taxRate, 2);
+            $normalizedTaxRate = $this->normalizeIrishVatRate($taxRate);
+        }
+        
+        // Calculate per-unit tax amount based on delivered units
+        $unitTaxAmount = $totalDeliveredUnits > 0 ? $taxAmount / $totalDeliveredUnits : 0;
+        $unitCostIncludingTax = $unitCost + $unitTaxAmount;
+        
+        // Use total delivered units as the primary quantity (what we're being charged for)
+        // This is the most accurate representation of what was delivered
+        $deliveredQuantity = $totalDeliveredUnits;
+        $orderedQuantity = $totalOrderedUnits;
+        
         return [
-            'code' => trim($row['Code'] ?? ''),
-            'ordered_quantity' => $orderedQuantity,
-            'quantity' => $receivedQuantity, // Use received quantity as the main quantity
+            'code' => $productCode,
+            'ordered_quantity' => $orderedQuantity, // Total units ordered
+            'quantity' => $deliveredQuantity, // Total units delivered (what we're charged for)
             'description' => $productName,
-            'unit_cost' => $unitCost, // Correct: Price column = unit price
+            'unit_cost' => $unitCost,
             'sale_price' => $rsp,
             'tax_amount' => $taxAmount,
             'tax_rate' => $taxRate,
             'normalized_tax_rate' => $normalizedTaxRate,
-            'line_value_ex_vat' => $lineValueExVat,
+            'line_value_ex_vat' => $lineValue,
             'unit_cost_including_tax' => $unitCostIncludingTax,
-            'total_cost' => $lineValueExVat, // Use CSV Value field as authoritative total cost
-            'units_per_case' => $unitsPerCase,
+            'total_cost' => $lineValue,
+            'units_per_case' => $caseSize,
             'attributes' => $attributes,
-            'sku' => $unitsPerCase, // Use units per case as SKU for consistency
-            'content' => $this->formatContentString($unitsPerCase),
+            'sku' => $caseSize, // Use case size as SKU for consistency
+            'content' => $this->formatContentString($caseSize),
             // Legacy fields for backward compatibility
             'rsp' => $rsp,
             'unit_cost_including_tax_legacy' => $unitCost + $unitTaxAmount,
