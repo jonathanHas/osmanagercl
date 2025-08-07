@@ -229,9 +229,13 @@ class DeliveryService
         // Calculate tax rate if needed
         $taxRate = null;
         $normalizedTaxRate = null;
-        if ($lineValue > 0 && $taxAmount > 0) {
-            $taxRate = ($taxAmount / $lineValue) * 100;
-            $taxRate = round($taxRate, 2);
+        if ($lineValue > 0) {
+            if ($taxAmount > 0) {
+                $taxRate = ($taxAmount / $lineValue) * 100;
+                $taxRate = round($taxRate, 2);
+            } else {
+                $taxRate = 0.0;  // Explicitly set to 0% for zero tax
+            }
             $normalizedTaxRate = $this->normalizeIrishVatRate($taxRate);
         }
         
