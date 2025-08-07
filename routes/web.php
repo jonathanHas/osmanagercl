@@ -44,6 +44,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/products/{id}/category', [ProductController::class, 'updateCategory'])->name('products.update-category');
     Route::patch('/products/{id}/price', [ProductController::class, 'updatePrice'])->name('products.update-price');
     Route::patch('/products/{id}/cost', [ProductController::class, 'updateCost'])->name('products.update-cost');
+    Route::patch('/products/{id}/barcode', [ProductController::class, 'updateBarcode'])->name('products.update-barcode');
     Route::patch('/products/{id}/display', [ProductController::class, 'updateDisplay'])->name('products.update-display');
     Route::post('/products/{id}/toggle-stocking', [ProductController::class, 'toggleStocking'])->name('products.toggle-stocking');
     Route::post('/products/{id}/toggle-till-visibility', [ProductController::class, 'toggleTillVisibility'])->name('products.toggle-till-visibility');

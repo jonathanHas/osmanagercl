@@ -3,13 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreProductRequest;
+use App\Http\Requests\UpdateBarcodeRequest;
 use App\Models\Category;
 use App\Models\LabelLog;
 use App\Models\LabelTemplate;
 use App\Models\Product;
 use App\Models\ProductMetadata;
+use App\Models\Stocking;
 use App\Models\Supplier;
 use App\Models\SupplierLink;
+use App\Models\VegDetails;
 use App\Models\Tax;
 use App\Models\TaxCategory;
 use App\Repositories\CategoryRepository;
@@ -369,6 +372,98 @@ class ProductController extends Controller
         return redirect()
             ->route('products.show', $id)
             ->with('success', 'Cost updated successfully.');
+    }
+
+    /**
+     * Update the barcode for a product.
+     * WARNING: This updates all related records that reference the barcode.
+     */
+    public function updateBarcode(UpdateBarcodeRequest $request, string $id): RedirectResponse
+    {
+        $product = $this->productRepository->findById($id);
+
+        if (! $product) {
+            abort(404, 'Product not found');
+        }
+
+        $oldBarcode = $product->CODE;
+        $newBarcode = $request->barcode;
+
+        // If barcode hasn't changed, just redirect back
+        if ($oldBarcode === $newBarcode) {
+            return redirect()
+                ->route('products.show', $id)
+                ->with('info', 'Barcode unchanged.');
+        }
+
+        try {
+            // Use a transaction to ensure all updates succeed or none do
+            DB::transaction(function () use ($product, $oldBarcode, $newBarcode) {
+                // 1. Update the product's CODE
+                $product->update([
+                    'CODE' => $newBarcode,
+                ]);
+
+                // 2. Update supplier_link records
+                SupplierLink::where('Barcode', $oldBarcode)
+                    ->update(['Barcode' => $newBarcode]);
+
+                // 3. Handle stocking table (primary key is Barcode)
+                $stockingRecord = Stocking::find($oldBarcode);
+                if ($stockingRecord) {
+                    // Get the data
+                    $stockingData = $stockingRecord->toArray();
+                    // Delete old record
+                    $stockingRecord->delete();
+                    // Create new record with new barcode
+                    $stockingData['Barcode'] = $newBarcode;
+                    Stocking::create($stockingData);
+                }
+
+                // 4. Update label_logs records
+                LabelLog::where('barcode', $oldBarcode)
+                    ->update(['barcode' => $newBarcode]);
+
+                // 5. Update product_metadata records
+                ProductMetadata::where('product_code', $oldBarcode)
+                    ->update(['product_code' => $newBarcode]);
+
+                // 6. Update veg_details records if they exist
+                try {
+                    VegDetails::where('product_code', $oldBarcode)
+                        ->update(['product_code' => $newBarcode]);
+                } catch (\Exception $e) {
+                    // Table might not exist or have no records, that's okay
+                }
+
+                // 7. Log this barcode change as a special event
+                LabelLog::create([
+                    'barcode' => $newBarcode,
+                    'event_type' => 'barcode_change',
+                    'user_id' => auth()->id(),
+                    'metadata' => json_encode([
+                        'old_barcode' => $oldBarcode,
+                        'new_barcode' => $newBarcode,
+                    ]),
+                ]);
+            });
+
+            return redirect()
+                ->route('products.show', $id)
+                ->with('success', "Barcode successfully changed from {$oldBarcode} to {$newBarcode}. All related records have been updated.");
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to update barcode', [
+                'product_id' => $id,
+                'old_barcode' => $oldBarcode,
+                'new_barcode' => $newBarcode,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()
+                ->route('products.show', $id)
+                ->with('error', 'Failed to update barcode. Please check the logs for details.');
+        }
     }
 
     /**

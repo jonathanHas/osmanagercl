@@ -37,12 +37,82 @@
                     </div>
                 </form>
                 
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    SKU: {{ $product->CODE }} 
-                    @if($product->REFERENCE)
-                        • REF: {{ $product->REFERENCE }}
-                    @endif
-                </p>
+                <div class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    <div class="flex items-center gap-2">
+                        <span>SKU: <span id="barcodeDisplay">{{ $product->CODE }}</span></span>
+                        @if($product->REFERENCE)
+                            <span>• REF: {{ $product->REFERENCE }}</span>
+                        @endif
+                        <button type="button" 
+                                onclick="toggleBarcodeEdit()" 
+                                class="ml-2 text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
+                                title="Edit Barcode">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <!-- Barcode Edit Form (hidden by default) -->
+                    <form method="POST" action="{{ route('products.update-barcode', $product->ID) }}" id="barcodeEditForm" class="hidden mt-3 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                        @csrf
+                        @method('PATCH')
+                        
+                        <div class="mb-3">
+                            <div class="flex items-start gap-2 mb-3">
+                                <svg class="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                </svg>
+                                <div class="text-sm text-yellow-800 dark:text-yellow-200">
+                                    <p class="font-semibold mb-1">Warning: Changing the barcode will update:</p>
+                                    <ul class="list-disc list-inside text-xs space-y-0.5">
+                                        <li>Supplier link records</li>
+                                        <li>Stocking records</li>
+                                        <li>Label logs</li>
+                                        <li>Product metadata</li>
+                                        <li>Any other barcode references</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-end gap-2">
+                            <div class="flex-1">
+                                <label for="barcode" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    New Barcode
+                                </label>
+                                <input type="text" 
+                                       id="barcode" 
+                                       name="barcode" 
+                                       value="{{ $product->CODE }}"
+                                       required
+                                       class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:border-indigo-500 focus:ring-indigo-500">
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <label class="flex items-start gap-2">
+                                <input type="checkbox" 
+                                       name="confirm" 
+                                       value="1"
+                                       required
+                                       class="mt-1 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                <span class="text-sm text-gray-700 dark:text-gray-300">
+                                    I understand that changing the barcode will update all related records and cannot be easily undone.
+                                </span>
+                            </label>
+                        </div>
+                        
+                        <div class="flex gap-2 mt-4">
+                            <button type="submit" class="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded-md transition">
+                                Update Barcode
+                            </button>
+                            <button type="button" onclick="toggleBarcodeEdit()" class="px-3 py-1 bg-gray-300 hover:bg-gray-400 dark:bg-gray-600 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm rounded-md transition">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
             @php
                 $productActions = [
@@ -669,6 +739,18 @@
         
         // Make sure togglePriceEdit is globally available  
         window.togglePriceEdit = togglePriceEdit;
+        
+        function toggleBarcodeEdit() {
+            const form = document.getElementById('barcodeEditForm');
+            const input = document.getElementById('barcode');
+            form.classList.toggle('hidden');
+            
+            // Focus the input field when showing the form
+            if (!form.classList.contains('hidden')) {
+                input.focus();
+                input.select();
+            }
+        }
         
         function toggleNameEdit() {
             const form = document.getElementById('nameEditForm');
