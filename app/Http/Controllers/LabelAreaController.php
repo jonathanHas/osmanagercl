@@ -237,4 +237,41 @@ class LabelAreaController extends Controller
             'message' => 'Added back to Products Needing Labels',
         ]);
     }
+
+    /**
+     * Clear all products from the "Products Needing Labels" section.
+     * This moves all products to "Recent Label Prints" by logging label_print events.
+     */
+    public function clearAllLabels(Request $request)
+    {
+        try {
+            // Get all products that currently need labels
+            $productsNeedingLabels = $this->getProductsNeedingLabels();
+            $clearedCount = $productsNeedingLabels->count();
+
+            if ($clearedCount === 0) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'No products needed labels to clear',
+                    'cleared_count' => 0,
+                ]);
+            }
+
+            // Log a label_print event for each product to move it to Recent Label Prints
+            foreach ($productsNeedingLabels as $product) {
+                LabelLog::logLabelPrint($product->CODE);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Cleared {$clearedCount} products from labels queue",
+                'cleared_count' => $clearedCount,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to clear labels: '.$e->getMessage(),
+            ], 500);
+        }
+    }
 }

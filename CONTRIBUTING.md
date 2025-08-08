@@ -108,6 +108,12 @@ class ProductService
    - Never modify existing migrations - create new ones
    - Use descriptive column names
 
+5. **Authorization & Security**
+   - Always check permissions on both frontend and backend
+   - Use middleware for route-level protection
+   - Follow the principle of least privilege
+   - Document required permissions in controllers/routes
+
 ### JavaScript Standards
 
 For Alpine.js components:
@@ -149,6 +155,7 @@ All new features must include tests:
 - Unit tests for services and models
 - Feature tests for API endpoints
 - Browser tests for critical user flows (optional)
+- Permission tests for protected routes
 
 ### Writing Tests
 
@@ -158,6 +165,7 @@ All new features must include tests:
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Models\Role;
 use App\Models\Delivery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -167,9 +175,12 @@ class DeliveryControllerTest extends TestCase
     use RefreshDatabase;
 
     /** @test */
-    public function authenticated_user_can_view_delivery(): void
+    public function authenticated_user_with_permission_can_view_delivery(): void
     {
-        $user = User::factory()->create();
+        $role = Role::factory()->create();
+        $role->givePermissionTo('deliveries.view');
+        
+        $user = User::factory()->create(['role_id' => $role->id]);
         $delivery = Delivery::factory()->create();
         
         $response = $this->actingAs($user)
@@ -195,6 +206,67 @@ php artisan test --testsuite=Feature
 php artisan test --coverage
 ```
 
+## Role-Based Development Guidelines
+
+### Adding Protected Routes
+
+When creating new routes that require specific permissions:
+
+1. **Define the Permission**
+   - Add to `RolesAndPermissionsSeeder` if it's a new permission
+   - Use consistent naming: `module.action` (e.g., `reports.export`)
+
+2. **Protect the Route**
+   ```php
+   // For role-based protection
+   Route::get('/admin-panel', [AdminController::class, 'index'])
+       ->middleware('role:admin');
+   
+   // For permission-based protection
+   Route::post('/products/bulk-update', [ProductController::class, 'bulkUpdate'])
+       ->middleware('permission:products.manage');
+   ```
+
+3. **Update the UI**
+   ```blade
+   @if(auth()->user()->can('products.manage'))
+       <button>Bulk Update</button>
+   @endif
+   ```
+
+4. **Document Requirements**
+   - Add comment in controller method about required permission
+   - Update feature documentation with role requirements
+
+### Testing Authorization
+
+Always test both authorized and unauthorized access:
+
+```php
+/** @test */
+public function user_without_permission_cannot_access_protected_route(): void
+{
+    $user = User::factory()->create(); // No role assigned
+    
+    $response = $this->actingAs($user)
+        ->get(route('admin.dashboard'));
+    
+    $response->assertStatus(403);
+}
+
+/** @test */
+public function admin_can_access_protected_route(): void
+{
+    $admin = User::factory()->create();
+    $admin->assignRole('admin');
+    
+    $response = $this->actingAs($admin)
+        ->get(route('admin.dashboard'));
+    
+    $response->assertStatus(200);
+}
+```
+
 ## Documentation Standards
 
 ### Code Documentation
@@ -203,6 +275,7 @@ php artisan test --coverage
 - Include parameter types and descriptions
 - Document complex algorithms or business logic
 - Add inline comments for non-obvious code
+- Document required permissions in controller methods
 
 ### Feature Documentation
 
@@ -294,6 +367,8 @@ Scan a product barcode for delivery verification.
    - [ ] Self-review completed
    - [ ] Documentation updated
    - [ ] No sensitive data exposed
+   - [ ] Permission checks implemented (if applicable)
+   - [ ] Role requirements documented (if applicable)
    ```
 
 3. **Review Process**

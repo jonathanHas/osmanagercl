@@ -329,7 +329,45 @@ Specialized agent for generating PHPUnit tests for Laravel applications...
 ### Version Control
 Include `.claude/agents/` in your repository to share agents with your team.
 
-## Real-World Example: Independent Delivery Implementer Agent
+## Real-World Examples
+
+### 1. User Roles & Permissions Agent
+
+We've created a comprehensive agent for the complete RBAC system implementation. This demonstrates how agents can maintain deep understanding of complex security systems:
+
+### Agent: `user_roles_agent`
+
+Located at: `.claude/agents/user_roles_agent.md`
+
+**Purpose**: Specialist in the OSManager CL user roles and permissions system with comprehensive knowledge of the complete RBAC implementation
+
+**Key Features**:
+- Complete understanding of three-tier role hierarchy (Admin, Manager, Employee)
+- Knowledge of 30+ granular permissions across 6 modules
+- Awareness of security features (self-demotion prevention, last admin protection)
+- File map of all role-related components
+- Common troubleshooting patterns
+
+**Usage Example**:
+```bash
+# Add new permissions
+@user_roles_agent How do I add a new permission for inventory management?
+
+# Troubleshoot issues
+@user_roles_agent User can't access sales reports despite having manager role
+
+# Extend functionality
+@user_roles_agent Implement department-based permissions on top of roles
+```
+
+This agent maintains complete context about:
+- Database schema (roles, permissions, role_permissions tables)
+- Models and relationships (Role, Permission, HasPermissions trait)
+- Middleware implementation (RoleMiddleware, PermissionMiddleware)
+- UI components (role badges, permission checks in Blade)
+- Security patterns and best practices
+
+### 2. Independent Delivery Implementer Agent
 
 We've created a feature-specific agent for implementing the Independent supplier delivery system. This demonstrates how agents can be used for complex feature development:
 

@@ -58,7 +58,7 @@ return [
                     'Ordered_Cases', 'Ordered_Units', 'Delivered_Cases', 'Delivered_Units',
                     'Case_Size', 'Total_Ordered_Units', 'Total_Delivered_Units',
                     'RSP', 'Price', 'Unit_Cost', 'Tax', 'Value',
-                    'Price_Valid', 'Calc_Method', 'Expected_Value'
+                    'Price_Valid', 'Calc_Method', 'Expected_Value',
                 ],
                 'primary_quantity_field' => 'Total_Delivered_Units', // What we're being charged for
                 'case_size_field' => 'Case_Size', // Units per case

@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -13,7 +14,9 @@ class AdminUserSeeder extends Seeder
      */
     public function run(): void
     {
-        User::updateOrCreate(
+        $adminRole = Role::where('name', 'admin')->first();
+
+        $user = User::updateOrCreate(
             ['email' => 'admin@osmanager.local'],
             [
                 'name' => 'Admin',
@@ -21,6 +24,7 @@ class AdminUserSeeder extends Seeder
                 'email' => 'admin@osmanager.local',
                 'password' => Hash::make('admin123'),
                 'email_verified_at' => now(),
+                'role_id' => $adminRole ? $adminRole->id : null,
             ]
         );
 
@@ -28,5 +32,6 @@ class AdminUserSeeder extends Seeder
         $this->command->info('Username: admin');
         $this->command->info('Email: admin@osmanager.local');
         $this->command->info('Password: admin123');
+        $this->command->info('Role: Administrator');
     }
 }

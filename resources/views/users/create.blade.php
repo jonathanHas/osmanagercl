@@ -39,6 +39,37 @@
                             <x-input-error :messages="$errors->get('username')" class="mt-2" />
                         </div>
 
+                        <!-- Role -->
+                        <div class="mb-4">
+                            <x-input-label for="role_id" :value="__('Role')" />
+                            <select id="role_id" name="role_id" class="block mt-1 w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
+                                <option value="">No Role Assigned</option>
+                                @foreach($roles as $role)
+                                    <option value="{{ $role->id }}" 
+                                            {{ (old('role_id') == $role->id || (!old('role_id') && $defaultRole && $defaultRole->id == $role->id)) ? 'selected' : '' }}
+                                            data-description="{{ $role->description }}">
+                                        {{ $role->display_name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <p id="role-description" class="mt-1 text-sm text-gray-600">
+                                @if($defaultRole)
+                                    {{ $defaultRole->description }}
+                                @else
+                                    Select a role to see its description.
+                                @endif
+                            </p>
+                            <x-input-error :messages="$errors->get('role_id')" class="mt-2" />
+                        </div>
+
+                        <script>
+                            document.getElementById('role_id').addEventListener('change', function() {
+                                const selectedOption = this.options[this.selectedIndex];
+                                const description = selectedOption.getAttribute('data-description') || 'No description available.';
+                                document.getElementById('role-description').textContent = description;
+                            });
+                        </script>
+
                         <!-- Password -->
                         <div class="mb-4">
                             <x-input-label for="password" :value="__('Password')" />

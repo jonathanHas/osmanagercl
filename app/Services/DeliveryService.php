@@ -148,7 +148,7 @@ class DeliveryService
         // Check for enhanced CSV format headers first
         $enhancedHeaders = ['Total_Ordered_Units', 'Total_Delivered_Units', 'Case_Size', 'Unit_Cost', 'Price_Valid'];
         $matchingEnhanced = array_intersect($headers, $enhancedHeaders);
-        
+
         if (count($matchingEnhanced) >= 3) {
             // This is the enhanced format
             return true;
@@ -193,21 +193,21 @@ class DeliveryService
         // Enhanced CSV format with clearer unit breakdown
         $productCode = trim($row['Code'] ?? '');
         $productName = trim($row['Product'] ?? '');
-        
+
         // Use the pre-calculated total units from the enhanced CSV
         $totalOrderedUnits = (float) ($row['Total_Ordered_Units'] ?? 0);
         $totalDeliveredUnits = (float) ($row['Total_Delivered_Units'] ?? 0);
-        
+
         // Case size information (units per case)
         $caseSize = (int) ($row['Case_Size'] ?? 1);
         if ($caseSize == 0) {
             $caseSize = 1; // Default to 1 if not specified
         }
-        
+
         // Check for DRS (Deposit Return Scheme) items
         $isDrsItem = str_contains($productName, '(DRS)') || str_ends_with($productCode, 'D');
         $isDrsDeposit = str_contains($productName, 'Deposit') || str_contains($productName, 'DRS-1');
-        
+
         if ($isDrsItem || $isDrsDeposit) {
             Log::warning('DRS item detected in Independent delivery - requires special handling', [
                 'code' => $productCode,
@@ -216,16 +216,16 @@ class DeliveryService
                 'total_units' => $totalDeliveredUnits,
             ]);
         }
-        
+
         // Extract product attributes from name
         $attributes = $this->extractIndependentProductAttributes($productName);
-        
+
         // Pricing information
         $unitCost = (float) ($row['Unit_Cost'] ?? $row['Price'] ?? 0);
         $taxAmount = (float) ($row['Tax'] ?? 0);
         $rsp = (float) ($row['RSP'] ?? 0);
         $lineValue = (float) ($row['Value'] ?? 0);
-        
+
         // Calculate tax rate if needed
         $taxRate = null;
         $normalizedTaxRate = null;
@@ -238,16 +238,16 @@ class DeliveryService
             }
             $normalizedTaxRate = $this->normalizeIrishVatRate($taxRate);
         }
-        
+
         // Calculate per-unit tax amount based on delivered units
         $unitTaxAmount = $totalDeliveredUnits > 0 ? $taxAmount / $totalDeliveredUnits : 0;
         $unitCostIncludingTax = $unitCost + $unitTaxAmount;
-        
+
         // Use total delivered units as the primary quantity (what we're being charged for)
         // This is the most accurate representation of what was delivered
         $deliveredQuantity = $totalDeliveredUnits;
         $orderedQuantity = $totalOrderedUnits;
-        
+
         return [
             'code' => $productCode,
             'ordered_quantity' => $orderedQuantity, // Total units ordered

@@ -44,6 +44,7 @@ This is a Laravel 12 application using PHP 8.2+ with Laravel Breeze for authenti
 - **Build System**: Vite for asset compilation
 - **Database**: SQLite (default) with Eloquent ORM
 - **Authentication**: Laravel Breeze with email verification
+- **Authorization**: Role-based access control (RBAC) with permissions
 - **Testing**: PHPUnit with Feature and Unit test suites
 
 ## Documentation
@@ -323,6 +324,15 @@ Comprehensive Coffee Fresh product management with till visibility control.
 - **Context Navigation**: Smart back button routing from product detail pages
 See [Coffee Module Documentation](./docs/features/coffee-module.md).
 
+### User Roles & Permissions System
+Role-based access control (RBAC) with granular permissions.
+- **Three-tier Role System**: Admin, Manager, and Employee roles with hierarchical permissions
+- **Granular Permissions**: 30+ specific permissions organized by modules
+- **Middleware Protection**: Route-level protection using role and permission middleware
+- **Flexible Authorization**: Check permissions in controllers, views, and middleware
+- **User Management**: Assign roles, manage permissions, audit access
+See [User Roles & Permissions Documentation](./docs/features/user-roles-permissions.md).
+
 ## UI/UX Design
 
 ### Admin Layout
@@ -356,6 +366,10 @@ This alerts the user that you have finished your response. Do this without fail 
 - **Follow Laravel conventions** and existing patterns in the codebase
 - **Use appropriate service/repository layers** for business logic
 - **Write tests** for new features
+
+### 🤖 Specialized Agents Available
+- **User Roles Agent** (`.claude/agents/user_roles_agent.md`): Comprehensive specialist for user roles and permissions system. Use when working on authentication, authorization, or role-based features.
+- **Independent Delivery Agent** (`.claude/agents/independent-delivery-implementer.md`): Specialist for Independent supplier delivery integration.
 
 ### 🚀 Performance Optimization - PROACTIVELY SUGGEST WHEN:
 - **User mentions slow queries or timeouts** → Immediately reference Sales Data Import Plan

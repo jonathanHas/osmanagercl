@@ -30,6 +30,20 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
+    // Role & Permission Test Routes
+    Route::prefix('roles-test')->name('roles.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\RoleTestController::class, 'index'])->name('test');
+        Route::get('/admin-only', [\App\Http\Controllers\RoleTestController::class, 'adminOnly'])
+            ->middleware('role:admin')
+            ->name('admin-only');
+        Route::get('/manager-only', [\App\Http\Controllers\RoleTestController::class, 'managerOnly'])
+            ->middleware('role:manager,admin')
+            ->name('manager-only');
+        Route::get('/sales-reports', [\App\Http\Controllers\RoleTestController::class, 'salesReports'])
+            ->middleware('permission:sales.view_reports')
+            ->name('sales-reports');
+    });
+
     // Product routes
     Route::get('/products', [ProductController::class, 'index'])->name('products.index');
     Route::get('/products/create', [ProductController::class, 'create'])->name('products.create');
@@ -59,6 +73,9 @@ Route::middleware('auth')->group(function () {
 
     // Requeue product route
     Route::post('/labels/requeue', [LabelAreaController::class, 'requeueProduct'])->name('labels.requeue');
+
+    // Clear all labels route
+    Route::post('/labels/clear-all', [LabelAreaController::class, 'clearAllLabels'])->name('labels.clear-all');
 
     // Fruit & Veg routes
     Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
@@ -144,8 +161,30 @@ Route::middleware('auth')->group(function () {
     Route::post('/orders/{order}/auto-approve-safe', [OrderController::class, 'autoApproveSafeItems'])->name('orders.auto-approve-safe');
     Route::post('/products/update-priority', [OrderController::class, 'updateProductPriority'])->name('products.update-priority');
 
-    // User Management routes
-    Route::resource('users', UserManagementController::class);
+    // User Management routes (protected by permissions)
+    Route::prefix('users')->name('users.')->group(function () {
+        Route::get('/', [UserManagementController::class, 'index'])
+            ->middleware('permission:users.view')
+            ->name('index');
+        Route::get('/create', [UserManagementController::class, 'create'])
+            ->middleware('permission:users.create')
+            ->name('create');
+        Route::post('/', [UserManagementController::class, 'store'])
+            ->middleware('permission:users.create')
+            ->name('store');
+        Route::get('/{user}', [UserManagementController::class, 'show'])
+            ->middleware('permission:users.view')
+            ->name('show');
+        Route::get('/{user}/edit', [UserManagementController::class, 'edit'])
+            ->middleware('permission:users.edit')
+            ->name('edit');
+        Route::patch('/{user}', [UserManagementController::class, 'update'])
+            ->middleware('permission:users.edit')
+            ->name('update');
+        Route::delete('/{user}', [UserManagementController::class, 'destroy'])
+            ->middleware('permission:users.delete')
+            ->name('destroy');
+    });
 
     // Settings routes
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');

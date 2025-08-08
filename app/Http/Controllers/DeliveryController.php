@@ -260,7 +260,7 @@ class DeliveryController extends Controller
         ]);
 
         // Check if item has a product
-        if (!$item->product) {
+        if (! $item->product) {
             return response()->json([
                 'success' => false,
                 'message' => 'Cannot update price for items without linked products',
@@ -312,7 +312,7 @@ class DeliveryController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update price: ' . $e->getMessage(),
+                'message' => 'Failed to update price: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -656,7 +656,7 @@ class DeliveryController extends Controller
         try {
             $request->validate([
                 'threshold' => 'numeric|min:0|max:100',
-                'items' => 'array'
+                'items' => 'array',
             ]);
 
             $threshold = $request->get('threshold', 5); // Default 5% threshold
@@ -670,7 +670,7 @@ class DeliveryController extends Controller
 
             foreach ($delivery->items as $item) {
                 // Skip if no product exists or specific items requested but this isn't one
-                if (!$item->product || (!empty($specificItems) && !in_array($item->id, $specificItems))) {
+                if (! $item->product || (! empty($specificItems) && ! in_array($item->id, $specificItems))) {
                     continue;
                 }
 
@@ -678,29 +678,30 @@ class DeliveryController extends Controller
                 if ($item->unit_cost <= 0) {
                     $zeroCostCount++;
                     $skippedCount++;
+
                     continue;
                 }
 
                 $currentCost = $item->product->PRICEBUY;
                 $newCost = $item->unit_cost;
-                
+
                 // Calculate percentage difference
                 $difference = $currentCost > 0 ? abs($newCost - $currentCost) / $currentCost * 100 : 0;
-                
+
                 // Only update if difference meets threshold
                 if ($difference >= $threshold && abs($newCost - $currentCost) > 0.01) {
                     try {
                         // Update the product cost in POS system
                         $item->product->update(['PRICEBUY' => $newCost]);
                         $updatedCount++;
-                        
+
                         \Log::info('Delivery cost update', [
                             'delivery_id' => $delivery->id,
                             'product_id' => $item->product->ID,
                             'product_name' => $item->product->NAME,
                             'old_cost' => $currentCost,
                             'new_cost' => $newCost,
-                            'difference_percent' => round($difference, 2)
+                            'difference_percent' => round($difference, 2),
                         ]);
                     } catch (\Exception $e) {
                         $errors[] = "Failed to update {$item->description}: {$e->getMessage()}";
@@ -712,23 +713,23 @@ class DeliveryController extends Controller
             }
 
             $message = "Updated costs for {$updatedCount} products";
-            
+
             $skipReasons = [];
             if ($zeroCostCount > 0) {
                 $skipReasons[] = "{$zeroCostCount} with €0.00 cost (not delivered)";
             }
             if ($skippedCount - $zeroCostCount > 0) {
-                $skipReasons[] = ($skippedCount - $zeroCostCount) . " below threshold or no change";
+                $skipReasons[] = ($skippedCount - $zeroCostCount).' below threshold or no change';
             }
-            
-            if (!empty($skipReasons)) {
-                $message .= ", skipped " . implode(', ', $skipReasons);
+
+            if (! empty($skipReasons)) {
+                $message .= ', skipped '.implode(', ', $skipReasons);
             }
-            
-            if (!empty($errors)) {
-                $message .= ". Errors: " . implode(', ', array_slice($errors, 0, 3));
+
+            if (! empty($errors)) {
+                $message .= '. Errors: '.implode(', ', array_slice($errors, 0, 3));
                 if (count($errors) > 3) {
-                    $message .= " and " . (count($errors) - 3) . " more";
+                    $message .= ' and '.(count($errors) - 3).' more';
                 }
             }
 
@@ -738,13 +739,13 @@ class DeliveryController extends Controller
                 'updated_count' => $updatedCount,
                 'skipped_count' => $skippedCount,
                 'zero_cost_count' => $zeroCostCount,
-                'errors' => $errors
+                'errors' => $errors,
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Cost update failed: ' . $e->getMessage()
+                'message' => 'Cost update failed: '.$e->getMessage(),
             ], 500);
         }
     }

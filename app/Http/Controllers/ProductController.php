@@ -12,9 +12,9 @@ use App\Models\ProductMetadata;
 use App\Models\Stocking;
 use App\Models\Supplier;
 use App\Models\SupplierLink;
-use App\Models\VegDetails;
 use App\Models\Tax;
 use App\Models\TaxCategory;
+use App\Models\VegDetails;
 use App\Repositories\CategoryRepository;
 use App\Repositories\ProductRepository;
 use App\Repositories\SalesRepository;
@@ -536,10 +536,10 @@ class ProductController extends Controller
         $taxCategories = TaxCategory::orderBy('NAME')->get();
         $categories = Category::orderBy('NAME')->get();
         $suppliers = Supplier::orderBy('Supplier')->get();
-        
+
         // Get tax rates for JavaScript pricing calculations
         $taxRates = Tax::pluck('RATE', 'CATEGORY')->toArray();
-        
+
         // Get UDEA supplier IDs from config
         $udeaSupplierIds = config('suppliers.external_links.udea.supplier_ids', [5, 44, 85]);
 

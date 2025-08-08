@@ -115,6 +115,13 @@ Detailed documentation for each major feature.
   - Live price scraping and barcode extraction
   - Extensible architecture for additional suppliers
 
+- **[User Roles & Permissions](./features/user-roles-permissions.md)** - 🆕 Role-based access control system
+  - Three-tier role system: Admin, Manager, Employee
+  - 30+ granular permissions organized by modules
+  - Middleware protection for routes
+  - Flexible authorization in controllers and views
+  - User management and role assignment
+
 - **[Label System](./features/label-system.md)** - Comprehensive label printing system *(Updated)*
   - Dynamic barcode generation with Code128 format
   - Enhanced 4x9 grid layout with 3-row structure

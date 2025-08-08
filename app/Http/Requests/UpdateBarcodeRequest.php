@@ -24,7 +24,7 @@ class UpdateBarcodeRequest extends FormRequest
     public function rules(): array
     {
         $productId = $this->route('product');
-        
+
         return [
             'barcode' => [
                 'required',
