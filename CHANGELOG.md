@@ -9,6 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **📝 Barcode Editing Feature**: Ability to edit product barcodes with comprehensive safety measures (2025-08-07)
+  - **Edit Interface**: Inline barcode editing directly from product detail page
+  - **Safety Warnings**: Clear warnings about affected records before changes
+  - **Confirmation Required**: Checkbox confirmation to prevent accidental changes
+  - **Transaction Safety**: All updates wrapped in database transaction
+  - **Automatic Updates**: Updates all dependent records:
+    - Supplier link records
+    - Stocking records (handles primary key change)
+    - Label logs with audit trail
+    - Product metadata
+    - Veg details
+  - **Audit Trail**: Creates special 'barcode_change' event in label_logs
+  - **Validation**: Ensures new barcode is unique across products
+  - **Error Handling**: Comprehensive error messages and rollback on failure
+  - **Visual Design**: Yellow warning colors for high visibility
+  - **Metadata Storage**: Stores old and new barcode in JSON metadata field
+
+- **🛠️ Product Creation Form Improvements**: Enhanced functionality and fixes (2025-08-07)
+  - **UDEA Button Fix**: "View on UDEA Website" button now only shows for UDEA suppliers (IDs: 5, 44, 85)
+  - **Independent Support**: Added Independent supplier website links and image preview
+  - **Pricing Breakdown Fix**: Initial pricing breakdown now displays correctly on page load
+  - **Tax Rates Integration**: Proper tax rates loaded from database for accurate calculations
+  - **Till Visibility Default**: "Show on Till" checkbox now unchecked by default (most products don't need till visibility)
+  - **Dynamic Supplier Links**: Links update based on selected supplier type
+  - **Improved Validation**: Better handling of supplier-specific features
+
+- **🖼️ Independent Health Foods Product Images**: Full integration with Independent supplier (2025-08-07)
+  - **Automatic Image Display**: Product images appear when supplier code is entered
+  - **Smart Path Detection**: Automatically tries multiple CDN paths (`/cdn/shop/files/` and `/cdn/shop/products/`)
+  - **Format Flexibility**: Supports both `.webp` and `.jpg` image formats
+  - **Click-to-View Modal**: Full-size image viewer with zoom capabilities
+  - **Test Page**: Dedicated testing interface at `/products/independent-test`
+  - **Dynamic Loading**: Images update in real-time as supplier codes change
+  - **Visual Feedback**: Hover effects and "click to view" indicators
+  - **Fallback System**: Gracefully handles missing images
+  - **Website Integration**: Direct links to Independent's product search
+  - **Error Handling**: Console logging for debugging image load issues
+
 - **🚨 Product Health Dashboard**: Auto-loading dashboard with critical product insights (2025-01-06)
   - **Good Sellers Gone Silent**: Identifies high performers with no recent sales
   - **Slow Movers**: Products with lowest sales velocity over 60 days

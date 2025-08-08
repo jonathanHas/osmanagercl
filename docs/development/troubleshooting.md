@@ -924,6 +924,53 @@ console.log('Sample data:', this.dailySales?.[0]);
 
 ## 🚛 Delivery System Authentication Issues
 
+### Barcode Editing Issues
+
+**Symptoms:**
+- Barcode edit form doesn't appear when clicking edit button
+- Barcode update fails with constraint errors
+- Related records not updating after barcode change
+
+**Common Causes & Solutions:**
+
+1. **JavaScript Function Not Found**
+   - Ensure `toggleBarcodeEdit()` function is defined in the page
+   - Check browser console for JavaScript errors
+   - Function should be in the main script section, not inside DOMContentLoaded
+
+2. **Unique Constraint Violation**
+   - New barcode already exists in another product
+   - Check with: `Product::where('CODE', $newBarcode)->exists()`
+   - UpdateBarcodeRequest validation should catch this
+
+3. **Stocking Table Primary Key Error**
+   ```php
+   // Stocking uses Barcode as primary key - must recreate record
+   $stockingData = $stockingRecord->toArray();
+   $stockingRecord->delete();
+   $stockingData['Barcode'] = $newBarcode;
+   Stocking::create($stockingData);
+   ```
+
+4. **Transaction Rollback**
+   - Check Laravel logs for specific error messages
+   - Common issue: Missing veg_details table (safe to ignore)
+   - Ensure all models are imported in controller
+
+5. **Label Logs Enum Error**
+   - Migration must include 'barcode_change' in event_type enum
+   - Check existing enum values before migration:
+   ```sql
+   SELECT DISTINCT event_type FROM label_logs;
+   ```
+
+**Debug Steps:**
+1. Check browser console for JavaScript errors
+2. Verify route exists: `php artisan route:list | grep update-barcode`
+3. Check Laravel log: `tail -f storage/logs/laravel.log`
+4. Test validation: Try updating to an existing barcode
+5. Verify transaction: Check if partial updates occurred
+
 ### "Unauthenticated" Error During Barcode Scanning
 
 **Symptoms:**

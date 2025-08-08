@@ -58,10 +58,10 @@ return [
         ]
     ],
     'independent' => [
-        'supplier_ids' => [/* Configured supplier IDs */],
-        'image_url' => 'https://iihealthfoods.com/images/{CODE}.jpg',
+        'supplier_ids' => [37], // Independent supplier ID
+        'image_url' => 'https://iihealthfoods.com/cdn/shop/files/{SUPPLIER_CODE}_1.webp?width=533',
         'website_search' => 'https://iihealthfoods.com/search?q={SUPPLIER_CODE}',
-        'display_name' => 'Independent Irish Health Foods',
+        'display_name' => 'Independent Health Foods',
         'enabled' => true,
         'csv_format' => [
             'headers' => ['Code', 'Product', 'Ordered', 'Qty', 'RSP', 'Price', 'Tax', 'Value'],
@@ -98,13 +98,15 @@ return [
 - **Delivery Integration**: Automatic product matching and pricing
 - **Status**: ✅ Fully Operational
 
-### Independent Irish Health Foods - Delivery Integration
+### Independent Health Foods - Full Integration
 - **CSV Import**: Specialized format with VAT calculations
 - **Tax Integration**: Automatic Irish VAT rate detection and normalization
 - **Product Creation**: Auto-populated tax categories based on VAT rates
 - **Case-to-Unit Conversion**: Handles case pricing with automatic unit cost calculation
 - **RSP Support**: Recommended selling price integration
-- **Status**: ✅ Delivery System Operational (Images/Scraping: Planned)
+- **Product Images**: Direct CDN access with automatic format detection
+- **Website Integration**: Direct product search links
+- **Status**: ✅ Fully Operational
 
 **Key Features**:
 - **VAT Rate Calculation**: Formula (Tax ÷ Value) × 100 with normalization to Irish rates
@@ -116,6 +118,18 @@ return [
   - 9% → Tax Second Reduced (ID: 003)  
   - 13.5% → Tax Reduced (ID: 001)
   - 23% → Tax Standard (ID: 002)
+- **Image CDN Integration**: Automatic detection of image paths and formats:
+  - Tries multiple CDN paths: `/cdn/shop/files/` and `/cdn/shop/products/`
+  - Supports both `.webp` and `.jpg` formats
+  - Smart fallback system for maximum compatibility
+- **Product Image Display**: Shows product images on creation page with:
+  - Click-to-view full size modal
+  - Automatic image loading when supplier code is entered
+  - Visual feedback for clickable images
+- **Test Page**: Dedicated testing interface at `/products/independent-test` for:
+  - Verifying image availability
+  - Testing product data extraction
+  - Debugging supplier code lookups
 
 ## Implementation Details
 

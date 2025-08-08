@@ -275,6 +275,15 @@ For common issues and solutions, see [Troubleshooting Guide](./docs/development/
 
 ## Key Features
 
+### Barcode Editing
+Safe barcode modification for correcting scanner errors.
+- **Safety Warnings**: Clear indication of affected records before changes
+- **Transaction Safety**: All updates wrapped in database transaction
+- **Comprehensive Updates**: Automatically updates supplier links, stocking, labels, and metadata
+- **Audit Trail**: Tracks changes in label_logs with old/new values
+- **Validation**: Ensures new barcode is unique across products
+See [Product Management Documentation](./docs/features/product-management.md#barcode-editing-feature-2025-08-07).
+
 ### Categories Management System
 Universal category management interface for all product categories.
 - **Universal Interface**: Manage any category with consistent tools

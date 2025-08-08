@@ -36,18 +36,22 @@ Complete category management system that generalizes the Coffee Fresh module to 
 
 See [Categories Management](./features/categories-management.md) for complete details.
 
-### Independent Irish Health Foods Integration
-Complete delivery system integration for Irish suppliers with advanced VAT processing:
+### Independent Health Foods Integration
+Complete integration for Independent Health Foods with delivery system, product images, and website links:
 
 - **🇮🇪 Irish VAT Support**: Automatic calculation and normalization of Irish VAT rates (0%, 9%, 13.5%, 23%)
 - **🏷️ Auto Tax Categories**: Intelligent tax category selection for POS integration
 - **📦 Case-to-Unit Conversion**: Smart pricing conversion from case to unit costs
 - **📋 Enhanced CSV Processing**: Multi-format support with automatic format detection
-- **✨ Visual UX**: Green indicators for auto-selected fields and smart form pre-population
+- **🖼️ Product Images**: Automatic CDN image display with smart path detection
+- **🔗 Website Integration**: Direct product search links to Independent's website
+- **✨ Visual UX**: Green indicators, image previews, and click-to-view modals
 
 **Key Benefits**:
 - Eliminates manual tax category selection for Irish products
 - Ensures accurate unit pricing from case-based supplier data  
+- Visual product verification with automatic image loading
+- Quick access to supplier website for product details
 - Reduces data entry errors with intelligent form pre-population
 - Streamlines Irish supplier delivery processing workflow
 
@@ -106,8 +110,8 @@ Detailed documentation for each major feature.
 
 - **[Supplier Integration](./features/supplier-integration.md)** - Multi-supplier connectivity *(Enhanced)*
   - Udea (Dutch): Full image CDN and price scraping integration
-  - Independent Irish Health Foods: Delivery system with VAT processing
-  - Product image CDN integration
+  - Independent Health Foods: Complete integration with images, website links, and VAT processing
+  - Product image CDN integration with smart path detection
   - Live price scraping and barcode extraction
   - Extensible architecture for additional suppliers
 

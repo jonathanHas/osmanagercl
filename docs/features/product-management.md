@@ -81,10 +81,28 @@ CREATE TABLE class (
 
 #### Product Updates
 1. User clicks edit button on product detail page
-2. Inline form appears for specific field (name, tax, price, cost)
+2. Inline form appears for specific field (name, tax, price, cost, barcode)
 3. PATCH request sent to specific update endpoint
 4. Controller validates and updates database
 5. User redirected with success message
+
+#### Barcode Updates
+1. User clicks edit icon next to SKU/barcode on product detail page
+2. Warning form appears with:
+   - List of affected records that will be updated
+   - Confirmation checkbox requirement
+   - New barcode input field
+3. `ProductController::updateBarcode()` processes the request:
+   - Validates new barcode is unique
+   - Updates product CODE in transaction
+   - Updates all dependent records:
+     - supplier_link records
+     - stocking records (recreates with new PK)
+     - label_logs records
+     - product_metadata records
+     - veg_details records
+   - Creates audit trail in label_logs
+4. User redirected with success/error message
 
 ### Cross-Database Relationships
 
@@ -223,6 +241,13 @@ public function toggleStocking() // Toggle stock management
 - Automatic price fetching from external suppliers (UDEA)
 - Supplier code linking for inventory management
 - Cost and pricing recommendations based on supplier data
+- **Independent Health Foods Integration**:
+  - Product images automatically displayed when supplier code is entered
+  - Smart image path detection (supports both `/cdn/shop/files/` and `/cdn/shop/products/`)
+  - Multiple format support (.webp and .jpg)
+  - Click-to-view full-size modal for product images
+  - Direct website search links to Independent's product pages
+  - Test page available at `/products/independent-test` for debugging
 
 ## Enhanced Features
 
@@ -309,6 +334,87 @@ return match ($taxRate) {
 - **Green Background**: Tax category field when auto-selected
 - **"Auto-selected" Label**: Displayed next to pre-filled dropdown
 - **Tooltip Information**: Shows source VAT rate and calculation details
+
+### Barcode Editing Feature (2025-08-07)
+
+#### Overview
+The barcode editing feature allows administrators to modify product barcodes after creation, addressing issues from faulty scanners or incorrect data entry. This feature includes comprehensive safety measures to ensure data integrity across all related systems.
+
+#### Key Features
+
+1. **Inline Editing Interface**
+   - Edit button next to SKU display on product detail page
+   - Warning form with yellow highlighting for visibility
+   - Clear indication of current and new barcode values
+
+2. **Safety Measures**
+   - Confirmation checkbox required before changes
+   - Clear warning about affected records
+   - Transaction-based updates for atomicity
+   - Rollback on any failure
+
+3. **Comprehensive Updates**
+   - All barcode references updated automatically:
+     - `supplier_link` table (Barcode field)
+     - `stocking` table (Barcode as primary key - recreated)
+     - `label_logs` table (barcode field)
+     - `product_metadata` table (product_code field)
+     - `veg_details` table (product_code field)
+
+4. **Audit Trail**
+   - Creates 'barcode_change' event in label_logs
+   - Stores old and new barcode in JSON metadata
+   - Tracks user who made the change
+   - Timestamp for change tracking
+
+#### Technical Implementation
+
+```php
+// UpdateBarcodeRequest validation
+'barcode' => [
+    'required',
+    'string',
+    'max:255',
+    Rule::unique('pos.PRODUCTS', 'CODE')->ignore($productId, 'ID'),
+],
+'confirm' => 'required|accepted'
+
+// Controller method with transaction
+DB::transaction(function () use ($product, $oldBarcode, $newBarcode) {
+    // Update product CODE
+    $product->update(['CODE' => $newBarcode]);
+    
+    // Update all dependent records
+    SupplierLink::where('Barcode', $oldBarcode)->update(['Barcode' => $newBarcode]);
+    
+    // Handle stocking table (PK change)
+    $stockingRecord = Stocking::find($oldBarcode);
+    if ($stockingRecord) {
+        $data = $stockingRecord->toArray();
+        $stockingRecord->delete();
+        $data['Barcode'] = $newBarcode;
+        Stocking::create($data);
+    }
+    
+    // Create audit log
+    LabelLog::create([
+        'barcode' => $newBarcode,
+        'event_type' => 'barcode_change',
+        'user_id' => auth()->id(),
+        'metadata' => json_encode([
+            'old_barcode' => $oldBarcode,
+            'new_barcode' => $newBarcode,
+        ]),
+    ]);
+});
+```
+
+#### Why It's Safe
+
+1. **Sales Unaffected**: TICKETLINES, STOCKDIARY, STOCKCURRENT reference products by ID, not CODE
+2. **Transaction Safety**: All updates happen together or rollback
+3. **Validation**: Ensures new barcode is unique
+4. **Audit Trail**: Changes are logged for accountability
 
 ### Display Name Management (2025)
 
