@@ -34,8 +34,7 @@ class KdsController extends Controller
         // Check if any job was processed recently (within last 5 minutes)
         $lastProcessedOrder = KdsOrder::orderBy('created_at', 'desc')->first();
         
-        // Also check the jobs table to see if monitoring is happening
-        // Even if no orders exist, the monitoring job should be running
+        // Check for recent job table activity (jobs being added/removed)
         $recentJobActivity = \DB::table('jobs')
             ->where('created_at', '>=', now()->subMinutes(2))
             ->exists();
@@ -45,27 +44,46 @@ class KdsController extends Controller
             ->where('failed_at', '>=', now()->subMinutes(5))
             ->exists();
         
+        // Check if MonitorCoffeeOrdersJob was dispatched recently
+        $lastMonitorJobTime = \DB::table('jobs')
+            ->where('queue', 'default')
+            ->where('payload', 'like', '%MonitorCoffeeOrdersJob%')
+            ->value('created_at');
+            
         $lastJobTime = null;
         $queueWorkerActive = false;
         
+        // Determine last activity time
         if ($lastProcessedOrder) {
             $lastJobTime = $lastProcessedOrder->created_at;
-            // Consider worker active if processed something in last 5 minutes
-            $queueWorkerActive = $lastProcessedOrder->created_at->diffInMinutes(now()) < 5;
         }
         
-        // If there are no pending jobs and no recent failures, worker is likely active
-        if ($pendingJobs == 0 && !$recentFailures) {
+        // Worker is considered active if:
+        // 1. Very few pending jobs (< 3) - means they're being processed
+        // 2. OR recent order was created (within 5 minutes)
+        // 3. OR recent job activity with no failures
+        // 4. AND NOT many pending jobs
+        
+        if ($pendingJobs <= 3 && !$recentFailures) {
+            // Few pending jobs and no failures = worker is processing them
             $queueWorkerActive = true;
-            // If we've never had an order, show "System Active" instead of "Never"
-            if (!$lastJobTime) {
-                $lastJobTime = now();
-            }
+        } elseif ($lastProcessedOrder && $lastProcessedOrder->created_at->diffInMinutes(now()) < 5) {
+            // Recent order processed
+            $queueWorkerActive = true;
+        } elseif ($recentJobActivity && !$recentFailures && $pendingJobs < 50) {
+            // Jobs being added but not piling up
+            $queueWorkerActive = true;
         }
         
-        // If there are many pending jobs, worker is definitely not active
-        if ($pendingJobs > 10) {
+        // Override: If too many pending jobs, worker is definitely not active
+        if ($pendingJobs > 100) {
             $queueWorkerActive = false;
+        }
+        
+        // If we've never had activity, but no pending jobs, show as active
+        if (!$lastJobTime && $pendingJobs == 0) {
+            $queueWorkerActive = true;
+            $lastJobTime = now();
         }
 
         $queueStatus = [
@@ -246,9 +264,9 @@ class KdsController extends Controller
                 // Wait 5 seconds before next update
                 sleep(5);
 
-                // Only dispatch monitoring job every 30 seconds instead of every 5 seconds
-                // This prevents job queue backlog since each job takes ~17 seconds
-                if ($lastMonitorCheck->diffInSeconds(now()) >= 30) {
+                // Dispatch monitoring job every 10 seconds (was 30)
+                // Job is now optimized to run in ~10ms
+                if ($lastMonitorCheck->diffInSeconds(now()) >= 10) {
                     MonitorCoffeeOrdersJob::dispatch();
                     $lastMonitorCheck = now();
                 }

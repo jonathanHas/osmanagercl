@@ -24,8 +24,28 @@ class MonitorCoffeeOrdersJob implements ShouldQueue
         try {
             $startTime = microtime(true);
             
+            Log::info('=== MonitorCoffeeOrdersJob START ===', [
+                'time' => now()->toDateTimeString()
+            ]);
+            
             // Get the last processed ticket time to avoid duplicates
-            $lastProcessedTime = KdsOrder::max('order_time') ?? Carbon::now()->subDay();
+            $lastProcessedTimeStr = KdsOrder::max('order_time');
+            $lastProcessedTime = $lastProcessedTimeStr ? Carbon::parse($lastProcessedTimeStr) : Carbon::now()->subDay();
+            
+            // IMPORTANT: Never look back more than 2 hours to prevent getting stuck
+            // This handles cases where the system was down or orders were cleared
+            $maxLookback = Carbon::now()->subHours(2);
+            if ($lastProcessedTime->lt($maxLookback)) {
+                Log::warning('Last processed time too old, using max lookback', [
+                    'original_cutoff' => $lastProcessedTime->toDateTimeString(),
+                    'new_cutoff' => $maxLookback->toDateTimeString()
+                ]);
+                $lastProcessedTime = $maxLookback;
+            }
+            
+            Log::info('Last processed time check', [
+                'last_processed_time' => $lastProcessedTime->toDateTimeString()
+            ]);
             
             // Check if there's a "last clear time" setting
             $lastClearTime = \DB::table('kds_settings')
@@ -43,37 +63,63 @@ class MonitorCoffeeOrdersJob implements ShouldQueue
                 }
             }
             
-            // Find new coffee orders from POS - LIMIT to last 2 hours and max 50 tickets
-            $newTickets = Ticket::with(['ticketLines.product', 'person'])
-                ->where('TICKETTYPE', 0) // Normal sales only
-                ->where(function ($query) use ($lastProcessedTime) {
-                    // Get tickets created after our last check
-                    $query->whereHas('receipt', function ($q) use ($lastProcessedTime) {
-                        $q->where('DATENEW', '>', $lastProcessedTime)
-                          ->where('DATENEW', '>', Carbon::now()->subHours(2)); // Only check last 2 hours
-                    });
-                })
-                ->whereHas('ticketLines.product', function ($query) {
-                    // Filter for Coffee Fresh products (category 081)
-                    $query->where('CATEGORY', '081');
-                })
-                ->limit(50) // Process max 50 tickets at a time
-                ->get();
-            
-            Log::info('MonitorCoffeeOrdersJob execution', [
-                'duration_ms' => round((microtime(true) - $startTime) * 1000, 2),
-                'tickets_found' => $newTickets->count(),
-                'last_processed_time' => $lastProcessedTime->toDateTimeString()
+            Log::info('Final cutoff time determined', [
+                'cutoff' => $lastProcessedTime->toDateTimeString(),
+                'now' => now()->toDateTimeString(),
+                'time_window' => 'Last 2 hours max'
             ]);
+            
+            // Find new coffee orders from POS - LIMIT to last 2 hours and max 50 tickets
+            $ticketQuery = Ticket::with(['ticketLines.product', 'person'])
+                ->where('TICKETTYPE', 0); // Normal sales only
+                
+            // Log the base query count
+            $totalTickets = (clone $ticketQuery)->count();
+            Log::info('Total tickets in POS', ['count' => $totalTickets]);
+            
+            // Add receipt date filter
+            $ticketQuery->where(function ($query) use ($lastProcessedTime) {
+                // Get tickets created after our last check
+                $query->whereHas('receipt', function ($q) use ($lastProcessedTime) {
+                    $q->where('DATENEW', '>', $lastProcessedTime)
+                      ->where('DATENEW', '>', Carbon::now()->subHours(2)); // Only check last 2 hours
+                });
+            });
+            
+            $ticketsAfterTime = (clone $ticketQuery)->count();
+            Log::info('Tickets after cutoff time', [
+                'count' => $ticketsAfterTime,
+                'cutoff' => $lastProcessedTime->toDateTimeString()
+            ]);
+            
+            // Add coffee category filter
+            $ticketQuery->whereHas('ticketLines.product', function ($query) {
+                // Filter for Coffee Fresh products (category 081)
+                $query->where('CATEGORY', '081');
+            });
+            
+            $coffeeTickets = (clone $ticketQuery)->count();
+            Log::info('Coffee tickets found', ['count' => $coffeeTickets]);
+            
+            $newTickets = $ticketQuery->limit(50)->get(); // Process max 50 tickets at a time
+            
 
             // Batch check for existing orders to reduce queries
-            $existingTicketIds = KdsOrder::whereIn('ticket_id', $newTickets->pluck('ID'))
+            $ticketIds = $newTickets->pluck('ID');
+            $existingTicketIds = KdsOrder::whereIn('ticket_id', $ticketIds)
                 ->pluck('ticket_id')
                 ->toArray();
+                
+            Log::info('Existing ticket check', [
+                'new_ticket_ids' => $ticketIds->toArray(),
+                'existing_in_kds' => $existingTicketIds,
+                'will_process' => count($ticketIds) - count($existingTicketIds)
+            ]);
 
             foreach ($newTickets as $ticket) {
                 // Skip if we already have this order
                 if (in_array($ticket->ID, $existingTicketIds)) {
+                    Log::debug('Skipping existing ticket', ['ticket_id' => $ticket->ID]);
                     continue;
                 }
 
@@ -149,9 +195,15 @@ class MonitorCoffeeOrdersJob implements ShouldQueue
             }
             
             // Clean up old completed orders (older than 24 hours)
-            KdsOrder::where('status', 'completed')
+            $deletedCount = KdsOrder::where('status', 'completed')
                 ->where('completed_at', '<', now()->subDay())
                 ->delete();
+                
+            Log::info('=== MonitorCoffeeOrdersJob END ===', [
+                'duration_ms' => round((microtime(true) - $startTime) * 1000, 2),
+                'orders_created' => $newTickets->count() - count($existingTicketIds),
+                'old_orders_deleted' => $deletedCount
+            ]);
                 
         } catch (\Exception $e) {
             Log::error('Failed to monitor coffee orders', [
