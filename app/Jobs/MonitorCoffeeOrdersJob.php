@@ -27,6 +27,22 @@ class MonitorCoffeeOrdersJob implements ShouldQueue
             // Get the last processed ticket time to avoid duplicates
             $lastProcessedTime = KdsOrder::max('order_time') ?? Carbon::now()->subDay();
             
+            // Check if there's a "last clear time" setting
+            $lastClearTime = \DB::table('kds_settings')
+                ->where('key', 'last_clear_time')
+                ->value('value');
+            
+            if ($lastClearTime) {
+                $lastClearTime = Carbon::parse($lastClearTime);
+                // Use the more recent of last processed time or last clear time
+                if ($lastClearTime->gt($lastProcessedTime)) {
+                    $lastProcessedTime = $lastClearTime;
+                    Log::info('Using last clear time as cutoff', [
+                        'clear_time' => $lastClearTime->toDateTimeString()
+                    ]);
+                }
+            }
+            
             // Find new coffee orders from POS - LIMIT to last 2 hours and max 50 tickets
             $newTickets = Ticket::with(['ticketLines.product', 'person'])
                 ->where('TICKETTYPE', 0) // Normal sales only

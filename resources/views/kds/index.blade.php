@@ -208,6 +208,7 @@
             
             eventSource.onmessage = function(event) {
                 const data = JSON.parse(event.data);
+                console.log('SSE Update: Received', data.orders.length, 'orders');
                 updateOrdersDisplay(data.orders);
             };
 
@@ -452,6 +453,7 @@
 
         // Clear all orders
         async function clearAll() {
+            console.log('Clear All: Starting clear operation...');
             try {
                 const response = await fetch('{{ route('kds.clear-all') }}', {
                     method: 'POST',
@@ -461,10 +463,25 @@
                 });
                 
                 const result = await response.json();
+                console.log('Clear All: Response received', result);
                 
                 if (result.success) {
                     alert(result.message);
-                    manualRefresh();
+                    
+                    // Log debug info if available
+                    if (result.debug) {
+                        console.log('Clear All Debug Info:', result.debug);
+                    }
+                    
+                    // Wait a moment before refreshing to ensure clear is processed
+                    console.log('Clear All: Waiting 2 seconds before refresh...');
+                    setTimeout(() => {
+                        console.log('Clear All: Triggering manual refresh');
+                        manualRefresh();
+                    }, 2000);
+                } else {
+                    console.error('Clear All: Failed', result.message);
+                    alert('Failed: ' + result.message);
                 }
             } catch (error) {
                 console.error('Error clearing all orders:', error);

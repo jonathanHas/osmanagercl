@@ -236,15 +236,35 @@ class KdsController extends Controller
         // Clear ALL orders (useful for testing/reset)
         try {
             $count = KdsOrder::count();
-            KdsOrder::query()->delete(); // Use delete() instead of truncate() to get count
+            
+            // Store the current time as the "last clear time" to prevent re-importing old orders
+            \DB::table('kds_settings')
+                ->updateOrInsert(
+                    ['key' => 'last_clear_time'],
+                    ['value' => now()->toDateTimeString(), 'updated_at' => now()]
+                );
+            
+            // Clear all orders
+            KdsOrder::query()->delete();
+            
+            \Log::info('KDS Clear All: Successfully cleared orders', [
+                'count' => $count,
+                'clear_time' => now()->toDateTimeString()
+            ]);
             
             return response()->json([
                 'success' => true,
-                'message' => "Cleared {$count} orders"
+                'message' => "Cleared {$count} orders",
+                'debug' => [
+                    'cleared_count' => $count,
+                    'clear_time' => now()->toDateTimeString(),
+                    'info' => 'Orders before this time will not be re-imported'
+                ]
             ]);
         } catch (\Exception $e) {
             \Log::error('Failed to clear KDS orders', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             
             return response()->json([
