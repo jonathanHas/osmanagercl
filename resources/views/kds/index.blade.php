@@ -1,21 +1,22 @@
 <x-admin-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-                Coffee KDS - Kitchen Display System
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4">
+            <h2 class="font-semibold text-base sm:text-xl text-gray-800 dark:text-gray-200 leading-tight">
+                <span class="hidden sm:inline">Coffee KDS - Kitchen Display System</span>
+                <span class="sm:hidden">Coffee KDS</span>
             </h2>
-            <div class="flex items-center gap-4">
+            <div class="flex flex-wrap items-center gap-2 sm:gap-4">
                 <!-- Queue Status Indicator -->
-                <div class="flex items-center gap-2 px-3 py-1 rounded-lg {{ $queueStatus['active'] ? 'bg-green-100 dark:bg-green-900' : 'bg-red-100 dark:bg-red-900' }}">
-                    <span class="relative flex h-3 w-3">
+                <div class="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm {{ $queueStatus['active'] ? 'bg-green-100 dark:bg-green-900' : 'bg-red-100 dark:bg-red-900' }}">
+                    <span class="relative flex h-2 sm:h-3 w-2 sm:w-3">
                         @if($queueStatus['active'])
                             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                            <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                            <span class="relative inline-flex rounded-full h-2 sm:h-3 w-2 sm:w-3 bg-green-500"></span>
                         @else
-                            <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                            <span class="relative inline-flex rounded-full h-2 sm:h-3 w-2 sm:w-3 bg-red-500"></span>
                         @endif
                     </span>
-                    <div class="text-sm">
+                    <div class="hidden sm:block text-sm">
                         <span class="font-semibold {{ $queueStatus['active'] ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300' }}">
                             Queue: {{ $queueStatus['active'] ? 'Active' : 'Inactive' }}
                         </span>
@@ -28,18 +29,27 @@
                             Last: {{ $queueStatus['last_check'] }}
                         </span>
                     </div>
+                    <div class="sm:hidden">
+                        <span class="font-semibold {{ $queueStatus['active'] ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300' }}">
+                            {{ $queueStatus['active'] ? 'Active' : 'Inactive' }}
+                        </span>
+                        @if($queueStatus['pending_jobs'] > 0)
+                            <span class="text-yellow-600 dark:text-yellow-400 ml-1">({{ $queueStatus['pending_jobs'] }})</span>
+                        @endif
+                    </div>
                 </div>
                 
-                <span class="text-sm text-gray-600 dark:text-gray-400">
+                <span class="hidden sm:inline text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                     Auto-refresh: <span id="refresh-status" class="font-semibold text-green-600">Active</span>
                 </span>
-                <button onclick="manualRefresh()" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
-                    Refresh Now
+                <button onclick="manualRefresh()" class="px-2 sm:px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs sm:text-sm">
+                    <span class="hidden sm:inline">Refresh Now</span>
+                    <span class="sm:hidden">Refresh</span>
                 </button>
                 
                 <!-- Clear Orders Dropdown -->
                 <div class="relative" x-data="{ open: false }">
-                    <button @click="open = !open" class="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700">
+                    <button @click="open = !open" class="px-2 sm:px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 text-xs sm:text-sm">
                         Clear ▼
                     </button>
                     <div x-show="open" @click.away="open = false" 
@@ -86,23 +96,23 @@
             @endif
             
             <!-- Order Status Legend -->
-            <div class="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-                <div class="flex flex-wrap gap-4 justify-center">
-                    <div class="flex items-center gap-2">
-                        <span class="w-4 h-4 bg-red-500 rounded"></span>
-                        <span class="text-sm">New</span>
+            <div class="mb-3 sm:mb-6 bg-white dark:bg-gray-800 rounded-lg shadow p-2 sm:p-4">
+                <div class="flex flex-wrap gap-2 sm:gap-4 justify-center">
+                    <div class="flex items-center gap-1 sm:gap-2">
+                        <span class="w-3 h-3 sm:w-4 sm:h-4 bg-red-500 rounded"></span>
+                        <span class="text-xs sm:text-sm">New</span>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <span class="w-4 h-4 bg-yellow-500 rounded"></span>
-                        <span class="text-sm">Viewed</span>
+                    <div class="flex items-center gap-1 sm:gap-2">
+                        <span class="w-3 h-3 sm:w-4 sm:h-4 bg-yellow-500 rounded"></span>
+                        <span class="text-xs sm:text-sm">Viewed</span>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <span class="w-4 h-4 bg-blue-500 rounded"></span>
-                        <span class="text-sm">Preparing</span>
+                    <div class="flex items-center gap-1 sm:gap-2">
+                        <span class="w-3 h-3 sm:w-4 sm:h-4 bg-blue-500 rounded"></span>
+                        <span class="text-xs sm:text-sm">Preparing</span>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <span class="w-4 h-4 bg-green-500 rounded"></span>
-                        <span class="text-sm">Ready</span>
+                    <div class="flex items-center gap-1 sm:gap-2">
+                        <span class="w-3 h-3 sm:w-4 sm:h-4 bg-green-500 rounded"></span>
+                        <span class="text-xs sm:text-sm">Ready</span>
                     </div>
                 </div>
             </div>
@@ -111,7 +121,7 @@
             <div id="orders-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 @forelse($orders as $order)
                     <div id="order-{{ $order->id }}" class="order-card bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 border-t-4 
-                        {{ $order->status === 'new' ? 'border-red-500 animate-pulse' : '' }}
+                        {{ $order->status === 'new' ? 'border-red-500' : '' }}
                         {{ $order->status === 'viewed' ? 'border-yellow-500' : '' }}
                         {{ $order->status === 'preparing' ? 'border-blue-500' : '' }}
                         {{ $order->status === 'ready' ? 'border-green-500' : '' }}">
@@ -154,33 +164,12 @@
                             @endforeach
                         </div>
 
-                        <!-- Action Buttons -->
-                        <div class="grid grid-cols-2 gap-2">
-                            @if($order->status === 'new')
-                                <button onclick="updateOrderStatus({{ $order->id }}, 'viewed')" 
-                                    class="px-3 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-sm">
-                                    View
-                                </button>
-                                <button onclick="updateOrderStatus({{ $order->id }}, 'preparing')" 
-                                    class="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm">
-                                    Start
-                                </button>
-                            @elseif($order->status === 'viewed')
-                                <button onclick="updateOrderStatus({{ $order->id }}, 'preparing')" 
-                                    class="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm col-span-2">
-                                    Start Preparing
-                                </button>
-                            @elseif($order->status === 'preparing')
-                                <button onclick="updateOrderStatus({{ $order->id }}, 'ready')" 
-                                    class="px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm col-span-2">
-                                    Mark Ready
-                                </button>
-                            @elseif($order->status === 'ready')
-                                <button onclick="updateOrderStatus({{ $order->id }}, 'completed')" 
-                                    class="px-3 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm col-span-2">
-                                    Complete
-                                </button>
-                            @endif
+                        <!-- Single Complete Button -->
+                        <div class="mt-3">
+                            <button onclick="updateOrderStatus({{ $order->id }}, 'completed')" 
+                                class="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold text-lg">
+                                ✓ Complete Order
+                            </button>
                         </div>
                     </div>
                 @empty
@@ -190,6 +179,51 @@
                     </div>
                 @endforelse
             </div>
+            
+            <!-- Completed Orders Section -->
+            @if(isset($completedOrders) && $completedOrders->count() > 0)
+            <div id="completed-orders-section" class="mt-8">
+                <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">Recently Completed Orders</h3>
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead class="bg-gray-50 dark:bg-gray-700">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Order #</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Items</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Completed</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="completed-orders-tbody" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                            @foreach($completedOrders as $order)
+                            <tr id="completed-{{ $order->id }}" class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                                    #{{ $order->ticket_number }}
+                                </td>
+                                <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
+                                    @foreach($order->items as $item)
+                                        <span class="inline-block">
+                                            {{ $item->formatted_quantity }}x {{ $item->display_name }}
+                                            @if(!$loop->last), @endif
+                                        </span>
+                                    @endforeach
+                                </td>
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                                    {{ $order->completed_at ? $order->completed_at->format('H:i:s') : '' }}
+                                </td>
+                                <td class="px-4 py-2 whitespace-nowrap">
+                                    <button onclick="restoreOrder({{ $order->id }})" 
+                                        class="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">
+                                        ↺ Restore
+                                    </button>
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            @endif
         </div>
     </div>
 
@@ -208,8 +242,11 @@
             
             eventSource.onmessage = function(event) {
                 const data = JSON.parse(event.data);
-                console.log('SSE Update: Received', data.orders.length, 'orders');
+                console.log('SSE Update: Received', data.orders.length, 'active orders,', (data.completed ? data.completed.length : 0), 'completed');
                 updateOrdersDisplay(data.orders);
+                if (data.completed) {
+                    updateCompletedOrdersTable(data.completed);
+                }
             };
 
             eventSource.onerror = function(error) {
@@ -227,6 +264,108 @@
                 document.getElementById('refresh-status').textContent = 'Active';
                 document.getElementById('refresh-status').className = 'font-semibold text-green-600';
             };
+        }
+
+        // Restore completed order back to active
+        async function restoreOrder(orderId) {
+            try {
+                const response = await fetch(`{{ url('kds/orders') }}/${orderId}/status`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ status: 'new' })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to restore order');
+                }
+
+                const result = await response.json();
+                
+                // Remove from completed table
+                const row = document.getElementById(`completed-${orderId}`);
+                if (row) {
+                    row.style.transition = 'opacity 0.5s';
+                    row.style.opacity = '0';
+                    setTimeout(() => row.remove(), 500);
+                }
+                
+                // Trigger refresh to show in active orders
+                setTimeout(() => manualRefresh(), 600);
+                
+            } catch (error) {
+                console.error('Error restoring order:', error);
+                alert('Failed to restore order. Please try again.');
+            }
+        }
+
+        // Update completed orders table
+        function updateCompletedOrdersTable(completedOrders) {
+            // Find or create the completed orders section
+            let completedSection = document.getElementById('completed-orders-section');
+            
+            if (!completedSection && completedOrders.length > 0) {
+                // Create the section if it doesn't exist and we have completed orders
+                const container = document.querySelector('.max-w-full.mx-auto');
+                const section = document.createElement('div');
+                section.id = 'completed-orders-section';
+                section.className = 'mt-8';
+                section.innerHTML = `
+                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">Recently Completed Orders</h3>
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                            <thead class="bg-gray-50 dark:bg-gray-700">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Order #</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Items</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Completed</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="completed-orders-tbody" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                container.appendChild(section);
+                completedSection = section;
+            }
+            
+            if (completedSection) {
+                const tbody = document.getElementById('completed-orders-tbody') || completedSection.querySelector('tbody');
+                
+                if (completedOrders.length === 0) {
+                    // Hide section if no completed orders
+                    completedSection.style.display = 'none';
+                } else {
+                    // Show section and update content
+                    completedSection.style.display = 'block';
+                    
+                    tbody.innerHTML = completedOrders.map(order => `
+                        <tr id="completed-${order.id}" class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                                #${order.ticket_number}
+                            </td>
+                            <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
+                                ${order.items.map(item => 
+                                    `<span class="inline-block">${item.quantity}x ${item.product_name}</span>`
+                                ).join(', ')}
+                            </td>
+                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                                ${order.completed_time}
+                            </td>
+                            <td class="px-4 py-2 whitespace-nowrap">
+                                <button onclick="restoreOrder(${order.id})" 
+                                    class="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">
+                                    ↺ Restore
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            }
         }
 
         // Update orders display
@@ -257,7 +396,7 @@
         // Create order card HTML
         function createOrderCard(order) {
             const statusColors = {
-                'new': 'border-red-500 animate-pulse',
+                'new': 'border-red-500',
                 'viewed': 'border-yellow-500',
                 'preparing': 'border-blue-500',
                 'ready': 'border-green-500'
@@ -313,51 +452,21 @@
                     <div class="border-t border-gray-200 dark:border-gray-700 pt-3 mb-3">
                         ${itemsHtml}
                     </div>
-                    <div class="grid grid-cols-2 gap-2">
+                    <div class="mt-3">
                         ${buttonsHtml}
                     </div>
                 </div>
             `;
         }
 
-        // Get action buttons based on status
+        // Get action buttons - simplified to just Complete button
         function getActionButtons(orderId, status) {
-            switch(status) {
-                case 'new':
-                    return `
-                        <button onclick="updateOrderStatus(${orderId}, 'viewed')" 
-                            class="px-3 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-sm">
-                            View
-                        </button>
-                        <button onclick="updateOrderStatus(${orderId}, 'preparing')" 
-                            class="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm">
-                            Start
-                        </button>
-                    `;
-                case 'viewed':
-                    return `
-                        <button onclick="updateOrderStatus(${orderId}, 'preparing')" 
-                            class="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm col-span-2">
-                            Start Preparing
-                        </button>
-                    `;
-                case 'preparing':
-                    return `
-                        <button onclick="updateOrderStatus(${orderId}, 'ready')" 
-                            class="px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm col-span-2">
-                            Mark Ready
-                        </button>
-                    `;
-                case 'ready':
-                    return `
-                        <button onclick="updateOrderStatus(${orderId}, 'completed')" 
-                            class="px-3 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm col-span-2">
-                            Complete
-                        </button>
-                    `;
-                default:
-                    return '';
-            }
+            return `
+                <button onclick="updateOrderStatus(${orderId}, 'completed')" 
+                    class="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold text-lg">
+                    ✓ Complete Order
+                </button>
+            `;
         }
 
         // Update order status
@@ -413,8 +522,17 @@
 
                 // Get updated orders
                 const response = await fetch('{{ route('kds.orders') }}');
-                const orders = await response.json();
-                updateOrdersDisplay(orders);
+                const data = await response.json();
+                
+                // Handle both old format (array) and new format (object with active/completed)
+                if (Array.isArray(data)) {
+                    updateOrdersDisplay(data);
+                } else if (data.active) {
+                    updateOrdersDisplay(data.active);
+                    if (data.completed) {
+                        updateCompletedOrdersTable(data.completed);
+                    }
+                }
                 
             } catch (error) {
                 console.error('Error refreshing orders:', error);

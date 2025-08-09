@@ -18,6 +18,14 @@ class KdsController extends Controller
             ->today()
             ->orderBy('order_time', 'asc')
             ->get();
+            
+        // Get recently completed orders (last 30 minutes)
+        $completedOrders = KdsOrder::with('items')
+            ->whereIn('status', ['completed'])
+            ->where('completed_at', '>=', now()->subMinutes(30))
+            ->orderBy('completed_at', 'desc')
+            ->limit(10)
+            ->get();
 
         // Check queue worker status
         $pendingJobs = \DB::table('jobs')->count();
@@ -68,12 +76,12 @@ class KdsController extends Controller
             'last_check_time' => $lastJobTime
         ];
 
-        return view('kds.index', compact('orders', 'queueStatus'));
+        return view('kds.index', compact('orders', 'completedOrders', 'queueStatus'));
     }
 
     public function getOrders(): JsonResponse
     {
-        $orders = KdsOrder::with('items')
+        $activeOrders = KdsOrder::with('items')
             ->active()
             ->today()
             ->orderBy('order_time', 'asc')
@@ -97,19 +105,56 @@ class KdsController extends Controller
                     'customer_info' => $order->customer_info,
                 ];
             });
+            
+        $completedOrders = KdsOrder::with('items')
+            ->whereIn('status', ['completed'])
+            ->where('completed_at', '>=', now()->subMinutes(30))
+            ->orderBy('completed_at', 'desc')
+            ->limit(10)
+            ->get()
+            ->map(function ($order) {
+                return [
+                    'id' => $order->id,
+                    'ticket_number' => $order->ticket_number,
+                    'status' => $order->status,
+                    'order_time' => $order->order_time->format('H:i:s'),
+                    'completed_time' => $order->completed_at ? $order->completed_at->format('H:i:s') : '',
+                    'items' => $order->items->map(function ($item) {
+                        return [
+                            'id' => $item->id,
+                            'product_name' => $item->display_name,
+                            'quantity' => $item->formatted_quantity,
+                        ];
+                    }),
+                ];
+            });
 
-        return response()->json($orders);
+        return response()->json([
+            'active' => $activeOrders,
+            'completed' => $completedOrders
+        ]);
     }
 
     public function updateStatus(Request $request, KdsOrder $kdsOrder): JsonResponse
     {
         $request->validate([
-            'status' => 'required|in:viewed,preparing,ready,completed,cancelled'
+            'status' => 'required|in:new,viewed,preparing,ready,completed,cancelled'
         ]);
 
         $status = $request->input('status');
 
         switch ($status) {
+            case 'new':
+                // Restore to new status
+                $kdsOrder->update([
+                    'status' => 'new',
+                    'viewed_at' => null,
+                    'started_at' => null,
+                    'ready_at' => null,
+                    'completed_at' => null,
+                    'prep_time' => null,
+                ]);
+                break;
             case 'viewed':
                 $kdsOrder->markAsViewed();
                 break;
@@ -150,6 +195,14 @@ class KdsController extends Controller
                     ->orderBy('order_time', 'asc')
                     ->get();
 
+                // Also get completed orders for the table
+                $completedOrders = KdsOrder::with('items')
+                    ->whereIn('status', ['completed'])
+                    ->where('completed_at', '>=', now()->subMinutes(30))
+                    ->orderBy('completed_at', 'desc')
+                    ->limit(10)
+                    ->get();
+
                 $data = json_encode([
                     'orders' => $orders->map(function ($order) {
                         return [
@@ -168,6 +221,20 @@ class KdsController extends Controller
                                 ];
                             })->toArray(),
                             'customer_info' => $order->customer_info,
+                        ];
+                    })->toArray(),
+                    'completed' => $completedOrders->map(function ($order) {
+                        return [
+                            'id' => $order->id,
+                            'ticket_number' => $order->ticket_number,
+                            'order_time' => $order->order_time->format('H:i:s'),
+                            'completed_time' => $order->completed_at ? $order->completed_at->format('H:i:s') : '',
+                            'items' => $order->items->map(function ($item) {
+                                return [
+                                    'product_name' => $item->display_name,
+                                    'quantity' => $item->formatted_quantity,
+                                ];
+                            })->toArray(),
                         ];
                     })->toArray()
                 ]);
