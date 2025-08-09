@@ -103,21 +103,70 @@ POST /kds/poll            - Manually trigger order check
 php artisan migrate
 ```
 
-### 2. Start Queue Worker
+### 2. Setup Queue Worker (REQUIRED)
+The queue worker MUST be running for the KDS to function. Choose one method:
+
+#### Option A: Simple Cron Job (Recommended for most users)
 ```bash
-php artisan queue:work
+# Run the setup script
+./scripts/queue-worker-setup.sh
+# Choose option 1 (Cron Job)
+```
+This checks every minute if the worker is running and restarts it if needed.
+
+#### Option B: Manual Cron Setup
+Add to your crontab (`crontab -e`):
+```bash
+# Check and restart queue worker if needed
+* * * * * cd /var/www/html/osmanager && pgrep -f "artisan queue:work" || nohup php artisan queue:work --sleep=3 --tries=3 >> storage/logs/queue.log 2>&1 &
+
+# Laravel scheduler (for monitoring)
+* * * * * cd /var/www/html/osmanager && php artisan schedule:run >> /dev/null 2>&1
 ```
 
-### 3. Enable Scheduled Monitoring
-The system automatically runs monitoring every minute via Laravel scheduler:
+#### Option C: Systemd Service (For production servers)
 ```bash
-php artisan schedule:work
+# Create service file
+sudo nano /etc/systemd/system/osmanager-queue.service
+
+# Add content from scripts/queue-worker-setup.sh systemd section
+
+# Enable and start
+sudo systemctl enable osmanager-queue
+sudo systemctl start osmanager-queue
 ```
+
+#### Option D: Supervisor (Most robust)
+```bash
+# Install supervisor
+sudo apt-get install supervisor
+
+# Create config
+sudo nano /etc/supervisor/conf.d/osmanager-queue.conf
+
+# Add content from scripts/queue-worker-setup.sh supervisor section
+
+# Start
+sudo supervisorctl reread
+sudo supervisorctl update
+sudo supervisorctl start osmanager-queue:*
+```
+
+### 3. Verify Queue Worker Status
+The KDS page now shows a visual indicator:
+- 🟢 **Green**: Queue worker is active
+- 🔴 **Red**: Queue worker is not running
+- Shows number of pending jobs
+- Shows last check time
 
 ### 4. Manual Testing
 ```bash
 # Check for new orders manually
 php artisan kds:monitor-coffee
+
+# Check queue status
+php artisan queue:failed
+php artisan tinker --execute="echo 'Pending: ' . \DB::table('jobs')->count()"
 
 # View KDS display
 Navigate to: /kds

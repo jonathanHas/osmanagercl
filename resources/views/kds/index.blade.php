@@ -5,6 +5,31 @@
                 Coffee KDS - Kitchen Display System
             </h2>
             <div class="flex items-center gap-4">
+                <!-- Queue Status Indicator -->
+                <div class="flex items-center gap-2 px-3 py-1 rounded-lg {{ $queueStatus['active'] ? 'bg-green-100 dark:bg-green-900' : 'bg-red-100 dark:bg-red-900' }}">
+                    <span class="relative flex h-3 w-3">
+                        @if($queueStatus['active'])
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                        @else
+                            <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                        @endif
+                    </span>
+                    <div class="text-sm">
+                        <span class="font-semibold {{ $queueStatus['active'] ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300' }}">
+                            Queue: {{ $queueStatus['active'] ? 'Active' : 'Inactive' }}
+                        </span>
+                        @if($queueStatus['pending_jobs'] > 0)
+                            <span class="text-yellow-600 dark:text-yellow-400 ml-1">
+                                ({{ $queueStatus['pending_jobs'] }} pending)
+                            </span>
+                        @endif
+                        <span class="text-gray-600 dark:text-gray-400 ml-1">
+                            Last: {{ $queueStatus['last_check'] }}
+                        </span>
+                    </div>
+                </div>
+                
                 <span class="text-sm text-gray-600 dark:text-gray-400">
                     Auto-refresh: <span id="refresh-status" class="font-semibold text-green-600">Active</span>
                 </span>
@@ -17,6 +42,31 @@
 
     <div class="py-6">
         <div class="max-w-full mx-auto sm:px-6 lg:px-8">
+            <!-- Queue Warning Banner -->
+            @if(!$queueStatus['active'] && $queueStatus['pending_jobs'] > 0)
+            <div class="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-red-800 dark:text-red-200">
+                            Queue Worker Not Running
+                        </h3>
+                        <div class="mt-2 text-sm text-red-700 dark:text-red-300">
+                            <p>The queue worker is not processing jobs. New orders will not be detected until the worker is started.</p>
+                            <p class="mt-1">{{ $queueStatus['pending_jobs'] }} jobs are waiting to be processed.</p>
+                            <p class="mt-2 font-mono bg-red-100 dark:bg-red-900/50 p-2 rounded">
+                                Start with: php artisan queue:work
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
+            
             <!-- Order Status Legend -->
             <div class="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow p-4">
                 <div class="flex flex-wrap gap-4 justify-center">

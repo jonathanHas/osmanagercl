@@ -19,7 +19,56 @@ class KdsController extends Controller
             ->orderBy('order_time', 'asc')
             ->get();
 
-        return view('kds.index', compact('orders'));
+        // Check queue worker status
+        $pendingJobs = \DB::table('jobs')->count();
+        $failedJobs = \DB::table('failed_jobs')->count();
+        
+        // Check if any job was processed recently (within last 5 minutes)
+        $lastProcessedOrder = KdsOrder::orderBy('created_at', 'desc')->first();
+        
+        // Also check the jobs table to see if monitoring is happening
+        // Even if no orders exist, the monitoring job should be running
+        $recentJobActivity = \DB::table('jobs')
+            ->where('created_at', '>=', now()->subMinutes(2))
+            ->exists();
+        
+        // Check failed jobs to see if recent failures
+        $recentFailures = \DB::table('failed_jobs')
+            ->where('failed_at', '>=', now()->subMinutes(5))
+            ->exists();
+        
+        $lastJobTime = null;
+        $queueWorkerActive = false;
+        
+        if ($lastProcessedOrder) {
+            $lastJobTime = $lastProcessedOrder->created_at;
+            // Consider worker active if processed something in last 5 minutes
+            $queueWorkerActive = $lastProcessedOrder->created_at->diffInMinutes(now()) < 5;
+        }
+        
+        // If there are no pending jobs and no recent failures, worker is likely active
+        if ($pendingJobs == 0 && !$recentFailures) {
+            $queueWorkerActive = true;
+            // If we've never had an order, show "System Active" instead of "Never"
+            if (!$lastJobTime) {
+                $lastJobTime = now();
+            }
+        }
+        
+        // If there are many pending jobs, worker is definitely not active
+        if ($pendingJobs > 10) {
+            $queueWorkerActive = false;
+        }
+
+        $queueStatus = [
+            'active' => $queueWorkerActive,
+            'pending_jobs' => $pendingJobs,
+            'failed_jobs' => $failedJobs,
+            'last_check' => $lastJobTime ? $lastJobTime->diffForHumans() : 'Never',
+            'last_check_time' => $lastJobTime
+        ];
+
+        return view('kds.index', compact('orders', 'queueStatus'));
     }
 
     public function getOrders(): JsonResponse
