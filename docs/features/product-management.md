@@ -86,6 +86,35 @@ CREATE TABLE class (
 4. Controller validates and updates database
 5. User redirected with success message
 
+#### Cost Update System
+The system provides multiple ways to update product costs with enhanced delivery integration:
+
+1. **Traditional Cost Update**:
+   - Form-based update on product detail page
+   - Validation: numeric, min 0, max 999,999.99
+   - Returns redirect response with success message
+
+2. **AJAX Cost Update** (Enhanced 2025-08-08):
+   - JSON API support for programmatic updates
+   - Route: `PATCH /products/{id}/cost`
+   - Dual response handling:
+     ```php
+     if ($request->expectsJson()) {
+         return response()->json([
+             'message' => 'Cost updated successfully.',
+             'cost' => $request->cost_price
+         ]);
+     }
+     return redirect()->route('products.show', $id);
+     ```
+
+3. **Delivery Integration Cost Updates**:
+   - **Quick Update Arrows**: One-click cost updates from delivery review pages
+   - **Visual Indicators**: Arrow buttons appear when delivery cost differs from product cost
+   - **Confirmation Dialogs**: Clear cost change confirmations before updates
+   - **Real-time Feedback**: Success messages and automatic page refresh
+   - **Smart Conditions**: Only available for non-completed deliveries with differences >€0.01
+
 #### Barcode Updates
 1. User clicks edit icon next to SKU/barcode on product detail page
 2. Warning form appears with:
@@ -658,6 +687,51 @@ A: Products in the `stocking` table are included in automated ordering calculati
 - Eager loading of relationships to prevent N+1 queries
 - Caching of tax category and supplier dropdowns
 - Optimized search queries with database indexes
+
+## Recent Updates
+
+### Cost Price Editing in Modal (2025-08-08)
+
+Enhanced the price editor modal to include inline cost price editing capabilities.
+
+#### Features
+- **Inline Cost Editing**: Edit button next to cost price in pricing breakdown
+- **Real-time Updates**: Margin calculations update automatically
+- **No Page Refresh**: AJAX-based updates for smooth UX
+- **UUID Support**: Handles both numeric and UUID product IDs
+- **Visual Feedback**: Clear edit/save/cancel workflow
+
+#### Technical Implementation
+- Cost price updates via `/products/{id}/cost` endpoint
+- Supports POS database write operations
+- Validation for numeric values (0-999999.99)
+- Error handling with user-friendly messages
+
+### Supplier-Specific UI Components (2025-08-08)
+
+Dynamic display of pricing cards based on supplier type.
+
+#### Features
+- **UDEA-Only Components**:
+  - Supplier Pricing card with cost comparisons
+  - Quick Actions for price updates
+  - Advanced pricing analysis section
+- **Adaptive Layout**: Grid adjusts from 3 columns (UDEA) to 1 column (others)
+- **Smart Pricing Suggestions**: 
+  - Optimal pricing (35% margin on total cost)
+  - Competitive pricing (+10% above supplier)
+- **One-Click Updates**: Apply supplier prices directly
+
+### Delivery Cost Quick Update (2025-08-08)
+
+Added quick cost update functionality to delivery pages.
+
+#### Features
+- **Arrow Button**: Update product cost from delivery item
+- **Inline UI Updates**: No page refresh required
+- **Visual Indicators**: Color-coded cost differences
+- **Confirmation Dialog**: Prevents accidental updates
+- **Batch Processing**: Handle multiple updates efficiently
 
 ## Future Enhancements
 

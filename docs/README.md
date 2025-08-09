@@ -158,6 +158,17 @@ Detailed documentation for each major feature.
   - Context-aware navigation
   - Alpine.js reactive UI components
 
+### 🏢 Management Systems
+Administrative and operational management tools.
+
+- **[Receipts Management](./management/receipts.md)** - 🆕 Complete till review and transaction analysis *(New)*
+  - POS transaction review with advanced filtering
+  - Color-coded payment type analysis (Cash, Card, Free, Debt)
+  - Interactive clickable summary cards for instant filtering
+  - Real-time analytics with caching optimization
+  - Export capabilities and audit trail
+  - Alpine.js reactive interface with Tailwind CSS
+
 ### 💻 Development
 Guides for developers working on the project.
 

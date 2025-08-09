@@ -1420,6 +1420,42 @@
                 saveButton.textContent = originalText;
             });
         }
+        
+        // Simple message display function for notifications
+        function showMessage(message, type = 'info') {
+            console.log(`[${type.toUpperCase()}]`, message);
+            
+            // Create or update message element
+            let messageEl = document.getElementById('flash-message');
+            if (!messageEl) {
+                messageEl = document.createElement('div');
+                messageEl.id = 'flash-message';
+                messageEl.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; padding: 12px 20px; border-radius: 6px; font-weight: 500; transition: opacity 0.3s;';
+                document.body.appendChild(messageEl);
+            }
+            
+            // Set colors based on type
+            const colors = {
+                success: 'background: #10b981; color: white;',
+                error: 'background: #ef4444; color: white;',
+                info: 'background: #3b82f6; color: white;',
+                warning: 'background: #f59e0b; color: white;'
+            };
+            
+            messageEl.style.cssText += colors[type] || colors.info;
+            messageEl.textContent = message;
+            messageEl.style.opacity = '1';
+            
+            // Auto-hide after 3 seconds
+            setTimeout(() => {
+                messageEl.style.opacity = '0';
+                setTimeout(() => {
+                    if (messageEl.parentNode) {
+                        messageEl.parentNode.removeChild(messageEl);
+                    }
+                }, 300);
+            }, 3000);
+        }
     </script>
     @endpush
 </x-admin-layout>

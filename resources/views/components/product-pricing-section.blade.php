@@ -4,6 +4,10 @@
     $hasSupplierIntegration = $product->supplier && $supplierService->hasExternalIntegration($product->supplier->SupplierID);
     $hasUdeaPricing = $hasSupplierIntegration && $udeaPricing;
     
+    // Check if supplier is UDEA
+    $udeaSupplierIds = config('suppliers.external_links.udea.supplier_ids', [5, 44, 85]);
+    $isUdeaSupplier = $product->supplier && in_array($product->supplier->SupplierID, $udeaSupplierIds);
+    
     // Calculate key metrics
     $sellPriceWithVat = $product->PRICESELL * (1 + $product->getVatRate());
     $costPrice = $product->PRICEBUY;
@@ -64,7 +68,7 @@
         </div>
 
         <!-- Main Pricing Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 {{ $isUdeaSupplier ? 'lg:grid-cols-3' : '' }} gap-6">
             <!-- Your Pricing Column -->
             <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-5">
                 <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-4 flex items-center">
@@ -109,6 +113,7 @@
                 </div>
             </div>
 
+            @if($isUdeaSupplier)
             <!-- Supplier Pricing Column -->
             <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-5">
                 <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-4 flex items-center">
@@ -313,6 +318,7 @@
                     </div>
                 @endif
             </div>
+            @endif {{-- End of UDEA-only columns --}}
         </div>
         
         <!-- Expandable Advanced Analysis -->

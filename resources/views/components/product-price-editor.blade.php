@@ -114,9 +114,49 @@
                                     <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Pricing Breakdown</h4>
                                     
                                     <div class="space-y-2 text-sm">
-                                        <div class="flex justify-between">
+                                        <div class="flex justify-between items-center">
                                             <span class="text-gray-600 dark:text-gray-400">Cost Price:</span>
-                                            <span id="breakdown-cost" class="font-medium">€{{ number_format($costPrice, 2) }}</span>
+                                            <div class="flex items-center gap-2">
+                                                <span id="breakdown-cost" class="font-medium">€{{ number_format($costPrice, 2) }}</span>
+                                                <button type="button" 
+                                                        onclick="toggleCostEdit()" 
+                                                        class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                                        title="Edit cost price">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Cost Edit Input (Hidden by default) -->
+                                        <div id="costEditSection" class="hidden">
+                                            <div class="flex items-center gap-2">
+                                                <input type="number" 
+                                                       id="cost_price_input" 
+                                                       value="{{ number_format($costPrice, 2) }}" 
+                                                       step="0.01" 
+                                                       min="0" 
+                                                       max="999999.99"
+                                                       data-product-id="{{ $product->ID }}"
+                                                       onchange="updateCostPrice(this.value)"
+                                                       class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-sm px-2 py-1">
+                                                <button type="button" 
+                                                        id="saveCostBtn"
+                                                        onclick="saveCostPrice('{{ $product->ID }}')" 
+                                                        class="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs"
+                                                        title="Save cost">
+                                                    Save Cost
+                                                </button>
+                                                <button type="button" 
+                                                        onclick="toggleCostEdit()" 
+                                                        class="text-gray-400 hover:text-gray-600"
+                                                        title="Cancel">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                    </svg>
+                                                </button>
+                                            </div>
                                         </div>
                                         <hr class="border-gray-300 dark:border-gray-600">
                                         <div class="flex justify-between">
@@ -333,9 +373,110 @@ window.closePriceEditorModal = function() {
     closePriceEditor();
 };
 
+// Toggle cost edit section
+window.toggleCostEdit = function() {
+    const costEditSection = document.getElementById('costEditSection');
+    const costDisplayContainer = document.getElementById('breakdown-cost').parentElement;
+    
+    if (costEditSection.classList.contains('hidden')) {
+        // Show edit section, hide display
+        costEditSection.classList.remove('hidden');
+        costDisplayContainer.style.display = 'none';
+    } else {
+        // Hide edit section, show display
+        costEditSection.classList.add('hidden');
+        costDisplayContainer.style.display = 'flex';
+    }
+}
+
+// Update cost price and recalculate margins
+function updateCostPrice(newCost) {
+    const cost = parseFloat(newCost);
+    if (isNaN(cost) || cost < 0) return;
+    
+    // Update the display
+    document.getElementById('breakdown-cost').textContent = '€' + cost.toFixed(2);
+    
+    // Recalculate margin
+    const netPrice = parseFloat(document.getElementById('final_net_price').value);
+    const margin = netPrice - cost;
+    const marginPercent = cost > 0 ? (margin / cost) * 100 : 0;
+    
+    document.getElementById('margin-amount').textContent = '€' + margin.toFixed(2);
+    document.getElementById('margin-percentage').textContent = marginPercent.toFixed(1) + '%';
+    
+    // Update color based on margin
+    const marginElements = [document.getElementById('margin-amount'), document.getElementById('margin-percentage')];
+    marginElements.forEach(el => {
+        el.className = margin > 0 ? 'font-semibold text-green-600 dark:text-green-400' : 'font-semibold text-red-600 dark:text-red-400';
+    });
+}
+
+// Save cost price to database
+window.saveCostPrice = async function(productId) {
+    const costInput = document.getElementById('cost_price_input');
+    if (!costInput) {
+        alert('Cost input field not found');
+        return;
+    }
+    
+    const newCost = parseFloat(costInput.value);
+    productId = String(productId);
+    
+    if (isNaN(newCost) || newCost < 0) {
+        alert('Please enter a valid cost price');
+        return;
+    }
+    
+    try {
+        const url = `/products/${encodeURIComponent(productId)}/cost`;
+        
+        const response = await fetch(url, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ cost_price: newCost })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            // Update the display
+            updateCostPrice(newCost);
+            // Hide the edit section
+            toggleCostEdit();
+            // Show success message if function exists
+            if (typeof showMessage === 'function') {
+                showMessage('Cost price updated successfully', 'success');
+            }
+            
+            // Update the main cost display on the page if it exists
+            const mainCostDisplay = document.querySelector('[data-cost-display]');
+            if (mainCostDisplay) {
+                mainCostDisplay.textContent = '€' + newCost.toFixed(2);
+            }
+        } else {
+            alert(data.message || 'Failed to update cost price');
+        }
+    } catch (error) {
+        alert('Network error occurred during cost update');
+    }
+};
+
+// Fallback message function if not defined globally
+if (typeof showMessage === 'undefined') {
+    window.showMessage = function(message, type = 'info') {
+        if (type === 'error') {
+            alert('Error: ' + message);
+        }
+    };
+}
+
 // Initialize on load
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Price editor component loaded');
     if (typeof updateBreakdown === 'function') {
         updateBreakdown();
     }

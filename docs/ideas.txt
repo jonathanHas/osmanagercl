@@ -1,12 +1,44 @@
 
 a udea product quick add feature that would allow the user to scan a products barcode or enter the udeas product code and would retrieve the relevant data to enter the product details by scrapping the info from the website. we already have the code for scrapping the info, and from what I can see the url that we make can take either the barcode or supplier code
 
-
-implement a users roles system so employees only have access to the features they need, managers have access to sales information etc and admins have complete access
-
 Fuit and Veg
 quick review section, make a handy and simple mobile page that the user can select which products need a label and change the country of origin if needed
 
 
 Price changes
-we need to be ablel
+we need to be able...
+
+
+Receipt section...
+
+Daily Totals...
+
+
+
+Management
+
+Expences
+
+wages - import or query the timekeeper web app
+
+Invoices
+
+Import existing code to see how its being implemented and improve upon this
+
+
+    VAT returns
+
+New features - low priority for the momenet
+    - ability to assign values to categories to get a better breakdown of costs & profits
+        for example an invoice might come in at 1000, some items may be for the kitchen if we have a way to identify these and extract the value we can then assign that cost to the kitchen.
+
+
+Bringing it all together
+    An overall profit and costs page, built on a model that allows us to fine tune over time to get a better insight into the business.
+
+
+
+Updates to /fruit-veg/product/2012 don't seend the product to the label already NEED TO CHECK - I originally looked in labels and not in Fruit and Veg labels
+
+
+

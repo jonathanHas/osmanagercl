@@ -352,22 +352,55 @@ class ProductController extends Controller
     /**
      * Update the cost for a product.
      */
-    public function updateCost(Request $request, string $id): RedirectResponse
+    public function updateCost(Request $request, string $id)
     {
+
         $request->validate([
             'cost_price' => 'required|numeric|min:0|max:999999.99',
         ]);
 
-        $product = $this->productRepository->findById($id);
+        // Ensure cost_price is a float
+        $costPrice = (float) $request->cost_price;
+
+        // Try finding the product directly first
+        $product = Product::find($id);
+        
+        // If not found, try the repository
+        if (!$product) {
+            $product = $this->productRepository->findById($id);
+        }
 
         if (! $product) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Product not found'], 404);
+            }
             abort(404, 'Product not found');
         }
 
+
         // Update the product's cost price
-        $product->update([
-            'PRICEBUY' => $request->cost_price,
-        ]);
+        try {
+            // Simple direct update
+            $product->PRICEBUY = $costPrice;
+            $result = $product->save();
+            
+            
+        } catch (\Exception $e) {
+            
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Database update failed: ' . $e->getMessage()], 500);
+            }
+            throw $e;
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Cost updated successfully.',
+                'cost' => $costPrice,
+                'product_id' => $product->ID,
+                'update_result' => $result ?? false
+            ]);
+        }
 
         return redirect()
             ->route('products.show', $id)

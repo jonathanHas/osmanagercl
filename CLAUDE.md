@@ -314,6 +314,9 @@ See [Delivery System Documentation](./docs/features/delivery-system.md).
 
 ### Pricing Management
 Advanced pricing with VAT calculations and supplier comparison.
+- **Enhanced Price Editor Modal**: Inline cost price editing with real-time margin updates
+- **Supplier-Specific UI**: UDEA suppliers get additional pricing cards and quick actions
+- **Quick Cost Updates**: Arrow buttons in deliveries for instant cost synchronization
 See [Pricing System Documentation](./docs/features/pricing-system.md).
 
 ### Coffee Module
@@ -332,6 +335,17 @@ Role-based access control (RBAC) with granular permissions.
 - **Flexible Authorization**: Check permissions in controllers, views, and middleware
 - **User Management**: Assign roles, manage permissions, audit access
 See [User Roles & Permissions Documentation](./docs/features/user-roles-permissions.md).
+
+### Receipts Management System
+Complete till review and transaction analysis for POS data with modern interface.
+- **Transaction Review**: View all POS transactions including receipts, drawer opens, and voided items
+- **Color-coded Interface**: Visual highlighting by payment type (Cash: Green, Card: Purple, Free: Orange, Debt: Yellow)
+- **Interactive Filtering**: Clickable summary cards for instant payment type filtering
+- **Advanced Search**: Filter by date, time, terminal, cashier, transaction type, and amounts
+- **Real-time Analytics**: Dynamic summary calculations with optimized caching layer
+- **Export Capabilities**: CSV export functionality with comprehensive transaction data
+- **Audit Trail**: Complete audit logging for compliance and security monitoring
+See [Receipts Management Documentation](./docs/management/receipts.md).
 
 ## UI/UX Design
 
@@ -418,6 +432,7 @@ php artisan optimize:clear
 - **Performance Guide**: `docs/development/performance-optimization-guide.md`
 - **Architecture decisions**: `docs/architecture/overview.md` (includes optimization patterns)
 - **Feature details**: `docs/features/`
+- **Management systems**: `docs/management/` (Receipts, future Inventory/Staff/Customer systems)
 - **API documentation**: `docs/api/`
 - **Development guides**: `docs/development/`
 - **Planning documents**: `planning/`

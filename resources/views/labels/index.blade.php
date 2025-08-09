@@ -196,58 +196,98 @@
                     <div class="p-6">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Recent Label Prints</h3>
                         
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                <thead class="bg-gray-50 dark:bg-gray-700">
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Product</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Barcode</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Printed At</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                    @foreach($recentLabelPrints as $labelPrint)
-                                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                            <td class="px-6 py-4 whitespace-nowrap">
-                                                @if($labelPrint->product)
-                                                    <div class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ $labelPrint->product->NAME }}</div>
-                                                @else
-                                                    <div class="text-sm text-gray-500 dark:text-gray-400 italic">Product not found</div>
-                                                @endif
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-gray-100">
-                                                {{ $labelPrint->barcode }}
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                                {{ $labelPrint->created_at->format('M j, Y H:i') }}
-                                                <div class="text-xs">{{ $labelPrint->created_at->diffForHumans() }}</div>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                                @if($labelPrint->product)
-                                                    <div class="flex items-center space-x-2">
-                                                        <button onclick="requeueProduct('{{ $labelPrint->product->ID }}', this)" 
-                                                                class="inline-flex items-center px-2 py-1 text-xs bg-green-100 hover:bg-green-200 dark:bg-green-900 dark:hover:bg-green-800 text-green-700 dark:text-green-300 rounded transition">
-                                                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                                                            </svg>
-                                                            Add Back to Products Needing Labels
-                                                        </button>
-                                                        <a href="{{ route('products.print-label', $labelPrint->product->ID) }}" 
-                                                           target="_blank"
-                                                           class="inline-flex items-center px-2 py-1 text-xs bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-900 dark:hover:bg-indigo-800 text-indigo-700 dark:text-indigo-300 rounded transition">
-                                                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
-                                                            </svg>
-                                                            Reprint
-                                                        </a>
-                                                    </div>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
+                        <!-- Grouped Label Print Sessions -->
+                        <div class="space-y-4">
+                            @foreach($groupedLabelPrints as $groupKey => $group)
+                                <div class="border border-gray-200 dark:border-gray-700 rounded-lg">
+                                    <!-- Group Header -->
+                                    <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 flex items-center justify-between cursor-pointer" 
+                                         onclick="toggleGroup('group-{{ $loop->index }}')">
+                                        <div class="flex items-center space-x-3">
+                                            <svg class="w-5 h-5 text-gray-400 transform transition-transform group-chevron" id="chevron-{{ $loop->index }}" 
+                                                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                            </svg>
+                                            <div>
+                                                <div class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                                    {{ $group['display_time'] }}
+                                                </div>
+                                                <div class="text-xs text-gray-500 dark:text-gray-400">
+                                                    {{ $group['count'] }} {{ Str::plural('product', $group['count']) }} printed
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Batch Actions -->
+                                        <div class="flex items-center space-x-2">
+                                            <button onclick="event.stopPropagation(); restoreBatch('{{ $group['display_time'] }}', '{{ $groupKey }}', {{ $loop->index }})"
+                                                    class="inline-flex items-center px-3 py-1 text-xs bg-green-100 hover:bg-green-200 dark:bg-green-900 dark:hover:bg-green-800 text-green-700 dark:text-green-300 rounded transition">
+                                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                                </svg>
+                                                Restore All ({{ $group['count'] }})
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Group Content (Initially Hidden) -->
+                                    <div class="hidden" id="group-{{ $loop->index }}">
+                                        <div class="overflow-x-auto">
+                                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                                <thead class="bg-gray-50 dark:bg-gray-700">
+                                                    <tr>
+                                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Product</th>
+                                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Barcode</th>
+                                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Exact Time</th>
+                                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                                    @foreach($group['products'] as $labelPrint)
+                                                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                                @if($labelPrint->product)
+                                                                    <div class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ $labelPrint->product->NAME }}</div>
+                                                                @else
+                                                                    <div class="text-sm text-gray-500 dark:text-gray-400 italic">Product not found</div>
+                                                                @endif
+                                                            </td>
+                                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-gray-100">
+                                                                {{ $labelPrint->barcode }}
+                                                            </td>
+                                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                                                {{ $labelPrint->created_at->format('H:i:s') }}
+                                                                <div class="text-xs">{{ $labelPrint->created_at->diffForHumans() }}</div>
+                                                            </td>
+                                                            <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                                                @if($labelPrint->product)
+                                                                    <div class="flex items-center space-x-2">
+                                                                        <button onclick="requeueProduct('{{ $labelPrint->product->ID }}', this)" 
+                                                                                class="inline-flex items-center px-2 py-1 text-xs bg-green-100 hover:bg-green-200 dark:bg-green-900 dark:hover:bg-green-800 text-green-700 dark:text-green-300 rounded transition">
+                                                                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                                                            </svg>
+                                                                            Add Back
+                                                                        </button>
+                                                                        <a href="{{ route('products.print-label', $labelPrint->product->ID) }}" 
+                                                                           target="_blank"
+                                                                           class="inline-flex items-center px-2 py-1 text-xs bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-900 dark:hover:bg-indigo-800 text-indigo-700 dark:text-indigo-300 rounded transition">
+                                                                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                                                                            </svg>
+                                                                            Reprint
+                                                                        </a>
+                                                                    </div>
+                                                                @endif
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
                         </div>
                     </div>
                 </div>
@@ -400,6 +440,95 @@
             
             // Open preview in new window
             window.open(`/labels/preview-a4?${params.toString()}`, '_blank', 'width=1200,height=800,scrollbars=yes');
+        }
+
+        // Toggle group visibility
+        function toggleGroup(groupId) {
+            const groupElement = document.getElementById(groupId);
+            const chevronElement = document.getElementById('chevron-' + groupId.replace('group-', ''));
+            
+            if (groupElement.classList.contains('hidden')) {
+                groupElement.classList.remove('hidden');
+                chevronElement.style.transform = 'rotate(90deg)';
+            } else {
+                groupElement.classList.add('hidden');
+                chevronElement.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        // Restore batch of products
+        function restoreBatch(displayTime, groupKey, groupIndex) {
+            // Get all product IDs from the group
+            const groupElement = document.getElementById('group-' + groupIndex);
+            const productRows = groupElement.querySelectorAll('tbody tr');
+            const productIds = [];
+            
+            productRows.forEach(row => {
+                const addBackButton = row.querySelector('button[onclick*="requeueProduct"]');
+                if (addBackButton) {
+                    const onclickAttr = addBackButton.getAttribute('onclick');
+                    const productIdMatch = onclickAttr.match(/requeueProduct\('([^']+)'/);
+                    if (productIdMatch) {
+                        productIds.push(productIdMatch[1]);
+                    }
+                }
+            });
+            
+            if (productIds.length === 0) {
+                alert('No products found in this group to restore.');
+                return;
+            }
+            
+            // Show confirmation dialog
+            const confirmed = confirm(`Are you sure you want to restore ${productIds.length} products from ${displayTime} session?\n\nThis will move all products back to "Products Needing Labels".`);
+            
+            if (!confirmed) {
+                return;
+            }
+            
+            // Disable the restore button while processing
+            const restoreButton = document.querySelector(`button[onclick*="restoreBatch('${displayTime}'"]`);
+            if (restoreButton) {
+                restoreButton.disabled = true;
+                restoreButton.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Restoring...';
+            }
+            
+            fetch('/labels/restore-batch', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({
+                    timestamp: displayTime,
+                    product_ids: productIds
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message
+                    alert(`Successfully restored ${data.restored_count} products from ${displayTime} session!`);
+                    // Reload page to show updated tables
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || data.message));
+                    // Re-enable button on error
+                    if (restoreButton) {
+                        restoreButton.disabled = false;
+                        restoreButton.innerHTML = '<svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>Restore All (' + productIds.length + ')';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error restoring products: ' + error.message);
+                // Re-enable button on error
+                if (restoreButton) {
+                    restoreButton.disabled = false;
+                    restoreButton.innerHTML = '<svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>Restore All (' + productIds.length + ')';
+                }
+            });
         }
 
         // Clear all labels function

@@ -374,7 +374,15 @@
                                     </td>
                                     <td class="px-6 py-4">
                                         <div class="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                            {{ $item->description }}
+                                            @if($item->product)
+                                                <a href="{{ route('products.show', $item->product->ID) }}" 
+                                                   class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+                                                   title="View product details">
+                                                    {{ $item->description }}
+                                                </a>
+                                            @else
+                                                {{ $item->description }}
+                                            @endif
                                         </div>
                                         <div class="text-sm text-gray-500 dark:text-gray-400">
                                             Code: {{ $item->supplier_code }}
@@ -459,11 +467,25 @@
                                     </td>
                                     <td class="px-6 py-4 text-right text-sm">
                                         @if($item->product)
-                                            <div class="text-gray-900 dark:text-gray-100">
-                                                €{{ number_format($item->product->PRICEBUY, 2) }}
-                                            </div>
-                                            <div class="text-xs text-gray-500">
-                                                in POS
+                                            <div class="flex items-center justify-end gap-2">
+                                                <div>
+                                                    <div class="text-gray-900 dark:text-gray-100">
+                                                        €{{ number_format($item->product->PRICEBUY, 2) }}
+                                                    </div>
+                                                    <div class="text-xs text-gray-500">
+                                                        in POS
+                                                    </div>
+                                                </div>
+                                                @if($delivery->status !== 'completed' && abs($item->unit_cost - $item->product->PRICEBUY) > 0.01)
+                                                    <button onclick="updateProductCost('{{ $item->product->ID }}', {{ $item->unit_cost }}, '{{ addslashes($item->description) }}', event)"
+                                                            class="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
+                                                            title="Update cost to €{{ number_format($item->unit_cost, 2) }}">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                                                  d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                                                        </svg>
+                                                    </button>
+                                                @endif
                                             </div>
                                         @else
                                             <span class="text-gray-400 dark:text-gray-500 text-xs">New Product</span>
@@ -507,7 +529,7 @@
                                                 }
                                             @endphp
                                             <div class="{{ $sellHighlight }} rounded px-2 py-1 cursor-pointer hover:ring-2 hover:ring-blue-300 transition-all group"
-                                                 onclick="openPriceEditor({{ $item->id }}, '{{ $item->product->CODE }}', '{{ addslashes($item->description) }}', {{ $item->product->PRICESELL }}, {{ $item->unit_cost }}, {{ $taxRate }})"
+                                                 onclick="openPriceEditor({{ $item->id }}, '{{ $item->product->CODE }}', '{{ addslashes($item->description) }}', {{ $item->product->PRICESELL }}, {{ $item->unit_cost }}, {{ $taxRate }}, {{ $item->sale_price ?? 0 }})"
                                                  title="Click to edit price">
                                                 <div class="flex items-center justify-between">
                                                     <div>
@@ -714,7 +736,8 @@
 
         // Check for barcode updates via AJAX
         function checkBarcodeUpdates() {
-            const retrievingElements = document.querySelectorAll('[id^="barcode-status-"]:contains("🔄")');
+            const statusElements = document.querySelectorAll('[id^="barcode-status-"]');
+            const retrievingElements = Array.from(statusElements).filter(el => el.textContent.includes('🔄'));
             
             if (retrievingElements.length === 0) return;
 
@@ -1192,7 +1215,7 @@
         // Price editor functionality
         let currentEditingItem = null;
 
-        function openPriceEditor(itemId, productCode, description, currentNetPrice, deliveryCost, taxRate = 0) {
+        function openPriceEditor(itemId, productCode, description, currentNetPrice, deliveryCost, taxRate = 0, rspPrice = 0) {
             currentEditingItem = {
                 itemId: itemId,
                 productCode: productCode,
@@ -1209,10 +1232,13 @@
             document.getElementById('modalCurrentPrice').textContent = '€' + currentNetPrice;
             document.getElementById('modalDeliveryCost').textContent = '€' + deliveryCost.toFixed(2);
             
-            // Set initial values
-            document.getElementById('grossPriceInput').value = '';
+            // Set initial values - default to gross mode with RSP as default
+            document.getElementById('grossPriceInput').value = rspPrice > 0 ? rspPrice.toFixed(2) : '';
             document.getElementById('netPriceInput').value = currentNetPrice;
-            document.getElementById('priceInputMode').value = 'net';
+            document.getElementById('priceInputMode').value = 'gross';
+            
+            // Toggle to show gross mode UI
+            togglePriceMode();
             
             // Calculate initial margin
             updateMarginDisplay();
@@ -1321,6 +1347,80 @@
             } catch (error) {
                 console.error('Price update failed:', error);
                 showMessage('Network error occurred during price update', 'error');
+            }
+        }
+
+        // Quick cost update functionality
+        async function updateProductCost(productId, newCost, productName, event) {
+            
+            if (!confirm(`Update cost for "${productName}" to €${newCost.toFixed(2)}?`)) {
+                return;
+            }
+
+            try {
+                const url = `/products/${productId}/cost`;
+                const requestBody = { cost_price: newCost };
+                const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                
+                const response = await fetch(url, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage(data.message || 'Product cost updated successfully', 'success');
+                    
+                    // Update the UI without refreshing
+                    // Find the button that was clicked and update its row
+                    const button = event.target.closest('button');
+                    const row = button.closest('tr');
+                    
+                    // Update the current cost display
+                    const currentCostDiv = button.closest('td').querySelector('div');
+                    if (currentCostDiv) {
+                        currentCostDiv.innerHTML = `
+                            <div class="text-gray-900 dark:text-gray-100">
+                                €${newCost.toFixed(2)}
+                            </div>
+                            <div class="text-xs text-gray-500">
+                                in POS
+                            </div>
+                        `;
+                    }
+                    
+                    // Hide the update button since costs now match
+                    button.style.display = 'none';
+                    
+                    // Update the delivery cost column to remove highlighting
+                    const costCell = row.querySelector('td:nth-child(8)');
+                    if (costCell) {
+                        const costDiv = costCell.querySelector('div');
+                        if (costDiv) {
+                            // Remove background highlighting
+                            costDiv.className = 'rounded px-2 py-1';
+                            // Update content to show just the cost without difference
+                            costDiv.innerHTML = `
+                                <div class="text-gray-900 dark:text-gray-100 font-medium">
+                                    €${newCost.toFixed(2)}
+                                </div>
+                            `;
+                        }
+                    }
+                    
+                } else {
+                    const errorMessage = data.message || data.errors || 'Failed to update product cost';
+                    showMessage(typeof errorMessage === 'object' ? JSON.stringify(errorMessage) : errorMessage, 'error');
+                }
+
+            } catch (error) {
+                showMessage('Network error occurred during cost update', 'error');
             }
         }
 

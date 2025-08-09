@@ -37,6 +37,9 @@ class LabelAreaController extends Controller
             ->limit(50)
             ->get();
 
+        // Group recent prints by time windows (5-minute intervals)
+        $groupedLabelPrints = $this->groupLabelPrintsByTime($recentLabelPrints);
+
         // Get products that need labels (new products or price updates without recent label prints)
         $productsNeedingLabels = $this->getProductsNeedingLabels();
 
@@ -48,10 +51,45 @@ class LabelAreaController extends Controller
 
         return view('labels.index', compact(
             'recentLabelPrints',
+            'groupedLabelPrints',
             'productsNeedingLabels',
             'labelTemplates',
             'defaultTemplate'
         ));
+    }
+
+    /**
+     * Group label prints by time windows (5-minute intervals).
+     */
+    private function groupLabelPrintsByTime($labelPrints)
+    {
+        $groups = [];
+
+        foreach ($labelPrints as $labelPrint) {
+            // Round to nearest 5-minute interval for grouping
+            $timestamp = $labelPrint->created_at;
+            $roundedMinutes = floor($timestamp->minute / 5) * 5;
+            $groupKey = $timestamp->copy()->setMinute($roundedMinutes)->setSecond(0)->format('Y-m-d H:i:s');
+
+            if (! isset($groups[$groupKey])) {
+                $groups[$groupKey] = [
+                    'timestamp' => $timestamp->copy()->setMinute($roundedMinutes)->setSecond(0),
+                    'display_time' => $timestamp->copy()->setMinute($roundedMinutes)->setSecond(0)->format('M j, Y H:i'),
+                    'products' => [],
+                    'count' => 0,
+                ];
+            }
+
+            $groups[$groupKey]['products'][] = $labelPrint;
+            $groups[$groupKey]['count']++;
+        }
+
+        // Sort groups by timestamp (newest first)
+        uasort($groups, function ($a, $b) {
+            return $b['timestamp']->timestamp - $a['timestamp']->timestamp;
+        });
+
+        return $groups;
     }
 
     /**
@@ -271,6 +309,44 @@ class LabelAreaController extends Controller
             return response()->json([
                 'success' => false,
                 'error' => 'Failed to clear labels: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Restore a batch of products from a specific time group back to "Products Needing Labels".
+     */
+    public function restoreBatch(Request $request)
+    {
+        $request->validate([
+            'timestamp' => 'required|string',
+            'product_ids' => 'required|array|min:1',
+            'product_ids.*' => 'required|string',
+        ]);
+
+        try {
+            $timestamp = $request->input('timestamp');
+            $productIds = $request->input('product_ids');
+            $restoredCount = 0;
+
+            // Find products and requeue them
+            foreach ($productIds as $productId) {
+                $product = Product::find($productId);
+                if ($product) {
+                    LabelLog::logRequeueLabel($product->CODE);
+                    $restoredCount++;
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Restored {$restoredCount} products from {$timestamp} session",
+                'restored_count' => $restoredCount,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to restore batch: '.$e->getMessage(),
             ], 500);
         }
     }

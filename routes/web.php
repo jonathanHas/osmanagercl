@@ -77,6 +77,9 @@ Route::middleware('auth')->group(function () {
     // Clear all labels route
     Route::post('/labels/clear-all', [LabelAreaController::class, 'clearAllLabels'])->name('labels.clear-all');
 
+    // Restore batch of labels route
+    Route::post('/labels/restore-batch', [LabelAreaController::class, 'restoreBatch'])->name('labels.restore-batch');
+
     // Fruit & Veg routes
     Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
         Route::get('/', [FruitVegController::class, 'index'])->name('index');
@@ -318,6 +321,15 @@ Route::middleware('auth')->group(function () {
         } catch (\Exception $e) {
             return 'Error: '.$e->getMessage();
         }
+    });
+
+    // Till Review routes
+    Route::prefix('till-review')->name('till-review.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\TillReviewController::class, 'index'])->name('index');
+        Route::get('/summary', [\App\Http\Controllers\TillReviewController::class, 'getSummary'])->name('summary');
+        Route::get('/transactions', [\App\Http\Controllers\TillReviewController::class, 'getTransactions'])->name('transactions');
+        Route::post('/refresh-cache', [\App\Http\Controllers\TillReviewController::class, 'refreshCache'])->name('refresh-cache');
+        Route::get('/export', [\App\Http\Controllers\TillReviewController::class, 'export'])->name('export');
     });
 });
 
