@@ -206,28 +206,51 @@ class KdsController extends Controller
 
     public function clearCompleted(): JsonResponse
     {
-        // Delete completed and cancelled orders older than 1 hour
-        $deleted = KdsOrder::whereIn('status', ['completed', 'cancelled'])
-            ->where(function($query) {
-                $query->where('completed_at', '<', now()->subHour())
-                      ->orWhere('updated_at', '<', now()->subHour());
-            })
-            ->delete();
+        try {
+            // Delete completed and cancelled orders older than 1 hour
+            $deleted = KdsOrder::whereIn('status', ['completed', 'cancelled'])
+                ->where(function($query) {
+                    $query->where('completed_at', '<', now()->subHour())
+                          ->orWhere('updated_at', '<', now()->subHour());
+                })
+                ->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => "Cleared {$deleted} completed orders"
-        ]);
+            return response()->json([
+                'success' => true,
+                'message' => "Cleared {$deleted} completed orders"
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Failed to clear completed KDS orders', [
+                'error' => $e->getMessage()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to clear completed orders: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function clearAll(): JsonResponse
     {
         // Clear ALL orders (useful for testing/reset)
-        $deleted = KdsOrder::truncate();
-        
-        return response()->json([
-            'success' => true,
-            'message' => 'All orders cleared'
-        ]);
+        try {
+            $count = KdsOrder::count();
+            KdsOrder::query()->delete(); // Use delete() instead of truncate() to get count
+            
+            return response()->json([
+                'success' => true,
+                'message' => "Cleared {$count} orders"
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Failed to clear KDS orders', [
+                'error' => $e->getMessage()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to clear orders: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
