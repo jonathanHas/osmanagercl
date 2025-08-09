@@ -25,6 +25,12 @@ class Kernel extends ConsoleKernel
             ->at('05:00')
             ->onOneServer()
             ->withoutOverlapping(60);
+            
+        // Monitor for new coffee orders every 10 seconds (runs every minute, job polls every 10 seconds)
+        $schedule->command('kds:monitor-coffee')
+            ->everyMinute()
+            ->onOneServer()
+            ->withoutOverlapping();
     }
 
     /**

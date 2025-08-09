@@ -4,6 +4,7 @@ use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\CoffeeController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\FruitVegController;
+use App\Http\Controllers\KdsController;
 use App\Http\Controllers\LabelAreaController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
@@ -193,6 +194,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
     Route::post('/settings/clear-cache', [SettingsController::class, 'clearCache'])->name('settings.clear-cache');
     Route::get('/settings/system-info', [SettingsController::class, 'systemInfo'])->name('settings.system-info');
+
+    // KDS (Kitchen Display System) routes
+    Route::prefix('kds')->name('kds.')->group(function () {
+        Route::get('/', [KdsController::class, 'index'])->name('index');
+        Route::get('/orders', [KdsController::class, 'getOrders'])->name('orders');
+        Route::post('/orders/{kdsOrder}/status', [KdsController::class, 'updateStatus'])->name('update-status');
+        Route::get('/stream', [KdsController::class, 'stream'])->name('stream');
+        Route::post('/poll', [KdsController::class, 'pollNewOrders'])->name('poll');
+    });
 
     // Sales Import routes
     Route::prefix('sales-import')->name('sales-import.')->group(function () {
