@@ -197,4 +197,31 @@ class KdsController extends Controller
             'message' => 'Checking for new orders'
         ]);
     }
+
+    public function clearCompleted(): JsonResponse
+    {
+        // Delete completed and cancelled orders older than 1 hour
+        $deleted = KdsOrder::whereIn('status', ['completed', 'cancelled'])
+            ->where(function($query) {
+                $query->where('completed_at', '<', now()->subHour())
+                      ->orWhere('updated_at', '<', now()->subHour());
+            })
+            ->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Cleared {$deleted} completed orders"
+        ]);
+    }
+
+    public function clearAll(): JsonResponse
+    {
+        // Clear ALL orders (useful for testing/reset)
+        $deleted = KdsOrder::truncate();
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'All orders cleared'
+        ]);
+    }
 }

@@ -36,6 +36,24 @@
                 <button onclick="manualRefresh()" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
                     Refresh Now
                 </button>
+                
+                <!-- Clear Orders Dropdown -->
+                <div class="relative" x-data="{ open: false }">
+                    <button @click="open = !open" class="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700">
+                        Clear ▼
+                    </button>
+                    <div x-show="open" @click.away="open = false" 
+                         class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-50">
+                        <button onclick="clearCompleted()" 
+                                class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                            Clear Completed (1hr+)
+                        </button>
+                        <button onclick="if(confirm('Clear ALL orders? This cannot be undone!')) clearAll()" 
+                                class="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
+                            Clear All Orders
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </x-slot>
@@ -408,6 +426,50 @@
         function playNotificationSound() {
             const audio = new Audio('/sounds/notification.mp3');
             audio.play().catch(e => console.log('Could not play notification sound'));
+        }
+
+        // Clear completed orders
+        async function clearCompleted() {
+            try {
+                const response = await fetch('{{ route('kds.clear-completed') }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(result.message);
+                    manualRefresh();
+                }
+            } catch (error) {
+                console.error('Error clearing completed orders:', error);
+                alert('Failed to clear completed orders');
+            }
+        }
+
+        // Clear all orders
+        async function clearAll() {
+            try {
+                const response = await fetch('{{ route('kds.clear-all') }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(result.message);
+                    manualRefresh();
+                }
+            } catch (error) {
+                console.error('Error clearing all orders:', error);
+                alert('Failed to clear all orders');
+            }
         }
 
         // Initialize on page load

@@ -202,6 +202,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/orders/{kdsOrder}/status', [KdsController::class, 'updateStatus'])->name('update-status');
         Route::get('/stream', [KdsController::class, 'stream'])->name('stream');
         Route::post('/poll', [KdsController::class, 'pollNewOrders'])->name('poll');
+        Route::post('/clear-completed', [KdsController::class, 'clearCompleted'])->name('clear-completed');
+        Route::post('/clear-all', [KdsController::class, 'clearAll'])->name('clear-all');
     });
 
     // Sales Import routes
