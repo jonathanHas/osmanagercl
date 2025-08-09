@@ -140,6 +140,8 @@ class KdsController extends Controller
     public function stream(): StreamedResponse
     {
         return response()->stream(function () {
+            $lastMonitorCheck = now();
+            
             while (true) {
                 // Check for new or updated orders
                 $orders = KdsOrder::with('items')
@@ -177,8 +179,12 @@ class KdsController extends Controller
                 // Wait 5 seconds before next update
                 sleep(5);
 
-                // Also dispatch the monitoring job to check for new orders
-                MonitorCoffeeOrdersJob::dispatch();
+                // Only dispatch monitoring job every 30 seconds instead of every 5 seconds
+                // This prevents job queue backlog since each job takes ~17 seconds
+                if ($lastMonitorCheck->diffInSeconds(now()) >= 30) {
+                    MonitorCoffeeOrdersJob::dispatch();
+                    $lastMonitorCheck = now();
+                }
             }
         }, 200, [
             'Content-Type' => 'text/event-stream',

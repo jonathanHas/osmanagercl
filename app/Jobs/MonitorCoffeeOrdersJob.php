@@ -22,27 +22,42 @@ class MonitorCoffeeOrdersJob implements ShouldQueue
     public function handle(): void
     {
         try {
+            $startTime = microtime(true);
+            
             // Get the last processed ticket time to avoid duplicates
             $lastProcessedTime = KdsOrder::max('order_time') ?? Carbon::now()->subDay();
             
-            // Find new coffee orders from POS
+            // Find new coffee orders from POS - LIMIT to last 2 hours and max 50 tickets
             $newTickets = Ticket::with(['ticketLines.product', 'person'])
                 ->where('TICKETTYPE', 0) // Normal sales only
                 ->where(function ($query) use ($lastProcessedTime) {
                     // Get tickets created after our last check
                     $query->whereHas('receipt', function ($q) use ($lastProcessedTime) {
-                        $q->where('DATENEW', '>', $lastProcessedTime);
+                        $q->where('DATENEW', '>', $lastProcessedTime)
+                          ->where('DATENEW', '>', Carbon::now()->subHours(2)); // Only check last 2 hours
                     });
                 })
                 ->whereHas('ticketLines.product', function ($query) {
                     // Filter for Coffee Fresh products (category 081)
                     $query->where('CATEGORY', '081');
                 })
+                ->limit(50) // Process max 50 tickets at a time
                 ->get();
+            
+            Log::info('MonitorCoffeeOrdersJob execution', [
+                'duration_ms' => round((microtime(true) - $startTime) * 1000, 2),
+                'tickets_found' => $newTickets->count(),
+                'last_processed_time' => $lastProcessedTime->toDateTimeString()
+            ]);
+
+            // Batch check for existing orders to reduce queries
+            $existingTicketIds = KdsOrder::whereIn('ticket_id', $newTickets->pluck('ID'))
+                ->pluck('ticket_id')
+                ->toArray();
 
             foreach ($newTickets as $ticket) {
                 // Skip if we already have this order
-                if (KdsOrder::where('ticket_id', $ticket->ID)->exists()) {
+                if (in_array($ticket->ID, $existingTicketIds)) {
                     continue;
                 }
 
