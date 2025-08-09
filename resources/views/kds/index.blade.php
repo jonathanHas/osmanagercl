@@ -72,50 +72,19 @@
         <div class="max-w-full mx-auto sm:px-6 lg:px-8">
             <!-- Queue Warning Banner -->
             @if(!$queueStatus['active'] && $queueStatus['pending_jobs'] > 0)
-            <div class="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                <div class="flex">
-                    <div class="flex-shrink-0">
-                        <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-                        </svg>
-                    </div>
-                    <div class="ml-3">
-                        <h3 class="text-sm font-medium text-red-800 dark:text-red-200">
-                            Queue Worker Not Running
-                        </h3>
-                        <div class="mt-2 text-sm text-red-700 dark:text-red-300">
-                            <p>The queue worker is not processing jobs. New orders will not be detected until the worker is started.</p>
-                            <p class="mt-1">{{ $queueStatus['pending_jobs'] }} jobs are waiting to be processed.</p>
-                            <p class="mt-2 font-mono bg-red-100 dark:bg-red-900/50 p-2 rounded">
-                                Start with: php artisan queue:work
-                            </p>
-                        </div>
+            <div class="mb-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-2 sm:p-3">
+                <div class="flex items-center gap-2">
+                    <svg class="h-4 w-4 text-red-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                    <div class="text-xs sm:text-sm text-red-700 dark:text-red-300">
+                        <span class="font-medium">Queue Worker Not Running</span> - 
+                        {{ $queueStatus['pending_jobs'] }} jobs pending. 
+                        <span class="hidden sm:inline">Run: <code class="bg-red-100 dark:bg-red-900/50 px-1 rounded">php artisan queue:work</code></span>
                     </div>
                 </div>
             </div>
             @endif
-            
-            <!-- Order Status Legend -->
-            <div class="mb-3 sm:mb-6 bg-white dark:bg-gray-800 rounded-lg shadow p-2 sm:p-4">
-                <div class="flex flex-wrap gap-2 sm:gap-4 justify-center">
-                    <div class="flex items-center gap-1 sm:gap-2">
-                        <span class="w-3 h-3 sm:w-4 sm:h-4 bg-red-500 rounded"></span>
-                        <span class="text-xs sm:text-sm">New</span>
-                    </div>
-                    <div class="flex items-center gap-1 sm:gap-2">
-                        <span class="w-3 h-3 sm:w-4 sm:h-4 bg-yellow-500 rounded"></span>
-                        <span class="text-xs sm:text-sm">Viewed</span>
-                    </div>
-                    <div class="flex items-center gap-1 sm:gap-2">
-                        <span class="w-3 h-3 sm:w-4 sm:h-4 bg-blue-500 rounded"></span>
-                        <span class="text-xs sm:text-sm">Preparing</span>
-                    </div>
-                    <div class="flex items-center gap-1 sm:gap-2">
-                        <span class="w-3 h-3 sm:w-4 sm:h-4 bg-green-500 rounded"></span>
-                        <span class="text-xs sm:text-sm">Ready</span>
-                    </div>
-                </div>
-            </div>
 
             <!-- Orders Grid -->
             <div id="orders-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
