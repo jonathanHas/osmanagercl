@@ -158,6 +158,14 @@ Detailed documentation for each major feature.
   - Context-aware navigation
   - Alpine.js reactive UI components
 
+- **[Coffee KDS System](./features/kds-coffee-system.md)** - Real-time Kitchen Display System *(New)*
+  - 2-3 second order detection from POS
+  - Direct database polling for optimal performance
+  - Audio notifications for new orders
+  - One-click order completion
+  - Real-time system status monitoring
+  - Mobile-responsive design for kitchen displays
+
 ### 🏢 Management Systems
 Administrative and operational management tools.
 

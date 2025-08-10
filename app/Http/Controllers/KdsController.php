@@ -27,74 +27,26 @@ class KdsController extends Controller
             ->limit(10)
             ->get();
 
-        // Check queue worker status
-        $pendingJobs = \DB::table('jobs')->count();
-        $failedJobs = \DB::table('failed_jobs')->count();
-        
-        // Check if any job was processed recently (within last 5 minutes)
+        // Check system status - simplified for real-time polling
         $lastProcessedOrder = KdsOrder::orderBy('created_at', 'desc')->first();
         
-        // Check for recent job table activity (jobs being added/removed)
-        $recentJobActivity = \DB::table('jobs')
-            ->where('created_at', '>=', now()->subMinutes(2))
-            ->exists();
-        
-        // Check failed jobs to see if recent failures
-        $recentFailures = \DB::table('failed_jobs')
-            ->where('failed_at', '>=', now()->subMinutes(5))
-            ->exists();
-        
-        // Check if MonitorCoffeeOrdersJob was dispatched recently
-        $lastMonitorJobTime = \DB::table('jobs')
-            ->where('queue', 'default')
-            ->where('payload', 'like', '%MonitorCoffeeOrdersJob%')
-            ->value('created_at');
-            
-        $lastJobTime = null;
-        $queueWorkerActive = false;
-        
-        // Determine last activity time
-        if ($lastProcessedOrder) {
-            $lastJobTime = $lastProcessedOrder->created_at;
+        // Test POS database connection
+        $posConnected = false;
+        try {
+            \DB::connection('pos')->getPdo();
+            $posConnected = true;
+        } catch (\Exception $e) {
+            $posConnected = false;
         }
         
-        // Worker is considered active if:
-        // 1. Very few pending jobs (< 3) - means they're being processed
-        // 2. OR recent order was created (within 5 minutes)
-        // 3. OR recent job activity with no failures
-        // 4. AND NOT many pending jobs
-        
-        if ($pendingJobs <= 3 && !$recentFailures) {
-            // Few pending jobs and no failures = worker is processing them
-            $queueWorkerActive = true;
-        } elseif ($lastProcessedOrder && $lastProcessedOrder->created_at->diffInMinutes(now()) < 5) {
-            // Recent order processed
-            $queueWorkerActive = true;
-        } elseif ($recentJobActivity && !$recentFailures && $pendingJobs < 50) {
-            // Jobs being added but not piling up
-            $queueWorkerActive = true;
-        }
-        
-        // Override: If too many pending jobs, worker is definitely not active
-        if ($pendingJobs > 100) {
-            $queueWorkerActive = false;
-        }
-        
-        // If we've never had activity, but no pending jobs, show as active
-        if (!$lastJobTime && $pendingJobs == 0) {
-            $queueWorkerActive = true;
-            $lastJobTime = now();
-        }
-
-        $queueStatus = [
-            'active' => $queueWorkerActive,
-            'pending_jobs' => $pendingJobs,
-            'failed_jobs' => $failedJobs,
-            'last_check' => $lastJobTime ? $lastJobTime->diffForHumans() : 'Never',
-            'last_check_time' => $lastJobTime
+        $systemStatus = [
+            'pos_connected' => $posConnected,
+            'last_order' => $lastProcessedOrder ? $lastProcessedOrder->created_at->diffForHumans() : 'No orders yet',
+            'polling_active' => true, // Will be updated by JavaScript
+            'active_orders' => $orders->count(),
         ];
 
-        return view('kds.index', compact('orders', 'completedOrders', 'queueStatus'));
+        return view('kds.index', compact('orders', 'completedOrders', 'systemStatus'));
     }
 
     public function getOrders(): JsonResponse
@@ -261,12 +213,12 @@ class KdsController extends Controller
                 ob_flush();
                 flush();
 
-                // Wait 5 seconds before next update
-                sleep(5);
+                // Wait 2 seconds before next update (was 3)
+                sleep(2);
 
-                // Dispatch monitoring job every 10 seconds (was 30)
-                // Job is now optimized to run in ~10ms
-                if ($lastMonitorCheck->diffInSeconds(now()) >= 10) {
+                // Dispatch monitoring job every 3 seconds (was 5)
+                // Job is now optimized to run in ~100ms
+                if ($lastMonitorCheck->diffInSeconds(now()) >= 3) {
                     MonitorCoffeeOrdersJob::dispatch();
                     $lastMonitorCheck = now();
                 }

@@ -6,36 +6,19 @@
                 <span class="sm:hidden">Coffee KDS</span>
             </h2>
             <div class="flex flex-wrap items-center gap-2 sm:gap-4">
-                <!-- Queue Status Indicator -->
-                <div class="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm {{ $queueStatus['active'] ? 'bg-green-100 dark:bg-green-900' : 'bg-red-100 dark:bg-red-900' }}">
+                <!-- System Status Indicator -->
+                <div id="system-status" class="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm bg-green-100 dark:bg-green-900">
                     <span class="relative flex h-2 sm:h-3 w-2 sm:w-3">
-                        @if($queueStatus['active'])
-                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                            <span class="relative inline-flex rounded-full h-2 sm:h-3 w-2 sm:w-3 bg-green-500"></span>
-                        @else
-                            <span class="relative inline-flex rounded-full h-2 sm:h-3 w-2 sm:w-3 bg-red-500"></span>
-                        @endif
+                        <span id="status-ping" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span id="status-dot" class="relative inline-flex rounded-full h-2 sm:h-3 w-2 sm:w-3 bg-green-500"></span>
                     </span>
-                    <div class="hidden sm:block text-sm">
-                        <span class="font-semibold {{ $queueStatus['active'] ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300' }}">
-                            Queue: {{ $queueStatus['active'] ? 'Active' : 'Inactive' }}
+                    <div class="text-sm">
+                        <span id="status-text" class="font-semibold text-green-700 dark:text-green-300">
+                            System: Active
                         </span>
-                        @if($queueStatus['pending_jobs'] > 0)
-                            <span class="text-yellow-600 dark:text-yellow-400 ml-1">
-                                ({{ $queueStatus['pending_jobs'] }} pending)
-                            </span>
-                        @endif
-                        <span class="text-gray-600 dark:text-gray-400 ml-1">
-                            Last: {{ $queueStatus['last_check'] }}
+                        <span id="last-check" class="text-gray-600 dark:text-gray-400 ml-1">
+                            Last check: just now
                         </span>
-                    </div>
-                    <div class="sm:hidden">
-                        <span class="font-semibold {{ $queueStatus['active'] ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300' }}">
-                            {{ $queueStatus['active'] ? 'Active' : 'Inactive' }}
-                        </span>
-                        @if($queueStatus['pending_jobs'] > 0)
-                            <span class="text-yellow-600 dark:text-yellow-400 ml-1">({{ $queueStatus['pending_jobs'] }})</span>
-                        @endif
                     </div>
                 </div>
                 
@@ -70,17 +53,16 @@
 
     <div class="py-6">
         <div class="max-w-full mx-auto sm:px-6 lg:px-8">
-            <!-- Queue Warning Banner -->
-            @if(!$queueStatus['active'] && $queueStatus['pending_jobs'] > 0)
+            <!-- POS Connection Warning (only if disconnected) -->
+            @if(!$systemStatus['pos_connected'])
             <div class="mb-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-2 sm:p-3">
                 <div class="flex items-center gap-2">
                     <svg class="h-4 w-4 text-red-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
                     </svg>
                     <div class="text-xs sm:text-sm text-red-700 dark:text-red-300">
-                        <span class="font-medium">Queue Worker Not Running</span> - 
-                        {{ $queueStatus['pending_jobs'] }} jobs pending. 
-                        <span class="hidden sm:inline">Run: <code class="bg-red-100 dark:bg-red-900/50 px-1 rounded">php artisan queue:work</code></span>
+                        <span class="font-medium">POS Database Disconnected</span> - 
+                        Unable to connect to POS system. New orders will not be detected.
                     </div>
                 </div>
             </div>
@@ -481,17 +463,18 @@
             
             isRefreshing = true;
             try {
-                // Trigger polling job
-                await fetch('{{ route('kds.poll') }}', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    }
-                });
+                // Trigger polling job and get orders in parallel for speed
+                const [pollResponse, ordersResponse] = await Promise.all([
+                    fetch('{{ route('kds.poll') }}', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                        }
+                    }),
+                    fetch('{{ route('kds.orders') }}')
+                ]);
 
-                // Get updated orders
-                const response = await fetch('{{ route('kds.orders') }}');
-                const data = await response.json();
+                const data = await ordersResponse.json();
                 
                 // Handle both old format (array) and new format (object with active/completed)
                 if (Array.isArray(data)) {
@@ -576,6 +559,80 @@
             }
         }
 
+        let lastSuccessfulCheck = Date.now();
+        let failedChecks = 0;
+        
+        // Fast direct polling for new orders
+        async function fastRealtimeCheck() {
+            try {
+                const response = await fetch('{{ route('kds.realtime-check') }}');
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update status to show success
+                    lastSuccessfulCheck = Date.now();
+                    failedChecks = 0;
+                    updateSystemStatus(true, data.duration_ms);
+                    
+                    if (data.orders_created > 0) {
+                        console.log(`Created ${data.orders_created} new orders in ${data.duration_ms}ms`);
+                        // Refresh display immediately
+                        const ordersResponse = await fetch('{{ route('kds.orders') }}');
+                        const ordersData = await ordersResponse.json();
+                        
+                        if (ordersData.active) {
+                            updateOrdersDisplay(ordersData.active);
+                            if (ordersData.completed) {
+                                updateCompletedOrdersTable(ordersData.completed);
+                            }
+                        }
+                    }
+                } else {
+                    failedChecks++;
+                    updateSystemStatus(false);
+                }
+            } catch (error) {
+                console.error('Realtime check error:', error);
+                failedChecks++;
+                updateSystemStatus(false);
+            }
+        }
+        
+        // Update system status indicator
+        function updateSystemStatus(isActive, responseTime = null) {
+            const statusDiv = document.getElementById('system-status');
+            const statusText = document.getElementById('status-text');
+            const statusPing = document.getElementById('status-ping');
+            const statusDot = document.getElementById('status-dot');
+            const lastCheck = document.getElementById('last-check');
+            
+            if (isActive) {
+                statusDiv.className = 'flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm bg-green-100 dark:bg-green-900';
+                statusText.className = 'font-semibold text-green-700 dark:text-green-300';
+                statusText.textContent = 'System: Active';
+                statusPing.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75';
+                statusDot.className = 'relative inline-flex rounded-full h-2 sm:h-3 w-2 sm:w-3 bg-green-500';
+                
+                if (responseTime) {
+                    lastCheck.textContent = `Response: ${responseTime}ms`;
+                } else {
+                    lastCheck.textContent = 'Last check: just now';
+                }
+            } else if (failedChecks >= 3) {
+                statusDiv.className = 'flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm bg-red-100 dark:bg-red-900';
+                statusText.className = 'font-semibold text-red-700 dark:text-red-300';
+                statusText.textContent = 'System: Disconnected';
+                statusPing.className = 'hidden';
+                statusDot.className = 'relative inline-flex rounded-full h-2 sm:h-3 w-2 sm:w-3 bg-red-500';
+                lastCheck.textContent = 'Connection lost';
+            } else {
+                statusDiv.className = 'flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm bg-yellow-100 dark:bg-yellow-900';
+                statusText.className = 'font-semibold text-yellow-700 dark:text-yellow-300';
+                statusText.textContent = 'System: Checking...';
+                statusDot.className = 'relative inline-flex rounded-full h-2 sm:h-3 w-2 sm:w-3 bg-yellow-500';
+            }
+        }
+        
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
             initializeSSE();
@@ -583,8 +640,11 @@
             // Trigger initial poll to check for orders
             manualRefresh();
             
-            // Set up periodic polling as backup (every 10 seconds)
-            setInterval(manualRefresh, 10000);
+            // Fast polling every 2 seconds for new orders
+            setInterval(fastRealtimeCheck, 2000);
+            
+            // Regular refresh as backup (every 5 seconds)
+            setInterval(manualRefresh, 5000);
         });
 
         // Clean up on page unload
@@ -592,6 +652,12 @@
             if (eventSource) {
                 eventSource.close();
             }
+        });
+        
+        // Refresh immediately when page gets focus
+        window.addEventListener('focus', function() {
+            console.log('Page focused - triggering refresh');
+            manualRefresh();
         });
     </script>
     @endpush

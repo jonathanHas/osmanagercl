@@ -347,6 +347,18 @@ Complete till review and transaction analysis for POS data with modern interface
 - **Audit Trail**: Complete audit logging for compliance and security monitoring
 See [Receipts Management Documentation](./docs/management/receipts.md).
 
+### Coffee KDS (Kitchen Display System)
+Real-time coffee order tracking system for baristas with optimized performance.
+- **Fast Order Detection**: 2-3 second detection time using direct database polling
+- **Real-time Updates**: Server-sent events (SSE) for instant display updates
+- **Audio Notifications**: Sound alerts for new coffee orders
+- **Order Management**: Simple one-click completion with restore capability
+- **System Monitoring**: Live connection status and response time display
+- **Completed Orders**: Track recently completed orders with quick restore
+- **Mobile Optimized**: Responsive design for tablets and phones
+- **No Queue Dependencies**: Direct polling eliminates queue worker requirements
+See [KDS Documentation](./docs/features/kds-coffee-system.md).
+
 ## UI/UX Design
 
 ### Admin Layout

@@ -204,6 +204,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/poll', [KdsController::class, 'pollNewOrders'])->name('poll');
         Route::post('/clear-completed', [KdsController::class, 'clearCompleted'])->name('clear-completed');
         Route::post('/clear-all', [KdsController::class, 'clearAll'])->name('clear-all');
+        Route::get('/realtime-check', [\App\Http\Controllers\KdsRealtimeController::class, 'checkNewOrders'])->name('realtime-check');
     });
 
     // Sales Import routes
