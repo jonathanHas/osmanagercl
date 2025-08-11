@@ -91,6 +91,14 @@ Navigate to `/kds` in your browser. The page will:
 - Click "Restore" in completed section
 - Order returns to active display
 
+### Clearing All Active Orders
+1. Click "Clear" dropdown button in header
+2. Select "Complete All Orders"
+3. Confirm the action
+4. All active orders are marked as completed
+5. Orders move to completed section (visible for 30 minutes)
+6. Orders won't be re-imported since they exist in database
+
 ### Status Indicators
 
 **System Status (Header)**
@@ -143,9 +151,11 @@ Navigate to `/kds` in your browser. The page will:
    - Orders with future timestamps won't appear
 
 4. **Clear Stuck Orders**
+   - Use the "Complete All Orders" button in the UI
+   - Or via command line:
    ```bash
    php artisan tinker
-   >>> App\Models\KdsOrder::where('order_time', '<', now()->subHours(2))->delete()
+   >>> App\Models\KdsOrder::where('status', '!=', 'completed')->update(['status' => 'completed', 'completed_at' => now()])
    ```
 
 ### Slow Detection
@@ -200,13 +210,25 @@ php artisan tinker
 ```
 
 ### Maintenance
-```bash
-# Clear old completed orders
-php artisan kds:clear-completed
 
-# Reset all orders
-php artisan kds:clear-all
+#### Clear Completed Orders
+Removes completed orders older than 1 hour:
+```bash
+php artisan kds:clear-completed
 ```
+
+#### Complete All Orders
+Marks all active orders as completed (they remain in the database):
+- Access KDS page (`/kds`)
+- Click "Clear" dropdown in header
+- Select "Complete All Orders"
+- Confirm the action
+
+**Note**: This doesn't delete orders, it marks them as completed. They will:
+- Disappear from active display immediately
+- Appear in "Recently Completed Orders" section
+- Be automatically deleted after 24 hours
+- Not be re-imported from POS (already exist in database)
 
 ## Configuration Options
 

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **☕ KDS Clear All Orders Fix**: Improved reliability of clearing all orders (2025-08-11)
+  - Changed from deleting orders to marking them as completed
+  - Prevents orders from reappearing after clearing
+  - Simplified implementation without complex tracking
+  - Orders remain in database for audit trail
+  - Automatic cleanup after 24 hours
+  - Updated UI button text to "Complete All Orders"
+
 ### Added
 
 - **🔐 User Roles & Permissions System**: Complete RBAC implementation (2025-08-08)

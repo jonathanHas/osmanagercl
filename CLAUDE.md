@@ -353,6 +353,7 @@ Real-time coffee order tracking system for baristas with optimized performance.
 - **Real-time Updates**: Server-sent events (SSE) for instant display updates
 - **Audio Notifications**: Sound alerts for new coffee orders
 - **Order Management**: Simple one-click completion with restore capability
+- **Complete All Orders**: Mark all active orders as completed (prevents re-import issues)
 - **System Monitoring**: Live connection status and response time display
 - **Completed Orders**: Track recently completed orders with quick restore
 - **Mobile Optimized**: Responsive design for tablets and phones

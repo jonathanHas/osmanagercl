@@ -307,7 +307,7 @@
                                     RSP
                                 </th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                    Current Sell
+                                    Current Sell (inc VAT)
                                 </th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                                     onclick="sortDeliveryItems('margin')" title="Sort by Margin">
@@ -506,7 +506,8 @@
                                     <td class="px-6 py-4 text-right text-sm">
                                         @php
                                             // Calculate sell price difference if product exists
-                                            $currentSell = $item->product ? $item->product->PRICESELL : null;
+                                            // Get the VAT-inclusive price (gross price)
+                                            $currentSell = $item->product ? $item->product->getGrossPrice() : null;
                                             $rsp = $item->sale_price;
                                             $sellDifference = ($currentSell !== null && $rsp !== null) ? $rsp - $currentSell : null;
                                             $sellPercentChange = $currentSell > 0 ? ($sellDifference / $currentSell * 100) : null;
