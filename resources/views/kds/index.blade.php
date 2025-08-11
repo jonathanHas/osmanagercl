@@ -41,9 +41,9 @@
                                 class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
                             Clear Completed (1hr+)
                         </button>
-                        <button onclick="if(confirm('Clear ALL orders? This cannot be undone!')) clearAll()" 
+                        <button onclick="if(confirm('Mark all active orders as completed?')) clearAll()" 
                                 class="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
-                            Clear All Orders
+                            Complete All Orders
                         </button>
                     </div>
                 </div>
@@ -541,6 +541,26 @@
                     // Log debug info if available
                     if (result.debug) {
                         console.log('Clear All Debug Info:', result.debug);
+                    }
+                    
+                    // Immediately clear the display
+                    document.getElementById('orders-container').innerHTML = `
+                        <div class="col-span-full text-center py-12">
+                            <p class="text-gray-500 dark:text-gray-400 text-lg">No active coffee orders</p>
+                            <p class="text-gray-400 dark:text-gray-500 text-sm mt-2">Orders will appear here automatically when placed</p>
+                        </div>
+                    `;
+                    
+                    // Clear completed orders table if it exists
+                    const completedTbody = document.getElementById('completed-orders-tbody');
+                    if (completedTbody) {
+                        completedTbody.innerHTML = '';
+                    }
+                    
+                    // Hide completed orders section if empty
+                    const completedSection = document.getElementById('completed-orders-section');
+                    if (completedSection) {
+                        completedSection.style.display = 'none';
                     }
                     
                     // Wait a moment before refreshing to ensure clear is processed

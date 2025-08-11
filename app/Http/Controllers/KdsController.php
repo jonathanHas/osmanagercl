@@ -270,32 +270,31 @@ class KdsController extends Controller
 
     public function clearAll(): JsonResponse
     {
-        // Clear ALL orders (useful for testing/reset)
+        // Mark all active orders as completed instead of deleting them
         try {
-            $count = KdsOrder::count();
+            // Count active orders before marking as completed
+            $count = KdsOrder::whereNotIn('status', ['completed', 'cancelled'])->count();
             
-            // Store the current time as the "last clear time" to prevent re-importing old orders
-            \DB::table('kds_settings')
-                ->updateOrInsert(
-                    ['key' => 'last_clear_time'],
-                    ['value' => now()->toDateTimeString(), 'updated_at' => now()]
-                );
+            // Mark all non-completed orders as completed
+            $updated = KdsOrder::whereNotIn('status', ['completed', 'cancelled'])
+                ->update([
+                    'status' => 'completed',
+                    'completed_at' => now(),
+                    'updated_at' => now()
+                ]);
             
-            // Clear all orders
-            KdsOrder::query()->delete();
-            
-            \Log::info('KDS Clear All: Successfully cleared orders', [
-                'count' => $count,
-                'clear_time' => now()->toDateTimeString()
+            \Log::info('KDS Clear All: Marked all orders as completed', [
+                'count' => $updated,
+                'completed_time' => now()->toDateTimeString()
             ]);
             
             return response()->json([
                 'success' => true,
-                'message' => "Cleared {$count} orders",
+                'message' => "Completed {$updated} orders",
                 'debug' => [
-                    'cleared_count' => $count,
-                    'clear_time' => now()->toDateTimeString(),
-                    'info' => 'Orders before this time will not be re-imported'
+                    'completed_count' => $updated,
+                    'completed_time' => now()->toDateTimeString(),
+                    'info' => 'All active orders marked as completed'
                 ]
             ]);
         } catch (\Exception $e) {
