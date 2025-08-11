@@ -364,7 +364,7 @@ class TillTransactionRepository
                     }
                     
                     // Track by hour
-                    $hour = Carbon::parse($data['transaction_time'])->format('H');
+                    $hour = Carbon::parse($data['transaction_time'])->setTimezone(config('app.timezone'))->format('H');
                     if (!isset($summary['hourly_breakdown'][$hour])) {
                         $summary['hourly_breakdown'][$hour] = ['count' => 0, 'total' => 0];
                     }

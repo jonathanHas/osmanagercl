@@ -128,7 +128,7 @@ class TillReviewController extends Controller
             $data = is_array($item) ? $item : $item->transaction_data;
             
             return [
-                'time' => Carbon::parse($data['transaction_time'])->format('H:i:s'),
+                'time' => Carbon::parse($data['transaction_time'])->setTimezone(config('app.timezone'))->format('H:i:s'),
                 'type' => $data['transaction_type'],
                 'type_display' => $this->getTypeDisplay($data['transaction_type']),
                 'type_color' => $this->getTypeColor($data['transaction_type']),
@@ -229,7 +229,7 @@ class TillReviewController extends Controller
                 $data = is_array($transaction) ? $transaction : $transaction->transaction_data;
                 
                 fputcsv($file, [
-                    Carbon::parse($data['transaction_time'])->format('H:i:s'),
+                    Carbon::parse($data['transaction_time'])->setTimezone(config('app.timezone'))->format('H:i:s'),
                     $data['transaction_type'],
                     $this->getTransactionDescription($data),
                     number_format($data['amount'] ?? 0, 2),

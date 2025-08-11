@@ -32,6 +32,3 @@ Updates to /fruit-veg/product/2012 don't seend the product to the label already 
 
 Sales analysis
 
-
-Coffee kds
-can we create a role calle barista and all that user has access to is the coffee kds?
