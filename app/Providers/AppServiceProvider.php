@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Route;
+use App\Models\InvoiceAttachment;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -19,6 +21,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Route model binding for invoice attachments
+        Route::bind('attachment', function (string $value) {
+            return InvoiceAttachment::findOrFail($value);
+        });
     }
 }

@@ -143,4 +143,12 @@ trait HasPermissions
     {
         return $this->hasRole('employee');
     }
+
+    /**
+     * Check if the user is a barista.
+     */
+    public function isBarista(): bool
+    {
+        return $this->hasRole('barista');
+    }
 }

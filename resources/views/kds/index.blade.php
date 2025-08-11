@@ -94,20 +94,20 @@
                         <!-- Order Items -->
                         <div class="border-t border-gray-200 dark:border-gray-700 pt-3 mb-3">
                             @foreach($order->items as $item)
-                                <div class="mb-2">
-                                    <div class="flex justify-between">
-                                        <span class="font-semibold">{{ $item->formatted_quantity }}x</span>
-                                        <span>{{ $item->display_name }}</span>
+                                <div class="mb-3">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-xl font-bold text-blue-600">{{ $item->formatted_quantity }}x</span>
+                                        <span class="text-lg font-semibold">{{ $item->display_name }}</span>
                                     </div>
                                     @if($item->modifiers)
-                                        <div class="text-sm text-gray-600 dark:text-gray-400 ml-6">
+                                        <div class="text-base text-gray-600 dark:text-gray-400 ml-6 mt-1">
                                             @foreach($item->modifiers as $key => $value)
                                                 <span class="inline-block mr-2">{{ $key }}: {{ $value }}</span>
                                             @endforeach
                                         </div>
                                     @endif
                                     @if($item->notes)
-                                        <div class="text-sm text-yellow-600 ml-6">
+                                        <div class="text-base text-yellow-600 ml-6 mt-1 font-medium">
                                             Note: {{ $item->notes }}
                                         </div>
                                     @endif
@@ -357,7 +357,7 @@
                 let modifiersHtml = '';
                 if (item.modifiers && Object.keys(item.modifiers).length > 0) {
                     modifiersHtml = `
-                        <div class="text-sm text-gray-600 dark:text-gray-400 ml-6">
+                        <div class="text-base text-gray-600 dark:text-gray-400 ml-6 mt-1">
                             ${Object.entries(item.modifiers).map(([key, value]) => 
                                 `<span class="inline-block mr-2">${key}: ${value}</span>`
                             ).join('')}
@@ -368,17 +368,17 @@
                 let notesHtml = '';
                 if (item.notes) {
                     notesHtml = `
-                        <div class="text-sm text-yellow-600 ml-6">
+                        <div class="text-base text-yellow-600 ml-6 mt-1 font-medium">
                             Note: ${item.notes}
                         </div>
                     `;
                 }
 
                 return `
-                    <div class="mb-2">
-                        <div class="flex justify-between">
-                            <span class="font-semibold">${item.quantity}x</span>
-                            <span>${item.product_name}</span>
+                    <div class="mb-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xl font-bold text-blue-600">${item.quantity}x</span>
+                            <span class="text-lg font-semibold">${item.product_name}</span>
                         </div>
                         ${modifiersHtml}
                         ${notesHtml}

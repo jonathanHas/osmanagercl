@@ -4,7 +4,28 @@ Welcome to the comprehensive documentation for OSManager CL. This documentation 
 
 📚 **New to the docs?** Start with the [Documentation Usage Guide](./DOCUMENTATION_GUIDE.md) to understand how to navigate and contribute to documentation.
 
-## 🆕 Latest Updates (January 2025)
+## 🆕 Latest Updates (August 2025)
+
+### OSAccounts Integration System (2025-08-10)
+Production-ready invoice and supplier data migration from legacy OSAccounts:
+
+- **🔄 Supplier Sync Command**: Automatic mapping of POS IDs to OSAccounts IDs
+- **📋 Full Invoice Import**: Import with correct supplier names and relationships
+- **💰 VAT Line Migration**: Detailed VAT breakdown with Irish tax rate support (0%, 9%, 13.5%, 23%)
+- **📎 Attachment Import**: File migration with proper web server permissions
+- **✅ Production-Ready Workflow**: Tested and optimized import process
+- **🔒 Data Integrity**: Transaction-safe imports with comprehensive validation
+- **🗄️ Cross-Database Support**: Handles EXPENSES_JOINED supplier table correctly
+
+**Key Benefits**:
+- Complete migration from OSAccounts with zero data loss
+- Automatic supplier mapping prevents "Unknown Supplier" issues
+- Preserves all invoice history and attachments
+- Production-tested workflow with rollback capability
+
+See [OSAccounts Integration](./features/osaccounts-integration.md) for complete details.
+
+## 🆕 Previous Updates (January 2025)
 
 ### Product Health Dashboard (2025-01-06)
 Auto-loading dashboard with critical product performance insights:

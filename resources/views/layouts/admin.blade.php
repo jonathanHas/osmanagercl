@@ -36,6 +36,7 @@
                     <!-- Navigation -->
                     <nav class="flex-1 space-y-1 px-2 py-4">
                         <!-- Dashboard -->
+                        @unless(auth()->user()->hasRole('barista'))
                         <a href="{{ route('dashboard') }}" 
                            class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('dashboard') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                             <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -43,8 +44,10 @@
                             </svg>
                             Dashboard
                         </a>
+                        @endunless
 
                         <!-- Products -->
+                        @unless(auth()->user()->hasRole('barista'))
                         <a href="{{ route('products.index') }}" 
                            class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('products.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                             <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -52,8 +55,10 @@
                             </svg>
                             Products
                         </a>
+                        @endunless
 
                         <!-- Fruit & Veg -->
+                        @unless(auth()->user()->hasRole('barista'))
                         <a href="{{ route('fruit-veg.index') }}" 
                            class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('fruit-veg.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                             <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -61,8 +66,10 @@
                             </svg>
                             Fruit & Veg
                         </a>
+                        @endunless
 
                         <!-- Categories -->
+                        @unless(auth()->user()->hasRole('barista'))
                         <a href="{{ route('categories.index') }}" 
                            class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('categories.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                             <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -70,7 +77,9 @@
                             </svg>
                             Categories
                         </a>
+                        @endunless
                         <!-- Coffee Fresh -->
+                        @unless(auth()->user()->hasRole('barista'))
                         <a href="{{ route('coffee.index') }}" 
                            class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('coffee.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                             <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -78,8 +87,10 @@
                             </svg>
                             Coffee Fresh
                         </a>
+                        @endunless
                         
                         <!-- Coffee KDS -->
+                        @if(auth()->user()->can('kds.access'))
                         <a href="{{ route('kds.index') }}" 
                            class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('kds.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                             <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -87,8 +98,10 @@
                             </svg>
                             Coffee KDS
                         </a>
+                        @endif
 
                         <!-- Orders -->
+                        @unless(auth()->user()->hasRole('barista'))
                         <a href="{{ route('orders.index') }}" 
                            class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('orders.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                             <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -96,8 +109,10 @@
                             </svg>
                             Orders
                         </a>
+                        @endunless
 
                         <!-- Deliveries -->
+                        @unless(auth()->user()->hasRole('barista'))
                         <a href="{{ route('deliveries.index') }}" 
                            class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('deliveries.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                             <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -105,8 +120,10 @@
                             </svg>
                             Deliveries
                         </a>
+                        @endunless
 
                         <!-- Label Area -->
+                        @unless(auth()->user()->hasRole('barista'))
                         <a href="{{ route('labels.index') }}" 
                            class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('labels.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                             <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -114,6 +131,7 @@
                             </svg>
                             Label Area
                         </a>
+                        @endunless
 
                         <!-- Users -->
                         @if(auth()->user()->can('users.view'))
@@ -127,6 +145,7 @@
                         @endif
 
                         <!-- Sales Import -->
+                        @unless(auth()->user()->hasRole('barista'))
                         <a href="{{ route('sales-import.index') }}" 
                            class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('sales-import.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                             <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -134,8 +153,10 @@
                             </svg>
                             🚀 Sales Import
                         </a>
+                        @endunless
 
                         <!-- Receipts -->
+                        @unless(auth()->user()->hasRole('barista'))
                         <a href="{{ route('till-review.index') }}" 
                            class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('till-review.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                             <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -143,8 +164,32 @@
                             </svg>
                             Receipts
                         </a>
+                        @endunless
+
+                        <!-- Invoices -->
+                        @unless(auth()->user()->hasRole('barista'))
+                        <a href="{{ route('invoices.index') }}" 
+                           class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('invoices.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                            <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Invoices
+                        </a>
+                        @endunless
+
+                        <!-- Suppliers & Expenses -->
+                        @unless(auth()->user()->hasRole('barista'))
+                        <a href="{{ route('suppliers.index') }}" 
+                           class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('suppliers.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                            <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                            Suppliers & Expenses
+                        </a>
+                        @endunless
 
                         <!-- Settings -->
+                        @unless(auth()->user()->hasRole('barista'))
                         <a href="{{ route('settings.index') }}" 
                            class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('settings.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                             <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -153,6 +198,7 @@
                             </svg>
                             Settings
                         </a>
+                        @endunless
                     </nav>
 
                     <!-- User menu -->

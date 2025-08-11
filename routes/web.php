@@ -66,6 +66,39 @@ Route::middleware('auth')->group(function () {
     Route::post('/products/{id}/toggle-till-visibility', [ProductController::class, 'toggleTillVisibility'])->name('products.toggle-till-visibility');
     Route::get('/products/{id}/print-label', [ProductController::class, 'printLabel'])->name('products.print-label');
 
+    // Invoice Management routes - specific routes BEFORE resource routes
+    Route::get('/invoices/create-simple', [\App\Http\Controllers\InvoiceController::class, 'createSimple'])->name('invoices.create-simple');
+    Route::post('/invoices/store-simple', [\App\Http\Controllers\InvoiceController::class, 'storeSimple'])->name('invoices.store-simple');
+    Route::post('/invoices/vat-rate', [\App\Http\Controllers\InvoiceController::class, 'getVatRate'])->name('invoices.vat-rate');
+    Route::post('/invoices/{invoice}/mark-paid', [\App\Http\Controllers\InvoiceController::class, 'markPaid'])->name('invoices.mark-paid');
+    
+    // Invoice Attachments routes
+    Route::prefix('invoices/{invoice}/attachments')->name('invoices.attachments.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'index'])->name('index');
+        Route::post('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'store'])->name('store');
+        Route::get('/config', [\App\Http\Controllers\InvoiceAttachmentController::class, 'getUploadConfig'])->name('config');
+    });
+    Route::prefix('invoice-attachments/{attachment}')->name('invoices.attachments.')->group(function () {
+        Route::get('/view', [\App\Http\Controllers\InvoiceAttachmentController::class, 'view'])->name('view');
+        Route::get('/viewer', [\App\Http\Controllers\InvoiceAttachmentController::class, 'viewEmbedded'])->name('viewer');
+        Route::get('/download', [\App\Http\Controllers\InvoiceAttachmentController::class, 'download'])->name('download');
+        Route::patch('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'update'])->name('update');
+        Route::delete('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'destroy'])->name('destroy');
+    });
+    
+    Route::resource('invoices', \App\Http\Controllers\InvoiceController::class);
+    
+    // VAT Rates Management
+    Route::get('/vat-rates', [\App\Http\Controllers\VatRateController::class, 'index'])->name('vat-rates.index');
+    Route::post('/vat-rates', [\App\Http\Controllers\VatRateController::class, 'store'])->name('vat-rates.store');
+    Route::put('/vat-rates/{vatRate}', [\App\Http\Controllers\VatRateController::class, 'update'])->name('vat-rates.update');
+    Route::delete('/vat-rates/{vatRate}', [\App\Http\Controllers\VatRateController::class, 'destroy'])->name('vat-rates.destroy');
+
+    // Supplier Management routes
+    Route::post('/suppliers/{supplier}/refresh-analytics', [\App\Http\Controllers\AccountingSuppliersController::class, 'refreshAnalytics'])->name('suppliers.refresh-analytics');
+    Route::post('/suppliers/{supplier}/toggle-status', [\App\Http\Controllers\AccountingSuppliersController::class, 'toggleStatus'])->name('suppliers.toggle-status');
+    Route::resource('suppliers', \App\Http\Controllers\AccountingSuppliersController::class);
+
     // Label area routes
     Route::get('/labels', [LabelAreaController::class, 'index'])->name('labels.index');
     Route::post('/labels/print-a4', [LabelAreaController::class, 'printA4'])->name('labels.print-a4');
@@ -196,7 +229,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/system-info', [SettingsController::class, 'systemInfo'])->name('settings.system-info');
 
     // KDS (Kitchen Display System) routes
-    Route::prefix('kds')->name('kds.')->group(function () {
+    Route::prefix('kds')->name('kds.')->middleware('permission:kds.access')->group(function () {
         Route::get('/', [KdsController::class, 'index'])->name('index');
         Route::get('/orders', [KdsController::class, 'getOrders'])->name('orders');
         Route::post('/orders/{kdsOrder}/status', [KdsController::class, 'updateStatus'])->name('update-status');

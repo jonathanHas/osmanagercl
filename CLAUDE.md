@@ -359,6 +359,17 @@ Real-time coffee order tracking system for baristas with optimized performance.
 - **No Queue Dependencies**: Direct polling eliminates queue worker requirements
 See [KDS Documentation](./docs/features/kds-coffee-system.md).
 
+### OSAccounts Integration System
+Complete invoice and supplier data migration from legacy OSAccounts system.
+- **Supplier Sync Command**: Automatic mapping of POS IDs to OSAccounts IDs
+- **Full Invoice Import**: Import with correct supplier names and relationships
+- **VAT Line Migration**: Detailed VAT breakdown with Irish tax rate support
+- **Attachment Import**: File migration with proper web server permissions
+- **Production-Ready Workflow**: Tested and optimized import process
+- **Data Integrity**: Transaction-safe imports with validation
+- **Cross-Database Support**: Handles EXPENSES_JOINED supplier table
+See [OSAccounts Integration Documentation](./docs/features/osaccounts-integration.md).
+
 ## UI/UX Design
 
 ### Admin Layout

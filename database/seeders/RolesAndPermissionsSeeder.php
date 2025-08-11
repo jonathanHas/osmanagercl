@@ -14,22 +14,32 @@ class RolesAndPermissionsSeeder extends Seeder
     public function run(): void
     {
         // Create Roles
-        $adminRole = Role::create([
+        $adminRole = Role::firstOrCreate([
             'name' => 'admin',
+        ], [
             'display_name' => 'Administrator',
             'description' => 'Full system access with all permissions',
         ]);
 
-        $managerRole = Role::create([
+        $managerRole = Role::firstOrCreate([
             'name' => 'manager',
+        ], [
             'display_name' => 'Manager',
             'description' => 'Access to sales data, reports, and management functions',
         ]);
 
-        $employeeRole = Role::create([
+        $employeeRole = Role::firstOrCreate([
             'name' => 'employee',
+        ], [
             'display_name' => 'Employee',
             'description' => 'Basic operational access for daily tasks',
+        ]);
+
+        $baristaRole = Role::firstOrCreate([
+            'name' => 'barista',
+        ], [
+            'display_name' => 'Barista',
+            'description' => 'Access to coffee KDS system only',
         ]);
 
         // Create Permissions
@@ -172,6 +182,14 @@ class RolesAndPermissionsSeeder extends Seeder
                 'module' => 'Category Management',
             ],
 
+            // KDS (Kitchen Display System)
+            [
+                'name' => 'kds.access',
+                'display_name' => 'Access Coffee KDS',
+                'description' => 'Can access the coffee kitchen display system',
+                'module' => 'KDS',
+            ],
+
             // User Management
             [
                 'name' => 'users.view',
@@ -233,7 +251,9 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // Create all permissions
         foreach ($permissions as $permissionData) {
-            Permission::create($permissionData);
+            Permission::firstOrCreate([
+                'name' => $permissionData['name'],
+            ], $permissionData);
         }
 
         // Assign permissions to roles
@@ -248,6 +268,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'categories.view',
             'fruit_veg.manage',
             'coffee.manage',
+            'kds.access',
         ];
 
         foreach ($employeePermissions as $permission) {
@@ -278,6 +299,9 @@ class RolesAndPermissionsSeeder extends Seeder
         foreach ($allPermissions as $permission) {
             $adminRole->givePermissionTo($permission);
         }
+
+        // Barista Role Permissions (only KDS access)
+        $baristaRole->givePermissionTo('kds.access');
 
         $this->command->info('Roles and permissions created successfully!');
     }

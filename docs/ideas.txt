@@ -16,16 +16,6 @@ Daily Totals...
 
 
 Management
-
-Expences
-
-wages - import or query the timekeeper web app
-
-Invoices
-
-Import existing code to see how its being implemented and improve upon this
-
-
     VAT returns
 
 New features - low priority for the momenet
@@ -40,5 +30,8 @@ Bringing it all together
 
 Updates to /fruit-veg/product/2012 don't seend the product to the label already NEED TO CHECK - I originally looked in labels and not in Fruit and Veg labels
 
+Sales analysis
 
 
+Coffee kds
+can we create a role calle barista and all that user has access to is the coffee kds?

@@ -141,6 +141,35 @@ return [
             ]) : [],
         ],
 
+        /*
+        |--------------------------------------------------------------------------
+        | OSAccounts Database Connection
+        |--------------------------------------------------------------------------
+        |
+        | Connection for OSAccounts system integration.
+        | Used for importing invoices and financial data.
+        |
+        */
+
+        'osaccounts' => [
+            'driver' => 'mysql',
+            'url' => env('INV_DB_URL'),
+            'host' => env('INV_DB_HOST', '127.0.0.1'),
+            'port' => env('INV_DB_PORT', '3306'),
+            'database' => env('INV_DB_DATABASE', 'OSAccounts'),
+            'username' => env('INV_DB_USERNAME', 'root'),
+            'password' => env('INV_DB_PASSWORD', ''),
+            'charset' => env('INV_DB_CHARSET', 'utf8mb4'),
+            'collation' => env('INV_DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => false, // May have legacy data structure
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                PDO::MYSQL_ATTR_SSL_CA => env('INV_MYSQL_ATTR_SSL_CA'),
+            ]) : [],
+        ],
+
     ],
 
     /*
