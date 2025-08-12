@@ -3,7 +3,6 @@
 namespace App\Models\OSAccounts;
 
 use Illuminate\Database\Eloquent\Model;
-use App\Models\OSAccounts\OSInvoice;
 
 /**
  * OSAccounts INVOICE_DETAIL table model
@@ -12,10 +11,15 @@ use App\Models\OSAccounts\OSInvoice;
 class OSInvoiceDetail extends Model
 {
     protected $connection = 'osaccounts';
+
     protected $table = 'INVOICE_DETAIL';
+
     protected $primaryKey = 'ID';
+
     protected $keyType = 'string';
+
     public $incrementing = false;
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -44,7 +48,7 @@ class OSInvoiceDetail extends Model
     public function getLaravelVatMapping()
     {
         $netAmount = (float) $this->Amount; // OSAccounts stores ex-VAT amounts
-        
+
         switch ($this->VatID) {
             case '000': // Zero rate (0%)
                 return [
@@ -54,9 +58,10 @@ class OSInvoiceDetail extends Model
                     'net_amount' => $netAmount,
                     'vat_amount' => 0.00,
                 ];
-                
+
             case '001': // Reduced rate (13.5%) - less common, hospitality/food
                 $vatAmount = round($netAmount * 0.135, 2);
+
                 return [
                     'net_field' => 'reduced_net',
                     'vat_field' => 'reduced_vat',
@@ -64,9 +69,10 @@ class OSInvoiceDetail extends Model
                     'net_amount' => $netAmount,
                     'vat_amount' => $vatAmount,
                 ];
-                
+
             case '002': // Standard rate (23%) - most common business expenses
                 $vatAmount = round($netAmount * 0.23, 2);
+
                 return [
                     'net_field' => 'standard_net',
                     'vat_field' => 'standard_vat',
@@ -74,9 +80,10 @@ class OSInvoiceDetail extends Model
                     'net_amount' => $netAmount,
                     'vat_amount' => $vatAmount,
                 ];
-                
+
             case '003': // Second reduced rate (9%) - rare, specific sectors
                 $vatAmount = round($netAmount * 0.09, 2);
+
                 return [
                     'net_field' => 'second_reduced_net',
                     'vat_field' => 'second_reduced_vat',
@@ -84,7 +91,7 @@ class OSInvoiceDetail extends Model
                     'net_amount' => $netAmount,
                     'vat_amount' => $vatAmount,
                 ];
-                
+
             default:
                 // Unknown VAT ID - log and treat as zero rate
                 \Log::warning('Unknown VAT ID in OSAccounts invoice detail', [
@@ -93,7 +100,7 @@ class OSInvoiceDetail extends Model
                     'vat_id' => $this->VatID,
                     'amount' => $netAmount,
                 ]);
-                
+
                 return [
                     'net_field' => 'zero_net',
                     'vat_field' => 'zero_vat',
@@ -110,6 +117,7 @@ class OSInvoiceDetail extends Model
     public function getNetAmountAttribute()
     {
         $mapping = $this->getLaravelVatMapping();
+
         return $mapping['net_amount'];
     }
 
@@ -119,6 +127,7 @@ class OSInvoiceDetail extends Model
     public function getVatAmountAttribute()
     {
         $mapping = $this->getLaravelVatMapping();
+
         return $mapping['vat_amount'];
     }
 
@@ -128,6 +137,7 @@ class OSInvoiceDetail extends Model
     public function getVatRateAttribute()
     {
         $mapping = $this->getLaravelVatMapping();
+
         return $mapping['rate'];
     }
 

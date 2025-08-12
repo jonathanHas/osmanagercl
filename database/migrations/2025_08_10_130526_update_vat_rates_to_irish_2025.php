@@ -1,8 +1,6 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
@@ -14,7 +12,7 @@ return new class extends Migration
     {
         // Delete all existing VAT rates
         DB::table('vat_rates')->truncate();
-        
+
         // Insert correct Irish VAT rates for 2025
         DB::table('vat_rates')->insert([
             [
@@ -63,7 +61,7 @@ return new class extends Migration
     {
         // Restore UK rates if rolling back
         DB::table('vat_rates')->truncate();
-        
+
         DB::table('vat_rates')->insert([
             [
                 'code' => 'STANDARD',

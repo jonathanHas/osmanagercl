@@ -5,7 +5,6 @@ namespace App\Repositories;
 use App\Models\CashReconciliation;
 use App\Models\POS\ClosedCash;
 use App\Models\POS\Payment;
-use App\Models\POS\Receipt;
 use App\Models\Supplier;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -23,28 +22,28 @@ class CashReconciliationRepository
         $closedCash = ClosedCash::where('HOST', $tillName)
             ->whereDate('DATEEND', $date)
             ->first();
-            
-        if (!$closedCash) {
+
+        if (! $closedCash) {
             throw new \Exception("No closed cash record found for till {$tillName} on {$date->format('Y-m-d')}");
         }
-        
+
         // Find or create reconciliation
         $reconciliation = CashReconciliation::firstOrNew([
             'closed_cash_id' => $closedCash->MONEY,
         ]);
-        
-        if (!$reconciliation->exists) {
+
+        if (! $reconciliation->exists) {
             // Calculate POS totals
             $posTotals = $this->calculatePosTotals($closedCash->MONEY);
-            
+
             // Get previous day's float
             $previousFloat = $this->getPreviousDayFloat($date, $tillId);
-            
+
             // Check for existing money record in legacy system
             $legacyMoney = DB::connection('pos')->table('money')
                 ->where('ID', $closedCash->MONEY)
                 ->first();
-            
+
             $reconciliation->fill([
                 'date' => $date,
                 'till_name' => $tillName,
@@ -55,7 +54,7 @@ class CashReconciliationRepository
                 'coin_float' => $legacyMoney->coinFloat ?? $previousFloat['coins'],
                 'created_by' => auth()->id() ?? 1,
             ]);
-            
+
             // Import cash counts from legacy money table if they exist
             // Legacy system stores TOTALS, not counts, so we need to convert
             if ($legacyMoney) {
@@ -80,30 +79,30 @@ class CashReconciliationRepository
                     'voucher_used' => $legacyMoney->voucherUsed ?? 0,
                     'money_added' => $legacyMoney->moneyAdded ?? 0,
                 ]);
-                
+
                 // Calculate total cash counted
                 $reconciliation->total_cash_counted = $reconciliation->calculateTotalCash();
-                
+
                 // Calculate variance
-                $daysCashTakings = $reconciliation->total_cash_counted + ($legacyMoney->cashBack ?? 0) - 
-                                  ($previousFloat['notes'] + $previousFloat['coins']) - 
+                $daysCashTakings = $reconciliation->total_cash_counted + ($legacyMoney->cashBack ?? 0) -
+                                  ($previousFloat['notes'] + $previousFloat['coins']) -
                                   ($legacyMoney->moneyAdded ?? 0);
-                
+
                 $reconciliation->variance = $daysCashTakings - $reconciliation->pos_cash_total;
             }
-            
+
             $reconciliation->save();
-            
+
             // Import legacy supplier payments if they exist
             if ($legacyMoney) {
                 $this->importLegacyPayments($reconciliation, $closedCash->MONEY);
                 $this->importLegacyNotes($reconciliation, $closedCash->MONEY);
             }
         }
-        
+
         return $reconciliation->load(['payments', 'latestNote']);
     }
-    
+
     /**
      * Calculate POS totals from payments
      */
@@ -114,7 +113,7 @@ class CashReconciliationRepository
             ->where('RECEIPTS.MONEY', $moneyId)
             ->groupBy('PAYMENT')
             ->get();
-            
+
         $totals = [
             'cash' => 0,
             'card' => 0,
@@ -122,7 +121,7 @@ class CashReconciliationRepository
             'free' => 0,
             'cheque' => 0,
         ];
-        
+
         foreach ($payments as $payment) {
             switch ($payment->PAYMENT) {
                 case 'cash':
@@ -142,10 +141,10 @@ class CashReconciliationRepository
                     break;
             }
         }
-        
+
         return $totals;
     }
-    
+
     /**
      * Get previous day's float
      */
@@ -155,17 +154,17 @@ class CashReconciliationRepository
             ->where('date', '<', $date)
             ->orderBy('date', 'desc')
             ->first();
-            
+
         if ($previousReconciliation) {
             return [
                 'notes' => $previousReconciliation->note_float,
                 'coins' => $previousReconciliation->coin_float,
             ];
         }
-        
+
         return ['notes' => 0, 'coins' => 0];
     }
-    
+
     /**
      * Save reconciliation data
      */
@@ -197,38 +196,38 @@ class CashReconciliationRepository
                 'money_added' => $data['money_added'] ?? 0,
                 'updated_by' => auth()->id(),
             ]);
-            
+
             // Calculate totals
             $totalCash = $reconciliation->calculateTotalCash();
             $reconciliation->total_cash_counted = $totalCash;
-            
+
             // Calculate variance
             $previousFloat = $this->getPreviousDayFloat($reconciliation->date, $reconciliation->till_id);
-            $daysCashTakings = $totalCash + ($data['cash_back'] ?? 0) - 
-                              ($previousFloat['notes'] + $previousFloat['coins']) - 
+            $daysCashTakings = $totalCash + ($data['cash_back'] ?? 0) -
+                              ($previousFloat['notes'] + $previousFloat['coins']) -
                               ($data['money_added'] ?? 0);
-            
+
             $reconciliation->variance = $daysCashTakings - $reconciliation->pos_cash_total;
-            
+
             $reconciliation->save();
-            
+
             // Handle payments
             if (isset($data['payments'])) {
                 $this->savePayments($reconciliation, $data['payments']);
             }
-            
+
             // Handle notes
-            if (!empty($data['notes'])) {
+            if (! empty($data['notes'])) {
                 $reconciliation->notes()->create([
                     'message' => $data['notes'],
                     'created_by' => auth()->id(),
                 ]);
             }
         });
-        
+
         return $reconciliation->fresh(['payments', 'latestNote']);
     }
-    
+
     /**
      * Save payment records
      */
@@ -236,13 +235,13 @@ class CashReconciliationRepository
     {
         // Delete existing payments
         $reconciliation->payments()->delete();
-        
+
         // Create new payments
         foreach ($payments as $index => $payment) {
             if (empty($payment['amount']) || $payment['amount'] == 0) {
                 continue;
             }
-            
+
             $reconciliation->payments()->create([
                 'supplier_id' => $payment['supplier_id'] ?? null,
                 'payee_name' => $payment['payee_name'] ?? null,
@@ -252,7 +251,7 @@ class CashReconciliationRepository
             ]);
         }
     }
-    
+
     /**
      * Get available tills
      */
@@ -270,7 +269,7 @@ class CashReconciliationRepository
                 });
         });
     }
-    
+
     /**
      * Get suppliers for dropdown
      */
@@ -282,44 +281,44 @@ class CashReconciliationRepository
                 return [$supplier->SupplierID => $supplier->Supplier];
             });
     }
-    
+
     /**
      * Get reconciliation history
      */
-    public function getHistory(int $tillId = null, int $limit = 30): Collection
+    public function getHistory(?int $tillId = null, int $limit = 30): Collection
     {
         $query = CashReconciliation::with(['creator', 'latestNote'])
             ->orderBy('date', 'desc');
-            
+
         if ($tillId) {
             $query->where('till_id', $tillId);
         }
-        
+
         return $query->limit($limit)->get();
     }
-    
+
     /**
      * Export reconciliation data
      */
-    public function exportToCsv(Carbon $startDate, Carbon $endDate, int $tillId = null): string
+    public function exportToCsv(Carbon $startDate, Carbon $endDate, ?int $tillId = null): string
     {
         $query = CashReconciliation::with(['payments.supplier', 'latestNote'])
             ->whereBetween('date', [$startDate, $endDate])
             ->orderBy('date');
-            
+
         if ($tillId) {
             $query->where('till_id', $tillId);
         }
-        
+
         $reconciliations = $query->get();
-        
+
         $csv = "Date,Till,Total Cash,POS Cash,Variance,Card,Notes,Payments,Created By\n";
-        
+
         foreach ($reconciliations as $rec) {
             $payments = $rec->payments->map(function ($p) {
-                return $p->payee_display_name . ': €' . number_format($p->amount, 2);
+                return $p->payee_display_name.': €'.number_format($p->amount, 2);
             })->implode('; ');
-            
+
             $csv .= sprintf(
                 "%s,%s,%.2f,%.2f,%.2f,%.2f,%s,%s,%s\n",
                 $rec->date->format('Y-m-d'),
@@ -333,10 +332,10 @@ class CashReconciliationRepository
                 $rec->creator->name
             );
         }
-        
+
         return $csv;
     }
-    
+
     /**
      * Import legacy supplier payments
      */
@@ -346,13 +345,13 @@ class CashReconciliationRepository
             ->where('closedCashID', $closedCashId)
             ->orderBy('sequence')
             ->get();
-            
+
         foreach ($legacyPayments as $payment) {
             // Skip if payment already exists
             if ($reconciliation->payments()->where('sequence', $payment->sequence)->exists()) {
                 continue;
             }
-            
+
             $reconciliation->payments()->create([
                 'supplier_id' => $payment->payeeID ?? null,
                 'payee_name' => null, // Will use supplier name from relationship
@@ -362,7 +361,7 @@ class CashReconciliationRepository
             ]);
         }
     }
-    
+
     /**
      * Import legacy notes
      */
@@ -371,8 +370,8 @@ class CashReconciliationRepository
         $legacyNote = DB::connection('pos')->table('dayNotes')
             ->where('closedCashID', $closedCashId)
             ->first();
-            
-        if ($legacyNote && !$reconciliation->notes()->exists()) {
+
+        if ($legacyNote && ! $reconciliation->notes()->exists()) {
             $reconciliation->notes()->create([
                 'message' => $legacyNote->message,
                 'created_by' => auth()->id() ?? 1,

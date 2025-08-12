@@ -28,10 +28,10 @@ class AccountingSuppliersController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'LIKE', "%{$search}%")
-                  ->orWhere('code', 'LIKE', "%{$search}%")
-                  ->orWhere('email', 'LIKE', "%{$search}%")
-                  ->orWhere('phone', 'LIKE', "%{$search}%")
-                  ->orWhere('contact_person', 'LIKE', "%{$search}%");
+                    ->orWhere('code', 'LIKE', "%{$search}%")
+                    ->orWhere('email', 'LIKE', "%{$search}%")
+                    ->orWhere('phone', 'LIKE', "%{$search}%")
+                    ->orWhere('contact_person', 'LIKE', "%{$search}%");
             });
         }
 
@@ -54,7 +54,7 @@ class AccountingSuppliersController extends Controller
         // Sort by
         $sortBy = $request->get('sort', 'name');
         $sortDirection = $request->get('direction', 'asc');
-        
+
         $allowedSorts = ['name', 'code', 'supplier_type', 'status', 'total_spent', 'invoice_count', 'last_invoice_date', 'created_at'];
         if (in_array($sortBy, $allowedSorts)) {
             $query->orderBy($sortBy, $sortDirection);
@@ -105,15 +105,15 @@ class AccountingSuppliersController extends Controller
 
         // Get stats for the current filtered query (before pagination)
         $filteredQuery = AccountingSupplier::query();
-        
+
         // Apply same filters to stats query
         if ($search) {
             $filteredQuery->where(function ($q) use ($search) {
                 $q->where('name', 'LIKE', "%{$search}%")
-                  ->orWhere('code', 'LIKE', "%{$search}%")
-                  ->orWhere('email', 'LIKE', "%{$search}%")
-                  ->orWhere('phone', 'LIKE', "%{$search}%")
-                  ->orWhere('contact_person', 'LIKE', "%{$search}%");
+                    ->orWhere('code', 'LIKE', "%{$search}%")
+                    ->orWhere('email', 'LIKE', "%{$search}%")
+                    ->orWhere('phone', 'LIKE', "%{$search}%")
+                    ->orWhere('contact_person', 'LIKE', "%{$search}%");
             });
         }
 
@@ -137,8 +137,6 @@ class AccountingSuppliersController extends Controller
             'pos_linked' => (clone $filteredQuery)->where('is_pos_linked', true)->count(),
             'total_spent' => (clone $filteredQuery)->sum('total_spent'),
         ];
-
-
 
         return view('suppliers.index', compact(
             'suppliers',
@@ -407,7 +405,7 @@ class AccountingSuppliersController extends Controller
             ]);
 
             $statusText = $newStatus === 'active' ? 'activated' : 'deactivated';
-            
+
             Log::info('Supplier status toggled', [
                 'supplier_id' => $supplier->id,
                 'supplier_name' => $supplier->name,
@@ -422,7 +420,7 @@ class AccountingSuppliersController extends Controller
                     'success' => true,
                     'message' => "Supplier '{$supplier->name}' has been {$statusText} successfully.",
                     'status' => $newStatus,
-                    'supplier_id' => $supplier->id
+                    'supplier_id' => $supplier->id,
                 ]);
             }
 
@@ -438,7 +436,7 @@ class AccountingSuppliersController extends Controller
             if (request()->wantsJson()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to update supplier status. Please try again.'
+                    'message' => 'Failed to update supplier status. Please try again.',
                 ], 422);
             }
 

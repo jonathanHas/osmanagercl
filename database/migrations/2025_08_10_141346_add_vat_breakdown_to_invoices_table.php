@@ -32,9 +32,9 @@ return new class extends Migration
         Schema::table('invoices', function (Blueprint $table) {
             $table->dropColumn([
                 'standard_net', 'standard_vat',
-                'reduced_net', 'reduced_vat', 
+                'reduced_net', 'reduced_vat',
                 'second_reduced_net', 'second_reduced_vat',
-                'zero_net', 'zero_vat'
+                'zero_net', 'zero_vat',
             ]);
         });
     }

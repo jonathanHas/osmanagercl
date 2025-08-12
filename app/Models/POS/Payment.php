@@ -7,10 +7,15 @@ use Illuminate\Database\Eloquent\Model;
 class Payment extends Model
 {
     protected $connection = 'pos';
+
     protected $table = 'PAYMENTS';
+
     protected $primaryKey = 'ID';
+
     public $incrementing = false;
+
     protected $keyType = 'string';
+
     public $timestamps = false;
 
     protected $fillable = [];

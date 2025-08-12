@@ -121,9 +121,9 @@ class InvoiceVatLine extends Model
     public function setVatCategoryAttribute(string $value): void
     {
         $this->attributes['vat_category'] = $value;
-        
+
         // Set default VAT rate if not already set
-        if (!isset($this->attributes['vat_rate']) || $this->attributes['vat_rate'] == 0) {
+        if (! isset($this->attributes['vat_rate']) || $this->attributes['vat_rate'] == 0) {
             $this->attributes['vat_rate'] = self::$defaultVatRates[$value] ?? 0;
         }
     }
@@ -141,7 +141,7 @@ class InvoiceVatLine extends Model
      */
     public function getFormattedNetAmountAttribute(): string
     {
-        return '€' . number_format($this->net_amount, 2);
+        return '€'.number_format($this->net_amount, 2);
     }
 
     /**
@@ -149,7 +149,7 @@ class InvoiceVatLine extends Model
      */
     public function getFormattedVatAmountAttribute(): string
     {
-        return '€' . number_format($this->vat_amount, 2);
+        return '€'.number_format($this->vat_amount, 2);
     }
 
     /**
@@ -157,7 +157,7 @@ class InvoiceVatLine extends Model
      */
     public function getFormattedGrossAmountAttribute(): string
     {
-        return '€' . number_format($this->gross_amount, 2);
+        return '€'.number_format($this->gross_amount, 2);
     }
 
     /**
@@ -165,7 +165,7 @@ class InvoiceVatLine extends Model
      */
     public function getFormattedVatRateAttribute(): string
     {
-        return number_format($this->vat_rate * 100, 1) . '%';
+        return number_format($this->vat_rate * 100, 1).'%';
     }
 
     /**

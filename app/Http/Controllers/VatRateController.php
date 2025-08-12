@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\VatRate;
-use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class VatRateController extends Controller
 {
@@ -55,7 +55,7 @@ class VatRateController extends Controller
         ]);
 
         return redirect()->route('vat-rates.index')
-            ->with('success', 'VAT rate scheduled successfully. It will take effect on ' . Carbon::parse($validated['effective_from'])->format('d/m/Y'));
+            ->with('success', 'VAT rate scheduled successfully. It will take effect on '.Carbon::parse($validated['effective_from'])->format('d/m/Y'));
     }
 
     /**

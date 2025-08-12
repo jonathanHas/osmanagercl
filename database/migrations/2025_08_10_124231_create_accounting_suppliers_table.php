@@ -15,26 +15,26 @@ return new class extends Migration
             $table->id();
             $table->string('code', 50)->unique();
             $table->string('name', 255);
-            
+
             // Contact details
             $table->text('address')->nullable();
             $table->string('phone', 50)->nullable();
             $table->string('email', 255)->nullable();
             $table->string('website', 255)->nullable();
-            
+
             // Financial details
             $table->string('vat_number', 50)->nullable();
             $table->string('default_vat_code', 20)->nullable();
             $table->string('default_expense_category', 50)->nullable();
             $table->integer('payment_terms_days')->default(30);
-            
+
             // Integration
             $table->string('external_id', 100)->nullable();
             $table->string('integration_type', 50)->nullable();
-            
+
             $table->boolean('is_active')->default(true);
             $table->timestamps();
-            
+
             $table->index('name');
             $table->index('vat_number');
         });

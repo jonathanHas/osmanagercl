@@ -2,16 +2,20 @@
 
 namespace App\Models\POS;
 
-use App\Models\Product;
 use Illuminate\Database\Eloquent\Model;
 
 class Ticket extends Model
 {
     protected $connection = 'pos';
+
     protected $table = 'TICKETS';
+
     protected $primaryKey = 'ID';
+
     public $incrementing = false;
+
     protected $keyType = 'string';
+
     public $timestamps = false;
 
     protected $fillable = [];

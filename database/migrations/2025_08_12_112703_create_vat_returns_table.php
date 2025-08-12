@@ -17,12 +17,12 @@ return new class extends Migration
             $table->date('period_start');
             $table->date('period_end');
             $table->enum('status', ['draft', 'finalized', 'submitted', 'paid'])->default('draft');
-            
+
             // Summary totals (calculated and stored for performance)
             $table->decimal('total_net', 12, 2)->default(0);
             $table->decimal('total_vat', 12, 2)->default(0);
             $table->decimal('total_gross', 12, 2)->default(0);
-            
+
             // VAT breakdown by rate
             $table->decimal('zero_net', 12, 2)->default(0);
             $table->decimal('zero_vat', 12, 2)->default(0);
@@ -32,7 +32,7 @@ return new class extends Migration
             $table->decimal('reduced_vat', 12, 2)->default(0);
             $table->decimal('standard_net', 12, 2)->default(0); // 23%
             $table->decimal('standard_vat', 12, 2)->default(0);
-            
+
             // Metadata
             $table->text('notes')->nullable();
             $table->date('submitted_date')->nullable();
@@ -40,10 +40,10 @@ return new class extends Migration
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('finalized_by')->nullable();
             $table->timestamps();
-            
+
             $table->foreign('created_by')->references('id')->on('users');
             $table->foreign('finalized_by')->references('id')->on('users');
-            
+
             $table->unique('return_period');
             $table->index('status');
             $table->index('period_end');

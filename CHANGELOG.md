@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **📎 OSAccounts Attachment Import**: Major improvements to attachment import system (2025-08-12)
+  - **Smart Path Resolution**: Handles various path formats from OSAccounts
+    - Detects when InvoicePath already contains full filename
+    - Decodes HTML entities (e.g., `&amp;` to `&`)
+    - Multiple fallback strategies for finding files
+    - Handles timestamp suffixes in paths
+  - **Production-Ready Permissions**: Automatic permission management
+    - Files created with `664` permissions (group-readable)
+    - Automatic `www-data` group ownership
+    - Directories use setgid bit for group inheritance
+    - No sudo required in production
+  - **Duplicate Prevention**: SHA-256 hash-based duplicate detection
+    - Prevents re-import of identical files
+    - New cleanup command `attachments:cleanup-duplicates`
+    - Removed 42 duplicate attachments from initial imports
+  - **Success Rate**: Improved from 23% to 98.4% (183 of 186 files)
+  - **New Commands**:
+    - `attachments:cleanup-duplicates` - Remove duplicates and fix permissions
+    - `attachments:fix-permissions` - Fix file ownership and permissions
+  - **Web Interface**: Fixed file access issues through proper group permissions
+
 ### Added
 
 - **📊 VAT Dashboard System**: Comprehensive VAT return management dashboard (2025-08-12)

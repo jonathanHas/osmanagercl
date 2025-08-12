@@ -27,8 +27,8 @@ return new class extends Migration
         Schema::table('accounting_suppliers', function (Blueprint $table) {
             $table->dropColumn([
                 'external_osaccounts_id',
-                'is_osaccounts_linked', 
-                'osaccounts_last_sync'
+                'is_osaccounts_linked',
+                'osaccounts_last_sync',
             ]);
         });
     }

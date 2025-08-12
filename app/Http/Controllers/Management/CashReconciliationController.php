@@ -25,16 +25,16 @@ class CashReconciliationController extends Controller
     {
         $date = $request->input('date', now()->format('Y-m-d'));
         $tillId = $request->input('till_id', 1);
-        
+
         $tills = $this->repository->getAvailableTills();
         $tillName = $tills[$tillId] ?? $tills->first();
-        
+
         try {
             $selectedDate = Carbon::parse($date);
             $reconciliation = $this->repository->getOrCreateReconciliation($selectedDate, $tillId, $tillName);
             $suppliers = $this->repository->getSuppliers();
             $history = $this->repository->getHistory($tillId, 7);
-            
+
             return view('management.cash-reconciliation.index', compact(
                 'reconciliation',
                 'selectedDate',
@@ -45,8 +45,8 @@ class CashReconciliationController extends Controller
                 'history'
             ));
         } catch (\Exception $e) {
-            Log::error('Cash reconciliation error: ' . $e->getMessage());
-            
+            Log::error('Cash reconciliation error: '.$e->getMessage());
+
             return view('management.cash-reconciliation.index', [
                 'error' => $e->getMessage(),
                 'selectedDate' => Carbon::parse($date),
@@ -99,19 +99,19 @@ class CashReconciliationController extends Controller
         try {
             $reconciliation = \App\Models\CashReconciliation::findOrFail($validated['reconciliation_id']);
             $this->repository->saveReconciliation($reconciliation, $validated);
-            
+
             return redirect()
                 ->route('cash-reconciliation.index', [
                     'date' => $reconciliation->date->format('Y-m-d'),
-                    'till_id' => $reconciliation->till_id
+                    'till_id' => $reconciliation->till_id,
                 ])
                 ->with('success', 'Cash reconciliation saved successfully');
         } catch (\Exception $e) {
-            Log::error('Error saving reconciliation: ' . $e->getMessage());
-            
+            Log::error('Error saving reconciliation: '.$e->getMessage());
+
             return back()
                 ->withInput()
-                ->with('error', 'Failed to save reconciliation: ' . $e->getMessage());
+                ->with('error', 'Failed to save reconciliation: '.$e->getMessage());
         }
     }
 
@@ -128,12 +128,12 @@ class CashReconciliationController extends Controller
         try {
             $date = Carbon::parse($request->input('date'));
             $tillId = $request->input('till_id');
-            
+
             $previousReconciliation = \App\Models\CashReconciliation::where('till_id', $tillId)
                 ->where('date', '<', $date)
                 ->orderBy('date', 'desc')
                 ->first();
-            
+
             if ($previousReconciliation) {
                 return response()->json([
                     'success' => true,
@@ -142,7 +142,7 @@ class CashReconciliationController extends Controller
                     'date' => $previousReconciliation->date->format('Y-m-d'),
                 ]);
             }
-            
+
             return response()->json([
                 'success' => true,
                 'note_float' => 0,
@@ -172,23 +172,23 @@ class CashReconciliationController extends Controller
             $startDate = Carbon::parse($request->input('start_date'));
             $endDate = Carbon::parse($request->input('end_date'));
             $tillId = $request->input('till_id');
-            
+
             $csv = $this->repository->exportToCsv($startDate, $endDate, $tillId);
-            
+
             $filename = sprintf(
                 'cash-reconciliation-%s-to-%s.csv',
                 $startDate->format('Y-m-d'),
                 $endDate->format('Y-m-d')
             );
-            
+
             return Response::make($csv, 200, [
                 'Content-Type' => 'text/csv',
-                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                'Content-Disposition' => 'attachment; filename="'.$filename.'"',
             ]);
         } catch (\Exception $e) {
-            Log::error('Export error: ' . $e->getMessage());
-            
-            return back()->with('error', 'Failed to export data: ' . $e->getMessage());
+            Log::error('Export error: '.$e->getMessage());
+
+            return back()->with('error', 'Failed to export data: '.$e->getMessage());
         }
     }
 
@@ -207,9 +207,9 @@ class CashReconciliationController extends Controller
             $tillId = $request->input('till_id');
             $tills = $this->repository->getAvailableTills();
             $tillName = $tills[$tillId] ?? $tills->first();
-            
+
             $reconciliation = $this->repository->getOrCreateReconciliation($date, $tillId, $tillName);
-            
+
             return response()->json([
                 'success' => true,
                 'reconciliation' => $reconciliation->load(['payments.supplier', 'latestNote']),

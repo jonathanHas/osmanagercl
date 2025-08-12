@@ -2,13 +2,11 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
-use App\Models\OSAccounts\OSInvoice;
-use App\Models\Invoice;
 use App\Models\AccountingSupplier;
-use Illuminate\Support\Facades\DB;
+use App\Models\Invoice;
+use App\Models\OSAccounts\OSInvoice;
+use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
 
 class ImportOSAccountsInvoices extends Command
 {
@@ -49,14 +47,14 @@ class ImportOSAccountsInvoices extends Command
     public function handle()
     {
         $this->info('🚀 Starting OSAccounts invoices import...');
-        
+
         $isDryRun = $this->option('dry-run');
         $force = $this->option('force');
         $chunkSize = (int) $this->option('chunk');
         $dateFrom = $this->option('date-from');
         $dateTo = $this->option('date-to');
         $limit = $this->option('limit') ? (int) $this->option('limit') : null;
-        
+
         if ($isDryRun) {
             $this->warn('🔍 DRY RUN MODE - No changes will be made');
         }
@@ -65,75 +63,88 @@ class ImportOSAccountsInvoices extends Command
             // Build supplier mapping
             $this->info('🔗 Building supplier mapping...');
             $this->buildSupplierMap();
-            $this->info('✅ Mapped ' . count($this->supplierMap) . ' suppliers');
-            
+            $this->info('✅ Mapped '.count($this->supplierMap).' suppliers');
+
             // Build invoice query
             $query = OSInvoice::with(['supplier', 'details']);
-            
+
             // Apply date filters
             if ($dateFrom) {
                 $query->where('InvoiceDate', '>=', $dateFrom);
                 $this->info("📅 Filtering from date: {$dateFrom}");
             }
-            
+
             if ($dateTo) {
                 $query->where('InvoiceDate', '<=', $dateTo);
                 $this->info("📅 Filtering to date: {$dateTo}");
             }
-            
+
             // Apply limit
             if ($limit) {
                 $query->limit($limit);
                 $this->info("📊 Limiting to {$limit} invoices");
             }
-            
+
             $invoiceCount = $query->count();
             $this->info("💰 Found {$invoiceCount} invoices to process");
-            
+
             if ($invoiceCount === 0) {
                 $this->warn('⚠️  No invoices found to import');
+
                 return 0;
             }
-            
-            // Check existing invoices if not forcing
-            if (!$force) {
-                $existingCount = Invoice::whereNotNull('external_osaccounts_id')->count();
+
+            // Check existing invoices in the date range if not forcing
+            if (! $force) {
+                $existingQuery = Invoice::whereNotNull('external_osaccounts_id');
+                
+                // Only check within the date range we're importing
+                if ($dateFrom) {
+                    $existingQuery->where('invoice_date', '>=', $dateFrom);
+                }
+                if ($dateTo) {
+                    $existingQuery->where('invoice_date', '<=', $dateTo);
+                }
+                
+                $existingCount = $existingQuery->count();
                 if ($existingCount > 0) {
-                    $this->error("❌ Found {$existingCount} existing OSAccounts invoices. Use --force to override.");
+                    $this->error("❌ Found {$existingCount} existing OSAccounts invoices in this date range. Use --force to override.");
+
                     return 1;
                 }
             }
-            
+
             // Process invoices in chunks
             $this->info("📦 Processing invoices in chunks of {$chunkSize}...");
-            
+
             $bar = $this->output->createProgressBar($invoiceCount);
             $bar->start();
-            
+
             $query->chunk($chunkSize, function ($invoices) use ($isDryRun, $bar) {
                 $this->processInvoiceChunk($invoices, $isDryRun);
                 $bar->advance($invoices->count());
             });
-            
+
             $bar->finish();
             $this->newLine();
-            
+
             // Display results
             $this->displayResults($isDryRun);
-            
-            if (!$isDryRun && $this->stats['created'] > 0) {
+
+            if (! $isDryRun && $this->stats['created'] > 0) {
                 $this->info('🎉 Import completed successfully!');
                 Log::info('OSAccounts invoices import completed', $this->stats);
             }
-            
+
             return 0;
-            
+
         } catch (\Exception $e) {
-            $this->error('❌ Import failed: ' . $e->getMessage());
+            $this->error('❌ Import failed: '.$e->getMessage());
             Log::error('OSAccounts invoices import failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
             return 1;
         }
     }
@@ -146,7 +157,7 @@ class ImportOSAccountsInvoices extends Command
         $suppliers = AccountingSupplier::where('is_osaccounts_linked', true)
             ->whereNotNull('external_osaccounts_id')
             ->get();
-            
+
         foreach ($suppliers as $supplier) {
             $this->supplierMap[$supplier->external_osaccounts_id] = $supplier->id;
         }
@@ -159,19 +170,20 @@ class ImportOSAccountsInvoices extends Command
     {
         foreach ($invoices as $osInvoice) {
             $this->stats['total']++;
-            
+
             try {
                 // Check if invoice already exists
                 $existing = Invoice::where('external_osaccounts_id', $osInvoice->ID)->first();
-                
-                if ($existing && !$this->option('force')) {
+
+                if ($existing && ! $this->option('force')) {
                     $this->stats['skipped']++;
+
                     continue;
                 }
-                
+
                 // Map supplier
                 $supplierId = $this->supplierMap[$osInvoice->SupplierID] ?? null;
-                if (!$supplierId) {
+                if (! $supplierId) {
                     $this->stats['unmapped_suppliers']++;
                     Log::warning('Unmapped supplier in OSAccounts invoice', [
                         'invoice_id' => $osInvoice->ID,
@@ -179,21 +191,22 @@ class ImportOSAccountsInvoices extends Command
                         'supplier_id' => $osInvoice->SupplierID,
                         'supplier_name' => $osInvoice->supplier?->Name,
                     ]);
+
                     continue;
                 }
-                
+
                 // Get the Laravel supplier to get the correct name
                 $laravelSupplier = AccountingSupplier::find($supplierId);
                 $supplierName = $laravelSupplier ? $laravelSupplier->name : 'Unknown Supplier';
-                
+
                 // Get VAT breakdown
                 $vatBreakdown = $osInvoice->vat_breakdown;
-                
+
                 // Calculate totals
                 $subtotal = $osInvoice->subtotal;
                 $vatAmount = $osInvoice->vat_amount;
                 $totalAmount = $subtotal + $vatAmount;
-                
+
                 $invoiceData = [
                     'invoice_number' => (string) $osInvoice->InvoiceNum,
                     'supplier_id' => $supplierId,
@@ -203,7 +216,7 @@ class ImportOSAccountsInvoices extends Command
                     'subtotal' => $subtotal,
                     'vat_amount' => $vatAmount,
                     'total_amount' => $totalAmount,
-                    
+
                     // VAT breakdown
                     'standard_net' => $vatBreakdown['standard_net'],
                     'standard_vat' => $vatBreakdown['standard_vat'],
@@ -213,24 +226,24 @@ class ImportOSAccountsInvoices extends Command
                     'second_reduced_vat' => $vatBreakdown['second_reduced_vat'],
                     'zero_net' => $vatBreakdown['zero_net'],
                     'zero_vat' => $vatBreakdown['zero_vat'],
-                    
+
                     // Payment status and dates
                     'payment_status' => $osInvoice->payment_status,
                     'payment_date' => $osInvoice->PaidDate,
-                    
+
                     // Additional fields
                     'notes' => $osInvoice->Assigned ? "Period: {$osInvoice->Assigned}" : null,
                     'expense_category' => 'imported', // Default category for imported invoices
-                    
+
                     // External reference
                     'external_osaccounts_id' => $osInvoice->ID,
-                    
+
                     // Audit fields
                     'created_by' => 1, // System user
                     'updated_by' => 1,
                 ];
-                
-                if (!$isDryRun) {
+
+                if (! $isDryRun) {
                     if ($existing) {
                         $existing->update($invoiceData);
                         $this->stats['updated']++;
@@ -241,7 +254,7 @@ class ImportOSAccountsInvoices extends Command
                 } else {
                     $this->stats['created']++; // Count as would-be-created for dry run
                 }
-                
+
             } catch (\Exception $e) {
                 $this->stats['errors']++;
                 Log::error('Error processing OSAccounts invoice', [
@@ -271,7 +284,7 @@ class ImportOSAccountsInvoices extends Command
                 ['Errors', $this->stats['errors']],
             ]
         );
-        
+
         if ($this->stats['unmapped_suppliers'] > 0) {
             $this->warn("⚠️  {$this->stats['unmapped_suppliers']} invoices skipped due to unmapped suppliers");
             $this->info('Check logs for details on unmapped suppliers');

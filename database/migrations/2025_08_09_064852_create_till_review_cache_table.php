@@ -24,7 +24,7 @@ return new class extends Migration
             $table->decimal('amount', 10, 2)->nullable();
             $table->timestamp('cached_at')->useCurrent();
             $table->timestamps();
-            
+
             $table->index(['transaction_date', 'transaction_type']);
             $table->index(['transaction_date', 'terminal']);
             $table->index(['transaction_date', 'cashier']);

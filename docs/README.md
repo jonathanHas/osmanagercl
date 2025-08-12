@@ -6,6 +6,26 @@ Welcome to the comprehensive documentation for OSManager CL. This documentation 
 
 ## 🆕 Latest Updates (August 2025)
 
+### Sales Accounting Report System (2025-08-12)
+VAT-compliant sales analysis with comprehensive export and accurate revenue calculations:
+
+- **💰 Accurate Revenue Calculation**: Excludes voucher sales to provide true customer revenue figures
+- **📊 Dynamic VAT Columns**: Only displays VAT rate columns with actual data for cleaner interface
+- **🏢 Stock Transfer Separation**: Internal movements excluded from revenue with collapsible display
+- **🎫 Gift Voucher Handling**: Paperin/paperin adjust system prevents double-counting
+- **📋 Comprehensive CSV Export**: Structured export with date range, VAT breakdown, and summary metrics
+- **⚡ Dual Performance Mode**: Uses pre-aggregated data (100x+ faster) with real-time fallback
+- **📄 Professional Formatting**: Tables match website layout for easy accounting review
+- **🔒 Role-based Access**: Admin and Manager access only for financial data security
+
+**Key Benefits**:
+- True revenue figures excluding internal voucher transactions
+- Complete VAT breakdown for tax return preparation
+- Professional CSV export with all accounting details needed
+- 100x+ performance using optimized data aggregation patterns
+
+See [Sales Accounting Report](./features/sales-accounting-report.md) for complete details.
+
 ### VAT Dashboard System (2025-08-12)
 Comprehensive VAT return management dashboard with proactive alerts:
 

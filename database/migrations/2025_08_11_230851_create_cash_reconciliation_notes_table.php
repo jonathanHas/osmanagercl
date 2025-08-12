@@ -18,7 +18,7 @@ return new class extends Migration
             $table->text('message');
             $table->foreignId('created_by')->constrained('users');
             $table->timestamps();
-            
+
             // Index
             $table->index('cash_reconciliation_id', 'cr_notes_reconciliation_id');
         });

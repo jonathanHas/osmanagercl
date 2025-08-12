@@ -15,7 +15,7 @@ class InvoiceAttachment extends Model
     protected $fillable = [
         'invoice_id',
         'original_filename',
-        'stored_filename', 
+        'stored_filename',
         'file_path',
         'mime_type',
         'file_size',
@@ -56,7 +56,8 @@ class InvoiceAttachment extends Model
     public static function generateStoredFilename(string $originalFilename): string
     {
         $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
-        return Str::uuid() . '.' . strtolower($extension);
+
+        return Str::uuid().'.'.strtolower($extension);
     }
 
     /**
@@ -66,6 +67,7 @@ class InvoiceAttachment extends Model
     {
         $year = date('Y');
         $month = date('m');
+
         return "invoices/{$year}/{$month}/{$invoiceId}/{$storedFilename}";
     }
 
@@ -141,12 +143,12 @@ class InvoiceAttachment extends Model
     {
         $bytes = $this->file_size;
         $units = ['B', 'KB', 'MB', 'GB', 'TB'];
-        
+
         for ($i = 0; $bytes > 1024 && $i < count($units) - 1; $i++) {
             $bytes /= 1024;
         }
-        
-        return round($bytes, 2) . ' ' . $units[$i];
+
+        return round($bytes, 2).' '.$units[$i];
     }
 
     /**
@@ -194,6 +196,7 @@ class InvoiceAttachment extends Model
         if ($this->exists()) {
             return Storage::disk('private')->delete($this->file_path);
         }
+
         return true;
     }
 
@@ -211,7 +214,7 @@ class InvoiceAttachment extends Model
 
         // Set uploaded_at when creating
         static::creating(function ($attachment) {
-            if (!$attachment->uploaded_at) {
+            if (! $attachment->uploaded_at) {
                 $attachment->uploaded_at = now();
             }
         });

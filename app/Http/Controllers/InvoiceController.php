@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Invoice;
-use App\Models\InvoiceVatLine;
 use App\Models\AccountingSupplier;
 use App\Models\CostCategory;
+use App\Models\Invoice;
+use App\Models\InvoiceVatLine;
 use App\Models\VatRate;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 class InvoiceController extends Controller
 {
@@ -49,27 +49,30 @@ class InvoiceController extends Controller
         // Handle sorting
         $sortField = $request->get('sort', 'invoice_date');
         $sortDirection = $request->get('direction', 'desc');
-        
+
         // Validate sort field
         $allowedSortFields = [
             'invoice_number',
-            'supplier_name', 
+            'supplier_name',
             'invoice_date',
             'payment_status',
             'subtotal',
             'vat_amount',
-            'total_amount'
+            'total_amount',
         ];
-        
-        if (!in_array($sortField, $allowedSortFields)) {
+
+        if (! in_array($sortField, $allowedSortFields)) {
             $sortField = 'invoice_date';
         }
-        
+
         // Validate sort direction
-        if (!in_array($sortDirection, ['asc', 'desc'])) {
+        if (! in_array($sortDirection, ['asc', 'desc'])) {
             $sortDirection = 'desc';
         }
 
+        // Clone query for statistics before pagination
+        $statsQuery = clone $query;
+        
         $invoices = $query->orderBy($sortField, $sortDirection)
             ->orderBy('id', 'desc') // Secondary sort for consistency
             ->paginate(20);
@@ -79,7 +82,25 @@ class InvoiceController extends Controller
             ->orderBy('name')
             ->pluck('name', 'id');
 
-        // Calculate summary statistics
+        // Calculate summary statistics for filtered results (always calculate for consistency)
+        $filteredStats = [
+            'total_count' => $statsQuery->count(),
+            'total_amount' => $statsQuery->sum('total_amount'),
+            'total_subtotal' => $statsQuery->sum('subtotal'),
+            'total_vat' => $statsQuery->sum('vat_amount'),
+            'standard_net' => $statsQuery->sum('standard_net'),
+            'standard_vat' => $statsQuery->sum('standard_vat'),
+            'reduced_net' => $statsQuery->sum('reduced_net'),
+            'reduced_vat' => $statsQuery->sum('reduced_vat'),
+            'second_reduced_net' => $statsQuery->sum('second_reduced_net'),
+            'second_reduced_vat' => $statsQuery->sum('second_reduced_vat'),
+            'zero_net' => $statsQuery->sum('zero_net'),
+            'paid_count' => (clone $statsQuery)->where('payment_status', 'paid')->count(),
+            'unpaid_count' => (clone $statsQuery)->whereIn('payment_status', ['pending', 'overdue', 'partial'])->count(),
+            'unpaid_total' => (clone $statsQuery)->whereIn('payment_status', ['pending', 'overdue', 'partial'])->sum('total_amount'),
+        ];
+
+        // Calculate overall statistics (unfiltered)
         $stats = [
             'total_unpaid' => Invoice::unpaid()->sum('total_amount'),
             'total_overdue' => Invoice::unpaid()
@@ -91,7 +112,7 @@ class InvoiceController extends Controller
                 ->count(),
         ];
 
-        return view('invoices.index', compact('invoices', 'suppliers', 'stats', 'sortField', 'sortDirection'));
+        return view('invoices.index', compact('invoices', 'suppliers', 'stats', 'filteredStats', 'sortField', 'sortDirection'));
     }
 
     /**
@@ -136,7 +157,7 @@ class InvoiceController extends Controller
             'due_date' => 'nullable|date|after_or_equal:invoice_date',
             'expense_category' => 'nullable|string|max:50',
             'notes' => 'nullable|string',
-            
+
             // VAT lines
             'vat_lines' => 'required|array|min:1',
             'vat_lines.*.vat_category' => 'required|string|in:STANDARD,REDUCED,SECOND_REDUCED,ZERO',
@@ -150,10 +171,10 @@ class InvoiceController extends Controller
                 $supplier = AccountingSupplier::find($validated['supplier_id']);
                 if ($supplier) {
                     $validated['supplier_name'] = $supplier->name;
-                    if (!$validated['expense_category'] && $supplier->default_expense_category) {
+                    if (! $validated['expense_category'] && $supplier->default_expense_category) {
                         $validated['expense_category'] = $supplier->default_expense_category;
                     }
-                    if (!$validated['due_date'] && $supplier->payment_terms_days) {
+                    if (! $validated['due_date'] && $supplier->payment_terms_days) {
                         $validated['due_date'] = Carbon::parse($validated['invoice_date'])
                             ->addDays($supplier->payment_terms_days);
                     }
@@ -195,8 +216,9 @@ class InvoiceController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+
             return back()->withInput()
-                ->with('error', 'Failed to create invoice: ' . $e->getMessage());
+                ->with('error', 'Failed to create invoice: '.$e->getMessage());
         }
     }
 
@@ -213,7 +235,7 @@ class InvoiceController extends Controller
             'due_date' => 'nullable|date|after_or_equal:invoice_date',
             'expense_category' => 'nullable|string|max:50',
             'notes' => 'nullable|string',
-            
+
             // VAT breakdown
             'standard_net' => 'nullable|numeric|min:0',
             'standard_vat' => 'nullable|numeric|min:0',
@@ -233,10 +255,10 @@ class InvoiceController extends Controller
             $supplier = AccountingSupplier::find($validated['supplier_id']);
             if ($supplier) {
                 $validated['supplier_name'] = $supplier->name;
-                if (!$validated['expense_category'] && $supplier->default_expense_category) {
+                if (! $validated['expense_category'] && $supplier->default_expense_category) {
                     $validated['expense_category'] = $supplier->default_expense_category;
                 }
-                if (!$validated['due_date'] && $supplier->payment_terms_days) {
+                if (! $validated['due_date'] && $supplier->payment_terms_days) {
                     $validated['due_date'] = Carbon::parse($validated['invoice_date'])
                         ->addDays($supplier->payment_terms_days);
                 }
@@ -278,7 +300,7 @@ class InvoiceController extends Controller
     public function show(Invoice $invoice)
     {
         $invoice->load(['supplier', 'vatLines', 'creator', 'updater']);
-        
+
         $vatBreakdown = $invoice->getVatBreakdown();
 
         return view('invoices.show', compact('invoice', 'vatBreakdown'));
@@ -290,16 +312,16 @@ class InvoiceController extends Controller
     public function edit(Invoice $invoice)
     {
         $invoice->load('vatLines');
-        
+
         $suppliers = AccountingSupplier::activeOnly()
             ->orderBy('name')
             ->pluck('name', 'id');
 
         $categories = CostCategory::getForDropdown();
         $vatRates = VatRate::getAvailableCodes($invoice->invoice_date);
-        
+
         // Prepare VAT lines for JavaScript with proper type casting
-        $invoiceVatLines = old('vat_lines', $invoice->vatLines->map(function($line) {
+        $invoiceVatLines = old('vat_lines', $invoice->vatLines->map(function ($line) {
             return [
                 'id' => $line->id,
                 'vat_category' => $line->vat_category,
@@ -313,7 +335,6 @@ class InvoiceController extends Controller
 
         return view('invoices.edit', compact('invoice', 'suppliers', 'categories', 'vatRates', 'invoiceVatLines'));
     }
-
 
     /**
      * Update the specified invoice in storage.
@@ -332,7 +353,7 @@ class InvoiceController extends Controller
             'payment_reference' => 'nullable|string|max:100',
             'expense_category' => 'nullable|string|max:50',
             'notes' => 'nullable|string',
-            
+
             // VAT lines
             'vat_lines' => 'required|array|min:1',
             'vat_lines.*.id' => 'nullable|exists:invoice_vat_lines,id',
@@ -391,7 +412,7 @@ class InvoiceController extends Controller
 
             // Delete removed lines
             $linesToDelete = array_diff($existingLineIds, $updatedLineIds);
-            if (!empty($linesToDelete)) {
+            if (! empty($linesToDelete)) {
                 InvoiceVatLine::whereIn('id', $linesToDelete)
                     ->where('invoice_id', $invoice->id)
                     ->delete();
@@ -407,8 +428,9 @@ class InvoiceController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+
             return back()->withInput()
-                ->with('error', 'Failed to update invoice: ' . $e->getMessage());
+                ->with('error', 'Failed to update invoice: '.$e->getMessage());
         }
     }
 
@@ -419,10 +441,11 @@ class InvoiceController extends Controller
     {
         try {
             $invoice->delete();
+
             return redirect()->route('invoices.index')
                 ->with('success', 'Invoice deleted successfully.');
         } catch (\Exception $e) {
-            return back()->with('error', 'Failed to delete invoice: ' . $e->getMessage());
+            return back()->with('error', 'Failed to delete invoice: '.$e->getMessage());
         }
     }
 

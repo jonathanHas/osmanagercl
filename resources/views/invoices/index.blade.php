@@ -105,6 +105,98 @@
             </form>
         </div>
 
+        {{-- Filtered Statistics Cards (show only when filters are applied) --}}
+        @if(request()->hasAny(['supplier_id', 'payment_status', 'from_date', 'to_date', 'search']))
+        <div class="bg-gray-800 rounded-lg p-4 mb-6">
+            <h3 class="text-lg font-semibold text-gray-200 mb-4">Filtered Results Summary</h3>
+            
+            {{-- Main Summary Cards --}}
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <div class="bg-gray-700 rounded p-3">
+                    <div class="text-gray-400 text-sm">Total Invoices</div>
+                    <div class="text-xl font-bold text-white">{{ $filteredStats['total_count'] }}</div>
+                </div>
+                <div class="bg-gray-700 rounded p-3">
+                    <div class="text-gray-400 text-sm">Total Amount</div>
+                    <div class="text-xl font-bold text-green-400">€{{ number_format($filteredStats['total_amount'], 2) }}</div>
+                </div>
+                <div class="bg-gray-700 rounded p-3">
+                    <div class="text-gray-400 text-sm">Total VAT</div>
+                    <div class="text-xl font-bold text-blue-400">€{{ number_format($filteredStats['total_vat'], 2) }}</div>
+                </div>
+                <div class="bg-gray-700 rounded p-3">
+                    <div class="text-gray-400 text-sm">Net Amount</div>
+                    <div class="text-xl font-bold text-gray-300">€{{ number_format($filteredStats['total_subtotal'], 2) }}</div>
+                </div>
+            </div>
+
+            {{-- VAT Breakdown --}}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <h4 class="text-sm font-medium text-gray-400 mb-2">VAT Breakdown</h4>
+                    <div class="space-y-2">
+                        @if($filteredStats['standard_net'] > 0 || $filteredStats['standard_vat'] > 0)
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-400">Standard Rate (23%)</span>
+                            <div class="text-right">
+                                <span class="text-gray-300">€{{ number_format($filteredStats['standard_net'], 2) }}</span>
+                                <span class="text-gray-500 mx-1">+</span>
+                                <span class="text-blue-400">€{{ number_format($filteredStats['standard_vat'], 2) }}</span>
+                            </div>
+                        </div>
+                        @endif
+                        @if($filteredStats['reduced_net'] > 0 || $filteredStats['reduced_vat'] > 0)
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-400">Reduced Rate (13.5%)</span>
+                            <div class="text-right">
+                                <span class="text-gray-300">€{{ number_format($filteredStats['reduced_net'], 2) }}</span>
+                                <span class="text-gray-500 mx-1">+</span>
+                                <span class="text-blue-400">€{{ number_format($filteredStats['reduced_vat'], 2) }}</span>
+                            </div>
+                        </div>
+                        @endif
+                        @if($filteredStats['second_reduced_net'] > 0 || $filteredStats['second_reduced_vat'] > 0)
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-400">Second Reduced (9%)</span>
+                            <div class="text-right">
+                                <span class="text-gray-300">€{{ number_format($filteredStats['second_reduced_net'], 2) }}</span>
+                                <span class="text-gray-500 mx-1">+</span>
+                                <span class="text-blue-400">€{{ number_format($filteredStats['second_reduced_vat'], 2) }}</span>
+                            </div>
+                        </div>
+                        @endif
+                        @if($filteredStats['zero_net'] > 0)
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-400">Zero Rate (0%)</span>
+                            <div class="text-right">
+                                <span class="text-gray-300">€{{ number_format($filteredStats['zero_net'], 2) }}</span>
+                            </div>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- Payment Status Breakdown --}}
+                <div>
+                    <h4 class="text-sm font-medium text-gray-400 mb-2">Payment Status</h4>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-green-400">Paid</span>
+                            <span class="text-gray-300">{{ $filteredStats['paid_count'] }} invoices</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-yellow-400">Unpaid</span>
+                            <div class="text-right">
+                                <span class="text-gray-300">{{ $filteredStats['unpaid_count'] }} invoices</span>
+                                <span class="text-red-400 ml-2">€{{ number_format($filteredStats['unpaid_total'], 2) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @endif
+
         {{-- Invoices Table --}}
         <div class="bg-gray-800 rounded-lg overflow-hidden">
             <table class="min-w-full divide-y divide-gray-700">

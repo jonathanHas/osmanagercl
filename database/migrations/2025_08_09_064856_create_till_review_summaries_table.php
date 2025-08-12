@@ -28,7 +28,7 @@ return new class extends Migration
             $table->json('terminal_breakdown')->nullable();
             $table->json('cashier_breakdown')->nullable();
             $table->timestamps();
-            
+
             $table->index('summary_date');
         });
     }

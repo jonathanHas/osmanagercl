@@ -364,9 +364,9 @@ class ProductController extends Controller
 
         // Try finding the product directly first
         $product = Product::find($id);
-        
+
         // If not found, try the repository
-        if (!$product) {
+        if (! $product) {
             $product = $this->productRepository->findById($id);
         }
 
@@ -377,18 +377,16 @@ class ProductController extends Controller
             abort(404, 'Product not found');
         }
 
-
         // Update the product's cost price
         try {
             // Simple direct update
             $product->PRICEBUY = $costPrice;
             $result = $product->save();
-            
-            
+
         } catch (\Exception $e) {
-            
+
             if ($request->expectsJson()) {
-                return response()->json(['message' => 'Database update failed: ' . $e->getMessage()], 500);
+                return response()->json(['message' => 'Database update failed: '.$e->getMessage()], 500);
             }
             throw $e;
         }
@@ -398,7 +396,7 @@ class ProductController extends Controller
                 'message' => 'Cost updated successfully.',
                 'cost' => $costPrice,
                 'product_id' => $product->ID,
-                'update_result' => $result ?? false
+                'update_result' => $result ?? false,
             ]);
         }
 

@@ -13,6 +13,7 @@ class CacheTillTransactions implements ShouldQueue
     use Queueable;
 
     protected Carbon $date;
+
     protected bool $clearExisting;
 
     /**
@@ -42,7 +43,7 @@ class CacheTillTransactions implements ShouldQueue
 
             // Fetch and cache transactions
             $transactions = $repository->getTransactionsForDate($this->date);
-            
+
             // Generate daily summary
             $summary = $repository->getDailySummary($this->date);
 
@@ -57,7 +58,7 @@ class CacheTillTransactions implements ShouldQueue
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            
+
             throw $e;
         }
     }

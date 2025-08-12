@@ -3,10 +3,6 @@
 namespace App\Models\OSAccounts;
 
 use Illuminate\Database\Eloquent\Model;
-use App\Models\OSAccounts\OSExpense;
-use App\Models\OSAccounts\OSInvoiceDetail;
-use App\Models\OSAccounts\OSInvoiceUnpaid;
-use Carbon\Carbon;
 
 /**
  * OSAccounts INVOICES table model
@@ -15,10 +11,15 @@ use Carbon\Carbon;
 class OSInvoice extends Model
 {
     protected $connection = 'osaccounts';
+
     protected $table = 'INVOICES';
+
     protected $primaryKey = 'ID';
+
     protected $keyType = 'string';
+
     public $incrementing = false;
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -85,19 +86,20 @@ class OSInvoice extends Model
         if ($this->PaidDate) {
             return 'paid';
         }
-        
+
         // Check if this invoice is in the INVOICES_UNPAID table
         $isUnpaid = OSInvoiceUnpaid::where('InvoiceID', $this->ID)->exists();
-        
+
         if ($isUnpaid) {
             // Invoice is in INVOICES_UNPAID - still outstanding
             // Determine if overdue based on invoice date
             if ($this->InvoiceDate && $this->InvoiceDate->addDays(30)->isPast()) {
                 return 'overdue';
             }
+
             return 'pending';
         }
-        
+
         // Not in INVOICES_UNPAID and no PaidDate = paid (date unknown)
         // This is the key logic the user clarified
         return 'paid';
@@ -124,7 +126,7 @@ class OSInvoice extends Model
             if ($vatMapping) {
                 $netField = $vatMapping['net_field'];
                 $vatField = $vatMapping['vat_field'];
-                
+
                 $breakdown[$netField] += $vatMapping['net_amount'];
                 $breakdown[$vatField] += $vatMapping['vat_amount'];
             }
@@ -139,7 +141,8 @@ class OSInvoice extends Model
     public function getSubtotalAttribute()
     {
         $breakdown = $this->getVatBreakdownAttribute();
-        return $breakdown['standard_net'] + $breakdown['reduced_net'] + 
+
+        return $breakdown['standard_net'] + $breakdown['reduced_net'] +
                $breakdown['second_reduced_net'] + $breakdown['zero_net'];
     }
 
@@ -149,7 +152,8 @@ class OSInvoice extends Model
     public function getVatAmountAttribute()
     {
         $breakdown = $this->getVatBreakdownAttribute();
-        return $breakdown['standard_vat'] + $breakdown['reduced_vat'] + 
+
+        return $breakdown['standard_vat'] + $breakdown['reduced_vat'] +
                $breakdown['second_reduced_vat'] + $breakdown['zero_vat'];
     }
 

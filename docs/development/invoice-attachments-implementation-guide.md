@@ -2,7 +2,7 @@
 
 ## Implementation Summary
 
-This document provides a technical overview of the Invoice Attachments System implementation completed on **2025-08-10**.
+This document provides a technical overview of the Invoice Attachments System implementation completed on **2025-08-10** and enhanced on **2025-08-12** with production-ready permission handling and duplicate management.
 
 ## Quick Start
 
@@ -246,12 +246,22 @@ public function getPaymentStatusAttribute()
 }
 ```
 
-### File Import Command
-Created `ImportOSAccountsAttachments` command:
-- Locates OSAccounts invoices with file attachments
-- Copies files to Laravel private storage
-- Creates attachment records with proper metadata
-- Handles various OSAccounts file organization patterns
+### File Import Command (Enhanced 2025-08-12)
+Created `ImportOSAccountsAttachments` command with major improvements:
+- **Smart Path Resolution**: 
+  - Detects when InvoicePath contains full filename
+  - Decodes HTML entities in supplier names
+  - Multiple fallback strategies for finding files
+- **Duplicate Prevention**: SHA-256 hash-based duplicate detection
+- **Production-Ready Permissions**:
+  - Files created with `664` permissions
+  - Automatic `www-data` group ownership
+  - Directories use setgid bit for inheritance
+- **98.4% Success Rate**: 183 of 186 files imported successfully
+
+### New Utility Commands (2025-08-12)
+- `attachments:cleanup-duplicates` - Remove duplicate attachments
+- `attachments:fix-permissions` - Fix file ownership and permissions
 
 ### Currency Conversion
 Updated all invoice views from £ to €:
@@ -280,14 +290,18 @@ Updated all invoice views from £ to €:
 
 ## Deployment Notes
 
-### Required Permissions
+### Required Permissions (Updated 2025-08-12)
+The import command now handles permissions automatically:
 ```bash
-# Storage directories must be writable by web server
-chmod -R 775 storage/app/private/invoices/
-chgrp -R www-data storage/app/private/invoices/
+# One-time setup for production
+sudo usermod -a -G www-data deploy  # Add deploy user to www-data group
+sudo chown -R www-data:www-data storage/app/private/invoices
+sudo chmod -R 2775 storage/app/private/invoices  # Setgid for group inheritance
 
-# Individual files should be readable
-chmod 644 storage/app/private/invoices/**/*.{pdf,jpg,png,txt,doc,docx}
+# Files are automatically created with:
+# - Permissions: 664 (rw-rw-r--)
+# - Group: www-data
+# - No manual intervention required
 ```
 
 ### Environment Configuration

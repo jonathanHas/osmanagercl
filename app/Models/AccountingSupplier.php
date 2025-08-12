@@ -135,7 +135,7 @@ class AccountingSupplier extends Model
      */
     public function posSupplier()
     {
-        if (!$this->is_pos_linked || !$this->external_pos_id) {
+        if (! $this->is_pos_linked || ! $this->external_pos_id) {
             return null;
         }
 
@@ -195,12 +195,12 @@ class AccountingSupplier extends Model
      */
     public function getIsOverdueForContactAttribute(): bool
     {
-        if (!$this->last_invoice_date) {
+        if (! $this->last_invoice_date) {
             return false;
         }
 
         $daysSinceLastInvoice = now()->diffInDays($this->last_invoice_date);
-        
+
         // Consider overdue if no invoice in 90+ days and previously active
         return $daysSinceLastInvoice > 90 && $this->invoice_count > 0;
     }
@@ -211,7 +211,7 @@ class AccountingSupplier extends Model
     public function getPerformanceRatingAttribute(): string
     {
         $rating = 'unknown';
-        
+
         if ($this->total_spent >= 10000) {
             $rating = 'premium';
         } elseif ($this->total_spent >= 1000) {
@@ -245,8 +245,8 @@ class AccountingSupplier extends Model
             'total_spent' => $stats->total_spent ?? 0,
             'average_invoice_value' => $stats->average_invoice_value ?? 0,
             'last_invoice_date' => $stats->last_invoice_date,
-            'days_since_last_order' => $stats->last_invoice_date 
-                ? now()->diffInDays($stats->last_invoice_date) 
+            'days_since_last_order' => $stats->last_invoice_date
+                ? now()->diffInDays($stats->last_invoice_date)
                 : null,
         ]);
     }
@@ -265,23 +265,23 @@ class AccountingSupplier extends Model
     public function getFormattedContactInfoAttribute(): array
     {
         $contact = [];
-        
+
         if ($this->contact_person) {
             $contact['person'] = $this->contact_person;
         }
-        
+
         if ($this->phone) {
             $contact['phone'] = $this->phone;
         }
-        
+
         if ($this->phone_secondary) {
             $contact['phone_secondary'] = $this->phone_secondary;
         }
-        
+
         if ($this->email) {
             $contact['email'] = $this->email;
         }
-        
+
         if ($this->fax) {
             $contact['fax'] = $this->fax;
         }

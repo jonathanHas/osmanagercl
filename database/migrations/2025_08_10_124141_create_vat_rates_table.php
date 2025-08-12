@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -20,11 +20,11 @@ return new class extends Migration
             $table->date('effective_from');
             $table->date('effective_to')->nullable();
             $table->timestamps();
-            
+
             $table->index(['code', 'effective_from', 'effective_to']);
             $table->index('effective_from');
         });
-        
+
         // Insert default UK VAT rates
         DB::table('vat_rates')->insert([
             [

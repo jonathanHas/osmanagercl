@@ -26,7 +26,7 @@ return new class extends Migration
             $table->integer('prep_time')->nullable(); // Actual prep time in seconds
             $table->json('customer_info')->nullable(); // Optional customer name/table
             $table->timestamps();
-            
+
             $table->index(['status', 'order_time']);
             $table->index('created_at');
         });
@@ -42,7 +42,7 @@ return new class extends Migration
             $table->json('modifiers')->nullable(); // Size, milk type, extras etc from ATTRIBUTES
             $table->text('notes')->nullable(); // Special instructions
             $table->timestamps();
-            
+
             $table->index('kds_order_id');
         });
     }

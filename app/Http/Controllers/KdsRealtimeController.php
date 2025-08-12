@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\POS\Ticket;
 use App\Models\KdsOrder;
 use App\Models\KdsOrderItem;
+use App\Models\POS\Ticket;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -15,18 +15,18 @@ class KdsRealtimeController extends Controller
     public function checkNewOrders(): JsonResponse
     {
         $startTime = microtime(true);
-        
+
         try {
             // Get the last processed ticket time
             $lastProcessedTime = KdsOrder::max('order_time') ?? Carbon::now()->subHours(2);
             $lastProcessedTime = Carbon::parse($lastProcessedTime);
-            
+
             // Never look back more than 2 hours
             $maxLookback = Carbon::now()->subHours(2);
             if ($lastProcessedTime->lt($maxLookback)) {
                 $lastProcessedTime = $maxLookback;
             }
-            
+
             // Find new coffee orders - SIMPLIFIED QUERY
             $newOrders = DB::connection('pos')
                 ->table('TICKETS as t')
@@ -40,15 +40,15 @@ class KdsRealtimeController extends Controller
                 ->distinct()
                 ->limit(10)
                 ->get();
-            
+
             $ordersCreated = 0;
-            
+
             foreach ($newOrders as $ticket) {
                 // Check if already exists
                 if (KdsOrder::where('ticket_id', $ticket->ID)->exists()) {
                     continue;
                 }
-                
+
                 // Create KDS order
                 $kdsOrder = KdsOrder::create([
                     'ticket_id' => $ticket->ID,
@@ -57,7 +57,7 @@ class KdsRealtimeController extends Controller
                     'status' => 'new',
                     'order_time' => Carbon::parse($ticket->DATENEW),
                 ]);
-                
+
                 // Get ticket lines for this order
                 $lines = DB::connection('pos')
                     ->table('TICKETLINES as tl')
@@ -66,7 +66,7 @@ class KdsRealtimeController extends Controller
                     ->where('p.CATEGORY', '081')
                     ->select('tl.*', 'p.NAME', 'p.DISPLAY')
                     ->get();
-                
+
                 foreach ($lines as $line) {
                     KdsOrderItem::create([
                         'kds_order_id' => $kdsOrder->id,
@@ -76,25 +76,26 @@ class KdsRealtimeController extends Controller
                         'quantity' => $line->UNITS ?? 1,
                     ]);
                 }
-                
+
                 $ordersCreated++;
                 Log::info('New coffee order added', ['ticket' => $ticket->TICKETID]);
             }
-            
+
             $duration = round((microtime(true) - $startTime) * 1000, 2);
-            
+
             return response()->json([
                 'success' => true,
                 'orders_created' => $ordersCreated,
                 'duration_ms' => $duration,
-                'checked_at' => now()->toDateTimeString()
+                'checked_at' => now()->toDateTimeString(),
             ]);
-            
+
         } catch (\Exception $e) {
             Log::error('Realtime check failed', ['error' => $e->getMessage()]);
+
             return response()->json([
                 'success' => false,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }

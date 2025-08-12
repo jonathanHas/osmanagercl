@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Carbon\Carbon;
 
 class VatRate extends Model
 {
@@ -50,7 +50,7 @@ class VatRate extends Model
      */
     public function getFormattedRateAttribute(): string
     {
-        return number_format($this->rate * 100, 1) . '%';
+        return number_format($this->rate * 100, 1).'%';
     }
 
     /**
@@ -88,10 +88,10 @@ class VatRate extends Model
     /**
      * Get VAT rate by code for a specific date.
      */
-    public static function getRateByCode(string $code, Carbon $date = null): ?self
+    public static function getRateByCode(string $code, ?Carbon $date = null): ?self
     {
         $date = $date ?? now();
-        
+
         return self::where('code', $code)
             ->effectiveOn($date)
             ->first();
@@ -100,10 +100,10 @@ class VatRate extends Model
     /**
      * Get all available VAT codes.
      */
-    public static function getAvailableCodes(Carbon $date = null): array
+    public static function getAvailableCodes(?Carbon $date = null): array
     {
         $date = $date ?? now();
-        
+
         return self::effectiveOn($date)
             ->pluck('name', 'code')
             ->toArray();

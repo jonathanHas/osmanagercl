@@ -6,7 +6,6 @@ use App\Models\Invoice;
 use App\Models\InvoiceAttachment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 class InvoiceAttachmentController extends Controller
@@ -29,7 +28,7 @@ class InvoiceAttachmentController extends Controller
             'attachment_types' => 'nullable|array',
             'attachment_types.*' => [
                 'nullable',
-                Rule::in(['invoice_scan', 'receipt', 'delivery_note', 'other'])
+                Rule::in(['invoice_scan', 'receipt', 'delivery_note', 'other']),
             ],
         ]);
 
@@ -46,13 +45,13 @@ class InvoiceAttachmentController extends Controller
 
                 // Ensure directory exists with proper permissions
                 $directory = dirname($filePath);
-                if (!Storage::disk('private')->exists($directory)) {
+                if (! Storage::disk('private')->exists($directory)) {
                     Storage::disk('private')->makeDirectory($directory, 0775, true);
                 }
-                
+
                 // Store the file
                 $file->storeAs($directory, basename($filePath), 'private');
-                
+
                 // Ensure proper permissions for web server access
                 $fullPath = Storage::disk('private')->path($filePath);
                 chmod($fullPath, 0644);
@@ -68,7 +67,7 @@ class InvoiceAttachmentController extends Controller
                     'file_hash' => $fileHash,
                     'description' => $validated['descriptions'][$index] ?? null,
                     'attachment_type' => $validated['attachment_types'][$index] ?? 'invoice_scan',
-                    'is_primary' => $index === 0 && !$invoice->hasAttachments(), // First upload becomes primary if none exist
+                    'is_primary' => $index === 0 && ! $invoice->hasAttachments(), // First upload becomes primary if none exist
                     'uploaded_by' => auth()->id(),
                 ]);
 
@@ -77,9 +76,9 @@ class InvoiceAttachmentController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => count($uploadedAttachments) === 1 ? 
-                    'File uploaded successfully' : 
-                    count($uploadedAttachments) . ' files uploaded successfully',
+                'message' => count($uploadedAttachments) === 1 ?
+                    'File uploaded successfully' :
+                    count($uploadedAttachments).' files uploaded successfully',
                 'attachments' => collect($uploadedAttachments)->map(function ($attachment) {
                     return [
                         'id' => $attachment->id,
@@ -91,7 +90,7 @@ class InvoiceAttachmentController extends Controller
                         'viewer_url' => $attachment->viewer_url,
                         'download_url' => $attachment->download_url,
                     ];
-                })
+                }),
             ]);
 
         } catch (\Exception $e) {
@@ -103,7 +102,7 @@ class InvoiceAttachmentController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to upload files: ' . $e->getMessage()
+                'message' => 'Failed to upload files: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -113,17 +112,17 @@ class InvoiceAttachmentController extends Controller
      */
     public function view(InvoiceAttachment $attachment)
     {
-        if (!$attachment->exists()) {
+        if (! $attachment->exists()) {
             abort(404, 'File not found');
         }
 
-        if (!$attachment->isViewable()) {
+        if (! $attachment->isViewable()) {
             return $this->download($attachment);
         }
 
         $filePath = $attachment->full_storage_path;
         $extension = strtolower(pathinfo($attachment->original_filename, PATHINFO_EXTENSION));
-        
+
         // Force correct MIME type based on file extension
         $mimeType = $attachment->mime_type;
         if ($extension === 'pdf') {
@@ -137,21 +136,21 @@ class InvoiceAttachmentController extends Controller
         } elseif ($extension === 'webp') {
             $mimeType = 'image/webp';
         }
-        
+
         $headers = [
             'Content-Type' => $mimeType,
-            'Content-Disposition' => 'inline; filename="' . $attachment->original_filename . '"',
+            'Content-Disposition' => 'inline; filename="'.$attachment->original_filename.'"',
             'Cache-Control' => 'public, max-age=3600', // Cache for 1 hour
             'Pragma' => 'public',
             'X-Content-Type-Options' => 'nosniff',
         ];
-        
+
         // For PDFs, add additional headers to encourage inline viewing
         if ($extension === 'pdf') {
             $headers['Content-Transfer-Encoding'] = 'binary';
             $headers['Accept-Ranges'] = 'bytes';
         }
-        
+
         return response()->file($filePath, $headers);
     }
 
@@ -160,17 +159,17 @@ class InvoiceAttachmentController extends Controller
      */
     public function viewEmbedded(InvoiceAttachment $attachment)
     {
-        if (!$attachment->exists()) {
+        if (! $attachment->exists()) {
             abort(404, 'File not found');
         }
 
-        if (!$attachment->isViewable()) {
+        if (! $attachment->isViewable()) {
             return $this->download($attachment);
         }
 
         $viewUrl = route('invoices.attachments.view', $attachment);
         $downloadUrl = route('invoices.attachments.download', $attachment);
-        
+
         return view('invoices.attachment-viewer', compact('attachment', 'viewUrl', 'downloadUrl'));
     }
 
@@ -179,12 +178,12 @@ class InvoiceAttachmentController extends Controller
      */
     public function download(InvoiceAttachment $attachment)
     {
-        if (!$attachment->exists()) {
+        if (! $attachment->exists()) {
             abort(404, 'File not found');
         }
 
         $filePath = $attachment->full_storage_path;
-        
+
         return response()->download($filePath, $attachment->original_filename, [
             'Content-Type' => $attachment->mime_type,
         ]);
@@ -199,7 +198,7 @@ class InvoiceAttachmentController extends Controller
             'description' => 'nullable|string|max:255',
             'attachment_type' => [
                 'required',
-                Rule::in(['invoice_scan', 'receipt', 'delivery_note', 'other'])
+                Rule::in(['invoice_scan', 'receipt', 'delivery_note', 'other']),
             ],
             'is_primary' => 'boolean',
         ]);
@@ -222,7 +221,7 @@ class InvoiceAttachmentController extends Controller
                     'description' => $attachment->description,
                     'attachment_type_label' => $attachment->attachment_type_label,
                     'is_primary' => $attachment->is_primary,
-                ]
+                ],
             ]);
         }
 
@@ -236,14 +235,14 @@ class InvoiceAttachmentController extends Controller
     {
         try {
             $filename = $attachment->original_filename;
-            
+
             // Delete the file and record
             $attachment->delete(); // Model boot method handles file deletion
 
             if (request()->expectsJson()) {
                 return response()->json([
                     'success' => true,
-                    'message' => "Attachment '{$filename}' deleted successfully"
+                    'message' => "Attachment '{$filename}' deleted successfully",
                 ]);
             }
 
@@ -253,11 +252,11 @@ class InvoiceAttachmentController extends Controller
             if (request()->expectsJson()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to delete attachment: ' . $e->getMessage()
+                    'message' => 'Failed to delete attachment: '.$e->getMessage(),
                 ], 500);
             }
 
-            return back()->with('error', 'Failed to delete attachment: ' . $e->getMessage());
+            return back()->with('error', 'Failed to delete attachment: '.$e->getMessage());
         }
     }
 
@@ -289,7 +288,7 @@ class InvoiceAttachmentController extends Controller
                     'uploaded_by' => $attachment->uploader?->name ?? 'System',
                     'uploaded_at' => $attachment->uploaded_at->format('d/m/Y H:i'),
                 ];
-            })
+            }),
         ]);
     }
 
@@ -304,10 +303,10 @@ class InvoiceAttachmentController extends Controller
             'allowed_extensions' => ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'txt', 'doc', 'docx', 'xls', 'xlsx'],
             'allowed_types' => [
                 'invoice_scan' => 'Invoice Scan',
-                'receipt' => 'Receipt', 
+                'receipt' => 'Receipt',
                 'delivery_note' => 'Delivery Note',
                 'other' => 'Other',
-            ]
+            ],
         ]);
     }
 }

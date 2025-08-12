@@ -382,6 +382,18 @@ Comprehensive VAT return management dashboard with proactive deadline alerts.
 - **Role-based Access**: Protected for Admin and Manager roles only
 See [VAT Dashboard Documentation](./docs/features/vat-dashboard.md).
 
+### Sales Accounting Report System
+VAT-compliant sales analysis with proper revenue/transfer separation and comprehensive export capabilities.
+- **Accurate Revenue Calculation**: Excludes voucher sales to provide true customer revenue figures
+- **Dynamic VAT Columns**: Only displays VAT rate columns with actual data for cleaner interface
+- **Stock Transfer Separation**: Internal movements excluded from revenue with collapsible display
+- **Gift Voucher Handling**: Paperin/paperin adjust system prevents double-counting
+- **Comprehensive CSV Export**: Structured export with date range, VAT breakdown, and summary metrics
+- **Dual Performance Mode**: Uses pre-aggregated data (100x+ faster) with real-time fallback
+- **Professional Formatting**: Tables match website layout for easy accounting review
+- **Role-based Access**: Admin and Manager access only for financial data security
+See [Sales Accounting Report Documentation](./docs/features/sales-accounting-report.md).
+
 ### Cash Reconciliation System
 Comprehensive end-of-day cash management with physical counting and variance tracking.
 - **Physical Cash Counting**: Count by denomination (€50 to 10c) with real-time totals

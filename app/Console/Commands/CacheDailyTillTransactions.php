@@ -29,20 +29,21 @@ class CacheDailyTillTransactions extends Command
     {
         $dateStr = $this->option('date') ?? now()->format('Y-m-d');
         $clearExisting = $this->option('clear');
-        
+
         try {
             $date = Carbon::parse($dateStr);
         } catch (\Exception $e) {
-            $this->error("Invalid date format. Please use Y-m-d format.");
+            $this->error('Invalid date format. Please use Y-m-d format.');
+
             return 1;
         }
-        
+
         $this->info("Dispatching cache job for {$date->format('Y-m-d')}...");
-        
+
         CacheTillTransactions::dispatch($date, $clearExisting);
-        
-        $this->info("Cache job dispatched successfully!");
-        
+
+        $this->info('Cache job dispatched successfully!');
+
         return 0;
     }
 }

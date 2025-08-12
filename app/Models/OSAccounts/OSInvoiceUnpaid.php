@@ -11,10 +11,15 @@ use Illuminate\Database\Eloquent\Model;
 class OSInvoiceUnpaid extends Model
 {
     protected $connection = 'osaccounts';
+
     protected $table = 'INVOICES_UNPAID';
+
     protected $primaryKey = 'ID';
+
     protected $keyType = 'string';
+
     public $incrementing = false;
+
     public $timestamps = false;
 
     protected $fillable = [

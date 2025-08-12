@@ -147,7 +147,7 @@ class Invoice extends Model
     public function getVatBreakdown(): array
     {
         $breakdown = [];
-        
+
         if ($this->standard_net > 0 || $this->standard_vat > 0) {
             $breakdown[] = [
                 'code' => 'STANDARD',
@@ -157,7 +157,7 @@ class Invoice extends Model
                 'gross_amount' => $this->standard_net + $this->standard_vat,
             ];
         }
-        
+
         if ($this->reduced_net > 0 || $this->reduced_vat > 0) {
             $breakdown[] = [
                 'code' => 'REDUCED',
@@ -167,7 +167,7 @@ class Invoice extends Model
                 'gross_amount' => $this->reduced_net + $this->reduced_vat,
             ];
         }
-        
+
         if ($this->second_reduced_net > 0 || $this->second_reduced_vat > 0) {
             $breakdown[] = [
                 'code' => 'SECOND_REDUCED',
@@ -177,7 +177,7 @@ class Invoice extends Model
                 'gross_amount' => $this->second_reduced_net + $this->second_reduced_vat,
             ];
         }
-        
+
         if ($this->zero_net > 0) {
             $breakdown[] = [
                 'code' => 'ZERO',
@@ -187,7 +187,7 @@ class Invoice extends Model
                 'gross_amount' => $this->zero_net + $this->zero_vat,
             ];
         }
-        
+
         return $breakdown;
     }
 
@@ -236,7 +236,7 @@ class Invoice extends Model
      */
     public function canBeAssignedToVatReturn(): bool
     {
-        return is_null($this->vat_return_id) && 
+        return is_null($this->vat_return_id) &&
                in_array($this->payment_status, ['paid', 'pending', 'overdue']);
     }
 

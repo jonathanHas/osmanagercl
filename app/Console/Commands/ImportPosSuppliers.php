@@ -46,11 +46,11 @@ class ImportPosSuppliers extends Command
 
             // Get existing POS-linked suppliers if not forcing
             $existingCount = 0;
-            if (!$force) {
+            if (! $force) {
                 $existingCount = AccountingSupplier::where('is_pos_linked', true)->count();
                 if ($existingCount > 0) {
                     $this->warn("Found {$existingCount} existing POS-linked suppliers.");
-                    if (!$this->confirm('Continue anyway? (existing suppliers will be skipped)')) {
+                    if (! $this->confirm('Continue anyway? (existing suppliers will be skipped)')) {
                         return self::FAILURE;
                     }
                 }
@@ -59,9 +59,10 @@ class ImportPosSuppliers extends Command
             // Get POS suppliers
             $this->info('📡 Fetching suppliers from POS database...');
             $posSuppliers = Supplier::orderBy('SupplierID')->get();
-            
+
             if ($posSuppliers->isEmpty()) {
                 $this->warn('No suppliers found in POS database.');
+
                 return self::SUCCESS;
             }
 
@@ -85,7 +86,7 @@ class ImportPosSuppliers extends Command
                 foreach ($chunk as $posSupplier) {
                     try {
                         $result = $this->importSupplier($posSupplier, $dryRun, $force);
-                        
+
                         if ($result === 'processed') {
                             $processedCount++;
                         } elseif ($result === 'skipped') {
@@ -98,7 +99,7 @@ class ImportPosSuppliers extends Command
                             'error' => $e->getMessage(),
                         ]);
                     }
-                    
+
                     $bar->advance();
                 }
             }
@@ -112,11 +113,12 @@ class ImportPosSuppliers extends Command
             return self::SUCCESS;
 
         } catch (Throwable $e) {
-            $this->error('Import failed: ' . $e->getMessage());
+            $this->error('Import failed: '.$e->getMessage());
             Log::error('POS supplier import failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
             return self::FAILURE;
         }
     }
@@ -130,7 +132,7 @@ class ImportPosSuppliers extends Command
             DB::connection('pos')->getPdo();
             $this->info('✅ POS database connection successful');
         } catch (Throwable $e) {
-            throw new \Exception('Cannot connect to POS database: ' . $e->getMessage());
+            throw new \Exception('Cannot connect to POS database: '.$e->getMessage());
         }
     }
 
@@ -141,8 +143,8 @@ class ImportPosSuppliers extends Command
     {
         // Check if supplier already exists
         $existing = AccountingSupplier::where('external_pos_id', $posSupplier->SupplierID)->first();
-        
-        if ($existing && !$force) {
+
+        if ($existing && ! $force) {
             return 'skipped';
         }
 
@@ -167,6 +169,7 @@ class ImportPosSuppliers extends Command
         if ($dryRun) {
             // In dry run, just show what would be imported
             $this->line("Would import: {$supplierData['name']} (POS ID: {$posSupplier->SupplierID})");
+
             return 'processed';
         }
 
@@ -187,13 +190,13 @@ class ImportPosSuppliers extends Command
      */
     private function generateSupplierCode(string $posId, ?string $name): string
     {
-        $baseCode = 'POS-' . str_pad($posId, 3, '0', STR_PAD_LEFT);
-        
+        $baseCode = 'POS-'.str_pad($posId, 3, '0', STR_PAD_LEFT);
+
         // If name is available, try to incorporate it
         if ($name) {
             $nameCode = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $name), 0, 3));
             if ($nameCode) {
-                $baseCode = $nameCode . '-' . $posId;
+                $baseCode = $nameCode.'-'.$posId;
             }
         }
 
@@ -201,7 +204,7 @@ class ImportPosSuppliers extends Command
         $code = $baseCode;
         $counter = 1;
         while (AccountingSupplier::where('code', $code)->exists()) {
-            $code = $baseCode . '-' . $counter;
+            $code = $baseCode.'-'.$counter;
             $counter++;
         }
 
@@ -215,7 +218,7 @@ class ImportPosSuppliers extends Command
     {
         // Based on existing supplier integrations config, we can categorize known suppliers
         $knownProductSuppliers = [5, 44, 85, 37]; // Udea variants and Independent
-        
+
         if (in_array((int) $posSupplier->SupplierID, $knownProductSuppliers)) {
             return 'product';
         }
@@ -230,24 +233,24 @@ class ImportPosSuppliers extends Command
     private function buildNotesFromPosData(Supplier $posSupplier): ?string
     {
         $notes = [];
-        
+
         if ($posSupplier->PostCode) {
             $notes[] = "Post Code: {$posSupplier->PostCode}";
         }
-        
+
         if ($posSupplier->Country) {
             $notes[] = "Country: {$posSupplier->Country}";
         }
-        
+
         if ($posSupplier->Products) {
             $notes[] = "Products: {$posSupplier->Products}";
         }
-        
+
         if ($posSupplier->Supplier_Type_ID) {
             $notes[] = "POS Supplier Type ID: {$posSupplier->Supplier_Type_ID}";
         }
 
-        $notes[] = "Imported from POS database on " . now()->format('Y-m-d H:i:s');
+        $notes[] = 'Imported from POS database on '.now()->format('Y-m-d H:i:s');
 
         return implode("\n", $notes);
     }
@@ -257,11 +260,12 @@ class ImportPosSuppliers extends Command
      */
     private function cleanString(?string $value): ?string
     {
-        if (!$value) {
+        if (! $value) {
             return null;
         }
 
         $cleaned = trim($value);
+
         return $cleaned !== '' ? $cleaned : null;
     }
 
@@ -271,8 +275,8 @@ class ImportPosSuppliers extends Command
     private function cleanEmail(?string $email): ?string
     {
         $cleaned = $this->cleanString($email);
-        
-        if (!$cleaned) {
+
+        if (! $cleaned) {
             return null;
         }
 
@@ -292,7 +296,7 @@ class ImportPosSuppliers extends Command
 
         $this->table(['Metric', 'Count'], [
             ['Processed', $processed],
-            ['Skipped', $skipped], 
+            ['Skipped', $skipped],
             ['Errors', $errors],
             ['Total', $processed + $skipped + $errors],
         ]);
@@ -301,7 +305,7 @@ class ImportPosSuppliers extends Command
             $this->warn("⚠️  {$errors} errors occurred. Check the application logs for details.");
         }
 
-        if (!$dryRun && $processed > 0) {
+        if (! $dryRun && $processed > 0) {
             $this->info('🎉 Suppliers have been imported into the unified management system!');
             $this->info('💡 You can now manage these suppliers through the Laravel application.');
         }

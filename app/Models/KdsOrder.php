@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use App\Models\POS\Ticket;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Carbon\Carbon;
-use App\Models\POS\Ticket;
 
 class KdsOrder extends Model
 {
@@ -44,23 +44,25 @@ class KdsOrder extends Model
 
     public function getWaitingTimeAttribute(): ?int
     {
-        if (!$this->order_time) {
+        if (! $this->order_time) {
             return null;
         }
 
         $endTime = $this->completed_at ?? $this->ready_at ?? now();
+
         return $this->order_time->diffInSeconds($endTime);
     }
 
     public function getWaitingTimeFormattedAttribute(): string
     {
         $seconds = $this->waiting_time;
-        if (!$seconds) {
+        if (! $seconds) {
             return '0:00';
         }
 
         $minutes = floor($seconds / 60);
         $remainingSeconds = $seconds % 60;
+
         return sprintf('%d:%02d', $minutes, $remainingSeconds);
     }
 

@@ -37,6 +37,7 @@ class KdsOrderItem extends Model
         if ($this->quantity == intval($this->quantity)) {
             return intval($this->quantity);
         }
+
         return number_format($this->quantity, 3, '.', '');
     }
 

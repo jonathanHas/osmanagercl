@@ -48,7 +48,7 @@ class CashReconciliationPayment extends Model
         if ($this->supplier) {
             return $this->supplier->Supplier;
         }
-        
+
         return $this->payee_name ?? 'Unknown';
     }
 }

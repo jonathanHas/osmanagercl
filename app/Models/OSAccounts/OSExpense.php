@@ -3,8 +3,6 @@
 namespace App\Models\OSAccounts;
 
 use Illuminate\Database\Eloquent\Model;
-use App\Models\OSAccounts\OSSupplierType;
-use App\Models\OSAccounts\OSInvoice;
 
 /**
  * OSAccounts EXPENSES table model
@@ -13,10 +11,15 @@ use App\Models\OSAccounts\OSInvoice;
 class OSExpense extends Model
 {
     protected $connection = 'osaccounts';
+
     protected $table = 'EXPENSES';
+
     protected $primaryKey = 'ID';
+
     protected $keyType = 'string';
+
     public $incrementing = false;
+
     public $timestamps = false;
 
     protected $fillable = [

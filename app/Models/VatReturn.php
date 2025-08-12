@@ -4,8 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
 
 class VatReturn extends Model
@@ -154,9 +154,9 @@ class VatReturn extends Model
     /**
      * Finalize the VAT return.
      */
-    public function finalize(int $userId = null): void
+    public function finalize(?int $userId = null): void
     {
-        if (!$this->canBeModified()) {
+        if (! $this->canBeModified()) {
             throw new \Exception('VAT return cannot be modified once finalized.');
         }
 

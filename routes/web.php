@@ -72,7 +72,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/invoices/store-simple', [\App\Http\Controllers\InvoiceController::class, 'storeSimple'])->name('invoices.store-simple');
     Route::post('/invoices/vat-rate', [\App\Http\Controllers\InvoiceController::class, 'getVatRate'])->name('invoices.vat-rate');
     Route::post('/invoices/{invoice}/mark-paid', [\App\Http\Controllers\InvoiceController::class, 'markPaid'])->name('invoices.mark-paid');
-    
+
     // Invoice Attachments routes
     Route::prefix('invoices/{invoice}/attachments')->name('invoices.attachments.')->group(function () {
         Route::get('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'index'])->name('index');
@@ -86,9 +86,9 @@ Route::middleware('auth')->group(function () {
         Route::patch('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'update'])->name('update');
         Route::delete('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'destroy'])->name('destroy');
     });
-    
+
     Route::resource('invoices', \App\Http\Controllers\InvoiceController::class);
-    
+
     // VAT Rates Management
     Route::get('/vat-rates', [\App\Http\Controllers\VatRateController::class, 'index'])->name('vat-rates.index');
     Route::post('/vat-rates', [\App\Http\Controllers\VatRateController::class, 'store'])->name('vat-rates.store');
@@ -378,7 +378,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/refresh-cache', [\App\Http\Controllers\TillReviewController::class, 'refreshCache'])->name('refresh-cache');
         Route::get('/export', [\App\Http\Controllers\TillReviewController::class, 'export'])->name('export');
     });
-    
+
     // Cash Reconciliation routes
     Route::prefix('cash-reconciliation')->name('cash-reconciliation.')->middleware('permission:cash_reconciliation.view')->group(function () {
         Route::get('/', [\App\Http\Controllers\Management\CashReconciliationController::class, 'index'])->name('index');
@@ -397,13 +397,13 @@ Route::middleware('auth')->group(function () {
         // Financial Dashboard
         Route::get('/financial/dashboard', [\App\Http\Controllers\Management\FinancialDashboardController::class, 'index'])
             ->name('financial.dashboard');
-        
+
         // VAT Dashboard
         Route::prefix('vat-dashboard')->name('vat-dashboard.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Management\VatDashboardController::class, 'index'])->name('index');
             Route::get('/history', [\App\Http\Controllers\Management\VatDashboardController::class, 'history'])->name('history');
         });
-        
+
         // VAT Returns Management
         Route::prefix('vat-returns')->name('vat-returns.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Management\VatReturnController::class, 'index'])->name('index');
@@ -414,6 +414,25 @@ Route::middleware('auth')->group(function () {
             Route::get('/{vatReturn}/export', [\App\Http\Controllers\Management\VatReturnController::class, 'export'])->name('export');
             Route::delete('/{vatReturn}/invoices/{invoice}', [\App\Http\Controllers\Management\VatReturnController::class, 'removeInvoice'])->name('remove-invoice');
             Route::delete('/{vatReturn}', [\App\Http\Controllers\Management\VatReturnController::class, 'destroy'])->name('destroy');
+        });
+
+        // Sales Accounting Reports
+        Route::prefix('sales-accounting')->name('sales-accounting.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Management\SalesAccountingReportController::class, 'index'])->name('index');
+            Route::get('/export-csv', [\App\Http\Controllers\Management\SalesAccountingReportController::class, 'exportCsv'])->name('export-csv');
+        });
+
+        // OSAccounts Import Management
+        Route::prefix('osaccounts-import')->name('osaccounts-import.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'index'])->name('index');
+            Route::get('/validate-connection', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'validateConnection'])->name('validate-connection');
+            Route::get('/check-supplier-mapping', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'checkSupplierMapping'])->name('check-supplier-mapping');
+            Route::post('/sync-suppliers', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'syncSuppliers'])->name('sync-suppliers');
+            Route::post('/import-invoices', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'importInvoices'])->name('import-invoices');
+            Route::post('/import-vat-lines', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'importVatLines'])->name('import-vat-lines');
+            Route::post('/import-attachments', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'importAttachments'])->name('import-attachments');
+            Route::get('/stats', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'getImportStats'])->name('stats');
+            Route::get('/test-stream', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'testStream'])->name('test-stream');
         });
     });
 });

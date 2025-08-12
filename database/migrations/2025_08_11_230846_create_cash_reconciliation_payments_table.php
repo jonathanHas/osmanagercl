@@ -21,7 +21,7 @@ return new class extends Migration
             $table->integer('sequence')->default(0);
             $table->text('description')->nullable();
             $table->timestamps();
-            
+
             // Indexes
             $table->index(['cash_reconciliation_id', 'sequence'], 'cr_payments_reconciliation_seq');
         });

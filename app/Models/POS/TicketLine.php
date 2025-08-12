@@ -9,10 +9,15 @@ use Illuminate\Database\Eloquent\Model;
 class TicketLine extends Model
 {
     protected $connection = 'pos';
+
     protected $table = 'TICKETLINES';
+
     protected $primaryKey = 'TICKET';
+
     public $incrementing = false;
+
     protected $keyType = 'string';
+
     public $timestamps = false;
 
     protected $fillable = [];

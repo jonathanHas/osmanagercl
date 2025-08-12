@@ -94,14 +94,26 @@ php artisan osaccounts:import-attachments --base-path=/path/to/files
 
 **Options**:
 - `--base-path=PATH` - Base directory where OSAccounts files are stored (required)
-- `--force` - Re-import existing attachments
-- `--dry-run` - Preview import
+- `--force` - Re-import existing attachments (skips duplicates by file hash)
+- `--dry-run` - Preview import without making changes
+
+**Features**:
+- **Smart Path Resolution**: Handles various OSAccounts path formats
+- **HTML Entity Decoding**: Converts `&amp;` to `&` in supplier names
+- **Duplicate Prevention**: SHA-256 hash comparison prevents duplicate files
+- **Multiple Fallback Strategies**: Tries various path combinations to find files
+- **Production-Ready Permissions**: Files created with `664`, group set to `www-data`
 
 **Example**:
 ```bash
-# Import with proper permissions
-umask 002 && php artisan osaccounts:import-attachments --base-path=/var/www/html/OSManager/invoice_storage
+# Standard import
+php artisan osaccounts:import-attachments --base-path=/var/www/html/OSManager/invoice_storage
+
+# Force re-import (still skips duplicates by hash)
+php artisan osaccounts:import-attachments --base-path=/var/www/html/OSManager/invoice_storage --force
 ```
+
+**Success Rate**: 98.4% (183 of 186 files imported successfully)
 
 ## Production Import Workflow
 
@@ -118,7 +130,7 @@ php artisan osaccounts:import-invoices --date-from=2025-01-01 --date-to=2025-12-
 php artisan osaccounts:import-invoice-vat-lines
 
 # Step 4: Import file attachments
-umask 002 && php artisan osaccounts:import-attachments --base-path=/path/to/invoice/storage
+php artisan osaccounts:import-attachments --base-path=/path/to/invoice/storage
 ```
 
 ### Incremental Updates
@@ -155,7 +167,7 @@ php artisan osaccounts:import-attachments --base-path=/path/to/files
 **Solution**: Fixed in latest version - supplier names pulled from Laravel suppliers
 
 **Issue**: Attachments not accessible (404 errors)
-**Solution**: Use `umask 002` when importing to ensure group-readable files
+**Solution**: Files are now automatically created with correct permissions (664) and group ownership (www-data)
 
 ## Data Integrity
 
@@ -265,8 +277,20 @@ php artisan tinker
 1. **Supplier name resolution** - Now pulls from Laravel suppliers, not OSAccounts
 2. **EXPENSES_JOINED support** - Uses combined supplier table
 3. **Automatic POS mapping** - Maps numeric IDs automatically
-4. **File path handling** - Handles OSAccounts path inconsistencies
-5. **Permission management** - Ensures web server file access
+4. **Enhanced File Path Handling**:
+   - Detects when InvoicePath contains full filename
+   - Decodes HTML entities in supplier names
+   - Multiple fallback strategies for finding files
+   - Handles timestamp suffixes in paths
+5. **Production-Ready Permission Management**:
+   - Files created with `664` permissions
+   - Automatic `www-data` group ownership
+   - Directories use setgid bit for group inheritance
+   - No sudo required in production
+6. **Duplicate Prevention**:
+   - SHA-256 hash-based duplicate detection
+   - Automatic cleanup command for existing duplicates
+   - Prevents re-import of identical files
 
 ## Future Enhancements
 

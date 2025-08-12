@@ -14,7 +14,7 @@ return new class extends Migration
             $table->text('value')->nullable();
             $table->timestamps();
         });
-        
+
         // Insert default setting
         \DB::table('kds_settings')->insert([
             'key' => 'last_clear_time',

@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\KdsOrder;
 use App\Jobs\MonitorCoffeeOrdersJob;
-use Illuminate\Http\Request;
+use App\Models\KdsOrder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class KdsController extends Controller
@@ -18,7 +18,7 @@ class KdsController extends Controller
             ->today()
             ->orderBy('order_time', 'asc')
             ->get();
-            
+
         // Get recently completed orders (last 30 minutes)
         $completedOrders = KdsOrder::with('items')
             ->whereIn('status', ['completed'])
@@ -29,7 +29,7 @@ class KdsController extends Controller
 
         // Check system status - simplified for real-time polling
         $lastProcessedOrder = KdsOrder::orderBy('created_at', 'desc')->first();
-        
+
         // Test POS database connection
         $posConnected = false;
         try {
@@ -38,7 +38,7 @@ class KdsController extends Controller
         } catch (\Exception $e) {
             $posConnected = false;
         }
-        
+
         $systemStatus = [
             'pos_connected' => $posConnected,
             'last_order' => $lastProcessedOrder ? $lastProcessedOrder->created_at->diffForHumans() : 'No orders yet',
@@ -75,7 +75,7 @@ class KdsController extends Controller
                     'customer_info' => $order->customer_info,
                 ];
             });
-            
+
         $completedOrders = KdsOrder::with('items')
             ->whereIn('status', ['completed'])
             ->where('completed_at', '>=', now()->subMinutes(30))
@@ -101,14 +101,14 @@ class KdsController extends Controller
 
         return response()->json([
             'active' => $activeOrders,
-            'completed' => $completedOrders
+            'completed' => $completedOrders,
         ]);
     }
 
     public function updateStatus(Request $request, KdsOrder $kdsOrder): JsonResponse
     {
         $request->validate([
-            'status' => 'required|in:new,viewed,preparing,ready,completed,cancelled'
+            'status' => 'required|in:new,viewed,preparing,ready,completed,cancelled',
         ]);
 
         $status = $request->input('status');
@@ -148,7 +148,7 @@ class KdsController extends Controller
                 'id' => $kdsOrder->id,
                 'status' => $kdsOrder->status,
                 'waiting_time' => $kdsOrder->waiting_time_formatted,
-            ]
+            ],
         ]);
     }
 
@@ -156,7 +156,7 @@ class KdsController extends Controller
     {
         return response()->stream(function () {
             $lastMonitorCheck = now();
-            
+
             while (true) {
                 // Check for new or updated orders
                 $orders = KdsOrder::with('items')
@@ -206,7 +206,7 @@ class KdsController extends Controller
                                 ];
                             })->toArray(),
                         ];
-                    })->toArray()
+                    })->toArray(),
                 ]);
 
                 echo "data: {$data}\n\n";
@@ -237,7 +237,7 @@ class KdsController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Checking for new orders'
+            'message' => 'Checking for new orders',
         ]);
     }
 
@@ -246,24 +246,24 @@ class KdsController extends Controller
         try {
             // Delete completed and cancelled orders older than 1 hour
             $deleted = KdsOrder::whereIn('status', ['completed', 'cancelled'])
-                ->where(function($query) {
+                ->where(function ($query) {
                     $query->where('completed_at', '<', now()->subHour())
-                          ->orWhere('updated_at', '<', now()->subHour());
+                        ->orWhere('updated_at', '<', now()->subHour());
                 })
                 ->delete();
 
             return response()->json([
                 'success' => true,
-                'message' => "Cleared {$deleted} completed orders"
+                'message' => "Cleared {$deleted} completed orders",
             ]);
         } catch (\Exception $e) {
             \Log::error('Failed to clear completed KDS orders', [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
-            
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to clear completed orders: ' . $e->getMessage()
+                'message' => 'Failed to clear completed orders: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -274,38 +274,38 @@ class KdsController extends Controller
         try {
             // Count active orders before marking as completed
             $count = KdsOrder::whereNotIn('status', ['completed', 'cancelled'])->count();
-            
+
             // Mark all non-completed orders as completed
             $updated = KdsOrder::whereNotIn('status', ['completed', 'cancelled'])
                 ->update([
                     'status' => 'completed',
                     'completed_at' => now(),
-                    'updated_at' => now()
+                    'updated_at' => now(),
                 ]);
-            
+
             \Log::info('KDS Clear All: Marked all orders as completed', [
                 'count' => $updated,
-                'completed_time' => now()->toDateTimeString()
+                'completed_time' => now()->toDateTimeString(),
             ]);
-            
+
             return response()->json([
                 'success' => true,
                 'message' => "Completed {$updated} orders",
                 'debug' => [
                     'completed_count' => $updated,
                     'completed_time' => now()->toDateTimeString(),
-                    'info' => 'All active orders marked as completed'
-                ]
+                    'info' => 'All active orders marked as completed',
+                ],
             ]);
         } catch (\Exception $e) {
             \Log::error('Failed to clear KDS orders', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to clear orders: ' . $e->getMessage()
+                'message' => 'Failed to clear orders: '.$e->getMessage(),
             ], 500);
         }
     }

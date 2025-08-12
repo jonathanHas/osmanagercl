@@ -14,7 +14,7 @@ class CashReconciliationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Run seeders
         $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
     }
@@ -32,7 +32,7 @@ class CashReconciliationTest extends TestCase
         $admin->roles()->attach($adminRole);
 
         $response = $this->actingAs($admin)->get('/cash-reconciliation');
-        
+
         // Will show error about no closed cash, but page loads
         $response->assertStatus(200);
         $response->assertSee('Cash Reconciliation');
@@ -45,7 +45,7 @@ class CashReconciliationTest extends TestCase
         $manager->roles()->attach($managerRole);
 
         $response = $this->actingAs($manager)->get('/cash-reconciliation');
-        
+
         // Will show error about no closed cash, but page loads
         $response->assertStatus(200);
         $response->assertSee('Cash Reconciliation');
@@ -58,7 +58,7 @@ class CashReconciliationTest extends TestCase
         $employee->roles()->attach($employeeRole);
 
         $response = $this->actingAs($employee)->get('/cash-reconciliation');
-        
+
         // Should be forbidden or redirected
         $response->assertStatus(403);
     }

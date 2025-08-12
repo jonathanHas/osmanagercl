@@ -85,10 +85,10 @@ class InvoiceItem extends Model
     {
         // Calculate net amount
         $this->net_amount = round($this->quantity * $this->unit_price, 2);
-        
+
         // Calculate VAT amount
         $this->vat_amount = round($this->net_amount * $this->vat_rate, 2);
-        
+
         // Calculate gross amount
         $this->gross_amount = $this->net_amount + $this->vat_amount;
     }
@@ -98,16 +98,16 @@ class InvoiceItem extends Model
      */
     public function getFormattedVatRateAttribute(): string
     {
-        return number_format($this->vat_rate * 100, 1) . '%';
+        return number_format($this->vat_rate * 100, 1).'%';
     }
 
     /**
      * Set VAT rate from code.
      */
-    public function setVatFromCode(string $code, \Carbon\Carbon $date = null): void
+    public function setVatFromCode(string $code, ?\Carbon\Carbon $date = null): void
     {
         $date = $date ?? now();
-        
+
         $vatRate = VatRate::where('code', $code)
             ->where('effective_from', '<=', $date)
             ->where(function ($query) use ($date) {

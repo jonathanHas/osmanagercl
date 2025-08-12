@@ -25,23 +25,23 @@ class TillReviewController extends Controller
     {
         // Get date from request, URL parameter, or default to today
         $date = $request->input('date') ?? $request->get('date') ?? now()->format('Y-m-d');
-        
+
         try {
             $selectedDate = Carbon::parse($date);
         } catch (\Exception $e) {
             // If date parsing fails, default to today
             $selectedDate = now();
         }
-        
+
         // Log audit
         $this->logAudit($selectedDate, $request->all());
-        
+
         // Get transactions first to ensure cache is populated
         $transactions = $this->repository->getTransactionsForDate($selectedDate);
-        
+
         // Get summary for the date
         $summary = $this->repository->getDailySummary($selectedDate);
-        
+
         // Debug logging
         \Log::info('Till Review Index Debug', [
             'date' => $selectedDate->format('Y-m-d'),
@@ -50,11 +50,11 @@ class TillReviewController extends Controller
             'summary_total_transactions' => $summary->total_transactions ?? 'null',
             'summary_exists' => $summary ? 'yes' : 'no',
         ]);
-        
+
         // Get available filters
         $terminals = $this->repository->getTerminals();
         $cashiers = $this->repository->getCashiers();
-        
+
         return view('till-review.index', compact(
             'selectedDate',
             'summary',
@@ -71,15 +71,15 @@ class TillReviewController extends Controller
         $request->validate([
             'date' => 'required|date',
         ]);
-        
+
         $date = Carbon::parse($request->input('date'));
-        
+
         // Ensure transactions are cached first
         $transactions = $this->repository->getTransactionsForDate($date);
-        
+
         // Get summary
         $summary = $this->repository->getDailySummary($date);
-        
+
         return response()->json([
             'date' => $date->format('Y-m-d'),
             'summary' => [
@@ -92,7 +92,7 @@ class TillReviewController extends Controller
                 'debt_total' => $summary->debt_total ?? 0,
                 'drawer_opens' => $summary->drawer_opens ?? 0,
                 'voided_items_count' => $summary->voided_items_count ?? 0,
-            ]
+            ],
         ]);
     }
 
@@ -113,20 +113,20 @@ class TillReviewController extends Controller
             'max_amount' => 'nullable|numeric|min:0',
             'payment_type' => 'nullable|in:cash,magcard,free,debt',
         ]);
-        
+
         $date = Carbon::parse($request->input('date'));
         $filters = $request->only([
-            'type', 'terminal', 'cashier', 'time_from', 
-            'time_to', 'search', 'min_amount', 'max_amount', 'payment_type'
+            'type', 'terminal', 'cashier', 'time_from',
+            'time_to', 'search', 'min_amount', 'max_amount', 'payment_type',
         ]);
-        
+
         // Get transactions
         $transactions = $this->repository->getTransactionsForDate($date, $filters);
-        
+
         // Format for display
         $formatted = $transactions->map(function ($item) {
             $data = is_array($item) ? $item : $item->transaction_data;
-            
+
             return [
                 'time' => Carbon::parse($data['transaction_time'])->setTimezone(config('app.timezone'))->format('H:i:s'),
                 'type' => $data['transaction_type'],
@@ -137,7 +137,7 @@ class TillReviewController extends Controller
                 'details' => $data,
             ];
         });
-        
+
         return response()->json([
             'transactions' => $formatted,
             'count' => $formatted->count(),
@@ -152,15 +152,15 @@ class TillReviewController extends Controller
         $request->validate([
             'date' => 'required|date',
         ]);
-        
+
         $date = Carbon::parse($request->input('date'));
-        
+
         // Clear existing cache
         $this->repository->clearCache($date);
-        
+
         // Re-fetch and cache
         $transactions = $this->repository->getTransactionsForDate($date);
-        
+
         return response()->json([
             'success' => true,
             'message' => 'Cache refreshed successfully',
@@ -177,17 +177,17 @@ class TillReviewController extends Controller
             'date' => 'required|date',
             'format' => 'required|in:csv,pdf',
         ]);
-        
+
         $date = Carbon::parse($request->input('date'));
         $format = $request->input('format');
-        
+
         $transactions = $this->repository->getTransactionsForDate($date);
         $summary = $this->repository->getDailySummary($date);
-        
+
         if ($format === 'csv') {
             return $this->exportCSV($transactions, $summary, $date);
         }
-        
+
         // PDF export would require additional package like dompdf
         return response()->json(['error' => 'PDF export not yet implemented'], 501);
     }
@@ -197,20 +197,20 @@ class TillReviewController extends Controller
      */
     private function exportCSV($transactions, $summary, Carbon $date)
     {
-        $filename = 'till-review-' . $date->format('Y-m-d') . '.csv';
-        
+        $filename = 'till-review-'.$date->format('Y-m-d').'.csv';
+
         $headers = [
             'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ];
-        
+
         $callback = function () use ($transactions, $summary, $date) {
             $file = fopen('php://output', 'w');
-            
+
             // Header
-            fputcsv($file, ['Till Review Report - ' . $date->format('Y-m-d')]);
+            fputcsv($file, ['Till Review Report - '.$date->format('Y-m-d')]);
             fputcsv($file, []);
-            
+
             // Summary
             fputcsv($file, ['Summary']);
             fputcsv($file, ['Total Sales', number_format($summary->total_sales, 2)]);
@@ -220,14 +220,14 @@ class TillReviewController extends Controller
             fputcsv($file, ['Drawer Opens', $summary->drawer_opens]);
             fputcsv($file, ['Voided Items', $summary->voided_items_count]);
             fputcsv($file, []);
-            
+
             // Transactions header
             fputcsv($file, ['Time', 'Type', 'Description', 'Amount', 'Terminal', 'Cashier']);
-            
+
             // Transactions data
             foreach ($transactions as $transaction) {
                 $data = is_array($transaction) ? $transaction : $transaction->transaction_data;
-                
+
                 fputcsv($file, [
                     Carbon::parse($data['transaction_time'])->setTimezone(config('app.timezone'))->format('H:i:s'),
                     $data['transaction_type'],
@@ -237,10 +237,10 @@ class TillReviewController extends Controller
                     $data['cashier'] ?? '',
                 ]);
             }
-            
+
             fclose($file);
         };
-        
+
         return Response::stream($callback, 200, $headers);
     }
 
@@ -286,19 +286,20 @@ class TillReviewController extends Controller
                 if ($customer) {
                     $desc .= " - Customer: {$customer}";
                 }
+
                 return $desc;
-                
+
             case 'drawer':
                 return "Drawer: {$data['action']}";
-                
+
             case 'removed':
                 return "Voided: {$data['product_name']} x {$data['units']}";
-                
+
             case 'card':
-                return "Card Transaction";
-                
+                return 'Card Transaction';
+
             default:
-                return "Transaction";
+                return 'Transaction';
         }
     }
 

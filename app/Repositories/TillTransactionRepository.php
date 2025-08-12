@@ -7,14 +7,12 @@ use App\Models\POS\DrawerOpened;
 use App\Models\POS\LineRemoved;
 use App\Models\POS\Payment;
 use App\Models\POS\Receipt;
-use App\Models\POS\Ticket;
 use App\Models\TillReviewCache;
 use App\Models\TillReviewSummary;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class TillTransactionRepository
 {
@@ -24,17 +22,17 @@ class TillTransactionRepository
     public function getTransactionsForDate(Carbon $date, array $filters = []): Collection
     {
         $dateStr = $date->format('Y-m-d');
-        
+
         // Try to get from cache first
         $cached = $this->getCachedTransactions($dateStr, $filters);
         if ($cached && $cached->isNotEmpty()) {
             return $cached;
         }
-        
+
         // If not cached, fetch from POS and cache it
         $transactions = $this->fetchFromPOS($date);
         $this->cacheTransactions($transactions, $dateStr);
-        
+
         return $this->applyFilters($transactions, $filters);
     }
 
@@ -44,32 +42,32 @@ class TillTransactionRepository
     private function getCachedTransactions(string $date, array $filters): ?Collection
     {
         $query = TillReviewCache::where('transaction_date', $date);
-        
-        if (!empty($filters['type'])) {
+
+        if (! empty($filters['type'])) {
             $query->where('transaction_type', $filters['type']);
         }
-        
-        if (!empty($filters['terminal'])) {
+
+        if (! empty($filters['terminal'])) {
             $query->where('terminal', $filters['terminal']);
         }
-        
-        if (!empty($filters['cashier'])) {
+
+        if (! empty($filters['cashier'])) {
             $query->where('cashier', $filters['cashier']);
         }
-        
-        if (!empty($filters['time_from'])) {
-            $query->where('transaction_time', '>=', $date . ' ' . $filters['time_from']);
+
+        if (! empty($filters['time_from'])) {
+            $query->where('transaction_time', '>=', $date.' '.$filters['time_from']);
         }
-        
-        if (!empty($filters['time_to'])) {
-            $query->where('transaction_time', '<=', $date . ' ' . $filters['time_to']);
+
+        if (! empty($filters['time_to'])) {
+            $query->where('transaction_time', '<=', $date.' '.$filters['time_to']);
         }
-        
+
         // Filter by payment type using JSON search
-        if (!empty($filters['payment_type'])) {
+        if (! empty($filters['payment_type'])) {
             $query->whereJsonContains('transaction_data->payment_type', $filters['payment_type']);
         }
-        
+
         return $query->orderBy('transaction_time')->get();
     }
 
@@ -80,25 +78,25 @@ class TillTransactionRepository
     {
         $transactions = collect();
         $dateStr = $date->format('Y-m-d');
-        
+
         // Fetch receipts with all related data
         $receipts = $this->fetchReceipts($dateStr);
         foreach ($receipts as $receipt) {
             $transactions->push($this->formatReceipt($receipt));
         }
-        
+
         // Fetch line removed events
         $removedLines = $this->fetchRemovedLines($dateStr);
         foreach ($removedLines as $removed) {
             $transactions->push($this->formatRemovedLine($removed));
         }
-        
+
         // Fetch drawer opened events
         $drawerEvents = $this->fetchDrawerEvents($dateStr);
         foreach ($drawerEvents as $drawer) {
             $transactions->push($this->formatDrawerEvent($drawer));
         }
-        
+
         // Sort by time
         return $transactions->sortBy('transaction_time')->values();
     }
@@ -114,10 +112,10 @@ class TillTransactionRepository
             'ticket.person',
             'ticket.customer',
             'payments',
-            'closedCash'
+            'closedCash',
         ])
-        ->whereDate('DATENEW', $date)
-        ->get();
+            ->whereDate('DATENEW', $date)
+            ->get();
     }
 
     /**
@@ -127,13 +125,13 @@ class TillTransactionRepository
     {
         $ticket = $receipt->ticket;
         $payment = $receipt->payments->first();
-        
+
         $lines = [];
         if ($ticket && $ticket->ticketLines) {
             foreach ($ticket->ticketLines as $line) {
                 $tax = $line->tax ? $line->tax->RATE : 0;
                 $lineTotal = ($line->PRICE * $line->UNITS) * (1 + $tax);
-                
+
                 $lines[] = [
                     'line' => $line->LINE,
                     'product' => $line->product ? $line->product->NAME : 'Unknown',
@@ -145,7 +143,7 @@ class TillTransactionRepository
                 ];
             }
         }
-        
+
         return [
             'transaction_time' => $receipt->DATENEW,
             'transaction_type' => 'receipt',
@@ -218,7 +216,7 @@ class TillTransactionRepository
     {
         // Clear existing cache for this date
         TillReviewCache::where('transaction_date', $date)->delete();
-        
+
         foreach ($transactions as $transaction) {
             TillReviewCache::create([
                 'transaction_date' => $date,
@@ -240,37 +238,41 @@ class TillTransactionRepository
      */
     private function applyFilters(Collection $transactions, array $filters): Collection
     {
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $search = strtolower($filters['search']);
             $transactions = $transactions->filter(function ($item) use ($search) {
                 $data = is_array($item) ? $item : $item->transaction_data;
                 $searchable = json_encode($data);
+
                 return str_contains(strtolower($searchable), $search);
             });
         }
-        
-        if (!empty($filters['min_amount'])) {
+
+        if (! empty($filters['min_amount'])) {
             $transactions = $transactions->filter(function ($item) use ($filters) {
                 $amount = is_array($item) ? ($item['amount'] ?? 0) : $item->amount;
+
                 return $amount >= $filters['min_amount'];
             });
         }
-        
-        if (!empty($filters['max_amount'])) {
+
+        if (! empty($filters['max_amount'])) {
             $transactions = $transactions->filter(function ($item) use ($filters) {
                 $amount = is_array($item) ? ($item['amount'] ?? 0) : $item->amount;
+
                 return $amount <= $filters['max_amount'];
             });
         }
-        
-        if (!empty($filters['payment_type'])) {
+
+        if (! empty($filters['payment_type'])) {
             $transactions = $transactions->filter(function ($item) use ($filters) {
                 $data = is_array($item) ? $item : $item->transaction_data;
                 $paymentType = $data['payment_type'] ?? null;
+
                 return $paymentType === $filters['payment_type'];
             });
         }
-        
+
         return $transactions;
     }
 
@@ -280,15 +282,15 @@ class TillTransactionRepository
     public function getDailySummary(Carbon $date): TillReviewSummary
     {
         $dateStr = $date->format('Y-m-d');
-        
+
         // Check if summary exists and looks valid
         $summary = TillReviewSummary::where('summary_date', $dateStr)->first();
-        
+
         // Get actual transaction count to validate summary
         $actualTransactionCount = TillReviewCache::where('transaction_date', $dateStr)
             ->where('transaction_type', 'receipt')
             ->count();
-            
+
         // If no cached transactions, get from POS to check
         if ($actualTransactionCount === 0) {
             $posTransactionCount = Receipt::whereDate('DATENEW', $dateStr)->count();
@@ -297,20 +299,21 @@ class TillTransactionRepository
                 if ($summary) {
                     $summary->delete();
                 }
+
                 return $this->generateDailySummary($date);
             }
         }
-        
+
         // If summary exists and transaction counts match, return it
         if ($summary && $summary->total_transactions === $actualTransactionCount) {
             return $summary;
         }
-        
+
         // Delete invalid summary and regenerate
         if ($summary) {
             $summary->delete();
         }
-        
+
         // Generate fresh summary
         return $this->generateDailySummary($date);
     }
@@ -322,7 +325,7 @@ class TillTransactionRepository
     {
         $dateStr = $date->format('Y-m-d');
         $transactions = $this->getTransactionsForDate($date);
-        
+
         $summary = [
             'summary_date' => $dateStr,
             'total_sales' => 0,
@@ -341,16 +344,16 @@ class TillTransactionRepository
             'terminal_breakdown' => [],
             'cashier_breakdown' => [],
         ];
-        
+
         foreach ($transactions as $transaction) {
             $data = is_array($transaction) ? $transaction : $transaction->transaction_data;
-            
+
             switch ($data['transaction_type']) {
                 case 'receipt':
                     $summary['total_transactions']++;
                     $amount = floatval($data['amount'] ?? 0);
                     $summary['total_sales'] += $amount;
-                    
+
                     if (($data['payment_type'] ?? '') == 'cash') {
                         $summary['cash_total'] += $amount;
                     } elseif (($data['payment_type'] ?? '') == 'magcard') {
@@ -362,47 +365,47 @@ class TillTransactionRepository
                     } else {
                         $summary['other_total'] += $amount;
                     }
-                    
+
                     // Track by hour
                     $hour = Carbon::parse($data['transaction_time'])->setTimezone(config('app.timezone'))->format('H');
-                    if (!isset($summary['hourly_breakdown'][$hour])) {
+                    if (! isset($summary['hourly_breakdown'][$hour])) {
                         $summary['hourly_breakdown'][$hour] = ['count' => 0, 'total' => 0];
                     }
                     $summary['hourly_breakdown'][$hour]['count']++;
                     $summary['hourly_breakdown'][$hour]['total'] += $amount;
-                    
+
                     // Track by terminal
-                    if (!empty($data['terminal'])) {
-                        if (!isset($summary['terminal_breakdown'][$data['terminal']])) {
+                    if (! empty($data['terminal'])) {
+                        if (! isset($summary['terminal_breakdown'][$data['terminal']])) {
                             $summary['terminal_breakdown'][$data['terminal']] = ['count' => 0, 'total' => 0];
                         }
                         $summary['terminal_breakdown'][$data['terminal']]['count']++;
                         $summary['terminal_breakdown'][$data['terminal']]['total'] += $amount;
                     }
-                    
+
                     // Track by cashier
-                    if (!empty($data['cashier'])) {
-                        if (!isset($summary['cashier_breakdown'][$data['cashier']])) {
+                    if (! empty($data['cashier'])) {
+                        if (! isset($summary['cashier_breakdown'][$data['cashier']])) {
                             $summary['cashier_breakdown'][$data['cashier']] = ['count' => 0, 'total' => 0];
                         }
                         $summary['cashier_breakdown'][$data['cashier']]['count']++;
                         $summary['cashier_breakdown'][$data['cashier']]['total'] += $amount;
                     }
                     break;
-                    
+
                 case 'drawer':
                     $summary['drawer_opens']++;
                     if (($data['action'] ?? '') == 'No Sale') {
                         $summary['no_sales']++;
                     }
                     break;
-                    
+
                 case 'removed':
                     $summary['voided_items_count']++;
                     break;
             }
         }
-        
+
         return TillReviewSummary::create($summary);
     }
 
@@ -425,14 +428,14 @@ class TillTransactionRepository
         $terminals = TillReviewCache::distinct('terminal')
             ->whereNotNull('terminal')
             ->pluck('terminal');
-            
+
         // If cache is empty, get from POS database
         if ($terminals->isEmpty()) {
             $terminals = ClosedCash::distinct('HOST')
                 ->whereNotNull('HOST')
                 ->pluck('HOST');
         }
-        
+
         return $terminals;
     }
 
@@ -445,7 +448,7 @@ class TillTransactionRepository
         $cashiers = TillReviewCache::distinct('cashier')
             ->whereNotNull('cashier')
             ->pluck('cashier');
-            
+
         // If cache is empty, get from POS database
         if ($cashiers->isEmpty()) {
             $cashiers = DB::connection('pos')
@@ -454,7 +457,7 @@ class TillTransactionRepository
                 ->whereNotNull('NAME')
                 ->pluck('NAME');
         }
-        
+
         return $cashiers;
     }
 }

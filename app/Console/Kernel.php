@@ -25,7 +25,7 @@ class Kernel extends ConsoleKernel
             ->at('05:00')
             ->onOneServer()
             ->withoutOverlapping(60);
-            
+
         // Monitor for new coffee orders every 10 seconds
         // This ensures orders are detected even when no one has the KDS page open
         $schedule->command('kds:monitor')

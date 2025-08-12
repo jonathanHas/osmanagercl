@@ -2,10 +2,9 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
 use App\Models\AccountingSupplier;
+use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class SyncOSAccountsSupplierMapping extends Command
 {
@@ -38,10 +37,10 @@ class SyncOSAccountsSupplierMapping extends Command
     public function handle()
     {
         $this->info('🔗 Starting OSAccounts supplier mapping sync...');
-        
+
         $isDryRun = $this->option('dry-run');
         $verbose = $this->option('detailed');
-        
+
         if ($isDryRun) {
             $this->warn('🔍 DRY RUN MODE - No changes will be made');
         }
@@ -50,7 +49,7 @@ class SyncOSAccountsSupplierMapping extends Command
             // Get all suppliers with POS IDs
             $suppliersWithPosId = AccountingSupplier::whereNotNull('external_pos_id')
                 ->get();
-            
+
             $this->info("📋 Found {$suppliersWithPosId->count()} suppliers with POS IDs");
 
             $bar = $this->output->createProgressBar($suppliersWithPosId->count());
@@ -58,7 +57,7 @@ class SyncOSAccountsSupplierMapping extends Command
 
             foreach ($suppliersWithPosId as $supplier) {
                 $this->stats['total']++;
-                
+
                 // Check if OSAccounts ID is already set and matches POS ID
                 if ($supplier->external_osaccounts_id == $supplier->external_pos_id) {
                     $this->stats['already_mapped']++;
@@ -71,16 +70,16 @@ class SyncOSAccountsSupplierMapping extends Command
                         ->table('EXPENSES_JOINED')
                         ->where('ID', $supplier->external_pos_id)
                         ->first();
-                    
+
                     if ($osSupplier) {
-                        if (!$isDryRun) {
+                        if (! $isDryRun) {
                             $supplier->external_osaccounts_id = $supplier->external_pos_id;
                             $supplier->is_osaccounts_linked = 1;
                             $supplier->save();
                         }
-                        
+
                         $this->stats['updated']++;
-                        
+
                         if ($verbose) {
                             $this->line("\n📝 {$supplier->name}: Set OSAccounts ID to {$supplier->external_pos_id}");
                         }
@@ -91,37 +90,38 @@ class SyncOSAccountsSupplierMapping extends Command
                         }
                     }
                 }
-                
+
                 $bar->advance();
             }
-            
+
             $bar->finish();
             $this->newLine();
-            
+
             // Also check for UUID-based suppliers
             $this->info("\n🔍 Checking UUID-based suppliers...");
-            
+
             $uuidSuppliers = AccountingSupplier::where('external_osaccounts_id', 'LIKE', '%-%-%-%-%')
                 ->whereNull('external_pos_id')
                 ->get();
-                
+
             if ($uuidSuppliers->count() > 0) {
                 $this->info("Found {$uuidSuppliers->count()} UUID-based suppliers (already correctly mapped)");
                 $this->stats['already_mapped'] += $uuidSuppliers->count();
             }
-            
+
             // Display results
             $this->displayResults($isDryRun);
-            
-            if (!$isDryRun && $this->stats['updated'] > 0) {
+
+            if (! $isDryRun && $this->stats['updated'] > 0) {
                 $this->info('🎉 Supplier mapping sync completed successfully!');
                 $this->comment('💡 You can now run osaccounts:import-invoices with proper supplier mapping');
             }
-            
+
             return 0;
-            
+
         } catch (\Exception $e) {
-            $this->error('❌ Sync failed: ' . $e->getMessage());
+            $this->error('❌ Sync failed: '.$e->getMessage());
+
             return 1;
         }
     }
@@ -142,7 +142,7 @@ class SyncOSAccountsSupplierMapping extends Command
                 ['Not Found in OSAccounts', $this->stats['not_found']],
             ]
         );
-        
+
         if ($this->stats['not_found'] > 0) {
             $this->warn("⚠️  {$this->stats['not_found']} suppliers with POS IDs not found in OSAccounts");
             $this->comment('These suppliers may be POS-only and not used for invoicing');
