@@ -185,16 +185,56 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <!-- Stock Status -->
                         <div>
-                            <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Stock Status</h3>
+                            <div class="flex items-center gap-2">
+                                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Stock Status</h3>
+                                @if(!$product->isService())
+                                    <button type="button" 
+                                            onclick="toggleStockEdit()" 
+                                            class="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors"
+                                            title="Edit Stock">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                        </svg>
+                                    </button>
+                                @endif
+                            </div>
                             @if($product->isService())
                                 <p class="text-lg font-semibold text-gray-500">Service Item</p>
                             @else
-                                <p class="text-2xl font-bold {{ $product->getCurrentStock() > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
-                                    {{ number_format($product->getCurrentStock(), 1) }}
-                                </p>
-                                @if($product->getCurrentStock() > 0 && $product->getCurrentStock() < 10)
-                                    <p class="text-xs text-yellow-600 dark:text-yellow-400">Low Stock</p>
-                                @endif
+                                <div id="stockDisplay">
+                                    <p class="text-2xl font-bold {{ $product->getCurrentStock() > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
+                                        <span id="currentStockValue">{{ number_format($product->getCurrentStock(), 1) }}</span>
+                                    </p>
+                                    @if($product->getCurrentStock() > 0 && $product->getCurrentStock() < 10)
+                                        <p class="text-xs text-yellow-600 dark:text-yellow-400">Low Stock</p>
+                                    @endif
+                                </div>
+                                
+                                <!-- Stock Edit Form (hidden by default) -->
+                                <form id="stockEditForm" class="hidden mt-2" onsubmit="updateStock(event)">
+                                    @csrf
+                                    <div class="flex items-center gap-2">
+                                        <input type="number" 
+                                               name="stock_units" 
+                                               id="stockUnitsInput"
+                                               value="{{ $product->getCurrentStock() }}" 
+                                               step="0.1"
+                                               min="0"
+                                               max="9999"
+                                               class="w-20 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                               required>
+                                        <button type="submit" 
+                                                class="inline-flex items-center px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded transition-colors">
+                                            Save
+                                        </button>
+                                        <button type="button" 
+                                                onclick="toggleStockEdit()" 
+                                                class="inline-flex items-center px-2 py-1 bg-gray-500 hover:bg-gray-600 text-white text-xs font-medium rounded transition-colors">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Update current stock level</p>
+                                </form>
                             @endif
                         </div>
                         
@@ -1418,6 +1458,80 @@
                 // Restore button state
                 saveButton.disabled = false;
                 saveButton.textContent = originalText;
+            });
+        }
+        
+        // Toggle stock edit form
+        function toggleStockEdit() {
+            const display = document.getElementById('stockDisplay');
+            const form = document.getElementById('stockEditForm');
+            const input = document.getElementById('stockUnitsInput');
+            
+            if (form.classList.contains('hidden')) {
+                display.classList.add('hidden');
+                form.classList.remove('hidden');
+                input.focus();
+                input.select();
+            } else {
+                form.classList.add('hidden');
+                display.classList.remove('hidden');
+            }
+        }
+        
+        // Update stock via AJAX
+        function updateStock(event) {
+            event.preventDefault();
+            
+            const form = event.target;
+            const input = form.querySelector('input[name="stock_units"]');
+            const stockValue = parseFloat(input.value);
+            const productId = '{{ $product->ID }}';
+            
+            // Disable form during submission
+            const submitButton = form.querySelector('button[type="submit"]');
+            const originalText = submitButton.textContent;
+            submitButton.disabled = true;
+            submitButton.textContent = 'Saving...';
+            
+            fetch(`/products/${productId}/update-stock`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({
+                    stock_units: stockValue
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update the display
+                    const currentStockValue = document.getElementById('currentStockValue');
+                    currentStockValue.textContent = Number(stockValue).toLocaleString('en-US', {minimumFractionDigits: 1, maximumFractionDigits: 1});
+                    
+                    // Update color based on stock level
+                    const stockDisplay = currentStockValue.closest('p');
+                    stockDisplay.className = stockValue > 0 ? 
+                        'text-2xl font-bold text-green-600 dark:text-green-400' : 
+                        'text-2xl font-bold text-red-600 dark:text-red-400';
+                    
+                    // Hide form and show display
+                    toggleStockEdit();
+                    
+                    // Show success message
+                    showMessage(data.message || 'Stock updated successfully', 'success');
+                } else {
+                    showMessage(data.message || 'Failed to update stock', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showMessage('Network error while updating stock. Please try again.', 'error');
+            })
+            .finally(() => {
+                submitButton.disabled = false;
+                submitButton.textContent = originalText;
             });
         }
         

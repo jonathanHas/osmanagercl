@@ -990,6 +990,64 @@ class ProductController extends Controller
     }
 
     /**
+     * Update stock for a product via AJAX.
+     */
+    public function updateStock(Request $request, string $id)
+    {
+        $request->validate([
+            'stock_units' => 'required|numeric|min:0|max:9999.99',
+        ]);
+
+        $product = $this->productRepository->findById($id);
+
+        if (! $product) {
+            return response()->json(['error' => 'Product not found'], 404);
+        }
+
+        // Check if it's a service item (service items don't have stock)
+        if ($product->isService()) {
+            return response()->json(['error' => 'Cannot update stock for service items'], 422);
+        }
+
+        $stockUnits = (float) $request->stock_units;
+
+        try {
+            // Update or create stock record in STOCKCURRENT table
+            $stockRecord = \App\Models\StockCurrent::where('PRODUCT', $product->ID)->first();
+
+            if ($stockRecord) {
+                // Update existing record
+                $stockRecord->update(['UNITS' => $stockUnits]);
+            } else {
+                // Create new stock record
+                \App\Models\StockCurrent::create([
+                    'PRODUCT' => $product->ID,
+                    'UNITS' => $stockUnits,
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Stock updated successfully',
+                'stock_units' => $stockUnits,
+                'product_id' => $product->ID,
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to update stock', [
+                'product_id' => $id,
+                'product_code' => $product->CODE,
+                'stock_units' => $stockUnits,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to update stock: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Get all categories formatted for dropdown.
      */
     private function getAllCategoriesForDropdown()
