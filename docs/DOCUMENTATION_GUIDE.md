@@ -88,6 +88,8 @@ docs/features/
 ├── delivery-system.md      → Delivery workflow
 ├── pricing-system.md       → Pricing logic
 ├── supplier-integration.md → Supplier connectivity
+├── vat-dashboard.md        → VAT return management
+├── cash-reconciliation.md  → Cash counting system
 └── {new-feature}.md       → Use feature template
 
 For Technical Details:

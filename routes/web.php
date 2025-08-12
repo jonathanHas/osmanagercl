@@ -390,6 +390,31 @@ Route::middleware('auth')->group(function () {
             ->middleware('permission:cash_reconciliation.export')
             ->name('export');
     });
+
+    // Financial Management routes
+    Route::prefix('management')->name('management.')->middleware(['role:admin,manager'])->group(function () {
+        // Financial Dashboard
+        Route::get('/financial/dashboard', [\App\Http\Controllers\Management\FinancialDashboardController::class, 'index'])
+            ->name('financial.dashboard');
+        
+        // VAT Dashboard
+        Route::prefix('vat-dashboard')->name('vat-dashboard.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Management\VatDashboardController::class, 'index'])->name('index');
+            Route::get('/history', [\App\Http\Controllers\Management\VatDashboardController::class, 'history'])->name('history');
+        });
+        
+        // VAT Returns Management
+        Route::prefix('vat-returns')->name('vat-returns.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Management\VatReturnController::class, 'index'])->name('index');
+            Route::get('/create', [\App\Http\Controllers\Management\VatReturnController::class, 'create'])->name('create');
+            Route::post('/', [\App\Http\Controllers\Management\VatReturnController::class, 'store'])->name('store');
+            Route::get('/{vatReturn}', [\App\Http\Controllers\Management\VatReturnController::class, 'show'])->name('show');
+            Route::patch('/{vatReturn}/finalize', [\App\Http\Controllers\Management\VatReturnController::class, 'finalize'])->name('finalize');
+            Route::get('/{vatReturn}/export', [\App\Http\Controllers\Management\VatReturnController::class, 'export'])->name('export');
+            Route::delete('/{vatReturn}/invoices/{invoice}', [\App\Http\Controllers\Management\VatReturnController::class, 'removeInvoice'])->name('remove-invoice');
+            Route::delete('/{vatReturn}', [\App\Http\Controllers\Management\VatReturnController::class, 'destroy'])->name('destroy');
+        });
+    });
 });
 
 require __DIR__.'/auth.php';

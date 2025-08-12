@@ -371,6 +371,17 @@ Complete invoice and supplier data migration from legacy OSAccounts system.
 - **Cross-Database Support**: Handles EXPENSES_JOINED supplier table
 See [OSAccounts Integration Documentation](./docs/features/osaccounts-integration.md).
 
+### VAT Dashboard System
+Comprehensive VAT return management dashboard with proactive deadline alerts.
+- **Outstanding Periods Alert**: Automatic detection of overdue VAT periods with direct links
+- **Current Period Tracking**: Real-time display of current period status and progress
+- **Next Deadline Tracker**: Visual countdown with color-coded urgency indicators
+- **Unsubmitted Invoices Summary**: Monthly breakdown with totals and trends
+- **Recent Submissions**: Quick view of latest VAT returns with status tracking
+- **Complete History View**: Paginated archive with year and status filtering
+- **Role-based Access**: Protected for Admin and Manager roles only
+See [VAT Dashboard Documentation](./docs/features/vat-dashboard.md).
+
 ### Cash Reconciliation System
 Comprehensive end-of-day cash management with physical counting and variance tracking.
 - **Physical Cash Counting**: Count by denomination (€50 to 10c) with real-time totals

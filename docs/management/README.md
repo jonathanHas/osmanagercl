@@ -16,6 +16,21 @@ Complete till review and transaction analysis system for POS data.
 
 **Status:** ✅ Implemented and Active
 
+### [VAT Dashboard](../features/vat-dashboard.md)
+Comprehensive VAT return management dashboard with proactive deadline alerts.
+
+**Key Features:**
+- Outstanding periods alert with automatic detection
+- Current period tracking with real-time status
+- Next deadline countdown with urgency indicators
+- Unsubmitted invoices summary with monthly breakdown
+- Recent submissions history and yearly statistics
+- Complete paginated history with filtering
+- Direct links to create returns with pre-filled dates
+- Role-based access for Admin and Manager roles
+
+**Status:** ✅ Implemented and Active
+
 ### [Cash Reconciliation](../features/cash-reconciliation.md)
 End-of-day cash management with physical counting and variance tracking.
 
@@ -92,4 +107,4 @@ Management systems are organized under the main navigation and follow consistent
 
 ---
 
-*Last Updated: 2025-08-11*
+*Last Updated: 2025-08-12*

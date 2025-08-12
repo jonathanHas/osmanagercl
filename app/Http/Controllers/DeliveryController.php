@@ -11,6 +11,7 @@ use App\Services\SupplierService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
@@ -29,11 +30,42 @@ class DeliveryController extends Controller
     /**
      * Display a listing of deliveries
      */
-    public function index(): View
+    public function index(Request $request): View
     {
-        $deliveries = Delivery::with(['supplier', 'items'])
-            ->orderBy('delivery_date', 'desc')
-            ->paginate(20);
+        $query = Delivery::with(['supplier', 'items']);
+        
+        // Handle search functionality
+        if ($search = $request->get('search')) {
+            $query->where(function ($q) use ($search) {
+                // Search in delivery items for barcode, supplier code, or description
+                $q->whereHas('items', function ($itemQuery) use ($search) {
+                    $itemQuery->where('barcode', 'LIKE', "%{$search}%")
+                             ->orWhere('supplier_code', 'LIKE', "%{$search}%")
+                             ->orWhere('description', 'LIKE', "%{$search}%");
+                })
+                // Also search delivery number
+                ->orWhere('delivery_number', 'LIKE', "%{$search}%");
+            });
+            
+            // Handle supplier name search separately due to cross-database relationship
+            // Get supplier IDs that match the search term
+            $matchingSupplierIds = \DB::connection('pos')
+                ->table('suppliers')
+                ->where('Supplier', 'LIKE', "%{$search}%")
+                ->pluck('SupplierID')
+                ->toArray();
+            
+            if (!empty($matchingSupplierIds)) {
+                $query->orWhereIn('supplier_id', $matchingSupplierIds);
+            }
+        }
+
+        $deliveries = $query->orderBy('delivery_date', 'desc')->paginate(20);
+        
+        // Preserve search parameter in pagination links
+        if ($search) {
+            $deliveries->appends(['search' => $search]);
+        }
 
         return view('deliveries.index', compact('deliveries'));
     }

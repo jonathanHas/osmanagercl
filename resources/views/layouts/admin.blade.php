@@ -177,6 +177,39 @@
                         </a>
                         @endif
 
+                        <!-- Financial Dashboard -->
+                        @if(auth()->user()->hasAnyRole(['admin', 'manager']))
+                        <a href="{{ route('management.financial.dashboard') }}" 
+                           class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('management.financial.dashboard') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                            <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            💰 Financial Dashboard
+                        </a>
+                        @endif
+                        
+                        <!-- VAT Dashboard -->
+                        @if(auth()->user()->hasAnyRole(['admin', 'manager']))
+                        <a href="{{ route('management.vat-dashboard.index') }}" 
+                           class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('management.vat-dashboard.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                            <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            VAT Dashboard
+                        </a>
+                        @endif
+                        
+                        <!-- VAT Returns -->
+                        @if(auth()->user()->hasAnyRole(['admin', 'manager']))
+                        <a href="{{ route('management.vat-returns.index') }}" 
+                           class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('management.vat-returns.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                            <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2zM10 8.5a.5.5 0 11-1 0 .5.5 0 011 0zm5 5a.5.5 0 11-1 0 .5.5 0 011 0z" />
+                            </svg>
+                            VAT Returns
+                        </a>
+                        @endif
+
                         <!-- Invoices -->
                         @unless(auth()->user()->hasRole('barista'))
                         <a href="{{ route('invoices.index') }}" 

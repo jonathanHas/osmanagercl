@@ -39,6 +39,7 @@ class Invoice extends Model
         'created_by',
         'updated_by',
         'external_osaccounts_id',
+        'vat_return_id',
     ];
 
     protected $casts = [
@@ -80,6 +81,14 @@ class Invoice extends Model
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(AccountingSupplier::class, 'supplier_id');
+    }
+
+    /**
+     * Get the VAT return this invoice is assigned to.
+     */
+    public function vatReturn(): BelongsTo
+    {
+        return $this->belongsTo(VatReturn::class);
     }
 
     /**
@@ -204,6 +213,31 @@ class Invoice extends Model
     public function scopeDateRange($query, $startDate, $endDate)
     {
         return $query->whereBetween('invoice_date', [$startDate, $endDate]);
+    }
+
+    /**
+     * Scope for unassigned invoices (not assigned to any VAT return).
+     */
+    public function scopeUnassigned($query)
+    {
+        return $query->whereNull('vat_return_id');
+    }
+
+    /**
+     * Scope for invoices up to a certain date.
+     */
+    public function scopeUpToDate($query, $date)
+    {
+        return $query->where('invoice_date', '<=', $date);
+    }
+
+    /**
+     * Check if invoice can be assigned to a VAT return.
+     */
+    public function canBeAssignedToVatReturn(): bool
+    {
+        return is_null($this->vat_return_id) && 
+               in_array($this->payment_status, ['paid', 'pending', 'overdue']);
     }
 
     /**

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **📊 VAT Dashboard System**: Comprehensive VAT return management dashboard (2025-08-12)
+  - **Outstanding Periods Alert**: Automatic detection of overdue VAT periods
+  - **Current Period Tracking**: Real-time display of current period status
+  - **Next Deadline Tracker**: Visual countdown with urgency indicators
+  - **Unsubmitted Invoices Summary**: Monthly breakdown of unassigned invoices
+  - **Recent Submissions**: Quick view of last 6 VAT returns
+  - **Yearly Statistics**: Side-by-side comparison of annual VAT metrics
+  - **Complete History View**: Paginated archive with filtering by year and status
+  - **Direct Links**: Quick access to create returns with pre-filled dates
+  - **Role-based Access**: Protected for Admin and Manager roles only
+
 ### Changed
 
 - **☕ KDS Clear All Orders Fix**: Improved reliability of clearing all orders (2025-08-11)

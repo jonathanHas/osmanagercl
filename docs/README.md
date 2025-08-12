@@ -6,6 +6,27 @@ Welcome to the comprehensive documentation for OSManager CL. This documentation 
 
 ## 🆕 Latest Updates (August 2025)
 
+### VAT Dashboard System (2025-08-12)
+Comprehensive VAT return management dashboard with proactive alerts:
+
+- **🚨 Outstanding Periods Alert**: Automatic detection of overdue VAT periods
+- **📅 Current Period Tracking**: Real-time display of current period status and progress
+- **⏰ Next Deadline Tracker**: Visual countdown with color-coded urgency indicators
+- **📊 Unsubmitted Invoices Summary**: Monthly breakdown with totals and trends
+- **📈 Recent Submissions**: Quick view of latest VAT returns with status tracking
+- **📉 Yearly Statistics**: Side-by-side comparison of annual VAT metrics
+- **📜 Complete History View**: Paginated archive with year and status filtering
+- **🔗 Direct Links**: Quick access to create returns with pre-filled dates
+- **🔒 Role-based Access**: Protected for Admin and Manager roles only
+
+**Key Benefits**:
+- Never miss a VAT deadline with proactive alerts
+- Complete visibility of VAT obligations and history
+- Streamlined workflow from dashboard to return creation
+- Comprehensive audit trail and export capabilities
+
+See [VAT Dashboard](./features/vat-dashboard.md) for complete details.
+
 ### Cash Reconciliation System (2025-08-11)
 Comprehensive end-of-day cash management with legacy data import:
 
