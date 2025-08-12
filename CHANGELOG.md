@@ -19,6 +19,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **💰 Cash Reconciliation System**: Comprehensive end-of-day cash management (2025-08-11)
+  - **Physical Cash Counting**: Count by denomination (€50 notes to 10c coins)
+  - **Legacy Data Import**: Seamlessly imports existing data from PHP system
+    - Converts stored totals to denomination counts (€400 → 8 × €50 notes)
+    - Imports supplier payments from `payeePayments` table
+    - Imports daily notes from `dayNotes` table
+  - **Variance Tracking**: Automatic calculation against POS totals
+  - **Float Management**: Automatic carry-over from previous day
+  - **Supplier Payments**: Track up to 4 cash payments to suppliers
+  - **Multi-Till Support**: Manage all terminals from one interface
+  - **Real-time Calculations**: Dynamic totals with Alpine.js
+  - **Export to CSV**: Generate reports for accounting
+  - **Audit Trail**: Complete tracking of who created/modified reconciliations
+  - **Role-Based Access**: Manager and Admin only permissions
+  - **Database Structure**: 3 new tables for reconciliations, payments, and notes
+  - **Repository Pattern**: Clean separation of business logic
+  - **Modern UI**: Responsive design with color-coded variance indicators
+
 - **🔐 User Roles & Permissions System**: Complete RBAC implementation (2025-08-08)
   - **Three-tier Role System**: Admin, Manager, and Employee roles
   - **30+ Granular Permissions**: Organized by modules (Products, Sales, Delivery, etc.)

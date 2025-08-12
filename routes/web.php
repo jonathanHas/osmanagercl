@@ -377,6 +377,19 @@ Route::middleware('auth')->group(function () {
         Route::post('/refresh-cache', [\App\Http\Controllers\TillReviewController::class, 'refreshCache'])->name('refresh-cache');
         Route::get('/export', [\App\Http\Controllers\TillReviewController::class, 'export'])->name('export');
     });
+    
+    // Cash Reconciliation routes
+    Route::prefix('cash-reconciliation')->name('cash-reconciliation.')->middleware('permission:cash_reconciliation.view')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Management\CashReconciliationController::class, 'index'])->name('index');
+        Route::post('/store', [\App\Http\Controllers\Management\CashReconciliationController::class, 'store'])
+            ->middleware('permission:cash_reconciliation.create')
+            ->name('store');
+        Route::get('/previous-float', [\App\Http\Controllers\Management\CashReconciliationController::class, 'getPreviousFloat'])->name('previous-float');
+        Route::get('/reconciliation', [\App\Http\Controllers\Management\CashReconciliationController::class, 'getReconciliation'])->name('get-reconciliation');
+        Route::get('/export', [\App\Http\Controllers\Management\CashReconciliationController::class, 'export'])
+            ->middleware('permission:cash_reconciliation.export')
+            ->name('export');
+    });
 });
 
 require __DIR__.'/auth.php';

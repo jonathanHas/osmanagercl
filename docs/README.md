@@ -6,6 +6,29 @@ Welcome to the comprehensive documentation for OSManager CL. This documentation 
 
 ## 🆕 Latest Updates (August 2025)
 
+### Cash Reconciliation System (2025-08-11)
+Comprehensive end-of-day cash management with legacy data import:
+
+- **💵 Physical Cash Counting**: Count by denomination (€50 to 10c) with real-time totals
+- **🔄 Legacy Data Import**: Seamlessly imports existing reconciliations from PHP system
+- **📊 Variance Tracking**: Automatic calculation against POS totals with visual indicators
+- **💰 Supplier Payments**: Track cash payments made from till to suppliers
+- **🏪 Multi-Till Support**: Manage reconciliations across all terminals
+- **📝 Daily Notes**: Add comments and context to each reconciliation
+- **📈 Float Management**: Automatic carry-over of previous day's float
+- **📤 Export to CSV**: Generate reports for accounting and analysis
+- **🔒 Role-Based Access**: Manager and Admin only with full audit trail
+
+**Key Benefits**:
+- Preserves all historical cash count data from legacy system
+- Converts legacy total values to correct denomination counts
+- Modern reactive interface with Alpine.js
+- Integrates with existing Till Review system
+
+See [Cash Reconciliation](./features/cash-reconciliation.md) for complete details.
+
+## 🆕 Previous Updates (August 2025)
+
 ### OSAccounts Integration System (2025-08-10)
 Production-ready invoice and supplier data migration from legacy OSAccounts:
 

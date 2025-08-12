@@ -371,6 +371,18 @@ Complete invoice and supplier data migration from legacy OSAccounts system.
 - **Cross-Database Support**: Handles EXPENSES_JOINED supplier table
 See [OSAccounts Integration Documentation](./docs/features/osaccounts-integration.md).
 
+### Cash Reconciliation System
+Comprehensive end-of-day cash management with physical counting and variance tracking.
+- **Physical Cash Counting**: Count by denomination (€50 to 10c) with real-time totals
+- **Legacy Data Import**: Seamlessly imports from PHP system (converts totals to counts)
+- **Variance Tracking**: Automatic calculation against POS with visual indicators
+- **Supplier Payments**: Track cash payments made from till
+- **Float Management**: Automatic carry-over between days
+- **Multi-Till Support**: Manage all terminals from one interface
+- **Export to CSV**: Generate reconciliation reports
+- **Audit Trail**: Complete tracking with user timestamps
+See [Cash Reconciliation Documentation](./docs/features/cash-reconciliation.md).
+
 ## UI/UX Design
 
 ### Admin Layout

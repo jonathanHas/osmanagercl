@@ -16,6 +16,20 @@ Complete till review and transaction analysis system for POS data.
 
 **Status:** ✅ Implemented and Active
 
+### [Cash Reconciliation](../features/cash-reconciliation.md)
+End-of-day cash management with physical counting and variance tracking.
+
+**Key Features:**
+- Physical cash counting by denomination
+- Automatic variance calculation against POS
+- Supplier payment tracking
+- Float management and carry-over
+- Legacy data import from PHP system
+- Multi-till support
+- Export to CSV
+
+**Status:** ✅ Implemented and Active
+
 ## Planned Systems
 
 ### Inventory Management
@@ -78,4 +92,4 @@ Management systems are organized under the main navigation and follow consistent
 
 ---
 
-*Last Updated: 2025-08-09*
+*Last Updated: 2025-08-11*
