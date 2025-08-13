@@ -339,7 +339,9 @@
                                    x-model="barcode"
                                    x-ref="barcodeInput"
                                    @keydown.enter="processBarcode()"
-                                   placeholder="Scan or enter barcode..."
+                                   placeholder="Ready for barcode scan..."
+                                   inputmode="none"
+                                   autocomplete="off"
                                    class="w-full text-lg py-3 px-4 rounded-lg border-2 border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-blue-500 focus:ring-blue-500">
                         </div>
 
@@ -698,12 +700,21 @@
             const modal = document.getElementById('scanner-modal');
             modal.classList.remove('hidden');
             
-            // Trigger Alpine to open
+            // Trigger Alpine to open and focus
             setTimeout(() => {
                 const alpineData = Alpine.$data(modal);
                 if (alpineData) {
                     alpineData.openModal();
                 }
+                
+                // Additional focus attempt
+                setTimeout(() => {
+                    const input = modal.querySelector('input[x-ref="barcodeInput"]');
+                    if (input) {
+                        input.focus();
+                        input.select();
+                    }
+                }, 200);
             }, 50);
         }
 
@@ -721,18 +732,32 @@
                     if (window.openLabelScanner) {
                         this.modalOpen = true;
                         window.openLabelScanner = false;
-                        this.$nextTick(() => {
-                            this.$refs.barcodeInput?.focus();
-                        });
+                        this.focusInput();
                     }
                     
                     // Initialize when modal opens
                     this.$watch('modalOpen', (value) => {
                         if (value) {
-                            this.$nextTick(() => {
-                                this.$refs.barcodeInput?.focus();
-                            });
+                            this.focusInput();
                         }
+                    });
+                },
+
+                focusInput() {
+                    // Multiple attempts with different timing to ensure focus
+                    this.$nextTick(() => {
+                        this.$refs.barcodeInput?.focus();
+                        this.$refs.barcodeInput?.select();
+                        
+                        setTimeout(() => {
+                            this.$refs.barcodeInput?.focus();
+                            this.$refs.barcodeInput?.select();
+                        }, 100);
+                        
+                        setTimeout(() => {
+                            this.$refs.barcodeInput?.focus();
+                            this.$refs.barcodeInput?.select();
+                        }, 300);
                     });
                 },
 
@@ -741,6 +766,7 @@
                     this.barcode = '';
                     this.scannedProduct = null;
                     this.lastScan = null;
+                    this.focusInput();
                 },
 
                 closeModal() {
@@ -818,9 +844,9 @@
                             };
                         }
 
-                        // Clear barcode and focus for next scan
+                        // Clear barcode and refocus for next scan
                         this.barcode = '';
-                        this.$refs.barcodeInput.focus();
+                        this.focusInput();
 
                     } catch (error) {
                         this.lastScan = {
