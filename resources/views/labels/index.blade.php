@@ -7,10 +7,20 @@
                     Manage and print product labels
                 </p>
             </div>
+            <div>
+                <!-- Scan to Label Button - Top Priority -->
+                <button onclick="openScannerModal()" 
+                        class="inline-flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm uppercase tracking-widest rounded-md transition shadow-lg">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h2m0 0V6a3 3 0 00-3-3H9a3 3 0 00-3 3v9.5M12 8h0m-6.5 4.5H4"/>
+                    </svg>
+                    Scan to Label
+                </button>
+            </div>
         </div>
     </x-slot>
 
-    <div class="py-12">
+    <div class="py-6">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <x-alert type="success" :message="session('success')" />
             <x-alert type="error" :messages="$errors->all()" />
@@ -22,33 +32,31 @@
                     : ceil(count($productsNeedingLabels) / 24);
             @endphp
             
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <x-stat-card 
-                    title="Products Needing Labels" 
-                    :value="count($productsNeedingLabels)" 
-                    icon="tag" 
-                    color="blue" />
-                    
-                <x-stat-card 
-                    title="Labels Printed" 
-                    :value="count($recentLabelPrints)" 
-                    subtitle="Last 7 days"
-                    icon="check-circle" 
-                    color="green" />
-                    
-                <x-stat-card 
-                    title="A4 Sheets Needed" 
-                    :value="$sheetsNeeded" 
-                    icon="document" 
-                    color="purple" 
-                    id="sheets-needed" />
+            <!-- Compact Stats -->
+            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
+                <div class="p-4">
+                    <div class="grid grid-cols-3 gap-4 text-center">
+                        <div class="flex flex-col items-center">
+                            <div class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ count($productsNeedingLabels) }}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">Need Labels</div>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <div class="text-2xl font-bold text-green-600 dark:text-green-400">{{ count($recentLabelPrints) }}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">Printed (7d)</div>
+                        </div>
+                        <div class="flex flex-col items-center">
+                            <div class="text-2xl font-bold text-purple-600 dark:text-purple-400" id="sheets-needed">{{ $sheetsNeeded }}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">A4 Sheets</div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Label Template Selector -->
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
-                <div class="p-6">
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Label Template</h3>
-                    <div class="flex flex-wrap gap-4">
+            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-4">
+                <div class="p-4">
+                    <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 mb-3">Label Template</h3>
+                    <div class="flex flex-wrap gap-3">
                         @foreach($labelTemplates as $template)
                             <label class="flex items-center cursor-pointer">
                                 <input type="radio" 
@@ -59,13 +67,10 @@
                                        data-labels-per-a4="{{ $template->labels_per_a4 }}"
                                        data-width="{{ $template->width_mm }}"
                                        data-height="{{ $template->height_mm }}">
-                                <div class="template-card border-2 rounded-lg p-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700" 
+                                <div class="template-card border-2 rounded-lg p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700" 
                                      data-template="{{ $template->id }}">
                                     <div class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ $template->name }}</div>
-                                    <div class="text-xs text-gray-500 dark:text-gray-400">{{ $template->description }}</div>
-                                    <div class="text-xs text-gray-600 dark:text-gray-300 mt-1">
-                                        {{ $template->labels_per_a4 }} labels per A4
-                                    </div>
+                                    <div class="text-xs text-gray-500 dark:text-gray-400">{{ $template->labels_per_a4 }}/A4</div>
                                 </div>
                             </label>
                         @endforeach
@@ -73,29 +78,11 @@
                 </div>
             </div>
 
-            <!-- Action Buttons Section (Always Visible) -->
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
-                <div class="p-6">
-                    <div class="flex justify-between items-center">
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Quick Actions</h3>
-                        <div class="flex items-center gap-3">
-                            <!-- Scan to Label Button -->
-                            <button onclick="openScannerModal()" 
-                                    class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs uppercase tracking-widest rounded-md transition">
-                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h2m0 0V6a3 3 0 00-3-3H9a3 3 0 00-3 3v9.5M12 8h0m-6.5 4.5H4"/>
-                                </svg>
-                                Scan to Label
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             <!-- Products Needing Labels -->
             @if(count($productsNeedingLabels) > 0)
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-8">
-                    <div class="p-6">
+                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
+                    <div class="p-4">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Products Needing Labels</h3>
                             <div class="flex items-center gap-3">
@@ -197,8 +184,8 @@
                     </div>
                 </div>
             @else
-                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-8">
-                    <div class="p-6 text-center">
+                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
+                    <div class="p-4 text-center">
                         <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
                         </svg>
@@ -211,7 +198,7 @@
             <!-- Recent Label Prints -->
             @if(count($recentLabelPrints) > 0)
                 <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                    <div class="p-6">
+                    <div class="p-4">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Recent Label Prints</h3>
                         
                         <!-- Grouped Label Print Sessions -->
