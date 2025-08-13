@@ -559,46 +559,73 @@ class ProductController extends Controller
     }
 
     /**
-     * Get the next available barcode for Coffee Fresh category (081).
-     * Follows the 4000s numbering pattern, fills gaps or increments from highest.
+     * Get the next available barcode for a specific category.
+     * Uses configuration-driven approach to support multiple categories with different patterns.
      * Checks ALL products across ALL categories since barcodes are globally unique.
      */
-    private function getNextAvailableCoffeeFreshBarcode(): string
+    private function getNextAvailableBarcodeForCategory(string $categoryId): ?string
     {
-        // Get Coffee Fresh codes to understand the numbering pattern
-        $coffeeFreshCodes = Product::where('CATEGORY', '081')
+        $config = config('barcode_patterns.categories.' . $categoryId);
+        
+        // Return null if category is not configured for barcode suggestions
+        if (!$config) {
+            return null;
+        }
+        
+        $settings = config('barcode_patterns.settings');
+        
+        // Get existing codes for this category within internal code range
+        $categoryCodes = Product::where('CATEGORY', $categoryId)
             ->pluck('CODE')
-            ->filter(fn($code) => is_numeric($code) && (int)$code < 100000)
+            ->filter(fn($code) => is_numeric($code) && (int)$code <= $settings['max_internal_code'])
             ->map(fn($code) => (int)$code)
             ->sort()
             ->values()
             ->toArray();
             
-        // If no Coffee Fresh codes exist, start at 4001
-        if (empty($coffeeFreshCodes)) {
-            return '4001';
+        // If no codes exist, start at the beginning of the first range
+        if (empty($categoryCodes)) {
+            $firstRange = $config['ranges'][0];
+            return (string)$firstRange[0];
         }
         
-        // Determine the search range based on Coffee Fresh pattern
-        $min = min($coffeeFreshCodes);
-        $max = max($coffeeFreshCodes);
+        $min = min($categoryCodes);
+        $max = max($categoryCodes);
         
-        // First check for gaps in the Coffee Fresh range, but verify globally
-        for ($i = $min; $i <= $max; $i++) {
-            if (!in_array($i, $coffeeFreshCodes) && !Product::where('CODE', (string)$i)->exists()) {
+        if ($config['priority'] === 'fill_gaps') {
+            // Fill gaps in existing range first
+            for ($i = $min; $i <= $max; $i++) {
+                if (!in_array($i, $categoryCodes) && $this->isCodeAvailableInRange($i, $config['ranges']) && !Product::where('CODE', (string)$i)->exists()) {
+                    return (string)$i;
+                }
+            }
+        }
+        
+        // No gaps found or priority is increment - find next available after highest
+        $searchStart = $max + 1;
+        $searchLimit = $searchStart + $settings['max_search_range'];
+        
+        for ($i = $searchStart; $i <= $searchLimit; $i++) {
+            if ($this->isCodeAvailableInRange($i, $config['ranges']) && !Product::where('CODE', (string)$i)->exists()) {
                 return (string)$i;
             }
         }
         
-        // No gaps found, find next available code after highest Coffee Fresh code
-        for ($i = $max + 1; $i <= $max + 200; $i++) { // Check next 200 numbers
-            if (!Product::where('CODE', (string)$i)->exists()) {
-                return (string)$i;
-            }
-        }
-        
-        // Fallback: if everything is taken, return next increment
+        // Fallback: return next increment (might be outside configured ranges)
         return (string)($max + 1);
+    }
+    
+    /**
+     * Check if a code falls within any of the configured ranges for a category.
+     */
+    private function isCodeAvailableInRange(int $code, array $ranges): bool
+    {
+        foreach ($ranges as $range) {
+            if ($code >= $range[0] && $code <= $range[1]) {
+                return true;
+            }
+        }
+        return false;
     }
     
     /**
@@ -622,10 +649,12 @@ class ProductController extends Controller
         $categoryId = $request->query('category'); // For category-specific creation (e.g., Coffee Fresh)
         $prefillData = null;
         
-        // Auto-suggest barcode for Coffee Fresh category (081)
+        // Auto-suggest barcode for configured categories
         $suggestedBarcode = null;
-        if ($categoryId === '081') {
-            $suggestedBarcode = $this->getNextAvailableCoffeeFreshBarcode();
+        $categoryConfig = null;
+        if ($categoryId) {
+            $suggestedBarcode = $this->getNextAvailableBarcodeForCategory($categoryId);
+            $categoryConfig = config('barcode_patterns.categories.' . $categoryId);
         }
 
         if ($deliveryItemId) {
@@ -691,7 +720,7 @@ class ProductController extends Controller
             }
         }
 
-        return view('products.create', compact('taxCategories', 'categories', 'suppliers', 'prefillData', 'deliveryItemId', 'categoryId', 'taxRates', 'udeaSupplierIds', 'suggestedBarcode'));
+        return view('products.create', compact('taxCategories', 'categories', 'suppliers', 'prefillData', 'deliveryItemId', 'categoryId', 'taxRates', 'udeaSupplierIds', 'suggestedBarcode', 'categoryConfig'));
     }
 
     /**

@@ -8,6 +8,11 @@ The Coffee module provides comprehensive management for Coffee Fresh products (c
 
 ### 1. Product Management
 
+- **Auto-Barcode Suggestions**: Automatic barcode suggestions when creating new Coffee Fresh products
+  - Access via `/products/create?category=081`
+  - Suggests next available barcode in 4000s sequence
+  - Fills gaps first, then increments from highest
+  - Global uniqueness checking prevents conflicts
 - **Till Visibility Control**: Toggle products on/off the POS till using the PRODUCTS_CAT table
 - **Alphabetical Ordering**: Products on the till are automatically ordered alphabetically by name
   - New products added to till have CATORDER set to NULL for consistent alphabetical sorting

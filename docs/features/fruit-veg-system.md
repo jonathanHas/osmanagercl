@@ -6,7 +6,14 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 
 ## Features
 
-### 1. Till Visibility Management
+### 1. Product Creation & Management
+- **Auto-Barcode Suggestions**: Automatic barcode suggestions when creating new Fruit & Vegetable products
+  - **Fruit**: Access via `/products/create?category=SUB1` - suggests next available barcode in 1000-2999 range
+  - **Vegetables**: Access via `/products/create?category=SUB2` - suggests next available barcode in 1000-2999 range
+  - **Incremental Logic**: Always increments from highest existing barcode
+  - **Global Uniqueness**: Checks across all categories to prevent conflicts
+
+### 2. Till Visibility Management
 - **Till Screen Control**: Manage which F&V products appear on the POS till screen
 - **PRODUCTS_CAT Integration**: Direct synchronization with POS database for immediate till updates
 - **Alphabetical Ordering**: Products on till automatically sorted alphabetically by name (CATORDER set to NULL)
@@ -19,7 +26,7 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 - **Activity Tracking**: Complete audit trail of product additions/removals without modifying POS database
 - **Reliable Interface**: Alpine.js integration with proper Blade template compatibility
 
-### 2. Pricing Management
+### 3. Pricing Management
 - **Inline Price Editing**: Click-to-edit interface with save/cancel buttons for intuitive price updates
 - **Universal Price Updates**: Update prices for both visible and hidden products in manage screen
 - **Dedicated Price Management**: Separate prices page for visible-only products
@@ -27,7 +34,7 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 - **Automatic Label Queue**: Products automatically added to print queue when prices change
 - **VAT Calculations**: Integrated with existing tax system
 
-### 3. Label Printing System
+### 4. Label Printing System
 - **Modern Label Layout**: 2-column × 8-row layout with 16 labels per A4 page
 - **Optimized for Cutting**: Enhanced padding (4mm) and margins (2mm) for easy label cutting
 - **Clean Design**: Borderless labels with improved cutting margins for professional appearance
@@ -39,7 +46,7 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 - **Print Queue Management**: Tracks products needing new labels
 - **Batch Printing**: Print labels for multiple products simultaneously
 
-### 4. Product Information Management
+### 5. Product Information Management
 - **Display Name Editing**: Set custom display names for products with live HTML preview
 - **Country of Origin**: Select and update product origin countries with dropdown
 - **Unit Management**: Edit unit types (kilogram, each, bunch, punnet, bag) with inline editing
@@ -47,7 +54,7 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 - **Product Images**: Full image management with upload, preview, and binary storage
 - **Comprehensive Edit Interface**: Dedicated product edit pages with tabbed layout
 
-### 5. Dashboard Features
+### 6. Dashboard Features
 - **Recently Added to Till Section**: Dynamic display of recently added products with real-time updates
 - **Quick Till Visibility Search**: Integrated search component for rapid visibility updates
 - **Clickable Product Cards**: Direct navigation to product edit pages from featured section
@@ -55,7 +62,7 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 - **Real-time Updates**: Live addition/removal of products with smooth animations
 - **Instant Visibility Changes**: Products appear/disappear immediately based till visibility changes
 
-### 6. Sales Analytics & Performance (Enhanced 2025! 🚀)
+### 7. Sales Analytics & Performance (Enhanced 2025! 🚀)
 - **Blazing-Fast Sales Dashboard**: Revolutionary performance improvement with 100x+ speed increase
 - **Sub-Second Queries**: Complete F&V sales analytics in under 20ms (previously 30+ seconds)
 - **Real-time Statistics**: Instant F&V sales summaries with category breakdowns
@@ -102,7 +109,7 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
   - Instant results from optimized indexes
   - Smart filtering with real-time updates
 
-### 7. Daily Sales Overview Chart (Enhanced 2025)
+### 8. Daily Sales Overview Chart (Enhanced 2025)
 - **Responsive Date Range Selection**: Chart updates correctly when date ranges change
 - **Data-Aware Quick Buttons**: "7 Days", "14 Days", "30 Days" buttons use available data periods
 - **Smart Fallback System**: Automatic fallback to live POS queries when aggregated data missing

@@ -114,6 +114,10 @@ Route::middleware('auth')->group(function () {
 
     // Restore batch of labels route
     Route::post('/labels/restore-batch', [LabelAreaController::class, 'restoreBatch'])->name('labels.restore-batch');
+    
+    // Scanner routes
+    Route::post('/labels/lookup-barcode', [LabelAreaController::class, 'lookupBarcode'])->name('labels.lookup-barcode');
+    Route::post('/labels/scan', [LabelAreaController::class, 'processBarcodeScan'])->name('labels.scan');
 
     // Fruit & Veg routes
     Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {

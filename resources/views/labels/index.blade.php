@@ -73,6 +73,24 @@
                 </div>
             </div>
 
+            <!-- Action Buttons Section (Always Visible) -->
+            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
+                <div class="p-6">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Quick Actions</h3>
+                        <div class="flex items-center gap-3">
+                            <!-- Scan to Label Button -->
+                            <button onclick="openScannerModal()" 
+                                    class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs uppercase tracking-widest rounded-md transition">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h2m0 0V6a3 3 0 00-3-3H9a3 3 0 00-3 3v9.5M12 8h0m-6.5 4.5H4"/>
+                                </svg>
+                                Scan to Label
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <!-- Products Needing Labels -->
             @if(count($productsNeedingLabels) > 0)
@@ -292,6 +310,90 @@
                     </div>
                 </div>
             @endif
+        </div>
+    </div>
+
+    <!-- Scanner Modal -->
+    <div id="scanner-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden" x-data="labelScanner()" x-show="modalOpen" @keydown.escape="closeModal()">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full max-h-screen overflow-y-auto" @click.away="closeModal()">
+                <div class="p-6">
+                    <!-- Header -->
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Scan to Label</h3>
+                        <button @click="closeModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Scanner Interface -->
+                    <div class="space-y-4">
+                        <!-- Barcode Input -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Scan Barcode
+                            </label>
+                            <input type="text" 
+                                   x-model="barcode"
+                                   x-ref="barcodeInput"
+                                   @keydown.enter="processBarcode()"
+                                   placeholder="Scan or enter barcode..."
+                                   class="w-full text-lg py-3 px-4 rounded-lg border-2 border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+
+                        <!-- Product Preview -->
+                        <div x-show="scannedProduct" x-transition class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1">
+                                    <div class="font-medium text-gray-900 dark:text-gray-100" x-text="scannedProduct?.name || 'Unknown Product'"></div>
+                                    <div class="text-sm text-gray-600 dark:text-gray-400">
+                                        <span x-text="scannedProduct?.code"></span>
+                                    </div>
+                                </div>
+                                <div x-show="scannedProduct?.price" class="text-right">
+                                    <div class="font-semibold text-gray-900 dark:text-gray-100" x-text="scannedProduct?.formatted_price"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Feedback Messages -->
+                        <div x-show="lastScan" x-transition class="p-3 rounded-lg" 
+                             :class="lastScan?.success ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'">
+                            <div class="flex items-center">
+                                <svg x-show="lastScan?.success" class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                <svg x-show="!lastScan?.success" class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                                <span x-text="lastScan?.message"></span>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="flex gap-3 pt-4">
+                            <button @click="processBarcode()" 
+                                    :disabled="!barcode || processing"
+                                    :class="(!barcode || processing) ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'"
+                                    class="flex-1 py-2 text-white rounded-md transition-colors font-medium">
+                                <span x-show="!processing">Add to Labels</span>
+                                <span x-show="processing">Processing...</span>
+                            </button>
+                            <button @click="closeModal()" 
+                                    class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-md transition-colors font-medium">
+                                Done
+                            </button>
+                        </div>
+
+                        <!-- Stats -->
+                        <div x-show="scansCount > 0" class="text-center text-sm text-gray-600 dark:text-gray-400 border-t pt-4">
+                            <span x-text="scansCount"></span> product<span x-show="scansCount !== 1">s</span> added to labels queue
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -586,6 +688,151 @@
                     clearButton.innerHTML = '<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>Clear All (' + productCount + ')';
                 }
             });
+        }
+
+        // Scanner Modal Functions
+        function openScannerModal() {
+            // Set a global flag that the Alpine component can check
+            window.openLabelScanner = true;
+            // Remove hidden class to show modal
+            const modal = document.getElementById('scanner-modal');
+            modal.classList.remove('hidden');
+            
+            // Trigger Alpine to open
+            setTimeout(() => {
+                const alpineData = Alpine.$data(modal);
+                if (alpineData) {
+                    alpineData.openModal();
+                }
+            }, 50);
+        }
+
+        function labelScanner() {
+            return {
+                modalOpen: false,
+                barcode: '',
+                scannedProduct: null,
+                lastScan: null,
+                processing: false,
+                scansCount: 0,
+
+                init() {
+                    // Check if we should open immediately
+                    if (window.openLabelScanner) {
+                        this.modalOpen = true;
+                        window.openLabelScanner = false;
+                        this.$nextTick(() => {
+                            this.$refs.barcodeInput?.focus();
+                        });
+                    }
+                    
+                    // Initialize when modal opens
+                    this.$watch('modalOpen', (value) => {
+                        if (value) {
+                            this.$nextTick(() => {
+                                this.$refs.barcodeInput?.focus();
+                            });
+                        }
+                    });
+                },
+
+                openModal() {
+                    this.modalOpen = true;
+                    this.barcode = '';
+                    this.scannedProduct = null;
+                    this.lastScan = null;
+                },
+
+                closeModal() {
+                    this.modalOpen = false;
+                    this.barcode = '';
+                    this.scannedProduct = null;
+                    this.lastScan = null;
+                    
+                    // Hide the modal div
+                    document.getElementById('scanner-modal').classList.add('hidden');
+                    
+                    // Refresh page if products were added to show updated queue
+                    if (this.scansCount > 0) {
+                        location.reload();
+                    }
+                },
+
+                async processBarcode() {
+                    if (!this.barcode || this.processing) return;
+                    
+                    this.processing = true;
+                    this.lastScan = null;
+
+                    try {
+                        // First, lookup product details
+                        const lookupResponse = await fetch('/labels/lookup-barcode', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                            },
+                            body: JSON.stringify({ barcode: this.barcode })
+                        });
+
+                        if (!lookupResponse.ok) {
+                            throw new Error('Network error');
+                        }
+
+                        const lookupData = await lookupResponse.json();
+
+                        if (lookupData.success && lookupData.product) {
+                            this.scannedProduct = lookupData.product;
+                            
+                            // Add to labels queue
+                            const addResponse = await fetch('/labels/scan', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                                },
+                                body: JSON.stringify({ barcode: this.barcode })
+                            });
+
+                            const addData = await addResponse.json();
+                            
+                            if (addData.success) {
+                                this.lastScan = {
+                                    success: true,
+                                    message: 'Product added to labels queue!'
+                                };
+                                this.scansCount++;
+                            } else {
+                                this.lastScan = {
+                                    success: false,
+                                    message: addData.message || 'Failed to add product to labels'
+                                };
+                            }
+                        } else {
+                            this.scannedProduct = null;
+                            this.lastScan = {
+                                success: false,
+                                message: lookupData.message || 'Product not found'
+                            };
+                        }
+
+                        // Clear barcode and focus for next scan
+                        this.barcode = '';
+                        this.$refs.barcodeInput.focus();
+
+                    } catch (error) {
+                        this.lastScan = {
+                            success: false,
+                            message: 'Network error - please try again'
+                        };
+                        console.error('Scanner error:', error);
+                    } finally {
+                        this.processing = false;
+                    }
+                }
+            };
         }
 
         // Requeue product function

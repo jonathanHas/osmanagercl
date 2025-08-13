@@ -690,6 +690,105 @@ A: Products in the `stocking` table are included in automated ordering calculati
 
 ## Recent Updates
 
+### Auto-Barcode Suggestion System (2025-08-13)
+
+Implemented a comprehensive, configuration-driven barcode suggestion system that automatically suggests the next available barcode for supported product categories.
+
+#### Supported Categories
+
+The system supports automatic barcode suggestions for the following categories:
+
+| Category | ID | Range | Priority | Description |
+|----------|-------|--------|----------|-------------|
+| **Coffee Fresh** | 081 | 4000-4999 | Fill Gaps | Coffee products use 4000s sequence, fills gaps first |
+| **Fruit** | SUB1 | 1000-2999 | Increment | Fresh fruit products use sequential numbering |
+| **Vegetables** | SUB2 | 1000-2999 | Increment | Fresh vegetable products use sequential numbering |
+| **Bakery** | 082 | 4000-4999 | Fill Gaps | Bakery products use 4000s sequence, fills gaps first |
+| **Zero Waste Food** | 083 | 7000-7999 | Increment | Zero waste and lunch products use 7000s sequence |
+| **Lunches** | 50918faf... | 4000-4999 | Increment | Lunch products use 4000s sequence |
+
+#### Key Features
+
+1. **Category-Specific Suggestions**
+   - Each category has its own numbering pattern and rules
+   - Configurable ranges and priorities per category
+   - Smart handling of overlapping ranges (Coffee Fresh + Bakery both use 4000s)
+
+2. **Global Barcode Uniqueness**
+   - Checks across ALL categories to prevent conflicts
+   - Ensures barcodes are unique across the entire system
+   - Handles cross-category range overlaps intelligently
+
+3. **Smart Numbering Logic**
+   - **Fill Gaps**: Some categories fill sequence gaps first (Coffee Fresh, Bakery)
+   - **Incremental**: Others always increment from highest (Fruit, Vegetables, Zero Waste)
+   - **Range Validation**: Ensures suggestions stay within configured ranges
+
+4. **Enhanced User Interface**
+   - Category-specific badges (e.g., "Coffee Fresh Auto-Suggested")
+   - Dynamic descriptions explaining numbering patterns
+   - Visual indicators showing suggested barcodes
+   - Easy to override suggestions if needed
+
+#### Usage
+
+To create a product with auto-suggested barcode, use category-specific URLs:
+
+- **Coffee Fresh**: `/products/create?category=081`
+- **Fruit**: `/products/create?category=SUB1`
+- **Vegetables**: `/products/create?category=SUB2`
+- **Bakery**: `/products/create?category=082`
+- **Zero Waste**: `/products/create?category=083`
+
+#### Configuration
+
+The system is configured via `config/barcode_patterns.php`:
+
+```php
+'categories' => [
+    '081' => [
+        'name' => 'Coffee Fresh',
+        'ranges' => [[4000, 4999]],
+        'priority' => 'fill_gaps',
+        'description' => 'Coffee Fresh products use the 4000s numbering sequence',
+    ],
+    // ... other categories
+],
+
+'settings' => [
+    'max_search_range' => 200,
+    'max_internal_code' => 99999,
+    'default_start' => 1000,
+]
+```
+
+#### Technical Implementation
+
+**Core Methods:**
+- `getNextAvailableBarcodeForCategory($categoryId)` - Main suggestion logic
+- `isCodeAvailableInRange($code, $ranges)` - Range validation
+- Configuration-driven approach for easy extensibility
+
+**Algorithm:**
+1. Load category configuration (ranges, priority, description)
+2. Get existing codes for the category within internal code range
+3. Apply category-specific logic (fill gaps vs increment)
+4. Check global availability across all products
+5. Return first available code within configured ranges
+
+**Frontend Integration:**
+- Auto-populates barcode field when category is detected
+- Shows category-specific messaging and styling
+- Maintains all existing functionality for manual barcode entry
+
+#### Benefits
+
+- **Streamlined Workflow**: Automatic barcode suggestions speed up product creation
+- **Consistency**: Maintains category-specific numbering patterns
+- **Conflict Prevention**: Global uniqueness checking prevents duplicate barcodes
+- **Extensible**: Easy to add new categories via configuration
+- **User-Friendly**: Clear visual indicators and helpful descriptions
+
 ### Cost Price Editing in Modal (2025-08-08)
 
 Enhanced the price editor modal to include inline cost price editing capabilities.

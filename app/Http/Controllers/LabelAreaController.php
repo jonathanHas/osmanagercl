@@ -350,4 +350,78 @@ class LabelAreaController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Lookup a product by barcode for the scanner.
+     */
+    public function lookupBarcode(Request $request)
+    {
+        $request->validate([
+            'barcode' => 'required|string|max:255',
+        ]);
+
+        $barcode = $request->input('barcode');
+        
+        // Find the product by barcode
+        $product = Product::where('CODE', $barcode)->first();
+
+        if ($product) {
+            return response()->json([
+                'success' => true,
+                'product' => [
+                    'code' => $product->CODE,
+                    'name' => $product->NAME,
+                    'price' => $product->PRICESELL,
+                    'formatted_price' => $product->getFormattedPriceWithVatAttribute(),
+                ],
+            ]);
+        } else {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product not found with barcode: ' . $barcode,
+            ]);
+        }
+    }
+
+    /**
+     * Process a barcode scan and add the product to the labels queue.
+     */
+    public function processBarcodeScan(Request $request)
+    {
+        $request->validate([
+            'barcode' => 'required|string|max:255',
+        ]);
+
+        $barcode = $request->input('barcode');
+        
+        // Find the product by barcode
+        $product = Product::where('CODE', $barcode)->first();
+
+        if (!$product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product not found with barcode: ' . $barcode,
+            ]);
+        }
+
+        try {
+            // Create a requeue event to add the product to "Products Needing Labels"
+            LabelLog::logRequeueLabel($product->CODE);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Product added to labels queue successfully',
+                'product' => [
+                    'code' => $product->CODE,
+                    'name' => $product->NAME,
+                    'formatted_price' => $product->getFormattedPriceWithVatAttribute(),
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to add product to labels queue: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
 }

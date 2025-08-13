@@ -276,6 +276,16 @@ For common issues and solutions, see [Troubleshooting Guide](./docs/development/
 
 ## Key Features
 
+### Auto-Barcode Suggestion System
+Comprehensive, configuration-driven barcode suggestion system for streamlined product creation.
+- **Multi-Category Support**: Coffee Fresh, Fruit, Vegetables, Bakery, Zero Waste Food, and Lunches
+- **Smart Numbering Logic**: Fill gaps or increment based on category-specific rules  
+- **Global Uniqueness**: Prevents barcode conflicts across all categories
+- **Category-Specific URLs**: Direct links for each category (e.g., `/products/create?category=081`)
+- **User-Friendly Interface**: Visual indicators, descriptions, and override capability
+- **Configuration-Driven**: Easy to add new categories via `config/barcode_patterns.php`
+See [Auto-Barcode Suggestion System Documentation](./docs/features/barcode-suggestion-system.md).
+
 ### Barcode Editing
 Safe barcode modification for correcting scanner errors.
 - **Safety Warnings**: Clear indication of affected records before changes
