@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\Invoice;
-use App\Models\InvoiceAttachment;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 
@@ -32,7 +31,7 @@ class CleanupDuplicateAttachments extends Command
     {
         $isDryRun = $this->option('dry-run');
         $fixPermissions = $this->option('fix-permissions');
-        
+
         if ($isDryRun) {
             $this->warn('🔍 DRY RUN MODE - No changes will be made');
         }
@@ -49,14 +48,14 @@ class CleanupDuplicateAttachments extends Command
 
         // Process invoices with attachments
         Invoice::whereHas('attachments')
-            ->chunk(100, function($invoices) use (&$stats, $isDryRun, $fixPermissions) {
+            ->chunk(100, function ($invoices) use (&$stats, $isDryRun, $fixPermissions) {
                 foreach ($invoices as $invoice) {
                     $stats['invoices_checked']++;
-                    
+
                     $attachments = $invoice->attachments()
                         ->orderBy('created_at', 'asc')
                         ->get();
-                    
+
                     if ($attachments->count() <= 1) {
                         continue;
                     }
@@ -65,7 +64,7 @@ class CleanupDuplicateAttachments extends Command
                     $attachmentsByHash = [];
                     foreach ($attachments as $attachment) {
                         $hash = $attachment->file_hash;
-                        if (!isset($attachmentsByHash[$hash])) {
+                        if (! isset($attachmentsByHash[$hash])) {
                             $attachmentsByHash[$hash] = [];
                         }
                         $attachmentsByHash[$hash][] = $attachment;
@@ -74,37 +73,37 @@ class CleanupDuplicateAttachments extends Command
                     // Process duplicates
                     foreach ($attachmentsByHash as $hash => $duplicateGroup) {
                         if (count($duplicateGroup) > 1) {
-                            $this->line("Invoice #{$invoice->invoice_number}: Found " . count($duplicateGroup) . " copies of same file");
-                            
+                            $this->line("Invoice #{$invoice->invoice_number}: Found ".count($duplicateGroup).' copies of same file');
+
                             // Keep the first one (oldest), remove the rest
                             $toKeep = array_shift($duplicateGroup);
-                            
+
                             // Fix permissions on the kept file
-                            if ($fixPermissions && !$isDryRun) {
+                            if ($fixPermissions && ! $isDryRun) {
                                 $fullPath = Storage::disk('private')->path($toKeep->file_path);
                                 if (file_exists($fullPath)) {
                                     @chmod($fullPath, 0664);
                                     $stats['permissions_fixed']++;
                                 }
                             }
-                            
+
                             // Remove duplicates
                             foreach ($duplicateGroup as $duplicate) {
                                 $stats['duplicates_found']++;
-                                
-                                if (!$isDryRun) {
+
+                                if (! $isDryRun) {
                                     try {
                                         // Delete the file
                                         Storage::disk('private')->delete($duplicate->file_path);
-                                        
+
                                         // Delete the database record
                                         $duplicate->delete();
-                                        
+
                                         $stats['duplicates_removed']++;
                                         $this->info("  ✅ Removed duplicate: {$duplicate->original_filename}");
                                     } catch (\Exception $e) {
                                         $stats['errors']++;
-                                        $this->error("  ❌ Error removing duplicate: " . $e->getMessage());
+                                        $this->error('  ❌ Error removing duplicate: '.$e->getMessage());
                                     }
                                 } else {
                                     $this->line("  Would remove: {$duplicate->original_filename}");
@@ -112,7 +111,7 @@ class CleanupDuplicateAttachments extends Command
                             }
                         } else {
                             // No duplicates, but fix permissions if requested
-                            if ($fixPermissions && !$isDryRun) {
+                            if ($fixPermissions && ! $isDryRun) {
                                 $attachment = $duplicateGroup[0];
                                 $fullPath = Storage::disk('private')->path($attachment->file_path);
                                 if (file_exists($fullPath)) {
@@ -142,7 +141,7 @@ class CleanupDuplicateAttachments extends Command
             ]
         );
 
-        if (!$isDryRun && $stats['duplicates_removed'] > 0) {
+        if (! $isDryRun && $stats['duplicates_removed'] > 0) {
             $this->info('🎉 Cleanup completed successfully!');
         }
 

@@ -8,7 +8,6 @@ use App\Models\Invoice;
 use App\Models\InvoiceAttachment;
 use App\Models\InvoiceVatLine;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -76,6 +75,22 @@ class OSAccountsImportController extends Controller
         ], 'Supplier Sync');
     }
 
+    public function importSuppliers(Request $request)
+    {
+        $dryRun = $request->boolean('dry_run', false);
+        $force = $request->boolean('force', false);
+
+        $options = [];
+        if ($dryRun) {
+            $options['--dry-run'] = true;
+        }
+        if ($force) {
+            $options['--force'] = true;
+        }
+
+        return $this->streamCommand('osaccounts:import-suppliers', $options, 'Suppliers Import');
+    }
+
     public function importInvoices(Request $request)
     {
         \Log::info('Import Invoices Request', [
@@ -84,8 +99,8 @@ class OSAccountsImportController extends Controller
             'user' => $request->user() ? [
                 'id' => $request->user()->id,
                 'name' => $request->user()->name,
-                'role' => $request->user()->role?->name
-            ] : null
+                'role' => $request->user()->role?->name,
+            ] : null,
         ]);
 
         try {
@@ -99,7 +114,7 @@ class OSAccountsImportController extends Controller
         } catch (\Illuminate\Validation\ValidationException $e) {
             \Log::error('Validation failed', [
                 'errors' => $e->errors(),
-                'input' => $request->all()
+                'input' => $request->all(),
             ]);
             throw $e;
         }
@@ -166,6 +181,21 @@ class OSAccountsImportController extends Controller
         return $this->streamCommand('osaccounts:import-attachments', $options, 'Attachments Import');
     }
 
+    public function importVatReturns(Request $request)
+    {
+        $options = [];
+
+        if ($request->boolean('dry_run')) {
+            $options['--dry-run'] = true;
+        }
+
+        if ($request->boolean('force')) {
+            $options['--force'] = true;
+        }
+
+        return $this->streamCommand('osaccounts:import-vat-returns', $options, 'VAT Returns Import');
+    }
+
     public function getImportStats()
     {
         try {
@@ -203,16 +233,16 @@ class OSAccountsImportController extends Controller
         return new StreamedResponse(function () {
             $this->sendStreamMessage('start', 'Starting test stream...');
             sleep(1);
-            
+
             $this->sendStreamMessage('output', 'This is a test message');
             sleep(1);
-            
+
             $this->sendStreamMessage('output', '🚀 Testing emojis and special chars');
             sleep(1);
-            
+
             $this->sendStreamMessage('output', 'Another test message');
             sleep(1);
-            
+
             $this->sendStreamMessage('complete', 'Test stream completed successfully', true);
         }, 200, [
             'Content-Type' => 'text/event-stream',
@@ -276,12 +306,12 @@ class OSAccountsImportController extends Controller
 
     private function streamCommand(string $command, array $options, string $title)
     {
-        \Log::info("StreamCommand called", [
+        \Log::info('StreamCommand called', [
             'command' => $command,
             'options' => $options,
-            'title' => $title
+            'title' => $title,
         ]);
-        
+
         return new StreamedResponse(function () use ($command, $options, $title) {
             // Send initial message
             $this->sendStreamMessage('start', "Starting {$title}...");
@@ -293,7 +323,7 @@ class OSAccountsImportController extends Controller
                 foreach ($options as $key => $value) {
                     if (is_bool($value) && $value) {
                         $commandString .= " {$key}";
-                    } elseif (!is_bool($value)) {
+                    } elseif (! is_bool($value)) {
                         $commandString .= " {$key}=".escapeshellarg($value);
                     }
                 }
@@ -312,10 +342,11 @@ class OSAccountsImportController extends Controller
                 $exitCode = 0; // shell_exec doesn't provide exit code easily
 
                 // Log output for debugging
-                Log::info("Command output length: ".strlen($output ?? ''));
+                Log::info('Command output length: '.strlen($output ?? ''));
 
                 if (empty(trim($output ?? ''))) {
                     $this->sendStreamMessage('error', 'Command executed but produced no output. Check logs for details.');
+
                     return;
                 }
 
@@ -323,19 +354,19 @@ class OSAccountsImportController extends Controller
                 $lines = explode("\n", $output);
                 foreach ($lines as $line) {
                     $trimmed = trim($line);
-                    if (!empty($trimmed)) {
+                    if (! empty($trimmed)) {
                         $this->sendStreamMessage('output', $trimmed);
                         usleep(50000); // Small delay for better UX
                     }
                 }
 
-                $this->sendStreamMessage('complete', 
+                $this->sendStreamMessage('complete',
                     "{$title} completed successfully",
                     true
                 );
 
             } catch (\Exception $e) {
-                Log::error("Stream command error: ".$e->getMessage());
+                Log::error('Stream command error: '.$e->getMessage());
                 $this->sendStreamMessage('error', "Error during {$title}: ".$e->getMessage());
             }
         }, 200, [
@@ -346,7 +377,7 @@ class OSAccountsImportController extends Controller
         ]);
     }
 
-    private function sendStreamMessage(string $type, string $message, bool $success = null)
+    private function sendStreamMessage(string $type, string $message, ?bool $success = null)
     {
         $data = [
             'type' => $type,

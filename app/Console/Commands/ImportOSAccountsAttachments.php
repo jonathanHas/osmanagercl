@@ -188,8 +188,8 @@ class ImportOSAccountsAttachments extends Command
         }
 
         // Check if InvoicePath ends with .pdf (full file path)
-        if (str_ends_with(strtolower($invoicePath), '.pdf') || 
-            str_ends_with(strtolower($invoicePath), '.xls') || 
+        if (str_ends_with(strtolower($invoicePath), '.pdf') ||
+            str_ends_with(strtolower($invoicePath), '.xls') ||
             str_ends_with(strtolower($invoicePath), '.xlsx')) {
             // InvoicePath is the complete file path
             return $basePath.'/'.$invoicePath;
@@ -221,8 +221,8 @@ class ImportOSAccountsAttachments extends Command
 
         // Try path without timestamp suffix (e.g., remove _20250807_081150 from path)
         if (preg_match('/^(.+?)(_\d{8}_\d{6})\.(pdf|xls|xlsx)$/i', $invoicePath, $matches)) {
-            $pathWithoutTimestamp = $matches[1] . '.' . $matches[3];
-            $fallbackPath = $basePath . '/' . $pathWithoutTimestamp;
+            $pathWithoutTimestamp = $matches[1].'.'.$matches[3];
+            $fallbackPath = $basePath.'/'.$pathWithoutTimestamp;
             if (File::exists($fallbackPath)) {
                 return $fallbackPath;
             }
@@ -230,7 +230,7 @@ class ImportOSAccountsAttachments extends Command
             // Also try with just the directory part (remove timestamp and extension)
             $dirOnly = dirname($invoicePath);
             if ($dirOnly !== '.') {
-                $fallbackPath = $basePath . '/' . $dirOnly . '/' . $filename;
+                $fallbackPath = $basePath.'/'.$dirOnly.'/'.$filename;
                 if (File::exists($fallbackPath)) {
                     return $fallbackPath;
                 }
@@ -241,14 +241,14 @@ class ImportOSAccountsAttachments extends Command
         // Sometimes the filesystem has & but database has &amp;
         $decodedPath = str_replace('&amp;', '&', $invoicePath);
         if ($decodedPath !== $invoicePath) {
-            $fallbackPath = $basePath . '/' . $decodedPath;
+            $fallbackPath = $basePath.'/'.$decodedPath;
             if (File::exists($fallbackPath)) {
                 return $fallbackPath;
             }
 
             // Try with filename appended
-            if (!str_ends_with($decodedPath, $filename)) {
-                $fallbackPath = $basePath . '/' . $decodedPath . '/' . $filename;
+            if (! str_ends_with($decodedPath, $filename)) {
+                $fallbackPath = $basePath.'/'.$decodedPath.'/'.$filename;
                 if (File::exists($fallbackPath)) {
                     return $fallbackPath;
                 }
@@ -276,13 +276,14 @@ class ImportOSAccountsAttachments extends Command
         $existingAttachment = $invoice->attachments()
             ->where('file_hash', $fileHash)
             ->first();
-            
+
         if ($existingAttachment) {
             Log::info('Skipping duplicate attachment (same file hash already exists)', [
                 'invoice_id' => $invoice->id,
                 'original_filename' => $originalFilename,
                 'existing_attachment_id' => $existingAttachment->id,
             ]);
+
             return;
         }
 
@@ -298,13 +299,13 @@ class ImportOSAccountsAttachments extends Command
 
         // Get the full path for permissions fix
         $fullPath = Storage::disk('private')->path($storagePath);
-        
+
         // PRODUCTION-SAFE: Set permissions that allow group access
         // This works regardless of who runs the command (cron, artisan, web)
         if (file_exists($fullPath)) {
             // Set file to be readable/writable by owner and group
             @chmod($fullPath, 0664);
-            
+
             // Try to set the group to www-data if we have permission
             // This will work if:
             // 1. We're running as root (unlikely)
@@ -314,12 +315,12 @@ class ImportOSAccountsAttachments extends Command
             if ($wwwDataGroup && isset($wwwDataGroup['gid'])) {
                 @chgrp($fullPath, $wwwDataGroup['gid']);
             }
-            
+
             // Also ensure parent directories have proper permissions and setgid bit
             $parentDir = dirname($fullPath);
             if (is_dir($parentDir)) {
                 @chmod($parentDir, 02775); // rwxrwsr-x - setgid ensures new files inherit group
-                
+
                 // Try to set group on directory too
                 if ($wwwDataGroup && isset($wwwDataGroup['gid'])) {
                     @chgrp($parentDir, $wwwDataGroup['gid']);

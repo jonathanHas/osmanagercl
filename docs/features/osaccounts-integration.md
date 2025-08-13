@@ -86,7 +86,54 @@ php artisan osaccounts:import-invoice-vat-lines
 - `SECOND_REDUCED` - 9% (Irish second reduced rate)
 - `ZERO` - 0% (Zero-rated items)
 
-### 4. Attachments Import
+### 4. VAT Returns Import
+
+```bash
+php artisan osaccounts:import-vat-returns
+```
+
+**Purpose**: Reconstructs historical VAT return records from the OSAccounts `Assigned` column, enabling recovery of VAT return data if lost during testing.
+
+**Options**:
+- `--force` - Re-import even if VAT returns already exist for periods
+- `--dry-run` - Preview import without making changes
+- `--chunk=N` - Process size (default: 100)
+
+**What it does**:
+1. **Analyzes VAT Periods**: Scans all unique `Assigned` values in OSAccounts INVOICES table
+2. **Parses Period Strings**: Handles various formats like "VAT Jan Feb 2024", "Mar Apr 2021", "Jan - Feb 2016"
+3. **Creates VAT Returns**: Generates `vat_returns` records for each historical period
+4. **Calculates Totals**: Aggregates invoice VAT breakdowns by rate (0%, 9%, 13.5%, 23%)
+5. **Links Invoices**: Updates imported invoices with `vat_return_id` references
+
+**Period Format Support**:
+- `VAT Jan Feb 2024` (most common)
+- `Jan - Feb 2016` (with dash)
+- `Mar Apr 2021` (without VAT prefix)
+- Automatically handles case variations and "VAT" prefix removal
+
+**Example**:
+```bash
+# Preview what will be imported
+php artisan osaccounts:import-vat-returns --dry-run
+
+# Import all historical VAT returns
+php artisan osaccounts:import-vat-returns
+
+# Force re-import (updates existing returns)
+php artisan osaccounts:import-vat-returns --force
+```
+
+**Success Rate**: 98.2% (56 of 57 periods parsed successfully)
+
+**Features**:
+- **Historical Flagging**: Imported returns marked as `is_historical = true`
+- **Status Setting**: Returns marked as `submitted` (already processed)
+- **Reference Generation**: Creates reference numbers like `OSA-2024-02`
+- **Transaction Safety**: Full rollback on errors
+- **Idempotent**: Safe to run multiple times
+
+### 5. Attachments Import
 
 ```bash
 php artisan osaccounts:import-attachments --base-path=/path/to/files
@@ -129,7 +176,10 @@ php artisan osaccounts:import-invoices --date-from=2025-01-01 --date-to=2025-12-
 # Step 3: Import VAT lines for all invoices
 php artisan osaccounts:import-invoice-vat-lines
 
-# Step 4: Import file attachments
+# Step 4: Import historical VAT returns (after invoices are imported!)
+php artisan osaccounts:import-vat-returns
+
+# Step 5: Import file attachments
 php artisan osaccounts:import-attachments --base-path=/path/to/invoice/storage
 ```
 
@@ -141,9 +191,20 @@ For ongoing synchronization:
 # Import last month's invoices
 php artisan osaccounts:import-invoices --date-from=$(date -d "first day of last month" +%Y-%m-%d) --date-to=$(date -d "last day of last month" +%Y-%m-%d)
 
-# Import VAT lines and attachments
+# Import VAT lines, VAT returns, and attachments
 php artisan osaccounts:import-invoice-vat-lines
+php artisan osaccounts:import-vat-returns --force  # Update if new assignments
 php artisan osaccounts:import-attachments --base-path=/path/to/files
+```
+
+### Data Recovery
+
+If VAT return data is lost during testing:
+
+```bash
+# Quick recovery - just import VAT returns from existing invoice assignments
+php artisan osaccounts:import-vat-returns --dry-run  # Preview first
+php artisan osaccounts:import-vat-returns            # Import historical data
 ```
 
 ## Supplier Mapping Logic

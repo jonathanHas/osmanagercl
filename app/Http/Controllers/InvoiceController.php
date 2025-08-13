@@ -72,7 +72,7 @@ class InvoiceController extends Controller
 
         // Clone query for statistics before pagination
         $statsQuery = clone $query;
-        
+
         $invoices = $query->orderBy($sortField, $sortDirection)
             ->orderBy('id', 'desc') // Secondary sort for consistency
             ->paginate(20);

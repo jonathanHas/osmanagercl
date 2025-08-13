@@ -97,7 +97,7 @@ class ImportOSAccountsInvoices extends Command
             // Check existing invoices in the date range if not forcing
             if (! $force) {
                 $existingQuery = Invoice::whereNotNull('external_osaccounts_id');
-                
+
                 // Only check within the date range we're importing
                 if ($dateFrom) {
                     $existingQuery->where('invoice_date', '>=', $dateFrom);
@@ -105,7 +105,7 @@ class ImportOSAccountsInvoices extends Command
                 if ($dateTo) {
                     $existingQuery->where('invoice_date', '<=', $dateTo);
                 }
-                
+
                 $existingCount = $existingQuery->count();
                 if ($existingCount > 0) {
                     $this->error("❌ Found {$existingCount} existing OSAccounts invoices in this date range. Use --force to override.");

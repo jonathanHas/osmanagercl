@@ -6,6 +6,27 @@ Welcome to the comprehensive documentation for OSManager CL. This documentation 
 
 ## 🆕 Latest Updates (August 2025)
 
+### VAT Returns Management System (2025-08-13)
+Complete Irish Revenue Online Service (ROS) VAT returns with automated calculations:
+
+- **🇮🇪 ROS Compliance**: All required fields (T1, T2, T3, T4, E1, E2) automatically calculated
+- **📅 Bi-Monthly Periods**: Supports Irish VAT periods (Jan-Feb, Mar-Apr, May-Jun, etc.)
+- **💰 Complete VAT Integration**: Sales VAT from POS + Purchase VAT from invoices
+- **🇪🇺 EU Trade Tracking**: Automatic INTRASTAT reporting for EU suppliers (Dynamis, Udea)
+- **🚀 Auto-Selection UX**: All period invoices selected by default with smart controls
+- **📊 Comprehensive Exports**: Automatic CSV download with all ROS data and breakdowns
+- **⚡ Dual Performance**: Uses optimized data (100x+ faster) with real-time fallback
+- **🔒 Role-Based Access**: Admin and Manager only with full audit trail
+
+**Key Benefits**:
+- Complete ROS VAT3 preparation with all required fields
+- Accurate VAT calculations including voucher sales VAT
+- EU supplier tracking for INTRASTAT compliance
+- Professional CSV exports ready for Revenue submission
+- Seamless integration with VAT Dashboard for workflow
+
+See [VAT Returns Management](./features/vat-returns.md) for complete details.
+
 ### Sales Accounting Report System (2025-08-12)
 VAT-compliant sales analysis with comprehensive export and accurate revenue calculations:
 
@@ -253,6 +274,21 @@ Detailed documentation for each major feature.
 
 ### 🏢 Management Systems
 Administrative and operational management tools.
+
+- **[VAT Returns Management](./features/vat-returns.md)** - 🆕 Complete Irish Revenue VAT returns *(New)*
+  - ROS-compliant VAT calculations (T1, T2, T3, T4, E1, E2)
+  - Bi-monthly Irish VAT periods with smart detection
+  - Sales VAT integration from POS data
+  - EU supplier tracking for INTRASTAT reporting
+  - Auto-selection UX with comprehensive CSV exports
+  - Dual performance mode with 100x+ optimization
+
+- **[VAT Dashboard](./features/vat-dashboard.md)** - 🆕 VAT return management dashboard *(New)*
+  - Outstanding period alerts with proactive notifications
+  - Current period tracking with deadline countdown
+  - Unsubmitted invoice summaries by month
+  - Complete history with filtering and export
+  - Direct workflow integration with VAT Returns
 
 - **[Receipts Management](./management/receipts.md)** - 🆕 Complete till review and transaction analysis *(New)*
   - POS transaction review with advanced filtering

@@ -365,11 +365,24 @@ Complete invoice and supplier data migration from legacy OSAccounts system.
 - **Supplier Sync Command**: Automatic mapping of POS IDs to OSAccounts IDs
 - **Full Invoice Import**: Import with correct supplier names and relationships
 - **VAT Line Migration**: Detailed VAT breakdown with Irish tax rate support
+- **VAT Returns Recovery**: Reconstruct historical VAT returns from invoice assignments
 - **Attachment Import**: File migration with proper web server permissions
 - **Production-Ready Workflow**: Tested and optimized import process
 - **Data Integrity**: Transaction-safe imports with validation
 - **Cross-Database Support**: Handles EXPENSES_JOINED supplier table
 See [OSAccounts Integration Documentation](./docs/features/osaccounts-integration.md).
+
+### VAT Returns Management System
+Complete Irish Revenue Online Service (ROS) VAT returns with automated calculations.
+- **ROS Compliance**: All required fields (T1, T2, T3, T4, E1, E2) automatically calculated
+- **Bi-Monthly Periods**: Supports Irish VAT periods (Jan-Feb, Mar-Apr, May-Jun, etc.)
+- **Complete VAT Integration**: Sales VAT from POS + Purchase VAT from invoices
+- **EU Trade Tracking**: Automatic INTRASTAT reporting for EU suppliers (Dynamis, Udea)
+- **Auto-Selection UX**: All period invoices selected by default with smart controls
+- **Comprehensive Exports**: Automatic CSV download with all ROS data and breakdowns
+- **Dual Performance**: Uses optimized data (100x+ faster) with real-time fallback
+- **Role-based Access**: Admin and Manager only with full audit trail
+See [VAT Returns Management Documentation](./docs/features/vat-returns.md).
 
 ### VAT Dashboard System
 Comprehensive VAT return management dashboard with proactive deadline alerts.

@@ -115,10 +115,49 @@
                 <div class="p-6">
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-6">Import Process</h3>
                     
-                    <!-- Step 1: Validation -->
+                    <!-- Step 1: Import Suppliers -->
+                    <div class="mb-8" id="suppliers-import-step">
+                        <div class="flex items-center mb-4">
+                            <span class="flex items-center justify-center w-8 h-8 bg-orange-100 text-orange-800 rounded-full mr-3">1</span>
+                            <h4 class="text-lg font-medium text-gray-900 dark:text-white">Import Suppliers</h4>
+                        </div>
+                        <div class="ml-11 space-y-4">
+                            <div class="bg-blue-50 border border-blue-200 rounded-md p-3">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="ml-3">
+                                        <h3 class="text-sm font-medium text-blue-800">
+                                            Important First Step
+                                        </h3>
+                                        <div class="mt-2 text-sm text-blue-700">
+                                            <p><strong>Run this first!</strong> This imports suppliers from OSAccounts EXPENSES table to populate the accounting_suppliers table. Without this, the supplier mapping will show 0 suppliers.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <input type="checkbox" id="suppliers-dry-run" checked class="rounded">
+                                <label for="suppliers-dry-run" class="text-sm text-gray-600 dark:text-gray-300">Dry Run (Preview Only)</label>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <input type="checkbox" id="suppliers-force" class="rounded">
+                                <label for="suppliers-force" class="text-sm text-gray-600 dark:text-gray-300">Force Import (Update Existing)</label>
+                            </div>
+                            <button onclick="importSuppliers()" class="bg-orange-500 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded">
+                                Import Suppliers from OSAccounts
+                            </button>
+                            <div id="suppliers-import-output" class="mt-4"></div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Validation -->
                     <div class="mb-8" id="validation-step">
                         <div class="flex items-center mb-4">
-                            <span class="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-800 rounded-full mr-3">1</span>
+                            <span class="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-800 rounded-full mr-3">2</span>
                             <h4 class="text-lg font-medium text-gray-900 dark:text-white">Pre-Import Validation</h4>
                         </div>
                         <div class="ml-11 space-y-4">
@@ -132,10 +171,10 @@
                         </div>
                     </div>
 
-                    <!-- Step 2: Supplier Sync -->
+                    <!-- Step 3: Supplier Sync -->
                     <div class="mb-8" id="supplier-sync-step">
                         <div class="flex items-center mb-4">
-                            <span class="flex items-center justify-center w-8 h-8 bg-purple-100 text-purple-800 rounded-full mr-3">2</span>
+                            <span class="flex items-center justify-center w-8 h-8 bg-purple-100 text-purple-800 rounded-full mr-3">3</span>
                             <h4 class="text-lg font-medium text-gray-900 dark:text-white">Supplier Mapping Sync</h4>
                         </div>
                         <div class="ml-11 space-y-4">
@@ -150,10 +189,10 @@
                         </div>
                     </div>
 
-                    <!-- Step 3: Invoice Import -->
+                    <!-- Step 4: Invoice Import -->
                     <div class="mb-8" id="invoice-import-step">
                         <div class="flex items-center mb-4">
-                            <span class="flex items-center justify-center w-8 h-8 bg-green-100 text-green-800 rounded-full mr-3">3</span>
+                            <span class="flex items-center justify-center w-8 h-8 bg-green-100 text-green-800 rounded-full mr-3">4</span>
                             <h4 class="text-lg font-medium text-gray-900 dark:text-white">Invoice Import</h4>
                         </div>
                         <div class="ml-11 space-y-4">
@@ -206,10 +245,10 @@
                         </div>
                     </div>
 
-                    <!-- Step 4: VAT Lines -->
+                    <!-- Step 5: VAT Lines -->
                     <div class="mb-8" id="vat-lines-step">
                         <div class="flex items-center mb-4">
-                            <span class="flex items-center justify-center w-8 h-8 bg-yellow-100 text-yellow-800 rounded-full mr-3">4</span>
+                            <span class="flex items-center justify-center w-8 h-8 bg-yellow-100 text-yellow-800 rounded-full mr-3">5</span>
                             <h4 class="text-lg font-medium text-gray-900 dark:text-white">VAT Lines Import</h4>
                         </div>
                         <div class="ml-11 space-y-4">
@@ -230,10 +269,10 @@
                         </div>
                     </div>
 
-                    <!-- Step 5: Attachments -->
+                    <!-- Step 6: Attachments -->
                     <div class="mb-8" id="attachments-step">
                         <div class="flex items-center mb-4">
-                            <span class="flex items-center justify-center w-8 h-8 bg-red-100 text-red-800 rounded-full mr-3">5</span>
+                            <span class="flex items-center justify-center w-8 h-8 bg-red-100 text-red-800 rounded-full mr-3">6</span>
                             <h4 class="text-lg font-medium text-gray-900 dark:text-white">Attachments Import</h4>
                         </div>
                         <div class="ml-11 space-y-4">
@@ -255,6 +294,47 @@
                                 Import Attachments
                             </button>
                             <div id="attachments-output" class="mt-4"></div>
+                        </div>
+                    </div>
+
+                    <!-- Step 7: VAT Returns -->
+                    <div class="mb-8" id="vat-returns-step">
+                        <div class="flex items-center mb-4">
+                            <span class="flex items-center justify-center w-8 h-8 bg-indigo-100 text-indigo-800 rounded-full mr-3">7</span>
+                            <h4 class="text-lg font-medium text-gray-900 dark:text-white">VAT Returns Import</h4>
+                        </div>
+                        <div class="ml-11 space-y-4">
+                            <div class="bg-indigo-50 border border-indigo-200 rounded-md p-3">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        <svg class="h-5 w-5 text-indigo-400" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="ml-3">
+                                        <h3 class="text-sm font-medium text-indigo-800">
+                                            Historical VAT Returns Recovery
+                                        </h3>
+                                        <div class="mt-2 text-sm text-indigo-700">
+                                            <p><strong>Run this after importing invoices!</strong> This reconstructs historical VAT returns from the OSAccounts 'Assigned' column. It creates VAT return records for each period and calculates totals from the assigned invoices.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <div class="flex items-center space-x-2">
+                                    <input type="checkbox" id="vat-returns-dry-run" checked class="rounded">
+                                    <label for="vat-returns-dry-run" class="text-sm text-gray-600 dark:text-gray-300">Dry Run (Preview Only)</label>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <input type="checkbox" id="vat-returns-force" class="rounded">
+                                    <label for="vat-returns-force" class="text-sm text-gray-600 dark:text-gray-300">Force Re-import</label>
+                                </div>
+                            </div>
+                            <button onclick="importVatReturns()" class="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">
+                                Import VAT Returns
+                            </button>
+                            <div id="vat-returns-output" class="mt-4"></div>
                         </div>
                     </div>
                 </div>
@@ -349,6 +429,13 @@
                 });
         }
 
+        function importSuppliers() {
+            const dryRun = document.getElementById('suppliers-dry-run').checked;
+            const force = document.getElementById('suppliers-force').checked;
+            startStreamedProcess('{{ route("management.osaccounts-import.import-suppliers") }}', 
+                { dry_run: dryRun, force: force }, 'suppliers-import-output');
+        }
+
         function syncSuppliers() {
             const dryRun = document.getElementById('supplier-dry-run').checked;
             startStreamedProcess('{{ route("management.osaccounts-import.sync-suppliers") }}', 
@@ -403,6 +490,15 @@
             };
 
             startStreamedProcess('{{ route("management.osaccounts-import.import-attachments") }}', params, 'attachments-output');
+        }
+
+        function importVatReturns() {
+            const params = {
+                dry_run: document.getElementById('vat-returns-dry-run').checked,
+                force: document.getElementById('vat-returns-force').checked
+            };
+
+            startStreamedProcess('{{ route("management.osaccounts-import.import-vat-returns") }}', params, 'vat-returns-output');
         }
 
         function startStreamedProcess(url, params, outputElementId) {

@@ -398,6 +398,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/financial/dashboard', [\App\Http\Controllers\Management\FinancialDashboardController::class, 'index'])
             ->name('financial.dashboard');
 
+        // Profit & Loss
+        Route::get('/profit-loss', [\App\Http\Controllers\Management\ProfitLossController::class, 'index'])
+            ->name('profit-loss.index');
+
         // VAT Dashboard
         Route::prefix('vat-dashboard')->name('vat-dashboard.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Management\VatDashboardController::class, 'index'])->name('index');
@@ -412,6 +416,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/{vatReturn}', [\App\Http\Controllers\Management\VatReturnController::class, 'show'])->name('show');
             Route::patch('/{vatReturn}/finalize', [\App\Http\Controllers\Management\VatReturnController::class, 'finalize'])->name('finalize');
             Route::get('/{vatReturn}/export', [\App\Http\Controllers\Management\VatReturnController::class, 'export'])->name('export');
+            Route::post('/export-preview', [\App\Http\Controllers\Management\VatReturnController::class, 'exportPreview'])->name('export-preview');
             Route::delete('/{vatReturn}/invoices/{invoice}', [\App\Http\Controllers\Management\VatReturnController::class, 'removeInvoice'])->name('remove-invoice');
             Route::delete('/{vatReturn}', [\App\Http\Controllers\Management\VatReturnController::class, 'destroy'])->name('destroy');
         });
@@ -427,10 +432,12 @@ Route::middleware('auth')->group(function () {
             Route::get('/', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'index'])->name('index');
             Route::get('/validate-connection', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'validateConnection'])->name('validate-connection');
             Route::get('/check-supplier-mapping', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'checkSupplierMapping'])->name('check-supplier-mapping');
+            Route::post('/import-suppliers', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'importSuppliers'])->name('import-suppliers');
             Route::post('/sync-suppliers', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'syncSuppliers'])->name('sync-suppliers');
             Route::post('/import-invoices', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'importInvoices'])->name('import-invoices');
             Route::post('/import-vat-lines', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'importVatLines'])->name('import-vat-lines');
             Route::post('/import-attachments', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'importAttachments'])->name('import-attachments');
+            Route::post('/import-vat-returns', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'importVatReturns'])->name('import-vat-returns');
             Route::get('/stats', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'getImportStats'])->name('stats');
             Route::get('/test-stream', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'testStream'])->name('test-stream');
         });

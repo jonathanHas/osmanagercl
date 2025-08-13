@@ -14,6 +14,8 @@ class AccountingSupplier extends Model
         'code',
         'name',
         'address',
+        'country_code',
+        'is_eu_supplier',
         'phone',
         'email',
         'website',
@@ -55,6 +57,7 @@ class AccountingSupplier extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'is_eu_supplier' => 'boolean',
         'payment_terms_days' => 'integer',
         // Enhanced field casts
         'is_pos_linked' => 'boolean',
@@ -188,6 +191,14 @@ class AccountingSupplier extends Model
     public function scopeActiveOnly($query)
     {
         return $query->where('status', 'active')->where('is_active', true);
+    }
+    
+    /**
+     * Scope for EU suppliers.
+     */
+    public function scopeEuSuppliers($query)
+    {
+        return $query->where('is_eu_supplier', true);
     }
 
     /**

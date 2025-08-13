@@ -258,4 +258,17 @@
             @endforeach
         </div>
     </div>
+    
+    @if(session('download_csv'))
+    @push('scripts')
+    <script>
+        // Automatically download CSV when VAT return is created
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                window.location.href = '{{ route("management.vat-returns.export", $vatReturn) }}';
+            }, 1000); // Wait 1 second for user to see success message
+        });
+    </script>
+    @endpush
+    @endif
 </x-admin-layout>

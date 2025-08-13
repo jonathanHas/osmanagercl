@@ -31,4 +31,9 @@ Bringing it all together
 Updates to /fruit-veg/product/2012 don't seend the product to the label already NEED TO CHECK - I originally looked in labels and not in Fruit and Veg labels
 
 Sales analysis
+Identify busy periods
+
+Simple Accounts, have a page that gives a very simple return of the amount of money taken in for a period and the outgoings for that same period and gives reasonable indication of how the business is doing
+
+
 

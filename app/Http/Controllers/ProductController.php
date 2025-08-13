@@ -559,6 +559,49 @@ class ProductController extends Controller
     }
 
     /**
+     * Get the next available barcode for Coffee Fresh category (081).
+     * Follows the 4000s numbering pattern, fills gaps or increments from highest.
+     * Checks ALL products across ALL categories since barcodes are globally unique.
+     */
+    private function getNextAvailableCoffeeFreshBarcode(): string
+    {
+        // Get Coffee Fresh codes to understand the numbering pattern
+        $coffeeFreshCodes = Product::where('CATEGORY', '081')
+            ->pluck('CODE')
+            ->filter(fn($code) => is_numeric($code) && (int)$code < 100000)
+            ->map(fn($code) => (int)$code)
+            ->sort()
+            ->values()
+            ->toArray();
+            
+        // If no Coffee Fresh codes exist, start at 4001
+        if (empty($coffeeFreshCodes)) {
+            return '4001';
+        }
+        
+        // Determine the search range based on Coffee Fresh pattern
+        $min = min($coffeeFreshCodes);
+        $max = max($coffeeFreshCodes);
+        
+        // First check for gaps in the Coffee Fresh range, but verify globally
+        for ($i = $min; $i <= $max; $i++) {
+            if (!in_array($i, $coffeeFreshCodes) && !Product::where('CODE', (string)$i)->exists()) {
+                return (string)$i;
+            }
+        }
+        
+        // No gaps found, find next available code after highest Coffee Fresh code
+        for ($i = $max + 1; $i <= $max + 200; $i++) { // Check next 200 numbers
+            if (!Product::where('CODE', (string)$i)->exists()) {
+                return (string)$i;
+            }
+        }
+        
+        // Fallback: if everything is taken, return next increment
+        return (string)($max + 1);
+    }
+    
+    /**
      * Show the form for creating a new product.
      */
     public function create(Request $request): View
@@ -578,6 +621,12 @@ class ProductController extends Controller
         $deliveryItemId = $request->query('delivery_item');
         $categoryId = $request->query('category'); // For category-specific creation (e.g., Coffee Fresh)
         $prefillData = null;
+        
+        // Auto-suggest barcode for Coffee Fresh category (081)
+        $suggestedBarcode = null;
+        if ($categoryId === '081') {
+            $suggestedBarcode = $this->getNextAvailableCoffeeFreshBarcode();
+        }
 
         if ($deliveryItemId) {
             $deliveryItem = \App\Models\DeliveryItem::findOrFail($deliveryItemId);
@@ -642,7 +691,7 @@ class ProductController extends Controller
             }
         }
 
-        return view('products.create', compact('taxCategories', 'categories', 'suppliers', 'prefillData', 'deliveryItemId', 'categoryId', 'taxRates', 'udeaSupplierIds'));
+        return view('products.create', compact('taxCategories', 'categories', 'suppliers', 'prefillData', 'deliveryItemId', 'categoryId', 'taxRates', 'udeaSupplierIds', 'suggestedBarcode'));
     }
 
     /**

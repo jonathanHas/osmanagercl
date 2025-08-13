@@ -126,13 +126,22 @@ The dashboard uses optimized queries with eager loading and aggregation:
 5. **View History**: Click "View History" for complete archive
 6. **Export Data**: Use export links on finalized returns for CSV downloads
 
+## Integration with VAT Returns
+
+The VAT Dashboard seamlessly integrates with the VAT Returns management system:
+
+- **Direct Navigation**: Outstanding period alerts link directly to VAT return creation
+- **Pre-filled Data**: Period dates are automatically populated when creating returns
+- **Bi-monthly Periods**: Uses Irish Revenue's standard bi-monthly VAT periods
+- **Real-time Updates**: Dashboard reflects newly created and finalized returns
+- **ROS Integration**: VAT returns include all required Revenue Online Service fields
+
 ## Future Enhancements
 
 Planned features for future releases:
-- VAT on sales tracking and reconciliation
 - Automated email reminders for upcoming deadlines
 - Graphical charts for VAT trends
-- Integration with Revenue Online Service (ROS)
+- Enhanced Revenue Online Service (ROS) integration
 - Bulk operations for multiple periods
 - Custom period configurations for special cases
 

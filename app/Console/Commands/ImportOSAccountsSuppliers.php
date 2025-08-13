@@ -3,9 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Models\AccountingSupplier;
-use App\Models\OSAccounts\OSExpense;
 use App\Models\OSAccounts\OSSupplierType;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB as DBFacade;
 use Illuminate\Support\Facades\Log;
 
 class ImportOSAccountsSuppliers extends Command
@@ -25,7 +25,7 @@ class ImportOSAccountsSuppliers extends Command
      *
      * @var string
      */
-    protected $description = 'Import suppliers from OSAccounts EXPENSES table to Laravel accounting_suppliers table';
+    protected $description = 'Import suppliers from OSAccounts EXPENSES_JOINED table (includes both POS and OSAccounts suppliers)';
 
     private $stats = [
         'total' => 0,
@@ -33,6 +33,8 @@ class ImportOSAccountsSuppliers extends Command
         'updated' => 0,
         'skipped' => 0,
         'errors' => 0,
+        'pos_suppliers' => 0,
+        'osaccounts_only' => 0,
     ];
 
     /**
@@ -53,8 +55,8 @@ class ImportOSAccountsSuppliers extends Command
         try {
             // Test OSAccounts connection
             $this->info('🔌 Testing OSAccounts database connection...');
-            $osSupplierCount = OSExpense::count();
-            $this->info("✅ Found {$osSupplierCount} suppliers in OSAccounts");
+            $osSupplierCount = DBFacade::connection('osaccounts')->table('EXPENSES_JOINED')->count();
+            $this->info("✅ Found {$osSupplierCount} suppliers in EXPENSES_JOINED (POS + OSAccounts)");
 
             // Get supplier type mappings
             $this->info('📋 Loading supplier type mappings...');
@@ -77,7 +79,9 @@ class ImportOSAccountsSuppliers extends Command
             $bar = $this->output->createProgressBar($osSupplierCount);
             $bar->start();
 
-            OSExpense::with('supplierType')
+            DBFacade::connection('osaccounts')
+                ->table('EXPENSES_JOINED')
+                ->orderBy('ID')
                 ->chunk($chunkSize, function ($suppliers) use ($isDryRun, $typeMap, $bar) {
                     $this->processSupplierChunk($suppliers, $isDryRun, $typeMap);
                     $bar->advance($suppliers->count());
@@ -116,10 +120,17 @@ class ImportOSAccountsSuppliers extends Command
             $this->stats['total']++;
 
             try {
+                // Determine if this is a POS supplier (numeric ID) or OSAccounts-only supplier (UUID)
+                $isPosSupplier = is_numeric($osSupplier->ID);
+
                 // Check if supplier already exists (by external ID or name)
-                $existing = AccountingSupplier::where('external_osaccounts_id', $osSupplier->ID)
-                    ->orWhere('name', $osSupplier->Name)
-                    ->first();
+                $query = AccountingSupplier::where('name', $osSupplier->Name);
+                if ($isPosSupplier) {
+                    $query->orWhere('external_pos_id', $osSupplier->ID);
+                } else {
+                    $query->orWhere('external_osaccounts_id', $osSupplier->ID);
+                }
+                $existing = $query->first();
 
                 if ($existing && ! $this->option('force')) {
                     $this->stats['skipped']++;
@@ -139,11 +150,25 @@ class ImportOSAccountsSuppliers extends Command
                     'supplier_type' => $supplierType,
                     'status' => 'active', // All imported suppliers start as active
                     'is_active' => true,
-                    'external_osaccounts_id' => $osSupplier->ID,
                     'is_osaccounts_linked' => true,
                     'created_by' => 1, // System user
                     'updated_by' => 1,
                 ];
+
+                // Set the appropriate external ID based on whether it's a POS or OSAccounts supplier
+                if ($isPosSupplier) {
+                    // Numeric ID = POS supplier
+                    $supplierData['external_pos_id'] = $osSupplier->ID;
+                    $supplierData['external_osaccounts_id'] = $osSupplier->ID; // Also set OSAccounts ID for mapping
+                    $supplierData['is_pos_linked'] = true;
+                    $this->stats['pos_suppliers']++;
+                } else {
+                    // UUID = OSAccounts-only supplier
+                    $supplierData['external_osaccounts_id'] = $osSupplier->ID;
+                    $supplierData['external_pos_id'] = null;
+                    $supplierData['is_pos_linked'] = false;
+                    $this->stats['osaccounts_only']++;
+                }
 
                 if (! $isDryRun) {
                     if ($existing) {
@@ -228,6 +253,8 @@ class ImportOSAccountsSuppliers extends Command
                 [$isDryRun ? 'Would Update' : 'Updated', $this->stats['updated']],
                 ['Skipped', $this->stats['skipped']],
                 ['Errors', $this->stats['errors']],
+                ['POS Suppliers', $this->stats['pos_suppliers']],
+                ['OSAccounts-Only', $this->stats['osaccounts_only']],
             ]
         );
     }

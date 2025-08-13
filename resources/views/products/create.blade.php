@@ -182,13 +182,41 @@
 
                                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                     <!-- Product Code/Barcode -->
-                                    <x-form-group 
-                                        name="code" 
-                                        label="Product Code/Barcode *" 
-                                        type="text" 
-                                        :value="old('code', $prefillData['code'] ?? '')" 
-                                        required 
-                                        placeholder="Enter code or scan" />
+                                    <div>
+                                        @php
+                                            $codeValue = old('code', $prefillData['code'] ?? ($suggestedBarcode ?? ''));
+                                            $codeLabel = 'Product Code/Barcode *';
+                                            if($categoryId === '081' && $suggestedBarcode) {
+                                                $codeLabel .= ' <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                                    <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                                    </svg>
+                                                    Coffee Fresh Auto-Suggested
+                                                </span>';
+                                            }
+                                        @endphp
+                                        <x-form-group 
+                                            name="code" 
+                                            label="{!! $codeLabel !!}" 
+                                            type="text" 
+                                            :value="$codeValue" 
+                                            required 
+                                            placeholder="Enter code or scan" />
+                                        
+                                        @if($categoryId === '081' && $suggestedBarcode)
+                                            <div class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:border-blue-800">
+                                                <div class="flex items-center">
+                                                    <svg class="w-4 h-4 text-blue-600 dark:text-blue-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                                                    </svg>
+                                                    <div class="text-sm">
+                                                        <p class="font-medium text-blue-800 dark:text-blue-200">Coffee Fresh Barcode Suggested: {{ $suggestedBarcode }}</p>
+                                                        <p class="text-blue-600 dark:text-blue-300">This follows the Coffee Fresh numbering sequence (4000s). You can change it if needed.</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        @endif
+                                    </div>
 
                                     <!-- Reference Code -->  
                                     <x-form-group 
