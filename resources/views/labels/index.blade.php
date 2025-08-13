@@ -320,7 +320,15 @@
                 <div class="p-6">
                     <!-- Header -->
                     <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Scan to Label</h3>
+                        <div class="flex items-center gap-3">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Scan to Label</h3>
+                            <div class="flex items-center gap-2">
+                                <div class="flex items-center justify-center w-8 h-8 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full font-bold text-sm">
+                                    <span x-text="currentQueueCount"></span>
+                                </div>
+                                <span class="text-sm text-gray-500 dark:text-gray-400">in queue</span>
+                            </div>
+                        </div>
                         <button @click="closeModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -390,8 +398,19 @@
                         </div>
 
                         <!-- Stats -->
-                        <div x-show="scansCount > 0" class="text-center text-sm text-gray-600 dark:text-gray-400 border-t pt-4">
-                            <span x-text="scansCount"></span> product<span x-show="scansCount !== 1">s</span> added to labels queue
+                        <div class="text-center border-t pt-4">
+                            <div class="flex items-center justify-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                <div class="flex items-center justify-center w-7 h-7 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full font-bold text-xs">
+                                    <span x-text="currentQueueCount"></span>
+                                </div>
+                                <span>in labels queue</span>
+                            </div>
+                            <div x-show="scansCount > 0" class="mt-2 flex items-center justify-center gap-1 text-sm text-green-600 dark:text-green-400">
+                                <div class="flex items-center justify-center w-6 h-6 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full font-bold text-xs">
+                                    +<span x-text="scansCount"></span>
+                                </div>
+                                <span>added this session</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -726,6 +745,7 @@
                 lastScan: null,
                 processing: false,
                 scansCount: 0,
+                currentQueueCount: {{ count($productsNeedingLabels) }},
 
                 init() {
                     // Check if we should open immediately
@@ -766,6 +786,8 @@
                     this.barcode = '';
                     this.scannedProduct = null;
                     this.lastScan = null;
+                    // Reset the current queue count to the latest value
+                    this.currentQueueCount = {{ count($productsNeedingLabels) }};
                     this.focusInput();
                 },
 
@@ -830,6 +852,7 @@
                                     message: 'Product added to labels queue!'
                                 };
                                 this.scansCount++;
+                                this.currentQueueCount++;
                             } else {
                                 this.lastScan = {
                                     success: false,
