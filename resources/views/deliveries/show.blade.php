@@ -350,7 +350,7 @@
                                         $rowClass = 'hover:bg-gray-50 dark:hover:bg-gray-700';
                                     }
                                 @endphp
-                                <tr class="{{ $rowClass }}">
+                                <tr class="{{ $rowClass }}" data-item-id="{{ $item->id }}">
                                     <td class="px-6 py-4 text-center">
                                         <div id="image-cell-{{ $item->id }}" class="mx-auto">
                                             @if($item->product)
@@ -1365,12 +1365,18 @@
                 
                 if (data.success) {
                     showMessage(data.message, 'success');
+                    
+                    // Update the table row with new price and margin data
+                    updateTableRowAfterPriceUpdate(currentEditingItem.itemId, data.data);
+                    
                     closePriceEditor();
                     
-                    // Refresh the page to show updated prices and margins
+                    // Auto-advance to next low margin product (optional enhancement)
                     setTimeout(() => {
-                        window.location.reload();
-                    }, 1500);
+                        autoAdvanceToNextLowMargin();
+                    }, 500);
+                    
+                    // No page refresh - keep working!
                 } else {
                     showMessage(data.message || 'Failed to update price', 'error');
                 }
@@ -1378,6 +1384,111 @@
             } catch (error) {
                 console.error('Price update failed:', error);
                 showMessage('Network error occurred during price update', 'error');
+            }
+        }
+
+        function updateTableRowAfterPriceUpdate(itemId, updatedData) {
+            const row = document.querySelector(`tr[data-item-id="${itemId}"]`);
+            if (!row) {
+                console.error('Could not find row for item ID:', itemId);
+                return;
+            }
+            
+            // Update Current Sell Price cell (column 10)
+            const sellPriceCell = row.querySelector('td:nth-child(10)');
+            if (sellPriceCell && sellPriceCell.querySelector('.cursor-pointer')) {
+                const priceContainer = sellPriceCell.querySelector('.cursor-pointer');
+                const priceDiv = priceContainer.querySelector('div > div');
+                if (priceDiv) {
+                    priceDiv.textContent = `€${updatedData.new_gross_price}`;
+                }
+            }
+            
+            // Update Margin cell (column 12)
+            const marginCell = row.querySelector('td:nth-child(12)');
+            if (marginCell) {
+                const marginContainer = marginCell.querySelector('.flex');
+                if (marginContainer) {
+                    const marginValue = marginContainer.querySelector('.text-right .font-medium');
+                    const marginPercent = marginContainer.querySelector('.text-right .text-xs');
+                    
+                    if (marginValue && marginPercent) {
+                        // Update margin values
+                        marginValue.textContent = `€${updatedData.margin}`;
+                        marginPercent.textContent = `${updatedData.margin_percent}%`;
+                        
+                        // Update styling based on margin
+                        const marginPercentFloat = parseFloat(updatedData.margin_percent);
+                        const showWarning = parseFloat(updatedData.margin.replace(',', '')) <= 0;
+                        
+                        // Reset classes
+                        marginValue.className = 'text-gray-900 dark:text-gray-100 font-medium';
+                        marginPercent.className = 'text-xs text-gray-500 dark:text-gray-400';
+                        
+                        if (showWarning) {
+                            marginValue.className += ' text-red-600 dark:text-red-400';
+                            marginPercent.className = 'text-xs text-red-500 dark:text-red-400';
+                        }
+                        
+                        // Update or remove warning icon
+                        const warningIcon = marginContainer.querySelector('svg');
+                        if (showWarning && !warningIcon) {
+                            // Add warning icon
+                            const iconHtml = `
+                                <svg class="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" title="Zero or negative margin">
+                                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                </svg>
+                            `;
+                            marginContainer.insertAdjacentHTML('afterbegin', iconHtml);
+                        } else if (!showWarning && warningIcon) {
+                            // Remove warning icon
+                            warningIcon.remove();
+                        }
+                    }
+                }
+            }
+            
+            // Trigger a brief highlight animation to show the update
+            row.classList.add('bg-blue-50', 'dark:bg-blue-900/20');
+            setTimeout(() => {
+                row.classList.remove('bg-blue-50', 'dark:bg-blue-900/20');
+            }, 1000);
+            
+            console.log('Updated row for item:', itemId, 'with data:', updatedData);
+        }
+
+        function autoAdvanceToNextLowMargin() {
+            // Find all clickable price cells (products that can be edited)
+            const clickablePriceCells = document.querySelectorAll('td:nth-child(10) .cursor-pointer');
+            
+            let lowestMarginElement = null;
+            let lowestMarginPercent = 100; // Start high
+            
+            clickablePriceCells.forEach(priceCell => {
+                const row = priceCell.closest('tr');
+                const marginCell = row.querySelector('td:nth-child(12)');
+                
+                if (marginCell) {
+                    const marginPercentElement = marginCell.querySelector('.text-right .text-xs');
+                    if (marginPercentElement) {
+                        const marginText = marginPercentElement.textContent;
+                        const marginPercent = parseFloat(marginText.replace('%', '')) || 0;
+                        
+                        // Find products with margin less than 20% (adjust threshold as needed)
+                        if (marginPercent < 20 && marginPercent < lowestMarginPercent) {
+                            lowestMarginPercent = marginPercent;
+                            lowestMarginElement = priceCell;
+                        }
+                    }
+                }
+            });
+            
+            // If we found a low margin product, automatically open its price editor
+            if (lowestMarginElement && lowestMarginPercent < 20) {
+                console.log(`Auto-advancing to product with ${lowestMarginPercent}% margin`);
+                lowestMarginElement.click();
+            } else {
+                showMessage('All products have good margins! (≥20%)', 'success');
             }
         }
 
@@ -1465,6 +1576,25 @@
             document.getElementById('grossPriceInput').addEventListener('input', updateMarginDisplay);
             document.getElementById('netPriceInput').addEventListener('input', updateMarginDisplay);
             document.getElementById('priceInputMode').addEventListener('change', togglePriceMode);
+            
+            // Add keyboard shortcuts for price editor
+            document.addEventListener('keydown', function(e) {
+                // Only apply when price editor modal is open
+                const modal = document.getElementById('priceEditorModal');
+                if (modal && !modal.classList.contains('hidden')) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        savePriceUpdate();
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        closePriceEditor();
+                    } else if (e.key === 'Tab' && e.shiftKey) {
+                        e.preventDefault();
+                        closePriceEditor(); 
+                        autoAdvanceToNextLowMargin();
+                    }
+                }
+            });
         });
     </script>
 
@@ -1582,15 +1712,21 @@
                 </div>
             </div>
             
-            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3">
-                <button type="button" onclick="closePriceEditor()" 
-                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500 rounded-md">
-                    Cancel
+            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex justify-between">
+                <button type="button" onclick="closePriceEditor(); autoAdvanceToNextLowMargin();" 
+                        class="px-4 py-2 text-sm font-medium text-orange-700 bg-orange-100 hover:bg-orange-200 dark:bg-orange-600 dark:text-orange-100 dark:hover:bg-orange-500 rounded-md">
+                    Skip to Next Low Margin
                 </button>
-                <button type="button" onclick="savePriceUpdate()" 
-                        class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md">
-                    Update Price & Add to Labels
-                </button>
+                <div class="flex space-x-3">
+                    <button type="button" onclick="closePriceEditor()" 
+                            class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500 rounded-md">
+                        Cancel
+                    </button>
+                    <button type="button" onclick="savePriceUpdate()" 
+                            class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md">
+                        Update Price & Add to Labels
+                    </button>
+                </div>
             </div>
         </div>
     </div>
