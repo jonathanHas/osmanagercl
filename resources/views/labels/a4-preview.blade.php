@@ -891,6 +891,110 @@
                 });
             }, 500);
         });
+
+        // 🔍 DEBUG: Grid 4x9 Custom Layout Analysis
+        setTimeout(() => {
+            console.group('🔍 Grid 4x9 Custom Layout Debug');
+            
+            // Template detection
+            const templateName = '{{ $template->name ?? "Unknown" }}';
+            const isGrid4x9Custom = templateName.includes('Grid 4x9 Custom');
+            console.log('📋 Template:', templateName);
+            console.log('🎯 Is Grid 4x9 Custom:', isGrid4x9Custom);
+            
+            // Find all middle row elements
+            const middleRows = document.querySelectorAll('.label-middle-row-4x9');
+            console.log('📦 Found middle rows:', middleRows.length);
+            
+            if (middleRows.length > 0) {
+                // Analyze first few labels for comparison
+                middleRows.forEach((row, index) => {
+                    if (index >= 3) return; // Only check first 3 labels
+                    
+                    const barcodeEl = row.querySelector('.label-barcode-4x9');
+                    const priceEl = row.querySelector('.label-price-4x9');
+                    
+                    if (barcodeEl && priceEl) {
+                        console.group(`🏷️ Label ${index + 1} Analysis`);
+                        
+                        // Get computed styles
+                        const rowStyle = window.getComputedStyle(row);
+                        const barcodeStyle = window.getComputedStyle(barcodeEl);
+                        const priceStyle = window.getComputedStyle(priceEl);
+                        
+                        // Row analysis
+                        console.log('📐 Row display:', rowStyle.display);
+                        console.log('📐 Row flex-direction:', rowStyle.flexDirection);
+                        console.log('📐 Row justify-content:', rowStyle.justifyContent);
+                        
+                        // Element positioning
+                        const rowRect = row.getBoundingClientRect();
+                        const barcodeRect = barcodeEl.getBoundingClientRect();
+                        const priceRect = priceEl.getBoundingClientRect();
+                        
+                        console.log('📏 Row width:', Math.round(rowRect.width) + 'px');
+                        console.log('📏 Barcode position:', `x:${Math.round(barcodeRect.left)} w:${Math.round(barcodeRect.width)}`);
+                        console.log('📏 Price position:', `x:${Math.round(priceRect.left)} w:${Math.round(priceRect.width)}`);
+                        
+                        // Flex properties
+                        console.log('🔧 Barcode flex:', barcodeStyle.flex);
+                        console.log('🔧 Price flex:', priceStyle.flex);
+                        console.log('🔧 Barcode flex-basis:', barcodeStyle.flexBasis);
+                        console.log('🔧 Price flex-basis:', priceStyle.flexBasis);
+                        
+                        // Data attributes
+                        console.log('🏷️ Price data-price-length:', priceEl.getAttribute('data-price-length'));
+                        console.log('🏷️ Price text content:', priceEl.textContent.trim());
+                        
+                        // Side-by-side check
+                        const sameLine = Math.abs(barcodeRect.top - priceRect.top) < 5;
+                        const totalWidth = barcodeRect.width + priceRect.width;
+                        const hasOverflow = totalWidth > rowRect.width;
+                        
+                        console.log(`✅ Same line: ${sameLine}`);
+                        console.log(`⚠️ Total width: ${Math.round(totalWidth)}px / ${Math.round(rowRect.width)}px`);
+                        console.log(`❌ Has overflow: ${hasOverflow}`);
+                        
+                        if (!sameLine) {
+                            console.error('🚨 ISSUE: Elements are NOT on the same line!');
+                        }
+                        
+                        console.groupEnd();
+                    }
+                });
+                
+                // CSS Rules Analysis
+                console.group('🎨 CSS Rules Analysis');
+                
+                // Check if custom CSS rules are being applied
+                const samplePrice = document.querySelector('.label-price-4x9[data-price-length^="custom"]');
+                if (samplePrice) {
+                    console.log('✅ Found price with custom- prefix');
+                    console.log('🎨 Applied flex:', window.getComputedStyle(samplePrice).flex);
+                } else {
+                    console.warn('⚠️ No prices found with custom- prefix');
+                    
+                    const allPrices = document.querySelectorAll('.label-price-4x9');
+                    allPrices.forEach((price, idx) => {
+                        if (idx < 3) {
+                            console.log(`Price ${idx + 1} data-price-length:`, price.getAttribute('data-price-length'));
+                        }
+                    });
+                }
+                
+                console.groupEnd();
+                
+                // Environment info
+                console.group('🌍 Environment Info');
+                console.log('🌐 User Agent:', navigator.userAgent);
+                console.log('🖥️ Screen size:', `${screen.width}x${screen.height}`);
+                console.log('📱 Viewport:', `${window.innerWidth}x${window.innerHeight}`);
+                console.log('🎨 Device pixel ratio:', window.devicePixelRatio);
+                console.groupEnd();
+            }
+            
+            console.groupEnd();
+        }, 1500);
         
         // Keyboard shortcuts
         document.addEventListener('keydown', function(e) {
