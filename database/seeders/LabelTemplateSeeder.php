@@ -23,7 +23,7 @@ class LabelTemplateSeeder extends Seeder
                 'font_size_barcode' => 10,
                 'font_size_price' => 16,
                 'barcode_height' => 20,
-                'is_default' => true,
+                'is_default' => false,
                 'is_active' => true,
             ],
             [
@@ -43,6 +43,27 @@ class LabelTemplateSeeder extends Seeder
                     'name_position' => 'top_full_width',
                 ],
                 'is_default' => false,
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Grid 4x9 Custom (47x31mm)',
+                'description' => 'Improved 4x9 grid with 32 labels per A4 - optimized spacing and font sizing',
+                'width_mm' => 47,
+                'height_mm' => 31,
+                'margin_mm' => 2,
+                'font_size_name' => 14,  // Base font size for custom algorithm
+                'font_size_barcode' => 7,
+                'font_size_price' => 18,  // Base price font size
+                'barcode_height' => 18,
+                'layout_config' => [
+                    'type' => 'grid_4x9_custom',
+                    'barcode_position' => 'bottom_left',
+                    'price_position' => 'bottom_right',
+                    'name_position' => 'top_full_width',
+                    'custom_sizing' => true,  // Enables custom sizing algorithm
+                    'labels_per_a4' => 32,
+                ],
+                'is_default' => true,  // Make this the new default
                 'is_active' => true,
             ],
             [
