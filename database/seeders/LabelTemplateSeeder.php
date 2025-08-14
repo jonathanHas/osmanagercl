@@ -56,7 +56,7 @@ class LabelTemplateSeeder extends Seeder
                 'font_size_price' => 18,  // Base price font size
                 'barcode_height' => 18,
                 'layout_config' => [
-                    'type' => 'grid_4x9_custom',
+                    'type' => 'grid_4x9',  // Must match blade template check
                     'barcode_position' => 'bottom_left',
                     'price_position' => 'bottom_right',
                     'name_position' => 'top_full_width',
