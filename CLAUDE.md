@@ -274,6 +274,8 @@ All authentication routes are defined in `routes/auth.php` and controllers are i
 
 For common issues and solutions, see [Troubleshooting Guide](./docs/development/troubleshooting.md).
 
+**🏷️ Label Template Issues**: [Label Template Layout Issues](./docs/troubleshooting/label-template-layout-issues.md) - Essential guide for diagnosing Grid 4x9 Custom layout problems.
+
 ## Key Features
 
 ### Auto-Barcode Suggestion System
