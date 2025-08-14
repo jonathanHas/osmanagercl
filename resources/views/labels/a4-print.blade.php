@@ -10,6 +10,14 @@
             margin: 10mm;
         }
         
+        .sheet {
+            page-break-after: always;
+        }
+        
+        .sheet:last-child {
+            page-break-after: auto;
+        }
+        
         body {
             margin: 0;
             padding: 0;
@@ -75,7 +83,69 @@
             max-height: calc(100% - 22px);
         }
         
-        /* Responsive font sizes for different text lengths */
+        /* Custom Grid 4x9 improved sizing classes */
+        .label-name-4x9[data-length="custom-tiny"] {
+            font-size: 22pt;
+            -webkit-line-clamp: 2;
+            line-height: 1.1;
+        }
+        
+        .label-name-4x9[data-length="custom-extra-short"] {
+            font-size: 18pt;
+            -webkit-line-clamp: 2;
+            line-height: 1.15;
+        }
+        
+        .label-name-4x9[data-length="custom-short"] {
+            font-size: 15pt;
+            -webkit-line-clamp: 3;
+            line-height: 1.15;
+        }
+        
+        .label-name-4x9[data-length="custom-medium"] {
+            font-size: 13pt;
+            -webkit-line-clamp: 3;
+            line-height: 1.15;
+        }
+        
+        .label-name-4x9[data-length="custom-long"] {
+            font-size: 11pt;
+            -webkit-line-clamp: 4;
+            line-height: 1.15;
+        }
+        
+        .label-name-4x9[data-length="custom-extra-long"] {
+            font-size: 9pt;
+            -webkit-line-clamp: 5;
+            line-height: 1.12;
+        }
+        
+        /* Custom Grid 4x9 price improvements */
+        .label-4x9 .label-bottom-row-4x9 .label-barcode-4x9 {
+            flex: 0 0 35%; /* Reduced from 40% to give more space to price */
+        }
+        
+        .label-4x9 .label-bottom-row-4x9 .label-price-4x9[data-price-length^="custom"] {
+            flex: 0 0 65%; /* Increased from 60% to prevent cropping */
+            overflow: visible !important; /* Allow text to show even if it overflows */
+            white-space: nowrap;
+            min-width: 0; /* Allow flex item to shrink */
+        }
+        
+        /* Custom price size classes with better sizing */
+        .label-price-4x9[data-price-length="custom-normal"] {
+            font-size: 24pt !important; /* Slightly smaller than 26pt for better fit */
+        }
+        
+        .label-price-4x9[data-price-length="custom-long"] {
+            font-size: 22pt !important; /* For 6-char prices like €32.95 */
+        }
+        
+        .label-price-4x9[data-price-length="custom-extra-long"] {
+            font-size: 20pt !important; /* For 7+ char prices */
+        }
+
+        /* Original responsive font sizes for standard Grid 4x9 */
         .label-name-4x9[data-length="short"] {
             font-size: 14pt;
             -webkit-line-clamp: 1;
@@ -246,64 +316,111 @@
 </head>
 <body>
     <div class="print-info no-print">
-        <strong>{{ count($products) }} labels</strong> ready to print
+        <strong>{{ count($products) }} labels</strong> on {{ $totalSheets }} sheet{{ $totalSheets > 1 ? 's' : '' }} ready to print
         <br>
         <button onclick="window.print()" style="margin-top: 5px; padding: 5px 10px;">Print Now</button>
         <button onclick="window.close()" style="margin-top: 5px; padding: 5px 10px; margin-left: 5px;">Close</button>
     </div>
 
-    <div class="labels-container">
-        @for($i = 0; $i < $labelsPerA4; $i++)
-            @if(isset($products[$i]))
-                @php 
-                    $product = $products[$i]; 
-                    $labelService = app(\App\Services\LabelService::class);
-                    $barcodeImage = $labelService->generateBarcode($product->CODE);
-                @endphp
-                @if($isGrid4x9)
-                    @php
-                        $nameLength = strlen($product->NAME);
-                        $lengthClass = $nameLength <= 15 ? 'short' : ($nameLength <= 30 ? 'medium' : 'long');
-                        
-                        $priceText = $product->getFormattedPriceWithVatAttribute();
-                        $priceLength = strlen($priceText);
-                        $priceLengthClass = $priceLength <= 5 ? 'normal' : ($priceLength <= 7 ? 'long' : 'extra-long');
-                    @endphp
-                    <div class="label label-4x9">
-                        <div class="label-name-4x9" data-length="{{ $lengthClass }}">{{ $product->NAME }}</div>
-                        
-                        <div class="label-bottom-row-4x9">
-                            <div class="label-barcode-4x9">
-                                <div class="barcode-visual-4x9">
-                                    {!! $barcodeImage !!}
+    @foreach($sheets as $sheet)
+        <div class="sheet">
+            <div class="labels-container">
+                @for($i = 0; $i < $labelsPerA4; $i++)
+                    @if(isset($sheet['products'][$i]))
+                        @php 
+                            $product = $sheet['products'][$i]; 
+                            $labelService = app(\App\Services\LabelService::class);
+                            $barcodeImage = $labelService->generateBarcode($product->CODE);
+                        @endphp
+                        @if($isGrid4x9)
+                            @php
+                                // Check if this is the custom template with improved sizing
+                                $isCustomGrid = $template->name === 'Grid 4x9 Custom (47x31mm)';
+                                
+                                if ($isCustomGrid) {
+                                    // Improved sizing algorithm for Grid 4x9 Custom
+                                    $nameLength = mb_strlen($product->NAME);
+                                    $wordCount = str_word_count($product->NAME);
+                                    
+                                    // Estimate characters per line at different font sizes (approximate)
+                                    $estimatedCharsPerLine = [
+                                        22 => 12, // 22pt font fits ~12 chars per line
+                                        18 => 15, // 18pt font fits ~15 chars per line
+                                        15 => 18, // 15pt font fits ~18 chars per line
+                                        13 => 21, // 13pt font fits ~21 chars per line
+                                        11 => 24, // 11pt font fits ~24 chars per line
+                                        9 => 28   // 9pt font fits ~28 chars per line
+                                    ];
+                                    
+                                    // Find the largest font that fits the content
+                                    if ($nameLength <= 10) {
+                                        $lengthClass = 'custom-tiny';      // 22pt, 1-2 lines
+                                    } elseif ($nameLength <= 20) {
+                                        $lengthClass = 'custom-extra-short'; // 18pt, 2 lines max
+                                    } elseif ($nameLength <= 30) {
+                                        $lengthClass = 'custom-short';      // 15pt, 2-3 lines
+                                    } elseif ($nameLength <= 45 && $wordCount >= 4) {
+                                        // For longer names with multiple words, use medium size
+                                        $lengthClass = 'custom-medium';     // 13pt, 3-4 lines
+                                    } elseif ($nameLength <= 60) {
+                                        $lengthClass = 'custom-long';       // 11pt, 4 lines
+                                    } else {
+                                        $lengthClass = 'custom-extra-long'; // 9pt, 5 lines
+                                    }
+                                } else {
+                                    // Original logic for standard Grid 4x9
+                                    $nameLength = strlen($product->NAME);
+                                    $lengthClass = $nameLength <= 15 ? 'short' : ($nameLength <= 30 ? 'medium' : 'long');
+                                }
+                                
+                                $priceText = $product->getFormattedPriceWithVatAttribute();
+                                if ($isCustomGrid) {
+                                    // Use mb_strlen for accurate character count (€ = 1 char, not 3 bytes)
+                                    $priceLength = mb_strlen($priceText);
+                                    // Better price classification: €9.99 = 5 chars, €32.95 = 6 chars
+                                    $priceLengthClass = $priceLength <= 5 ? 'custom-normal' : ($priceLength <= 6 ? 'custom-long' : 'custom-extra-long');
+                                } else {
+                                    $priceLength = strlen($priceText);
+                                    $priceLengthClass = $priceLength <= 5 ? 'normal' : ($priceLength <= 7 ? 'long' : 'extra-long');
+                                }
+                            @endphp
+                            <div class="label label-4x9">
+                                <div class="label-name-4x9" data-length="{{ $lengthClass }}">{{ $product->NAME }}</div>
+                                
+                                <div class="label-bottom-row-4x9">
+                                    <div class="label-barcode-4x9">
+                                        <div class="barcode-visual-4x9">
+                                            {!! $barcodeImage !!}
+                                        </div>
+                                        <div class="barcode-number-4x9">{{ $product->CODE }}</div>
+                                    </div>
+                                    
+                                    <div class="label-price-4x9" data-price-length="{{ $priceLengthClass }}">{{ $priceText }}</div>
                                 </div>
-                                <div class="barcode-number-4x9">{{ $product->CODE }}</div>
                             </div>
-                            
-                            <div class="label-price-4x9" data-price-length="{{ $priceLengthClass }}">{{ $priceText }}</div>
-                        </div>
-                    </div>
-                @else
-                    <div class="label">
-                        <div class="label-name">{{ $product->NAME }}</div>
-                        
-                        <div class="label-price-section">
-                            <div class="label-price">{{ $product->getFormattedPriceWithVatAttribute() }}</div>
-                        </div>
-                        
-                        <div class="label-barcode">
-                            <div class="barcode-visual">
-                                {!! $barcodeImage !!}
+                        @else
+                            <div class="label">
+                                <div class="label-name">{{ $product->NAME }}</div>
+                                
+                                <div class="label-price-section">
+                                    <div class="label-price">{{ $product->getFormattedPriceWithVatAttribute() }}</div>
+                                </div>
+                                
+                                <div class="label-barcode">
+                                    <div class="barcode-visual">
+                                        {!! $barcodeImage !!}
+                                    </div>
+                                    <div class="barcode-number">{{ $product->CODE }}</div>
+                                </div>
                             </div>
-                            <div class="barcode-number">{{ $product->CODE }}</div>
-                        </div>
-                    </div>
-                @endif
-            @else
-                <div class="empty-label"></div>
-            @endif
-        @endfor
-    </div>
+                        @endif
+                    @else
+                        <div class="empty-label"></div>
+                    @endif
+                @endfor
+            </div>
+        </div>
+    @endforeach
 
     <script>
         window.onload = function() {

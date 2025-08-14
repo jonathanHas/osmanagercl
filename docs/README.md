@@ -6,6 +6,24 @@ Welcome to the comprehensive documentation for OSManager CL. This documentation 
 
 ## 🆕 Latest Updates (August 2025)
 
+### Label System Barcode Scanner Enhancement (2025-08-13)
+Scanner-optimized label queue management with instant barcode scanning:
+
+- **📱 Scan to Label Modal**: Instant barcode scanning interface with auto-focus and real-time feedback
+- **🎯 Scanner-Optimized Layout**: Prominent scan button in page header, compact stats, streamlined interface for continuous scanning workflow
+- **📊 Live Queue Counter**: Prominent circular badge showing current items in labels queue with session tracking
+- **👆 Touch-Free Workflow**: Virtual keyboard suppression and automatic focus management for hands-free scanning
+- **⚡ Real-Time Product Lookup**: Instant product details display with name, code, and price verification
+- **🔄 Seamless Queue Integration**: Automatic addition to existing label printing workflow via LabelLog system
+
+**Key Benefits**:
+- Immediate access to scanner from page header (no scrolling required)
+- Continuous scanning workflow without manual field interaction
+- Visual feedback and error handling for scan validation
+- Direct integration with existing label printing system
+
+See [Label System Documentation](./features/label-system.md) for complete details.
+
 ### VAT Returns Management System (2025-08-13)
 Complete Irish Revenue Online Service (ROS) VAT returns with automated calculations:
 

@@ -309,6 +309,9 @@
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                     Current Sell (inc VAT)
                                 </th>
+                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    Current Stock
+                                </th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                                     onclick="sortDeliveryItems('margin')" title="Sort by Margin">
                                     <div class="flex items-center justify-end gap-1">
@@ -337,9 +340,15 @@
                                 @php
                                     // Check if this item wasn't on the delivery (0 invoiced quantity)
                                     $notOnDelivery = $item->ordered_quantity == 0;
-                                    $rowClass = $notOnDelivery 
-                                        ? 'bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30' 
-                                        : 'hover:bg-gray-50 dark:hover:bg-gray-700';
+                                    
+                                    // Determine row background class based on status
+                                    if ($item->is_new_product) {
+                                        $rowClass = 'bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30';
+                                    } elseif ($notOnDelivery) {
+                                        $rowClass = 'bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30';
+                                    } else {
+                                        $rowClass = 'hover:bg-gray-50 dark:hover:bg-gray-700';
+                                    }
                                 @endphp
                                 <tr class="{{ $rowClass }}">
                                     <td class="px-6 py-4 text-center">
@@ -561,6 +570,27 @@
                                                     </div>
                                                 @endif
                                             </div>
+                                        @else
+                                            <span class="text-gray-400 dark:text-gray-500 text-xs">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-6 py-4 text-center text-sm">
+                                        @if($item->product)
+                                            @php
+                                                $currentStock = $item->product->getCurrentStock();
+                                            @endphp
+                                            <div class="text-gray-900 dark:text-gray-100">
+                                                {{ number_format($currentStock, 1) }}
+                                            </div>
+                                            @if($currentStock <= 0)
+                                                <div class="text-xs text-red-500 dark:text-red-400">
+                                                    Out of stock
+                                                </div>
+                                            @elseif($currentStock <= 5)
+                                                <div class="text-xs text-orange-500 dark:text-orange-400">
+                                                    Low stock
+                                                </div>
+                                            @endif
                                         @else
                                             <span class="text-gray-400 dark:text-gray-500 text-xs">—</span>
                                         @endif
@@ -1032,9 +1062,9 @@
                         break;
                     }
                     case 'margin': {
-                        // Get margin percentage from nested structure: .text-right > .text-xs 
-                        const aMarginPercentText = a.querySelector('td:nth-child(11) .text-right .text-xs')?.textContent || '0.0%';
-                        const bMarginPercentText = b.querySelector('td:nth-child(11) .text-right .text-xs')?.textContent || '0.0%';
+                        // Get margin percentage from nested structure: .text-right > .text-xs (now column 12 due to added stock column)
+                        const aMarginPercentText = a.querySelector('td:nth-child(12) .text-right .text-xs')?.textContent || '0.0%';
+                        const bMarginPercentText = b.querySelector('td:nth-child(12) .text-right .text-xs')?.textContent || '0.0%';
                         const aMarginPercent = parseFloat(aMarginPercentText.replace('%', '')) || 0;
                         const bMarginPercent = parseFloat(bMarginPercentText.replace('%', '')) || 0;
                         
@@ -1131,15 +1161,15 @@
                 return;
             }
             
-            // Count delivery items with price differences (only in delivery cost column - now 8th column)
-            const deliveryCostCells = document.querySelectorAll('.delivery-items-table tbody tr td:nth-child(8) .bg-red-100, .delivery-items-table tbody tr td:nth-child(8) .bg-yellow-100, .delivery-items-table tbody tr td:nth-child(8) .bg-green-100, .delivery-items-table tbody tr td:nth-child(8) .bg-blue-100');
+            // Count delivery items with price differences (delivery cost column is 7th)
+            const deliveryCostCells = document.querySelectorAll('.delivery-items-table tbody tr td:nth-child(7) .bg-red-100, .delivery-items-table tbody tr td:nth-child(7) .bg-yellow-100, .delivery-items-table tbody tr td:nth-child(7) .bg-green-100, .delivery-items-table tbody tr td:nth-child(7) .bg-blue-100');
             const highlightedItemsCount = deliveryCostCells.length;
             
             // Check for zero cost items in delivery
             const zeroCostItems = [];
             const tableRows = document.querySelectorAll('.delivery-items-table tbody tr');
             tableRows.forEach(row => {
-                const deliveryCostCell = row.querySelector('td:nth-child(8)'); // Delivery Cost column (now 8th)
+                const deliveryCostCell = row.querySelector('td:nth-child(7)'); // Delivery Cost column (7th)
                 if (deliveryCostCell) {
                     const costText = deliveryCostCell.textContent.trim();
                     if (costText.includes('€0.00')) {
@@ -1400,7 +1430,7 @@
                     button.style.display = 'none';
                     
                     // Update the delivery cost column to remove highlighting
-                    const costCell = row.querySelector('td:nth-child(8)');
+                    const costCell = row.querySelector('td:nth-child(7)');
                     if (costCell) {
                         const costDiv = costCell.querySelector('div');
                         if (costDiv) {

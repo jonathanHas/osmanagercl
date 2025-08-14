@@ -197,7 +197,69 @@
             padding-right: 2px;
         }
         
-        /* Responsive font sizes - maximizing space usage */
+        /* Custom Grid 4x9 improved sizing classes */
+        .label-name-4x9[data-length="custom-tiny"] {
+            font-size: 22pt;
+            -webkit-line-clamp: 2;
+            line-height: 1.1;
+        }
+        
+        .label-name-4x9[data-length="custom-extra-short"] {
+            font-size: 18pt;
+            -webkit-line-clamp: 2;
+            line-height: 1.15;
+        }
+        
+        .label-name-4x9[data-length="custom-short"] {
+            font-size: 15pt;
+            -webkit-line-clamp: 3;
+            line-height: 1.15;
+        }
+        
+        .label-name-4x9[data-length="custom-medium"] {
+            font-size: 13pt;
+            -webkit-line-clamp: 3;
+            line-height: 1.15;
+        }
+        
+        .label-name-4x9[data-length="custom-long"] {
+            font-size: 11pt;
+            -webkit-line-clamp: 4;
+            line-height: 1.15;
+        }
+        
+        .label-name-4x9[data-length="custom-extra-long"] {
+            font-size: 9pt;
+            -webkit-line-clamp: 5;
+            line-height: 1.12;
+        }
+        
+        /* Custom Grid 4x9 price improvements */
+        .label-4x9 .label-middle-row-4x9 .label-barcode-4x9 {
+            flex: 0 0 35%; /* Reduced from 48% to give more space to price */
+        }
+        
+        .label-4x9 .label-middle-row-4x9 .label-price-4x9[data-price-length^="custom"] {
+            flex: 0 0 65%; /* Increased from 48% to prevent cropping */
+            overflow: visible !important; /* Allow text to show even if it overflows */
+            white-space: nowrap;
+            min-width: 0; /* Allow flex item to shrink */
+        }
+        
+        /* Custom price size classes with better sizing */
+        .label-price-4x9[data-price-length="custom-normal"] {
+            font-size: 24pt !important; /* Slightly smaller than 26pt for better fit */
+        }
+        
+        .label-price-4x9[data-price-length="custom-long"] {
+            font-size: 22pt !important; /* For 6-char prices like €32.95 */
+        }
+        
+        .label-price-4x9[data-price-length="custom-extra-long"] {
+            font-size: 20pt !important; /* For 7+ char prices */
+        }
+
+        /* Original responsive font sizes for standard Grid 4x9 */
         .label-name-4x9[data-length="extra-short"] {
             font-size: 22pt; /* Very large for short names */
             -webkit-line-clamp: 2;
@@ -522,25 +584,58 @@
                                     @endphp
                                     @if($isGrid4x9)
                                         @php
-                                            $nameLength = mb_strlen($product->NAME);
-                                            // More granular thresholds for better space utilization
-                                            if ($nameLength <= 12) {
-                                                $lengthClass = 'extra-short';
-                                            } elseif ($nameLength <= 20) {
-                                                $lengthClass = 'short';
-                                            } elseif ($nameLength <= 30) {
-                                                $lengthClass = 'medium';
-                                            } elseif ($nameLength <= 45) {
-                                                $lengthClass = 'long';
+                                            // Check if this is the custom template with improved sizing
+                                            $isCustomGrid = $template->name === 'Grid 4x9 Custom (47x31mm)';
+                                            
+                                            if ($isCustomGrid) {
+                                                // Improved sizing algorithm for Grid 4x9 Custom
+                                                $nameLength = mb_strlen($product->NAME);
+                                                $wordCount = str_word_count($product->NAME);
+                                                
+                                                // Find the largest font that fits the content
+                                                if ($nameLength <= 10) {
+                                                    $lengthClass = 'custom-tiny';      // 22pt, 1-2 lines
+                                                } elseif ($nameLength <= 20) {
+                                                    $lengthClass = 'custom-extra-short'; // 18pt, 2 lines max
+                                                } elseif ($nameLength <= 30) {
+                                                    $lengthClass = 'custom-short';      // 15pt, 2-3 lines
+                                                } elseif ($nameLength <= 45 && $wordCount >= 4) {
+                                                    // For longer names with multiple words, use medium size
+                                                    $lengthClass = 'custom-medium';     // 13pt, 3-4 lines
+                                                } elseif ($nameLength <= 60) {
+                                                    $lengthClass = 'custom-long';       // 11pt, 4 lines
+                                                } else {
+                                                    $lengthClass = 'custom-extra-long'; // 9pt, 5 lines
+                                                }
                                             } else {
-                                                $lengthClass = 'extra-long';
+                                                // Original logic for standard Grid 4x9
+                                                $nameLength = mb_strlen($product->NAME);
+                                                // More granular thresholds for better space utilization
+                                                if ($nameLength <= 12) {
+                                                    $lengthClass = 'extra-short';
+                                                } elseif ($nameLength <= 20) {
+                                                    $lengthClass = 'short';
+                                                } elseif ($nameLength <= 30) {
+                                                    $lengthClass = 'medium';
+                                                } elseif ($nameLength <= 45) {
+                                                    $lengthClass = 'long';
+                                                } else {
+                                                    $lengthClass = 'extra-long';
+                                                }
                                             }
                                             
                                             $priceText = $product->getFormattedPriceWithVatAttribute();
-                                            // Use mb_strlen for accurate character count with UTF-8 (€ symbol)
-                                            $priceLength = mb_strlen($priceText);
-                                            // Adjusted thresholds: €9.99 = 5 chars, €15.95 = 6 chars
-                                            $priceLengthClass = $priceLength <= 5 ? 'normal' : ($priceLength <= 6 ? 'long' : 'extra-long');
+                                            if ($isCustomGrid) {
+                                                // Use mb_strlen for accurate character count (€ = 1 char, not 3 bytes)
+                                                $priceLength = mb_strlen($priceText);
+                                                // Better price classification: €9.99 = 5 chars, €32.95 = 6 chars
+                                                $priceLengthClass = $priceLength <= 5 ? 'custom-normal' : ($priceLength <= 6 ? 'custom-long' : 'custom-extra-long');
+                                            } else {
+                                                // Use mb_strlen for accurate character count with UTF-8 (€ symbol)
+                                                $priceLength = mb_strlen($priceText);
+                                                // Adjusted thresholds: €9.99 = 5 chars, €15.95 = 6 chars
+                                                $priceLengthClass = $priceLength <= 5 ? 'normal' : ($priceLength <= 6 ? 'long' : 'extra-long');
+                                            }
                                         @endphp
                                         <div class="label label-4x9">
                                             <div class="label-name-4x9" data-length="{{ $lengthClass }}">{{ $product->NAME }}</div>

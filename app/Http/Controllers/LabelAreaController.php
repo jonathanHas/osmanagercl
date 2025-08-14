@@ -126,7 +126,24 @@ class LabelAreaController extends Controller
             LabelLog::logLabelPrint($product->CODE);
         }
 
-        return view('labels.a4-print', compact('products', 'template'));
+        // Calculate how many A4 sheets we need
+        $labelsPerSheet = $template->labels_per_a4;
+        $totalProducts = $products->count();
+        $totalSheets = ceil($totalProducts / $labelsPerSheet);
+
+        // Split products into sheets
+        $sheets = [];
+        for ($sheet = 0; $sheet < $totalSheets; $sheet++) {
+            $startIndex = $sheet * $labelsPerSheet;
+            $sheetProducts = $products->slice($startIndex, $labelsPerSheet)->values();
+            $sheets[] = [
+                'number' => $sheet + 1,
+                'products' => $sheetProducts,
+                'labels_count' => $sheetProducts->count(),
+            ];
+        }
+
+        return view('labels.a4-print', compact('products', 'template', 'sheets', 'totalSheets'));
     }
 
     /**
@@ -167,7 +184,7 @@ class LabelAreaController extends Controller
         $sheets = [];
         for ($sheet = 0; $sheet < $totalSheets; $sheet++) {
             $startIndex = $sheet * $labelsPerSheet;
-            $sheetProducts = $products->slice($startIndex, $labelsPerSheet);
+            $sheetProducts = $products->slice($startIndex, $labelsPerSheet)->values();
             $sheets[] = [
                 'number' => $sheet + 1,
                 'products' => $sheetProducts,

@@ -20,10 +20,11 @@
 
         .page {
             width: 210mm;
-            min-height: 297mm;
+            height: 297mm;
             margin: 0 auto;
             background: white;
             box-shadow: 0 0 5mm rgba(0,0,0,0.1);
+            box-sizing: border-box;
         }
 
         @media print {
@@ -33,8 +34,15 @@
             }
             .page {
                 margin: 0;
+                height: 297mm;
                 box-shadow: none;
                 page-break-after: always;
+                break-after: page;
+                box-sizing: border-box;
+            }
+            .page:last-child {
+                page-break-after: avoid;
+                break-after: avoid;
             }
             .no-print,
             .print-controls {
@@ -48,6 +56,8 @@
             grid-template-columns: repeat(2, 1fr);
             gap: 0.5mm;
             padding: 2mm;
+            height: 100%;
+            box-sizing: border-box;
         }
 
         .label {
@@ -58,6 +68,7 @@
             position: relative;
             overflow: hidden;
             background: white;
+            page-break-inside: avoid;
         }
 
 

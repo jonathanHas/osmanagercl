@@ -322,6 +322,14 @@ See [Supplier Integration Documentation](./docs/features/supplier-integration.md
 Comprehensive delivery processing with barcode scanning.
 See [Delivery System Documentation](./docs/features/delivery-system.md).
 
+### Label System with Barcode Scanner
+Complete label printing system with integrated barcode scanning for quick product queue management.
+- **Scan to Label Modal**: Instant barcode scanning interface with auto-focus and real-time feedback
+- **Scanner-Optimized Layout**: Prominent scan button in page header, compact stats, streamlined interface
+- **Queue Management**: Live counter showing products in labels queue with session tracking
+- **Touch-Free Workflow**: Virtual keyboard suppression and automatic focus management for continuous scanning
+See [Label System Documentation](./docs/features/label-system.md).
+
 ### Pricing Management
 Advanced pricing with VAT calculations and supplier comparison.
 - **Enhanced Price Editor Modal**: Inline cost price editing with real-time margin updates

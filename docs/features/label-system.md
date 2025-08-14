@@ -55,6 +55,25 @@ The label system provides automated label generation and printing capabilities w
   - Bigger barcode numbers (7pt from 5.5pt)
   - No € symbol clipping with visible overflow
 
+### 📱 Scan to Label Feature
+- **Barcode Scanner Integration**: Quick barcode scanning modal for instant product addition to label queue
+- **Scanner-Optimized Interface**: 
+  - Prominent "Scan to Label" button in page header (always accessible without scrolling)
+  - Auto-focus input field with virtual keyboard suppression (`inputmode="none"`)
+  - Real-time product lookup and visual feedback
+  - Queue counter showing current items in labels queue
+- **Streamlined Workflow**:
+  1. Click "Scan to Label" → Modal opens with auto-focused input
+  2. Scan barcode → Product details display instantly
+  3. Press Enter or "Add to Labels" → Product queued automatically
+  4. Clear input and focus returns for next scan (no manual interaction needed)
+  5. Continue scanning multiple products in sequence
+- **Visual Feedback**:
+  - Live queue counter with prominent circular badge design
+  - Success/error messages for each scan
+  - Session tracking showing products added during current session
+  - Product preview showing name, code, and price before adding
+
 ### 🔄 Re-queue Functionality
 - **"Add Back to Products Needing Labels"** buttons on:
   - Recent label prints table
@@ -111,6 +130,8 @@ Main controller handling all label operations:
 - `previewA4()` - Preview A4 layout before printing
 - `previewLabel()` - Single label preview
 - `requeueProduct()` - Add product back to needs labels queue
+- `lookupBarcode()` - Lookup product details by barcode for scanner modal
+- `processBarcodeScan()` - Process scanned barcode and add product to labels queue
 
 ### Services
 
@@ -141,10 +162,12 @@ This ensures:
 ## User Interface
 
 ### Label Area Dashboard (`/labels`)
-- **Quick stats**: Products needing labels, recent prints, A4 sheets needed
-- **Template selector**: Choose label layout and dimensions
+- **Scanner-Optimized Layout**: Prominent "Scan to Label" button in page header for immediate access
+- **Compact stats**: Streamlined display showing products needing labels, recent prints, A4 sheets needed
+- **Template selector**: Choose label layout and dimensions (simplified display)
 - **Products table**: Current products needing labels with preview/print actions
 - **Recent prints**: Previously printed labels with re-queue options
+- **Scan to Label Modal**: Overlay interface with barcode input, product preview, and queue counter
 
 ### Dynamic Forms
 - **Print All**: Collects current visible products dynamically (not cached)
@@ -208,6 +231,8 @@ This integration ensures that pricing changes made during delivery verification 
 - `GET /labels/preview-a4` - Preview A4 layout
 - `GET /labels/preview/{productId}` - Single label preview
 - `POST /labels/requeue` - Add product back to needs labels queue
+- `POST /labels/lookup-barcode` - Lookup product details by barcode for scanner interface
+- `POST /labels/scan` - Process scanned barcode and add product to labels queue
 
 ## Configuration
 
@@ -256,6 +281,7 @@ Templates are stored in the database and can be managed through:
 - **Custom label fields** beyond name/price/barcode
 - **Print queue scheduling** for batch processing
 - **Integration with external printers** via API
+- **Enhanced scanner features** such as camera-based barcode scanning for mobile devices
 
 ### Performance Optimizations
 - **Database indexing** on LabelLog event_type and created_at
@@ -272,4 +298,4 @@ Templates are stored in the database and can be managed through:
 ---
 
 **Last Updated**: August 2025  
-**Version**: 1.1.0
+**Version**: 1.2.0
