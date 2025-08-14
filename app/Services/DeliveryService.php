@@ -221,9 +221,7 @@ class DeliveryService
         $attributes = $this->extractIndependentProductAttributes($productName);
 
         // Pricing information
-        // The CSV 'Unit_Cost' or 'Price' field contains the case cost, not unit cost
-        $caseCost = (float) ($row['Unit_Cost'] ?? $row['Price'] ?? 0);
-        $unitCost = $caseSize > 0 ? $caseCost / $caseSize : $caseCost; // Convert case cost to unit cost
+        $unitCost = (float) ($row['Unit_Cost'] ?? $row['Price'] ?? 0);
         $taxAmount = (float) ($row['Tax'] ?? 0);
         $rsp = (float) ($row['RSP'] ?? 0);
         $lineValue = (float) ($row['Value'] ?? 0);
