@@ -232,7 +232,7 @@
                                                 Important Note
                                             </h3>
                                             <div class="mt-2 text-sm text-yellow-700">
-                                                <p>If you have existing OSAccounts invoices in the system, you must check <strong>"Force Update Existing"</strong> to reimport them. Otherwise, the import will skip existing invoices.</p>
+                                                <p>The import will automatically skip existing OSAccounts invoices and import only new ones. Check <strong>"Force Update Existing"</strong> to update existing invoices with the latest data from OSAccounts.</p>
                                             </div>
                                         </div>
                                     </div>

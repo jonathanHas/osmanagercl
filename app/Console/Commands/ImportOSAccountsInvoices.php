@@ -94,23 +94,16 @@ class ImportOSAccountsInvoices extends Command
                 return 0;
             }
 
-            // Check existing invoices in the date range if not forcing
+            // Note: Individual invoice checking happens in processInvoiceChunk()
+            // Existing invoices will be skipped unless --force is used to update them
             if (! $force) {
-                $existingQuery = Invoice::whereNotNull('external_osaccounts_id');
-
-                // Only check within the date range we're importing
-                if ($dateFrom) {
-                    $existingQuery->where('invoice_date', '>=', $dateFrom);
-                }
-                if ($dateTo) {
-                    $existingQuery->where('invoice_date', '<=', $dateTo);
-                }
-
-                $existingCount = $existingQuery->count();
+                $existingCount = Invoice::whereNotNull('external_osaccounts_id')
+                    ->when($dateFrom, fn($q) => $q->where('invoice_date', '>=', $dateFrom))
+                    ->when($dateTo, fn($q) => $q->where('invoice_date', '<=', $dateTo))
+                    ->count();
+                
                 if ($existingCount > 0) {
-                    $this->error("❌ Found {$existingCount} existing OSAccounts invoices in this date range. Use --force to override.");
-
-                    return 1;
+                    $this->info("ℹ️  Found {$existingCount} existing OSAccounts invoices in this date range - these will be skipped.");
                 }
             }
 
