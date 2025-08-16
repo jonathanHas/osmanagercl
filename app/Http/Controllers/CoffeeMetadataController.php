@@ -10,8 +10,10 @@ class CoffeeMetadataController extends Controller
 {
     public function index()
     {
-        $coffeeTypes = CoffeeProductMetadata::getCoffeeTypes();
-        $optionsGrouped = CoffeeProductMetadata::getOptionsGrouped();
+        // Get all metadata, sorted by type then name
+        $allMetadata = CoffeeProductMetadata::orderBy('type')->orderBy('product_name')->get();
+        $coffeeTypes = $allMetadata->where('type', 'coffee');
+        $optionsGrouped = $allMetadata->where('type', 'option')->groupBy('group_name');
         
         // Get any products that don't have metadata yet
         $allCoffeeProducts = DB::connection('pos')
@@ -62,6 +64,23 @@ class CoffeeMetadataController extends Controller
         CoffeeProductMetadata::create($request->all());
 
         return response()->json(['success' => true]);
+    }
+
+    public function destroy(CoffeeProductMetadata $metadata)
+    {
+        try {
+            $metadata->delete();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Metadata deleted successfully'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete metadata: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function addSpecificSyrups()

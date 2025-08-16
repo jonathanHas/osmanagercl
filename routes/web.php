@@ -163,6 +163,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/metadata', [CoffeeMetadataController::class, 'index'])->name('metadata.index');
         Route::put('/metadata/{metadata}', [CoffeeMetadataController::class, 'update'])->name('metadata.update');
         Route::post('/metadata', [CoffeeMetadataController::class, 'store'])->name('metadata.store');
+        Route::delete('/metadata/{metadata}', [CoffeeMetadataController::class, 'destroy'])->name('metadata.destroy');
         Route::post('/metadata/add-syrups', [CoffeeMetadataController::class, 'addSpecificSyrups'])->name('metadata.add-syrups');
         Route::get('/sales', [CoffeeController::class, 'sales'])->name('sales');
         Route::get('/sales/data', [CoffeeController::class, 'getSalesData'])->name('sales.data');

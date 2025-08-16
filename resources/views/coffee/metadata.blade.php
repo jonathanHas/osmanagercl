@@ -1,14 +1,8 @@
 <x-admin-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-                Coffee KDS - Product Metadata
-            </h2>
-            <button onclick="addSpecificSyrups()" 
-                class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                Add Specific Syrups (Van, Haz, Car)
-            </button>
-        </div>
+        <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+            Coffee KDS - Product Metadata
+        </h2>
     </x-slot>
 
     <div class="py-6">
@@ -16,13 +10,16 @@
             <!-- Coffee Types Section -->
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
                 <div class="p-6 text-gray-900 dark:text-gray-100">
-                    <h3 class="text-lg font-semibold mb-4">Coffee Types (Main Drinks)</h3>
+                    <h3 class="text-lg font-semibold mb-4">Coffee Types (Main Drinks) - {{ $coffeeTypes->count() }} items</h3>
                     <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                             <thead class="bg-gray-50 dark:bg-gray-700">
                                 <tr>
                                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                                         Product Name
+                                    </th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                                        Type
                                     </th>
                                     <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                                         Short Name (KDS Display)
@@ -40,9 +37,17 @@
                             </thead>
                             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                 @foreach($coffeeTypes as $coffee)
-                                <tr>
+                                <tr class="bg-green-50 dark:bg-green-900/20">
                                     <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                                         {{ $coffee->product_name }}
+                                    </td>
+                                    <td class="px-4 py-2 whitespace-nowrap">
+                                        <select id="type_{{ $coffee->id }}" 
+                                            class="text-sm px-2 py-1 border rounded w-24 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                                            onchange="handleTypeChange({{ $coffee->id }})">
+                                            <option value="coffee" {{ $coffee->type === 'coffee' ? 'selected' : '' }}>Coffee</option>
+                                            <option value="option" {{ $coffee->type === 'option' ? 'selected' : '' }}>Option</option>
+                                        </select>
                                     </td>
                                     <td class="px-4 py-2 whitespace-nowrap">
                                         <input type="text" 
@@ -65,10 +70,16 @@
                                             class="rounded dark:bg-gray-700 dark:border-gray-600">
                                     </td>
                                     <td class="px-4 py-2 whitespace-nowrap">
-                                        <button onclick="updateMetadata({{ $coffee->id }}, 'coffee')" 
-                                            class="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">
-                                            Update
-                                        </button>
+                                        <div class="flex gap-2">
+                                            <button onclick="updateMetadata({{ $coffee->id }})" 
+                                                class="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">
+                                                Update
+                                            </button>
+                                            <button onclick="deleteMetadata({{ $coffee->id }})" 
+                                                class="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600">
+                                                Delete
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                                 @endforeach
@@ -93,6 +104,9 @@
                                             Product Name
                                         </th>
                                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
+                                            Type
+                                        </th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
                                             Short Name
                                         </th>
                                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
@@ -111,9 +125,17 @@
                                 </thead>
                                 <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                     @foreach($options as $option)
-                                    <tr>
+                                    <tr class="bg-blue-50 dark:bg-blue-900/20">
                                         <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                                             {{ $option->product_name }}
+                                        </td>
+                                        <td class="px-4 py-2 whitespace-nowrap">
+                                            <select id="type_{{ $option->id }}" 
+                                                class="text-sm px-2 py-1 border rounded w-24 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                                                onchange="handleTypeChange({{ $option->id }})">
+                                                <option value="coffee" {{ $option->type === 'coffee' ? 'selected' : '' }}>Coffee</option>
+                                                <option value="option" {{ $option->type === 'option' ? 'selected' : '' }}>Option</option>
+                                            </select>
                                         </td>
                                         <td class="px-4 py-2 whitespace-nowrap">
                                             <input type="text" 
@@ -143,10 +165,16 @@
                                                 class="rounded dark:bg-gray-700 dark:border-gray-600">
                                         </td>
                                         <td class="px-4 py-2 whitespace-nowrap">
-                                            <button onclick="updateMetadata({{ $option->id }}, 'option')" 
-                                                class="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">
-                                                Update
-                                            </button>
+                                            <div class="flex gap-2">
+                                                <button onclick="updateMetadata({{ $option->id }})" 
+                                                    class="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">
+                                                    Update
+                                                </button>
+                                                <button onclick="deleteMetadata({{ $option->id }})" 
+                                                    class="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600">
+                                                    Delete
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                     @endforeach
@@ -185,14 +213,18 @@
 
     @push('scripts')
     <script>
-        async function updateMetadata(id, type) {
+        async function updateMetadata(id) {
             const shortName = document.getElementById(`short_name_${id}`).value;
             const displayOrder = document.getElementById(`display_order_${id}`).value;
             const isActive = document.getElementById(`is_active_${id}`).checked;
+            const type = document.getElementById(`type_${id}`).value;
             
             let groupName = null;
             if (type === 'option') {
-                groupName = document.getElementById(`group_name_${id}`).value;
+                const groupElement = document.getElementById(`group_name_${id}`);
+                if (groupElement) {
+                    groupName = groupElement.value;
+                }
             }
 
             try {
@@ -229,6 +261,49 @@
             } catch (error) {
                 console.error('Error updating metadata:', error);
                 alert('Error updating metadata');
+            }
+        }
+
+        function handleTypeChange(id) {
+            const type = document.getElementById(`type_${id}`).value;
+            const row = document.querySelector(`tr:has(#type_${id})`);
+            
+            if (type === 'coffee') {
+                row.className = 'bg-green-50 dark:bg-green-900/20';
+            } else {
+                row.className = 'bg-blue-50 dark:bg-blue-900/20';
+            }
+        }
+
+        async function deleteMetadata(id) {
+            if (!confirm('Are you sure you want to delete this metadata? This cannot be undone.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/coffee/metadata/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    }
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    // Remove the row from the table
+                    const row = document.querySelector(`tr:has(#type_${id})`);
+                    if (row) {
+                        row.style.transition = 'opacity 0.5s';
+                        row.style.opacity = '0';
+                        setTimeout(() => row.remove(), 500);
+                    }
+                } else {
+                    alert('Failed to delete metadata');
+                }
+            } catch (error) {
+                console.error('Error deleting metadata:', error);
+                alert('Error deleting metadata');
             }
         }
 
