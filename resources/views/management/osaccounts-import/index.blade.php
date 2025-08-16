@@ -279,8 +279,8 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Base Path to OSManager Files</label>
                                 <input type="text" id="attachments-base-path" 
-                                       placeholder="{{ env('OSACCOUNTS_FILE_PATH', '/var/www/html/OSManager/invoice_storage') }}" 
-                                       value="{{ env('OSACCOUNTS_FILE_PATH', '') }}"
+                                       placeholder="{{ config('osaccounts.file_path', '/var/www/html/OSManager/invoice_storage') }}" 
+                                       value="{{ config('osaccounts.file_path', '') }}"
                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
                             </div>
                             <div class="flex items-center space-x-4">
@@ -686,7 +686,7 @@
             document.getElementById('invoice-date-to').value = lastMonthEnd.toISOString().split('T')[0];
             
             // Set default attachment path from environment
-            const envPath = '{{ env('OSACCOUNTS_FILE_PATH', '/var/www/html/OSManager/invoice_storage') }}';
+            const envPath = '{{ config('osaccounts.file_path', '/var/www/html/OSManager/invoice_storage') }}';
             if (envPath && !document.getElementById('attachments-base-path').value) {
                 document.getElementById('attachments-base-path').value = envPath;
             }

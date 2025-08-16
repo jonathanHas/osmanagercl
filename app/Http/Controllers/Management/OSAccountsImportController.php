@@ -167,7 +167,7 @@ class OSAccountsImportController extends Controller
         ]);
 
         $options = [
-            '--base-path' => $request->base_path ?: env('OSACCOUNTS_FILE_PATH', '/var/www/html/OSManager/invoice_storage'),
+            '--base-path' => $request->base_path ?: config('osaccounts.file_path', '/var/www/html/OSManager/invoice_storage'),
         ];
 
         if ($request->boolean('dry_run')) {

@@ -45,12 +45,14 @@ class ImportOSAccountsAttachments extends Command
         $this->info('🔗 Starting OSAccounts attachments import...');
 
         $isDryRun = $this->option('dry-run');
-        $basePath = $this->option('base-path') ?? env('OSACCOUNTS_FILE_PATH', '/var/www/html/OSManager/invoice_storage');
+        $basePath = $this->option('base-path') ?? config('osaccounts.file_path', '/var/www/html/OSManager/invoice_storage');
         $force = $this->option('force');
 
         if ($isDryRun) {
             $this->warn('🔍 DRY RUN MODE - No changes will be made');
         }
+
+        $this->info("📁 Using base path: {$basePath}");
 
         if (! is_dir($basePath)) {
             $this->error("❌ Base path does not exist: {$basePath}");
