@@ -378,7 +378,7 @@ class LabelAreaController extends Controller
         ]);
 
         $barcode = $request->input('barcode');
-        
+
         // Find the product by barcode
         $product = Product::where('CODE', $barcode)->first();
 
@@ -395,7 +395,7 @@ class LabelAreaController extends Controller
         } else {
             return response()->json([
                 'success' => false,
-                'message' => 'Product not found with barcode: ' . $barcode,
+                'message' => 'Product not found with barcode: '.$barcode,
             ]);
         }
     }
@@ -410,14 +410,14 @@ class LabelAreaController extends Controller
         ]);
 
         $barcode = $request->input('barcode');
-        
+
         // Find the product by barcode
         $product = Product::where('CODE', $barcode)->first();
 
-        if (!$product) {
+        if (! $product) {
             return response()->json([
                 'success' => false,
-                'message' => 'Product not found with barcode: ' . $barcode,
+                'message' => 'Product not found with barcode: '.$barcode,
             ]);
         }
 
@@ -437,7 +437,7 @@ class LabelAreaController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to add product to labels queue: ' . $e->getMessage(),
+                'message' => 'Failed to add product to labels queue: '.$e->getMessage(),
             ], 500);
         }
     }

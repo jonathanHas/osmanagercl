@@ -71,7 +71,7 @@ class ProfitLossController extends Controller
         // Fall back to real-time POS queries - matching sales-accounting methodology exactly
         $formattedStartDate = $startDate->format('Y m d');
         $formattedEndDate = $endDate->format('Y m d');
-        
+
         // Use TICKETLINES approach (same as sales-accounting) for accurate calculations
         $mainSalesQuery = "
             SELECT TAXES.RATE, SUM(PRICE * UNITS) AS Net, PAYMENTS.PAYMENT
@@ -96,14 +96,14 @@ class ProfitLossController extends Controller
             'free' => ['net' => 0, 'vat' => 0],
             'paperin' => ['net' => 0, 'vat' => 0],
         ];
-        
+
         $vatBreakdown = [
             '0.23' => ['net' => 0, 'vat' => 0],
             '0.135' => ['net' => 0, 'vat' => 0],
             '0.09' => ['net' => 0, 'vat' => 0],
             '0' => ['net' => 0, 'vat' => 0],
         ];
-        
+
         $totalNetSales = 0;
         $totalVatOnSales = 0;
         $paperinGrossTotal = 0;
@@ -112,41 +112,41 @@ class ProfitLossController extends Controller
             $net = $sale->Net ?? 0;
             $vat = $net * $sale->RATE;
             $payment = strtolower($sale->PAYMENT);
-            $rateKey = (string)$sale->RATE;
-            
+            $rateKey = (string) $sale->RATE;
+
             // Track by payment type
             if (isset($paymentTotals[$payment])) {
                 $paymentTotals[$payment]['net'] += $net;
                 $paymentTotals[$payment]['vat'] += $vat;
             }
-            
+
             // Track by VAT rate
             if (isset($vatBreakdown[$rateKey])) {
                 $vatBreakdown[$rateKey]['net'] += $net;
                 $vatBreakdown[$rateKey]['vat'] += $vat;
             }
-            
+
             $totalNetSales += $net;
             $totalVatOnSales += $vat;
-            
+
             // Track paperin for adjustment
             if ($payment === 'paperin') {
                 $paperinGrossTotal += ($net + $vat);
             }
         }
-        
+
         // Apply paperin adjustment (gift vouchers should not be counted as revenue)
         $adjustedNetRevenue = $totalNetSales - $paperinGrossTotal;
-        
+
         // Get transaction count separately
         $transactionCount = DB::connection('pos')
             ->table('RECEIPTS as r')
             ->leftJoin('TICKETS as t', 'r.ID', '=', 't.ID')
             ->leftJoin('CUSTOMERS as c', 't.CUSTOMER', '=', 'c.ID')
             ->whereBetween('r.DATENEW', [$startDate, $endDate])
-            ->where(function($query) {
+            ->where(function ($query) {
                 $query->whereNull('c.NAME')
-                      ->orWhereNotIn('c.NAME', ['Kitchen', 'Coffee']);
+                    ->orWhereNotIn('c.NAME', ['Kitchen', 'Coffee']);
             })
             ->count('r.ID');
 
@@ -299,7 +299,7 @@ class ProfitLossController extends Controller
         // Previous period revenue - using same methodology as current period
         $formattedPrevStart = $previousStart->format('Y m d');
         $formattedPrevEnd = $previousEnd->format('Y m d');
-        
+
         $prevSalesQuery = "
             SELECT TAXES.RATE, SUM(PRICE * UNITS) AS Net, PAYMENTS.PAYMENT
             FROM TICKETLINES
@@ -314,20 +314,20 @@ class ProfitLossController extends Controller
         ";
 
         $prevSales = DB::connection('pos')->select($prevSalesQuery, [$formattedPrevStart, $formattedPrevEnd]);
-        
+
         $prevTotalNet = 0;
         $prevPaperinGross = 0;
-        
+
         foreach ($prevSales as $sale) {
             $net = $sale->Net ?? 0;
             $vat = $net * $sale->RATE;
             $prevTotalNet += $net;
-            
+
             if (strtolower($sale->PAYMENT) === 'paperin') {
                 $prevPaperinGross += ($net + $vat);
             }
         }
-        
+
         $previousRevenue = $prevTotalNet - $prevPaperinGross;
 
         // Previous period costs - VAT exclusive

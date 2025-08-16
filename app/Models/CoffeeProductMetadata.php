@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class CoffeeProductMetadata extends Model
 {
     protected $table = 'coffee_product_metadata';
-    
+
     protected $fillable = [
         'product_id',
         'product_name',
@@ -48,6 +48,7 @@ class CoffeeProductMetadata extends Model
     public static function getShortName($productId)
     {
         $metadata = self::where('product_id', $productId)->first();
+
         return $metadata ? $metadata->short_name : null;
     }
 

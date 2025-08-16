@@ -25,7 +25,7 @@ return [
 
         // Fruit - Uses 1000s-2000s range
         'SUB1' => [
-            'name' => 'Fruit', 
+            'name' => 'Fruit',
             'ranges' => [[1000, 2999]],
             'priority' => 'increment', // Always increment from highest
             'description' => 'Fresh fruit products use sequential numbering in 1000s-2000s range',
@@ -34,7 +34,7 @@ return [
         // Vegetables - Uses 1000s-2000s range (as requested)
         'SUB2' => [
             'name' => 'Vegetables',
-            'ranges' => [[1000, 2999]], 
+            'ranges' => [[1000, 2999]],
             'priority' => 'increment', // Always increment from highest
             'description' => 'Fresh vegetable products use sequential numbering in 1000s-2000s range',
         ],
@@ -73,10 +73,10 @@ return [
     'settings' => [
         // Maximum number of codes to check when looking for gaps or next available
         'max_search_range' => 200,
-        
+
         // Exclude codes above this threshold (to avoid EAN/UPC barcodes)
         'max_internal_code' => 99999,
-        
+
         // Default fallback starting code for new categories
         'default_start' => 1000,
     ],

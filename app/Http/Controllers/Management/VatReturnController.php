@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Management;
 
 use App\Http\Controllers\Controller;
+use App\Models\AccountingSupplier;
 use App\Models\Invoice;
 use App\Models\VatReturn;
-use App\Models\AccountingSupplier;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -37,7 +37,7 @@ class VatReturnController extends Controller
             // Determine which bi-monthly period the selected date falls into
             $month = $endDate->month;
             $year = $endDate->year;
-            
+
             // Calculate bi-monthly period
             if ($month % 2 == 0) {
                 // Even month (Feb, Apr, Jun, Aug, Oct, Dec)
@@ -100,12 +100,12 @@ class VatReturnController extends Controller
             'total_vat' => $invoices->sum('vat_amount'),
             'total_gross' => $invoices->sum('total_amount'),
         ];
-        
+
         // Get EU supplier invoices
         $euSupplierIds = AccountingSupplier::euSuppliers()->pluck('id');
         $euInvoices = $invoices->whereIn('supplier_id', $euSupplierIds);
         $euTotalAmount = $euInvoices->sum('subtotal'); // Net amount for EU goods
-        
+
         // Initialize default values
         $salesData = null;
         $rosFields = [
@@ -116,16 +116,16 @@ class VatReturnController extends Controller
             'E1' => 0,
             'E2' => $euTotalAmount,
         ];
-        
+
         // Get Sales VAT data only if dates are provided
         if ($startDate && $periodEnd) {
             $salesData = $this->getSalesVatData($startDate, $periodEnd);
-            
+
             // Calculate net payable/repayable
             $vatOnSales = $salesData['total_vat'] ?? 0;
             $vatOnPurchases = $purchaseTotals['total_vat'];
             $netPayable = $vatOnSales - $vatOnPurchases;
-            
+
             // Update ROS VAT Return fields with actual values
             $rosFields = [
                 'T1' => $vatOnSales, // VAT on Sales
@@ -152,7 +152,7 @@ class VatReturnController extends Controller
             'euSupplierIds'
         ));
     }
-    
+
     /**
      * Get sales VAT data for the period
      */
@@ -162,7 +162,7 @@ class VatReturnController extends Controller
         $hasAggregatedData = DB::table('sales_accounting_daily')
             ->whereBetween('sale_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
             ->exists();
-            
+
         if ($hasAggregatedData) {
             // Use optimized pre-aggregated data
             // Include ALL payment types for VAT calculation (including paperin/vouchers)
@@ -177,19 +177,19 @@ class VatReturnController extends Controller
                 ->whereBetween('sale_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
                 ->groupBy('vat_rate')
                 ->get();
-                
+
             $totals = [
                 'total_net' => $salesData->sum('total_net'),
                 'total_vat' => $salesData->sum('total_vat'),
                 'total_gross' => $salesData->sum('total_gross'),
                 'by_rate' => $salesData->keyBy('vat_rate'),
-                'data_source' => 'optimized'
+                'data_source' => 'optimized',
             ];
         } else {
             // Fall back to real-time POS query
             $formattedStartDate = $startDate->format('Y m d');
             $formattedEndDate = $endDate->format('Y m d');
-            
+
             // Include ALL sales for VAT calculation (including paperin/vouchers)
             // as VAT on vouchers still needs to be paid to Revenue
             $salesQuery = "
@@ -207,22 +207,22 @@ class VatReturnController extends Controller
                 AND (CUSTOMERS.NAME IS NULL OR CUSTOMERS.NAME NOT IN ('Kitchen', 'Coffee'))
                 GROUP BY TAXES.RATE
             ";
-            
+
             $salesData = DB::connection('pos')
                 ->select($salesQuery, [$formattedStartDate, $formattedEndDate]);
-                
+
             $totalNet = collect($salesData)->sum('total_net');
             $totalVat = collect($salesData)->sum('total_vat');
-            
+
             $totals = [
                 'total_net' => $totalNet,
                 'total_vat' => $totalVat,
                 'total_gross' => $totalNet + $totalVat,
                 'by_rate' => collect($salesData)->keyBy('vat_rate'),
-                'data_source' => 'real-time'
+                'data_source' => 'real-time',
             ];
         }
-        
+
         return $totals;
     }
 
@@ -340,26 +340,26 @@ class VatReturnController extends Controller
             'invoice_ids' => 'required|array|min:1',
             'invoice_ids.*' => 'exists:invoices,id',
         ]);
-        
+
         $startDate = Carbon::parse($validated['start_date']);
         $endDate = Carbon::parse($validated['end_date']);
         $period = $validated['period'];
-        
+
         // Get selected invoices
         $invoices = Invoice::with(['supplier', 'vatLines'])
             ->whereIn('id', $validated['invoice_ids'])
             ->orderBy('supplier_name')
             ->orderBy('invoice_date')
             ->get();
-        
+
         // Get sales data
         $salesData = $this->getSalesVatData($startDate, $endDate);
-        
+
         // Get EU supplier invoices
         $euSupplierIds = AccountingSupplier::euSuppliers()->pluck('id');
         $euInvoices = $invoices->whereIn('supplier_id', $euSupplierIds);
         $euTotalAmount = $euInvoices->sum('subtotal');
-        
+
         // Calculate purchase totals
         $purchaseTotals = [
             'zero_net' => $invoices->sum('zero_net'),
@@ -374,12 +374,12 @@ class VatReturnController extends Controller
             'total_vat' => $invoices->sum('vat_amount'),
             'total_gross' => $invoices->sum('total_amount'),
         ];
-        
+
         // Calculate ROS fields
         $vatOnSales = $salesData['total_vat'] ?? 0;
         $vatOnPurchases = $purchaseTotals['total_vat'];
         $netPayable = $vatOnSales - $vatOnPurchases;
-        
+
         $rosFields = [
             'T1' => $vatOnSales,
             'T2' => $vatOnPurchases,
@@ -388,9 +388,9 @@ class VatReturnController extends Controller
             'E1' => 0,
             'E2' => $euTotalAmount,
         ];
-        
+
         $filename = 'vat-return-preview-'.$period.'.csv';
-        
+
         return $this->generateCsvExport($filename, $period, $startDate, $endDate, $invoices, $salesData, $rosFields, $purchaseTotals, $euInvoices);
     }
 
@@ -401,21 +401,21 @@ class VatReturnController extends Controller
     {
         $vatReturn->load('invoices.supplier');
         $filename = 'vat-return-'.$vatReturn->return_period.'.csv';
-        
+
         // Get additional data for comprehensive export
         $startDate = $vatReturn->period_start;
         $endDate = $vatReturn->period_end;
         $salesData = $this->getSalesVatData($startDate, $endDate);
-        
+
         // Get EU supplier invoices
         $euSupplierIds = AccountingSupplier::euSuppliers()->pluck('id');
         $euInvoices = $vatReturn->invoices->whereIn('supplier_id', $euSupplierIds);
-        
+
         // Calculate ROS fields
         $vatOnSales = $salesData['total_vat'] ?? 0;
         $vatOnPurchases = $vatReturn->total_vat;
         $netPayable = $vatOnSales - $vatOnPurchases;
-        
+
         $rosFields = [
             'T1' => $vatOnSales,
             'T2' => $vatOnPurchases,
@@ -424,7 +424,7 @@ class VatReturnController extends Controller
             'E1' => 0,
             'E2' => $euInvoices->sum('subtotal'),
         ];
-        
+
         $purchaseTotals = [
             'zero_net' => $vatReturn->zero_net,
             'zero_vat' => $vatReturn->zero_vat,
@@ -438,10 +438,10 @@ class VatReturnController extends Controller
             'total_vat' => $vatReturn->total_vat,
             'total_gross' => $vatReturn->total_gross,
         ];
-        
+
         return $this->generateCsvExport($filename, $vatReturn->return_period, $startDate, $endDate, $vatReturn->invoices, $salesData, $rosFields, $purchaseTotals, $euInvoices);
     }
-    
+
     /**
      * Generate comprehensive CSV export for VAT return data.
      */
@@ -473,7 +473,7 @@ class VatReturnController extends Controller
             fputcsv($file, ['E1', 'Goods to other EU countries', number_format($rosFields['E1'], 2)]);
             fputcsv($file, ['E2', 'Goods from other EU countries', number_format($rosFields['E2'], 2)]);
             fputcsv($file, []); // Empty row
-            
+
             // Write Sales VAT breakdown if available
             if (isset($salesData['by_rate']) && $salesData['by_rate']->count() > 0) {
                 fputcsv($file, ['SALES VAT BREAKDOWN']);
@@ -483,18 +483,18 @@ class VatReturnController extends Controller
                         number_format($rate * 100, 1).'%',
                         number_format($data->total_net ?? 0, 2),
                         number_format($data->total_vat ?? 0, 2),
-                        number_format(($data->total_net ?? 0) + ($data->total_vat ?? 0), 2)
+                        number_format(($data->total_net ?? 0) + ($data->total_vat ?? 0), 2),
                     ]);
                 }
                 fputcsv($file, [
                     'TOTAL',
                     number_format($salesData['total_net'], 2),
                     number_format($salesData['total_vat'], 2),
-                    number_format($salesData['total_gross'], 2)
+                    number_format($salesData['total_gross'], 2),
                 ]);
                 fputcsv($file, []); // Empty row
             }
-            
+
             // Write Purchase VAT breakdown
             fputcsv($file, ['PURCHASE VAT BREAKDOWN']);
             fputcsv($file, ['VAT Rate', 'Net Purchases', 'VAT Amount']);
@@ -504,7 +504,7 @@ class VatReturnController extends Controller
             fputcsv($file, ['23%', number_format($purchaseTotals['standard_net'], 2), number_format($purchaseTotals['standard_vat'], 2)]);
             fputcsv($file, ['TOTAL', number_format($purchaseTotals['total_net'], 2), number_format($purchaseTotals['total_vat'], 2)]);
             fputcsv($file, []); // Empty row
-            
+
             // Write EU Suppliers section if applicable
             if ($euInvoices->count() > 0) {
                 fputcsv($file, ['EU SUPPLIERS (INTRASTAT E2)']);
@@ -517,7 +517,7 @@ class VatReturnController extends Controller
                     fputcsv($file, [
                         $supplierName,
                         $countryCode,
-                        number_format($supplierInvoices->sum('subtotal'), 2)
+                        number_format($supplierInvoices->sum('subtotal'), 2),
                     ]);
                 }
                 fputcsv($file, ['TOTAL EU GOODS', '', number_format($euInvoices->sum('subtotal'), 2)]);
@@ -541,7 +541,7 @@ class VatReturnController extends Controller
                 'Total Net',
                 'Total VAT',
                 'Total Gross',
-                'EU Supplier'
+                'EU Supplier',
             ]);
 
             // Get EU supplier IDs for flagging
@@ -550,7 +550,7 @@ class VatReturnController extends Controller
             // Write invoice data
             foreach ($invoices as $invoice) {
                 $isEuSupplier = in_array($invoice->supplier_id, $euSupplierIds) ? 'Yes' : 'No';
-                
+
                 fputcsv($file, [
                     $invoice->invoice_number,
                     $invoice->supplier_name,
@@ -566,7 +566,7 @@ class VatReturnController extends Controller
                     number_format($invoice->subtotal, 2, '.', ''),
                     number_format($invoice->vat_amount, 2, '.', ''),
                     number_format($invoice->total_amount, 2, '.', ''),
-                    $isEuSupplier
+                    $isEuSupplier,
                 ]);
             }
 
@@ -586,7 +586,7 @@ class VatReturnController extends Controller
                 number_format($purchaseTotals['total_net'], 2, '.', ''),
                 number_format($purchaseTotals['total_vat'], 2, '.', ''),
                 number_format($purchaseTotals['total_gross'], 2, '.', ''),
-                ''
+                '',
             ]);
 
             fclose($file);

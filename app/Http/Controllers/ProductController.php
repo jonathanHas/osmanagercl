@@ -565,56 +565,57 @@ class ProductController extends Controller
      */
     private function getNextAvailableBarcodeForCategory(string $categoryId): ?string
     {
-        $config = config('barcode_patterns.categories.' . $categoryId);
-        
+        $config = config('barcode_patterns.categories.'.$categoryId);
+
         // Return null if category is not configured for barcode suggestions
-        if (!$config) {
+        if (! $config) {
             return null;
         }
-        
+
         $settings = config('barcode_patterns.settings');
-        
+
         // Get existing codes for this category within internal code range
         $categoryCodes = Product::where('CATEGORY', $categoryId)
             ->pluck('CODE')
-            ->filter(fn($code) => is_numeric($code) && (int)$code <= $settings['max_internal_code'])
-            ->map(fn($code) => (int)$code)
+            ->filter(fn ($code) => is_numeric($code) && (int) $code <= $settings['max_internal_code'])
+            ->map(fn ($code) => (int) $code)
             ->sort()
             ->values()
             ->toArray();
-            
+
         // If no codes exist, start at the beginning of the first range
         if (empty($categoryCodes)) {
             $firstRange = $config['ranges'][0];
-            return (string)$firstRange[0];
+
+            return (string) $firstRange[0];
         }
-        
+
         $min = min($categoryCodes);
         $max = max($categoryCodes);
-        
+
         if ($config['priority'] === 'fill_gaps') {
             // Fill gaps in existing range first
             for ($i = $min; $i <= $max; $i++) {
-                if (!in_array($i, $categoryCodes) && $this->isCodeAvailableInRange($i, $config['ranges']) && !Product::where('CODE', (string)$i)->exists()) {
-                    return (string)$i;
+                if (! in_array($i, $categoryCodes) && $this->isCodeAvailableInRange($i, $config['ranges']) && ! Product::where('CODE', (string) $i)->exists()) {
+                    return (string) $i;
                 }
             }
         }
-        
+
         // No gaps found or priority is increment - find next available after highest
         $searchStart = $max + 1;
         $searchLimit = $searchStart + $settings['max_search_range'];
-        
+
         for ($i = $searchStart; $i <= $searchLimit; $i++) {
-            if ($this->isCodeAvailableInRange($i, $config['ranges']) && !Product::where('CODE', (string)$i)->exists()) {
-                return (string)$i;
+            if ($this->isCodeAvailableInRange($i, $config['ranges']) && ! Product::where('CODE', (string) $i)->exists()) {
+                return (string) $i;
             }
         }
-        
+
         // Fallback: return next increment (might be outside configured ranges)
-        return (string)($max + 1);
+        return (string) ($max + 1);
     }
-    
+
     /**
      * Check if a code falls within any of the configured ranges for a category.
      */
@@ -625,9 +626,10 @@ class ProductController extends Controller
                 return true;
             }
         }
+
         return false;
     }
-    
+
     /**
      * Show the form for creating a new product.
      */
@@ -648,13 +650,13 @@ class ProductController extends Controller
         $deliveryItemId = $request->query('delivery_item');
         $categoryId = $request->query('category'); // For category-specific creation (e.g., Coffee Fresh)
         $prefillData = null;
-        
+
         // Auto-suggest barcode for configured categories
         $suggestedBarcode = null;
         $categoryConfig = null;
         if ($categoryId) {
             $suggestedBarcode = $this->getNextAvailableBarcodeForCategory($categoryId);
-            $categoryConfig = config('barcode_patterns.categories.' . $categoryId);
+            $categoryConfig = config('barcode_patterns.categories.'.$categoryId);
         }
 
         if ($deliveryItemId) {

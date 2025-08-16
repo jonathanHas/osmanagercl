@@ -18,7 +18,7 @@ return new class extends Migration
             $table->integer('display_order')->default(0); // Order within group
             $table->boolean('is_active')->default(true);
             $table->timestamps();
-            
+
             $table->unique('product_id');
             $table->index(['type', 'is_active']);
         });

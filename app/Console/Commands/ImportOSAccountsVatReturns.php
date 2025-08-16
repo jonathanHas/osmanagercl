@@ -3,8 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\Invoice;
-use App\Models\VatReturn;
 use App\Models\OSAccounts\OSInvoice;
+use App\Models\VatReturn;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -59,12 +59,13 @@ class ImportOSAccountsVatReturns extends Command
             // Get all unique Assigned values (VAT periods)
             $this->info('📊 Analyzing VAT periods from OSAccounts...');
             $uniquePeriods = $this->getUniquePeriods();
-            
+
             $this->stats['total_periods'] = count($uniquePeriods);
             $this->info("📅 Found {$this->stats['total_periods']} unique VAT periods");
 
             if ($this->stats['total_periods'] === 0) {
                 $this->warn('⚠️  No VAT periods found to import');
+
                 return 0;
             }
 
@@ -86,11 +87,12 @@ class ImportOSAccountsVatReturns extends Command
             return 0;
 
         } catch (\Exception $e) {
-            $this->error('❌ Import failed: ' . $e->getMessage());
+            $this->error('❌ Import failed: '.$e->getMessage());
             Log::error('VAT returns import failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
             return 1;
         }
     }
@@ -118,9 +120,10 @@ class ImportOSAccountsVatReturns extends Command
         try {
             // Parse the period string to get date range
             $dateRange = $this->parsePeriodString($periodString);
-            if (!$dateRange) {
+            if (! $dateRange) {
                 $this->warn("⚠️  Could not parse period: {$periodString}");
                 $this->stats['errors']++;
+
                 return;
             }
 
@@ -130,22 +133,24 @@ class ImportOSAccountsVatReturns extends Command
 
             // Check if VAT return already exists
             $existingReturn = VatReturn::where('return_period', $periodCode)->first();
-            if ($existingReturn && !$force) {
+            if ($existingReturn && ! $force) {
                 $this->stats['skipped']++;
+
                 return;
             }
 
             if ($isDryRun) {
                 $this->info("🔍 Would process period: {$periodString} ({$periodCode})");
                 $this->stats['created']++;
+
                 return;
             }
 
             DB::beginTransaction();
             try {
                 // Create or update VAT return
-                $vatReturn = $existingReturn ?: new VatReturn();
-                
+                $vatReturn = $existingReturn ?: new VatReturn;
+
                 // Get all invoices for this period from OSAccounts
                 $osInvoices = OSInvoice::where('Assigned', $periodString)
                     ->with('details')
@@ -196,7 +201,7 @@ class ImportOSAccountsVatReturns extends Command
             }
 
         } catch (\Exception $e) {
-            $this->error("❌ Error processing period {$periodString}: " . $e->getMessage());
+            $this->error("❌ Error processing period {$periodString}: ".$e->getMessage());
             $this->stats['errors']++;
         }
     }
@@ -208,17 +213,17 @@ class ImportOSAccountsVatReturns extends Command
     {
         // Common patterns:
         // "VAT Jan Feb 2024" or "Jan Feb 2024"
-        // "VAT MAR APR 2017" 
+        // "VAT MAR APR 2017"
         // "VAT May June 2019"
         // "Jan - Feb 2016"
         // And various other formats
 
         $periodString = trim($periodString);
-        
+
         // Remove "VAT" prefix if present (case insensitive)
         $periodString = preg_replace('/^VAT\s+/i', '', $periodString);
         $periodString = trim($periodString);
-        
+
         // Skip invalid entries
         if (empty($periodString) || strtoupper($periodString) === 'ASSIGNED') {
             return null;
@@ -233,7 +238,7 @@ class ImportOSAccountsVatReturns extends Command
             try {
                 $start = Carbon::parse("1 {$startMonth} {$year}")->startOfMonth();
                 $end = Carbon::parse("1 {$endMonth} {$year}")->endOfMonth();
-                
+
                 return [
                     'start' => $start,
                     'end' => $end,
@@ -252,7 +257,7 @@ class ImportOSAccountsVatReturns extends Command
             try {
                 $start = Carbon::parse("1 {$startMonth} {$year}")->startOfMonth();
                 $end = Carbon::parse("1 {$endMonth} {$year}")->endOfMonth();
-                
+
                 return [
                     'start' => $start,
                     'end' => $end,
@@ -272,7 +277,7 @@ class ImportOSAccountsVatReturns extends Command
             try {
                 $start = Carbon::parse("1 {$startMonth} {$year}")->startOfMonth();
                 $end = Carbon::parse("1 {$endMonth} {$year}")->endOfMonth();
-                
+
                 return [
                     'start' => $start,
                     'end' => $end,
@@ -284,7 +289,7 @@ class ImportOSAccountsVatReturns extends Command
 
         // Try to match quarter pattern like "Q1 2019"
         if (preg_match('/^Q(\d)\s+(\d{4})$/i', $periodString, $matches)) {
-            $quarter = (int)$matches[1];
+            $quarter = (int) $matches[1];
             $year = $matches[2];
 
             $start = Carbon::create($year, ($quarter - 1) * 3 + 1, 1)->startOfMonth();
@@ -353,7 +358,7 @@ class ImportOSAccountsVatReturns extends Command
 
         foreach ($osInvoices as $invoice) {
             $breakdown = $invoice->vat_breakdown;
-            
+
             $totals['zero_net'] += $breakdown['zero_net'];
             $totals['zero_vat'] += $breakdown['zero_vat'];
             $totals['second_reduced_net'] += $breakdown['second_reduced_net'];
@@ -364,9 +369,9 @@ class ImportOSAccountsVatReturns extends Command
             $totals['standard_vat'] += $breakdown['standard_vat'];
         }
 
-        $totals['total_net'] = $totals['zero_net'] + $totals['second_reduced_net'] + 
+        $totals['total_net'] = $totals['zero_net'] + $totals['second_reduced_net'] +
                                 $totals['reduced_net'] + $totals['standard_net'];
-        $totals['total_vat'] = $totals['zero_vat'] + $totals['second_reduced_vat'] + 
+        $totals['total_vat'] = $totals['zero_vat'] + $totals['second_reduced_vat'] +
                                 $totals['reduced_vat'] + $totals['standard_vat'];
         $totals['total_gross'] = $totals['total_net'] + $totals['total_vat'];
 
@@ -379,7 +384,7 @@ class ImportOSAccountsVatReturns extends Command
     private function assignInvoicesToReturn($vatReturn, $osInvoices)
     {
         $osInvoiceIds = $osInvoices->pluck('ID')->toArray();
-        
+
         // Update Laravel invoices that match these OSAccounts IDs
         return Invoice::whereIn('external_osaccounts_id', $osInvoiceIds)
             ->update(['vat_return_id' => $vatReturn->id]);
@@ -397,7 +402,7 @@ class ImportOSAccountsVatReturns extends Command
         $this->info("   🔄 Updated: {$this->stats['updated']}");
         $this->info("   ⏭️  Skipped: {$this->stats['skipped']}");
         $this->info("   📎 Invoices assigned: {$this->stats['invoices_assigned']}");
-        
+
         if ($this->stats['errors'] > 0) {
             $this->warn("   ❌ Errors: {$this->stats['errors']}");
         }

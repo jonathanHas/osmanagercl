@@ -35,11 +35,11 @@ class CoffeeProductMetadataSeeder extends Seeder
             // Options grouped by category
             'Milk Alternative' => ['type' => 'option', 'short_name' => 'Alt Milk', 'group_name' => 'Milk', 'display_order' => 1],
             'Milk Alt OAT' => ['type' => 'option', 'short_name' => 'Oat', 'group_name' => 'Milk', 'display_order' => 2],
-            
+
             'Syrup' => ['type' => 'option', 'short_name' => 'Syrup', 'group_name' => 'Syrups', 'display_order' => 1],
-            
+
             'Espresso Extra Shot' => ['type' => 'option', 'short_name' => 'Extra Shot', 'group_name' => 'Coffee', 'display_order' => 1],
-            
+
             'Take Away' => ['type' => 'option', 'short_name' => 'Takeaway', 'group_name' => 'Service', 'display_order' => 1],
             '2GoCup Cup' => ['type' => 'option', 'short_name' => '2Go Cup', 'group_name' => 'Service', 'display_order' => 2],
             '2GoCup Cup Return' => ['type' => 'option', 'short_name' => '2Go Return', 'group_name' => 'Service', 'display_order' => 3],
@@ -51,11 +51,11 @@ class CoffeeProductMetadataSeeder extends Seeder
 
         foreach ($products as $product) {
             $productName = $product->NAME;
-            
+
             // Check if we have metadata for this product
             if (isset($coffeeMetadata[$productName])) {
                 $metadata = $coffeeMetadata[$productName];
-                
+
                 CoffeeProductMetadata::updateOrCreate(
                     ['product_id' => $product->ID],
                     [
@@ -84,7 +84,7 @@ class CoffeeProductMetadataSeeder extends Seeder
         }
 
         $this->command->info('Coffee product metadata seeded successfully.');
-        $this->command->info('Total products processed: ' . $products->count());
+        $this->command->info('Total products processed: '.$products->count());
     }
 
     /**
@@ -110,8 +110,8 @@ class CoffeeProductMetadataSeeder extends Seeder
             for ($i = 0; $i < count($words) - 1; $i++) {
                 $abbreviated .= substr($words[$i], 0, 1);
             }
-            $abbreviated .= ' ' . $words[count($words) - 1];
-            
+            $abbreviated .= ' '.$words[count($words) - 1];
+
             if (strlen($abbreviated) <= 12) {
                 return $abbreviated;
             }

@@ -16,7 +16,7 @@ return new class extends Migration
             $table->boolean('is_eu_supplier')->default(false)->after('country_code');
             $table->index('is_eu_supplier', 'idx_eu_suppliers');
         });
-        
+
         // Update known EU suppliers (Dynamis from France and Udea from Netherlands)
         DB::table('accounting_suppliers')
             ->where('name', 'like', '%Dynamis%')
@@ -24,7 +24,7 @@ return new class extends Migration
                 'country_code' => 'FR',
                 'is_eu_supplier' => true,
             ]);
-            
+
         DB::table('accounting_suppliers')
             ->where('name', 'like', '%Udea%')
             ->orWhere('name', 'like', '%UDEA%')

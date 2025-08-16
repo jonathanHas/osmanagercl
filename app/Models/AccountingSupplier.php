@@ -192,7 +192,7 @@ class AccountingSupplier extends Model
     {
         return $query->where('status', 'active')->where('is_active', true);
     }
-    
+
     /**
      * Scope for EU suppliers.
      */

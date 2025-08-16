@@ -98,10 +98,10 @@ class ImportOSAccountsInvoices extends Command
             // Existing invoices will be skipped unless --force is used to update them
             if (! $force) {
                 $existingCount = Invoice::whereNotNull('external_osaccounts_id')
-                    ->when($dateFrom, fn($q) => $q->where('invoice_date', '>=', $dateFrom))
-                    ->when($dateTo, fn($q) => $q->where('invoice_date', '<=', $dateTo))
+                    ->when($dateFrom, fn ($q) => $q->where('invoice_date', '>=', $dateFrom))
+                    ->when($dateTo, fn ($q) => $q->where('invoice_date', '<=', $dateTo))
                     ->count();
-                
+
                 if ($existingCount > 0) {
                     $this->info("ℹ️  Found {$existingCount} existing OSAccounts invoices in this date range - these will be skipped.");
                 }

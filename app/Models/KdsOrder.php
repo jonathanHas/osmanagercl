@@ -126,7 +126,7 @@ class KdsOrder extends Model
      */
     public function getGroupedItemsAttribute()
     {
-        $groupingService = new CoffeeOrderGroupingService();
+        $groupingService = new CoffeeOrderGroupingService;
         $items = $this->items->map(function ($item) {
             return [
                 'id' => $item->id,
@@ -148,7 +148,8 @@ class KdsOrder extends Model
      */
     public function getCompactDisplayAttribute()
     {
-        $groupingService = new CoffeeOrderGroupingService();
+        $groupingService = new CoffeeOrderGroupingService;
+
         return $groupingService->getCompactDisplay($this->grouped_items);
     }
 
@@ -160,18 +161,18 @@ class KdsOrder extends Model
         // Use compact display if:
         // 1. Order has 3+ items total, OR
         // 2. Order has at least 1 coffee type AND 1 option (allowing grouping even with 2 items)
-        
+
         $itemCount = $this->items->count();
-        
+
         if ($itemCount >= 3) {
             return true;
         }
-        
+
         if ($itemCount >= 2) {
             // Check if we have both coffee types and options for grouping
             $hasCoffee = false;
             $hasOption = false;
-            
+
             foreach ($this->items as $item) {
                 $metadata = \App\Models\CoffeeProductMetadata::where('product_id', $item->product_id)->first();
                 if ($metadata) {
@@ -181,14 +182,14 @@ class KdsOrder extends Model
                         $hasOption = true;
                     }
                 }
-                
+
                 // Early exit if we found both
                 if ($hasCoffee && $hasOption) {
                     return true;
                 }
             }
         }
-        
+
         return false;
     }
 }

@@ -14,16 +14,16 @@ class CoffeeMetadataController extends Controller
         $allMetadata = CoffeeProductMetadata::orderBy('type')->orderBy('product_name')->get();
         $coffeeTypes = $allMetadata->where('type', 'coffee');
         $optionsGrouped = $allMetadata->where('type', 'option')->groupBy('group_name');
-        
+
         // Get any products that don't have metadata yet
         $allCoffeeProducts = DB::connection('pos')
             ->table('PRODUCTS')
             ->where('CATEGORY', '081')
             ->select('ID', 'NAME')
             ->get();
-            
+
         $missingMetadata = $allCoffeeProducts->filter(function ($product) {
-            return !CoffeeProductMetadata::where('product_id', $product->ID)->exists();
+            return ! CoffeeProductMetadata::where('product_id', $product->ID)->exists();
         });
 
         return view('coffee.metadata', compact('coffeeTypes', 'optionsGrouped', 'missingMetadata'));
@@ -41,10 +41,10 @@ class CoffeeMetadataController extends Controller
 
         $metadata->update($request->only([
             'short_name',
-            'type', 
+            'type',
             'group_name',
             'display_order',
-            'is_active'
+            'is_active',
         ]));
 
         return response()->json(['success' => true]);
@@ -70,15 +70,15 @@ class CoffeeMetadataController extends Controller
     {
         try {
             $metadata->delete();
-            
+
             return response()->json([
                 'success' => true,
-                'message' => 'Metadata deleted successfully'
+                'message' => 'Metadata deleted successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to delete metadata: ' . $e->getMessage()
+                'message' => 'Failed to delete metadata: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -88,17 +88,17 @@ class CoffeeMetadataController extends Controller
         // Add your specific syrups
         $syrups = [
             'Vanilla Syrup' => 'Van',
-            'Hazelnut Syrup' => 'Haz', 
+            'Hazelnut Syrup' => 'Haz',
             'Caramel Syrup' => 'Car',
         ];
 
         $created = 0;
         foreach ($syrups as $name => $shortName) {
             // Check if this syrup already exists
-            if (!CoffeeProductMetadata::where('product_name', $name)->exists()) {
+            if (! CoffeeProductMetadata::where('product_name', $name)->exists()) {
                 // Create a dummy product ID for manual tracking
-                $productId = 'SYRUP_' . strtoupper(str_replace(' ', '_', $name));
-                
+                $productId = 'SYRUP_'.strtoupper(str_replace(' ', '_', $name));
+
                 CoffeeProductMetadata::create([
                     'product_id' => $productId,
                     'product_name' => $name,
@@ -113,9 +113,9 @@ class CoffeeMetadataController extends Controller
         }
 
         return response()->json([
-            'success' => true, 
+            'success' => true,
             'message' => "Added {$created} new syrup entries",
-            'created' => $created
+            'created' => $created,
         ]);
     }
 }

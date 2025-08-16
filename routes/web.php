@@ -115,7 +115,7 @@ Route::middleware('auth')->group(function () {
 
     // Restore batch of labels route
     Route::post('/labels/restore-batch', [LabelAreaController::class, 'restoreBatch'])->name('labels.restore-batch');
-    
+
     // Scanner routes
     Route::post('/labels/lookup-barcode', [LabelAreaController::class, 'lookupBarcode'])->name('labels.lookup-barcode');
     Route::post('/labels/scan', [LabelAreaController::class, 'processBarcodeScan'])->name('labels.scan');
@@ -158,7 +158,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [CoffeeController::class, 'index'])->name('index');
         Route::get('/products', [CoffeeController::class, 'products'])->name('products');
         Route::post('/visibility/toggle', [CoffeeController::class, 'toggleVisibility'])->name('visibility.toggle');
-        
+
         // Coffee KDS Metadata management
         Route::get('/metadata', [CoffeeMetadataController::class, 'index'])->name('metadata.index');
         Route::put('/metadata/{metadata}', [CoffeeMetadataController::class, 'update'])->name('metadata.update');
