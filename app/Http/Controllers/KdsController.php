@@ -72,6 +72,8 @@ class KdsController extends Controller
                             'notes' => $item->notes,
                         ];
                     }),
+                    'compact_display' => $order->compact_display,
+                    'should_use_compact' => $order->shouldUseCompactDisplay(),
                     'customer_info' => $order->customer_info,
                 ];
             });
@@ -190,6 +192,8 @@ class KdsController extends Controller
                                     'notes' => $item->notes,
                                 ];
                             })->toArray(),
+                            'compact_display' => $order->compact_display,
+                            'should_use_compact' => $order->shouldUseCompactDisplay(),
                             'customer_info' => $order->customer_info,
                         ];
                     })->toArray(),

@@ -91,28 +91,63 @@
                             </div>
                         </div>
 
-                        <!-- Order Items -->
+                        <!-- Order Items - Mobile Optimized Display -->
                         <div class="border-t border-gray-200 dark:border-gray-700 pt-3 mb-3">
-                            @foreach($order->items as $item)
-                                <div class="mb-3">
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-xl font-bold text-blue-600">{{ $item->formatted_quantity }}x</span>
-                                        <span class="text-lg font-semibold">{{ $item->display_name }}</span>
-                                    </div>
-                                    @if($item->modifiers)
-                                        <div class="text-base text-gray-600 dark:text-gray-400 ml-6 mt-1">
-                                            @foreach($item->modifiers as $key => $value)
-                                                <span class="inline-block mr-2">{{ $key }}: {{ $value }}</span>
-                                            @endforeach
+                            @if($order->shouldUseCompactDisplay() && $order->compact_display)
+                                <!-- Compact Mobile Display -->
+                                <div class="sm:hidden">
+                                    @foreach($order->compact_display as $line)
+                                        <div class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                                            {{ $line }}
                                         </div>
-                                    @endif
-                                    @if($item->notes)
-                                        <div class="text-base text-yellow-600 ml-6 mt-1 font-medium">
-                                            Note: {{ $item->notes }}
-                                        </div>
-                                    @endif
+                                    @endforeach
                                 </div>
-                            @endforeach
+                                <!-- Desktop Display (hidden on mobile) -->
+                                <div class="hidden sm:block">
+                                    @foreach($order->items as $item)
+                                        <div class="mb-3">
+                                            <div class="flex justify-between items-center">
+                                                <span class="text-xl font-bold text-blue-600">{{ $item->formatted_quantity }}x</span>
+                                                <span class="text-lg font-semibold">{{ $item->display_name }}</span>
+                                            </div>
+                                            @if($item->modifiers)
+                                                <div class="text-base text-gray-600 dark:text-gray-400 ml-6 mt-1">
+                                                    @foreach($item->modifiers as $key => $value)
+                                                        <span class="inline-block mr-2">{{ $key }}: {{ $value }}</span>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                            @if($item->notes)
+                                                <div class="text-base text-yellow-600 ml-6 mt-1 font-medium">
+                                                    Note: {{ $item->notes }}
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <!-- Standard Display for Simple Orders -->
+                                @foreach($order->items as $item)
+                                    <div class="mb-3">
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-xl font-bold text-blue-600">{{ $item->formatted_quantity }}x</span>
+                                            <span class="text-lg font-semibold">{{ $item->display_name }}</span>
+                                        </div>
+                                        @if($item->modifiers)
+                                            <div class="text-base text-gray-600 dark:text-gray-400 ml-6 mt-1">
+                                                @foreach($item->modifiers as $key => $value)
+                                                    <span class="inline-block mr-2">{{ $key }}: {{ $value }}</span>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                        @if($item->notes)
+                                            <div class="text-base text-yellow-600 ml-6 mt-1 font-medium">
+                                                Note: {{ $item->notes }}
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            @endif
                         </div>
 
                         <!-- Single Complete Button -->
@@ -353,38 +388,29 @@
                 'ready': 'border-green-500'
             };
 
-            const itemsHtml = order.items.map(item => {
-                let modifiersHtml = '';
-                if (item.modifiers && Object.keys(item.modifiers).length > 0) {
-                    modifiersHtml = `
-                        <div class="text-base text-gray-600 dark:text-gray-400 ml-6 mt-1">
-                            ${Object.entries(item.modifiers).map(([key, value]) => 
-                                `<span class="inline-block mr-2">${key}: ${value}</span>`
-                            ).join('')}
-                        </div>
-                    `;
-                }
-
-                let notesHtml = '';
-                if (item.notes) {
-                    notesHtml = `
-                        <div class="text-base text-yellow-600 ml-6 mt-1 font-medium">
-                            Note: ${item.notes}
-                        </div>
-                    `;
-                }
-
-                return `
-                    <div class="mb-3">
-                        <div class="flex justify-between items-center">
-                            <span class="text-xl font-bold text-blue-600">${item.quantity}x</span>
-                            <span class="text-lg font-semibold">${item.product_name}</span>
-                        </div>
-                        ${modifiersHtml}
-                        ${notesHtml}
+            // Check if we should use compact display (from server logic)
+            const useCompactDisplay = order.should_use_compact || (order.compact_display && order.compact_display.length > 0);
+            
+            let itemsHtml = '';
+            
+            if (useCompactDisplay && order.compact_display) {
+                // Use compact display for mobile
+                itemsHtml = `
+                    <!-- Compact Mobile Display -->
+                    <div class="sm:hidden">
+                        ${order.compact_display.map(line => 
+                            `<div class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">${line}</div>`
+                        ).join('')}
+                    </div>
+                    <!-- Desktop Display (hidden on mobile) -->
+                    <div class="hidden sm:block">
+                        ${order.items.map(item => createItemHtml(item)).join('')}
                     </div>
                 `;
-            }).join('');
+            } else {
+                // Standard display for simple orders
+                itemsHtml = order.items.map(item => createItemHtml(item)).join('');
+            }
 
             const buttonsHtml = getActionButtons(order.id, order.status);
 
@@ -406,6 +432,40 @@
                     <div class="mt-3">
                         ${buttonsHtml}
                     </div>
+                </div>
+            `;
+        }
+
+        // Create individual item HTML
+        function createItemHtml(item) {
+            let modifiersHtml = '';
+            if (item.modifiers && Object.keys(item.modifiers).length > 0) {
+                modifiersHtml = `
+                    <div class="text-base text-gray-600 dark:text-gray-400 ml-6 mt-1">
+                        ${Object.entries(item.modifiers).map(([key, value]) => 
+                            `<span class="inline-block mr-2">${key}: ${value}</span>`
+                        ).join('')}
+                    </div>
+                `;
+            }
+
+            let notesHtml = '';
+            if (item.notes) {
+                notesHtml = `
+                    <div class="text-base text-yellow-600 ml-6 mt-1 font-medium">
+                        Note: ${item.notes}
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="mb-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xl font-bold text-blue-600">${item.quantity}x</span>
+                        <span class="text-lg font-semibold">${item.product_name}</span>
+                    </div>
+                    ${modifiersHtml}
+                    ${notesHtml}
                 </div>
             `;
         }

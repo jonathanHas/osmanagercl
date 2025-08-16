@@ -143,6 +143,8 @@ class InvoiceAttachmentController extends Controller
             'Cache-Control' => 'public, max-age=3600', // Cache for 1 hour
             'Pragma' => 'public',
             'X-Content-Type-Options' => 'nosniff',
+            'X-Frame-Options' => 'SAMEORIGIN', // Allow framing only from same origin
+            'Content-Security-Policy' => "default-src 'none'; object-src 'none'; script-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self';",
         ];
 
         // For PDFs, add additional headers to encourage inline viewing

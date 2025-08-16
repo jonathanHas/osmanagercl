@@ -161,13 +161,13 @@ class OSAccountsImportController extends Controller
     public function importAttachments(Request $request)
     {
         $request->validate([
-            'base_path' => 'required|string',
+            'base_path' => 'nullable|string',
             'dry_run' => 'boolean',
             'force' => 'boolean',
         ]);
 
         $options = [
-            '--base-path' => $request->base_path,
+            '--base-path' => $request->base_path ?: env('OSACCOUNTS_FILE_PATH', '/var/www/html/OSManager/invoice_storage'),
         ];
 
         if ($request->boolean('dry_run')) {

@@ -120,6 +120,50 @@
                         </table>
                     </div>
                 </div>
+
+                {{-- Inline Document Viewer --}}
+                <div class="bg-gray-800 rounded-lg" id="inline-viewer-section" style="display: none;">
+                    <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                        <h3 class="text-lg font-semibold text-gray-100">Document Viewer</h3>
+                        <div class="flex space-x-2">
+                            <button onclick="toggleViewer()" class="text-gray-400 hover:text-gray-300">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="relative">
+                        <iframe id="document-iframe" 
+                                src="" 
+                                class="w-full border-0 bg-white" 
+                                style="height: 600px;"
+                                sandbox="allow-same-origin"
+                                title="Document Viewer">
+                        </iframe>
+                        <div id="viewer-loading" class="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75" style="display: none;">
+                            <div class="text-center">
+                                <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-blue-500 mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <div class="text-gray-300">Loading document...</div>
+                            </div>
+                        </div>
+                        <div id="viewer-error" class="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75 text-center" style="display: none;">
+                            <div>
+                                <svg class="w-12 h-12 mx-auto text-red-500 mb-3" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+                                </svg>
+                                <div class="text-gray-300 mb-2">Could not load document</div>
+                                <button onclick="window.open(document.getElementById('document-iframe').src, '_blank')" 
+                                        class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
+                                    Open in New Tab
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {{-- Sidebar --}}
@@ -446,12 +490,18 @@
                     <!-- Action Buttons Row -->
                     <div class="flex justify-center space-x-2 pt-2 border-t border-gray-600">
                         ${attachment.is_viewable ? 
-                            `<a href="${attachment.viewer_url}" class="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-400 hover:text-blue-300 hover:bg-gray-600 rounded-md transition-colors" title="View in embedded viewer">
+                            `<button onclick="showInlineViewer('${attachment.view_url}', '${attachment.original_filename}')" class="inline-flex items-center px-2 py-1 text-xs font-medium text-orange-400 hover:text-orange-300 hover:bg-gray-600 rounded-md transition-colors" title="View inline on this page">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                                </svg>
+                                Inline
+                            </button>
+                            <a href="${attachment.viewer_url}" class="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-400 hover:text-blue-300 hover:bg-gray-600 rounded-md transition-colors" title="View in dedicated viewer page">
                                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                 </svg>
-                                View
+                                Page
                             </a>
                             <a href="${attachment.view_url}" target="_blank" class="inline-flex items-center px-2 py-1 text-xs font-medium text-purple-400 hover:text-purple-300 hover:bg-gray-600 rounded-md transition-colors" title="Open directly (may download depending on browser settings)">
                                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -591,6 +641,62 @@
                 uploadLoading.classList.add('hidden');
                 alert('Upload failed');
             });
+        });
+
+        // Inline Viewer Functions
+        function showInlineViewer(viewUrl, filename) {
+            const section = document.getElementById('inline-viewer-section');
+            const iframe = document.getElementById('document-iframe');
+            const loading = document.getElementById('viewer-loading');
+            const error = document.getElementById('viewer-error');
+            
+            // Show the viewer section
+            section.style.display = 'block';
+            
+            // Show loading state
+            loading.style.display = 'flex';
+            error.style.display = 'none';
+            
+            // Update document title
+            iframe.title = filename;
+            
+            // Set iframe source
+            iframe.src = viewUrl;
+            
+            // Handle iframe load
+            iframe.onload = function() {
+                loading.style.display = 'none';
+            };
+            
+            // Handle iframe error (timeout after 10 seconds)
+            setTimeout(function() {
+                if (loading.style.display !== 'none') {
+                    loading.style.display = 'none';
+                    error.style.display = 'flex';
+                }
+            }, 10000);
+            
+            // Scroll to viewer
+            section.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function toggleViewer() {
+            const section = document.getElementById('inline-viewer-section');
+            const iframe = document.getElementById('document-iframe');
+            
+            section.style.display = 'none';
+            iframe.src = ''; // Clear src to stop loading
+        }
+
+        // Auto-show primary attachment on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Wait for attachments to load, then check for primary attachment
+            setTimeout(function() {
+                const primaryAttachment = attachments.find(att => att.is_primary && att.is_viewable);
+                if (primaryAttachment) {
+                    showInlineViewer(primaryAttachment.view_url, primaryAttachment.original_filename);
+                }
+            }, 1000);
         });
     </script>
 </x-admin-layout>

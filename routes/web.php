@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\CoffeeController;
+use App\Http\Controllers\CoffeeMetadataController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\FruitVegController;
 use App\Http\Controllers\KdsController;
@@ -157,6 +158,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [CoffeeController::class, 'index'])->name('index');
         Route::get('/products', [CoffeeController::class, 'products'])->name('products');
         Route::post('/visibility/toggle', [CoffeeController::class, 'toggleVisibility'])->name('visibility.toggle');
+        
+        // Coffee KDS Metadata management
+        Route::get('/metadata', [CoffeeMetadataController::class, 'index'])->name('metadata.index');
+        Route::put('/metadata/{metadata}', [CoffeeMetadataController::class, 'update'])->name('metadata.update');
+        Route::post('/metadata', [CoffeeMetadataController::class, 'store'])->name('metadata.store');
+        Route::post('/metadata/add-syrups', [CoffeeMetadataController::class, 'addSpecificSyrups'])->name('metadata.add-syrups');
         Route::get('/sales', [CoffeeController::class, 'sales'])->name('sales');
         Route::get('/sales/data', [CoffeeController::class, 'getSalesData'])->name('sales.data');
         Route::get('/sales/product/{code}/daily', [CoffeeController::class, 'getProductDailySales'])->name('sales.product.daily');

@@ -278,7 +278,10 @@
                         <div class="ml-11 space-y-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Base Path to OSManager Files</label>
-                                <input type="text" id="attachments-base-path" placeholder="/var/www/html/OSManager/invoice_storage" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                                <input type="text" id="attachments-base-path" 
+                                       placeholder="{{ env('OSACCOUNTS_FILE_PATH', '/var/www/html/OSManager/invoice_storage') }}" 
+                                       value="{{ env('OSACCOUNTS_FILE_PATH', '') }}"
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
                             </div>
                             <div class="flex items-center space-x-4">
                                 <div class="flex items-center space-x-2">
@@ -682,8 +685,11 @@
             document.getElementById('invoice-date-from').value = lastMonth.toISOString().split('T')[0];
             document.getElementById('invoice-date-to').value = lastMonthEnd.toISOString().split('T')[0];
             
-            // Set default attachment path
-            document.getElementById('attachments-base-path').value = '/var/www/html/OSManager/invoice_storage';
+            // Set default attachment path from environment
+            const envPath = '{{ env('OSACCOUNTS_FILE_PATH', '/var/www/html/OSManager/invoice_storage') }}';
+            if (envPath && !document.getElementById('attachments-base-path').value) {
+                document.getElementById('attachments-base-path').value = envPath;
+            }
         });
     </script>
 </x-admin-layout>

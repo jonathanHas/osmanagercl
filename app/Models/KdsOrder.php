@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\POS\Ticket;
+use App\Services\CoffeeOrderGroupingService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -118,5 +119,76 @@ class KdsOrder extends Model
             'status' => 'cancelled',
             'completed_at' => now(),
         ]);
+    }
+
+    /**
+     * Get grouped items for mobile display
+     */
+    public function getGroupedItemsAttribute()
+    {
+        $groupingService = new CoffeeOrderGroupingService();
+        $items = $this->items->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'product_id' => $item->product_id,
+                'product_name' => $item->display_name,
+                'display_name' => $item->display_name,
+                'quantity' => $item->quantity,
+                'formatted_quantity' => $item->formatted_quantity,
+                'notes' => $item->notes,
+                'modifiers' => $item->modifiers,
+            ];
+        })->toArray();
+
+        return $groupingService->groupOrderItems($items);
+    }
+
+    /**
+     * Get compact display lines for mobile
+     */
+    public function getCompactDisplayAttribute()
+    {
+        $groupingService = new CoffeeOrderGroupingService();
+        return $groupingService->getCompactDisplay($this->grouped_items);
+    }
+
+    /**
+     * Check if order should use compact display (mobile view)
+     */
+    public function shouldUseCompactDisplay()
+    {
+        // Use compact display if:
+        // 1. Order has 3+ items total, OR
+        // 2. Order has at least 1 coffee type AND 1 option (allowing grouping even with 2 items)
+        
+        $itemCount = $this->items->count();
+        
+        if ($itemCount >= 3) {
+            return true;
+        }
+        
+        if ($itemCount >= 2) {
+            // Check if we have both coffee types and options for grouping
+            $hasCoffee = false;
+            $hasOption = false;
+            
+            foreach ($this->items as $item) {
+                $metadata = \App\Models\CoffeeProductMetadata::where('product_id', $item->product_id)->first();
+                if ($metadata) {
+                    if ($metadata->type === 'coffee') {
+                        $hasCoffee = true;
+                    } elseif ($metadata->type === 'option') {
+                        $hasOption = true;
+                    }
+                }
+                
+                // Early exit if we found both
+                if ($hasCoffee && $hasOption) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
     }
 }
