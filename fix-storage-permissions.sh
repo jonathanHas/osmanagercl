@@ -1,98 +1,42 @@
 #!/bin/bash
 
-#########################################################
-# Laravel Storage Permissions Fix Script
-# 
-# This script fixes common permission issues with Laravel
-# storage directories. Run after deployment or when
-# experiencing permission errors.
-#
-# Usage: ./fix-storage-permissions.sh
-#########################################################
+# Fix storage permissions for invoice upload system
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+echo "Fixing storage permissions for invoice upload..."
 
-# Get the directory where the script is located
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "$SCRIPT_DIR"
+# Create necessary directories
+sudo mkdir -p /var/www/html/osmanagercl/storage/app/private/temp/invoices
 
-echo -e "${GREEN}Starting Laravel storage permissions fix...${NC}"
+# Set ownership to current user and www-data group  
+sudo chown -R $USER:www-data /var/www/html/osmanagercl/storage/app/private
 
-# Check if we're in a Laravel project
-if [ ! -f "artisan" ]; then
-    echo -e "${RED}Error: This doesn't appear to be a Laravel project root.${NC}"
-    echo "Please run this script from your Laravel project directory."
-    exit 1
-fi
+# Set permissions - directories need execute permission
+sudo find /var/www/html/osmanagercl/storage/app/private -type d -exec chmod 775 {} \;
+sudo find /var/www/html/osmanagercl/storage/app/private -type f -exec chmod 664 {} \;
 
-# Detect web server user
-WEB_USER="www-data"
-if id "apache" &>/dev/null; then
-    WEB_USER="apache"
-elif id "nginx" &>/dev/null; then
-    WEB_USER="nginx"
-fi
+# Fix any existing batch directories with wrong permissions
+sudo find /var/www/html/osmanagercl/storage/app/private/temp/invoices -type d -name "BATCH-*" -exec chmod 775 {} \;
+sudo find /var/www/html/osmanagercl/storage/app/private/temp/invoices -type f -name "*.pdf" -exec chmod 664 {} \;
+sudo chown -R $USER:www-data /var/www/html/osmanagercl/storage/app/private/temp/invoices
 
-echo -e "${YELLOW}Using web server user: ${WEB_USER}${NC}"
+# Ensure web server can write to temp directory
+sudo chmod 775 /var/www/html/osmanagercl/storage/app/private/temp
+sudo chmod 775 /var/www/html/osmanagercl/storage/app/private/temp/invoices
 
-# Create required directories if they don't exist
-echo "Creating required storage directories..."
-mkdir -p storage/app/private/temp
-mkdir -p storage/app/public
-mkdir -p storage/framework/{sessions,views,cache,testing}
-mkdir -p storage/logs
-mkdir -p bootstrap/cache
+# Set default umask for PHP to create group-writable files
+echo "Setting up proper file creation permissions..."
 
-# Fix ownership
-echo "Setting ownership to ${WEB_USER}:${WEB_USER}..."
-sudo chown -R ${WEB_USER}:${WEB_USER} storage bootstrap/cache
+echo "Permissions fixed. Testing write access..."
 
-# Fix directory permissions
-echo "Setting directory permissions to 775..."
-sudo find storage -type d -exec chmod 775 {} \;
-sudo find bootstrap/cache -type d -exec chmod 775 {} \;
+# Test write access from PHP
+php -r "
+\$testFile = '/var/www/html/osmanagercl/storage/app/private/temp/test.txt';
+if (file_put_contents(\$testFile, 'test')) {
+    echo 'Write test successful!' . PHP_EOL;
+    unlink(\$testFile);
+} else {
+    echo 'Write test failed!' . PHP_EOL;
+}
+"
 
-# Fix file permissions
-echo "Setting file permissions to 664..."
-sudo find storage -type f -exec chmod 664 {} \;
-sudo find bootstrap/cache -type f -exec chmod 664 {} \;
-
-# Ensure log file exists and has correct permissions
-if [ ! -f "storage/logs/laravel.log" ]; then
-    echo "Creating laravel.log file..."
-    sudo touch storage/logs/laravel.log
-    sudo chown ${WEB_USER}:${WEB_USER} storage/logs/laravel.log
-    sudo chmod 664 storage/logs/laravel.log
-fi
-
-# Clear Laravel caches
-echo "Clearing Laravel caches..."
-sudo -u ${WEB_USER} php artisan cache:clear 2>/dev/null || echo "Cache clear skipped"
-sudo -u ${WEB_USER} php artisan config:clear 2>/dev/null || echo "Config clear skipped"
-sudo -u ${WEB_USER} php artisan view:clear 2>/dev/null || echo "View clear skipped"
-
-# Check if SELinux is enabled (for RedHat/CentOS)
-if command -v getenforce &> /dev/null && [ "$(getenforce)" != "Disabled" ]; then
-    echo "Setting SELinux context..."
-    sudo chcon -R -t httpd_sys_rw_content_t storage bootstrap/cache
-fi
-
-echo -e "${GREEN}✓ Storage permissions fixed successfully!${NC}"
-echo ""
-echo "Summary of changes:"
-echo "- Created missing storage directories"
-echo "- Set ownership to ${WEB_USER}:${WEB_USER}"
-echo "- Set directory permissions to 775"
-echo "- Set file permissions to 664"
-echo "- Cleared Laravel caches"
-
-# Verify permissions
-echo ""
-echo "Verifying permissions:"
-ls -la storage/ | head -5
-echo "..."
-ls -la storage/logs/laravel.log 2>/dev/null || echo "Log file not found"
+echo "Done!"

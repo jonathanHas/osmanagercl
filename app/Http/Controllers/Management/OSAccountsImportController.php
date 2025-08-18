@@ -72,6 +72,7 @@ class OSAccountsImportController extends Controller
         return $this->streamCommand('osaccounts:sync-supplier-mapping', [
             '--dry-run' => $dryRun,
             '--detailed' => true,
+            '--user' => auth()->id(), // Pass current authenticated user's ID
         ], 'Supplier Sync');
     }
 
@@ -87,6 +88,9 @@ class OSAccountsImportController extends Controller
         if ($force) {
             $options['--force'] = true;
         }
+        
+        // Pass current authenticated user's ID
+        $options['--user'] = auth()->id();
 
         return $this->streamCommand('osaccounts:import-suppliers', $options, 'Suppliers Import');
     }
@@ -124,6 +128,7 @@ class OSAccountsImportController extends Controller
         $options = [
             '--date-from' => $request->date_from,
             '--date-to' => $request->date_to,
+            '--user' => auth()->id(), // Pass current authenticated user's ID
         ];
 
         if ($request->boolean('dry_run')) {
@@ -154,6 +159,9 @@ class OSAccountsImportController extends Controller
         if ($request->boolean('force')) {
             $options['--force'] = true;
         }
+        
+        // Pass current authenticated user's ID
+        $options['--user'] = auth()->id();
 
         return $this->streamCommand('osaccounts:import-invoice-vat-lines', $options, 'VAT Lines Import');
     }
@@ -168,6 +176,7 @@ class OSAccountsImportController extends Controller
 
         $options = [
             '--base-path' => $request->base_path ?: config('osaccounts.file_path', '/var/www/html/OSManager/invoice_storage'),
+            '--user' => auth()->id(), // Pass current authenticated user's ID
         ];
 
         if ($request->boolean('dry_run')) {

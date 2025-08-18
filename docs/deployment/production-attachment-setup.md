@@ -1,10 +1,58 @@
 # Production Setup for Invoice Attachments
 
 ## Overview
-This guide ensures invoice attachments work correctly in production without manual intervention. The system has been updated to handle permissions automatically, requiring minimal setup.
+This guide ensures invoice attachments work correctly in production without manual intervention. The system has been updated to handle permissions automatically and supports environment-based configuration for various deployment scenarios.
 
 ## Key Principle
 Files are created with group-readable permissions (664) and `www-data` group ownership, allowing both web server and CLI processes to access them.
+
+## Environment Configuration
+
+### OSAccounts File Path Setup
+
+The attachment import system uses environment-based configuration:
+
+```bash
+# In production .env file
+OSACCOUNTS_FILE_PATH=/path/to/osaccounts/files
+```
+
+This configuration is stored in `config/osaccounts.php` and supports Laravel's config caching for production performance.
+
+### Cross-Server Deployment Scenarios
+
+#### Scenario 1: Same Server
+When OSAccounts and Laravel are on the same server:
+```bash
+OSACCOUNTS_FILE_PATH=/var/www/html/OSManager/invoice_storage
+```
+
+#### Scenario 2: Network Mount (Recommended for separate servers)
+```bash
+# Create mount point
+sudo mkdir -p /mnt/osaccounts-files
+
+# Mount OSAccounts server directory (NFS example)
+sudo mount -t nfs osaccounts-server:/var/www/html/OSManager/invoice_storage /mnt/osaccounts-files
+
+# Make permanent in /etc/fstab
+echo "osaccounts-server:/var/www/html/OSManager/invoice_storage /mnt/osaccounts-files nfs defaults 0 0" | sudo tee -a /etc/fstab
+
+# Configure Laravel
+OSACCOUNTS_FILE_PATH=/mnt/osaccounts-files
+```
+
+#### Scenario 3: File Synchronization
+```bash
+# Create local storage
+sudo mkdir -p /var/lib/osaccounts-files
+
+# Set up rsync (consider adding to cron for regular updates)
+rsync -av user@osaccounts-server:/var/www/html/OSManager/invoice_storage/ /var/lib/osaccounts-files/
+
+# Configure Laravel
+OSACCOUNTS_FILE_PATH=/var/lib/osaccounts-files
+```
 
 ## Production Setup Requirements
 
@@ -133,8 +181,89 @@ sudo find storage/app/private/invoices -type d -exec chmod g+s {} \;
 * * * * * newgrp www-data && cd /var/www/html/osmanagercl && php artisan schedule:run
 ```
 
+## Configuration Deployment Steps
+
+### Step 1: Environment Setup
+```bash
+# 1. Configure OSAccounts file path in .env
+echo "OSACCOUNTS_FILE_PATH=/path/to/osaccounts/files" >> .env
+
+# 2. Clear and cache configuration
+sudo -u www-data php artisan config:clear
+sudo -u www-data php artisan config:cache
+
+# 3. Test configuration
+sudo -u www-data php artisan tinker --execute="echo 'Path: ' . config('osaccounts.file_path');"
+```
+
+### Step 2: Test Import
+```bash
+# Test with dry run first
+sudo -u www-data php artisan osaccounts:import-attachments --dry-run
+
+# Check output shows correct path:
+# 📁 Using base path: /your/configured/path
+```
+
+## Troubleshooting Cross-Server Issues
+
+### Issue: "Base path does not exist"
+```bash
+# Check if path is accessible
+ls -la /path/to/osaccounts/files
+
+# For network mounts, verify mount is active
+mount | grep osaccounts
+
+# Test network connectivity
+ping osaccounts-server
+```
+
+### Issue: "Files not found" with correct path
+```bash
+# Check file permissions on source server
+sudo find /var/www/html/OSManager/invoice_storage -type f -name "*.pdf" | head -5
+
+# Verify Laravel can read files
+sudo -u www-data ls -la /path/to/osaccounts/files/
+
+# Check SELinux (if enabled)
+sestatus
+# If enforcing, may need: setsebool -P httpd_use_nfs 1
+```
+
+### Issue: Network mount fails
+```bash
+# Install NFS utilities
+sudo apt-get install nfs-common
+
+# Test mount manually
+sudo mount -t nfs -v osaccounts-server:/path/to/files /mnt/test
+
+# Check firewall on OSAccounts server
+# Ensure ports 111, 2049 are open for NFS
+```
+
+### Issue: Permission denied on mounted files
+```bash
+# Check mount options
+mount | grep osaccounts
+
+# Remount with proper options
+sudo umount /mnt/osaccounts-files
+sudo mount -t nfs -o rw,sync,hard,intr osaccounts-server:/path /mnt/osaccounts-files
+```
+
 ## Production Deployment Checklist
 
+### Environment Configuration
+- [ ] `OSACCOUNTS_FILE_PATH` configured in production `.env`
+- [ ] Configuration cached with `php artisan config:cache`
+- [ ] Path accessibility verified with dry run import
+- [ ] Network mount configured (if cross-server)
+- [ ] Mount persisted in `/etc/fstab` (if applicable)
+
+### Laravel Application
 - [ ] Deployment user is in `www-data` group
 - [ ] Storage directory has correct ownership (`www-data:www-data`)
 - [ ] Storage directory has setgid bit set
@@ -142,6 +271,13 @@ sudo find storage/app/private/invoices -type d -exec chmod g+s {} \;
 - [ ] Web server runs as `www-data`
 - [ ] Test import works without sudo
 - [ ] Files are accessible via web interface
+
+### Cross-Server (if applicable)
+- [ ] Network connectivity between servers verified
+- [ ] File sharing protocol configured (NFS/CIFS)
+- [ ] Mount permissions allow Laravel user access
+- [ ] Firewall rules allow required ports
+- [ ] SELinux policies configured (if applicable)
 
 ## Additional Commands
 

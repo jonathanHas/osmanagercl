@@ -128,6 +128,28 @@ Production-ready invoice and supplier data migration from legacy OSAccounts:
 
 See [OSAccounts Integration](./features/osaccounts-integration.md) for complete details.
 
+### Invoice Bulk Upload System (2025-08-16)
+Modern multi-file invoice upload system with drag-and-drop interface:
+
+- **📤 Drag-and-Drop Upload**: Upload up to 50 invoice files simultaneously
+- **📁 Multi-Format Support**: PDF, JPG, PNG, TIFF documents accepted
+- **⚡ Real-Time Progress**: Individual progress tracking for each file
+- **🔄 Batch Management**: Track upload batches with unique identifiers
+- **👁️ File Preview**: Review uploaded files before processing
+- **🐍 Python Parser Ready**: Prepared for Phase 2 automated data extraction
+- **📊 Recent History**: View and manage recent upload batches
+- **🔒 Secure Storage**: Temporary file storage with automatic cleanup
+
+**Key Benefits**:
+- Eliminates tedious one-by-one invoice uploads
+- Supports bulk processing workflows for month-end
+- Configurable limits (files, sizes) per environment
+- Foundation for automated invoice data extraction
+- Streamlined UX with visual feedback
+
+See [Invoice Bulk Upload System](./features/invoice-bulk-upload-system.md) for implementation details.
+See [Invoice Parser Integration](./features/invoice-parser-integration.md) for Phase 2 Python integration guide.
+
 ## 🆕 Previous Updates (January 2025)
 
 ### Product Health Dashboard (2025-01-06)
@@ -323,6 +345,7 @@ Guides for developers working on the project.
 - **[Testing Guide](./development/testing.md)** - Testing strategies and examples
 - **[Coding Standards](./development/coding-standards.md)** - Code style and best practices
 - **[Performance Optimization Guide](./development/performance-optimization-guide.md)** - 🚀 **NEW** Apply 100x+ performance improvements to any module
+- **[Bulk Upload Development Guide](./development/bulk-upload-development-guide.md)** - 🆕 Extend and customize the bulk upload system
 - **[Troubleshooting](./development/troubleshooting.md)** - Common issues and solutions
 
 ### 🚢 Deployment

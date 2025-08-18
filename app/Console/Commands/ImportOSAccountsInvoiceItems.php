@@ -6,6 +6,7 @@ use App\Models\Invoice;
 use App\Models\InvoiceVatLine;
 use App\Models\OSAccounts\OSInvoice;
 use App\Models\OSAccounts\OSInvoiceDetail;
+use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -19,7 +20,8 @@ class ImportOSAccountsInvoiceItems extends Command
     protected $signature = 'osaccounts:import-invoice-vat-lines 
                             {--dry-run : Preview the import without making changes}
                             {--force : Import even if VAT lines already exist}
-                            {--invoice= : Import VAT lines for specific invoice number only}';
+                            {--invoice= : Import VAT lines for specific invoice number only}
+                            {--user= : User ID for created_by field}';
 
     /**
      * The console command description.
@@ -182,7 +184,7 @@ class ImportOSAccountsInvoiceItems extends Command
                 'vat_category' => $vatCategory,
                 'net_amount' => $invoice->subtotal,
                 'line_number' => 1,
-                'created_by' => 1, // System user
+                'created_by' => $this->option('user') ?: User::first()->id,
             ]);
         } else {
             // Create VAT lines from existing breakdown
@@ -194,7 +196,7 @@ class ImportOSAccountsInvoiceItems extends Command
                         'vat_category' => $breakdown['code'],
                         'net_amount' => $breakdown['net_amount'],
                         'line_number' => $lineNumber++,
-                        'created_by' => 1, // System user
+                        'created_by' => $this->option('user') ?: User::first()->id,
                     ]);
                 }
             }
@@ -215,7 +217,7 @@ class ImportOSAccountsInvoiceItems extends Command
                 'vat_category' => $vatCategory,
                 'net_amount' => $group['total_net'],
                 'line_number' => $lineNumber++,
-                'created_by' => 1, // System user
+                'created_by' => $this->option('user') ?: User::first()->id,
             ]);
         }
 

@@ -1011,6 +1011,134 @@ const response = await fetch(`/deliveries/${this.deliveryId}/scan`, {...});
 - See [Delivery System Documentation](../features/delivery-system.md) for full scanning workflow
 - Authentication patterns are documented in delivery system API section
 
+## 🛠️ System Recovery Issues
+
+### Database Data Loss - Users and Roles Cleared (2025-08-16)
+
+**Symptoms:**
+- Unable to log in with any account
+- Users table shows 0 records
+- Roles and permissions tables are empty
+- Authentication system completely non-functional
+
+**Root Cause:**
+Database seeding tables were cleared during failed test runs or migrations with `--fresh` flag.
+
+**Recovery Process:**
+
+1. **Verify the Damage:**
+   ```bash
+   php artisan tinker --execute="
+   echo 'Users: ' . \App\Models\User::count() . PHP_EOL;
+   echo 'Roles: ' . \App\Models\Role::count() . PHP_EOL;
+   echo 'Permissions: ' . \App\Models\Permission::count() . PHP_EOL;
+   "
+   ```
+
+2. **Restore Roles and Permissions:**
+   ```bash
+   php artisan db:seed --class=RolesAndPermissionsSeeder
+   ```
+   This creates:
+   - 4 roles (admin, manager, employee, barista)
+   - 36+ permissions across all modules
+   - Proper role-permission assignments
+
+3. **Restore Admin User:**
+   ```bash
+   php artisan db:seed --class=AdminUserSeeder
+   ```
+   Creates default admin:
+   - Username: `admin`
+   - Email: `admin@osmanager.local`
+   - Password: `admin123`
+   - Role: Administrator
+
+4. **Verify Recovery:**
+   ```bash
+   php artisan tinker --execute="
+   \$admin = \App\Models\User::where('username', 'admin')->first();
+   echo 'Admin found: ' . (\$admin ? 'YES' : 'NO') . PHP_EOL;
+   echo 'Can access KDS: ' . (\$admin->hasPermission('kds.access') ? 'YES' : 'NO') . PHP_EOL;
+   echo 'Password check: ' . (\Illuminate\Support\Facades\Hash::check('admin123', \$admin->password) ? 'PASS' : 'FAIL') . PHP_EOL;
+   "
+   ```
+
+5. **Restore Coffee Metadata (if affected):**
+   ```bash
+   php artisan db:seed --class=CoffeeProductMetadataSeeder
+   ```
+
+**Prevention:**
+- Never use `migrate:fresh` in production
+- Always backup before running migrations
+- Use specific seeders instead of `db:seed` without class parameter
+- Test migrations and seeders in development first
+
+**Related Issues:**
+- Coffee KDS order grouping requires coffee metadata to function properly
+- User authentication system must be restored for any system access
+- All protected routes depend on roles and permissions system
+
+### Coffee Metadata Cleared
+
+**Symptoms:**
+- KDS mobile grouping not working
+- Coffee orders display as individual items instead of grouped
+- Metadata management page shows no data
+- Order grouping falls back to basic detection
+
+**Recovery:**
+```bash
+# Check if metadata exists
+php artisan tinker --execute="echo \App\Models\CoffeeProductMetadata::count() . ' metadata records';"
+
+# Restore if needed
+php artisan db:seed --class=CoffeeProductMetadataSeeder
+```
+
+**Expected Result:**
+- 22+ coffee products with metadata
+- 14 coffee types (main drinks)
+- 8+ options (modifiers)
+- Proper short names for mobile display
+
+### Complete System Recovery Checklist
+
+When multiple systems are affected:
+
+1. ✅ **Database Tables Exist**
+   ```bash
+   php artisan migrate:status
+   ```
+
+2. ✅ **Roles & Permissions Restored**
+   ```bash
+   php artisan db:seed --class=RolesAndPermissionsSeeder
+   ```
+
+3. ✅ **Admin User Created**
+   ```bash
+   php artisan db:seed --class=AdminUserSeeder
+   ```
+
+4. ✅ **Coffee Metadata Restored**
+   ```bash
+   php artisan db:seed --class=CoffeeProductMetadataSeeder
+   ```
+
+5. ✅ **Test Authentication**
+   - Login with admin/admin123
+   - Verify role permissions work
+   - Check KDS access functions
+
+6. ✅ **Clear Caches**
+   ```bash
+   php artisan optimize:clear
+   ```
+
+**Recovery Time:** 2-3 minutes for complete system restoration
+
 ## 📞 Getting Help
 
 - Check Laravel Blade documentation

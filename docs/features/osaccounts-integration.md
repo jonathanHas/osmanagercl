@@ -135,29 +135,80 @@ php artisan osaccounts:import-vat-returns --force
 
 ### 5. Attachments Import
 
+#### Environment Configuration
+
+The attachment import system uses an environment variable for the base path configuration:
+
 ```bash
+# In .env file
+OSACCOUNTS_FILE_PATH=/path/to/osaccounts/invoice_storage
+```
+
+This path is configured in `config/osaccounts.php` and works with Laravel's config caching for production.
+
+#### Command Usage
+
+```bash
+# Uses configured path from environment
+php artisan osaccounts:import-attachments
+
+# Override with specific path
 php artisan osaccounts:import-attachments --base-path=/path/to/files
 ```
 
 **Options**:
-- `--base-path=PATH` - Base directory where OSAccounts files are stored (required)
+- `--base-path=PATH` - Override the configured base directory (optional)
 - `--force` - Re-import existing attachments (skips duplicates by file hash)
 - `--dry-run` - Preview import without making changes
 
 **Features**:
+- **Environment-Based Configuration**: Uses `OSACCOUNTS_FILE_PATH` environment variable
+- **Production Config Caching**: Works with `php artisan config:cache`
 - **Smart Path Resolution**: Handles various OSAccounts path formats
 - **HTML Entity Decoding**: Converts `&amp;` to `&` in supplier names
 - **Duplicate Prevention**: SHA-256 hash comparison prevents duplicate files
 - **Multiple Fallback Strategies**: Tries various path combinations to find files
 - **Production-Ready Permissions**: Files created with `664`, group set to `www-data`
+- **Path Visibility**: Shows the base path being used in command output
 
-**Example**:
+#### Cross-Server Setup
+
+When OSAccounts files are on a different server:
+
+**Option 1: Network Mount (Recommended)**
 ```bash
-# Standard import
-php artisan osaccounts:import-attachments --base-path=/var/www/html/OSManager/invoice_storage
+# Mount remote directory
+sudo mkdir -p /mnt/osaccounts-files
+sudo mount -t nfs osaccounts-server:/var/www/html/OSManager/invoice_storage /mnt/osaccounts-files
 
-# Force re-import (still skips duplicates by hash)
-php artisan osaccounts:import-attachments --base-path=/var/www/html/OSManager/invoice_storage --force
+# Configure in .env
+OSACCOUNTS_FILE_PATH=/mnt/osaccounts-files
+```
+
+**Option 2: File Synchronization**
+```bash
+# Sync files to local storage
+sudo mkdir -p /var/lib/osaccounts-files
+rsync -av user@osaccounts-server:/var/www/html/OSManager/invoice_storage/ /var/lib/osaccounts-files/
+
+# Configure in .env
+OSACCOUNTS_FILE_PATH=/var/lib/osaccounts-files
+```
+
+#### Examples
+
+```bash
+# Standard import (uses environment configuration)
+php artisan osaccounts:import-attachments
+
+# Force re-import with environment path
+php artisan osaccounts:import-attachments --force
+
+# Override environment path
+php artisan osaccounts:import-attachments --base-path=/custom/path/to/files
+
+# Dry run to test configuration
+php artisan osaccounts:import-attachments --dry-run
 ```
 
 **Success Rate**: 98.4% (183 of 186 files imported successfully)
@@ -166,21 +217,31 @@ php artisan osaccounts:import-attachments --base-path=/var/www/html/OSManager/in
 
 ### Complete Import Process
 
+**Prerequisites**: Configure environment and cache config:
+```bash
+# 1. Configure attachment path in .env
+echo "OSACCOUNTS_FILE_PATH=/path/to/osaccounts/files" >> .env
+
+# 2. Cache configuration for production
+sudo -u www-data php artisan config:cache
+```
+
+**Import Steps**:
 ```bash
 # Step 1: Sync supplier mappings (ONE TIME - crucial!)
-php artisan osaccounts:sync-supplier-mapping
+sudo -u www-data php artisan osaccounts:sync-supplier-mapping
 
 # Step 2: Import invoices for desired period
-php artisan osaccounts:import-invoices --date-from=2025-01-01 --date-to=2025-12-31
+sudo -u www-data php artisan osaccounts:import-invoices --date-from=2025-01-01 --date-to=2025-12-31
 
 # Step 3: Import VAT lines for all invoices
-php artisan osaccounts:import-invoice-vat-lines
+sudo -u www-data php artisan osaccounts:import-invoice-vat-lines
 
 # Step 4: Import historical VAT returns (after invoices are imported!)
-php artisan osaccounts:import-vat-returns
+sudo -u www-data php artisan osaccounts:import-vat-returns
 
-# Step 5: Import file attachments
-php artisan osaccounts:import-attachments --base-path=/path/to/invoice/storage
+# Step 5: Import file attachments (uses environment configuration)
+sudo -u www-data php artisan osaccounts:import-attachments
 ```
 
 ### Incremental Updates

@@ -392,6 +392,19 @@ Complete invoice and supplier data migration from legacy OSAccounts system.
 - **Cross-Database Support**: Handles EXPENSES_JOINED supplier table
 See [OSAccounts Integration Documentation](./docs/features/osaccounts-integration.md).
 
+### Invoice Bulk Upload System
+Modern multi-file invoice upload system with drag-and-drop interface.
+- **Drag-and-Drop Interface**: Upload up to 50 files simultaneously
+- **Multi-Format Support**: PDF, JPG, PNG, TIFF documents
+- **Real-Time Progress**: Individual file upload progress tracking
+- **Batch Management**: Unique batch IDs for tracking uploads
+- **File Preview**: Review uploaded files before processing
+- **Configurable Limits**: Customizable file count and size limits
+- **Recent History**: View and manage recent upload batches
+- **Python Parser Ready**: Foundation for automated data extraction (Phase 2)
+See [Invoice Bulk Upload Documentation](./docs/features/invoice-bulk-upload-system.md).
+See [Invoice Parser Integration Guide](./docs/features/invoice-parser-integration.md) for Phase 2.
+
 ### VAT Returns Management System
 Complete Irish Revenue Online Service (ROS) VAT returns with automated calculations.
 - **ROS Compliance**: All required fields (T1, T2, T3, T4, E1, E2) automatically calculated

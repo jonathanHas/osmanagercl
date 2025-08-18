@@ -88,6 +88,19 @@ Route::middleware('auth')->group(function () {
         Route::delete('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'destroy'])->name('destroy');
     });
 
+    // Bulk Upload Routes (must be before resource route)
+    Route::prefix('invoices/bulk-upload')->name('invoices.bulk-upload.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'index'])->name('index');
+        Route::post('/upload', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'upload'])->name('upload');
+        Route::get('/status/{batchId}', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'status'])->name('status');
+        Route::get('/preview/{batchId}', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'preview'])->name('preview');
+        Route::post('/{batchId}/cancel', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'cancel'])->name('cancel');
+        Route::post('/{batchId}/process', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'startProcessing'])->name('process');
+        Route::post('/{batchId}/create-from-review', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'createFromReview'])->name('create-from-review');
+        Route::get('/check-parser', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'checkParserConfiguration'])->name('check-parser');
+        Route::delete('/{batchId}/file/{fileId}', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'deleteFile'])->name('delete-file');
+    });
+    
     Route::resource('invoices', \App\Http\Controllers\InvoiceController::class);
 
     // VAT Rates Management

@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\AccountingSupplier;
 use App\Models\Invoice;
 use App\Models\OSAccounts\OSInvoice;
+use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -21,7 +22,8 @@ class ImportOSAccountsInvoices extends Command
                             {--chunk=100 : Number of invoices to process at once}
                             {--date-from= : Import invoices from this date (YYYY-MM-DD)}
                             {--date-to= : Import invoices to this date (YYYY-MM-DD)}
-                            {--limit= : Limit the number of invoices to import}';
+                            {--limit= : Limit the number of invoices to import}
+                            {--user= : User ID for created_by/updated_by fields}';
 
     /**
      * The console command description.
@@ -232,8 +234,8 @@ class ImportOSAccountsInvoices extends Command
                     'external_osaccounts_id' => $osInvoice->ID,
 
                     // Audit fields
-                    'created_by' => 1, // System user
-                    'updated_by' => 1,
+                    'created_by' => $this->option('user') ?: User::first()->id,
+                    'updated_by' => $this->option('user') ?: User::first()->id,
                 ];
 
                 if (! $isDryRun) {

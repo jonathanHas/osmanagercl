@@ -123,7 +123,14 @@ Route::get('/products/edit', [Controller::class, 'method'])
   - View categories
   - Manage Fruit & Veg module
   - Manage Coffee module
+  - Access KDS (Kitchen Display System)
 - **Use Case**: Shop floor staff, cashiers
+
+### Barista (`barista`)
+- **Description**: Access to coffee KDS system only
+- **Key Permissions**:
+  - Access KDS (Kitchen Display System)
+- **Use Case**: Coffee preparation staff who only need to see coffee orders
 
 ## Permission Modules
 
@@ -157,6 +164,9 @@ Route::get('/products/edit', [Controller::class, 'method'])
 - `categories.manage` - Edit category settings
 - `fruit_veg.manage` - Manage Fruit & Veg module
 - `coffee.manage` - Manage Coffee module
+
+### KDS (Kitchen Display System)
+- `kds.access` - Access the coffee kitchen display system
 
 ### User Management
 - `users.view` - View user list
@@ -435,6 +445,23 @@ if ($this->hasRole('admin')) {
 - Implement role-based dashboards
 
 ## Recent Updates
+
+### System Data Recovery (2025-08-16)
+- **Issue**: Users and roles were cleared from the database during testing
+- **Resolution**: Restored complete system using seeders
+- **Commands Used**:
+  ```bash
+  php artisan db:seed --class=RolesAndPermissionsSeeder
+  php artisan db:seed --class=AdminUserSeeder
+  ```
+- **Result**: Full restoration of 4 roles, 36 permissions, and admin account
+- **New Default Admin**: Username `admin`, Password `admin123`, Email `admin@osmanager.local`
+
+### Barista Role Addition (2025-08-16)
+- Added dedicated `barista` role for coffee KDS access only
+- **Permissions**: Limited to `kds.access` permission
+- **Use Case**: Staff who only need coffee kitchen display system access
+- **Description**: "Access to coffee KDS system only"
 
 ### Profile Role Display (2025-08-08)
 - Added comprehensive role information section to user profile page

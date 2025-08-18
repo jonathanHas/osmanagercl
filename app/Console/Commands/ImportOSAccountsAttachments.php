@@ -20,7 +20,8 @@ class ImportOSAccountsAttachments extends Command
     protected $signature = 'osaccounts:import-attachments 
                             {--dry-run : Preview the import without making changes}
                             {--base-path= : Base path where OSAccounts files are stored}
-                            {--force : Import even if attachments already exist}';
+                            {--force : Import even if attachments already exist}
+                            {--user= : User ID for uploaded_by field}';
 
     /**
      * The console command description.
@@ -342,7 +343,7 @@ class ImportOSAccountsAttachments extends Command
             'description' => 'Imported from OSAccounts',
             'attachment_type' => 'invoice_scan',
             'is_primary' => ! $invoice->hasAttachments(), // First attachment becomes primary
-            'uploaded_by' => 1, // System user
+            'uploaded_by' => $this->option('user') ?: \App\Models\User::first()->id,
             'external_osaccounts_path' => $osInvoice->InvoicePath,
         ]);
 

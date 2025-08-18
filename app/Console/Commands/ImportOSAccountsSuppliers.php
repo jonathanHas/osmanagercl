@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\AccountingSupplier;
 use App\Models\OSAccounts\OSSupplierType;
+use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB as DBFacade;
 use Illuminate\Support\Facades\Log;
@@ -18,7 +19,8 @@ class ImportOSAccountsSuppliers extends Command
     protected $signature = 'osaccounts:import-suppliers 
                             {--dry-run : Preview the import without making changes}
                             {--force : Import even if suppliers already exist}
-                            {--chunk=50 : Number of suppliers to process at once}';
+                            {--chunk=50 : Number of suppliers to process at once}
+                            {--user= : User ID for created_by/updated_by fields}';
 
     /**
      * The console command description.
@@ -151,8 +153,8 @@ class ImportOSAccountsSuppliers extends Command
                     'status' => 'active', // All imported suppliers start as active
                     'is_active' => true,
                     'is_osaccounts_linked' => true,
-                    'created_by' => 1, // System user
-                    'updated_by' => 1,
+                    'created_by' => $this->option('user') ?: User::first()->id,
+                    'updated_by' => $this->option('user') ?: User::first()->id,
                 ];
 
                 // Set the appropriate external ID based on whether it's a POS or OSAccounts supplier

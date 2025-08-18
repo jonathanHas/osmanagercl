@@ -7,8 +7,9 @@ The Coffee KDS is a real-time order tracking system designed specifically for co
 - 2-3 second order detection time
 - Audio notifications for new orders
 - One-click order completion
-- Mobile-responsive design
+- Mobile-responsive design with order grouping
 - Real-time system monitoring
+- Smart coffee order grouping for mobile displays
 
 ## Technical Architecture
 
@@ -25,6 +26,8 @@ The system uses direct database polling instead of queue workers for optimal per
 - `KdsController` - Main display and SSE streaming
 - `KdsRealtimeController` - Fast direct polling endpoint
 - `KdsOrder` / `KdsOrderItem` - Order data models
+- `CoffeeOrderGroupingService` - Smart order grouping for mobile display
+- `CoffeeProductMetadata` - Product classification (coffee types vs options)
 - `MonitorCoffeeOrdersJob` - Legacy queue job (kept for backward compatibility)
 
 #### Frontend
@@ -65,6 +68,17 @@ POS_DB_PASSWORD=password
 ### 4. Coffee Category
 The system looks for products in category `081` (Coffee Fresh). Verify this matches your POS setup.
 
+### 5. Coffee Product Metadata
+Seed the coffee product metadata for proper order grouping:
+```bash
+php artisan db:seed --class=CoffeeProductMetadataSeeder
+```
+
+This creates classification data for:
+- **Coffee Types**: Main drinks (Cappuccino, Latte, Americano, etc.)
+- **Options**: Modifiers (Oat Milk, Syrups, Takeaway, etc.)
+- **Short Names**: Compact display names for mobile (Van for Vanilla, Oat for Oat Milk)
+
 ## Usage
 
 ### Accessing the KDS
@@ -90,6 +104,93 @@ Navigate to `/kds` in your browser. The page will:
 #### Restoring Orders
 - Click "Restore" in completed section
 - Order returns to active display
+
+## Mobile Order Grouping
+
+### Overview
+On mobile devices (screens <640px), the KDS automatically groups coffee orders with their options into compact single lines for better readability.
+
+### How It Works
+
+#### Automatic Detection
+- **Coffee Types**: Main drinks like Cappuccino, Latte, Americano
+- **Options**: Modifiers like Oat Milk, Syrups, Takeaway, Extra Shots
+- **Sequential Processing**: Maintains order entry sequence
+
+#### Grouping Logic
+Orders are processed in the exact sequence they were entered:
+1. When a coffee type is detected → starts new group
+2. Following options are added to that coffee group
+3. Next coffee type → starts another group
+4. Preserves the original staff entry order
+
+#### Display Examples
+**Before Grouping (Desktop):**
+- 1x Cappuccino
+- 1x Oat Milk
+- 1x Takeaway
+
+**After Grouping (Mobile):**
+- 1x Cappuccino + Oat, Takeaway
+
+**Multiple Orders:**
+- 1x Cappuccino + Sit In
+- 1x Latte + Oat, Vanilla, Takeaway
+
+### Product Classification
+
+#### Coffee Types (Main Drinks)
+- Cappuccino → Cappuccino
+- Latte → Latte
+- Americano → Americano
+- Flat White → Flat White
+- Espresso → Espresso
+- Hot Chocolate → Hot Choc S/L
+- Tea varieties → Tea/Herbal Tea
+
+#### Options by Category
+- **Service**: Takeaway, Cup Discount, 2Go Cups
+- **Milk**: Oat Milk, Alternative Milk
+- **Syrups**: Vanilla, Hazelnut, Caramel
+- **Coffee**: Extra Shots
+
+### Managing Metadata
+Access `/coffee/metadata` to:
+- View all coffee products and their classifications
+- Change product types (coffee vs option)
+- Edit short names for mobile display
+- Manage grouping categories
+- Add new products to the system
+
+### Troubleshooting Grouping
+
+#### Orders Not Grouping
+1. Check product metadata exists:
+   ```bash
+   php artisan tinker
+   >>> App\Models\CoffeeProductMetadata::count()
+   ```
+
+2. Verify product classification:
+   ```bash
+   >>> App\Models\CoffeeProductMetadata::where('type', 'coffee')->count()
+   >>> App\Models\CoffeeProductMetadata::where('type', 'option')->count()
+   ```
+
+3. Re-seed if needed:
+   ```bash
+   php artisan db:seed --class=CoffeeProductMetadataSeeder
+   ```
+
+#### Incorrect Grouping
+- Check if products are properly classified as 'coffee' or 'option'
+- Verify order sequence is preserved
+- Use metadata management interface to fix classifications
+
+#### Missing Short Names
+- Products without metadata fall back to auto-generated short names
+- Add proper metadata via `/coffee/metadata` interface
+- Use descriptive short names (max 12 characters)
 
 ### Clearing All Active Orders
 1. Click "Clear" dropdown button in header
