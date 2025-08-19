@@ -389,16 +389,34 @@ class OSAccountsImportController extends Controller
     public function syncPaymentStatus(Request $request)
     {
         try {
+            $request->validate([
+                'date_from' => 'nullable|date',
+                'date_to' => 'nullable|date|after_or_equal:date_from',
+                'dry_run' => 'boolean',
+            ]);
+
             $isDryRun = $request->boolean('dry_run', true);
+            $dateFrom = $request->input('date_from');
+            $dateTo = $request->input('date_to');
 
             if ($isDryRun) {
                 // Preview mode - use the command to show what would be updated
                 $output = [];
-                $exitCode = \Artisan::call('osaccounts:import-invoices', [
+                $commandOptions = [
                     '--update-existing' => true,
                     '--dry-run' => true,
                     '--user' => auth()->id(),
-                ], $output);
+                ];
+
+                // Add date filters if provided
+                if ($dateFrom) {
+                    $commandOptions['--date-from'] = $dateFrom;
+                }
+                if ($dateTo) {
+                    $commandOptions['--date-to'] = $dateTo;
+                }
+
+                $exitCode = \Artisan::call('osaccounts:import-invoices', $commandOptions, $output);
 
                 $outputText = \Artisan::output();
 
@@ -419,9 +437,14 @@ class OSAccountsImportController extends Controller
                 // Debug: Log the samples for troubleshooting
                 \Log::info('Parsed samples from command output', ['samples' => $samples]);
 
+                $dateRangeText = '';
+                if ($dateFrom || $dateTo) {
+                    $dateRangeText = ' for date range '.($dateFrom ?: 'beginning').' to '.($dateTo ?: 'end');
+                }
+
                 return response()->json([
                     'success' => true,
-                    'message' => "Preview complete. {$updated} invoice(s) would be updated with payment status from OSAccounts.",
+                    'message' => "Preview complete{$dateRangeText}. {$updated} invoice(s) would be updated with payment status from OSAccounts.",
                     'summary' => [
                         'total' => (int) $total,
                         'updated' => (int) $updated,
@@ -432,10 +455,20 @@ class OSAccountsImportController extends Controller
                 ]);
             } else {
                 // Actually sync the payment status
-                $exitCode = \Artisan::call('osaccounts:import-invoices', [
+                $commandOptions = [
                     '--update-existing' => true,
                     '--user' => auth()->id(),
-                ]);
+                ];
+
+                // Add date filters if provided
+                if ($dateFrom) {
+                    $commandOptions['--date-from'] = $dateFrom;
+                }
+                if ($dateTo) {
+                    $commandOptions['--date-to'] = $dateTo;
+                }
+
+                $exitCode = \Artisan::call('osaccounts:import-invoices', $commandOptions);
 
                 $outputText = \Artisan::output();
 
@@ -451,9 +484,14 @@ class OSAccountsImportController extends Controller
                 $errors = $errorMatches[1] ?? 0;
 
                 if ($exitCode === 0) {
+                    $dateRangeText = '';
+                    if ($dateFrom || $dateTo) {
+                        $dateRangeText = ' for date range '.($dateFrom ?: 'beginning').' to '.($dateTo ?: 'end');
+                    }
+
                     return response()->json([
                         'success' => true,
-                        'message' => "Payment status sync completed successfully. {$updated} invoice(s) updated.",
+                        'message' => "Payment status sync completed successfully{$dateRangeText}. {$updated} invoice(s) updated.",
                         'summary' => [
                             'total' => (int) $total,
                             'updated' => (int) $updated,

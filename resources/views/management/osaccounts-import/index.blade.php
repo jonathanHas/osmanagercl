@@ -273,6 +273,20 @@
                                 <input type="checkbox" id="payment-sync-dry-run" checked class="rounded">
                                 <label for="payment-sync-dry-run" class="text-sm text-gray-600 dark:text-gray-300">Dry Run (Preview Only)</label>
                             </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">From Date (optional)</label>
+                                    <input type="date" id="payment-sync-date-from" 
+                                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                                    <p class="mt-1 text-xs text-gray-500">Leave empty to sync all invoices</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">To Date (optional)</label>
+                                    <input type="date" id="payment-sync-date-to" 
+                                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                                    <p class="mt-1 text-xs text-gray-500">Leave empty to sync all invoices</p>
+                                </div>
+                            </div>
                             <button onclick="syncPaymentStatus()" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded">
                                 Sync Payment Status
                             </button>
@@ -653,12 +667,16 @@
 
         function syncPaymentStatus() {
             const dryRun = document.getElementById('payment-sync-dry-run').checked;
+            const dateFrom = document.getElementById('payment-sync-date-from').value;
+            const dateTo = document.getElementById('payment-sync-date-to').value;
             const outputElementId = 'payment-sync-output';
             
             showSpinner(outputElementId);
 
             const formData = new FormData();
-            formData.append('dry_run', dryRun);
+            formData.append('dry_run', dryRun ? '1' : '0');
+            if (dateFrom) formData.append('date_from', dateFrom);
+            if (dateTo) formData.append('date_to', dateTo);
 
             fetch('{{ route("management.osaccounts-import.sync-payment-status") }}', {
                 method: 'POST',
@@ -826,6 +844,14 @@
             const envPath = '{{ config('osaccounts.file_path', '/var/www/html/OSManager/invoice_storage') }}';
             if (envPath && !document.getElementById('attachments-base-path').value) {
                 document.getElementById('attachments-base-path').value = envPath;
+            }
+            
+            // Set default date range for payment sync (last month)
+            const paymentSyncDateFrom = document.getElementById('payment-sync-date-from');
+            const paymentSyncDateTo = document.getElementById('payment-sync-date-to');
+            if (paymentSyncDateFrom && paymentSyncDateTo) {
+                paymentSyncDateFrom.value = lastMonth.toISOString().split('T')[0];
+                paymentSyncDateTo.value = lastMonthEnd.toISOString().split('T')[0];
             }
         });
     </script>
