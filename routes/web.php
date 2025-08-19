@@ -100,7 +100,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/check-parser', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'checkParserConfiguration'])->name('check-parser');
         Route::delete('/{batchId}/file/{fileId}', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'deleteFile'])->name('delete-file');
     });
-    
+
+    Route::post('/invoices/bulk-mark-paid', [\App\Http\Controllers\InvoiceController::class, 'bulkMarkPaid'])->name('invoices.bulk-mark-paid');
+    Route::patch('/invoices/{invoice}/mark-unpaid', [\App\Http\Controllers\InvoiceController::class, 'markUnpaid'])->name('invoices.mark-unpaid');
     Route::resource('invoices', \App\Http\Controllers\InvoiceController::class);
 
     // VAT Rates Management
@@ -461,6 +463,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/sync-suppliers', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'syncSuppliers'])->name('sync-suppliers');
             Route::post('/import-invoices', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'importInvoices'])->name('import-invoices');
             Route::post('/import-vat-lines', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'importVatLines'])->name('import-vat-lines');
+            Route::post('/sync-payment-status', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'syncPaymentStatus'])->name('sync-payment-status');
             Route::post('/import-attachments', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'importAttachments'])->name('import-attachments');
             Route::post('/import-vat-returns', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'importVatReturns'])->name('import-vat-returns');
             Route::get('/stats', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'getImportStats'])->name('stats');

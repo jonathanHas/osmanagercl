@@ -26,7 +26,12 @@ class InvoiceController extends Controller
         }
 
         if ($request->filled('payment_status')) {
-            $query->where('payment_status', $request->payment_status);
+            if ($request->payment_status === 'unpaid') {
+                // "All Unpaid" includes pending, overdue, and partial
+                $query->whereIn('payment_status', ['pending', 'overdue', 'partial']);
+            } else {
+                $query->where('payment_status', $request->payment_status);
+            }
         }
 
         if ($request->filled('from_date')) {
@@ -56,6 +61,7 @@ class InvoiceController extends Controller
             'supplier_name',
             'invoice_date',
             'payment_status',
+            'payment_date',
             'subtotal',
             'vat_amount',
             'total_amount',
@@ -469,6 +475,77 @@ class InvoiceController extends Controller
         ]);
 
         return back()->with('success', 'Invoice marked as paid.');
+    }
+
+    /**
+     * Mark multiple invoices as paid (bulk operation).
+     */
+    public function bulkMarkPaid(Request $request)
+    {
+        $validated = $request->validate([
+            'invoice_ids' => 'required|array|min:1',
+            'invoice_ids.*' => 'exists:invoices,id',
+            'payment_date' => 'required|date',
+            'payment_method' => 'nullable|string|max:50',
+            'payment_reference' => 'nullable|string|max:100',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $invoices = Invoice::whereIn('id', $validated['invoice_ids'])->get();
+            $updatedCount = 0;
+
+            foreach ($invoices as $invoice) {
+                // Only update if not already paid
+                if ($invoice->payment_status !== 'paid') {
+                    $invoice->update([
+                        'payment_status' => 'paid',
+                        'payment_date' => $validated['payment_date'],
+                        'payment_method' => $validated['payment_method'],
+                        'payment_reference' => $validated['payment_reference'],
+                        'updated_by' => auth()->id(),
+                    ]);
+                    $updatedCount++;
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => "{$updatedCount} invoice(s) marked as paid successfully.",
+                'updated_count' => $updatedCount,
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to mark invoices as paid: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Mark invoice as unpaid.
+     */
+    public function markUnpaid(Invoice $invoice)
+    {
+        try {
+            $invoice->update([
+                'payment_status' => 'pending',
+                'payment_date' => null,
+                'payment_method' => null,
+                'payment_reference' => null,
+                'updated_by' => auth()->id(),
+            ]);
+
+            return back()->with('success', 'Invoice marked as unpaid.');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to mark invoice as unpaid: '.$e->getMessage());
+        }
     }
 
     /**

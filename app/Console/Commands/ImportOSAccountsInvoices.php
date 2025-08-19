@@ -23,7 +23,8 @@ class ImportOSAccountsInvoices extends Command
                             {--date-from= : Import invoices from this date (YYYY-MM-DD)}
                             {--date-to= : Import invoices to this date (YYYY-MM-DD)}
                             {--limit= : Limit the number of invoices to import}
-                            {--user= : User ID for created_by/updated_by fields}';
+                            {--user= : User ID for created_by/updated_by fields}
+                            {--update-existing : Update existing invoices with payment status from OSAccounts}';
 
     /**
      * The console command description.
@@ -42,6 +43,10 @@ class ImportOSAccountsInvoices extends Command
     ];
 
     private $supplierMap = [];
+
+    private $sampleUpdates = [];
+
+    private const MAX_SAMPLES = 10;
 
     /**
      * Execute the console command.
@@ -170,6 +175,13 @@ class ImportOSAccountsInvoices extends Command
                 // Check if invoice already exists
                 $existing = Invoice::where('external_osaccounts_id', $osInvoice->ID)->first();
 
+                if ($existing && $this->option('update-existing')) {
+                    // Update existing invoice with payment status from OSAccounts
+                    $this->updateExistingInvoice($existing, $osInvoice, $isDryRun);
+
+                    continue;
+                }
+
                 if ($existing && ! $this->option('force')) {
                     $this->stats['skipped']++;
 
@@ -262,6 +274,74 @@ class ImportOSAccountsInvoices extends Command
     }
 
     /**
+     * Update existing invoice with payment status from OSAccounts
+     */
+    private function updateExistingInvoice(Invoice $existing, $osInvoice, $isDryRun)
+    {
+        try {
+            // Get payment status using the OSInvoice model's correct logic
+            // This checks INVOICES_UNPAID table and PaidDate properly
+            $paymentStatus = $osInvoice->payment_status;
+            $paymentDate = $osInvoice->PaidDate; // Keep actual date when available
+            $paymentReference = $osInvoice->PaymentRef ?? null;
+
+            // Only update if payment status changed
+            if ($existing->payment_status !== $paymentStatus) {
+                // Collect sample for dry run display
+                if ($isDryRun && count($this->sampleUpdates) < self::MAX_SAMPLES) {
+                    $this->sampleUpdates[] = [
+                        'invoice_number' => $existing->invoice_number,
+                        'supplier_name' => $existing->supplier_name ?? 'Unknown',
+                        'old_status' => $existing->payment_status,
+                        'new_status' => $paymentStatus,
+                        'payment_date' => $paymentDate ? $paymentDate->format('Y-m-d') : null,
+                        'payment_reference' => $paymentReference,
+                        'total_amount' => $existing->total_amount,
+                    ];
+                }
+
+                if (! $isDryRun) {
+                    $existing->update([
+                        'payment_status' => $paymentStatus,
+                        'payment_date' => $paymentDate,
+                        'payment_method' => $paymentReference ? 'osaccounts_transfer' : null,
+                        'payment_reference' => $paymentReference,
+                        'updated_by' => $this->option('user') ?: User::first()->id,
+                    ]);
+
+                    Log::info('Updated invoice payment status from OSAccounts', [
+                        'invoice_id' => $existing->id,
+                        'osaccounts_id' => $osInvoice->ID,
+                        'old_status' => $existing->payment_status,
+                        'new_status' => $paymentStatus,
+                        'payment_date' => $paymentDate,
+                    ]);
+                }
+
+                $this->stats['updated']++;
+
+                if ($this->option('verbose')) {
+                    $this->info("Updated invoice #{$existing->invoice_number}: {$existing->payment_status} → {$paymentStatus}");
+                }
+            } else {
+                $this->stats['skipped']++;
+            }
+
+        } catch (\Exception $e) {
+            $this->stats['errors']++;
+            Log::error('Failed to update invoice from OSAccounts', [
+                'invoice_id' => $existing->id,
+                'osaccounts_id' => $osInvoice->ID,
+                'error' => $e->getMessage(),
+            ]);
+
+            if ($this->option('verbose')) {
+                $this->error("Failed to update invoice #{$existing->invoice_number}: {$e->getMessage()}");
+            }
+        }
+    }
+
+    /**
      * Display import results
      */
     private function displayResults($isDryRun)
@@ -283,6 +363,33 @@ class ImportOSAccountsInvoices extends Command
         if ($this->stats['unmapped_suppliers'] > 0) {
             $this->warn("⚠️  {$this->stats['unmapped_suppliers']} invoices skipped due to unmapped suppliers");
             $this->info('Check logs for details on unmapped suppliers');
+        }
+
+        // Show sample updates if in dry run mode and we have samples
+        if ($isDryRun && ! empty($this->sampleUpdates)) {
+            $this->newLine();
+            $this->info('📋 Sample Invoice Changes (Dry Run):');
+
+            $sampleData = [];
+            foreach ($this->sampleUpdates as $sample) {
+                $sampleData[] = [
+                    $sample['invoice_number'],
+                    $sample['supplier_name'],
+                    $sample['old_status'],
+                    $sample['new_status'],
+                    $sample['payment_date'] ?? 'N/A',
+                    '€'.number_format($sample['total_amount'], 2),
+                ];
+            }
+
+            $this->table(
+                ['Invoice #', 'Supplier', 'Current Status', 'New Status', 'Payment Date', 'Amount'],
+                $sampleData
+            );
+
+            if (count($this->sampleUpdates) >= self::MAX_SAMPLES) {
+                $this->info('ℹ️  Showing first '.self::MAX_SAMPLES.' samples. More invoices may be updated.');
+            }
         }
     }
 }

@@ -115,7 +115,7 @@ class InvoiceUploadFile extends Model
             $bytes /= 1024;
         }
 
-        return round($bytes, 2) . ' ' . $units[$i];
+        return round($bytes, 2).' '.$units[$i];
     }
 
     /**
@@ -131,7 +131,7 @@ class InvoiceUploadFile extends Model
      */
     public function getStatusColorAttribute(): string
     {
-        return match($this->status) {
+        return match ($this->status) {
             'pending' => 'gray',
             'uploading' => 'blue',
             'uploaded', 'parsing' => 'yellow',
@@ -147,7 +147,7 @@ class InvoiceUploadFile extends Model
      */
     public function getStatusLabelAttribute(): string
     {
-        return match($this->status) {
+        return match ($this->status) {
             'pending' => 'Pending',
             'uploading' => 'Uploading...',
             'uploaded' => 'Uploaded',
@@ -166,10 +166,10 @@ class InvoiceUploadFile extends Model
      */
     public function tempFileExists(): bool
     {
-        if (!$this->temp_path) {
+        if (! $this->temp_path) {
             return false;
         }
-        
+
         return Storage::disk('local')->exists($this->temp_path);
     }
 
@@ -178,10 +178,10 @@ class InvoiceUploadFile extends Model
      */
     public function getTempFilePathAttribute(): ?string
     {
-        if (!$this->temp_path) {
+        if (! $this->temp_path) {
             return null;
         }
-        
+
         return Storage::disk('local')->path($this->temp_path);
     }
 
@@ -193,7 +193,7 @@ class InvoiceUploadFile extends Model
         if ($this->tempFileExists()) {
             return Storage::disk('local')->delete($this->temp_path);
         }
-        
+
         return true;
     }
 
@@ -224,7 +224,7 @@ class InvoiceUploadFile extends Model
     /**
      * Mark as parsed.
      */
-    public function markAsParsed(array $data, float $confidence = null): void
+    public function markAsParsed(array $data, ?float $confidence = null): void
     {
         // Extract specific fields from parsed data
         $updateData = [
@@ -233,45 +233,45 @@ class InvoiceUploadFile extends Model
             'parsing_confidence' => $confidence,
             'parsed_at' => now(),
         ];
-        
+
         // Store supplier information
         if (isset($data['supplier_name'])) {
             $updateData['supplier_detected'] = $data['supplier_name'];
         }
-        
+
         // Store VAT breakdown
         if (isset($data['vat_breakdown'])) {
             $updateData['parsed_vat_data'] = $data['vat_breakdown'];
         }
-        
+
         // Store anomaly warnings
-        if (isset($data['warnings']) && !empty($data['warnings'])) {
+        if (isset($data['warnings']) && ! empty($data['warnings'])) {
             $updateData['anomaly_warnings'] = $data['warnings'];
             // If there are warnings, set status to review instead of parsed
             $updateData['status'] = 'review';
         }
-        
+
         // Store invoice metadata
         if (isset($data['invoice_number'])) {
             $updateData['parsed_invoice_number'] = $data['invoice_number'];
         }
-        
+
         if (isset($data['invoice_date'])) {
             $updateData['parsed_invoice_date'] = $data['invoice_date'];
         }
-        
+
         if (isset($data['total_amount'])) {
             $updateData['parsed_total_amount'] = $data['total_amount'];
         }
-        
+
         if (isset($data['is_tax_free'])) {
             $updateData['is_tax_free'] = $data['is_tax_free'];
         }
-        
+
         if (isset($data['is_credit_note'])) {
             $updateData['is_credit_note'] = $data['is_credit_note'];
         }
-        
+
         $this->update($updateData);
     }
 

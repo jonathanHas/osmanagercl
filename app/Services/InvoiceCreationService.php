@@ -9,14 +9,13 @@ use App\Models\InvoiceVatLine;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class InvoiceCreationService
 {
     /**
      * Create an invoice from a parsed upload file
-     * @param InvoiceUploadFile $file
-     * @param bool $skipDuplicateCheck Whether to skip duplicate checking (for manual review override)
+     *
+     * @param  bool  $skipDuplicateCheck  Whether to skip duplicate checking (for manual review override)
      */
     public function createFromParsedFile(InvoiceUploadFile $file, bool $skipDuplicateCheck = false): ?Invoice
     {
@@ -24,12 +23,12 @@ class InvoiceCreationService
             return DB::transaction(function () use ($file, $skipDuplicateCheck) {
                 // Find or create supplier
                 $supplier = $this->findOrCreateSupplier($file->supplier_detected);
-                
+
                 // Parse VAT data from JSON
-                $vatData = is_string($file->parsed_vat_data) 
-                    ? json_decode($file->parsed_vat_data, true) 
+                $vatData = is_string($file->parsed_vat_data)
+                    ? json_decode($file->parsed_vat_data, true)
                     : $file->parsed_vat_data;
-                
+
                 // Handle missing VAT data
                 if (empty($vatData)) {
                     $vatData = [
@@ -39,7 +38,7 @@ class InvoiceCreationService
                         'vat_0' => ['net' => 0, 'vat' => 0],
                     ];
                 }
-                
+
                 // Handle both old format (simple floats) and new format (net/vat objects)
                 // Check if we have the new format (with 'net' and 'vat' keys)
                 if (isset($vatData['vat_0']) && is_array($vatData['vat_0']) && isset($vatData['vat_0']['net'])) {
@@ -64,37 +63,37 @@ class InvoiceCreationService
                     $standardNet = $vatData['vat_23'] ?? 0;
                     $standardVat = $standardNet * 0.23;
                 }
-                
+
                 // Calculate totals
                 $subtotal = $standardNet + $reducedNet + $secondReducedNet + $zeroNet;
                 $vatAmount = $standardVat + $reducedVat + $secondReducedVat + $zeroVat;
                 // Always calculate total from subtotal + VAT for accuracy
                 $totalAmount = $subtotal + $vatAmount;
-                
+
                 // Check for duplicate invoices (unless explicitly skipped)
-                if (!$skipDuplicateCheck) {
+                if (! $skipDuplicateCheck) {
                     $duplicateCheck = $this->checkForDuplicateInvoice(
                         $supplier->id,
                         $file->parsed_invoice_date,
                         $totalAmount
                     );
-                    
+
                     if ($duplicateCheck) {
                         // Mark as review if potential duplicate found
                         $file->status = 'review';
-                        $file->error_message = 'Potential duplicate invoice found: ' . $duplicateCheck->invoice_number . 
-                                              ' (ID: ' . $duplicateCheck->id . ')';
+                        $file->error_message = 'Potential duplicate invoice found: '.$duplicateCheck->invoice_number.
+                                              ' (ID: '.$duplicateCheck->id.')';
                         $file->save();
-                        
+
                         Log::warning('Potential duplicate invoice detected', [
                             'file_id' => $file->id,
                             'existing_invoice_id' => $duplicateCheck->id,
                             'existing_invoice_number' => $duplicateCheck->invoice_number,
                             'supplier' => $supplier->name,
                             'date' => $file->parsed_invoice_date,
-                            'amount' => $totalAmount
+                            'amount' => $totalAmount,
                         ]);
-                        
+
                         return null;
                     }
                 } else {
@@ -103,30 +102,30 @@ class InvoiceCreationService
                         'file_id' => $file->id,
                         'supplier' => $supplier->name,
                         'date' => $file->parsed_invoice_date,
-                        'amount' => $totalAmount
+                        'amount' => $totalAmount,
                     ]);
                 }
-                
+
                 // Generate invoice number if not parsed
                 $invoiceNumber = $file->parsed_invoice_number;
                 if (empty($invoiceNumber)) {
                     // Generate a unique invoice number
-                    $invoiceNumber = 'BU-' . date('Y') . '-' . str_pad($file->id, 6, '0', STR_PAD_LEFT);
+                    $invoiceNumber = 'BU-'.date('Y').'-'.str_pad($file->id, 6, '0', STR_PAD_LEFT);
                 }
-                
+
                 // Create invoice
                 $invoice = Invoice::create([
                     'invoice_number' => $invoiceNumber,
                     'supplier_id' => $supplier->id,
                     'supplier_name' => $supplier->name,
                     'invoice_date' => $file->parsed_invoice_date ?: now(),
-                    'due_date' => $file->parsed_invoice_date ? 
-                        \Carbon\Carbon::parse($file->parsed_invoice_date)->addDays(30) : 
+                    'due_date' => $file->parsed_invoice_date ?
+                        \Carbon\Carbon::parse($file->parsed_invoice_date)->addDays(30) :
                         now()->addDays(30),
                     'subtotal' => $subtotal,
                     'vat_amount' => $vatAmount,
                     'total_amount' => $totalAmount,
-                    
+
                     // VAT breakdown
                     'standard_net' => $standardNet,
                     'standard_vat' => $standardVat,
@@ -136,35 +135,35 @@ class InvoiceCreationService
                     'second_reduced_vat' => $secondReducedVat,
                     'zero_net' => $zeroNet,
                     'zero_vat' => $zeroVat,
-                    
+
                     // Status and metadata
                     'payment_status' => 'pending',
                     'expense_category' => 'bulk_upload',
                     'notes' => "Imported from bulk upload batch: {$file->bulk_upload_id}",
-                    
+
                     // Audit fields
                     'created_by' => auth()->id() ?: $file->created_by,
                     'updated_by' => auth()->id() ?: $file->created_by,
                 ]);
-                
+
                 // Create VAT lines for better detail tracking
                 $this->createVatLines($invoice, $vatData);
-                
+
                 // Link the uploaded file to the created invoice
                 $file->invoice_id = $invoice->id;
                 $file->status = 'completed';
                 $file->save();
-                
+
                 // Move uploaded file to invoice attachments
                 $this->createInvoiceAttachment($invoice, $file);
-                
+
                 Log::info('Invoice created from bulk upload', [
                     'invoice_id' => $invoice->id,
                     'file_id' => $file->id,
                     'supplier' => $supplier->name,
                     'total' => $totalAmount,
                 ]);
-                
+
                 return $invoice;
             });
         } catch (\Exception $e) {
@@ -173,16 +172,16 @@ class InvoiceCreationService
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            
+
             // Mark file as failed
             $file->status = 'failed';
-            $file->error_message = 'Failed to create invoice: ' . $e->getMessage();
+            $file->error_message = 'Failed to create invoice: '.$e->getMessage();
             $file->save();
-            
+
             return null;
         }
     }
-    
+
     /**
      * Find or create supplier based on detected name
      */
@@ -190,24 +189,24 @@ class InvoiceCreationService
     {
         // Clean the supplier name
         $supplierName = trim($supplierName);
-        
+
         // Try exact match first
         $supplier = AccountingSupplier::where('name', $supplierName)->first();
-        
+
         // Try case-insensitive match
-        if (!$supplier) {
+        if (! $supplier) {
             $supplier = AccountingSupplier::whereRaw('LOWER(name) = ?', [strtolower($supplierName)])->first();
         }
-        
+
         // Try partial match for common variations
-        if (!$supplier) {
+        if (! $supplier) {
             // Remove common suffixes like Ltd, Limited, etc.
             $cleanName = preg_replace('/\s+(ltd|limited|inc|corp|plc|co\.|company)\.?$/i', '', $supplierName);
-            $supplier = AccountingSupplier::whereRaw('LOWER(name) LIKE ?', ['%' . strtolower($cleanName) . '%'])->first();
+            $supplier = AccountingSupplier::whereRaw('LOWER(name) LIKE ?', ['%'.strtolower($cleanName).'%'])->first();
         }
-        
+
         // Create new supplier if not found
-        if (!$supplier) {
+        if (! $supplier) {
             $supplier = AccountingSupplier::create([
                 'code' => $this->generateSupplierCode($supplierName),
                 'name' => $supplierName,
@@ -218,16 +217,16 @@ class InvoiceCreationService
                 'created_by' => auth()->id() ?: 1,
                 'updated_by' => auth()->id() ?: 1,
             ]);
-            
+
             Log::info('Created new supplier from bulk upload', [
                 'supplier_id' => $supplier->id,
                 'name' => $supplierName,
             ]);
         }
-        
+
         return $supplier;
     }
-    
+
     /**
      * Generate a unique supplier code
      */
@@ -235,29 +234,29 @@ class InvoiceCreationService
     {
         // Create code from name (first 3-4 letters)
         $nameCode = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $name), 0, 4));
-        
+
         // Add timestamp for uniqueness
         $timestamp = now()->format('ymd');
-        $code = $nameCode . $timestamp;
-        
+        $code = $nameCode.$timestamp;
+
         // Ensure uniqueness
         $counter = 1;
         $originalCode = $code;
         while (AccountingSupplier::where('code', $code)->exists()) {
-            $code = $originalCode . $counter;
+            $code = $originalCode.$counter;
             $counter++;
         }
-        
+
         return $code;
     }
-    
+
     /**
      * Create VAT lines for the invoice
      */
     private function createVatLines(Invoice $invoice, array $vatData): void
     {
         $lineNumber = 1;
-        
+
         // Standard rate (23%)
         if (($vatData['vat_23']['net'] ?? 0) > 0) {
             InvoiceVatLine::create([
@@ -268,7 +267,7 @@ class InvoiceCreationService
                 'created_by' => $invoice->created_by,
             ]);
         }
-        
+
         // Reduced rate (13.5%)
         if (($vatData['vat_13_5']['net'] ?? 0) > 0) {
             InvoiceVatLine::create([
@@ -279,7 +278,7 @@ class InvoiceCreationService
                 'created_by' => $invoice->created_by,
             ]);
         }
-        
+
         // Second reduced rate (9%)
         if (($vatData['vat_9']['net'] ?? 0) > 0) {
             InvoiceVatLine::create([
@@ -290,7 +289,7 @@ class InvoiceCreationService
                 'created_by' => $invoice->created_by,
             ]);
         }
-        
+
         // Zero rate (0%)
         if (($vatData['vat_0']['net'] ?? 0) > 0) {
             InvoiceVatLine::create([
@@ -302,37 +301,38 @@ class InvoiceCreationService
             ]);
         }
     }
-    
+
     /**
      * Create invoice attachment from uploaded file
      */
     private function createInvoiceAttachment(Invoice $invoice, InvoiceUploadFile $file): void
     {
         // Check if temp file exists
-        if (!$file->temp_path || !$file->tempFileExists()) {
+        if (! $file->temp_path || ! $file->tempFileExists()) {
             Log::warning('Temp file not found for attachment creation', [
                 'invoice_id' => $invoice->id,
                 'file_id' => $file->id,
-                'temp_path' => $file->temp_path
+                'temp_path' => $file->temp_path,
             ]);
+
             return;
         }
-        
+
         try {
             // Get the full path to the temp file
             $tempFilePath = $file->temp_file_path;
-            
+
             // Generate filename for permanent storage
-            $filename = $file->stored_filename ?: ($invoice->id . '_' . \Str::slug($file->original_filename))
-                . '.' . pathinfo($file->original_filename, PATHINFO_EXTENSION);
-            
+            $filename = $file->stored_filename ?: ($invoice->id.'_'.\Str::slug($file->original_filename))
+                .'.'.pathinfo($file->original_filename, PATHINFO_EXTENSION);
+
             // Create a permanent path for the attachment
-            $permanentPath = 'invoices/attachments/' . $invoice->id . '/' . $filename;
-            
+            $permanentPath = 'invoices/attachments/'.$invoice->id.'/'.$filename;
+
             // Copy file to permanent location
             $tempFileContent = file_get_contents($tempFilePath);
             Storage::disk('local')->put($permanentPath, $tempFileContent);
-            
+
             // Create attachment record
             $invoice->attachments()->create([
                 'original_filename' => $file->original_filename,
@@ -346,45 +346,45 @@ class InvoiceCreationService
                 'uploaded_by' => $invoice->created_by,
                 'uploaded_at' => now(),
             ]);
-            
+
             Log::info('Invoice attachment created successfully', [
                 'invoice_id' => $invoice->id,
                 'file_id' => $file->id,
-                'attachment_path' => $permanentPath
+                'attachment_path' => $permanentPath,
             ]);
         } catch (\Exception $e) {
             Log::error('Failed to create invoice attachment', [
                 'invoice_id' => $invoice->id,
                 'file_id' => $file->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
         }
     }
-    
+
     /**
      * Check for potential duplicate invoices
      */
     private function checkForDuplicateInvoice(int $supplierId, ?string $invoiceDate, float $totalAmount): ?Invoice
     {
-        if (!$invoiceDate) {
+        if (! $invoiceDate) {
             return null;
         }
-        
+
         $dateCarbon = \Carbon\Carbon::parse($invoiceDate);
-        
+
         // Look for invoices from the same supplier within 1 day and similar amount
         $query = Invoice::where('supplier_id', $supplierId)
             ->whereBetween('invoice_date', [
                 $dateCarbon->copy()->subDay()->format('Y-m-d'),
-                $dateCarbon->copy()->addDay()->format('Y-m-d')
+                $dateCarbon->copy()->addDay()->format('Y-m-d'),
             ]);
-            
+
         // Check for similar amounts (within €0.50)
         $potentialDuplicates = $query->get()->filter(function ($invoice) use ($totalAmount) {
             return abs($invoice->total_amount - $totalAmount) <= 0.50;
         });
-        
+
         return $potentialDuplicates->first();
     }
 }

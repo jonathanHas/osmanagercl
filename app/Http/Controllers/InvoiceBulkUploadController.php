@@ -2,15 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\ParseInvoiceFile;
 use App\Models\InvoiceBulkUpload;
 use App\Models\InvoiceUploadFile;
-use App\Jobs\ParseInvoiceFile;
 use App\Services\InvoiceParsingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 
 class InvoiceBulkUploadController extends Controller
 {
@@ -45,7 +44,7 @@ class InvoiceBulkUploadController extends Controller
         $maxSizeMB = config('invoices.bulk_upload.max_file_size_mb');
         $maxSizeKB = $maxSizeMB * 1024;
         $allowedMimes = implode(',', config('invoices.bulk_upload.allowed_mime_types'));
-        
+
         $request->validate([
             'files' => "required|array|min:1|max:{$maxFiles}",
             'files.*' => [
@@ -61,7 +60,7 @@ class InvoiceBulkUploadController extends Controller
         ]);
 
         DB::beginTransaction();
-        
+
         try {
             // Create bulk upload batch
             $batch = InvoiceBulkUpload::create([
@@ -77,11 +76,11 @@ class InvoiceBulkUploadController extends Controller
 
             $uploadedFiles = [];
             $tempPath = config('invoices.bulk_upload.temp_path');
-            $batchFolder = $tempPath . '/' . $batch->batch_id;
+            $batchFolder = $tempPath.'/'.$batch->batch_id;
 
             // Ensure the temp directory exists
             Storage::disk('local')->makeDirectory($batchFolder);
-            
+
             // Fix permissions for the batch directory so queue worker can access it
             $fullBatchPath = Storage::disk('local')->path($batchFolder);
             chmod($fullBatchPath, 0775); // rwxrwxr-x
@@ -91,14 +90,14 @@ class InvoiceBulkUploadController extends Controller
                 $extension = $file->getClientOriginalExtension();
                 $mimeType = $file->getMimeType();
                 $fileSize = $file->getSize();
-                
+
                 // Generate unique filename
-                $storedName = Str::uuid() . '.' . $extension;
-                $filePath = $batchFolder . '/' . $storedName;
-                
+                $storedName = Str::uuid().'.'.$extension;
+                $filePath = $batchFolder.'/'.$storedName;
+
                 // Store the file temporarily - use 'local' disk which is now storage/app/private
                 $storedPath = $file->storeAs($batchFolder, $storedName, 'local');
-                
+
                 // Debug logging to track file creation
                 $fullPath = Storage::disk('local')->path($filePath);
                 \Log::info('File upload debug', [
@@ -109,14 +108,14 @@ class InvoiceBulkUploadController extends Controller
                     'full_path' => $fullPath,
                     'stored_path' => $storedPath,
                     'file_exists_after_store' => file_exists($fullPath),
-                    'file_size' => file_exists($fullPath) ? filesize($fullPath) : 0
+                    'file_size' => file_exists($fullPath) ? filesize($fullPath) : 0,
                 ]);
-                
+
                 // Calculate file hash and fix file permissions
                 $fullPath = Storage::disk('local')->path($filePath);
                 chmod($fullPath, 0664); // rw-rw-r--
                 $fileHash = hash_file('sha256', $fullPath);
-                
+
                 // Create file record
                 $uploadFile = InvoiceUploadFile::create([
                     'bulk_upload_id' => $batch->id,
@@ -130,18 +129,18 @@ class InvoiceBulkUploadController extends Controller
                     'upload_progress' => 100,
                     'uploaded_at' => now(),
                 ]);
-                
+
                 $uploadedFiles[] = $uploadFile;
             }
-            
+
             // Update batch status
             $batch->update([
                 'status' => 'uploaded',
                 'started_at' => now(),
             ]);
-            
+
             DB::commit();
-            
+
             // Debug: Check if files still exist after commit
             foreach ($uploadedFiles as $uploadFile) {
                 $exists = file_exists($uploadFile->temp_file_path);
@@ -150,30 +149,30 @@ class InvoiceBulkUploadController extends Controller
                     'filename' => $uploadFile->original_filename,
                     'temp_path' => $uploadFile->temp_file_path,
                     'exists_after_commit' => $exists,
-                    'file_size' => $exists ? filesize($uploadFile->temp_file_path) : 0
+                    'file_size' => $exists ? filesize($uploadFile->temp_file_path) : 0,
                 ]);
             }
-            
+
             // Return response with batch info
             return response()->json([
                 'success' => true,
                 'batch_id' => $batch->batch_id,
                 'total_files' => count($uploadedFiles),
-                'message' => count($uploadedFiles) . ' file(s) uploaded successfully. Ready for processing.',
+                'message' => count($uploadedFiles).' file(s) uploaded successfully. Ready for processing.',
                 'redirect_url' => route('invoices.bulk-upload.preview', $batch->batch_id),
             ]);
-            
+
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             // Clean up any uploaded files
             if (isset($batchFolder)) {
                 Storage::disk('local')->deleteDirectory($batchFolder);
             }
-            
+
             return response()->json([
                 'success' => false,
-                'error' => 'Upload failed: ' . $e->getMessage(),
+                'error' => 'Upload failed: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -186,8 +185,8 @@ class InvoiceBulkUploadController extends Controller
         $batch = InvoiceBulkUpload::where('batch_id', $batchId)
             ->where('user_id', auth()->id())
             ->with(['files' => function ($query) {
-                $query->select('id', 'bulk_upload_id', 'original_filename', 'status', 
-                              'upload_progress', 'error_message', 'parsing_confidence');
+                $query->select('id', 'bulk_upload_id', 'original_filename', 'status',
+                    'upload_progress', 'error_message', 'parsing_confidence');
             }])
             ->firstOrFail();
 
@@ -239,7 +238,7 @@ class InvoiceBulkUploadController extends Controller
             ->where('user_id', auth()->id())
             ->firstOrFail();
 
-        if (!$batch->canBeCancelled()) {
+        if (! $batch->canBeCancelled()) {
             return response()->json([
                 'success' => false,
                 'error' => 'This batch cannot be cancelled.',
@@ -249,7 +248,7 @@ class InvoiceBulkUploadController extends Controller
         $batch->cancel();
 
         // Clean up temporary files
-        $tempPath = config('invoices.bulk_upload.temp_path') . '/' . $batch->batch_id;
+        $tempPath = config('invoices.bulk_upload.temp_path').'/'.$batch->batch_id;
         Storage::disk('local')->deleteDirectory($tempPath);
 
         return response()->json([
@@ -267,7 +266,7 @@ class InvoiceBulkUploadController extends Controller
             ->where('user_id', auth()->id())
             ->firstOrFail();
 
-        if (!in_array($batch->status, ['uploaded', 'failed'])) {
+        if (! in_array($batch->status, ['uploaded', 'failed'])) {
             return response()->json([
                 'success' => false,
                 'error' => 'Batch is not ready for processing.',
@@ -298,9 +297,9 @@ class InvoiceBulkUploadController extends Controller
      */
     public function checkParserConfiguration()
     {
-        $parsingService = new InvoiceParsingService();
+        $parsingService = new InvoiceParsingService;
         $checks = $parsingService->checkConfiguration();
-        
+
         return response()->json($checks);
     }
 
@@ -328,21 +327,21 @@ class InvoiceBulkUploadController extends Controller
         $createdCount = 0;
         $failedCount = 0;
         $errors = [];
-        
-        $creationService = new \App\Services\InvoiceCreationService();
+
+        $creationService = new \App\Services\InvoiceCreationService;
 
         foreach ($reviewFiles as $file) {
             try {
                 // Check if this is a duplicate that user is intentionally overriding
                 $isDuplicateOverride = $file->error_message && str_contains(strtolower($file->error_message), 'duplicate');
-                
+
                 if ($isDuplicateOverride) {
                     \Log::info('Creating invoice despite duplicate warning (user override)', [
                         'file_id' => $file->id,
-                        'warning' => $file->error_message
+                        'warning' => $file->error_message,
                     ]);
                 }
-                
+
                 // Create invoice, skipping duplicate check if it's an override
                 $invoice = $creationService->createFromParsedFile($file, $isDuplicateOverride);
                 if ($invoice) {
@@ -353,10 +352,10 @@ class InvoiceBulkUploadController extends Controller
                 }
             } catch (\Exception $e) {
                 $failedCount++;
-                $errors[] = "File {$file->original_filename}: " . $e->getMessage();
+                $errors[] = "File {$file->original_filename}: ".$e->getMessage();
                 \Log::error('Failed to create invoice from review', [
                     'file_id' => $file->id,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
             }
         }
@@ -392,7 +391,7 @@ class InvoiceBulkUploadController extends Controller
             ->firstOrFail();
 
         // Only allow deletion if file is not processed
-        if (!in_array($file->status, ['pending', 'uploaded', 'failed'])) {
+        if (! in_array($file->status, ['pending', 'uploaded', 'failed'])) {
             return response()->json([
                 'success' => false,
                 'error' => 'Cannot delete a file that has been processed.',
@@ -401,10 +400,10 @@ class InvoiceBulkUploadController extends Controller
 
         // Delete temp file
         $file->deleteTempFile();
-        
+
         // Delete record
         $file->delete();
-        
+
         // Update batch totals
         $batch->total_files--;
         $batch->save();

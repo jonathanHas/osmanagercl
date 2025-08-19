@@ -88,7 +88,7 @@ class OSAccountsImportController extends Controller
         if ($force) {
             $options['--force'] = true;
         }
-        
+
         // Pass current authenticated user's ID
         $options['--user'] = auth()->id();
 
@@ -159,7 +159,7 @@ class OSAccountsImportController extends Controller
         if ($request->boolean('force')) {
             $options['--force'] = true;
         }
-        
+
         // Pass current authenticated user's ID
         $options['--user'] = auth()->id();
 
@@ -386,6 +386,99 @@ class OSAccountsImportController extends Controller
         ]);
     }
 
+    public function syncPaymentStatus(Request $request)
+    {
+        try {
+            $isDryRun = $request->boolean('dry_run', true);
+
+            if ($isDryRun) {
+                // Preview mode - use the command to show what would be updated
+                $output = [];
+                $exitCode = \Artisan::call('osaccounts:import-invoices', [
+                    '--update-existing' => true,
+                    '--dry-run' => true,
+                    '--user' => auth()->id(),
+                ], $output);
+
+                $outputText = \Artisan::output();
+
+                // Parse the results from the command output
+                preg_match('/Total Processed\s+\|\s*(\d+)/', $outputText, $totalMatches);
+                preg_match('/Would Update\s+\|\s*(\d+)/', $outputText, $updateMatches);
+                preg_match('/Skipped\s+\|\s*(\d+)/', $outputText, $skippedMatches);
+                preg_match('/Errors\s+\|\s*(\d+)/', $outputText, $errorMatches);
+
+                $total = $totalMatches[1] ?? 0;
+                $updated = $updateMatches[1] ?? 0;
+                $skipped = $skippedMatches[1] ?? 0;
+                $errors = $errorMatches[1] ?? 0;
+
+                // Parse sample invoice changes if they exist
+                $samples = $this->parseSampleInvoiceChanges($outputText);
+
+                // Debug: Log the samples for troubleshooting
+                \Log::info('Parsed samples from command output', ['samples' => $samples]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => "Preview complete. {$updated} invoice(s) would be updated with payment status from OSAccounts.",
+                    'summary' => [
+                        'total' => (int) $total,
+                        'updated' => (int) $updated,
+                        'skipped' => (int) $skipped,
+                        'errors' => (int) $errors,
+                    ],
+                    'samples' => $samples,
+                ]);
+            } else {
+                // Actually sync the payment status
+                $exitCode = \Artisan::call('osaccounts:import-invoices', [
+                    '--update-existing' => true,
+                    '--user' => auth()->id(),
+                ]);
+
+                $outputText = \Artisan::output();
+
+                // Parse the results from the command output
+                preg_match('/Total Processed\s+\|\s*(\d+)/', $outputText, $totalMatches);
+                preg_match('/Updated\s+\|\s*(\d+)/', $outputText, $updateMatches);
+                preg_match('/Skipped\s+\|\s*(\d+)/', $outputText, $skippedMatches);
+                preg_match('/Errors\s+\|\s*(\d+)/', $outputText, $errorMatches);
+
+                $total = $totalMatches[1] ?? 0;
+                $updated = $updateMatches[1] ?? 0;
+                $skipped = $skippedMatches[1] ?? 0;
+                $errors = $errorMatches[1] ?? 0;
+
+                if ($exitCode === 0) {
+                    return response()->json([
+                        'success' => true,
+                        'message' => "Payment status sync completed successfully. {$updated} invoice(s) updated.",
+                        'summary' => [
+                            'total' => (int) $total,
+                            'updated' => (int) $updated,
+                            'skipped' => (int) $skipped,
+                            'errors' => (int) $errors,
+                        ],
+                    ]);
+                } else {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Payment status sync failed. Check logs for details.',
+                        'command_output' => $outputText,
+                    ]);
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error('Payment status sync error: '.$e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Payment status sync failed: '.$e->getMessage(),
+            ]);
+        }
+    }
+
     private function sendStreamMessage(string $type, string $message, ?bool $success = null)
     {
         $data = [
@@ -401,5 +494,38 @@ class OSAccountsImportController extends Controller
         echo 'data: '.json_encode($data)."\n\n";
         ob_flush();
         flush();
+    }
+
+    /**
+     * Parse sample invoice changes from command output
+     */
+    private function parseSampleInvoiceChanges(string $output): array
+    {
+        $samples = [];
+
+        // Look for the sample table section in the output
+        if (strpos($output, '📋 Sample Invoice Changes (Dry Run):') !== false) {
+            $tableStart = strpos($output, '📋 Sample Invoice Changes (Dry Run):');
+            $tableSection = substr($output, $tableStart);
+
+            $lines = explode("\n", $tableSection);
+            foreach ($lines as $line) {
+                $line = trim($line);
+
+                // Look for data rows using regex pattern
+                if (preg_match('/\| (\d+)\s+\| (.+?) \| (.+?) \| (.+?) \| (.+?) \| (.+?) \|/', $line, $matches)) {
+                    $samples[] = [
+                        'invoice_number' => trim($matches[1]),
+                        'supplier_name' => trim($matches[2]),
+                        'old_status' => trim($matches[3]),
+                        'new_status' => trim($matches[4]),
+                        'payment_date' => trim($matches[5]) === 'N/A' ? null : trim($matches[5]),
+                        'amount' => trim($matches[6]),
+                    ];
+                }
+            }
+        }
+
+        return $samples;
     }
 }

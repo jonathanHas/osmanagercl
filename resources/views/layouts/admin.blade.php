@@ -26,7 +26,7 @@
             <!-- Sidebar -->
             <div :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" 
                  class="fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:block lg:flex-shrink-0">
-                <div class="flex h-full flex-col">
+                <div class="flex h-full min-h-full flex-col bg-gray-900">
                     <!-- Logo -->
                     <div class="flex h-16 items-center justify-between px-4 bg-gray-800">
                         <a href="{{ route('dashboard') }}" class="flex items-center">
@@ -41,7 +41,7 @@
                     </div>
 
                     <!-- Navigation -->
-                    <nav class="flex-1 space-y-1 px-2 py-4">
+                    <nav class="flex-1 overflow-y-auto space-y-1 px-2 py-4">
                         <!-- OPERATIONS SECTION -->
                         @unless(auth()->user()->hasRole('barista'))
                         <div class="px-2">

@@ -21,17 +21,17 @@ return new class extends Migration
             $table->integer('successful_files')->default(0);
             $table->integer('failed_files')->default(0);
             $table->enum('status', ['pending', 'uploading', 'processing', 'completed', 'failed', 'cancelled'])
-                  ->default('pending');
+                ->default('pending');
             $table->json('metadata')->nullable(); // Store additional info
             $table->timestamp('started_at')->nullable();
             $table->timestamp('completed_at')->nullable();
             $table->timestamps();
-            
+
             $table->index('batch_id');
             $table->index('status');
             $table->index('user_id');
         });
-        
+
         // Individual file tracking table
         Schema::create('invoice_upload_files', function (Blueprint $table) {
             $table->id();
@@ -51,7 +51,7 @@ return new class extends Migration
                 'review',
                 'completed',
                 'failed',
-                'rejected'
+                'rejected',
             ])->default('pending');
             $table->json('parsed_data')->nullable(); // Store extracted invoice data
             $table->json('parsing_errors')->nullable(); // Store any parsing errors
@@ -63,7 +63,7 @@ return new class extends Migration
             $table->timestamp('parsed_at')->nullable();
             $table->timestamp('processed_at')->nullable();
             $table->timestamps();
-            
+
             $table->index('bulk_upload_id');
             $table->index('status');
             $table->index('invoice_id');

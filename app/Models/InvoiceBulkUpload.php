@@ -36,7 +36,7 @@ class InvoiceBulkUpload extends Model
      */
     public static function generateBatchId(): string
     {
-        return 'BATCH-' . strtoupper(Str::random(8)) . '-' . time();
+        return 'BATCH-'.strtoupper(Str::random(8)).'-'.time();
     }
 
     /**
@@ -115,15 +115,15 @@ class InvoiceBulkUpload extends Model
         $this->processed_files = $this->files()
             ->whereNotIn('status', ['pending', 'uploading'])
             ->count();
-        
+
         $this->successful_files = $this->files()
             ->where('status', 'completed')
             ->count();
-        
+
         $this->failed_files = $this->files()
             ->whereIn('status', ['failed', 'rejected'])
             ->count();
-        
+
         // Update status if all files are processed
         if ($this->processed_files >= $this->total_files && $this->total_files > 0) {
             if ($this->failed_files == $this->total_files) {
@@ -133,7 +133,7 @@ class InvoiceBulkUpload extends Model
             }
             $this->completed_at = now();
         }
-        
+
         $this->save();
     }
 
@@ -156,7 +156,7 @@ class InvoiceBulkUpload extends Model
             $this->status = 'cancelled';
             $this->completed_at = now();
             $this->save();
-            
+
             // Cancel all pending files
             $this->files()
                 ->whereIn('status', ['pending', 'uploading', 'parsing'])

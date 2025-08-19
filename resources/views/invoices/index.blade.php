@@ -78,6 +78,7 @@
                     <label class="block text-sm font-medium text-gray-400 mb-1">Status</label>
                     <select name="payment_status" class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md">
                         <option value="">All Status</option>
+                        <option value="unpaid" {{ request('payment_status') == 'unpaid' ? 'selected' : '' }}>All Unpaid</option>
                         <option value="pending" {{ request('payment_status') == 'pending' ? 'selected' : '' }}>Pending</option>
                         <option value="overdue" {{ request('payment_status') == 'overdue' ? 'selected' : '' }}>Overdue</option>
                         <option value="paid" {{ request('payment_status') == 'paid' ? 'selected' : '' }}>Paid</option>
@@ -204,11 +205,42 @@
         </div>
         @endif
 
+        {{-- Bulk Actions Bar --}}
+        <div id="bulk-actions-bar" class="hidden bg-blue-900 rounded-lg p-4 mb-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <span id="selection-count" class="text-blue-100 font-medium">0 invoices selected</span>
+                    <span id="selection-total" class="text-blue-200 text-sm">Total: €0.00</span>
+                </div>
+                <div class="flex space-x-2">
+                    <button id="mark-paid-btn" 
+                            class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                        Mark as Paid
+                    </button>
+                    <button id="clear-selection-btn" 
+                            class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                        Clear Selection
+                    </button>
+                </div>
+            </div>
+            
+            {{-- Breakdown by supplier --}}
+            <div id="supplier-breakdown" class="mt-3 hidden">
+                <div class="text-blue-200 text-sm font-medium mb-2">Selected by supplier:</div>
+                <div id="supplier-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                    <!-- Supplier breakdowns will be inserted here -->
+                </div>
+            </div>
+        </div>
+
         {{-- Invoices Table --}}
         <div class="bg-gray-800 rounded-lg overflow-hidden">
             <table class="min-w-full divide-y divide-gray-700">
                 <thead class="bg-gray-900">
                     <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider w-12">
+                            <input type="checkbox" id="select-all" class="rounded bg-gray-700 border-gray-600 text-blue-600 focus:ring-blue-500 focus:ring-2">
+                        </th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                             <a href="{{ route('invoices.index', array_merge(request()->all(), ['sort' => 'invoice_number', 'direction' => $sortField === 'invoice_number' && $sortDirection === 'asc' ? 'desc' : 'asc'])) }}" 
                                class="flex items-center space-x-1 hover:text-gray-200">
@@ -259,6 +291,21 @@
                                class="flex items-center space-x-1 hover:text-gray-200">
                                 <span>Status</span>
                                 @if($sortField === 'payment_status')
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                        @if($sortDirection === 'asc')
+                                            <path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" />
+                                        @else
+                                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                        @endif
+                                    </svg>
+                                @endif
+                            </a>
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                            <a href="{{ route('invoices.index', array_merge(request()->all(), ['sort' => 'payment_date', 'direction' => $sortField === 'payment_date' && $sortDirection === 'asc' ? 'desc' : 'asc'])) }}" 
+                               class="flex items-center space-x-1 hover:text-gray-200">
+                                <span>Paid On</span>
+                                @if($sortField === 'payment_date')
                                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                         @if($sortDirection === 'asc')
                                             <path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" />
@@ -321,7 +368,16 @@
                 </thead>
                 <tbody class="bg-gray-800 divide-y divide-gray-700">
                     @forelse($invoices as $invoice)
-                        <tr class="hover:bg-gray-750">
+                        <tr class="hover:bg-gray-750" data-invoice-id="{{ $invoice->id }}">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <input type="checkbox" 
+                                       class="invoice-checkbox rounded bg-gray-700 border-gray-600 text-blue-600 focus:ring-blue-500 focus:ring-2" 
+                                       data-invoice-id="{{ $invoice->id }}"
+                                       data-supplier-id="{{ $invoice->supplier_id }}"
+                                       data-supplier-name="{{ $invoice->supplier_name }}"
+                                       data-total-amount="{{ $invoice->total_amount }}"
+                                       data-invoice-number="{{ $invoice->invoice_number }}">
+                            </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <a href="{{ route('invoices.show', $invoice) }}" class="text-blue-400 hover:text-blue-300">
                                     {{ $invoice->invoice_number }}
@@ -355,6 +411,13 @@
                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $statusColor }}">
                                     {{ ucfirst($invoice->payment_status) }}
                                 </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-gray-300">
+                                @if($invoice->payment_date && $invoice->payment_status === 'paid')
+                                    <span class="text-green-400">{{ $invoice->payment_date->format('d/m/Y') }}</span>
+                                @else
+                                    <span class="text-gray-500">-</span>
+                                @endif
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-gray-300">
                                 €{{ number_format($invoice->subtotal, 2) }}
@@ -401,4 +464,307 @@
             </div>
         @endif
     </div>
+
+    {{-- Bulk Payment Modal --}}
+    <div id="payment-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-gray-100">Mark Invoices as Paid</h3>
+                    <button id="close-modal" class="text-gray-400 hover:text-gray-200">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                
+                <form id="bulk-payment-form">
+                    @csrf
+                    
+                    {{-- Selected Invoices Summary --}}
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold text-gray-200 mb-3">Selected Invoices</h4>
+                        <div id="modal-supplier-breakdown" class="space-y-3">
+                            <!-- Supplier breakdown will be inserted here -->
+                        </div>
+                    </div>
+                    
+                    {{-- Payment Details --}}
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">Payment Date</label>
+                            <input type="date" name="payment_date" id="payment_date" 
+                                   value="{{ now()->format('Y-m-d') }}"
+                                   class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md"
+                                   required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">Payment Method</label>
+                            <select name="payment_method" id="payment_method" 
+                                    class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md">
+                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="cash">Cash</option>
+                                <option value="cheque">Cheque</option>
+                                <option value="credit_card">Credit Card</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Payment Reference (Optional)</label>
+                        <input type="text" name="payment_reference" id="payment_reference" 
+                               placeholder="e.g., Transfer confirmation number, cheque number..."
+                               class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md">
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" id="cancel-payment" 
+                                class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                            Cancel
+                        </button>
+                        <button type="submit" 
+                                class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                            Mark as Paid
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    @push('scripts')
+    <script>
+        let selectedInvoices = new Map();
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const selectAllCheckbox = document.getElementById('select-all');
+            const invoiceCheckboxes = document.querySelectorAll('.invoice-checkbox');
+            const bulkActionsBar = document.getElementById('bulk-actions-bar');
+            const selectionCount = document.getElementById('selection-count');
+            const selectionTotal = document.getElementById('selection-total');
+            const supplierBreakdown = document.getElementById('supplier-breakdown');
+            const supplierList = document.getElementById('supplier-list');
+            const markPaidBtn = document.getElementById('mark-paid-btn');
+            const clearSelectionBtn = document.getElementById('clear-selection-btn');
+            const paymentModal = document.getElementById('payment-modal');
+            const bulkPaymentForm = document.getElementById('bulk-payment-form');
+            
+            // Handle select all checkbox
+            selectAllCheckbox.addEventListener('change', function() {
+                invoiceCheckboxes.forEach(checkbox => {
+                    checkbox.checked = this.checked;
+                    if (this.checked) {
+                        addToSelection(checkbox);
+                    } else {
+                        removeFromSelection(checkbox);
+                    }
+                });
+                updateSelectionDisplay();
+            });
+            
+            // Handle individual checkboxes
+            invoiceCheckboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        addToSelection(this);
+                    } else {
+                        removeFromSelection(this);
+                    }
+                    updateSelectionDisplay();
+                    updateSelectAllState();
+                });
+            });
+            
+            // Clear selection button
+            clearSelectionBtn.addEventListener('click', function() {
+                selectedInvoices.clear();
+                invoiceCheckboxes.forEach(checkbox => checkbox.checked = false);
+                selectAllCheckbox.checked = false;
+                updateSelectionDisplay();
+            });
+            
+            // Mark as paid button
+            markPaidBtn.addEventListener('click', function() {
+                if (selectedInvoices.size === 0) return;
+                showPaymentModal();
+            });
+            
+            // Modal controls
+            document.getElementById('close-modal').addEventListener('click', hidePaymentModal);
+            document.getElementById('cancel-payment').addEventListener('click', hidePaymentModal);
+            
+            // Form submission
+            bulkPaymentForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                submitBulkPayment();
+            });
+            
+            function addToSelection(checkbox) {
+                const invoiceData = {
+                    id: checkbox.dataset.invoiceId,
+                    supplierId: checkbox.dataset.supplierId,
+                    supplierName: checkbox.dataset.supplierName,
+                    totalAmount: parseFloat(checkbox.dataset.totalAmount),
+                    invoiceNumber: checkbox.dataset.invoiceNumber
+                };
+                selectedInvoices.set(invoiceData.id, invoiceData);
+            }
+            
+            function removeFromSelection(checkbox) {
+                selectedInvoices.delete(checkbox.dataset.invoiceId);
+            }
+            
+            function updateSelectionDisplay() {
+                const count = selectedInvoices.size;
+                const total = Array.from(selectedInvoices.values())
+                    .reduce((sum, invoice) => sum + invoice.totalAmount, 0);
+                
+                if (count === 0) {
+                    bulkActionsBar.classList.add('hidden');
+                } else {
+                    bulkActionsBar.classList.remove('hidden');
+                    selectionCount.textContent = `${count} invoice${count !== 1 ? 's' : ''} selected`;
+                    selectionTotal.textContent = `Total: €${total.toFixed(2)}`;
+                    
+                    // Update supplier breakdown
+                    updateSupplierBreakdown();
+                }
+            }
+            
+            function updateSupplierBreakdown() {
+                const supplierTotals = new Map();
+                
+                selectedInvoices.forEach(invoice => {
+                    if (!supplierTotals.has(invoice.supplierId)) {
+                        supplierTotals.set(invoice.supplierId, {
+                            name: invoice.supplierName,
+                            count: 0,
+                            total: 0,
+                            invoices: []
+                        });
+                    }
+                    
+                    const supplier = supplierTotals.get(invoice.supplierId);
+                    supplier.count++;
+                    supplier.total += invoice.totalAmount;
+                    supplier.invoices.push(invoice);
+                });
+                
+                if (supplierTotals.size > 1) {
+                    supplierBreakdown.classList.remove('hidden');
+                    
+                    supplierList.innerHTML = '';
+                    supplierTotals.forEach(supplier => {
+                        const div = document.createElement('div');
+                        div.className = 'bg-blue-800 rounded p-2';
+                        div.innerHTML = `
+                            <div class="text-blue-100 font-medium">${supplier.name}</div>
+                            <div class="text-blue-200 text-sm">${supplier.count} invoice${supplier.count !== 1 ? 's' : ''} - €${supplier.total.toFixed(2)}</div>
+                        `;
+                        supplierList.appendChild(div);
+                    });
+                } else {
+                    supplierBreakdown.classList.add('hidden');
+                }
+            }
+            
+            function updateSelectAllState() {
+                const checkedCount = document.querySelectorAll('.invoice-checkbox:checked').length;
+                const totalCount = invoiceCheckboxes.length;
+                
+                selectAllCheckbox.checked = checkedCount === totalCount && totalCount > 0;
+                selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < totalCount;
+            }
+            
+            function showPaymentModal() {
+                // Update modal with selected invoices
+                updateModalSupplierBreakdown();
+                paymentModal.classList.remove('hidden');
+                document.getElementById('payment_date').focus();
+            }
+            
+            function hidePaymentModal() {
+                paymentModal.classList.add('hidden');
+            }
+            
+            function updateModalSupplierBreakdown() {
+                const supplierTotals = new Map();
+                
+                selectedInvoices.forEach(invoice => {
+                    if (!supplierTotals.has(invoice.supplierId)) {
+                        supplierTotals.set(invoice.supplierId, {
+                            name: invoice.supplierName,
+                            count: 0,
+                            total: 0,
+                            invoices: []
+                        });
+                    }
+                    
+                    const supplier = supplierTotals.get(invoice.supplierId);
+                    supplier.count++;
+                    supplier.total += invoice.totalAmount;
+                    supplier.invoices.push(invoice);
+                });
+                
+                const modalBreakdown = document.getElementById('modal-supplier-breakdown');
+                modalBreakdown.innerHTML = '';
+                
+                supplierTotals.forEach(supplier => {
+                    const div = document.createElement('div');
+                    div.className = 'bg-gray-700 rounded p-3';
+                    
+                    const invoicesList = supplier.invoices
+                        .map(inv => inv.invoiceNumber)
+                        .join(', ');
+                    
+                    div.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <div class="text-gray-200 font-medium">${supplier.name}</div>
+                                <div class="text-gray-400 text-sm">${invoicesList}</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-gray-200 font-medium">€${supplier.total.toFixed(2)}</div>
+                                <div class="text-gray-400 text-sm">${supplier.count} invoice${supplier.count !== 1 ? 's' : ''}</div>
+                            </div>
+                        </div>
+                    `;
+                    modalBreakdown.appendChild(div);
+                });
+            }
+            
+            function submitBulkPayment() {
+                const formData = new FormData(bulkPaymentForm);
+                const invoiceIds = Array.from(selectedInvoices.keys());
+                
+                // Add invoice IDs to form data
+                invoiceIds.forEach(id => {
+                    formData.append('invoice_ids[]', id);
+                });
+                
+                fetch('{{ route("invoices.bulk-mark-paid") }}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        hidePaymentModal();
+                        window.location.reload(); // Refresh to show updated statuses
+                    } else {
+                        alert(data.error || 'Failed to mark invoices as paid');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while processing payment');
+                });
+            }
+        });
+    </script>
+    @endpush
 </x-admin-layout>

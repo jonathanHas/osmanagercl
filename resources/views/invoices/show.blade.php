@@ -190,7 +190,7 @@
                     </div>
                     
                     @if($invoice->payment_status === 'paid')
-                        <dl class="space-y-2 text-sm">
+                        <dl class="space-y-2 text-sm mb-4">
                             <div class="flex justify-between">
                                 <dt class="text-gray-400">Payment Date:</dt>
                                 <dd class="text-gray-200">{{ $invoice->payment_date ? $invoice->payment_date->format('d/m/Y') : '-' }}</dd>
@@ -204,6 +204,17 @@
                                 <dd class="text-gray-200">{{ $invoice->payment_reference ?: '-' }}</dd>
                             </div>
                         </dl>
+                        
+                        {{-- Mark as Unpaid button --}}
+                        <form action="{{ route('invoices.mark-unpaid', $invoice) }}" method="POST" 
+                              onsubmit="return confirm('Are you sure you want to mark this invoice as unpaid? This will remove all payment details.')">
+                            @csrf
+                            @method('PATCH')
+                            <button type="submit" 
+                                    class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded text-sm">
+                                Mark as Unpaid
+                            </button>
+                        </form>
                     @elseif($invoice->payment_status !== 'cancelled')
                         <form action="{{ route('invoices.mark-paid', $invoice) }}" method="POST" class="space-y-3">
                             @csrf

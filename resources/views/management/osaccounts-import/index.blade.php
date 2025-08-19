@@ -245,10 +245,45 @@
                         </div>
                     </div>
 
-                    <!-- Step 5: VAT Lines -->
-                    <div class="mb-8" id="vat-lines-step">
+                    <!-- Step 5: Payment Status Sync -->
+                    <div class="mb-8" id="payment-sync-step">
                         <div class="flex items-center mb-4">
                             <span class="flex items-center justify-center w-8 h-8 bg-yellow-100 text-yellow-800 rounded-full mr-3">5</span>
+                            <h4 class="text-lg font-medium text-gray-900 dark:text-white">Payment Status Sync</h4>
+                        </div>
+                        <div class="ml-11 space-y-4">
+                            <div class="bg-blue-50 border border-blue-200 rounded-md p-3">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="ml-3">
+                                        <h3 class="text-sm font-medium text-blue-800">
+                                            Payment Status Synchronization
+                                        </h3>
+                                        <div class="mt-2 text-sm text-blue-700">
+                                            <p>Update existing invoices with payment status from OSAccounts. This will sync payment dates and status for invoices that have been paid in the old system.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <input type="checkbox" id="payment-sync-dry-run" checked class="rounded">
+                                <label for="payment-sync-dry-run" class="text-sm text-gray-600 dark:text-gray-300">Dry Run (Preview Only)</label>
+                            </div>
+                            <button onclick="syncPaymentStatus()" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded">
+                                Sync Payment Status
+                            </button>
+                            <div id="payment-sync-output" class="mt-4"></div>
+                        </div>
+                    </div>
+
+                    <!-- Step 6: VAT Lines -->
+                    <div class="mb-8" id="vat-lines-step">
+                        <div class="flex items-center mb-4">
+                            <span class="flex items-center justify-center w-8 h-8 bg-yellow-100 text-yellow-800 rounded-full mr-3">6</span>
                             <h4 class="text-lg font-medium text-gray-900 dark:text-white">VAT Lines Import</h4>
                         </div>
                         <div class="ml-11 space-y-4">
@@ -612,6 +647,108 @@
                 return readStream();
             }).catch(error => {
                 console.error('Fetch error:', error);
+                showError(outputElementId, 'Request failed: ' + error.message);
+            });
+        }
+
+        function syncPaymentStatus() {
+            const dryRun = document.getElementById('payment-sync-dry-run').checked;
+            const outputElementId = 'payment-sync-output';
+            
+            showSpinner(outputElementId);
+
+            const formData = new FormData();
+            formData.append('dry_run', dryRun);
+
+            fetch('{{ route("management.osaccounts-import.sync-payment-status") }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'Accept': 'application/json'
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                const outputDiv = document.getElementById(outputElementId);
+                if (data.success) {
+                    outputDiv.innerHTML = `
+                        <div class="p-4 rounded-md bg-green-50 border border-green-200">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <svg class="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                    </svg>
+                                </div>
+                                <div class="ml-3">
+                                    <h3 class="text-sm font-medium text-green-800">
+                                        ${dryRun ? 'Sync Preview Complete' : 'Payment Status Sync Complete'}
+                                    </h3>
+                                    <div class="mt-2 text-sm text-green-700">
+                                        <p>${data.message}</p>
+                                        ${data.summary ? `
+                                            <div class="mt-2">
+                                                <p><strong>Summary:</strong></p>
+                                                <ul class="list-disc list-inside">
+                                                    <li>Total invoices checked: ${data.summary.total}</li>
+                                                    <li>Invoices updated: ${data.summary.updated}</li>
+                                                    <li>Invoices skipped: ${data.summary.skipped}</li>
+                                                    <li>Errors: ${data.summary.errors}</li>
+                                                </ul>
+                                            </div>
+                                        ` : ''}
+                                        ${data.samples && data.samples.length > 0 && dryRun ? `
+                                            <div class="mt-4">
+                                                <p><strong>Sample Invoice Changes:</strong></p>
+                                                <div class="mt-2 overflow-x-auto">
+                                                    <table class="min-w-full text-sm text-gray-600">
+                                                        <thead class="bg-gray-50">
+                                                            <tr>
+                                                                <th class="px-3 py-2 text-left">Invoice #</th>
+                                                                <th class="px-3 py-2 text-left">Supplier</th>
+                                                                <th class="px-3 py-2 text-left">Current → New Status</th>
+                                                                <th class="px-3 py-2 text-left">Payment Date</th>
+                                                                <th class="px-3 py-2 text-left">Amount</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody class="divide-y divide-gray-200">
+                                                            ${data.samples.map(sample => `
+                                                                <tr>
+                                                                    <td class="px-3 py-2 font-medium">${sample.invoice_number}</td>
+                                                                    <td class="px-3 py-2">${sample.supplier_name}</td>
+                                                                    <td class="px-3 py-2">
+                                                                        <span class="inline-block px-2 py-1 text-xs rounded ${
+                                                                            sample.old_status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                                                                            sample.old_status === 'paid' ? 'bg-green-100 text-green-800' : 
+                                                                            'bg-gray-100 text-gray-800'
+                                                                        }">${sample.old_status}</span>
+                                                                        <span class="mx-2">→</span>
+                                                                        <span class="inline-block px-2 py-1 text-xs rounded ${
+                                                                            sample.new_status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                                                                            sample.new_status === 'paid' ? 'bg-green-100 text-green-800' : 
+                                                                            'bg-gray-100 text-gray-800'
+                                                                        }">${sample.new_status}</span>
+                                                                    </td>
+                                                                    <td class="px-3 py-2">${sample.payment_date || 'N/A'}</td>
+                                                                    <td class="px-3 py-2">${sample.amount}</td>
+                                                                </tr>
+                                                            `).join('')}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                                ${data.samples.length >= 10 ? '<p class="mt-2 text-xs text-gray-500">Showing first 10 samples. More invoices may be updated.</p>' : ''}
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    showError(outputElementId, data.error || 'Payment status sync failed');
+                }
+            })
+            .catch(error => {
                 showError(outputElementId, 'Request failed: ' + error.message);
             });
         }

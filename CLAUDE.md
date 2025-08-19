@@ -405,6 +405,18 @@ Modern multi-file invoice upload system with drag-and-drop interface.
 See [Invoice Bulk Upload Documentation](./docs/features/invoice-bulk-upload-system.md).
 See [Invoice Parser Integration Guide](./docs/features/invoice-parser-integration.md) for Phase 2.
 
+### Invoice Payment Management System
+Comprehensive supplier payment management with bulk processing and status synchronization.
+- **Payment Date Tracking**: Sortable "Paid On" column for quick payment history reference
+- **Unified Unpaid Filter**: Combined view of pending, overdue, and partial invoices
+- **Bulk Payment Processing**: Multi-invoice selection with real-time total calculations
+- **Supplier Grouping**: Automatic payment breakdown by supplier in selection interface
+- **Payment Status Toggle**: Mark invoices paid/unpaid from detail pages with audit trail
+- **OSAccounts Sync**: Automated payment status synchronization from legacy system
+- **Transaction Safety**: All bulk operations use database transactions for data integrity
+- **Payment Methods Support**: Bank transfer, cash, cheque, credit card options with reference tracking
+See [Invoice Payment Management Documentation](./docs/features/invoice-payment-management.md).
+
 ### VAT Returns Management System
 Complete Irish Revenue Online Service (ROS) VAT returns with automated calculations.
 - **ROS Compliance**: All required fields (T1, T2, T3, T4, E1, E2) automatically calculated
