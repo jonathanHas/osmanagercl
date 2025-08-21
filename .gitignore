@@ -19,7 +19,6 @@
 /storage/*.key
 /storage/pail
 /vendor
-/scripts/invoice-parser
 Homestead.json
 Homestead.yaml
 Thumbs.db
