@@ -319,6 +319,11 @@
                                             class="text-red-400 hover:text-red-300 text-sm">
                                         Remove
                                     </button>
+                                    @elseif($file->status === 'review' && $file->error_message && str_contains(strtolower($file->error_message), 'duplicate'))
+                                    <button onclick="removeDuplicateFile({{ $file->id }})" 
+                                            class="text-yellow-400 hover:text-yellow-300 text-sm">
+                                        Delete Duplicate
+                                    </button>
                                     @endif
                                     @if($file->error_message)
                                         @if(str_contains(strtolower($file->error_message), 'duplicate'))
@@ -567,6 +572,26 @@
                         window.location.reload();
                     } else {
                         alert(data.error || 'Failed to remove file');
+                    }
+                });
+            }
+        }
+
+        function removeDuplicateFile(fileId) {
+            if (confirm('Delete this duplicate invoice?\n\nThis file appears to match an existing invoice in the system. Deleting it will prevent creating a duplicate.\n\nAre you sure you want to delete this file?')) {
+                fetch(`/invoices/bulk-upload/${batchId}/file/${fileId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        alert(data.error || 'Failed to delete duplicate file');
                     }
                 });
             }

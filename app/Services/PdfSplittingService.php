@@ -54,7 +54,15 @@ class PdfSplittingService
             if (!$result->successful()) {
                 Log::error('PDF page count failed', [
                     'file_id' => $file->id,
-                    'error' => $result->errorOutput(),
+                    'command' => implode(' ', $command),
+                    'exit_code' => $result->exitCode(),
+                    'error_output' => $result->errorOutput(),
+                    'std_output' => $result->output(),
+                    'python_executable' => $pythonExecutable,
+                    'python_exists' => file_exists($pythonExecutable),
+                    'script_exists' => file_exists($this->splitterScript),
+                    'file_exists' => file_exists($file->temp_file_path),
+                    'file_readable' => is_readable($file->temp_file_path),
                 ]);
                 return 0;
             }
@@ -110,7 +118,15 @@ class PdfSplittingService
             if (!$result->successful()) {
                 Log::error('PDF thumbnail generation failed', [
                     'file_id' => $file->id,
-                    'error' => $result->errorOutput(),
+                    'command' => implode(' ', $command),
+                    'exit_code' => $result->exitCode(),
+                    'error_output' => $result->errorOutput(),
+                    'std_output' => $result->output(),
+                    'python_executable' => $pythonExecutable,
+                    'python_exists' => file_exists($pythonExecutable),
+                    'script_exists' => file_exists($this->splitterScript),
+                    'file_exists' => file_exists($file->temp_file_path),
+                    'file_readable' => is_readable($file->temp_file_path),
                 ]);
                 return [];
             }
@@ -176,11 +192,37 @@ class PdfSplittingService
             $result = Process::timeout($this->timeout)->run($command);
 
             if (!$result->successful()) {
+                $errorOutput = $result->errorOutput();
+                $stdOutput = $result->output();
+                $exitCode = $result->exitCode();
+                
                 Log::error('PDF splitting failed', [
                     'file_id' => $file->id,
-                    'error' => $result->errorOutput(),
+                    'command' => implode(' ', $command),
+                    'exit_code' => $exitCode,
+                    'error_output' => $errorOutput,
+                    'std_output' => $stdOutput,
+                    'file_exists' => file_exists($file->temp_file_path),
+                    'file_readable' => is_readable($file->temp_file_path),
+                    'output_dir_exists' => is_dir($outputDir),
+                    'output_dir_writable' => is_writable($outputDir),
+                    'python_executable' => $pythonExecutable,
+                    'python_exists' => file_exists($pythonExecutable),
+                    'script_exists' => file_exists($this->splitterScript),
+                    'script_readable' => is_readable($this->splitterScript),
                 ]);
-                throw new \Exception('PDF splitting failed: ' . $result->errorOutput());
+                
+                // Provide more helpful error message
+                $errorMessage = 'PDF splitting failed';
+                if (!empty($errorOutput)) {
+                    $errorMessage .= ': ' . $errorOutput;
+                } elseif (!empty($stdOutput)) {
+                    $errorMessage .= ': ' . $stdOutput;
+                } else {
+                    $errorMessage .= ' with exit code ' . $exitCode;
+                }
+                
+                throw new \Exception($errorMessage);
             }
 
             $output = json_decode($result->output(), true);

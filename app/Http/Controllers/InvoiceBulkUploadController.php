@@ -613,11 +613,19 @@ class InvoiceBulkUploadController extends Controller
             ->where('bulk_upload_id', $batch->id)
             ->firstOrFail();
 
-        // Only allow deletion if file is not processed
-        if (! in_array($file->status, ['pending', 'uploaded', 'failed'])) {
+        // Check if file can be deleted
+        $canDelete = in_array($file->status, ['pending', 'uploaded', 'failed']);
+        
+        // Allow deletion of 'review' status files only if they have duplicate warnings
+        if ($file->status === 'review') {
+            $isDuplicate = $file->error_message && str_contains(strtolower($file->error_message), 'duplicate');
+            $canDelete = $isDuplicate;
+        }
+        
+        if (! $canDelete) {
             return response()->json([
                 'success' => false,
-                'error' => 'Cannot delete a file that has been processed.',
+                'error' => 'Cannot delete a file that has been processed. Only duplicates can be removed from review.',
             ], 400);
         }
 
