@@ -4,6 +4,25 @@
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-2xl font-bold text-gray-100">Invoices</h2>
             <div class="flex space-x-2">
+                @php
+                    // Count Amazon pending invoices from unified bulk-upload system
+                    $pendingCount = \App\Models\InvoiceUploadFile::where('status', 'amazon_pending')
+                        ->orWhere(function ($query) {
+                            $query->where('supplier_detected', 'Amazon')
+                                  ->whereIn('status', ['review', 'parsed']);
+                        })
+                        ->count();
+                @endphp
+                @if($pendingCount > 0)
+                <a href="{{ route('invoices.bulk-upload.amazon-pending') }}" 
+                   class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                    </svg>
+                    Amazon Pending ({{ $pendingCount }})
+                </a>
+                @endif
+                
                 <a href="{{ route('invoices.bulk-upload.index') }}" 
                    class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

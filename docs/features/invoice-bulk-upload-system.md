@@ -260,6 +260,66 @@ Create feature tests for:
 2. Check MySQL enum values match model
 3. Verify foreign key constraints
 
+### Invoice Created But Attachment Files Missing (Fixed 2025-08-19)
+
+**Symptoms:**
+- Invoice amounts and data are created successfully
+- Invoice shows in the system with correct totals
+- No attachment files appear on invoice detail pages
+- Error logs show "Unable to create directory" errors
+
+**Cause:**
+Directory permission issues where the queue worker (running as user `jon`) cannot create directories in `/storage/app/private/invoices/attachments/` which is owned by `www-data` with restrictive permissions (700).
+
+**Root Cause Analysis:**
+1. Web server uploads create directories owned by `www-data:www-data`
+2. Queue worker runs as user `jon` (different from web server user)
+3. Restrictive permissions on `attachments/` directory prevent queue worker from creating subdirectories
+4. Invoice creation succeeds but attachment creation silently fails
+
+**Solution Implemented:**
+The `InvoiceCreationService` was updated to use a different directory structure that avoids permission conflicts:
+
+- **Old path**: `invoices/attachments/[invoice_id]/[filename]`
+- **New path**: `invoices/[year]/[month]/[invoice_id]/[filename]`
+
+This uses the existing `invoices/2025/` structure with proper group permissions instead of the restricted `attachments/` folder.
+
+### Attachment Path Mismatch (Fixed 2025-08-20)
+
+**Symptoms:**
+- Files upload successfully to bulk upload system
+- Invoice amounts are correct and shown in bulk upload preview
+- When creating invoices, attachments are not created
+- `tempFileExists()` returns false preventing attachment creation
+
+**Root Cause:**
+Path mismatch between what's stored in database and what Laravel's Storage facade expects:
+- Files stored by `Storage::disk('local')->storeAs()` in `storage/app/private/temp/invoices/...`
+- Database was storing only relative path `temp/invoices/...` (missing 'private/' prefix)
+- `tempFileExists()` checks `Storage::disk('local')->exists()` which expects full path with 'private/'
+
+**Solution Implemented:**
+Updated `InvoiceBulkUploadController.php` line 126 to store the full path returned by `storeAs()`:
+```php
+// Before (incorrect):
+'temp_path' => $filePath,  // Only stored 'temp/invoices/batch/file.pdf'
+
+// After (correct):
+'temp_path' => $storedPath,  // Stores 'private/temp/invoices/batch/file.pdf'
+```
+
+**Prevention:**
+- Always use the path returned by Laravel's Storage methods
+- Ensure database stores exactly what Storage facade expects
+- Test `tempFileExists()` method when making storage changes
+
+**Verification Steps:**
+1. Upload new Amazon invoice through bulk upload
+2. Verify file shows in preview with correct parsing
+3. Create invoice from review and confirm attachment appears on invoice detail page
+4. Check that attachment can be viewed/downloaded successfully
+
 ## Related Documentation
 
 - [Invoice Management System](./invoice-management.md)

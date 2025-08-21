@@ -305,6 +305,17 @@ class InvoiceController extends Controller
      */
     public function show(Invoice $invoice)
     {
+        // Debug logging to track invoice access attempts
+        \Log::info('Invoice show accessed', [
+            'invoice_id' => $invoice->id,
+            'invoice_number' => $invoice->invoice_number,
+            'supplier_name' => $invoice->supplier_name,
+            'supplier_id' => $invoice->supplier_id,
+            'user_id' => auth()->id(),
+            'user_agent' => request()->userAgent(),
+            'ip' => request()->ip(),
+        ]);
+
         $invoice->load(['supplier', 'vatLines', 'creator', 'updater']);
 
         $vatBreakdown = $invoice->getVatBreakdown();

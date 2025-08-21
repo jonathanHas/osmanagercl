@@ -414,6 +414,49 @@ php artisan tinker
    - Automatic cleanup command for existing duplicates
    - Prevents re-import of identical files
 
+## Amazon Invoice Processing Integration
+
+### Unified Processing System (Updated 2025-08-20)
+
+Amazon invoices now use the same bulk upload system as other invoice types, providing consistency and improved user experience.
+
+**Previous System**:
+- Separate `/invoices/amazon-pending` route with different interface
+- Duplicate code for similar functionality
+- Inconsistent processing workflows
+
+**Current System**:
+- Amazon invoices integrated into `/invoices/bulk-upload/preview` system
+- Unified interface for all invoice types
+- Consistent filtering and processing
+
+**Key Changes**:
+1. **Route Migration**: Old Amazon pending routes now redirect to bulk upload preview with filters
+2. **Filtering Support**: Bulk upload preview supports `supplier` and `status` filters
+3. **Delete Functionality**: Bulk delete operations for unwanted Amazon pending files
+4. **Unified Processing**: Amazon invoices processed through same workflow as other suppliers
+
+**Migration Process**:
+- Existing pending Amazon invoices automatically migrated to bulk upload system
+- Status mapping: `amazon_pending` → bulk upload with Amazon supplier filter
+- Consistent UI/UX across all invoice processing
+
+**Benefits**:
+- Single interface for all invoice management
+- Consistent user experience
+- Reduced code duplication
+- Easier maintenance and feature updates
+
+### Amazon Payment Adjustments
+
+Amazon invoices often require payment adjustments due to exchange rate differences between invoice EUR amounts and actual bank charges.
+
+**Features**:
+- Payment adjustment input during invoice creation
+- Automatic VAT recalculation based on actual payment
+- Adjustment tracking in invoice notes
+- Integration with VAT returns for accurate reporting
+
 ## Future Enhancements
 
 ### Planned Features

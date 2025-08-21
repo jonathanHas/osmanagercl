@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Storage;
 
 class InvoiceUploadFile extends Model
@@ -19,6 +20,10 @@ class InvoiceUploadFile extends Model
         'mime_type',
         'file_size',
         'file_hash',
+        'page_count',
+        'is_split',
+        'parent_file_id',
+        'page_range',
         'status',
         'parsed_data',
         'parsing_errors',
@@ -48,7 +53,9 @@ class InvoiceUploadFile extends Model
         'parsed_total_amount' => 'decimal:2',
         'is_tax_free' => 'boolean',
         'is_credit_note' => 'boolean',
+        'is_split' => 'boolean',
         'file_size' => 'integer',
+        'page_count' => 'integer',
         'upload_progress' => 'integer',
         'uploaded_at' => 'datetime',
         'parsed_at' => 'datetime',
@@ -70,6 +77,30 @@ class InvoiceUploadFile extends Model
     public function invoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class);
+    }
+
+    /**
+     * Get the Amazon pending invoice record for this file.
+     */
+    public function amazonPending(): HasOne
+    {
+        return $this->hasOne(AmazonInvoicePending::class, 'invoice_upload_file_id');
+    }
+
+    /**
+     * Get the parent file if this is a split file.
+     */
+    public function parentFile(): BelongsTo
+    {
+        return $this->belongsTo(InvoiceUploadFile::class, 'parent_file_id');
+    }
+
+    /**
+     * Get the child files if this file was split.
+     */
+    public function splitFiles()
+    {
+        return $this->hasMany(InvoiceUploadFile::class, 'parent_file_id');
     }
 
     /**
@@ -101,6 +132,25 @@ class InvoiceUploadFile extends Model
     public function isPdf(): bool
     {
         return $this->mime_type === 'application/pdf';
+    }
+
+    /**
+     * Check if this PDF can be split (multi-page PDF).
+     */
+    public function canBeSplit(): bool
+    {
+        return $this->isPdf() && 
+               $this->page_count > 1 && 
+               !$this->is_split && 
+               $this->status === 'uploaded';
+    }
+
+    /**
+     * Check if this file was created from splitting.
+     */
+    public function isSplitFile(): bool
+    {
+        return $this->is_split && $this->parent_file_id !== null;
     }
 
     /**
@@ -136,7 +186,9 @@ class InvoiceUploadFile extends Model
             'uploading' => 'blue',
             'uploaded', 'parsing' => 'yellow',
             'parsed', 'review' => 'purple',
+            'amazon_pending' => 'orange',
             'completed' => 'green',
+            'split_processed' => 'blue',
             'failed', 'rejected' => 'red',
             default => 'gray',
         };
@@ -154,7 +206,9 @@ class InvoiceUploadFile extends Model
             'parsing' => 'Parsing...',
             'parsed' => 'Parsed',
             'review' => 'Ready for Review',
+            'amazon_pending' => 'Amazon Payment Pending',
             'completed' => 'Completed',
+            'split_processed' => 'Split Processed',
             'failed' => 'Failed',
             'rejected' => 'Rejected',
             default => 'Unknown',

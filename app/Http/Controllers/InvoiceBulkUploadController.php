@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Jobs\ParseInvoiceFile;
 use App\Models\InvoiceBulkUpload;
 use App\Models\InvoiceUploadFile;
+use App\Services\AmazonPaymentAdjustmentService;
 use App\Services\InvoiceParsingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -121,7 +123,7 @@ class InvoiceBulkUploadController extends Controller
                     'bulk_upload_id' => $batch->id,
                     'original_filename' => $originalName,
                     'stored_filename' => $storedName,
-                    'temp_path' => $filePath,
+                    'temp_path' => $storedPath,
                     'mime_type' => $mimeType,
                     'file_size' => $fileSize,
                     'file_hash' => $fileHash,
@@ -141,7 +143,8 @@ class InvoiceBulkUploadController extends Controller
 
             DB::commit();
 
-            // Debug: Check if files still exist after commit
+            // Get page count for PDFs after successful upload
+            $pdfSplittingService = new \App\Services\PdfSplittingService();
             foreach ($uploadedFiles as $uploadFile) {
                 $exists = file_exists($uploadFile->temp_file_path);
                 \Log::info('File status after DB commit', [
@@ -151,6 +154,25 @@ class InvoiceBulkUploadController extends Controller
                     'exists_after_commit' => $exists,
                     'file_size' => $exists ? filesize($uploadFile->temp_file_path) : 0,
                 ]);
+
+                // Get page count for PDFs
+                if ($uploadFile->isPdf() && $exists) {
+                    try {
+                        $pageCount = $pdfSplittingService->getPageCount($uploadFile);
+                        if ($pageCount > 0) {
+                            $uploadFile->update(['page_count' => $pageCount]);
+                            \Log::info('Updated PDF page count', [
+                                'file_id' => $uploadFile->id,
+                                'page_count' => $pageCount,
+                            ]);
+                        }
+                    } catch (\Exception $e) {
+                        \Log::warning('Failed to get PDF page count', [
+                            'file_id' => $uploadFile->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
             }
 
             // Return response with batch info
@@ -216,17 +238,137 @@ class InvoiceBulkUploadController extends Controller
     /**
      * Preview uploaded files before processing.
      */
-    public function preview($batchId)
+    public function preview($batchId, Request $request)
     {
         $batch = InvoiceBulkUpload::where('batch_id', $batchId)
             ->where('user_id', auth()->id())
-            ->with('files')
+            ->with(['files', 'files.parentFile'])
             ->firstOrFail();
+
+        // Apply filters if provided
+        $files = $batch->files;
+        
+        // Filter by supplier if specified
+        if ($request->has('supplier') && $request->supplier) {
+            $files = $files->where('supplier_detected', $request->supplier);
+        }
+        
+        // Filter by status if specified
+        if ($request->has('status') && $request->status) {
+            $files = $files->where('status', $request->status);
+        }
+        
+        // For Amazon pending view, show specific messaging
+        $isAmazonPendingView = $request->has('amazon_pending') && $request->amazon_pending == '1';
 
         return view('invoices.bulk-upload-preview', [
             'batch' => $batch,
-            'files' => $batch->files,
+            'files' => $files,
+            'isAmazonPendingView' => $isAmazonPendingView,
+            'filters' => [
+                'supplier' => $request->supplier,
+                'status' => $request->status,
+            ],
         ]);
+    }
+
+    /**
+     * Show Amazon pending invoices across all batches (unified view).
+     */
+    public function amazonPending(Request $request)
+    {
+        // Find all files with Amazon pending status across all batches for the current user
+        $files = InvoiceUploadFile::whereHas('bulkUpload', function ($query) {
+                $query->where('user_id', auth()->id());
+            })
+            ->where(function ($query) {
+                $query->where('status', 'amazon_pending')
+                      ->orWhere(function ($subQuery) {
+                          $subQuery->where('supplier_detected', 'Amazon')
+                                   ->whereIn('status', ['review', 'parsed']);
+                      });
+            })
+            ->with(['bulkUpload'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // Group files by batch for better organization
+        $batches = $files->groupBy('bulk_upload_id')->map(function ($batchFiles) {
+            $firstFile = $batchFiles->first();
+            return [
+                'batch' => $firstFile->bulkUpload,
+                'files' => $batchFiles,
+            ];
+        });
+
+        return view('invoices.bulk-upload-amazon-pending', [
+            'batches' => $batches,
+            'totalFiles' => $files->count(),
+        ]);
+    }
+
+    /**
+     * Delete Amazon pending invoice files (bulk operation).
+     */
+    public function deleteAmazonPendingFiles(Request $request)
+    {
+        $validated = $request->validate([
+            'file_ids' => 'required|array|min:1',
+            'file_ids.*' => 'exists:invoice_upload_files,id',
+        ]);
+
+        try {
+            DB::transaction(function () use ($validated) {
+                $files = InvoiceUploadFile::whereIn('id', $validated['file_ids'])
+                    ->whereHas('bulkUpload', function ($query) {
+                        $query->where('user_id', auth()->id());
+                    })
+                    ->get();
+
+                $deletedCount = 0;
+                foreach ($files as $file) {
+                    // Only delete Amazon files that are pending/review
+                    if ($file->supplier_detected === 'Amazon' && 
+                        in_array($file->status, ['amazon_pending', 'review', 'parsed'])) {
+                        
+                        // Delete temp file if exists
+                        $file->deleteTempFile();
+                        
+                        // Delete the upload file record
+                        $file->delete();
+                        $deletedCount++;
+
+                        Log::info('Deleted Amazon pending file', [
+                            'file_id' => $file->id,
+                            'filename' => $file->original_filename,
+                            'batch_id' => $file->bulk_upload_id,
+                            'deleted_by' => auth()->id(),
+                        ]);
+                    }
+                }
+
+                if ($deletedCount === 0) {
+                    throw new \Exception('No valid Amazon pending files found to delete.');
+                }
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Amazon pending files deleted successfully.',
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to delete Amazon pending files', [
+                'error' => $e->getMessage(),
+                'file_ids' => $validated['file_ids'],
+                'user_id' => auth()->id(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to delete files: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**
@@ -260,7 +402,7 @@ class InvoiceBulkUploadController extends Controller
     /**
      * Start processing uploaded files.
      */
-    public function startProcessing($batchId)
+    public function startProcessing(Request $request, $batchId)
     {
         $batch = InvoiceBulkUpload::where('batch_id', $batchId)
             ->where('user_id', auth()->id())
@@ -272,6 +414,9 @@ class InvoiceBulkUploadController extends Controller
                 'error' => 'Batch is not ready for processing.',
             ], 400);
         }
+
+        // Handle payment adjustments for Amazon invoices
+        $this->processPaymentAdjustments($request, $batch);
 
         // Mark batch as started
         $batch->markAsStarted();
@@ -293,6 +438,55 @@ class InvoiceBulkUploadController extends Controller
     }
 
     /**
+     * Process payment adjustments for Amazon invoices
+     */
+    protected function processPaymentAdjustments(Request $request, InvoiceBulkUpload $batch): void
+    {
+        $paymentAdjustments = $request->input('actual_payment', []);
+        $adjustmentService = new AmazonPaymentAdjustmentService;
+
+        foreach ($batch->files as $file) {
+            $fileId = $file->id;
+
+            if (isset($paymentAdjustments[$fileId]) && $adjustmentService->needsPaymentAdjustment($file)) {
+                $actualPaid = (float) $paymentAdjustments[$fileId];
+
+                // Validate payment amount
+                $errors = $adjustmentService->validatePaymentAmount($file, $actualPaid);
+                if (! empty($errors)) {
+                    // Log validation errors but continue processing
+                    Log::warning('Payment adjustment validation failed', [
+                        'file_id' => $fileId,
+                        'actual_paid' => $actualPaid,
+                        'errors' => $errors,
+                    ]);
+
+                    continue;
+                }
+
+                // Calculate adjusted VAT breakdown
+                $adjustmentData = $adjustmentService->adjustPayment($file, $actualPaid);
+
+                // Store adjustment data in parsed_data for later use
+                $parsedData = $file->parsed_data ?? [];
+                $parsedData['payment_adjusted'] = true;
+                $parsedData['actual_payment'] = $actualPaid;
+                $parsedData['adjustment_data'] = $adjustmentData;
+
+                $file->parsed_data = $parsedData;
+                $file->save();
+
+                Log::info('Payment adjustment stored for Amazon invoice', [
+                    'file_id' => $fileId,
+                    'original_total' => $adjustmentData['original_total'],
+                    'actual_paid' => $actualPaid,
+                    'payment_difference' => $adjustmentData['payment_difference'],
+                ]);
+            }
+        }
+    }
+
+    /**
      * Check parser configuration.
      */
     public function checkParserConfiguration()
@@ -306,15 +500,15 @@ class InvoiceBulkUploadController extends Controller
     /**
      * Create invoices from files marked for review.
      */
-    public function createFromReview($batchId)
+    public function createFromReview($batchId, Request $request)
     {
         $batch = InvoiceBulkUpload::where('batch_id', $batchId)
             ->where('user_id', auth()->id())
             ->firstOrFail();
 
-        // Find all files with 'review' or 'parsed' status
+        // Find all files with 'review', 'parsed', or 'amazon_pending' status
         $reviewFiles = InvoiceUploadFile::where('bulk_upload_id', $batch->id)
-            ->whereIn('status', ['review', 'parsed'])
+            ->whereIn('status', ['review', 'parsed', 'amazon_pending'])
             ->get();
 
         if ($reviewFiles->isEmpty()) {
@@ -328,27 +522,56 @@ class InvoiceBulkUploadController extends Controller
         $failedCount = 0;
         $errors = [];
 
+        // Get payment adjustments from request
+        $paymentAdjustments = $request->input('payment_adjustments', []);
+
         $creationService = new \App\Services\InvoiceCreationService;
+        $amazonService = new \App\Services\AmazonInvoiceProcessingService($creationService);
 
         foreach ($reviewFiles as $file) {
             try {
-                // Check if this is a duplicate that user is intentionally overriding
-                $isDuplicateOverride = $file->error_message && str_contains(strtolower($file->error_message), 'duplicate');
+                // Handle Amazon pending invoices with payment adjustments
+                if ($file->status === 'amazon_pending') {
+                    $actualPayment = $paymentAdjustments[$file->id] ?? null;
 
-                if ($isDuplicateOverride) {
-                    \Log::info('Creating invoice despite duplicate warning (user override)', [
-                        'file_id' => $file->id,
-                        'warning' => $file->error_message,
-                    ]);
-                }
+                    if (! $actualPayment) {
+                        throw new \Exception('Amazon invoice requires payment amount');
+                    }
 
-                // Create invoice, skipping duplicate check if it's an override
-                $invoice = $creationService->createFromParsedFile($file, $isDuplicateOverride);
-                if ($invoice) {
-                    $createdCount++;
+                    // Create invoice with payment adjustment
+                    $invoice = $amazonService->createFromPendingWithPayment($file, (float) $actualPayment);
+
+                    if ($invoice) {
+                        $createdCount++;
+                        \Log::info('Amazon invoice created with payment adjustment', [
+                            'file_id' => $file->id,
+                            'invoice_id' => $invoice->id,
+                            'actual_payment' => $actualPayment,
+                        ]);
+                    } else {
+                        $failedCount++;
+                        $errors[] = "File {$file->original_filename}: Failed to create Amazon invoice";
+                    }
                 } else {
-                    $failedCount++;
-                    $errors[] = "File {$file->original_filename}: Failed to create invoice";
+                    // Handle regular review and parsed files
+                    // Check if this is a duplicate that user is intentionally overriding
+                    $isDuplicateOverride = $file->error_message && str_contains(strtolower($file->error_message), 'duplicate');
+
+                    if ($isDuplicateOverride) {
+                        \Log::info('Creating invoice despite duplicate warning (user override)', [
+                            'file_id' => $file->id,
+                            'warning' => $file->error_message,
+                        ]);
+                    }
+
+                    // Create invoice, skipping duplicate check if it's an override
+                    $invoice = $creationService->createFromParsedFile($file, $isDuplicateOverride);
+                    if ($invoice) {
+                        $createdCount++;
+                    } else {
+                        $failedCount++;
+                        $errors[] = "File {$file->original_filename}: Failed to create invoice";
+                    }
                 }
             } catch (\Exception $e) {
                 $failedCount++;
@@ -413,5 +636,200 @@ class InvoiceBulkUploadController extends Controller
             'success' => true,
             'message' => 'File removed successfully.',
         ]);
+    }
+
+    /**
+     * Display embedded file viewer page.
+     */
+    public function fileViewer($batchId, $fileId)
+    {
+        $batch = InvoiceBulkUpload::where('batch_id', $batchId)
+            ->where('user_id', auth()->id())
+            ->firstOrFail();
+
+        $file = InvoiceUploadFile::where('id', $fileId)
+            ->where('bulk_upload_id', $batch->id)
+            ->firstOrFail();
+
+        if (! $file->tempFileExists() || ! $file->isViewable()) {
+            abort(404, 'File not found or not viewable');
+        }
+
+        $viewUrl = route('invoices.bulk-upload.view-file', [$batchId, $fileId]);
+        $downloadUrl = route('invoices.bulk-upload.view-file', [$batchId, $fileId]).'?download=1';
+
+        return view('invoices.bulk-upload-file-viewer', compact('batch', 'file', 'viewUrl', 'downloadUrl'));
+    }
+
+    /**
+     * Serve the actual file content.
+     */
+    public function viewFile($batchId, $fileId)
+    {
+        $batch = InvoiceBulkUpload::where('batch_id', $batchId)
+            ->where('user_id', auth()->id())
+            ->firstOrFail();
+
+        $file = InvoiceUploadFile::where('id', $fileId)
+            ->where('bulk_upload_id', $batch->id)
+            ->firstOrFail();
+
+        if (! $file->tempFileExists() || ! $file->isViewable()) {
+            abort(404, 'File not found or not viewable');
+        }
+
+        // Get the full path to the temp file
+        $filePath = $file->temp_file_path;
+
+        if (! file_exists($filePath)) {
+            abort(404, 'File not found on disk');
+        }
+
+        // Check if download is requested
+        $isDownload = request()->has('download');
+        $disposition = $isDownload ? 'attachment' : 'inline';
+
+        // Return file response
+        $fileContent = file_get_contents($filePath);
+
+        return response($fileContent, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => $disposition.'; filename="'.$file->original_filename.'"',
+            'Cache-Control' => 'private, max-age=600',
+        ]);
+    }
+
+    /**
+     * Get thumbnails for PDF pages.
+     */
+    public function getThumbnails($batchId, $fileId)
+    {
+        $batch = InvoiceBulkUpload::where('batch_id', $batchId)
+            ->where('user_id', auth()->id())
+            ->firstOrFail();
+
+        $file = InvoiceUploadFile::where('id', $fileId)
+            ->where('bulk_upload_id', $batch->id)
+            ->firstOrFail();
+
+        if (!$file->isPdf()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'File is not a PDF',
+            ], 400);
+        }
+
+        try {
+            $pdfSplittingService = new \App\Services\PdfSplittingService();
+            $thumbnails = $pdfSplittingService->generateThumbnails($file);
+
+            return response()->json([
+                'success' => true,
+                'thumbnails' => $thumbnails,
+                'total_pages' => count($thumbnails),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to generate PDF thumbnails', [
+                'file_id' => $fileId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to generate thumbnails: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Split a PDF file by page ranges.
+     */
+    public function splitPdf($batchId, $fileId, Request $request)
+    {
+        $batch = InvoiceBulkUpload::where('batch_id', $batchId)
+            ->where('user_id', auth()->id())
+            ->firstOrFail();
+
+        $file = InvoiceUploadFile::where('id', $fileId)
+            ->where('bulk_upload_id', $batch->id)
+            ->firstOrFail();
+
+        if (!$file->canBeSplit()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'File cannot be split (must be multi-page PDF in uploaded status)',
+            ], 400);
+        }
+
+        $request->validate([
+            'page_ranges' => 'required|array|min:1',
+            'page_ranges.*' => 'required|string|regex:/^\d+(-\d+)?$/',
+        ], [
+            'page_ranges.required' => 'Page ranges are required',
+            'page_ranges.*.regex' => 'Page ranges must be in format "1" or "1-3"',
+        ]);
+
+        $pageRanges = $request->input('page_ranges');
+
+        // Validate page ranges don't exceed file page count
+        foreach ($pageRanges as $range) {
+            if (str_contains($range, '-')) {
+                [$start, $end] = explode('-', $range, 2);
+                $maxPage = max(intval($start), intval($end));
+            } else {
+                $maxPage = intval($range);
+            }
+
+            if ($maxPage > $file->page_count) {
+                return response()->json([
+                    'success' => false,
+                    'error' => "Page range '{$range}' exceeds PDF page count ({$file->page_count})",
+                ], 400);
+            }
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $pdfSplittingService = new \App\Services\PdfSplittingService();
+            $splitFiles = $pdfSplittingService->splitPdf($file, $pageRanges);
+
+            DB::commit();
+
+            Log::info('PDF split successfully', [
+                'original_file_id' => $fileId,
+                'split_count' => count($splitFiles),
+                'page_ranges' => $pageRanges,
+                'user_id' => auth()->id(),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'PDF split successfully',
+                'split_count' => count($splitFiles),
+                'split_files' => $splitFiles->map(function ($splitFile) {
+                    return [
+                        'id' => $splitFile->id,
+                        'filename' => $splitFile->original_filename,
+                        'page_range' => $splitFile->page_range,
+                    ];
+                })->toArray(),
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            Log::error('PDF splitting failed', [
+                'file_id' => $fileId,
+                'page_ranges' => $pageRanges,
+                'error' => $e->getMessage(),
+                'user_id' => auth()->id(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'PDF splitting failed: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 }

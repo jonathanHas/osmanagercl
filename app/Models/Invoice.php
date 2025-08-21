@@ -76,6 +76,14 @@ class Invoice extends Model
     }
 
     /**
+     * Get the upload files for this invoice.
+     */
+    public function uploadFiles(): HasMany
+    {
+        return $this->hasMany(InvoiceUploadFile::class, 'invoice_id');
+    }
+
+    /**
      * Get the supplier for this invoice.
      */
     public function supplier(): BelongsTo

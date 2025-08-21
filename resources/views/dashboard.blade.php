@@ -116,6 +116,45 @@
                 </div>
             </div>
 
+            <!-- Amazon Pending Invoices Alert (if any) -->
+            @if(($amazonPendingCount ?? 0) > 0)
+            <div class="mb-8">
+                <div class="bg-gradient-to-r from-orange-500 to-red-600 overflow-hidden shadow rounded-lg">
+                    <div class="p-6">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <svg class="h-8 w-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                                </svg>
+                            </div>
+                            <div class="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt class="text-sm font-medium text-orange-100 truncate">Amazon Invoices Pending</dt>
+                                    <dd class="text-3xl font-bold text-white">{{ $amazonPendingCount ?? 0 }}</dd>
+                                </dl>
+                            </div>
+                            <div class="ml-5 flex-shrink-0">
+                                <a href="{{ route('amazon-pending.index') }}" 
+                                   class="bg-white bg-opacity-20 backdrop-blur-sm hover:bg-opacity-30 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 inline-flex items-center">
+                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                    Enter EUR Payments
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-orange-600 bg-opacity-50 px-6 py-3">
+                        <div class="text-sm">
+                            <p class="text-orange-100">
+                                {{ ($amazonPendingCount ?? 0) == 1 ? 'This invoice needs' : 'These invoices need' }} EUR payment amounts entered before they can be processed.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
+
             <!-- Quick Actions -->
             <div class="bg-white overflow-hidden shadow rounded-lg">
                 <div class="p-6">

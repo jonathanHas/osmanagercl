@@ -1139,6 +1139,137 @@ When multiple systems are affected:
 
 **Recovery Time:** 2-3 minutes for complete system restoration
 
+## File Upload & Storage Issues
+
+### Invoice Bulk Upload Attachments Not Saved (Fixed 2025-08-19)
+
+**Symptoms:**
+- Invoice data and amounts are created successfully in bulk upload
+- Invoice records appear in the system with correct totals
+- Attachment files are missing from invoice detail pages
+- Error logs contain "Unable to create directory" errors
+
+**Root Cause:**
+Directory permission mismatch between web server process and queue worker process:
+
+1. **Web Server Process**: Runs as `www-data` user
+2. **Queue Worker Process**: Runs as `jon` user (or different system user)
+3. **Permission Conflict**: `/storage/app/private/invoices/attachments/` owned by `www-data:www-data` with restrictive permissions (700)
+4. **Result**: Queue worker cannot create invoice-specific subdirectories
+
+**Diagnostic Steps:**
+```bash
+# 1. Check directory permissions
+ls -la /var/www/html/osmanagercl/storage/app/private/invoices/
+
+# 2. Check running processes
+ps aux | grep php | grep -v grep
+
+# 3. Check recent error logs
+tail -50 /var/www/html/osmanagercl/storage/logs/laravel.log | grep -i "unable to create"
+
+# 4. Test attachment creation manually
+php artisan tinker
+$file = App\Models\InvoiceUploadFile::where('status', 'review')->first();
+$service = new App\Services\InvoiceCreationService();
+$invoice = $service->createFromParsedFile($file, true);
+```
+
+**Solution Implemented:**
+Updated `InvoiceCreationService.php` to use year/month directory structure that avoids permission conflicts:
+
+- **Old Path**: `invoices/attachments/[invoice_id]/[filename]`  
+- **New Path**: `invoices/[year]/[month]/[invoice_id]/[filename]`
+
+**Key Changes:**
+- Uses existing `invoices/2025/` directory with proper group permissions
+- Creates new directories with 775 permissions (group writable)
+- Sets proper file permissions (664) for created attachments
+- Maintains logical organization by invoice ID
+
+**Prevention:**
+- Ensure consistent user/group ownership for storage directories
+- Use group-writable permissions (775) for directories
+- Monitor logs for permission-related errors
+- Test with both web interface and queue worker processes
+
+**Verification:**
+```bash
+# Check that new invoices have attachments
+# Visit invoice detail page and verify files are visible
+
+# Verify file storage location
+ls -la /var/www/html/osmanagercl/storage/app/private/invoices/2025/08/[invoice_id]/
+
+# Test file permissions
+stat /var/www/html/osmanagercl/storage/app/private/invoices/2025/08/[invoice_id]/[filename]
+```
+
+### Invoice Attachment Path Mismatch (Fixed 2025-08-20)
+
+**Symptoms:**
+- Files upload successfully to bulk upload system
+- Invoice data and amounts are correctly displayed in bulk upload preview
+- When creating invoices from review, attachments are not created
+- Database records show correct file paths but `tempFileExists()` returns false
+- No errors in logs but attachment creation is silently skipped
+
+**Root Cause:**
+Path mismatch between what's stored in database and what Laravel's Storage facade expects when checking file existence:
+
+1. **File Storage**: Laravel's `Storage::disk('local')->storeAs()` puts files in `storage/app/private/temp/invoices/...`
+2. **Database Storage**: `InvoiceBulkUploadController` was storing only relative path `temp/invoices/...`
+3. **File Check**: `tempFileExists()` uses `Storage::disk('local')->exists()` which expects the full path including 'private/'
+4. **Result**: File exists on disk but `tempFileExists()` returns false, preventing attachment creation
+
+**Technical Details:**
+```php
+// The problem was in InvoiceBulkUploadController.php line 126:
+'temp_path' => $filePath,  // Only stored 'temp/invoices/batch/file.pdf'
+
+// But storeAs() actually returned:
+$storedPath = 'private/temp/invoices/batch/file.pdf'  // Full path with 'private/' prefix
+
+// When tempFileExists() checked:
+Storage::disk('local')->exists($this->temp_path);  // Looked for 'temp/invoices/...' but file was at 'private/temp/invoices/...'
+```
+
+**Solution Implemented:**
+Fixed `InvoiceBulkUploadController.php` to store the correct path returned by Laravel's `storeAs()` method:
+
+```php
+// ❌ WRONG (before fix):
+'temp_path' => $filePath,  // Manual path construction
+
+// ✅ CORRECT (after fix):
+'temp_path' => $storedPath,  // Use path returned by storeAs()
+```
+
+**Key Lesson:**
+Always use the path returned by Laravel's Storage methods rather than constructing paths manually. The Storage facade knows the correct disk structure and returns the exact path needed for future operations.
+
+**Verification:**
+```bash
+# 1. Upload new Amazon invoice through bulk upload interface
+# 2. Verify invoice appears in preview with correct parsing
+# 3. Create invoice from review - confirm attachment appears on detail page
+# 4. Test attachment download/view functionality
+
+# Debug if issues persist:
+php artisan tinker --execute="
+\$file = App\Models\InvoiceUploadFile::latest()->first();
+echo 'Temp Path: ' . \$file->temp_path . PHP_EOL;
+echo 'File Exists: ' . (\$file->tempFileExists() ? 'YES' : 'NO') . PHP_EOL;
+echo 'Full Path: ' . \$file->temp_file_path . PHP_EOL;
+echo 'Disk Path: ' . Storage::disk('local')->path(\$file->temp_path) . PHP_EOL;
+"
+```
+
+**Prevention:**
+- Always use Storage facade returned paths instead of manual path construction
+- Test `tempFileExists()` method when making file storage changes
+- Ensure database stores exactly what Storage facade expects for consistency
+
 ## 📞 Getting Help
 
 - Check Laravel Blade documentation

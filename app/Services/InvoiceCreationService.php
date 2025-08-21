@@ -137,9 +137,11 @@ class InvoiceCreationService
                     'zero_vat' => $zeroVat,
 
                     // Status and metadata
-                    'payment_status' => 'pending',
+                    'payment_status' => $this->determinePaymentStatus($file),
+                    'payment_date' => $this->determinePaymentDate($file),
+                    'payment_method' => $this->determinePaymentMethod($file),
                     'expense_category' => 'bulk_upload',
-                    'notes' => "Imported from bulk upload batch: {$file->bulk_upload_id}",
+                    'notes' => $this->buildInvoiceNotes($file),
 
                     // Audit fields
                     'created_by' => auth()->id() ?: $file->created_by,
@@ -323,15 +325,40 @@ class InvoiceCreationService
             $tempFilePath = $file->temp_file_path;
 
             // Generate filename for permanent storage
-            $filename = $file->stored_filename ?: ($invoice->id.'_'.\Str::slug($file->original_filename))
-                .'.'.pathinfo($file->original_filename, PATHINFO_EXTENSION);
+            $filename = $file->stored_filename ?: \Str::uuid().'.'.pathinfo($file->original_filename, PATHINFO_EXTENSION);
 
-            // Create a permanent path for the attachment
-            $permanentPath = 'invoices/attachments/'.$invoice->id.'/'.$filename;
+            // Create permanent path using year/month structure to avoid permission issues
+            $year = $invoice->invoice_date ? $invoice->invoice_date->format('Y') : now()->format('Y');
+            $month = $invoice->invoice_date ? $invoice->invoice_date->format('m') : now()->format('m');
+            $permanentPath = "invoices/{$year}/{$month}/{$invoice->id}/{$filename}";
 
             // Copy file to permanent location
             $tempFileContent = file_get_contents($tempFilePath);
             Storage::disk('local')->put($permanentPath, $tempFileContent);
+            
+            // Fix directory permissions to ensure web server can access files
+            try {
+                $fullPath = Storage::disk('local')->path($permanentPath);
+                $directory = dirname($fullPath);
+                
+                // Set directory permissions to 755 (readable by web server)
+                chmod($directory, 0755);
+                
+                // Also ensure parent directories have correct permissions
+                $parentDir = dirname($directory); // /invoices/year/month
+                if (is_dir($parentDir)) {
+                    chmod($parentDir, 0755);
+                }
+                $grandParentDir = dirname($parentDir); // /invoices/year  
+                if (is_dir($grandParentDir)) {
+                    chmod($grandParentDir, 0755);
+                }
+            } catch (\Exception $e) {
+                Log::warning('Failed to set directory permissions for invoice attachment', [
+                    'path' => $permanentPath,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             // Create attachment record
             $invoice->attachments()->create([
@@ -386,5 +413,77 @@ class InvoiceCreationService
         });
 
         return $potentialDuplicates->first();
+    }
+
+    /**
+     * Build invoice notes including batch information
+     */
+    private function buildInvoiceNotes(InvoiceUploadFile $file): string
+    {
+        return "Imported from bulk upload batch: {$file->bulk_upload_id}";
+    }
+
+    /**
+     * Determine payment status based on supplier and invoice type
+     */
+    private function determinePaymentStatus(InvoiceUploadFile $file): string
+    {
+        // Amazon invoices are always paid on the invoice date
+        if ($file->supplier_detected === 'Amazon' || $file->status === 'amazon_pending') {
+            return 'paid';
+        }
+
+        // Check if there's payment adjustment data indicating it's already paid
+        $parsedData = $file->parsed_data ?? [];
+        if (isset($parsedData['amazon_payment_adjusted']) && $parsedData['amazon_payment_adjusted'] === true) {
+            return 'paid';
+        }
+
+        // Default to pending for other suppliers
+        return 'pending';
+    }
+
+    /**
+     * Determine payment date based on supplier and invoice type
+     */
+    private function determinePaymentDate(InvoiceUploadFile $file): ?\Carbon\Carbon
+    {
+        // Amazon invoices are always paid on the invoice date
+        if ($file->supplier_detected === 'Amazon' || $file->status === 'amazon_pending') {
+            if ($file->parsed_invoice_date) {
+                return \Carbon\Carbon::parse($file->parsed_invoice_date);
+            }
+        }
+
+        // Check if there's payment adjustment data
+        $parsedData = $file->parsed_data ?? [];
+        if (isset($parsedData['amazon_payment_adjusted']) && $parsedData['amazon_payment_adjusted'] === true) {
+            if ($file->parsed_invoice_date) {
+                return \Carbon\Carbon::parse($file->parsed_invoice_date);
+            }
+        }
+
+        // No payment date for other suppliers
+        return null;
+    }
+
+    /**
+     * Determine payment method based on supplier
+     */
+    private function determinePaymentMethod(InvoiceUploadFile $file): ?string
+    {
+        // Amazon is always paid by credit card
+        if ($file->supplier_detected === 'Amazon' || $file->status === 'amazon_pending') {
+            return 'credit_card';
+        }
+
+        // Check if there's payment adjustment data
+        $parsedData = $file->parsed_data ?? [];
+        if (isset($parsedData['amazon_payment_adjusted']) && $parsedData['amazon_payment_adjusted'] === true) {
+            return 'credit_card';
+        }
+
+        // No default payment method for other suppliers
+        return null;
     }
 }

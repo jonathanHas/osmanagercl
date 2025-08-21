@@ -24,7 +24,10 @@ Route::get('/dashboard', function () {
     $productRepository = new \App\Repositories\ProductRepository;
     $statistics = $productRepository->getStatistics();
 
-    return view('dashboard', compact('statistics'));
+    // Add Amazon pending count for dashboard widget
+    $amazonPendingCount = \App\Models\AmazonInvoicePending::pending()->count();
+
+    return view('dashboard', compact('statistics', 'amazonPendingCount'));
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
@@ -94,15 +97,36 @@ Route::middleware('auth')->group(function () {
         Route::post('/upload', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'upload'])->name('upload');
         Route::get('/status/{batchId}', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'status'])->name('status');
         Route::get('/preview/{batchId}', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'preview'])->name('preview');
+        Route::get('/amazon-pending', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'amazonPending'])->name('amazon-pending');
+        Route::delete('/amazon-pending/files', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'deleteAmazonPendingFiles'])->name('delete-amazon-pending-files');
         Route::post('/{batchId}/cancel', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'cancel'])->name('cancel');
         Route::post('/{batchId}/process', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'startProcessing'])->name('process');
         Route::post('/{batchId}/create-from-review', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'createFromReview'])->name('create-from-review');
         Route::get('/check-parser', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'checkParserConfiguration'])->name('check-parser');
+        Route::get('/{batchId}/file/{fileId}/viewer', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'fileViewer'])->name('file-viewer');
+        Route::get('/{batchId}/file/{fileId}/view', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'viewFile'])->name('view-file');
         Route::delete('/{batchId}/file/{fileId}', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'deleteFile'])->name('delete-file');
+        Route::get('/{batchId}/file/{fileId}/thumbnails', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'getThumbnails'])->name('get-thumbnails');
+        Route::post('/{batchId}/file/{fileId}/split', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'splitPdf'])->name('split-pdf');
     });
 
     Route::post('/invoices/bulk-mark-paid', [\App\Http\Controllers\InvoiceController::class, 'bulkMarkPaid'])->name('invoices.bulk-mark-paid');
     Route::patch('/invoices/{invoice}/mark-unpaid', [\App\Http\Controllers\InvoiceController::class, 'markUnpaid'])->name('invoices.mark-unpaid');
+
+    // Amazon Pending Invoices (must be before resource route)
+    Route::prefix('invoices/amazon-pending')->name('amazon-pending.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'index'])->name('index');
+        Route::get('/{pending}', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'show'])->name('show');
+        Route::get('/{pending}/viewer', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'viewer'])->name('viewer');
+        Route::get('/{pending}/view-invoice', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'viewInvoice'])->name('view-invoice');
+        Route::put('/{pending}/payment', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'updatePayment'])->name('update-payment');
+        Route::post('/{pending}/process', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'process'])->name('process');
+        Route::delete('/{pending}', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'cancel'])->name('cancel');
+        Route::post('/bulk-process', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'bulkProcess'])->name('bulk-process');
+        Route::get('/ajax/summary', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'summary'])->name('ajax.summary');
+        Route::post('/{pending}/preview-calculation', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'previewCalculation'])->name('preview-calculation');
+    });
+
     Route::resource('invoices', \App\Http\Controllers\InvoiceController::class);
 
     // VAT Rates Management

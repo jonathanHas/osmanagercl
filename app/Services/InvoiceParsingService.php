@@ -145,7 +145,14 @@ class InvoiceParsingService
                 ]);
             }
 
-            // Auto-create invoice if confidence is high enough
+            // Special handling for Amazon invoices - create pending record
+            if ($this->isAmazonInvoice($file)) {
+                $this->createAmazonPendingRecord($file);
+
+                return;
+            }
+
+            // Auto-create invoice if confidence is high enough (non-Amazon invoices)
             $confidence = $output['confidence'] ?? 0.0;
             // Convert confidence to percentage if it's a decimal (0.85 -> 85)
             if ($confidence <= 1.0) {
@@ -383,5 +390,44 @@ class InvoiceParsingService
         });
 
         return $potentialDuplicates->first();
+    }
+
+    /**
+     * Check if the parsed file is an Amazon invoice
+     */
+    protected function isAmazonInvoice(InvoiceUploadFile $file): bool
+    {
+        return $file->supplier_detected === 'Amazon';
+    }
+
+    /**
+     * Create a pending record for Amazon invoice
+     */
+    protected function createAmazonPendingRecord(InvoiceUploadFile $file): void
+    {
+        try {
+            $amazonService = new \App\Services\AmazonInvoiceProcessingService(
+                new \App\Services\InvoiceCreationService
+            );
+
+            $pending = $amazonService->createPendingFromParsedFile($file);
+
+            Log::info('Amazon invoice moved to pending payment', [
+                'file_id' => $file->id,
+                'pending_id' => $pending->id,
+                'gbp_amount' => $pending->gbp_amount,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to create Amazon pending record', [
+                'file_id' => $file->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            // Fall back to review status if pending creation fails
+            $file->update([
+                'status' => 'review',
+                'error_message' => 'Failed to create Amazon pending record: '.$e->getMessage(),
+            ]);
+        }
     }
 }
