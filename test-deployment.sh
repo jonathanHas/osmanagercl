@@ -192,7 +192,7 @@ test_invoice_parser() {
     fi
     
     # Test Python modules
-    if sudo -u "$WEB_USER" bash -c "source venv/bin/activate && python -c 'import pytesseract, PyPDF2, python_docx; print(\"OK\")'" 2>/dev/null | grep -q "OK"; then
+    if sudo -u "$WEB_USER" bash -c "source venv/bin/activate && python -c 'import pytesseract, PyPDF2, docx; print(\"OK\")'" 2>/dev/null | grep -q "OK"; then
         success "Required Python modules import successfully"
     else
         error "Python module imports failed"

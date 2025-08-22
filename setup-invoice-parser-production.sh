@@ -297,7 +297,7 @@ test_parser_installation() {
     
     # Test Python modules import
     log "Testing Python module imports..."
-    if sudo -u "$WEB_USER" bash -c "source venv/bin/activate && python -c 'import pytesseract, PyPDF2, python_docx; print(\"All modules imported successfully\")'" 2>/dev/null; then
+    if sudo -u "$WEB_USER" bash -c "source venv/bin/activate && python -c 'import pytesseract, PyPDF2, docx; print(\"All modules imported successfully\")'" 2>/dev/null; then
         success "✅ Required Python modules can be imported"
     else
         warning "⚠️  Some Python modules may have import issues"
