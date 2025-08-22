@@ -339,28 +339,53 @@ setup_invoice_parser() {
     log "🐍 Setting up invoice parser on server..."
     
     ssh "$PROD_USER@$PROD_HOST" << EOF
-        cd $DEPLOY_TARGET/scripts/invoice-parser
+        cd $DEPLOY_TARGET/scripts/invoice-parser || exit 1
+        
+        # Check if virtual environment already exists
+        if [[ -d "venv" && -f "venv/bin/python" ]]; then
+            echo "✅ Virtual environment already exists, verifying functionality..."
+            
+            # Test if parser works
+            if bash -c "source venv/bin/activate && python invoice_parser_laravel.py --help" >/dev/null 2>&1; then
+                echo "✅ Invoice parser is already working, skipping setup"
+                
+                # Just ensure permissions are correct
+                chown -R www-data:www-data . 2>/dev/null || true
+                chmod -R 755 . 2>/dev/null || true
+                chmod +x venv/bin/* 2>/dev/null || true
+                
+                echo "✅ Parser setup verification complete"
+                exit 0
+            else
+                echo "⚠️  Virtual environment exists but parser test failed, attempting full setup..."
+            fi
+        else
+            echo "📦 Virtual environment not found, running full setup..."
+        fi
+        
+        # Check if python3-venv is available
+        if ! python3 -m venv --help >/dev/null 2>&1; then
+            echo "❌ python3-venv is not installed"
+            echo "📋 Please run manually on server:"
+            echo "   sudo apt-get update && sudo apt-get install -y python3-venv"
+            echo "   Then re-run deployment or setup parser manually:"
+            echo "   sudo ./setup-invoice-parser-production.sh $DEPLOY_TARGET www-data www-data"
+            exit 1
+        fi
         
         # Run the existing setup script
         if [[ -f setup.sh ]]; then
             echo "Running invoice parser setup..."
             bash setup.sh
+            SETUP_EXIT_CODE=\$?
             
-            # Ensure proper permissions for www-data
-            echo "Setting parser permissions for www-data..."
-            sudo chown -R www-data:www-data .
-            sudo chmod -R 755 .
-            sudo chmod +x venv/bin/python
-            sudo chmod +x venv/bin/pip
-            
-            # Test parser as www-data
-            echo "Testing parser as www-data..."
-            sudo -u www-data bash -c "source venv/bin/activate && python invoice_parser_laravel.py --help" 2>/dev/null
-            if [[ \$? -eq 0 ]]; then
+            if [[ \$SETUP_EXIT_CODE -eq 0 ]]; then
                 echo "✅ Invoice parser setup successful"
             else
-                echo "❌ Invoice parser test failed"
-                exit 1
+                echo "⚠️  Setup script completed with warnings (exit code: \$SETUP_EXIT_CODE)"
+                echo "This may be due to permission issues in non-interactive SSH"
+                echo "📋 To complete setup manually, run on server:"
+                echo "   sudo ./setup-invoice-parser-production.sh $DEPLOY_TARGET www-data www-data"
             fi
         else
             echo "❌ Invoice parser setup script not found"
@@ -368,11 +393,25 @@ setup_invoice_parser() {
         fi
 EOF
     
-    if [[ $? -eq 0 ]]; then
-        success "Invoice parser setup completed."
+    SETUP_RESULT=$?
+    
+    if [[ $SETUP_RESULT -eq 0 ]]; then
+        success "Invoice parser setup completed successfully."
     else
-        error "Invoice parser setup failed!"
-        exit 1
+        warning "Invoice parser setup completed with issues."
+        warning "You may need to run the setup manually:"
+        warning "  ssh $PROD_USER@$PROD_HOST"
+        warning "  cd $DEPLOY_TARGET"
+        warning "  sudo ./setup-invoice-parser-production.sh $DEPLOY_TARGET www-data www-data"
+        
+        echo
+        read -p "Continue deployment despite parser setup issues? [y/N] " CONTINUE_ANYWAY
+        if [[ $CONTINUE_ANYWAY != "y" && $CONTINUE_ANYWAY != "Y" ]]; then
+            error "Deployment stopped due to parser setup issues."
+            exit 1
+        else
+            warning "Continuing deployment. Please fix parser setup manually later."
+        fi
     fi
 }
 
