@@ -295,6 +295,22 @@ tail -f storage/logs/queue-worker.log
 ./debug-queue-processing.sh /var/www/html/osmanager
 ```
 
+### **Issue 8: Parser Files Not Syncing During Deployment**
+**Problem:** Invoice parser files exist locally in `~/deployments/osmanagercl/scripts/invoice-parser/` but rsync fails during deployment
+**Cause:** Destination directory owned by www-data, preventing direct rsync from user account
+**Solution:**
+```bash
+# Step 1: On production server - temporarily change ownership
+sudo chown -R jon:www-data /var/www/html/osmanager/scripts/invoice-parser
+
+# Step 2: From local machine - run rsync
+rsync -avz --progress invoice-parser/ jon@lilThink2:/var/www/html/osmanager/scripts/invoice-parser/
+
+# Step 3: On production server - restore proper ownership  
+sudo chown -R www-data:www-data /var/www/html/osmanager/scripts/invoice-parser
+```
+**When to use:** When deployment scripts create parser directory but files fail to sync properly due to ownership conflicts.
+
 ---
 
 ## ✅ **Verification Steps**

@@ -1011,7 +1011,10 @@
             confirmButton.disabled = true;
             confirmButton.innerHTML = 'Splitting...';
             
-            // Perform split
+            // Perform split with timeout handling
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout for large PDFs
+            
             fetch(`/invoices/bulk-upload/${batchId}/file/${currentFileForSplit}/split`, {
                 method: 'POST',
                 headers: {
@@ -1021,23 +1024,49 @@
                 },
                 body: JSON.stringify({
                     page_ranges: pageRanges
-                })
+                }),
+                signal: controller.signal
             })
-            .then(response => response.json())
+            .then(response => {
+                clearTimeout(timeoutId);
+                
+                if (!response.ok) {
+                    // Try to get error message from response
+                    return response.text().then(text => {
+                        let errorMsg = 'Server error';
+                        try {
+                            const json = JSON.parse(text);
+                            errorMsg = json.error || json.message || errorMsg;
+                        } catch (e) {
+                            // Response wasn't JSON, use status text
+                            errorMsg = `Server error (${response.status})`;
+                        }
+                        throw new Error(errorMsg);
+                    });
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.success) {
                     alert(`Successfully split PDF into ${data.split_count} files`);
                     closeSplitPdfModal();
                     window.location.reload(); // Reload to show new files
                 } else {
-                    alert('Failed to split PDF: ' + data.error);
+                    alert('Failed to split PDF: ' + (data.error || 'Unknown error'));
                     confirmButton.disabled = false;
                     confirmButton.innerHTML = 'Split PDF';
                 }
             })
             .catch(error => {
                 console.error('Error splitting PDF:', error);
-                alert('Failed to split PDF');
+                
+                // Check if it was a timeout
+                if (error.name === 'AbortError') {
+                    alert('PDF split is taking longer than expected. Please refresh the page to see if it completed.');
+                } else {
+                    alert('Failed to split PDF: ' + error.message);
+                }
+                
                 confirmButton.disabled = false;
                 confirmButton.innerHTML = 'Split PDF';
             });

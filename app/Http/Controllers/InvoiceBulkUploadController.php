@@ -815,7 +815,7 @@ class InvoiceBulkUploadController extends Controller
                 'success' => true,
                 'message' => 'PDF split successfully',
                 'split_count' => count($splitFiles),
-                'split_files' => $splitFiles->map(function ($splitFile) {
+                'split_files' => collect($splitFiles)->map(function ($splitFile) {
                     return [
                         'id' => $splitFile->id,
                         'filename' => $splitFile->original_filename,
