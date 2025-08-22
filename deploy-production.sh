@@ -420,47 +420,79 @@ fix_permissions() {
     log "🔐 Fixing all permissions on server..."
     
     ssh "$PROD_USER@$PROD_HOST" << EOF
-        cd $DEPLOY_TARGET
+        cd $DEPLOY_TARGET || exit 1
         
-        echo "Setting basic file permissions..."
-        sudo chown -R www-data:www-data .
-        sudo chmod -R 755 .
-        sudo chmod -R 775 storage bootstrap/cache
-        
-        echo "Creating invoice storage directories..."
-        sudo mkdir -p storage/app/private/temp/invoices
-        sudo mkdir -p storage/app/private/invoices/2025/{01,02,03,04,05,06,07,08,09,10,11,12}
-        sudo mkdir -p storage/app/private/invoices/attachments
-        
-        echo "Setting invoice directory permissions..."
-        sudo chown -R www-data:www-data storage/app/private
-        sudo chmod -R 775 storage/app/private
-        
-        # Set proper permissions for invoice parser
-        if [[ -d scripts/invoice-parser ]]; then
-            echo "Setting invoice parser permissions..."
-            sudo chown -R www-data:www-data scripts/invoice-parser
-            sudo chmod -R 755 scripts/invoice-parser
-            sudo chmod +x scripts/invoice-parser/venv/bin/*
+        # First test if basic write permissions work (since user is in www-data group)
+        echo "Testing current write permissions..."
+        if touch storage/app/private/temp/test-basic.txt 2>/dev/null; then
+            rm storage/app/private/temp/test-basic.txt 2>/dev/null
+            echo "✅ Basic write permissions working (user in www-data group)"
+            BASIC_PERMS_OK=true
+        else
+            echo "⚠️  Basic write permissions not working"
+            BASIC_PERMS_OK=false
         fi
         
-        # Test write permissions
-        echo "Testing write permissions..."
-        sudo -u www-data touch storage/app/private/temp/test.txt 2>/dev/null
-        if [[ \$? -eq 0 ]]; then
-            sudo -u www-data rm storage/app/private/temp/test.txt
-            echo "✅ Write permissions working"
+        # Try to create directories without sudo first
+        echo "Creating invoice storage directories..."
+        mkdir -p storage/app/private/temp/invoices 2>/dev/null || true
+        mkdir -p storage/app/private/invoices/2025/{01,02,03,04,05,06,07,08,09,10,11,12} 2>/dev/null || true
+        mkdir -p storage/app/private/invoices/attachments 2>/dev/null || true
+        
+        # Try to set basic permissions without sudo
+        echo "Setting basic file permissions (non-sudo)..."
+        chmod -R 755 . 2>/dev/null || true
+        chmod -R 775 storage bootstrap/cache 2>/dev/null || true
+        chmod -R 775 storage/app/private 2>/dev/null || true
+        
+        # Set parser permissions without sudo
+        if [[ -d scripts/invoice-parser ]]; then
+            echo "Setting invoice parser permissions (non-sudo)..."
+            chmod -R 755 scripts/invoice-parser 2>/dev/null || true
+            chmod +x scripts/invoice-parser/venv/bin/* 2>/dev/null || true
+        fi
+        
+        # Test final write permissions
+        echo "Testing final write permissions..."
+        if touch storage/app/private/temp/test-final.txt 2>/dev/null; then
+            rm storage/app/private/temp/test-final.txt 2>/dev/null
+            echo "✅ Final write permissions working"
+            exit 0
         else
-            echo "❌ Write permissions failed"
-            exit 1
+            echo "⚠️  Write permissions may need manual fixing"
+            if [[ \$BASIC_PERMS_OK == "true" ]]; then
+                echo "📋 Basic permissions work, but some directories may need sudo access"
+                echo "   Run manually if needed: sudo ./fix-all-permissions.sh $DEPLOY_TARGET www-data www-data"
+                exit 0
+            else
+                echo "❌ Permissions need manual fixing"
+                echo "📋 To fix permissions manually, run on server:"
+                echo "   sudo ./fix-all-permissions.sh $DEPLOY_TARGET www-data www-data"
+                exit 1
+            fi
         fi
 EOF
     
-    if [[ $? -eq 0 ]]; then
-        success "Permissions fixed successfully."
+    PERM_RESULT=$?
+    
+    if [[ $PERM_RESULT -eq 0 ]]; then
+        success "Permissions are working correctly."
     else
-        error "Permission fixing failed!"
-        exit 1
+        warning "Permission fixing completed with issues."
+        warning "Some permissions may need manual adjustment."
+        warning "You may need to run on the server:"
+        warning "  ssh $PROD_USER@$PROD_HOST"
+        warning "  cd $DEPLOY_TARGET"
+        warning "  sudo ./fix-all-permissions.sh $DEPLOY_TARGET www-data www-data"
+        
+        echo
+        read -p "Continue deployment despite permission issues? [y/N] " CONTINUE_ANYWAY
+        if [[ $CONTINUE_ANYWAY != "y" && $CONTINUE_ANYWAY != "Y" ]]; then
+            error "Deployment stopped due to permission issues."
+            exit 1
+        else
+            warning "Continuing deployment. Fix permissions manually if needed."
+        fi
     fi
 }
 
