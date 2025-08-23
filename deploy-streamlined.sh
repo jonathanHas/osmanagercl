@@ -260,15 +260,25 @@ main() {
     
     # Step 8: Rsync to production
     log "📡 Syncing files to production..."
+    # WARNING: --delete flag removes files on destination that don't exist in source
+    # This can delete production-only files like venv, so we exclude them
     rsync -avz --no-group --delete \
         --exclude='.env' \
         --exclude='.git' \
         --exclude='node_modules' \
+        --exclude='vendor' \
         --exclude='tests' \
         --exclude='storage/logs/*' \
+        --exclude='storage/app/*' \
         --exclude='storage/framework/cache/*' \
         --exclude='storage/framework/sessions/*' \
         --exclude='storage/framework/views/*' \
+        --exclude='bootstrap/cache/*' \
+        --exclude='scripts/invoice-parser/venv' \
+        --exclude='scripts/invoice-parser/__pycache__' \
+        --exclude='*.pyc' \
+        --exclude='*.log' \
+        --exclude='*.sqlite' \
         "$DEPLOY_DIR/" "$PROD_USER@$PROD_HOST:$PROD_PATH"
     
     success "Files synced to production."

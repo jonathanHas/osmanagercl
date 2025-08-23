@@ -319,16 +319,25 @@ EOF
 deploy_files() {
     log "📡 Syncing files to $TARGET_NAME..."
     
+    # WARNING: --delete removes files on destination not in source
+    # Excluding production-only files like venv to prevent deletion
     rsync -avz --no-group --delete \
         --exclude='.env' \
         --exclude='.git' \
         --exclude='node_modules' \
+        --exclude='vendor' \
         --exclude='tests' \
         --exclude='storage/logs/*' \
+        --exclude='storage/app/private/temp/*' \
         --exclude='storage/framework/cache/*' \
         --exclude='storage/framework/sessions/*' \
         --exclude='storage/framework/views/*' \
-        --exclude='storage/app/private/temp/*' \
+        --exclude='bootstrap/cache/*' \
+        --exclude='scripts/invoice-parser/venv' \
+        --exclude='scripts/invoice-parser/__pycache__' \
+        --exclude='*.pyc' \
+        --exclude='*.log' \
+        --exclude='*.sqlite' \
         "$DEPLOY_DIR/" "$PROD_USER@$PROD_HOST:$DEPLOY_TARGET"
     
     success "Files synced to $TARGET_NAME."

@@ -98,6 +98,8 @@ show_success "Backup created"
 
 # Step 5: Rsync files
 show_step "Syncing files to production..."
+# WARNING: --delete removes files on destination not in source
+# Excluding production-only files like venv to prevent deletion
 rsync -az --delete \
     --exclude='.git/' \
     --exclude='node_modules/' \
@@ -107,8 +109,13 @@ rsync -az --delete \
     --exclude='storage/framework/cache/' \
     --exclude='storage/framework/sessions/' \
     --exclude='storage/framework/views/' \
+    --exclude='bootstrap/cache/' \
+    --exclude='scripts/invoice-parser/venv/' \
+    --exclude='scripts/invoice-parser/__pycache__/' \
+    --exclude='*.pyc' \
     --exclude='.env' \
     --exclude='*.log' \
+    --exclude='*.sqlite' \
     --exclude='deploy*.sh' \
     --exclude='debug*.sh' \
     --exclude='setup*.sh' \

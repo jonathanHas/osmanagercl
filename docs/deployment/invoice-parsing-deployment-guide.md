@@ -28,6 +28,14 @@ sudo chmod g+s /var/www/html  # Inherit group ownership
 # Log out and back in for group membership to take effect
 exit
 ssh jon@server
+
+# Verify group membership is active
+groups
+# Should show: jon : jon www-data
+
+# Test write access
+touch /var/www/html/osmanager/test.txt && rm /var/www/html/osmanager/test.txt
+# Should succeed without sudo
 ```
 
 ### **System Dependencies**
@@ -42,6 +50,25 @@ sudo apt-get install -y \
     python3-dev \
     build-essential \
     supervisor
+```
+
+---
+
+## ⚠️ **CRITICAL: Deployment Script Warnings**
+
+**BEFORE running any deployment script**, ensure it has proper exclusions:
+- Check that `scripts/invoice-parser/venv` is excluded in rsync command
+- Verify `--delete` flag won't remove production-only files
+- The following scripts have been updated with proper exclusions:
+  - `deploy-streamlined.sh`
+  - `deploy-production.sh`
+  - `deploy.sh`
+
+**If using older or custom scripts**, manually verify the rsync exclusions include:
+```bash
+--exclude='scripts/invoice-parser/venv'
+--exclude='scripts/invoice-parser/__pycache__'
+--exclude='*.pyc'
 ```
 
 ---
@@ -70,6 +97,8 @@ sudo apt-get install -y \
 #### **Git and File Sync**
 - Should complete without errors
 - If git credential issues appear, they're usually non-blocking
+- ⚠️ **Watch for rsync errors:** "Operation not permitted" errors indicate permission issues
+- Files may not update properly even if deployment appears successful
 
 #### **Parser Setup Phase**
 **Expected Output:**
@@ -310,6 +339,67 @@ rsync -avz --progress invoice-parser/ jon@lilThink2:/var/www/html/osmanager/scri
 sudo chown -R www-data:www-data /var/www/html/osmanager/scripts/invoice-parser
 ```
 **When to use:** When deployment scripts create parser directory but files fail to sync properly due to ownership conflicts.
+
+### **Issue 9: Python Virtual Environment Deleted by Deployment**
+**Problem:** Parser fails with "ModuleNotFoundError: No module named 'pytesseract'"
+**Cause:** Deployment script's rsync --delete flag removed venv directory
+**Solution:**
+```bash
+# Rebuild the virtual environment completely
+cd /var/www/html/osmanager/scripts/invoice-parser
+sudo rm -rf venv
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+deactivate
+sudo chown -R www-data:www-data venv
+
+# Test it works
+sudo -u www-data bash -c "cd /var/www/html/osmanager/scripts/invoice-parser && source venv/bin/activate && python -c 'import pytesseract; print(\"OK\")'"
+```
+**Prevention:** Ensure deployment scripts exclude venv directory in rsync command
+
+### **Issue 10: Deployment Files Not Updating**
+**Problem:** Files appear to deploy but aren't actually updated on production
+**Cause:** Production files owned by www-data, deployment user lacks write permissions
+**Solution:**
+```bash
+# Fix group permissions on production
+sudo chmod -R g+w /var/www/html/osmanager
+sudo find /var/www/html/osmanager -type d -exec chmod g+s {} \;
+sudo chown -R www-data:www-data /var/www/html/osmanager
+
+# Ensure user is in www-data group
+sudo usermod -a -G www-data jon
+# Log out and back in for group to take effect
+```
+**Verify:** After deployment, check critical files were updated:
+```bash
+grep -c 'AbortController' /var/www/html/osmanager/resources/views/invoices/bulk-upload-preview.blade.php
+# Should return 1 or higher if updates applied
+```
+
+### **Issue 11: Site Shows JSON After Deployment**
+**Problem:** After deployment, website returns JSON responses instead of rendering pages
+**Cause:** Laravel cache corruption during deployment
+**Solution:**
+```bash
+cd /var/www/html/osmanager
+php artisan config:clear
+php artisan route:clear
+php artisan view:clear
+php artisan cache:clear
+php artisan config:cache
+php artisan route:cache
+```
+**If still broken:**
+```bash
+rm -rf bootstrap/cache/*
+php artisan optimize:clear
+composer dump-autoload
+php artisan optimize
+```
 
 ---
 
