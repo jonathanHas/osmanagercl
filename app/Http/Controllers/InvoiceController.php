@@ -20,6 +20,10 @@ class InvoiceController extends Controller
     {
         $query = Invoice::with(['supplier', 'vatLines']);
 
+        // Default to current year (2025) if no date filters provided
+        $fromDate = $request->filled('from_date') ? $request->from_date : '2025-01-01';
+        $toDate = $request->filled('to_date') ? $request->to_date : null;
+
         // Apply filters
         if ($request->filled('supplier_id')) {
             $query->where('supplier_id', $request->supplier_id);
@@ -34,12 +38,11 @@ class InvoiceController extends Controller
             }
         }
 
-        if ($request->filled('from_date')) {
-            $query->where('invoice_date', '>=', $request->from_date);
-        }
+        // Apply date filters (default to 2025 onwards)
+        $query->where('invoice_date', '>=', $fromDate);
 
-        if ($request->filled('to_date')) {
-            $query->where('invoice_date', '<=', $request->to_date);
+        if ($toDate) {
+            $query->where('invoice_date', '<=', $toDate);
         }
 
         if ($request->filled('search')) {
@@ -81,7 +84,7 @@ class InvoiceController extends Controller
 
         $invoices = $query->orderBy($sortField, $sortDirection)
             ->orderBy('id', 'desc') // Secondary sort for consistency
-            ->paginate(20);
+            ->get();
 
         // Get suppliers for filter dropdown
         $suppliers = AccountingSupplier::activeOnly()
@@ -364,10 +367,6 @@ class InvoiceController extends Controller
             'supplier_name' => 'required|string|max:255',
             'invoice_date' => 'required|date',
             'due_date' => 'nullable|date|after_or_equal:invoice_date',
-            'payment_status' => 'required|in:pending,partial,paid,overdue,cancelled',
-            'payment_date' => 'nullable|required_if:payment_status,paid|date',
-            'payment_method' => 'nullable|string|max:50',
-            'payment_reference' => 'nullable|string|max:100',
             'expense_category' => 'nullable|string|max:50',
             'notes' => 'nullable|string',
 
@@ -387,10 +386,6 @@ class InvoiceController extends Controller
                 'supplier_name' => $validated['supplier_name'],
                 'invoice_date' => $validated['invoice_date'],
                 'due_date' => $validated['due_date'],
-                'payment_status' => $validated['payment_status'],
-                'payment_date' => $validated['payment_date'],
-                'payment_method' => $validated['payment_method'],
-                'payment_reference' => $validated['payment_reference'],
                 'expense_category' => $validated['expense_category'],
                 'notes' => $validated['notes'],
                 'updated_by' => auth()->id(),
@@ -409,6 +404,7 @@ class InvoiceController extends Controller
                         $line->update([
                             'vat_category' => $lineData['vat_category'],
                             'net_amount' => $lineData['net_amount'],
+                            'vat_rate' => InvoiceVatLine::getDefaultVatRate($lineData['vat_category']),
                             'line_number' => $index + 1,
                             'updated_by' => auth()->id(),
                         ]);
@@ -435,7 +431,9 @@ class InvoiceController extends Controller
                     ->delete();
             }
 
-            // Recalculate totals
+            // Refresh the invoice's VAT lines relationship and recalculate totals
+            $invoice->refresh();
+            $invoice->load('vatLines');
             $invoice->calculateTotals();
 
             DB::commit();

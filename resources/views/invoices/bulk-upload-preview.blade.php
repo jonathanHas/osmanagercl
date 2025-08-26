@@ -33,11 +33,23 @@
         {{-- Batch Summary --}}
         <div class="bg-gray-800 rounded-lg p-6 mb-6">
             <h3 class="text-lg font-semibold text-gray-100 mb-4">Batch Summary</h3>
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div>
                     <p class="text-gray-400 text-sm">Total Files</p>
                     <p class="text-2xl font-bold text-gray-100">{{ $batch->total_files }}</p>
                 </div>
+                @php
+                    $multiPageCount = $files->filter(function($file) {
+                        return $file->isPdf() && $file->page_count > 1;
+                    })->count();
+                @endphp
+                @if($multiPageCount > 0)
+                <div>
+                    <p class="text-amber-400 text-sm font-semibold">⚠ Multi-Page PDFs</p>
+                    <p class="text-2xl font-bold text-amber-300">{{ $multiPageCount }}</p>
+                    <p class="text-amber-400 text-xs">May need splitting</p>
+                </div>
+                @endif
                 <div>
                     <p class="text-gray-400 text-sm">Status</p>
                     <p class="text-lg font-medium">
@@ -147,11 +159,11 @@
                     </thead>
                     <tbody class="divide-y divide-gray-700">
                         @foreach($files as $file)
-                        <tr class="hover:bg-gray-700/50">
+                        <tr class="hover:bg-gray-700/50 @if($file->isPdf() && $file->page_count > 1) bg-amber-900/20 border-l-4 border-amber-500 @endif">
                             <td class="py-3 px-4">
                                 <div class="flex items-center">
                                     @if($file->isPdf())
-                                        <svg class="w-5 h-5 text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                        <svg class="w-5 h-5 @if($file->page_count > 1) text-amber-400 @else text-red-400 @endif mr-2" fill="currentColor" viewBox="0 0 20 20">
                                             <path d="M4 18h12a2 2 0 002-2V6.414A2 2 0 0017.414 5L14 1.586A2 2 0 0012.586 1H4a2 2 0 00-2 2v13a2 2 0 002 2z"/>
                                         </svg>
                                     @elseif($file->isImage())
@@ -166,7 +178,7 @@
                                     @endif
                                     <span class="text-gray-200">{{ $file->original_filename }}</span>
                                     @if($file->isPdf() && $file->page_count > 0)
-                                        <span class="ml-2 px-2 py-1 text-xs rounded-full bg-blue-900 text-blue-300">
+                                        <span class="ml-2 px-2 py-1 text-xs rounded-full @if($file->page_count > 1) bg-amber-900 text-amber-300 font-semibold @else bg-blue-900 text-blue-300 @endif">
                                             {{ $file->page_count }} page{{ $file->page_count > 1 ? 's' : '' }}
                                         </span>
                                     @endif
@@ -310,8 +322,8 @@
                                     @endif
                                     @if($file->canBeSplit())
                                     <button onclick="splitPdf({{ $file->id }})" 
-                                            class="text-green-400 hover:text-green-300 text-sm">
-                                        Split
+                                            class="@if($file->page_count > 1) bg-amber-600 hover:bg-amber-700 text-white px-2 py-1 rounded text-xs font-semibold @else text-green-400 hover:text-green-300 text-sm @endif">
+                                        @if($file->page_count > 1) ⚠ Split @else Split @endif
                                     </button>
                                     @endif
                                     @if($file->status === 'failed' || $file->status === 'uploaded')

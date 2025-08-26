@@ -107,7 +107,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-400 mb-1">From Date</label>
-                    <input type="date" name="from_date" value="{{ request('from_date') }}" 
+                    <input type="date" name="from_date" value="{{ request('from_date', '2025-01-01') }}" 
                            class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md">
                 </div>
                 <div>
@@ -253,14 +253,14 @@
         </div>
 
         {{-- Invoices Table --}}
-        <div class="bg-gray-800 rounded-lg overflow-hidden">
-            <table class="min-w-full divide-y divide-gray-700">
+        <div class="bg-gray-800 rounded-lg overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-700" style="min-width: 1200px;">
                 <thead class="bg-gray-900">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider w-12">
+                        <th class="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider w-8">
                             <input type="checkbox" id="select-all" class="rounded bg-gray-700 border-gray-600 text-blue-600 focus:ring-blue-500 focus:ring-2">
                         </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        <th class="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider" style="width: 100px;">
                             <a href="{{ route('invoices.index', array_merge(request()->all(), ['sort' => 'invoice_number', 'direction' => $sortField === 'invoice_number' && $sortDirection === 'asc' ? 'desc' : 'asc'])) }}" 
                                class="flex items-center space-x-1 hover:text-gray-200">
                                 <span>Invoice #</span>
@@ -275,7 +275,7 @@
                                 @endif
                             </a>
                         </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        <th class="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider" style="width: 140px;">
                             <a href="{{ route('invoices.index', array_merge(request()->all(), ['sort' => 'supplier_name', 'direction' => $sortField === 'supplier_name' && $sortDirection === 'asc' ? 'desc' : 'asc'])) }}" 
                                class="flex items-center space-x-1 hover:text-gray-200">
                                 <span>Supplier</span>
@@ -284,13 +284,13 @@
                                         @if($sortDirection === 'asc')
                                             <path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" />
                                         @else
-                                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                                         @endif
                                     </svg>
                                 @endif
                             </a>
                         </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        <th class="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider" style="width: 80px;">
                             <a href="{{ route('invoices.index', array_merge(request()->all(), ['sort' => 'invoice_date', 'direction' => $sortField === 'invoice_date' && $sortDirection === 'asc' ? 'desc' : 'asc'])) }}" 
                                class="flex items-center space-x-1 hover:text-gray-200">
                                 <span>Date</span>
@@ -305,10 +305,10 @@
                                 @endif
                             </a>
                         </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        <th class="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider" style="width: 120px;">
                             <a href="{{ route('invoices.index', array_merge(request()->all(), ['sort' => 'payment_status', 'direction' => $sortField === 'payment_status' && $sortDirection === 'asc' ? 'desc' : 'asc'])) }}" 
                                class="flex items-center space-x-1 hover:text-gray-200">
-                                <span>Status</span>
+                                <span>Status / Paid On</span>
                                 @if($sortField === 'payment_status')
                                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                         @if($sortDirection === 'asc')
@@ -320,22 +320,7 @@
                                 @endif
                             </a>
                         </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                            <a href="{{ route('invoices.index', array_merge(request()->all(), ['sort' => 'payment_date', 'direction' => $sortField === 'payment_date' && $sortDirection === 'asc' ? 'desc' : 'asc'])) }}" 
-                               class="flex items-center space-x-1 hover:text-gray-200">
-                                <span>Paid On</span>
-                                @if($sortField === 'payment_date')
-                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                        @if($sortDirection === 'asc')
-                                            <path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" />
-                                        @else
-                                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                        @endif
-                                    </svg>
-                                @endif
-                            </a>
-                        </th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        <th class="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider" style="width: 80px;">
                             <a href="{{ route('invoices.index', array_merge(request()->all(), ['sort' => 'subtotal', 'direction' => $sortField === 'subtotal' && $sortDirection === 'asc' ? 'desc' : 'asc'])) }}" 
                                class="flex items-center justify-end space-x-1 hover:text-gray-200">
                                 <span>Net</span>
@@ -350,7 +335,7 @@
                                 @endif
                             </a>
                         </th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        <th class="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider" style="width: 80px;">
                             <a href="{{ route('invoices.index', array_merge(request()->all(), ['sort' => 'vat_amount', 'direction' => $sortField === 'vat_amount' && $sortDirection === 'asc' ? 'desc' : 'asc'])) }}" 
                                class="flex items-center justify-end space-x-1 hover:text-gray-200">
                                 <span>VAT</span>
@@ -365,7 +350,7 @@
                                 @endif
                             </a>
                         </th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        <th class="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider" style="width: 90px;">
                             <a href="{{ route('invoices.index', array_merge(request()->all(), ['sort' => 'total_amount', 'direction' => $sortField === 'total_amount' && $sortDirection === 'asc' ? 'desc' : 'asc'])) }}" 
                                class="flex items-center justify-end space-x-1 hover:text-gray-200">
                                 <span>Total</span>
@@ -380,7 +365,7 @@
                                 @endif
                             </a>
                         </th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        <th class="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider" style="width: 70px;">
                             Actions
                         </th>
                     </tr>
@@ -388,7 +373,7 @@
                 <tbody class="bg-gray-800 divide-y divide-gray-700">
                     @forelse($invoices as $invoice)
                         <tr class="hover:bg-gray-750" data-invoice-id="{{ $invoice->id }}">
-                            <td class="px-6 py-4 whitespace-nowrap">
+                            <td class="px-3 py-3 whitespace-nowrap">
                                 <input type="checkbox" 
                                        class="invoice-checkbox rounded bg-gray-700 border-gray-600 text-blue-600 focus:ring-blue-500 focus:ring-2" 
                                        data-invoice-id="{{ $invoice->id }}"
@@ -397,12 +382,21 @@
                                        data-total-amount="{{ $invoice->total_amount }}"
                                        data-invoice-number="{{ $invoice->invoice_number }}">
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <a href="{{ route('invoices.show', $invoice) }}" class="text-blue-400 hover:text-blue-300">
-                                    {{ $invoice->invoice_number }}
+                            <td class="px-3 py-3 text-gray-300">
+                                <a href="{{ route('invoices.show', $invoice) }}" class="text-blue-400 hover:text-blue-300 break-all text-sm">
+                                    @php
+                                        $invoiceNum = $invoice->invoice_number;
+                                        // Add soft breaks for bulk upload format (BU-2025-000137)
+                                        if (preg_match('/^(BU-\d{4}-)(\d+)$/', $invoiceNum, $matches)) {
+                                            $displayNum = $matches[1] . '<br>' . $matches[2];
+                                        } else {
+                                            $displayNum = $invoiceNum;
+                                        }
+                                    @endphp
+                                    {!! $displayNum !!}
                                     @if($invoice->hasAttachments())
-                                        <span class="inline-flex items-center ml-2 px-2 py-1 rounded-full text-xs bg-blue-600 text-blue-100" title="{{ $invoice->attachment_count }} attachment(s)">
-                                            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                                        <span class="inline-flex items-center ml-1 px-1 py-0.5 rounded-full text-xs bg-blue-600 text-blue-100" title="{{ $invoice->attachment_count }} attachment(s)">
+                                            <svg class="w-2 h-2 mr-0.5" fill="currentColor" viewBox="0 0 24 24">
                                                 <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
                                             </svg>
                                             {{ $invoice->attachment_count }}
@@ -410,13 +404,13 @@
                                     @endif
                                 </a>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-gray-300">
-                                {{ $invoice->supplier_name }}
+                            <td class="px-3 py-3 text-gray-300 text-sm">
+                                <div class="break-words">{{ $invoice->supplier_name }}</div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-gray-300">
+                            <td class="px-3 py-3 whitespace-nowrap text-gray-300 text-sm">
                                 {{ $invoice->invoice_date->format('d/m/Y') }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
+                            <td class="px-3 py-3">
                                 @php
                                     $statusColors = [
                                         'pending' => 'bg-yellow-900 text-yellow-300',
@@ -427,38 +421,40 @@
                                     ];
                                     $statusColor = $statusColors[$invoice->payment_status] ?? 'bg-gray-700 text-gray-400';
                                 @endphp
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $statusColor }}">
-                                    {{ ucfirst($invoice->payment_status) }}
-                                </span>
+                                <div class="space-y-1">
+                                    <div>
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $statusColor }}">
+                                            {{ ucfirst($invoice->payment_status) }}
+                                        </span>
+                                    </div>
+                                    @if($invoice->payment_date && $invoice->payment_status === 'paid')
+                                        <div class="text-xs text-green-400">
+                                            {{ $invoice->payment_date->format('d/m/Y') }}
+                                        </div>
+                                    @endif
+                                </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-gray-300">
-                                @if($invoice->payment_date && $invoice->payment_status === 'paid')
-                                    <span class="text-green-400">{{ $invoice->payment_date->format('d/m/Y') }}</span>
-                                @else
-                                    <span class="text-gray-500">-</span>
-                                @endif
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-gray-300">
+                            <td class="px-3 py-3 whitespace-nowrap text-right text-gray-300 text-sm">
                                 €{{ number_format($invoice->subtotal, 2) }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-gray-300">
+                            <td class="px-3 py-3 whitespace-nowrap text-right text-gray-300 text-sm">
                                 €{{ number_format($invoice->vat_amount, 2) }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right font-semibold text-white">
+                            <td class="px-3 py-3 whitespace-nowrap text-right font-semibold text-white text-sm">
                                 €{{ number_format($invoice->total_amount, 2) }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <div class="flex justify-end space-x-2">
+                            <td class="px-3 py-3 whitespace-nowrap text-right text-sm font-medium">
+                                <div class="flex justify-end space-x-1">
                                     <a href="{{ route('invoices.show', $invoice) }}" 
                                        class="text-gray-400 hover:text-gray-300" title="View">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                         </svg>
                                     </a>
                                     <a href="{{ route('invoices.edit', $invoice) }}" 
                                        class="text-blue-400 hover:text-blue-300" title="Edit">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
                                     </a>
@@ -467,7 +463,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="px-6 py-12 text-center text-gray-500">
+                            <td colspan="9" class="px-3 py-12 text-center text-gray-500">
                                 No invoices found. <a href="{{ route('invoices.create') }}" class="text-blue-400 hover:text-blue-300">Create your first invoice</a>
                             </td>
                         </tr>
@@ -476,12 +472,6 @@
             </table>
         </div>
 
-        {{-- Pagination --}}
-        @if($invoices->hasPages())
-            <div class="mt-4">
-                {{ $invoices->withQueryString()->links() }}
-            </div>
-        @endif
     </div>
 
     {{-- Bulk Payment Modal --}}

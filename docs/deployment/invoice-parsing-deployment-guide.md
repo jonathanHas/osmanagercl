@@ -60,9 +60,9 @@ sudo apt-get install -y \
 - Check that `scripts/invoice-parser/venv` is excluded in rsync command
 - Verify `--delete` flag won't remove production-only files
 - The following scripts have been updated with proper exclusions:
-  - `deploy-streamlined.sh`
-  - `deploy-production.sh`
-  - `deploy.sh`
+  - `scripts/deployment/deploy/deploy-streamlined.sh`
+  - `scripts/deployment/deploy/deploy-production.sh`
+  - `scripts/deployment/deploy/deploy.sh`
 
 **If using older or custom scripts**, manually verify the rsync exclusions include:
 ```bash
@@ -77,7 +77,7 @@ sudo apt-get install -y \
 
 ### **Step 1: Run Pre-Deployment Verification**
 ```bash
-./verify-deployment-ready.sh /var/www/html/osmanager www-data www-data
+./scripts/deployment/testing/verify-deployment-ready.sh /var/www/html/osmanager www-data www-data
 ```
 
 **Expected Result:** All checks should pass
@@ -85,7 +85,7 @@ sudo apt-get install -y \
 
 ### **Step 2: Start Deployment**
 ```bash
-./deploy-production.sh
+./scripts/deployment/deploy/deploy-production.sh
 ```
 
 **Choose Environment:**
@@ -131,7 +131,7 @@ ssh jon@server
 cd /var/www/html/osmanager  # or /osmanager-test
 
 # Run parser setup with CORRECT path
-sudo ./setup-invoice-parser-production.sh /var/www/html/osmanager www-data www-data
+sudo ./scripts/deployment/setup/setup-invoice-parser-production.sh /var/www/html/osmanager www-data www-data
 ```
 
 ### **Step 5: Set Up Queue Workers (One-Time)**
@@ -157,12 +157,12 @@ sudo supervisorctl status
 ```bash
 # Copy the dedicated worker files to your server
 scp osmanager-test-dedicated-workers.conf server:/path/to/app/
-scp setup-dedicated-workers.sh server:/path/to/app/
+scp scripts/deployment/setup/setup-dedicated-workers.sh server:/path/to/app/
 
 # SSH to server and run setup
 ssh user@server
 cd /var/www/html/osmanager
-sudo ./setup-dedicated-workers.sh /var/www/html/osmanager
+sudo ./scripts/deployment/setup/setup-dedicated-workers.sh /var/www/html/osmanager
 ```
 
 **What this does:**
@@ -174,7 +174,8 @@ sudo ./setup-dedicated-workers.sh /var/www/html/osmanager
 **Alternative: Priority Queue System (if dedicated workers not preferred):**
 ```bash
 # Less optimal but simpler - uses priority instead of independence
-./enable-invoice-priority-queue.sh /var/www/html/osmanager
+# Note: Priority queue scripts have been removed - use dedicated workers instead
+./scripts/deployment/setup/setup-dedicated-workers.sh /var/www/html/osmanager
 ```
 ⚠️ **Note**: Priority system still blocks coffee orders when many invoices are uploaded.
 
@@ -208,7 +209,7 @@ tail -f storage/logs/invoice-worker.log &    # Invoice jobs
 
 ### **Step 9: Run Post-Deployment Tests**
 ```bash
-./test-deployment.sh /var/www/html/osmanager www-data www-data
+./scripts/deployment/testing/test-deployment.sh /var/www/html/osmanager www-data www-data
 ```
 
 **If parser tests fail:**
@@ -268,7 +269,7 @@ groups  # Should show www-data
 **Solution:**
 ```bash
 # Manual parser setup with correct path
-sudo ./setup-invoice-parser-production.sh /var/www/html/osmanager www-data www-data
+sudo ./scripts/deployment/setup/setup-invoice-parser-production.sh /var/www/html/osmanager www-data www-data
 
 # Test manually
 cd scripts/invoice-parser
@@ -282,7 +283,7 @@ python invoice_parser_laravel.py --help
 **Best Solution - Dedicated Workers:**
 ```bash
 # Set up dedicated workers (recommended)
-./setup-dedicated-workers.sh /var/www/html/osmanager
+./scripts/deployment/setup/setup-dedicated-workers.sh /var/www/html/osmanager
 
 # Verify both worker types are running
 sudo supervisorctl status | grep -E "(coffee-worker|invoice-worker)"
@@ -295,7 +296,8 @@ tail -f storage/logs/invoice-worker.log   # Invoice jobs
 **Alternative Solution - Priority System:**
 ```bash
 # Run the queue priority fix (less optimal)
-./enable-invoice-priority-queue.sh /var/www/html/osmanager
+# Note: Priority queue scripts have been removed - use dedicated workers instead
+./scripts/deployment/setup/setup-dedicated-workers.sh /var/www/html/osmanager
 
 # Clear queue backlog if needed
 php artisan queue:clear
@@ -469,19 +471,19 @@ tail -f storage/logs/queue-worker.log
 ### **If Deployment Fails Completely**
 ```bash
 # Use emergency rollback
-sudo ./rollback-deployment.sh /var/www/html/osmanager
+sudo ./scripts/deployment/deploy/rollback-deployment.sh /var/www/html/osmanager
 ```
 
 ### **If Only Parser Fails**
 ```bash
 # Manual parser setup
-sudo ./setup-invoice-parser-production.sh /var/www/html/osmanager www-data www-data
+sudo ./scripts/deployment/setup/setup-invoice-parser-production.sh /var/www/html/osmanager www-data www-data
 ```
 
 ### **If Permissions Break**
 ```bash
 # Fix all permissions
-sudo ./fix-all-permissions.sh /var/www/html/osmanager www-data www-data
+sudo ./scripts/deployment/permissions/fix-all-permissions.sh /var/www/html/osmanager www-data www-data
 ```
 
 ---
@@ -525,13 +527,13 @@ sudo ./fix-all-permissions.sh /var/www/html/osmanager www-data www-data
 
 ## 📚 **Additional Resources**
 
-- **Main Scripts:**
-  - `deploy-production.sh` - Main deployment
-  - `verify-deployment-ready.sh` - Pre-deployment checks
-  - `test-deployment.sh` - Post-deployment verification
-  - `setup-invoice-parser-production.sh` - Parser setup
-  - `fix-all-permissions.sh` - Permission fixing
-  - `rollback-deployment.sh` - Emergency recovery
+- **Main Scripts (in `scripts/deployment/`):**
+  - `deploy/deploy-production.sh` - Main deployment
+  - `testing/verify-deployment-ready.sh` - Pre-deployment checks
+  - `testing/test-deployment.sh` - Post-deployment verification
+  - `setup/setup-invoice-parser-production.sh` - Parser setup
+  - `permissions/fix-all-permissions.sh` - Permission fixing
+  - `deploy/rollback-deployment.sh` - Emergency recovery
 
 - **Configuration Files:**
   - `osmanager-queue-worker.conf` - Supervisor config
@@ -570,7 +572,7 @@ Invoice Workers (2): [Invoice 1] → [Invoice 2] → [Invoice 3]
 
 ### 📊 **Key Files Created:**
 - `osmanager-test-dedicated-workers.conf` - Supervisor configuration
-- `setup-dedicated-workers.sh` - Automated setup script
+- `scripts/deployment/setup/setup-dedicated-workers.sh` - Automated setup script
 - `README-dedicated-workers.md` - Complete instructions
 
 ### 🎯 **Performance Results:**

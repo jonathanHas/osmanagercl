@@ -515,6 +515,8 @@ EOF
 sudo chmod +x /usr/local/bin/osmanager-deploy.sh
 ```
 
+> **Note:** For more comprehensive deployment scripts with rollback, testing, and permission management, see the organized scripts in `scripts/deployment/` directory. The main deployment script is `scripts/deployment/deploy/deploy-streamlined.sh`.
+
 ### **2. Zero-Downtime Deployment (Advanced)**
 ```bash
 # Use deployment tools like Envoy or Deployer for zero-downtime deployments

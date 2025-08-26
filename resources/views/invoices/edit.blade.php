@@ -124,6 +124,10 @@
                                     <template x-for="(vatLine, index) in vatLines" :key="index">
                                         <tr class="border-b border-gray-700">
                                             <td class="py-2 px-1">
+                                                {{-- Hidden field for VAT line ID --}}
+                                                <input type="hidden" :name="'vat_lines[' + index + '][id]'" 
+                                                       x-model="vatLine.id" 
+                                                       x-show="vatLine.id">
                                                 <select :name="'vat_lines[' + index + '][vat_category]'" 
                                                         x-model="vatLine.vat_category" required
                                                         @change="updateVatLineRate(index)"

@@ -109,7 +109,7 @@ The queue worker MUST be running for the KDS to function. Choose one method:
 #### Option A: Simple Cron Job (Recommended for most users)
 ```bash
 # Run the setup script
-./scripts/queue-worker-setup.sh
+./scripts/deployment/setup/queue-worker-setup.sh
 # Choose option 1 (Cron Job)
 ```
 This checks every minute if the worker is running and restarts it if needed.
@@ -129,7 +129,7 @@ Add to your crontab (`crontab -e`):
 # Create service file
 sudo nano /etc/systemd/system/osmanager-queue.service
 
-# Add content from scripts/queue-worker-setup.sh systemd section
+# Add content from scripts/deployment/setup/queue-worker-setup.sh systemd section
 
 # Enable and start
 sudo systemctl enable osmanager-queue
@@ -144,7 +144,7 @@ sudo apt-get install supervisor
 # Create config
 sudo nano /etc/supervisor/conf.d/osmanager-queue.conf
 
-# Add content from scripts/queue-worker-setup.sh supervisor section
+# Add content from scripts/deployment/setup/queue-worker-setup.sh supervisor section
 
 # Start
 sudo supervisorctl reread
