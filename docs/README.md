@@ -150,6 +150,27 @@ Modern multi-file invoice upload system with drag-and-drop interface:
 See [Invoice Bulk Upload System](./features/invoice-bulk-upload-system.md) for implementation details.
 See [Invoice Parser Integration](./features/invoice-parser-integration.md) for Phase 2 Python integration guide.
 
+### Invoice Editing System (2025-08-26)
+Comprehensive invoice modification system with VAT line management and automatic total recalculation:
+
+- **📝 Full Invoice Editing**: Modify all invoice details including supplier, dates, and categories
+- **🧮 Dynamic VAT Line Management**: Add, remove, and modify VAT lines with real-time calculations
+- **💰 Negative Amount Support**: Handle credit notes and refunds with negative values
+- **🔄 Automatic Recalculation**: Invoice totals update automatically when VAT lines change
+- **🇮🇪 Irish VAT Rates**: Support for all Irish VAT categories (23%, 13.5%, 9%, 0%)
+- **⚡ Real-time Feedback**: JavaScript calculations with server-side validation
+- **🔒 Data Integrity**: Transaction-safe updates with relationship refresh
+- **📊 VAT Breakdown Display**: Per-category VAT analysis in summary sidebar
+
+**Key Benefits**:
+- Fix invoice data errors without recreating invoices
+- Handle complex VAT scenarios with multiple rates per invoice
+- Support credit notes and adjustments with negative amounts
+- Maintain audit trail with user attribution for all changes
+- Real-time user interface updates for immediate feedback
+
+See [Invoice Editing System](./features/invoice-editing-system.md) for complete implementation details.
+
 ## 🆕 Previous Updates (January 2025)
 
 ### Product Health Dashboard (2025-01-06)
@@ -329,6 +350,14 @@ Administrative and operational management tools.
   - Unsubmitted invoice summaries by month
   - Complete history with filtering and export
   - Direct workflow integration with VAT Returns
+
+- **[Invoice Editing System](./features/invoice-editing-system.md)** - 🆕 Comprehensive invoice modification system *(New)*
+  - Full invoice editing with supplier, date, and category changes
+  - Dynamic VAT line management with real-time calculations
+  - Support for negative amounts (credit notes and refunds)
+  - Automatic total recalculation with data integrity
+  - Irish VAT rate support (23%, 13.5%, 9%, 0%)
+  - Transaction-safe updates with audit trail
 
 - **[Receipts Management](./management/receipts.md)** - 🆕 Complete till review and transaction analysis *(New)*
   - POS transaction review with advanced filtering

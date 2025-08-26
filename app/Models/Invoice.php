@@ -120,9 +120,43 @@ class Invoice extends Model
      */
     public function calculateTotals(): void
     {
+        // Calculate main totals
         $this->subtotal = $this->vatLines->sum('net_amount');
         $this->vat_amount = $this->vatLines->sum('vat_amount');
         $this->total_amount = $this->vatLines->sum('gross_amount');
+        
+        // Reset VAT breakdown fields
+        $this->standard_net = 0;
+        $this->standard_vat = 0;
+        $this->reduced_net = 0;
+        $this->reduced_vat = 0;
+        $this->second_reduced_net = 0;
+        $this->second_reduced_vat = 0;
+        $this->zero_net = 0;
+        $this->zero_vat = 0;
+        
+        // Calculate VAT breakdown from VAT lines
+        foreach ($this->vatLines as $line) {
+            switch ($line->vat_category) {
+                case 'STANDARD':
+                    $this->standard_net += $line->net_amount;
+                    $this->standard_vat += $line->vat_amount;
+                    break;
+                case 'REDUCED':
+                    $this->reduced_net += $line->net_amount;
+                    $this->reduced_vat += $line->vat_amount;
+                    break;
+                case 'SECOND_REDUCED':
+                    $this->second_reduced_net += $line->net_amount;
+                    $this->second_reduced_vat += $line->vat_amount;
+                    break;
+                case 'ZERO':
+                    $this->zero_net += $line->net_amount;
+                    $this->zero_vat += $line->vat_amount;
+                    break;
+            }
+        }
+        
         $this->save();
     }
 

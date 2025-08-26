@@ -162,7 +162,7 @@
                 <div>
                     <h4 class="text-sm font-medium text-gray-400 mb-2">VAT Breakdown</h4>
                     <div class="space-y-2">
-                        @if($filteredStats['standard_net'] > 0 || $filteredStats['standard_vat'] > 0)
+                        @if($filteredStats['standard_net'] != 0 || $filteredStats['standard_vat'] != 0)
                         <div class="flex justify-between text-sm">
                             <span class="text-gray-400">Standard Rate (23%)</span>
                             <div class="text-right">
@@ -172,7 +172,7 @@
                             </div>
                         </div>
                         @endif
-                        @if($filteredStats['reduced_net'] > 0 || $filteredStats['reduced_vat'] > 0)
+                        @if($filteredStats['reduced_net'] != 0 || $filteredStats['reduced_vat'] != 0)
                         <div class="flex justify-between text-sm">
                             <span class="text-gray-400">Reduced Rate (13.5%)</span>
                             <div class="text-right">
@@ -182,7 +182,7 @@
                             </div>
                         </div>
                         @endif
-                        @if($filteredStats['second_reduced_net'] > 0 || $filteredStats['second_reduced_vat'] > 0)
+                        @if($filteredStats['second_reduced_net'] != 0 || $filteredStats['second_reduced_vat'] != 0)
                         <div class="flex justify-between text-sm">
                             <span class="text-gray-400">Second Reduced (9%)</span>
                             <div class="text-right">
@@ -192,7 +192,7 @@
                             </div>
                         </div>
                         @endif
-                        @if($filteredStats['zero_net'] > 0)
+                        @if($filteredStats['zero_net'] != 0)
                         <div class="flex justify-between text-sm">
                             <span class="text-gray-400">Zero Rate (0%)</span>
                             <div class="text-right">
