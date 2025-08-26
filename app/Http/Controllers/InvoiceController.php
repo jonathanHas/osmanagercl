@@ -170,7 +170,7 @@ class InvoiceController extends Controller
             // VAT lines
             'vat_lines' => 'required|array|min:1',
             'vat_lines.*.vat_category' => 'required|string|in:STANDARD,REDUCED,SECOND_REDUCED,ZERO',
-            'vat_lines.*.net_amount' => 'required|numeric|min:0',
+            'vat_lines.*.net_amount' => 'required|numeric',
         ]);
 
         DB::beginTransaction();
@@ -374,7 +374,7 @@ class InvoiceController extends Controller
             'vat_lines' => 'required|array|min:1',
             'vat_lines.*.id' => 'nullable|exists:invoice_vat_lines,id',
             'vat_lines.*.vat_category' => 'required|string|in:STANDARD,REDUCED,SECOND_REDUCED,ZERO',
-            'vat_lines.*.net_amount' => 'required|numeric|min:0',
+            'vat_lines.*.net_amount' => 'required|numeric',
         ]);
 
         DB::beginTransaction();

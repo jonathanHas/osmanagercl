@@ -141,7 +141,7 @@
                                             </td>
                                             <td class="py-2 px-1">
                                                 <input type="number" :name="'vat_lines[' + index + '][net_amount]'" 
-                                                       x-model.number="vatLine.net_amount" required step="0.01" min="0"
+                                                       x-model.number="vatLine.net_amount" required step="0.01"
                                                        @input="calculateVatLine(index)"
                                                        class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded text-sm text-right"
                                                        placeholder="0.00">
