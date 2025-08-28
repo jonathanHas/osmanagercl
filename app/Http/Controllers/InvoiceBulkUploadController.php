@@ -144,7 +144,7 @@ class InvoiceBulkUploadController extends Controller
             DB::commit();
 
             // Get page count for PDFs after successful upload
-            $pdfSplittingService = new \App\Services\PdfSplittingService();
+            $pdfSplittingService = new \App\Services\PdfSplittingService;
             foreach ($uploadedFiles as $uploadFile) {
                 $exists = file_exists($uploadFile->temp_file_path);
                 \Log::info('File status after DB commit', [
@@ -247,17 +247,17 @@ class InvoiceBulkUploadController extends Controller
 
         // Apply filters if provided
         $files = $batch->files;
-        
+
         // Filter by supplier if specified
         if ($request->has('supplier') && $request->supplier) {
             $files = $files->where('supplier_detected', $request->supplier);
         }
-        
+
         // Filter by status if specified
         if ($request->has('status') && $request->status) {
             $files = $files->where('status', $request->status);
         }
-        
+
         // For Amazon pending view, show specific messaging
         $isAmazonPendingView = $request->has('amazon_pending') && $request->amazon_pending == '1';
 
@@ -279,14 +279,14 @@ class InvoiceBulkUploadController extends Controller
     {
         // Find all files with Amazon pending status across all batches for the current user
         $files = InvoiceUploadFile::whereHas('bulkUpload', function ($query) {
-                $query->where('user_id', auth()->id());
-            })
+            $query->where('user_id', auth()->id());
+        })
             ->where(function ($query) {
                 $query->where('status', 'amazon_pending')
-                      ->orWhere(function ($subQuery) {
-                          $subQuery->where('supplier_detected', 'Amazon')
-                                   ->whereIn('status', ['review', 'parsed']);
-                      });
+                    ->orWhere(function ($subQuery) {
+                        $subQuery->where('supplier_detected', 'Amazon')
+                            ->whereIn('status', ['review', 'parsed']);
+                    });
             })
             ->with(['bulkUpload'])
             ->orderBy('created_at', 'desc')
@@ -295,6 +295,7 @@ class InvoiceBulkUploadController extends Controller
         // Group files by batch for better organization
         $batches = $files->groupBy('bulk_upload_id')->map(function ($batchFiles) {
             $firstFile = $batchFiles->first();
+
             return [
                 'batch' => $firstFile->bulkUpload,
                 'files' => $batchFiles,
@@ -328,12 +329,12 @@ class InvoiceBulkUploadController extends Controller
                 $deletedCount = 0;
                 foreach ($files as $file) {
                     // Only delete Amazon files that are pending/review
-                    if ($file->supplier_detected === 'Amazon' && 
+                    if ($file->supplier_detected === 'Amazon' &&
                         in_array($file->status, ['amazon_pending', 'review', 'parsed'])) {
-                        
+
                         // Delete temp file if exists
                         $file->deleteTempFile();
-                        
+
                         // Delete the upload file record
                         $file->delete();
                         $deletedCount++;
@@ -366,7 +367,7 @@ class InvoiceBulkUploadController extends Controller
 
             return response()->json([
                 'success' => false,
-                'error' => 'Failed to delete files: ' . $e->getMessage(),
+                'error' => 'Failed to delete files: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -615,13 +616,13 @@ class InvoiceBulkUploadController extends Controller
 
         // Check if file can be deleted
         $canDelete = in_array($file->status, ['pending', 'uploaded', 'failed']);
-        
+
         // Allow deletion of 'review' status files only if they have duplicate warnings
         if ($file->status === 'review') {
             $isDuplicate = $file->error_message && str_contains(strtolower($file->error_message), 'duplicate');
             $canDelete = $isDuplicate;
         }
-        
+
         if (! $canDelete) {
             return response()->json([
                 'success' => false,
@@ -720,7 +721,7 @@ class InvoiceBulkUploadController extends Controller
             ->where('bulk_upload_id', $batch->id)
             ->firstOrFail();
 
-        if (!$file->isPdf()) {
+        if (! $file->isPdf()) {
             return response()->json([
                 'success' => false,
                 'error' => 'File is not a PDF',
@@ -728,7 +729,7 @@ class InvoiceBulkUploadController extends Controller
         }
 
         try {
-            $pdfSplittingService = new \App\Services\PdfSplittingService();
+            $pdfSplittingService = new \App\Services\PdfSplittingService;
             $thumbnails = $pdfSplittingService->generateThumbnails($file);
 
             return response()->json([
@@ -744,7 +745,7 @@ class InvoiceBulkUploadController extends Controller
 
             return response()->json([
                 'success' => false,
-                'error' => 'Failed to generate thumbnails: ' . $e->getMessage(),
+                'error' => 'Failed to generate thumbnails: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -762,7 +763,7 @@ class InvoiceBulkUploadController extends Controller
             ->where('bulk_upload_id', $batch->id)
             ->firstOrFail();
 
-        if (!$file->canBeSplit()) {
+        if (! $file->canBeSplit()) {
             return response()->json([
                 'success' => false,
                 'error' => 'File cannot be split (must be multi-page PDF in uploaded status)',
@@ -799,7 +800,7 @@ class InvoiceBulkUploadController extends Controller
         DB::beginTransaction();
 
         try {
-            $pdfSplittingService = new \App\Services\PdfSplittingService();
+            $pdfSplittingService = new \App\Services\PdfSplittingService;
             $splitFiles = $pdfSplittingService->splitPdf($file, $pageRanges);
 
             DB::commit();
@@ -836,7 +837,7 @@ class InvoiceBulkUploadController extends Controller
 
             return response()->json([
                 'success' => false,
-                'error' => 'PDF splitting failed: ' . $e->getMessage(),
+                'error' => 'PDF splitting failed: '.$e->getMessage(),
             ], 500);
         }
     }

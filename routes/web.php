@@ -192,6 +192,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/sales', [FruitVegController::class, 'sales'])->name('sales');
         Route::get('/sales/data', [FruitVegController::class, 'getSalesData'])->name('sales.data');
         Route::get('/sales/product/{code}/daily', [FruitVegController::class, 'getProductDailySales'])->name('sales.product.daily');
+        Route::get('/price-sync', [FruitVegController::class, 'priceSync'])->name('price-sync');
+        Route::post('/price-sync/sync', [FruitVegController::class, 'syncPrice'])->name('price-sync.sync');
+        Route::post('/price-sync/bulk-sync', [FruitVegController::class, 'bulkSyncPrices'])->name('price-sync.bulk-sync');
     });
 
     // Coffee routes

@@ -11,8 +11,11 @@ use Illuminate\Support\Str;
 class PdfSplittingService
 {
     protected string $pythonPath;
+
     protected string $splitterScript;
+
     protected string $venvPath;
+
     protected int $timeout;
 
     public function __construct()
@@ -28,7 +31,7 @@ class PdfSplittingService
      */
     public function getPageCount(InvoiceUploadFile $file): int
     {
-        if (!$file->isPdf() || !$file->tempFileExists()) {
+        if (! $file->isPdf() || ! $file->tempFileExists()) {
             return 0;
         }
 
@@ -51,7 +54,7 @@ class PdfSplittingService
 
             $result = Process::timeout($this->timeout)->run($command);
 
-            if (!$result->successful()) {
+            if (! $result->successful()) {
                 Log::error('PDF page count failed', [
                     'file_id' => $file->id,
                     'command' => implode(' ', $command),
@@ -64,16 +67,18 @@ class PdfSplittingService
                     'file_exists' => file_exists($file->temp_file_path),
                     'file_readable' => is_readable($file->temp_file_path),
                 ]);
+
                 return 0;
             }
 
             $output = json_decode($result->output(), true);
-            
+
             if (json_last_error() !== JSON_ERROR_NONE) {
                 Log::error('Invalid JSON from PDF page counter', [
                     'file_id' => $file->id,
                     'output' => $result->output(),
                 ]);
+
                 return 0;
             }
 
@@ -83,6 +88,7 @@ class PdfSplittingService
                 'file_id' => $file->id,
                 'error' => $e->getMessage(),
             ]);
+
             return 0;
         }
     }
@@ -92,7 +98,7 @@ class PdfSplittingService
      */
     public function generateThumbnails(InvoiceUploadFile $file): array
     {
-        if (!$file->isPdf() || !$file->tempFileExists()) {
+        if (! $file->isPdf() || ! $file->tempFileExists()) {
             return [];
         }
 
@@ -115,7 +121,7 @@ class PdfSplittingService
 
             $result = Process::timeout($this->timeout)->run($command);
 
-            if (!$result->successful()) {
+            if (! $result->successful()) {
                 Log::error('PDF thumbnail generation failed', [
                     'file_id' => $file->id,
                     'command' => implode(' ', $command),
@@ -128,16 +134,18 @@ class PdfSplittingService
                     'file_exists' => file_exists($file->temp_file_path),
                     'file_readable' => is_readable($file->temp_file_path),
                 ]);
+
                 return [];
             }
 
             $output = json_decode($result->output(), true);
-            
+
             if (json_last_error() !== JSON_ERROR_NONE) {
                 Log::error('Invalid JSON from PDF thumbnail generator', [
                     'file_id' => $file->id,
                     'output' => $result->output(),
                 ]);
+
                 return [];
             }
 
@@ -147,20 +155,20 @@ class PdfSplittingService
                 'file_id' => $file->id,
                 'error' => $e->getMessage(),
             ]);
+
             return [];
         }
     }
 
     /**
      * Split a PDF file by page ranges
-     * 
-     * @param InvoiceUploadFile $file
-     * @param array $pageRanges Array of page ranges, e.g., ['1', '2-3', '4']
+     *
+     * @param  array  $pageRanges  Array of page ranges, e.g., ['1', '2-3', '4']
      * @return array Array of new InvoiceUploadFile records
      */
     public function splitPdf(InvoiceUploadFile $file, array $pageRanges): array
     {
-        if (!$file->canBeSplit()) {
+        if (! $file->canBeSplit()) {
             throw new \InvalidArgumentException('File cannot be split');
         }
 
@@ -170,7 +178,7 @@ class PdfSplittingService
             $pythonExecutable = file_exists($venvPython) ? $venvPython : $this->pythonPath;
 
             $outputDir = dirname($file->temp_file_path).'/splits';
-            if (!is_dir($outputDir)) {
+            if (! is_dir($outputDir)) {
                 mkdir($outputDir, 0775, true);
             }
 
@@ -191,11 +199,11 @@ class PdfSplittingService
 
             $result = Process::timeout($this->timeout)->run($command);
 
-            if (!$result->successful()) {
+            if (! $result->successful()) {
                 $errorOutput = $result->errorOutput();
                 $stdOutput = $result->output();
                 $exitCode = $result->exitCode();
-                
+
                 Log::error('PDF splitting failed', [
                     'file_id' => $file->id,
                     'command' => implode(' ', $command),
@@ -211,22 +219,22 @@ class PdfSplittingService
                     'script_exists' => file_exists($this->splitterScript),
                     'script_readable' => is_readable($this->splitterScript),
                 ]);
-                
+
                 // Provide more helpful error message
                 $errorMessage = 'PDF splitting failed';
-                if (!empty($errorOutput)) {
-                    $errorMessage .= ': ' . $errorOutput;
-                } elseif (!empty($stdOutput)) {
-                    $errorMessage .= ': ' . $stdOutput;
+                if (! empty($errorOutput)) {
+                    $errorMessage .= ': '.$errorOutput;
+                } elseif (! empty($stdOutput)) {
+                    $errorMessage .= ': '.$stdOutput;
                 } else {
-                    $errorMessage .= ' with exit code ' . $exitCode;
+                    $errorMessage .= ' with exit code '.$exitCode;
                 }
-                
+
                 throw new \Exception($errorMessage);
             }
 
             $output = json_decode($result->output(), true);
-            
+
             if (json_last_error() !== JSON_ERROR_NONE) {
                 Log::error('Invalid JSON from PDF splitter', [
                     'file_id' => $file->id,
@@ -239,45 +247,47 @@ class PdfSplittingService
             $splitFilePaths = $output['split_files'] ?? [];
 
             foreach ($splitFilePaths as $index => $splitPath) {
-                if (!file_exists($splitPath)) {
+                if (! file_exists($splitPath)) {
                     Log::warning('Split file not found', [
                         'expected_path' => $splitPath,
                         'index' => $index,
                     ]);
+
                     continue;
                 }
 
                 $pageRange = $pageRanges[$index] ?? 'unknown';
                 $originalExt = pathinfo($file->original_filename, PATHINFO_EXTENSION);
                 $originalName = pathinfo($file->original_filename, PATHINFO_FILENAME);
-                
+
                 // Create a descriptive filename
-                $newFilename = $originalName . '_page_' . str_replace('-', '_to_', $pageRange) . '.' . $originalExt;
-                
+                $newFilename = $originalName.'_page_'.str_replace('-', '_to_', $pageRange).'.'.$originalExt;
+
                 // Generate new stored filename
-                $storedName = Str::uuid() . '.pdf';
-                
+                $storedName = Str::uuid().'.pdf';
+
                 // Calculate path within batch folder
                 $batchFolder = dirname($file->temp_path);
-                $newTempPath = $batchFolder . '/' . $storedName;
-                
+                $newTempPath = $batchFolder.'/'.$storedName;
+
                 // Move file to batch folder
                 $newFullPath = Storage::disk('local')->path($newTempPath);
-                if (!rename($splitPath, $newFullPath)) {
+                if (! rename($splitPath, $newFullPath)) {
                     Log::error('Failed to move split file', [
                         'from' => $splitPath,
                         'to' => $newFullPath,
                     ]);
+
                     continue;
                 }
 
                 // Set proper permissions
                 chmod($newFullPath, 0664);
-                
+
                 // Calculate file hash and size
                 $fileHash = hash_file('sha256', $newFullPath);
                 $fileSize = filesize($newFullPath);
-                
+
                 // Create new file record
                 $splitFile = InvoiceUploadFile::create([
                     'bulk_upload_id' => $file->bulk_upload_id,
@@ -297,7 +307,7 @@ class PdfSplittingService
                 ]);
 
                 $splitFiles[] = $splitFile;
-                
+
                 Log::info('Created split file', [
                     'original_file_id' => $file->id,
                     'split_file_id' => $splitFile->id,
@@ -343,8 +353,10 @@ class PdfSplittingService
     {
         if (str_contains($range, '-')) {
             [$start, $end] = explode('-', $range, 2);
+
             return max(1, intval($end) - intval($start) + 1);
         }
+
         return 1;
     }
 
@@ -353,19 +365,20 @@ class PdfSplittingService
      */
     private function removeDirectory(string $dir): bool
     {
-        if (!is_dir($dir)) {
+        if (! is_dir($dir)) {
             return false;
         }
 
         $files = array_diff(scandir($dir), ['.', '..']);
         foreach ($files as $file) {
-            $path = $dir . DIRECTORY_SEPARATOR . $file;
+            $path = $dir.DIRECTORY_SEPARATOR.$file;
             if (is_dir($path)) {
                 $this->removeDirectory($path);
             } else {
                 unlink($path);
             }
         }
+
         return rmdir($dir);
     }
 }

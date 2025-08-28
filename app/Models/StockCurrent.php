@@ -55,7 +55,9 @@ class StockCurrent extends Model
      * @var array<int, string>
      */
     protected $fillable = [
+        'LOCATION',
         'PRODUCT',
+        'ATTRIBUTESETINSTANCE_ID',
         'UNITS',
     ];
 

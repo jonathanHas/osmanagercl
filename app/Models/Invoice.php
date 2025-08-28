@@ -124,7 +124,7 @@ class Invoice extends Model
         $this->subtotal = $this->vatLines->sum('net_amount');
         $this->vat_amount = $this->vatLines->sum('vat_amount');
         $this->total_amount = $this->vatLines->sum('gross_amount');
-        
+
         // Reset VAT breakdown fields
         $this->standard_net = 0;
         $this->standard_vat = 0;
@@ -134,7 +134,7 @@ class Invoice extends Model
         $this->second_reduced_vat = 0;
         $this->zero_net = 0;
         $this->zero_vat = 0;
-        
+
         // Calculate VAT breakdown from VAT lines
         foreach ($this->vatLines as $line) {
             switch ($line->vat_category) {
@@ -156,7 +156,7 @@ class Invoice extends Model
                     break;
             }
         }
-        
+
         $this->save();
     }
 

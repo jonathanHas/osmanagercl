@@ -139,9 +139,9 @@ class InvoiceUploadFile extends Model
      */
     public function canBeSplit(): bool
     {
-        return $this->isPdf() && 
-               $this->page_count > 1 && 
-               !$this->is_split && 
+        return $this->isPdf() &&
+               $this->page_count > 1 &&
+               ! $this->is_split &&
                $this->status === 'uploaded';
     }
 

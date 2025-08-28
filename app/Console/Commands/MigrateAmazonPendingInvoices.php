@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\AmazonInvoicePending;
-use App\Models\InvoiceBulkUpload;
 use App\Models\InvoiceUploadFile;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -28,9 +27,9 @@ class MigrateAmazonPendingInvoices extends Command
     public function handle()
     {
         $isDryRun = $this->option('dry-run');
-        
+
         $this->info('Migrating Amazon pending invoices to unified bulk-upload system...');
-        
+
         if ($isDryRun) {
             $this->warn('DRY RUN MODE - No changes will be made');
         }
@@ -42,6 +41,7 @@ class MigrateAmazonPendingInvoices extends Command
 
         if ($pendingInvoices->isEmpty()) {
             $this->info('No pending Amazon invoices found to migrate.');
+
             return 0;
         }
 
@@ -51,9 +51,10 @@ class MigrateAmazonPendingInvoices extends Command
             $this->line("- ID: {$pending->id}, File: {$pending->uploadFile->original_filename}, User: {$pending->user->name}");
         }
 
-        if (!$isDryRun) {
-            if (!$this->confirm('Proceed with migration?')) {
+        if (! $isDryRun) {
+            if (! $this->confirm('Proceed with migration?')) {
                 $this->info('Migration cancelled.');
+
                 return 0;
             }
         }
@@ -63,7 +64,7 @@ class MigrateAmazonPendingInvoices extends Command
 
         foreach ($pendingInvoices as $pending) {
             try {
-                if (!$isDryRun) {
+                if (! $isDryRun) {
                     DB::transaction(function () use ($pending) {
                         // Update the InvoiceUploadFile status to amazon_pending
                         $uploadFile = $pending->uploadFile;
@@ -82,8 +83,8 @@ class MigrateAmazonPendingInvoices extends Command
                         // Archive the old pending record (don't delete for history)
                         // Just update notes, keep existing status to avoid enum issues
                         $pending->update([
-                            'notes' => ($pending->notes ? $pending->notes . "\n\n" : '') . 
-                                      'Migrated to unified bulk-upload system on ' . now()->format('Y-m-d H:i:s'),
+                            'notes' => ($pending->notes ? $pending->notes."\n\n" : '').
+                                      'Migrated to unified bulk-upload system on '.now()->format('Y-m-d H:i:s'),
                         ]);
 
                         Log::info('Migrated Amazon pending invoice to bulk-upload system', [
@@ -96,12 +97,12 @@ class MigrateAmazonPendingInvoices extends Command
 
                 $this->info("✓ Migrated: {$pending->uploadFile->original_filename} (Pending ID: {$pending->id})");
                 $migratedCount++;
-                
+
             } catch (\Exception $e) {
                 $this->error("✗ Failed to migrate: {$pending->uploadFile->original_filename} - {$e->getMessage()}");
                 $errorCount++;
-                
-                if (!$isDryRun) {
+
+                if (! $isDryRun) {
                     Log::error('Failed to migrate Amazon pending invoice', [
                         'amazon_pending_id' => $pending->id,
                         'error' => $e->getMessage(),
@@ -120,12 +121,13 @@ class MigrateAmazonPendingInvoices extends Command
         } else {
             $this->info("\nMIGRATION COMPLETE:");
             $this->info("Successfully migrated: {$migratedCount} invoices");
-            
+
             if ($errorCount > 0) {
                 $this->error("Failed to migrate: {$errorCount} invoices");
+
                 return 1;
             }
-            
+
             $this->info('All Amazon pending invoices have been migrated to the unified bulk-upload system!');
             $this->info('You can now access them at: /invoices/bulk-upload/amazon-pending');
         }

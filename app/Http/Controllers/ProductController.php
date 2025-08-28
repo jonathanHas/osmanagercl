@@ -756,16 +756,16 @@ class ProductController extends Controller
         $taxCategories = TaxCategory::orderBy('NAME')->get();
         $categories = Category::orderBy('NAME')->get();
         $suppliers = Supplier::orderBy('Supplier')->get();
-        
+
         // Get tax rates for JavaScript pricing calculations
         $taxRates = Tax::pluck('RATE', 'CATEGORY')->toArray();
-        
+
         // Get UDEA supplier IDs from config
         $udeaSupplierIds = config('suppliers.external_links.udea.supplier_ids', [5, 44, 85]);
 
         // Get supplier information if product has a supplier link
         $supplierLink = $product->supplierLinks->first();
-        
+
         // Prepare data for form population
         $prefillData = [
             'name' => $product->NAME,
@@ -782,7 +782,7 @@ class ProductController extends Controller
 
         // Check if product is in stocking management
         $includeInStocking = $product->stocking !== null;
-        
+
         // Check if product is visible on till
         $showOnTill = $this->tillVisibilityService->isVisibleOnTill($product->ID);
 
@@ -792,11 +792,11 @@ class ProductController extends Controller
 
         return view('products.edit', compact(
             'product',
-            'taxCategories', 
-            'categories', 
-            'suppliers', 
+            'taxCategories',
+            'categories',
+            'suppliers',
             'prefillData',
-            'taxRates', 
+            'taxRates',
             'udeaSupplierIds',
             'includeInStocking',
             'showOnTill',
@@ -880,6 +880,23 @@ class ProductController extends Controller
                     ]);
                 }
 
+                // Initialize STOCKCURRENT entry with 0 units (required for POS integration)
+                try {
+                    \App\Models\StockCurrent::create([
+                        'LOCATION' => '0',  // Default location
+                        'PRODUCT' => $product->ID,
+                        'ATTRIBUTESETINSTANCE_ID' => null,
+                        'UNITS' => 0.0,  // Initialize with 0 stock
+                    ]);
+                } catch (\Exception $e) {
+                    // Log the error but don't fail the product creation
+                    \Log::warning('Failed to initialize STOCKCURRENT for new product', [
+                        'product_id' => $product->ID,
+                        'product_code' => $product->CODE,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+
                 // Add to stocking table if requested
                 if ($request->boolean('include_in_stocking', true)) {
                     try {
@@ -945,7 +962,7 @@ class ProductController extends Controller
             // Update supplier link if provided
             if ($request->supplier_id) {
                 $supplierLink = $product->supplierLinks->first();
-                
+
                 if ($supplierLink) {
                     // Update existing supplier link
                     $supplierLink->update([
@@ -969,7 +986,7 @@ class ProductController extends Controller
             // Update stocking status
             if ($request->boolean('include_in_stocking', false)) {
                 // Ensure stocking record exists
-                if (!$product->stocking) {
+                if (! $product->stocking) {
                     \App\Models\Stocking::create([
                         'PRODUCT' => $product->CODE,
                         'STOCKSECURITY' => 0,
@@ -984,9 +1001,26 @@ class ProductController extends Controller
 
             // Update till visibility
             $this->tillVisibilityService->setVisibility(
-                $product->ID, 
+                $product->ID,
                 $request->boolean('show_on_till', true)
             );
+
+            // Ensure STOCKCURRENT exists (create if missing)
+            if (! $product->stockCurrent) {
+                try {
+                    \App\Models\StockCurrent::create([
+                        'LOCATION' => '0',  // Default location
+                        'PRODUCT' => $product->ID,
+                        'ATTRIBUTESETINSTANCE_ID' => null,
+                        'UNITS' => 0.0,  // Initialize with 0 stock
+                    ]);
+                } catch (\Exception $e) {
+                    \Log::warning('Failed to create missing STOCKCURRENT during product update', [
+                        'product_id' => $product->ID,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
 
             // Log the update
             \Log::info('Product updated via edit form', [
@@ -999,13 +1033,13 @@ class ProductController extends Controller
             // Determine redirect route with context
             $fromDelivery = $request->query('from_delivery');
             $fromContext = $request->query('from');
-            
+
             $redirectUrl = route('products.show', $product->ID);
-            
+
             if ($fromDelivery) {
-                $redirectUrl .= '?from_delivery=' . $fromDelivery;
+                $redirectUrl .= '?from_delivery='.$fromDelivery;
             } elseif ($fromContext) {
-                $redirectUrl .= '?from=' . $fromContext;
+                $redirectUrl .= '?from='.$fromContext;
             }
 
             return redirect($redirectUrl)
@@ -1014,7 +1048,7 @@ class ProductController extends Controller
         } catch (\Exception $e) {
             return back()
                 ->withInput()
-                ->withErrors(['error' => 'Failed to update product: ' . $e->getMessage()]);
+                ->withErrors(['error' => 'Failed to update product: '.$e->getMessage()]);
         }
     }
 
@@ -1266,7 +1300,9 @@ class ProductController extends Controller
             } else {
                 // Create new stock record
                 \App\Models\StockCurrent::create([
+                    'LOCATION' => '0',  // Default location
                     'PRODUCT' => $product->ID,
+                    'ATTRIBUTESETINSTANCE_ID' => null,
                     'UNITS' => $stockUnits,
                 ]);
             }

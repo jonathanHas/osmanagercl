@@ -323,7 +323,7 @@ class InvoiceCreationService
         try {
             // Set umask to ensure proper permissions for new files/directories
             $oldUmask = umask(0002); // This ensures group write permissions
-            
+
             // Get the full path to the temp file
             $tempFilePath = $file->temp_file_path;
 
@@ -341,10 +341,10 @@ class InvoiceCreationService
             // Copy file to permanent location
             $tempFileContent = file_get_contents($tempFilePath);
             Storage::disk('local')->put($permanentPath, $tempFileContent);
-            
+
             // Fix file and directory permissions to ensure web server can access files
             $this->fixAttachmentPermissions($permanentPath);
-            
+
             // Restore original umask
             umask($oldUmask);
 
@@ -484,9 +484,9 @@ class InvoiceCreationService
         $fullDirPath = Storage::disk('local')->path($directory);
 
         // Create directory structure if it doesn't exist
-        if (!Storage::disk('local')->exists($directory)) {
+        if (! Storage::disk('local')->exists($directory)) {
             Storage::disk('local')->makeDirectory($directory, 0775, true);
-            
+
             // Manually set permissions and ownership to ensure consistency
             $this->fixDirectoryPermissions($fullDirPath);
         }
@@ -500,11 +500,11 @@ class InvoiceCreationService
         try {
             $fullPath = Storage::disk('local')->path($filePath);
             $directory = dirname($fullPath);
-            
+
             // Set file permissions (readable by group)
             if (file_exists($fullPath)) {
                 chmod($fullPath, 0664);
-                
+
                 // Try to set group ownership if possible (jon user is in www-data group)
                 try {
                     chgrp($fullPath, 'www-data');
@@ -515,10 +515,10 @@ class InvoiceCreationService
                     ]);
                 }
             }
-            
+
             // Fix directory permissions recursively
             $this->fixDirectoryPermissions($directory);
-            
+
         } catch (\Exception $e) {
             Log::warning('Failed to set permissions for invoice attachment', [
                 'path' => $filePath,
@@ -535,7 +535,7 @@ class InvoiceCreationService
         try {
             // Set directory permissions (775 = rwxrwxr-x)
             chmod($directory, 0775);
-            
+
             // Try to set group ownership if possible
             try {
                 chgrp($directory, 'www-data');
@@ -545,7 +545,7 @@ class InvoiceCreationService
                     'error' => $e->getMessage(),
                 ]);
             }
-            
+
             // Also ensure parent directories have correct permissions
             $parentDir = dirname($directory);
             if (is_dir($parentDir) && $parentDir !== $directory) {
@@ -554,7 +554,7 @@ class InvoiceCreationService
                     $this->fixDirectoryPermissions($parentDir);
                 }
             }
-            
+
         } catch (\Exception $e) {
             Log::debug('Could not fix directory permissions', [
                 'directory' => $directory,

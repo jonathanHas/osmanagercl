@@ -220,19 +220,52 @@ class FruitVegController extends Controller
 
         // Only proceed if price actually changed
         if ($oldPrice != $newPrice) {
-            // Log price change
-            DB::table('veg_price_history')->insert([
-                'product_code' => $request->product_code,
-                'old_price' => $oldPrice,
-                'new_price' => $newPrice,
-                'changed_by' => Auth::id(),
-                'changed_at' => now(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            // Start transactions on both database connections
+            DB::beginTransaction();
+            DB::connection('pos')->beginTransaction();
 
-            // Add to print queue
-            VegPrintQueue::addToQueue($request->product_code, 'price_change');
+            try {
+                // Log price change in Laravel database
+                DB::table('veg_price_history')->insert([
+                    'product_code' => $request->product_code,
+                    'old_price' => $oldPrice,
+                    'new_price' => $newPrice,
+                    'changed_by' => Auth::id(),
+                    'changed_at' => now(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                // Calculate net price for POS database (remove VAT)
+                $vatRate = $product->getVatRate();
+                $netPrice = $newPrice / (1 + $vatRate);
+
+                // Update POS database price
+                DB::connection('pos')->table('PRODUCTS')
+                    ->where('ID', $product->ID)
+                    ->update(['PRICESELL' => $netPrice]);
+
+                // Commit both transactions if everything succeeded
+                DB::commit();
+                DB::connection('pos')->commit();
+
+                // Add to print queue after successful update
+                VegPrintQueue::addToQueue($request->product_code, 'price_change');
+            } catch (\Exception $e) {
+                // Rollback both transactions on failure
+                DB::rollBack();
+                DB::connection('pos')->rollBack();
+
+                // Log the error for debugging
+                \Log::error('Failed to update product price', [
+                    'product_code' => $request->product_code,
+                    'old_price' => $oldPrice,
+                    'new_price' => $newPrice,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return response()->json(['error' => 'Failed to update price. Please try again.'], 500);
+            }
         }
 
         return response()->json(['success' => true]);
@@ -1288,5 +1321,220 @@ class FruitVegController extends Controller
                 'error' => 'Failed to load daily sales data',
             ], 500);
         }
+    }
+
+    /**
+     * Display price synchronization management page.
+     */
+    public function priceSync()
+    {
+        // Get all products with price history
+        $priceHistoryProducts = DB::table('veg_price_history')
+            ->select('product_code', DB::raw('MAX(changed_at) as latest_change'))
+            ->groupBy('product_code')
+            ->get();
+
+        $totalProducts = Product::whereHas('vegDetails')->count();
+        $productsWithHistory = $priceHistoryProducts->count();
+
+        $discrepancies = [];
+        $synchronizedCount = 0;
+
+        foreach ($priceHistoryProducts as $historyProduct) {
+            // Get the latest price from history
+            $latestPrice = DB::table('veg_price_history')
+                ->where('product_code', $historyProduct->product_code)
+                ->where('changed_at', $historyProduct->latest_change)
+                ->first();
+
+            // Get the product from POS
+            $product = Product::where('CODE', $historyProduct->product_code)->first();
+
+            if ($product) {
+                $posGrossPrice = round($product->getGrossPrice(), 2);
+                $historyPrice = round($latestPrice->new_price, 2);
+
+                if (abs($posGrossPrice - $historyPrice) > 0.01) {
+                    $discrepancies[] = [
+                        'code' => $historyProduct->product_code,
+                        'name' => $product->NAME,
+                        'pos_price' => $posGrossPrice,
+                        'history_price' => $historyPrice,
+                        'difference' => $historyPrice - $posGrossPrice,
+                        'last_changed' => $historyProduct->latest_change,
+                        'pos_net_price' => $product->PRICESELL,
+                    ];
+                } else {
+                    $synchronizedCount++;
+                }
+            }
+        }
+
+        // Sort by absolute difference (largest first)
+        usort($discrepancies, function ($a, $b) {
+            return abs($b['difference']) <=> abs($a['difference']);
+        });
+
+        $stats = [
+            'total_fv_products' => $totalProducts,
+            'products_with_history' => $productsWithHistory,
+            'synchronized' => $synchronizedCount,
+            'out_of_sync' => count($discrepancies),
+        ];
+
+        return view('fruit-veg.price-sync', compact('discrepancies', 'stats'));
+    }
+
+    /**
+     * Sync a single product's price.
+     */
+    public function syncPrice(Request $request)
+    {
+        $request->validate([
+            'product_code' => 'required|string',
+            'direction' => 'required|in:history_to_pos,pos_to_history',
+        ]);
+
+        $product = Product::where('CODE', $request->product_code)->firstOrFail();
+
+        try {
+            if ($request->direction === 'history_to_pos') {
+                // Sync from history to POS
+                $latestHistory = DB::table('veg_price_history')
+                    ->where('product_code', $request->product_code)
+                    ->orderBy('changed_at', 'desc')
+                    ->first();
+
+                if (! $latestHistory) {
+                    return response()->json(['error' => 'No price history found'], 400);
+                }
+
+                $newGrossPrice = $latestHistory->new_price;
+                $vatRate = $product->getVatRate();
+                $netPrice = $newGrossPrice / (1 + $vatRate);
+
+                DB::connection('pos')->table('PRODUCTS')
+                    ->where('ID', $product->ID)
+                    ->update(['PRICESELL' => $netPrice]);
+
+                $message = "POS price updated to €{$newGrossPrice} from price history";
+            } else {
+                // Sync from POS to history
+                $posGrossPrice = $product->getGrossPrice();
+
+                // Get the current history price for comparison
+                $latestHistory = DB::table('veg_price_history')
+                    ->where('product_code', $request->product_code)
+                    ->orderBy('changed_at', 'desc')
+                    ->first();
+
+                $oldPrice = $latestHistory ? $latestHistory->new_price : $posGrossPrice;
+
+                DB::table('veg_price_history')->insert([
+                    'product_code' => $request->product_code,
+                    'old_price' => $oldPrice,
+                    'new_price' => $posGrossPrice,
+                    'changed_by' => Auth::id(),
+                    'changed_at' => now(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                $message = "Price history updated to €{$posGrossPrice} from POS";
+            }
+
+            return response()->json(['success' => true, 'message' => $message]);
+        } catch (\Exception $e) {
+            \Log::error('Failed to sync product price', [
+                'product_code' => $request->product_code,
+                'direction' => $request->direction,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json(['error' => 'Failed to sync price'], 500);
+        }
+    }
+
+    /**
+     * Bulk sync multiple products.
+     */
+    public function bulkSyncPrices(Request $request)
+    {
+        $request->validate([
+            'product_codes' => 'required|array',
+            'product_codes.*' => 'string',
+            'direction' => 'required|in:history_to_pos,pos_to_history',
+        ]);
+
+        $successCount = 0;
+        $errorCount = 0;
+        $errors = [];
+
+        foreach ($request->product_codes as $productCode) {
+            try {
+                $product = Product::where('CODE', $productCode)->first();
+                if (! $product) {
+                    $errors[] = "Product {$productCode} not found";
+                    $errorCount++;
+
+                    continue;
+                }
+
+                if ($request->direction === 'history_to_pos') {
+                    $latestHistory = DB::table('veg_price_history')
+                        ->where('product_code', $productCode)
+                        ->orderBy('changed_at', 'desc')
+                        ->first();
+
+                    if (! $latestHistory) {
+                        $errors[] = "No price history for {$productCode}";
+                        $errorCount++;
+
+                        continue;
+                    }
+
+                    $newGrossPrice = $latestHistory->new_price;
+                    $vatRate = $product->getVatRate();
+                    $netPrice = $newGrossPrice / (1 + $vatRate);
+
+                    DB::connection('pos')->table('PRODUCTS')
+                        ->where('ID', $product->ID)
+                        ->update(['PRICESELL' => $netPrice]);
+                } else {
+                    $posGrossPrice = $product->getGrossPrice();
+                    $latestHistory = DB::table('veg_price_history')
+                        ->where('product_code', $productCode)
+                        ->orderBy('changed_at', 'desc')
+                        ->first();
+
+                    $oldPrice = $latestHistory ? $latestHistory->new_price : $posGrossPrice;
+
+                    DB::table('veg_price_history')->insert([
+                        'product_code' => $productCode,
+                        'old_price' => $oldPrice,
+                        'new_price' => $posGrossPrice,
+                        'changed_by' => Auth::id(),
+                        'changed_at' => now(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                $successCount++;
+            } catch (\Exception $e) {
+                $errors[] = "Error syncing {$productCode}: ".$e->getMessage();
+                $errorCount++;
+            }
+        }
+
+        return response()->json([
+            'success' => $errorCount === 0,
+            'message' => "Synced {$successCount} products".($errorCount > 0 ? " with {$errorCount} errors" : ''),
+            'errors' => $errors,
+            'stats' => [
+                'success' => $successCount,
+                'errors' => $errorCount,
+            ],
+        ]);
     }
 }
