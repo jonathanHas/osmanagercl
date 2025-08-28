@@ -79,12 +79,83 @@
             </div>
 
 
+            <!-- Filter Controls -->
+            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-4">
+                <div class="p-4">
+                    <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 mb-3">Filter Labels by Add Method</h3>
+                    <div class="flex flex-wrap gap-3">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" 
+                                   name="filter_all" 
+                                   id="filter-all"
+                                   class="sr-only filter-checkbox" 
+                                   data-filter="all"
+                                   @if(empty($filters)) checked @endif>
+                            <div class="filter-card border-2 rounded-lg px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700" 
+                                 data-filter="all">
+                                <div class="text-sm font-medium text-gray-900 dark:text-gray-100">All Labels</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">{{ $labelCounts['total'] }} products</div>
+                            </div>
+                        </label>
+                        
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" 
+                                   name="filter_new_product" 
+                                   id="filter-new-product"
+                                   class="sr-only filter-checkbox" 
+                                   data-filter="new_product"
+                                   @if(in_array('new_product', $filters)) checked @endif>
+                            <div class="filter-card border-2 rounded-lg px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700" 
+                                 data-filter="new_product">
+                                <div class="text-sm font-medium text-gray-900 dark:text-gray-100">New Products</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">{{ $labelCounts['new_product'] }} products</div>
+                            </div>
+                        </label>
+                        
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" 
+                                   name="filter_price_update" 
+                                   id="filter-price-update"
+                                   class="sr-only filter-checkbox" 
+                                   data-filter="price_update"
+                                   @if(in_array('price_update', $filters)) checked @endif>
+                            <div class="filter-card border-2 rounded-lg px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700" 
+                                 data-filter="price_update">
+                                <div class="text-sm font-medium text-gray-900 dark:text-gray-100">Price Updates</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">{{ $labelCounts['price_update'] }} products</div>
+                            </div>
+                        </label>
+                        
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" 
+                                   name="filter_requeue_label" 
+                                   id="filter-requeue-label"
+                                   class="sr-only filter-checkbox" 
+                                   data-filter="requeue_label"
+                                   @if(in_array('requeue_label', $filters)) checked @endif>
+                            <div class="filter-card border-2 rounded-lg px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700" 
+                                 data-filter="requeue_label">
+                                <div class="text-sm font-medium text-gray-900 dark:text-gray-100">Scanned/Re-queued</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">{{ $labelCounts['requeue_label'] }} products</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
             <!-- Products Needing Labels -->
             @if(count($productsNeedingLabels) > 0)
                 <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
                     <div class="p-4">
                         <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Products Needing Labels</h3>
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                                Products Needing Labels
+                                @if(!empty($filters))
+                                    <span class="text-sm text-gray-500 dark:text-gray-400 font-normal ml-2">
+                                        (Filtered: {{ implode(', ', array_map('ucwords', str_replace('_', ' ', $filters))) }})
+                                    </span>
+                                @endif
+                            </h3>
                             <div class="flex items-center gap-3">
                                 <!-- Clear Labels Button -->
                                 <button onclick="clearAllLabels()" 
@@ -127,6 +198,7 @@
                                     <tr>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Product</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Barcode</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Add Method</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Price</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Preview</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
@@ -141,6 +213,27 @@
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-gray-100">
                                                 {{ $product->CODE }}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                @php
+                                                    $eventType = $product->label_event_type ?? 'unknown';
+                                                    $badgeColors = [
+                                                        'new_product' => 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+                                                        'price_update' => 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+                                                        'requeue_label' => 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+                                                    ];
+                                                    $badgeText = [
+                                                        'new_product' => 'New Product',
+                                                        'price_update' => 'Price Update',
+                                                        'requeue_label' => 'Scanned',
+                                                    ];
+                                                @endphp
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $badgeColors[$eventType] ?? 'bg-gray-100 text-gray-800' }}">
+                                                    {{ $badgeText[$eventType] ?? ucwords(str_replace('_', ' ', $eventType)) }}
+                                                </span>
+                                                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                    {{ $product->label_event_date ? \Carbon\Carbon::parse($product->label_event_date)->diffForHumans() : '' }}
+                                                </div>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                                                 <div class="font-semibold">{{ $product->getFormattedPriceWithVatAttribute() }}</div>
@@ -410,7 +503,93 @@
         let selectedTemplateId = {{ $defaultTemplate?->id ?? 'null' }};
         const totalProducts = {{ count($productsNeedingLabels) }};
 
+        // Filter functionality
+        function initializeFilters() {
+            const filterCards = document.querySelectorAll('.filter-card');
+            const filterCheckboxes = document.querySelectorAll('.filter-checkbox');
+            
+            // Update visual states for filters
+            function updateFilterSelection() {
+                filterCards.forEach(card => {
+                    const checkbox = card.parentElement.querySelector('.filter-checkbox');
+                    if (checkbox.checked) {
+                        card.classList.add('border-blue-500', 'bg-blue-50', 'dark:bg-blue-900/20');
+                        card.classList.remove('border-gray-300', 'dark:border-gray-600');
+                    } else {
+                        card.classList.remove('border-blue-500', 'bg-blue-50', 'dark:bg-blue-900/20');
+                        card.classList.add('border-gray-300', 'dark:border-gray-600');
+                    }
+                });
+            }
+
+            // Handle filter card clicks
+            filterCards.forEach(card => {
+                card.addEventListener('click', function() {
+                    const checkbox = this.parentElement.querySelector('.filter-checkbox');
+                    const filter = checkbox.dataset.filter;
+                    
+                    if (filter === 'all') {
+                        // If "All" is clicked, uncheck other filters
+                        filterCheckboxes.forEach(cb => {
+                            if (cb.dataset.filter !== 'all') {
+                                cb.checked = false;
+                            }
+                        });
+                        checkbox.checked = true;
+                    } else {
+                        // If specific filter is clicked, uncheck "All"
+                        const allCheckbox = document.querySelector('.filter-checkbox[data-filter="all"]');
+                        if (allCheckbox) {
+                            allCheckbox.checked = false;
+                        }
+                        checkbox.checked = !checkbox.checked;
+                        
+                        // If no specific filters are selected, check "All"
+                        const specificFiltersChecked = Array.from(filterCheckboxes).some(cb => 
+                            cb.dataset.filter !== 'all' && cb.checked
+                        );
+                        if (!specificFiltersChecked && allCheckbox) {
+                            allCheckbox.checked = true;
+                        }
+                    }
+                    
+                    updateFilterSelection();
+                    applyFilters();
+                });
+            });
+
+            // Initialize visual state
+            updateFilterSelection();
+        }
+
+        function applyFilters() {
+            const selectedFilters = [];
+            const filterCheckboxes = document.querySelectorAll('.filter-checkbox');
+            
+            filterCheckboxes.forEach(checkbox => {
+                if (checkbox.checked && checkbox.dataset.filter !== 'all') {
+                    selectedFilters.push(checkbox.dataset.filter);
+                }
+            });
+            
+            // Build URL with filters
+            const url = new URL(window.location);
+            url.searchParams.delete('filters[]'); // Remove existing filters
+            
+            if (selectedFilters.length > 0) {
+                selectedFilters.forEach(filter => {
+                    url.searchParams.append('filters[]', filter);
+                });
+            }
+            
+            // Navigate to filtered URL
+            window.location.href = url.toString();
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
+            // Handle filter selection
+            initializeFilters();
+            
             // Handle template selection
             const templateRadios = document.querySelectorAll('.template-radio');
             const templateCards = document.querySelectorAll('.template-card');

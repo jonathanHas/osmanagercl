@@ -27,8 +27,11 @@ class LabelAreaController extends Controller
     /**
      * Display the label area dashboard.
      */
-    public function index(): View
+    public function index(Request $request): View
     {
+        // Get filter parameters from request
+        $filters = $request->input('filters', []); // Array of event types to show
+
         // Get recent label print requests (last 7 days)
         $recentLabelPrints = LabelLog::with('product')
             ->eventType(LabelLog::EVENT_LABEL_PRINT)
@@ -40,8 +43,11 @@ class LabelAreaController extends Controller
         // Group recent prints by time windows (5-minute intervals)
         $groupedLabelPrints = $this->groupLabelPrintsByTime($recentLabelPrints);
 
-        // Get products that need labels (new products or price updates without recent label prints)
-        $productsNeedingLabels = $this->getProductsNeedingLabels();
+        // Get products that need labels (with optional filtering)
+        $productsNeedingLabels = $this->getProductsNeedingLabels($filters);
+
+        // Get counts by event type for filter display
+        $labelCounts = $this->getLabelCountsByEventType();
 
         // Get available label templates
         $labelTemplates = LabelTemplate::active()->orderBy('name')->get();
@@ -53,6 +59,8 @@ class LabelAreaController extends Controller
             'recentLabelPrints',
             'groupedLabelPrints',
             'productsNeedingLabels',
+            'labelCounts',
+            'filters',
             'labelTemplates',
             'defaultTemplate'
         ));
@@ -198,22 +206,24 @@ class LabelAreaController extends Controller
     /**
      * Get products that likely need labels printed.
      */
-    private function getProductsNeedingLabels()
+    private function getProductsNeedingLabels(array $filters = [])
     {
         // Get all products with any label-related events in the last 30 days
-        $candidateBarcodes = LabelLog::whereIn('event_type', [
+        $candidateEvents = LabelLog::whereIn('event_type', [
             LabelLog::EVENT_NEW_PRODUCT,
             LabelLog::EVENT_PRICE_UPDATE,
             LabelLog::EVENT_REQUEUE_LABEL,
         ])
             ->where('created_at', '>=', now()->subDays(30))
-            ->pluck('barcode')
-            ->unique();
+            ->orderBy('created_at', 'desc')
+            ->get();
 
-        $needsLabelsBarcodes = collect();
+        $needsLabelsData = collect();
 
-        // For each candidate barcode, check if it needs a label
-        foreach ($candidateBarcodes as $barcode) {
+        // Group events by barcode and find the most recent for each
+        $eventsByBarcode = $candidateEvents->groupBy('barcode');
+
+        foreach ($eventsByBarcode as $barcode => $events) {
             // Get the most recent print event for this barcode (last 7 days)
             $mostRecentPrint = LabelLog::where('barcode', $barcode)
                 ->where('event_type', LabelLog::EVENT_LABEL_PRINT)
@@ -221,28 +231,84 @@ class LabelAreaController extends Controller
                 ->orderBy('created_at', 'desc')
                 ->first();
 
-            // Get the most recent non-print event for this barcode (last 30 days)
-            $mostRecentEvent = LabelLog::where('barcode', $barcode)
-                ->whereIn('event_type', [
-                    LabelLog::EVENT_NEW_PRODUCT,
-                    LabelLog::EVENT_PRICE_UPDATE,
-                    LabelLog::EVENT_REQUEUE_LABEL,
-                ])
-                ->where('created_at', '>=', now()->subDays(30))
-                ->orderBy('created_at', 'desc')
-                ->first();
+            // Get the most recent non-print event for this barcode
+            $mostRecentEvent = $events->first(); // Already ordered by created_at desc
 
             // Product needs a label if:
             // 1. There's a recent event (new_product, price_update, or requeue_label)
             // 2. AND either no recent print OR the event is more recent than the print
             if ($mostRecentEvent && (! $mostRecentPrint || $mostRecentEvent->created_at > $mostRecentPrint->created_at)) {
-                $needsLabelsBarcodes->push($barcode);
+                // Apply filter if specified
+                if (empty($filters) || in_array($mostRecentEvent->event_type, $filters)) {
+                    $needsLabelsData->push([
+                        'barcode' => $barcode,
+                        'event_type' => $mostRecentEvent->event_type,
+                        'created_at' => $mostRecentEvent->created_at,
+                    ]);
+                }
             }
         }
 
+        $needsLabelsBarcodes = $needsLabelsData->pluck('barcode');
+
         return Product::whereIn('CODE', $needsLabelsBarcodes)
             ->orderBy('NAME')
+            ->get()
+            ->map(function ($product) use ($needsLabelsData) {
+                $eventData = $needsLabelsData->firstWhere('barcode', $product->CODE);
+                $product->label_event_type = $eventData['event_type'];
+                $product->label_event_date = $eventData['created_at'];
+
+                return $product;
+            });
+    }
+
+    /**
+     * Get counts of products needing labels by event type.
+     */
+    private function getLabelCountsByEventType(): array
+    {
+        $counts = [
+            LabelLog::EVENT_NEW_PRODUCT => 0,
+            LabelLog::EVENT_PRICE_UPDATE => 0,
+            LabelLog::EVENT_REQUEUE_LABEL => 0,
+        ];
+
+        // Get all products with any label-related events in the last 30 days
+        $candidateEvents = LabelLog::whereIn('event_type', [
+            LabelLog::EVENT_NEW_PRODUCT,
+            LabelLog::EVENT_PRICE_UPDATE,
+            LabelLog::EVENT_REQUEUE_LABEL,
+        ])
+            ->where('created_at', '>=', now()->subDays(30))
+            ->orderBy('created_at', 'desc')
             ->get();
+
+        // Group events by barcode and find the most recent for each
+        $eventsByBarcode = $candidateEvents->groupBy('barcode');
+
+        foreach ($eventsByBarcode as $barcode => $events) {
+            // Get the most recent print event for this barcode (last 7 days)
+            $mostRecentPrint = LabelLog::where('barcode', $barcode)
+                ->where('event_type', LabelLog::EVENT_LABEL_PRINT)
+                ->where('created_at', '>=', now()->subDays(7))
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+            // Get the most recent non-print event for this barcode
+            $mostRecentEvent = $events->first(); // Already ordered by created_at desc
+
+            // Product needs a label if:
+            // 1. There's a recent event (new_product, price_update, or requeue_label)
+            // 2. AND either no recent print OR the event is more recent than the print
+            if ($mostRecentEvent && (! $mostRecentPrint || $mostRecentEvent->created_at > $mostRecentPrint->created_at)) {
+                $counts[$mostRecentEvent->event_type]++;
+            }
+        }
+
+        $counts['total'] = array_sum(array_filter($counts, 'is_numeric'));
+
+        return $counts;
     }
 
     /**

@@ -117,6 +117,19 @@
             @php
                 $productActions = [
                     [
+                        'type' => 'link',
+                        'route' => 'products.edit',
+                        'params' => [
+                            'id' => $product->ID,
+                            'from_delivery' => $fromDelivery,
+                            'from' => $from ?? null
+                        ],
+                        'label' => 'Edit Details',
+                        'color' => 'orange',
+                        'class' => 'inline-flex items-center px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs uppercase tracking-widest rounded-md transition',
+                        'icon' => 'M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z'
+                    ],
+                    [
                         'type' => 'button',
                         'onclick' => "requeueProduct('{$product->ID}', this)",
                         'label' => 'Add Back to Products Needing Labels',
@@ -367,8 +380,103 @@
                         <!-- Consolidated Pricing Section -->
                         <x-product-pricing-section :product="$product" :supplier-service="$supplierService" :udea-pricing="$udeaPricing" />
                         
-                        <!-- Supplier Information Card -->
-                        <x-supplier-info-card :product="$product" :supplier-service="$supplierService" />
+                        <!-- Supplier Information Section -->
+                        @if($product->supplier || $product->supplierLinks->isNotEmpty())
+                            <div class="mt-6 bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+                                <div class="p-6">
+                                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                                        <svg class="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                        </svg>
+                                        Supplier Information
+                                    </h3>
+                                    
+                                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        <!-- Primary Supplier -->
+                                        @if($product->supplier)
+                                            <div class="col-span-1 md:col-span-2 lg:col-span-1">
+                                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Primary Supplier</dt>
+                                                <dd class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">
+                                                    {{ $product->supplier->Supplier }}
+                                                </dd>
+                                            </div>
+                                        @endif
+                                        
+                                        <!-- Supplier Code -->
+                                        @if($product->supplierLink && $product->supplierLink->SupplierCode)
+                                            <div>
+                                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Supplier Code</dt>
+                                                <dd class="mt-1 text-base text-gray-900 dark:text-gray-100 font-mono bg-gray-50 dark:bg-gray-700 px-2 py-1 rounded">
+                                                    {{ $product->supplierLink->SupplierCode }}
+                                                </dd>
+                                            </div>
+                                        @endif
+                                        
+                                        <!-- Units per Case -->
+                                        @if($product->supplierLink && $product->supplierLink->UnitsPerCase > 1)
+                                            <div>
+                                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Units per Case</dt>
+                                                <dd class="mt-1 text-base text-gray-900 dark:text-gray-100">
+                                                    {{ $product->supplierLink->UnitsPerCase }} units
+                                                </dd>
+                                            </div>
+                                        @endif
+                                        
+                                        <!-- Supplier Cost -->
+                                        @if($product->supplierLink && $product->supplierLink->CostPrice > 0)
+                                            <div>
+                                                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Supplier Cost</dt>
+                                                <dd class="mt-1 text-base text-gray-900 dark:text-gray-100">
+                                                    €{{ number_format($product->supplierLink->CostPrice, 2) }}
+                                                </dd>
+                                            </div>
+                                        @endif
+                                        
+                                        <!-- External Link for integrated suppliers -->
+                                        @if($supplierService->hasExternalIntegration($product->supplier?->SupplierID ?? 0) && $link = $supplierService->getSupplierWebsiteLink($product))
+                                            <div class="col-span-full">
+                                                <a href="{{ $link }}" 
+                                                   target="_blank" 
+                                                   rel="noopener noreferrer" 
+                                                   class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-md transition-colors duration-200">
+                                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                                                    </svg>
+                                                    View on {{ $supplierService->getSupplierDisplayName($product->supplier->SupplierID) }}
+                                                </a>
+                                            </div>
+                                        @endif
+                                    </div>
+                                    
+                                    <!-- Product Image for integrated suppliers -->
+                                    @if($supplierService->hasExternalIntegration($product->supplier?->SupplierID ?? 0))
+                                        <div class="mt-6">
+                                            <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Product Image</dt>
+                                            <div class="relative inline-block">
+                                                <img 
+                                                    src="{{ $supplierService->getExternalImageUrl($product) }}" 
+                                                    alt="{{ $product->NAME }}"
+                                                    class="w-32 h-32 object-cover rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                                                    loading="lazy"
+                                                    onclick="openImageModal(this.src, '{{ $product->NAME }}')"
+                                                    onerror="this.style.display='none'"
+                                                >
+                                            </div>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        @elseif(!$product->supplier && $product->supplierLinks->isEmpty())
+                            <!-- No Supplier Information -->
+                            <div class="mt-6 bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+                                <div class="flex items-center">
+                                    <svg class="w-5 h-5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    <span class="text-gray-600 dark:text-gray-400">No supplier information available</span>
+                                </div>
+                            </div>
+                        @endif
 
                         <!-- Product Details & Configuration -->
                         <div class="mt-6 bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
@@ -1569,6 +1677,42 @@
                     }
                 }, 300);
             }, 3000);
+        }
+
+        // Simple image modal function
+        function openImageModal(imageSrc, productName) {
+            // Create modal overlay
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4';
+            modal.onclick = () => document.body.removeChild(modal);
+            
+            // Create modal content
+            const content = document.createElement('div');
+            content.className = 'bg-white dark:bg-gray-800 rounded-lg p-4 max-w-2xl max-h-full overflow-auto';
+            content.onclick = (e) => e.stopPropagation();
+            
+            // Create image
+            const img = document.createElement('img');
+            img.src = imageSrc;
+            img.alt = productName;
+            img.className = 'w-full h-auto rounded-lg';
+            
+            // Create title
+            const title = document.createElement('h3');
+            title.textContent = productName;
+            title.className = 'text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100';
+            
+            // Create close button
+            const closeBtn = document.createElement('button');
+            closeBtn.innerHTML = '✕';
+            closeBtn.className = 'absolute top-2 right-2 w-8 h-8 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300';
+            closeBtn.onclick = () => document.body.removeChild(modal);
+            
+            content.appendChild(title);
+            content.appendChild(img);
+            content.appendChild(closeBtn);
+            modal.appendChild(content);
+            document.body.appendChild(modal);
         }
     </script>
     @endpush

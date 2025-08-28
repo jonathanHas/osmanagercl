@@ -56,6 +56,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/products', [ProductController::class, 'store'])->name('products.store');
     Route::get('/products/suppliers', [ProductController::class, 'suppliersIndex'])->name('products.suppliers');
     Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show');
+    Route::get('/products/{id}/edit', [ProductController::class, 'edit'])->name('products.edit');
+    Route::put('/products/{id}', [ProductController::class, 'update'])->name('products.update');
     Route::get('/products/{id}/sales-data', [ProductController::class, 'salesData'])->name('products.sales-data');
     Route::get('/products/{id}/refresh-udea-pricing', [ProductController::class, 'refreshUdeaPricing'])->name('products.refresh-udea-pricing');
     Route::get('/products/udea-pricing', [ProductController::class, 'getUdeaPricing'])->name('products.udea-pricing');

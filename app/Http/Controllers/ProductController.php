@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateBarcodeRequest;
+use App\Http\Requests\UpdateProductRequest;
 use App\Models\Category;
 use App\Models\LabelLog;
 use App\Models\LabelTemplate;
@@ -741,6 +742,70 @@ class ProductController extends Controller
     }
 
     /**
+     * Show the form for editing the product.
+     */
+    public function edit(Request $request, string $id): View
+    {
+        // Find the product
+        $product = $this->productRepository->findById($id);
+        if (! $product) {
+            abort(404, 'Product not found');
+        }
+
+        // Get necessary data for the form (same as create method)
+        $taxCategories = TaxCategory::orderBy('NAME')->get();
+        $categories = Category::orderBy('NAME')->get();
+        $suppliers = Supplier::orderBy('Supplier')->get();
+        
+        // Get tax rates for JavaScript pricing calculations
+        $taxRates = Tax::pluck('RATE', 'CATEGORY')->toArray();
+        
+        // Get UDEA supplier IDs from config
+        $udeaSupplierIds = config('suppliers.external_links.udea.supplier_ids', [5, 44, 85]);
+
+        // Get supplier information if product has a supplier link
+        $supplierLink = $product->supplierLinks->first();
+        
+        // Prepare data for form population
+        $prefillData = [
+            'name' => $product->NAME,
+            'code' => $product->CODE,
+            'reference' => $product->REFERENCE,
+            'price_buy' => $product->PRICEBUY,
+            'price_sell' => $product->PRICESELL,
+            'display_name' => $product->DISPLAY,
+            'supplier_id' => $supplierLink?->SupplierID,
+            'supplier_code' => $supplierLink?->SupplierCode,
+            'units_per_case' => $supplierLink?->UnitsPerCase ?? 1,
+            'supplier_cost' => $supplierLink?->CostPrice,
+        ];
+
+        // Check if product is in stocking management
+        $includeInStocking = $product->stocking !== null;
+        
+        // Check if product is visible on till
+        $showOnTill = $this->tillVisibilityService->isVisibleOnTill($product->ID);
+
+        // Context information for navigation
+        $fromDelivery = $request->query('from_delivery');
+        $fromContext = $request->query('from');
+
+        return view('products.edit', compact(
+            'product',
+            'taxCategories', 
+            'categories', 
+            'suppliers', 
+            'prefillData',
+            'taxRates', 
+            'udeaSupplierIds',
+            'includeInStocking',
+            'showOnTill',
+            'fromDelivery',
+            'fromContext'
+        ));
+    }
+
+    /**
      * Store a newly created product in storage.
      */
     public function store(StoreProductRequest $request): RedirectResponse
@@ -848,6 +913,108 @@ class ProductController extends Controller
             return back()
                 ->withInput()
                 ->withErrors(['error' => 'Failed to create product: '.$e->getMessage()]);
+        }
+    }
+
+    /**
+     * Update the specified product in storage.
+     */
+    public function update(UpdateProductRequest $request, string $id): RedirectResponse
+    {
+        try {
+            // Find the product
+            $product = $this->productRepository->findById($id);
+            if (! $product) {
+                abort(404, 'Product not found');
+            }
+
+            // Update the product's basic information
+            $productData = [
+                'NAME' => $request->name,
+                'REFERENCE' => $request->reference,
+                'CATEGORY' => $request->category,
+                'TAXCAT' => $request->tax_category,
+                'PRICESELL' => $request->price_sell,
+                'PRICEBUY' => $request->price_buy,
+                'DISPLAY' => $request->display_name,
+            ];
+
+            // Update the product
+            $product->update($productData);
+
+            // Update supplier link if provided
+            if ($request->supplier_id) {
+                $supplierLink = $product->supplierLinks->first();
+                
+                if ($supplierLink) {
+                    // Update existing supplier link
+                    $supplierLink->update([
+                        'SupplierID' => $request->supplier_id,
+                        'SupplierCode' => $request->supplier_code,
+                        'UnitsPerCase' => $request->units_per_case ?? 1,
+                        'CostPrice' => $request->supplier_cost ?? $request->price_buy,
+                    ]);
+                } else {
+                    // Create new supplier link
+                    \App\Models\SupplierLink::create([
+                        'ProductCode' => $product->CODE,
+                        'SupplierID' => $request->supplier_id,
+                        'SupplierCode' => $request->supplier_code,
+                        'UnitsPerCase' => $request->units_per_case ?? 1,
+                        'CostPrice' => $request->supplier_cost ?? $request->price_buy,
+                    ]);
+                }
+            }
+
+            // Update stocking status
+            if ($request->boolean('include_in_stocking', false)) {
+                // Ensure stocking record exists
+                if (!$product->stocking) {
+                    \App\Models\Stocking::create([
+                        'PRODUCT' => $product->CODE,
+                        'STOCKSECURITY' => 0,
+                        'STOCKMAXIMUM' => 0,
+                        'UNITS' => 0,
+                    ]);
+                }
+            } else {
+                // Remove from stocking if it exists
+                $product->stocking?->delete();
+            }
+
+            // Update till visibility
+            $this->tillVisibilityService->setVisibility(
+                $product->ID, 
+                $request->boolean('show_on_till', true)
+            );
+
+            // Log the update
+            \Log::info('Product updated via edit form', [
+                'product_id' => $product->ID,
+                'product_name' => $product->NAME,
+                'updated_by' => auth()->id(),
+                'updated_fields' => array_keys($productData),
+            ]);
+
+            // Determine redirect route with context
+            $fromDelivery = $request->query('from_delivery');
+            $fromContext = $request->query('from');
+            
+            $redirectUrl = route('products.show', $product->ID);
+            
+            if ($fromDelivery) {
+                $redirectUrl .= '?from_delivery=' . $fromDelivery;
+            } elseif ($fromContext) {
+                $redirectUrl .= '?from=' . $fromContext;
+            }
+
+            return redirect($redirectUrl)
+                ->with('success', 'Product updated successfully!');
+
+        } catch (\Exception $e) {
+            return back()
+                ->withInput()
+                ->withErrors(['error' => 'Failed to update product: ' . $e->getMessage()]);
         }
     }
 
