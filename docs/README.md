@@ -6,8 +6,8 @@ Welcome to the comprehensive documentation for OSManager CL. This documentation 
 
 ## 🆕 Latest Updates (August 2025)
 
-### Label System Barcode Scanner Enhancement (2025-08-13)
-Scanner-optimized label queue management with instant barcode scanning:
+### Label System Barcode Scanner Enhancement (2025-08-29)
+Scanner-optimized label queue management with instant barcode scanning and advanced filtering:
 
 - **📱 Scan to Label Modal**: Instant barcode scanning interface with auto-focus and real-time feedback
 - **🎯 Scanner-Optimized Layout**: Prominent scan button in page header, compact stats, streamlined interface for continuous scanning workflow
@@ -15,12 +15,17 @@ Scanner-optimized label queue management with instant barcode scanning:
 - **👆 Touch-Free Workflow**: Virtual keyboard suppression and automatic focus management for hands-free scanning
 - **⚡ Real-Time Product Lookup**: Instant product details display with name, code, and price verification
 - **🔄 Seamless Queue Integration**: Automatic addition to existing label printing workflow via LabelLog system
+- **🔍 Filter by Add Method**: Select labels by how they were added with visual indicators:
+  - **🆕 New Products** (Green badge) - Products created through product creation
+  - **💰 Price Updates** (Blue badge) - Products with price changes (manual or delivery-based)
+  - **📱 Scanned/Re-queued** (Purple badge) - Products manually scanned or re-queued
+- **📈 Real-Time Counts**: Live product counts for each filter category with persistent filter state
 
 **Key Benefits**:
-- Immediate access to scanner from page header (no scrolling required)
-- Continuous scanning workflow without manual field interaction
-- Visual feedback and error handling for scan validation
-- Direct integration with existing label printing system
+- Focus on specific types of label requirements for improved workflow efficiency
+- Visual indicators clearly show the source of each label requirement
+- Persistent filtering maintains user preferences across page reloads
+- Enhanced productivity through targeted label management
 
 See [Label System Documentation](./features/label-system.md) for complete details.
 

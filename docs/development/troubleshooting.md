@@ -48,6 +48,59 @@ Use a single `<template x-for>` that wraps both rows in a `<tbody>` element:
 - Alpine.js can properly scope the loop variable to both rows
 - Maintains proper table structure and row ordering
 
+### POS Database Connection Mismatch - Price Updates Not Appearing on Till
+
+**Symptoms:**
+- Price updates in Laravel F&V interface don't reflect on the POS till
+- Laravel shows one price, direct MySQL/MariaDB queries show different price
+- Price sync tool shows products as synchronized but till prices remain unchanged
+
+**Root Cause:**
+Multiple database instances running on different ports. Laravel may be connecting to a different database than the actual POS system.
+
+**Common Configuration:**
+- Port 3306: MariaDB (actual POS database used by till)
+- Port 3307: MySQL (test/development database)
+
+**Diagnosis Steps:**
+1. **Check Laravel's POS connection:**
+```bash
+php artisan tinker --execute="
+\$config = config('database.connections.pos');
+echo 'Laravel connects to: ' . \$config['host'] . ':' . (\$config['port'] ?? '3306') . '/' . \$config['database'] . PHP_EOL;
+\$dbInfo = DB::connection('pos')->select('SELECT DATABASE() as db, @@hostname as host, @@port as port, VERSION() as version');
+echo 'Actual connection: ' . \$dbInfo[0]->host . ':' . \$dbInfo[0]->port . '/' . \$dbInfo[0]->db . ' (' . \$dbInfo[0]->version . ')' . PHP_EOL;
+"
+```
+
+2. **Check what database your till system uses:**
+```bash
+# Connect to your actual POS database (usually port 3306)
+mysql -u username -p -h 127.0.0.1 -P 3306 unicenta2016
+SELECT PRICESELL FROM PRODUCTS WHERE CODE = 'your_test_product_code';
+```
+
+**Solution:**
+Update the `.env` file to use the correct port:
+```env
+# Change from the wrong port
+POS_DB_PORT=3307
+
+# To the correct port (usually 3306 for MariaDB)
+POS_DB_PORT=3306
+```
+
+Then clear configuration cache:
+```bash
+php artisan config:clear
+php artisan config:cache
+```
+
+**Prevention:**
+- Always verify the POS database connection after setup changes
+- Use the Price Sync Management tool at `/fruit-veg/price-sync` to identify discrepancies
+- Test price changes on a sample product before making bulk updates
+
 ### Alpine.js Template Tag Errors - "can't access property 'after', A is undefined" (FIXED 2025-08-04)
 
 **Symptoms:**

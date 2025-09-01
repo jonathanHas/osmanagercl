@@ -766,13 +766,19 @@ class ProductController extends Controller
         // Get supplier information if product has a supplier link
         $supplierLink = $product->supplierLinks->first();
 
+        // Calculate gross price (VAT inclusive) for form display
+        // This ensures consistency with the create form where users input gross prices
+        $taxCategory = TaxCategory::with('primaryTax')->find($product->TAXCAT);
+        $vatRate = $taxCategory?->primaryTax?->RATE ?? 0.0;
+        $grossPrice = $vatRate > 0 ? $product->PRICESELL * (1 + $vatRate) : $product->PRICESELL;
+
         // Prepare data for form population
         $prefillData = [
             'name' => $product->NAME,
             'code' => $product->CODE,
             'reference' => $product->REFERENCE,
             'price_buy' => $product->PRICEBUY,
-            'price_sell' => $product->PRICESELL,
+            'price_sell' => $grossPrice, // Show VAT-inclusive price for consistency
             'display_name' => $product->DISPLAY,
             'supplier_id' => $supplierLink?->SupplierID,
             'supplier_code' => $supplierLink?->SupplierCode,
@@ -945,13 +951,21 @@ class ProductController extends Controller
                 abort(404, 'Product not found');
             }
 
+            // Get VAT rate for the selected tax category to convert inclusive price to exclusive
+            $taxCategory = TaxCategory::with('primaryTax')->find($request->tax_category);
+            $vatRate = $taxCategory?->primaryTax?->RATE ?? 0.0;
+            
+            // Convert VAT-inclusive price to VAT-exclusive price for storage
+            // PRICESELL should be stored ex-VAT as it's used in getGrossPrice() calculation
+            $priceExVat = $vatRate > 0 ? $request->price_sell / (1 + $vatRate) : $request->price_sell;
+
             // Update the product's basic information
             $productData = [
                 'NAME' => $request->name,
                 'REFERENCE' => $request->reference,
                 'CATEGORY' => $request->category,
                 'TAXCAT' => $request->tax_category,
-                'PRICESELL' => $request->price_sell,
+                'PRICESELL' => $priceExVat, // Store ex-VAT price
                 'PRICEBUY' => $request->price_buy,
                 'DISPLAY' => $request->display_name,
             ];

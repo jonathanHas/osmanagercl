@@ -6,9 +6,6 @@ Price changes
 we need to be able...
 
 
-Receipt section...
-
-Daily Totals...
 
 New features - low priority for the momenet
     - ability to assign values to categories to get a better breakdown of costs & profits
@@ -18,3 +15,10 @@ New features - low priority for the momenet
 
 Sales analysis
 Identify busy periods
+
+
+
+
+look into if its necessary to add a 0 entry into stock when a product is created, seems to be an issue with stock levels of some new products - this may or may not be the cause
+
+also having the deliveries page update to reflect any products that have been added

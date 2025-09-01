@@ -29,6 +29,18 @@ The label system provides automated label generation and printing capabilities w
 - **Real-time updates** when products are added back to the queue
 - **Delivery Integration**: Price updates during delivery verification automatically trigger label requirements
 
+### 🔍 Filter by Add Method
+- **Comprehensive filtering** allows users to focus on specific types of label requirements:
+  - **All Labels**: View all products needing labels (default)
+  - **New Products**: Only show products added through product creation
+  - **Price Updates**: Only show products with price changes (manual updates and delivery integration)
+  - **Scanned/Re-queued**: Only show products manually added via barcode scanner or re-queue actions
+- **Visual indicators** with color-coded badges showing the source of each label requirement
+- **Real-time counts** display the number of products in each category
+- **Time information** shows when each product was added to the labels queue
+- **Persistent filtering** maintains selected filters across page reloads via URL parameters
+- **Smart filter logic** with intuitive "All" vs specific category selection
+
 ### 🖨️ Printing System
 - **Single label printing** for individual products
 - **Bulk A4 printing** with optimized layout based on template
@@ -125,13 +137,17 @@ Template definitions for different label sizes and layouts.
 #### LabelAreaController
 Main controller handling all label operations:
 
-- `index()` - Label dashboard with products needing labels
+- `index()` - Label dashboard with products needing labels and filtering support
 - `printA4()` - Generate A4 sheet with multiple labels
 - `previewA4()` - Preview A4 layout before printing
 - `previewLabel()` - Single label preview
 - `requeueProduct()` - Add product back to needs labels queue
 - `lookupBarcode()` - Lookup product details by barcode for scanner modal
 - `processBarcodeScan()` - Process scanned barcode and add product to labels queue
+
+**Enhanced Filtering Methods**:
+- `getProductsNeedingLabels($filters)` - Retrieve products needing labels with optional event type filtering
+- `getLabelCountsByEventType()` - Get product counts grouped by label add method for filter display
 
 ### Services
 
@@ -165,7 +181,15 @@ This ensures:
 - **Scanner-Optimized Layout**: Prominent "Scan to Label" button in page header for immediate access
 - **Compact stats**: Streamlined display showing products needing labels, recent prints, A4 sheets needed
 - **Template selector**: Choose label layout and dimensions (simplified display)
-- **Products table**: Current products needing labels with preview/print actions
+- **Filter Controls**: Interactive filter buttons to view products by add method:
+  - Visual toggle buttons with product counts for each category
+  - Color-coded selection with real-time filtering
+  - URL-based filter persistence across page reloads
+- **Enhanced Products Table**: 
+  - Current products needing labels with preview/print actions
+  - **Add Method column** with color-coded badges (New Product: Green, Price Update: Blue, Scanned: Purple)
+  - Time information showing when each product was added to the queue
+  - Dynamic filtering based on selected add method
 - **Recent prints**: Previously printed labels with re-queue options
 - **Scan to Label Modal**: Overlay interface with barcode input, product preview, and queue counter
 
@@ -226,13 +250,24 @@ This integration ensures that pricing changes made during delivery verification 
 ## API Endpoints
 
 ### Label Operations
-- `GET /labels` - Label dashboard
+- `GET /labels` - Label dashboard with optional `filters[]` query parameter for filtering by event type
 - `POST /labels/print-a4` - Print A4 sheet with multiple labels
 - `GET /labels/preview-a4` - Preview A4 layout
 - `GET /labels/preview/{productId}` - Single label preview
 - `POST /labels/requeue` - Add product back to needs labels queue
 - `POST /labels/lookup-barcode` - Lookup product details by barcode for scanner interface
 - `POST /labels/scan` - Process scanned barcode and add product to labels queue
+
+#### Filtering Parameters
+The dashboard endpoint accepts filtering parameters:
+```
+GET /labels?filters[]=new_product&filters[]=price_update
+```
+
+Supported filter values:
+- `new_product` - Products created through product creation
+- `price_update` - Products with price changes (manual or delivery-based)
+- `requeue_label` - Products manually scanned or re-queued
 
 ## Configuration
 
@@ -298,4 +333,4 @@ Templates are stored in the database and can be managed through:
 ---
 
 **Last Updated**: August 2025  
-**Version**: 1.2.0
+**Version**: 1.3.0 - Added filtering by label add method with visual indicators and persistent filter state

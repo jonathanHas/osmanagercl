@@ -7,7 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **🔧 F&V Price Sync Management System** (2025-08-28)
+  - **Web-based Price Sync Tool**: New management interface at `/fruit-veg/price-sync`
+  - **Cross-Database Discrepancy Detection**: Identifies products where POS and Laravel price history don't match
+  - **Bidirectional Synchronization**: Choose sync direction (History→POS or POS→History)
+  - **Statistics Dashboard**: Real-time overview of total F&V products, sync status, and discrepancy counts
+  - **Individual & Bulk Operations**: Sync single products or multiple products simultaneously
+  - **Professional Interface**: Sortable tables, loading indicators, success/error notifications
+  - **Production Ready**: Eliminates need for terminal access to identify price issues
+  - **Transaction Safety**: Proper cross-database transaction management with error handling
+  - **Audit Trail Preservation**: Maintains complete price change history during sync operations
+
 ### Fixed
+
+- **🚨 F&V Price Updates Not Appearing on POS Till** (2025-08-28) - **CRITICAL BUG FIX**
+  - **Cross-Database Transaction Issue**: Laravel `DB::transaction()` only applied to default connection
+  - **Root Cause**: POS database updates were running but not committing properly due to transaction scope
+  - **Solution**: Implemented separate transaction management for each database connection
+  - **Database Connection Verification**: Added diagnostic tools to detect port mismatches (3306 vs 3307)
+  - **Result**: Price changes now synchronize correctly between Laravel app and POS till system
 
 - **📎 OSAccounts Attachment Import**: Major improvements to attachment import system (2025-08-12)
   - **Smart Path Resolution**: Handles various path formats from OSAccounts

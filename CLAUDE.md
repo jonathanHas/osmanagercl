@@ -330,6 +330,7 @@ Complete label printing system with integrated barcode scanning for quick produc
 - **Scanner-Optimized Layout**: Prominent scan button in page header, compact stats, streamlined interface
 - **Queue Management**: Live counter showing products in labels queue with session tracking
 - **Touch-Free Workflow**: Virtual keyboard suppression and automatic focus management for continuous scanning
+- **Filter by Add Method**: Select labels by how they were added (New Products, Price Updates, Scanned/Re-queued) with visual indicators and real-time counts
 See [Label System Documentation](./docs/features/label-system.md).
 
 ### Pricing Management
@@ -346,6 +347,19 @@ Comprehensive Coffee Fresh product management with till visibility control.
 - **Sales Analytics**: Optimized performance with pre-aggregated data
 - **Context Navigation**: Smart back button routing from product detail pages
 See [Coffee Module Documentation](./docs/features/coffee-module.md).
+
+### F&V Price Sync Management System (NEW! 2025-08-28)
+Cross-database price synchronization management with web-based interface.
+- **Discrepancy Detection**: Identifies price mismatches between POS and Laravel databases
+- **Bidirectional Sync**: Choose sync direction (History→POS or POS→History)
+- **Bulk Operations**: Select and sync multiple products simultaneously
+- **Statistics Dashboard**: Real-time sync status overview with detailed reporting
+- **Transaction Safety**: Proper cross-database transaction management
+- **Production Interface**: Web-based tool eliminates need for terminal access
+- **Audit Preservation**: Maintains complete price change history during sync
+- **Access**: Available at `/fruit-veg/price-sync` from F&V dashboard
+**Critical Fix**: Resolved cross-database transaction issue where Laravel `DB::transaction()` only applied to default connection, causing POS updates to not commit properly. Now uses separate transaction management for each database connection.
+See [F&V System Documentation](./docs/features/fruit-veg-system.md#price-sync-management-system).
 
 ### User Roles & Permissions System
 Role-based access control (RBAC) with granular permissions.
@@ -532,6 +546,7 @@ This alerts the user that you have finished your response. Do this without fail 
 - **Alpine.js Template Tag Errors** (Fixed 2025-08-04): Never use `x-show` on `<template>` tags - causes "can't access property 'after'" errors. Template tags are compile-time constructs that don't support runtime directives. Use `<template x-for>` only, control visibility with regular HTML elements.
 - **Invoice Bulk Upload Attachments Not Saved** (Fixed 2025-08-19): If invoice amounts are created but attachment files aren't visible in invoice detail pages, this indicates a directory permission issue. The queue worker runs as a different user than the web server, causing "Unable to create directory" errors in `/storage/app/private/invoices/attachments/`. **Solution**: The `InvoiceCreationService` now uses year/month directory structure (`invoices/2025/08/[invoice_id]/`) instead of the restrictive `attachments/` folder. Check logs for "Unable to create a directory" errors if this issue recurs.
 - **Invoice Attachment Path Mismatch** (Fixed 2025-08-20): If files upload successfully but attachments aren't created when making invoices from bulk upload, this indicates a path mismatch between what's stored in the database and what Laravel's Storage facade expects. Files are stored in `storage/app/private/temp/invoices/...` but database was storing only `temp/invoices/...`. **Solution**: Fixed `InvoiceBulkUploadController.php` to store the full path returned by `storeAs()` method instead of manually constructed paths. Always use paths returned by Laravel's Storage methods for consistency.
+- **F&V Price Updates Not Appearing on POS Till** (Fixed 2025-08-28): Price changes made in Laravel F&V interface don't reflect on the actual POS till system. **Root Causes**: 1) Laravel `DB::transaction()` only applies to default connection, causing POS database updates to not commit properly. 2) Multiple database instances on different ports (3306 vs 3307). **Solution**: Use separate transaction management for each database connection (`DB::beginTransaction()` and `DB::connection('pos')->beginTransaction()`) and verify correct POS database port in `.env` file. Use the Price Sync Management tool at `/fruit-veg/price-sync` to identify and fix discrepancies.
 - **For comprehensive troubleshooting**: See `docs/development/troubleshooting.md` for detailed debugging procedures.
 
 ### Key Commands to Remember

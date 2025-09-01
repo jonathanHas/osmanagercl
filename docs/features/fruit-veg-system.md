@@ -33,6 +33,8 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 - **Price History**: Complete audit trail of all price changes stored in veg_price_history
 - **Automatic Label Queue**: Products automatically added to print queue when prices change
 - **VAT Calculations**: Integrated with existing tax system
+- **Cross-Database Synchronization**: Price updates now synchronize between Laravel and POS databases
+- **Transaction Safety**: Separate transaction management for each database connection ensures atomic updates
 
 ### 4. Label Printing System
 - **Modern Label Layout**: 2-column × 8-row layout with 16 labels per A4 page
@@ -62,7 +64,29 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 - **Real-time Updates**: Live addition/removal of products with smooth animations
 - **Instant Visibility Changes**: Products appear/disappear immediately based till visibility changes
 
-### 7. Sales Analytics & Performance (Enhanced 2025! 🚀)
+### 7. Price Sync Management System (NEW! 2025-08-28 🔧)
+- **Cross-Database Discrepancy Detection**: Identifies products where POS and Laravel price history don't match
+- **Comprehensive Statistics Dashboard**: Shows total F&V products, products with history, and sync status
+- **Price Comparison Analysis**: Side-by-side display of POS vs. price history values with exact differences
+- **Bidirectional Synchronization**:
+  - **History → POS**: Updates POS database from price history (recommended for recent changes)
+  - **POS → History**: Updates price history from POS database (for correcting historical data)
+- **Individual Product Sync**: Quick sync buttons for single products with real-time feedback
+- **Bulk Operations**: 
+  - Select all/clear selection functionality
+  - Bulk sync multiple products with progress reporting
+  - Detailed error reporting for failed sync operations
+- **Professional Interface**:
+  - Sortable table by price difference magnitude
+  - Visual indicators for sync status (✅ synchronized, ❌ out of sync)
+  - Loading overlays and success/error notifications
+  - Responsive design for all screen sizes
+- **Production-Ready**: Web-based interface eliminates need for terminal access
+- **Audit Trail Preservation**: All sync operations maintain complete price change history
+- **Transaction Safety**: Proper error handling ensures database integrity
+- **Access**: Available at `/fruit-veg/price-sync` from the F&V dashboard
+
+### 8. Sales Analytics & Performance (Enhanced 2025! 🚀)
 - **Blazing-Fast Sales Dashboard**: Revolutionary performance improvement with 100x+ speed increase
 - **Sub-Second Queries**: Complete F&V sales analytics in under 20ms (previously 30+ seconds)
 - **Real-time Statistics**: Instant F&V sales summaries with category breakdowns

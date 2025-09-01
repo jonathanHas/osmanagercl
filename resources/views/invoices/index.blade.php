@@ -258,7 +258,7 @@
                 <thead class="bg-gray-900">
                     <tr>
                         <th class="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider w-8">
-                            <input type="checkbox" id="select-all" class="rounded bg-gray-700 border-gray-600 text-blue-600 focus:ring-blue-500 focus:ring-2">
+                            <input type="checkbox" id="select-all" class="rounded bg-gray-700 border-gray-600 text-blue-600 focus:ring-blue-500 focus:ring-2" autocomplete="off">
                         </th>
                         <th class="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider" style="width: 100px;">
                             <a href="{{ route('invoices.index', array_merge(request()->all(), ['sort' => 'invoice_number', 'direction' => $sortField === 'invoice_number' && $sortDirection === 'asc' ? 'desc' : 'asc'])) }}" 
@@ -380,7 +380,8 @@
                                        data-supplier-id="{{ $invoice->supplier_id }}"
                                        data-supplier-name="{{ $invoice->supplier_name }}"
                                        data-total-amount="{{ $invoice->total_amount }}"
-                                       data-invoice-number="{{ $invoice->invoice_number }}">
+                                       data-invoice-number="{{ $invoice->invoice_number }}"
+                                       autocomplete="off">
                             </td>
                             <td class="px-3 py-3 text-gray-300">
                                 <a href="{{ route('invoices.show', $invoice) }}" class="text-blue-400 hover:text-blue-300 break-all text-sm">
@@ -558,6 +559,12 @@
             const clearSelectionBtn = document.getElementById('clear-selection-btn');
             const paymentModal = document.getElementById('payment-modal');
             const bulkPaymentForm = document.getElementById('bulk-payment-form');
+            
+            // Force clear all checkboxes on page load to prevent browser persistence
+            selectedInvoices.clear();
+            invoiceCheckboxes.forEach(checkbox => checkbox.checked = false);
+            selectAllCheckbox.checked = false;
+            bulkActionsBar.classList.add('hidden');
             
             // Handle select all checkbox
             selectAllCheckbox.addEventListener('change', function() {
@@ -763,7 +770,12 @@
                 .then(data => {
                     if (data.success) {
                         hidePaymentModal();
-                        window.location.reload(); // Refresh to show updated statuses
+                        // Clear checkboxes and selection state before refresh
+                        selectedInvoices.clear();
+                        invoiceCheckboxes.forEach(checkbox => checkbox.checked = false);
+                        selectAllCheckbox.checked = false;
+                        updateSelectionDisplay();
+                        window.location.href = window.location.href; // Clean refresh to show updated statuses
                     } else {
                         alert(data.error || 'Failed to mark invoices as paid');
                     }
