@@ -501,14 +501,15 @@
             .then(data => {
                 if (data.success) {
                     showAlert('Image updated successfully!', 'success');
-                    // Refresh current image
-                    document.getElementById('current-image').src = '{{ route("fruit-veg.product-image", $product->CODE) }}?' + new Date().getTime();
+                    // Refresh current image with server timestamp for cache busting
+                    const timestamp = data.timestamp || new Date().getTime();
+                    document.getElementById('current-image').src = '{{ route("fruit-veg.product-image", $product->CODE) }}?t=' + timestamp;
                     // Hide preview
                     document.getElementById('image-preview').classList.add('hidden');
                     // Reset form
                     this.reset();
                 } else {
-                    showAlert('Failed to update image.', 'error');
+                    showAlert(data.error || 'Failed to update image.', 'error');
                 }
             })
             .catch(error => {

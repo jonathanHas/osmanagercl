@@ -7,8 +7,14 @@ Welcome to the comprehensive documentation for OSManager CL. This documentation 
 ## 🆕 Latest Updates (August-September 2025)
 
 ### Invoice Management Enhancements (2025-09-02)
-Enhanced invoice system with advanced sorting and comprehensive data export capabilities:
+Enhanced invoice system with advanced sorting, comprehensive data export, and quick attachment viewing:
 
+- **📎 Clickable Invoice Attachment Icons**: Click attachment icons in invoice table to instantly view documents
+  - **🔗 One-Click Viewing**: Direct access to attachments without navigating to detail pages
+  - **🪟 New Window Display**: Opens in dedicated window (1200x800) without disrupting current workflow
+  - **🎯 Smart Selection**: Automatically prioritizes primary attachment, falls back to first available
+  - **✨ Visual Feedback**: Hover effects and tooltips indicate clickability and file count
+  - **🛡️ Error Handling**: Graceful handling of missing attachments with user-friendly messages
 - **🔄 Smart Payment Date Sorting**: Click "Status / Paid On" column to toggle between payment status and payment date sorting
   - **📅 Payment Date Priority**: Most recent payments appear first when sorting by payment date
   - **📊 NULL Value Handling**: Proper ordering with paid invoices grouped by date, unpaid invoices at end
@@ -22,12 +28,14 @@ Enhanced invoice system with advanced sorting and comprehensive data export capa
   - **📁 Smart Filename**: Auto-generated as `invoices_YYYY-MM-DD.csv`
 
 **Key Benefits**:
+- Instant attachment access directly from invoice listings
+- Streamlined document review workflow with new window display
 - Chronological payment tracking with intuitive sorting interface
 - Complete data export for accounting and financial analysis
 - Professional CSV format ready for external systems
 - Enhanced productivity through better payment history visibility
 
-See [Invoice Payment Management](./features/invoice-payment-management.md) for complete details.
+See [Invoice Payment Management](./features/invoice-payment-management.md) and [Invoice Attachments System](./features/invoice-attachments-system.md) for complete details.
 
 ### Label System Barcode Scanner Enhancement (2025-08-29)
 Scanner-optimized label queue management with instant barcode scanning and advanced filtering:

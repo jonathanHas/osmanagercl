@@ -342,6 +342,52 @@ php artisan optimize:clear
 php artisan serve
 ```
 
+### Image Uploads Not Appearing (Fixed September 2025)
+
+**Problem:** Image uploads appear successful but changes don't show on the page.
+
+**Symptoms:**
+- Image file uploads without errors
+- Success message displayed to user
+- Upload function returns 200 status
+- New image doesn't appear, shows old image instead
+
+**Root Cause:** 
+Images are successfully saved to the database, but browser caching prevents updated images from being displayed. The image serving endpoint sets 24-hour cache headers.
+
+**Solution (Implemented):**
+1. **Cache-Busting**: Added timestamp parameter to image URLs after upload
+2. **Dynamic Cache Control**: Reduced cache time to 5 minutes when cache-busting parameter present
+3. **Transaction Safety**: Added proper database transaction handling for image updates
+4. **Content-Type Detection**: Automatic MIME type detection from image binary data
+
+**For Users (Temporary Workaround):**
+If you encounter this issue, force refresh the image:
+- Press Ctrl+F5 to hard refresh the page
+- Or clear browser cache for the site
+
+**Technical Details:**
+```javascript
+// Fixed: Image URL now includes timestamp for cache busting
+document.getElementById('current-image').src = 
+    '/fruit-veg/product-image/' + productCode + '?t=' + timestamp;
+```
+
+**Controller Changes:**
+```php
+// Added proper transaction management
+DB::connection('pos')->beginTransaction();
+try {
+    DB::connection('pos')->table('PRODUCTS')
+        ->where('ID', $product->ID)
+        ->update(['IMAGE' => $imageData]);
+    DB::connection('pos')->commit();
+} catch (\Exception $e) {
+    DB::connection('pos')->rollBack();
+    // Error handling...
+}
+```
+
 ## 📦 Delivery System Issues
 
 ### Independent Irish Health Foods CSV Format Problems

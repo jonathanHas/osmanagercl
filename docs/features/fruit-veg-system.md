@@ -543,6 +543,13 @@ Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
 - **Chart Recursion Fix**: Resolved "too much recursion" error by storing Chart.js instance outside Alpine reactive scope
 - **Table Template Structure**: Fixed nested template issues in x-for loops that prevented data rendering
 - **Individual Product Charts**: Added Chart.js visualizations to expandable product rows in sales table
+- **🔧 Image Upload Cache Persistence Fix (September 2025)**: Resolved issue where uploaded images appeared to upload but didn't persist visually due to browser caching
+  - **Root Cause**: Images were successfully saving to POS database but 24-hour browser cache prevented updated images from displaying
+  - **Transaction Management**: Added proper POS database transaction handling matching price update patterns
+  - **Content-Type Detection**: Implemented automatic image format detection (PNG, JPEG, GIF, WebP) from binary data
+  - **Cache-Busting**: Added timestamp-based cache invalidation with server-returned timestamps
+  - **Error Handling**: Enhanced logging and rollback on failures with comprehensive debugging information
+  - **Performance**: Reduced cache time to 5 minutes when cache-busting parameter present, maintains 24-hour cache otherwise
 
 ### Recent Feature Additions (2025)
 
@@ -598,12 +605,16 @@ Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
   - AJAX-powered data loading without page refresh
 - Real-time AJAX form submissions without page refresh
 
-#### Enhanced Image Management
-- Direct image upload to POS database IMAGE field
-- Real-time image preview before upload
-- Cache-optimized image serving with proper headers
+#### Enhanced Image Management (Updated September 2025)
+- Direct image upload to POS database IMAGE field with transaction-safe operations
+- Real-time image preview before upload with drag-and-drop support
+- **Intelligent Cache Management**: 24-hour cache normally, 5-minute cache with cache-busting for immediate updates
+- **Automatic Content-Type Detection**: Serves images with correct MIME types (PNG, JPEG, GIF, WebP) detected from binary data
+- **Cache-Busting Integration**: Server-returned timestamps ensure immediate visibility of uploaded images
+- **Robust Error Handling**: Comprehensive logging and rollback on upload failures
 - Fallback transparent PNG for products without images
 - Image update triggers automatic addition to print queue
+- **Transaction Management**: Uses same pattern as price updates with explicit POS database transactions
 
 #### Modern Label System Redesign (July 2024)
 - **Increased Density**: Changed from 4×4 to 2×8 layout for 16 labels per page

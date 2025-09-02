@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **🔧 F&V Image Upload Cache Fix** (2025-09-02)
+  - **Root Cause Resolution**: Fixed issue where uploaded images appeared successful but didn't show updated images
+  - **Cache-Busting Implementation**: Added server timestamp parameters to force browser cache refresh
+  - **Dynamic Cache Control**: Images cached for 24 hours normally, 5 minutes when cache-busting parameter present
+  - **Transaction Safety**: Added proper POS database transaction management matching price update patterns
+  - **Content-Type Detection**: Automatic MIME type detection (PNG, JPEG, GIF, WebP) from binary image data
+  - **Enhanced Error Handling**: Comprehensive logging and rollback on upload failures with debugging information
+  - **Immediate Visibility**: Uploaded images now appear instantly without requiring browser refresh or cache clear
+  - **Robust Architecture**: Uses explicit `DB::connection('pos')->beginTransaction()` for transaction integrity
+
+- **📎 Clickable Invoice Attachment Icons** (2025-09-02)
+  - **One-Click Viewing**: Click attachment icons in invoice table to instantly view documents
+  - **New Window Display**: Opens attachments in dedicated window (1200x800) without navigation disruption
+  - **Smart Selection**: Automatically prioritizes primary attachment, falls back to first available
+  - **Visual Feedback**: Hover effects and tooltips indicate clickability and file count
+  - **Error Handling**: Graceful handling of missing attachments with user-friendly messages
+  - **Event Management**: Click handlers prevent interference with existing table row links
+  - **Quick Access**: No need to navigate to invoice detail page to view attachments
+
+- **📊 Outstanding Invoices Report System** (2025-09-02)
+  - **Date-Based Reporting**: Select any date to see invoices outstanding at that time
+  - **Supplier Grouping**: Automatic organization by supplier with individual tables
+  - **Smart Outstanding Logic**: Uses `payment_status` field to accurately determine outstanding invoices
+  - **Comprehensive Calculations**: Per-supplier totals and overall outstanding amounts
+  - **Summary Statistics**: Cards showing supplier count, invoice count, total amounts, unpaid count
+  - **CSV Export**: Download complete report with all supplier groupings and totals
+  - **Year-End Reporting**: Perfect for management accounts and financial reporting at any date
+  - **Access Points**: Available at `/suppliers/outstanding-report` or via button on suppliers page
+  - **Payment Status Integration**: Properly excludes cancelled invoices and handles payment dates
+
 - **📊 Invoice CSV Export System** (2025-09-02)
   - **Comprehensive Export**: Export button on invoices page with complete statistics and invoice data
   - **Filter Preservation**: CSV respects all active filters (supplier, status, dates, search terms)

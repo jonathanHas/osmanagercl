@@ -164,10 +164,34 @@ Route::prefix('invoice-attachments/{attachment}')->name('invoices.attachments.')
 - Action buttons (View, Download, Delete)
 - Primary attachment badge
 
+### Quick View Integration (New)
+**Location**: `resources/views/invoices/index.blade.php` (JavaScript)
+
+**Features:**
+- **One-Click Viewing**: Click attachment icon in invoice table
+- **Smart Selection**: Prioritizes primary attachment, falls back to first available
+- **New Window Display**: Opens in dedicated window (1200x800 dimensions)
+- **Visual Feedback**: Hover effects and tooltips indicate interactivity
+- **Error Handling**: Graceful handling of missing attachments or API errors
+- **Event Management**: Prevents interference with existing row click behavior
+
+**JavaScript Function:**
+```javascript
+function viewInvoiceAttachment(invoiceId) {
+    // Fetches attachments via existing API endpoint
+    // Opens primary or first attachment in new window
+    // Handles errors with user-friendly alerts
+}
+```
+
 ### Invoice List Integration
-**Feature**: Attachment count badges on invoice listings
+**Feature**: Interactive attachment count badges on invoice listings
 - Shows blue badge with count when attachments exist
-- Tooltip shows attachment count details
+- **✅ NEW**: Clickable icon opens attachment viewer in new window
+- Hover effects indicate clickability
+- Smart attachment selection (prioritizes primary attachment)
+- Tooltip shows attachment count and click instructions
+- Opens in properly sized new window (1200x800)
 
 ## OSAccounts Migration
 

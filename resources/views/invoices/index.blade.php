@@ -416,7 +416,9 @@
                                     @endphp
                                     {!! $displayNum !!}
                                     @if($invoice->hasAttachments())
-                                        <span class="inline-flex items-center ml-1 px-1 py-0.5 rounded-full text-xs bg-blue-600 text-blue-100" title="{{ $invoice->attachment_count }} attachment(s)">
+                                        <span class="inline-flex items-center ml-1 px-1 py-0.5 rounded-full text-xs bg-blue-600 text-blue-100 hover:bg-blue-500 cursor-pointer transition-colors" 
+                                              title="Click to view attachment ({{ $invoice->attachment_count }} file{{ $invoice->attachment_count > 1 ? 's' : '' }})"
+                                              onclick="event.preventDefault(); event.stopPropagation(); viewInvoiceAttachment({{ $invoice->id }});">
                                             <svg class="w-2 h-2 mr-0.5" fill="currentColor" viewBox="0 0 24 24">
                                                 <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
                                             </svg>
@@ -806,6 +808,32 @@
                 });
             }
         });
+
+        // Function to view invoice attachment in new window
+        function viewInvoiceAttachment(invoiceId) {
+            // Fetch attachment info for this invoice
+            fetch(`/invoices/${invoiceId}/attachments`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.attachments && data.attachments.length > 0) {
+                        // Find primary attachment or use first one
+                        let attachmentToView = data.attachments.find(att => att.is_primary) || data.attachments[0];
+                        
+                        // Open attachment viewer in new window
+                        const viewerUrl = attachmentToView.viewer_url;
+                        const windowName = `invoice_attachment_${invoiceId}_${attachmentToView.id}`;
+                        const windowFeatures = 'width=1200,height=800,scrollbars=yes,resizable=yes,toolbar=no,menubar=no,location=no,status=no';
+                        
+                        window.open(viewerUrl, windowName, windowFeatures);
+                    } else {
+                        alert('No attachments found for this invoice.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading attachments:', error);
+                    alert('Failed to load attachments.');
+                });
+        }
     </script>
     @endpush
 </x-admin-layout>

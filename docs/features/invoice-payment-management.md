@@ -1,7 +1,8 @@
 # Invoice Payment Management System
 
 **Status**: ✅ Implemented (2025-08-18)  
-**Version**: 1.0  
+**Version**: 1.1  
+**Last Updated**: 2025-09-02  
 **Dependencies**: Laravel Invoices System, OSAccounts Integration
 
 ## Overview
@@ -70,7 +71,34 @@ php artisan osaccounts:import-invoices --update-existing --dry-run
 php artisan osaccounts:import-invoices --update-existing --user=1
 ```
 
-### 5. Comprehensive CSV Export System (Added 2025-09-02)
+### 5. Outstanding Invoices Report System (Added 2025-09-02)
+
+#### Date-Based Outstanding Report
+- **Flexible Date Selection**: Choose any date to see what invoices were outstanding at that time
+- **Supplier Grouping**: Invoices automatically grouped by supplier with individual tables
+- **Total Calculations**: Per-supplier totals and overall outstanding amount
+- **Payment Status Logic**: Uses `payment_status` field to determine if invoice was outstanding
+  - Includes invoices with status: pending, overdue, partial
+  - Includes paid invoices if payment_date is after report date
+  - Excludes cancelled invoices
+- **Access Location**: `/suppliers/outstanding-report` or via "Outstanding Report" button on suppliers index
+
+#### Outstanding Report Features
+- **Summary Statistics**: Quick overview cards showing:
+  - Total suppliers with outstanding invoices
+  - Total number of outstanding invoices
+  - Total outstanding amount
+  - Count of invoices still unpaid
+- **Detailed Tables**: Each supplier gets dedicated table with:
+  - Invoice number
+  - Invoice date
+  - Due date
+  - Amount
+  - Current payment status
+- **CSV Export**: Download complete report with all supplier groupings
+- **Warning Indicators**: Highlights invoices still unpaid for manual review
+
+### 6. Comprehensive CSV Export System (Added 2025-09-02)
 
 #### Export Current View
 - **One-Click Export**: Green "Export CSV" button in the invoices page header
@@ -350,9 +378,10 @@ php artisan optimize:clear
 - [OSAccounts Integration](./osaccounts-integration.md)
 - [Invoice Attachments System](./invoice-attachments-system.md)
 - [User Roles & Permissions](./user-roles-permissions.md)
+- [Supplier Management](../management/suppliers.md)
 
 ---
 
-**Last Updated**: 2025-08-18  
+**Last Updated**: 2025-09-02  
 **Contributors**: Claude Code Assistant  
 **Review Status**: Ready for Production

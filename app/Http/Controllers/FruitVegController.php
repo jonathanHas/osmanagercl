@@ -756,7 +756,7 @@ class FruitVegController extends Controller
     /**
      * Serve product image.
      */
-    public function productImage($code)
+    public function productImage($code, Request $request)
     {
         $product = Product::where('CODE', $code)->first();
 
@@ -770,10 +770,32 @@ class FruitVegController extends Controller
             ]);
         }
 
+        // Detect content type from image binary data
+        $imageData = $product->IMAGE;
+        $contentType = 'image/jpeg'; // default fallback
+
+        // Detect image format from first few bytes (magic numbers)
+        if (strlen($imageData) >= 4) {
+            $header = substr($imageData, 0, 4);
+            if (substr($header, 0, 3) === "\xFF\xD8\xFF") {
+                $contentType = 'image/jpeg';
+            } elseif (substr($header, 0, 4) === "\x89PNG") {
+                $contentType = 'image/png';
+            } elseif (substr($header, 0, 3) === 'GIF') {
+                $contentType = 'image/gif';
+            } elseif (substr($header, 0, 4) === 'RIFF' && substr($imageData, 8, 4) === 'WEBP') {
+                $contentType = 'image/webp';
+            }
+        }
+
+        // Check for cache-busting parameter - if present, reduce cache time
+        $cacheTime = $request->has('t') ? 300 : 86400; // 5 minutes vs 24 hours
+
         // Return the image from the database
-        return response($product->IMAGE, 200, [
-            'Content-Type' => 'image/jpeg', // Assume JPEG for now
-            'Cache-Control' => 'public, max-age=86400', // Cache for 24 hours
+        return response($imageData, 200, [
+            'Content-Type' => $contentType,
+            'Cache-Control' => "public, max-age={$cacheTime}",
+            'Last-Modified' => gmdate('D, d M Y H:i:s T', $request->get('t', time() - 86400)),
         ]);
     }
 
@@ -897,14 +919,57 @@ class FruitVegController extends Controller
         $product = Product::where('CODE', $code)->firstOrFail();
 
         if ($request->hasFile('image')) {
-            $imageData = file_get_contents($request->file('image')->path());
-            $product->update(['IMAGE' => $imageData]);
+            $imageFile = $request->file('image');
+            $imageData = file_get_contents($imageFile->path());
+            $mimeType = $imageFile->getMimeType();
 
-            // Add to print queue since image changed
-            VegPrintQueue::addToQueue($code, 'image_updated');
+            // Start transaction on POS database connection
+            DB::connection('pos')->beginTransaction();
+
+            try {
+                // Update the image in POS database using direct query to ensure proper transaction handling
+                DB::connection('pos')->table('PRODUCTS')
+                    ->where('ID', $product->ID)
+                    ->update(['IMAGE' => $imageData]);
+
+                // Commit the transaction
+                DB::connection('pos')->commit();
+
+                // Add to print queue after successful update
+                VegPrintQueue::addToQueue($code, 'image_updated');
+
+                // Log successful update for debugging
+                \Log::info('Product image updated successfully', [
+                    'product_code' => $code,
+                    'product_id' => $product->ID,
+                    'image_size_bytes' => strlen($imageData),
+                    'mime_type' => $mimeType,
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'timestamp' => time(), // Return timestamp for cache busting
+                ]);
+
+            } catch (\Exception $e) {
+                // Rollback transaction on failure
+                DB::connection('pos')->rollBack();
+
+                // Log the error for debugging
+                \Log::error('Failed to update product image', [
+                    'product_code' => $code,
+                    'product_id' => $product->ID,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Failed to update image',
+                ], 500);
+            }
         }
 
-        return response()->json(['success' => true]);
+        return response()->json(['success' => false, 'error' => 'No image file provided']);
     }
 
     /**
