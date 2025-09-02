@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **📊 Invoice CSV Export System** (2025-09-02)
+  - **Comprehensive Export**: Export button on invoices page with complete statistics and invoice data
+  - **Filter Preservation**: CSV respects all active filters (supplier, status, dates, search terms)
+  - **Statistics Cards Data**: Includes Total Unpaid, Overdue, This Month, Last Month summaries
+  - **Filtered Results Summary**: Shows breakdown of filtered results when filters are applied
+  - **Professional Format**: Structured CSV with header info, statistics sections, and detailed invoice table
+  - **Smart Filename**: Auto-generated filename format `invoices_YYYY-MM-DD.csv`
+  - **Complete Data Export**: All invoice fields including payment details, due dates, notes
+  - **One-Click Export**: Green "Export CSV" button preserves current view state
+
+- **🔄 Enhanced Invoice Payment Date Sorting** (2025-09-02)
+  - **Smart Column Sorting**: "Status / Paid On" column now toggles between payment status and payment date sorting
+  - **Payment Date Priority**: Click to sort by payment date (most recent payments first)
+  - **NULL Value Handling**: Proper ordering with paid invoices first, unpaid invoices at end
+  - **Direction Toggle**: Second click reverses payment date order (oldest to newest)
+  - **Visual Feedback**: Arrow indicators show current sort field and direction
+  - **Maintained Layout**: Single column design preserves compact table layout
+
 - **🔧 F&V Price Sync Management System** (2025-08-28)
   - **Web-based Price Sync Tool**: New management interface at `/fruit-veg/price-sync`
   - **Cross-Database Discrepancy Detection**: Identifies products where POS and Laravel price history don't match

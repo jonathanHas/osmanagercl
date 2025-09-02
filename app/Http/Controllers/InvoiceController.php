@@ -82,9 +82,24 @@ class InvoiceController extends Controller
         // Clone query for statistics before pagination
         $statsQuery = clone $query;
 
-        $invoices = $query->orderBy($sortField, $sortDirection)
-            ->orderBy('id', 'desc') // Secondary sort for consistency
-            ->get();
+        // Handle payment_date sorting with special logic for NULL values
+        if ($sortField === 'payment_date') {
+            if ($sortDirection === 'desc') {
+                // Most recent payments first, then unpaid invoices
+                $invoices = $query->orderByRaw('payment_date IS NULL ASC, payment_date DESC')
+                    ->orderBy('id', 'desc')
+                    ->get();
+            } else {
+                // Oldest payments first, then unpaid invoices
+                $invoices = $query->orderByRaw('payment_date IS NULL ASC, payment_date ASC')
+                    ->orderBy('id', 'desc')
+                    ->get();
+            }
+        } else {
+            $invoices = $query->orderBy($sortField, $sortDirection)
+                ->orderBy('id', 'desc') // Secondary sort for consistency
+                ->get();
+        }
 
         // Get suppliers for filter dropdown
         $suppliers = AccountingSupplier::activeOnly()
@@ -584,5 +599,202 @@ class InvoiceController extends Controller
             'success' => false,
             'message' => 'VAT rate not found',
         ], 404);
+    }
+
+    /**
+     * Export invoices to CSV
+     */
+    public function exportCsv(Request $request)
+    {
+        // Use the same filtering logic as index method
+        $query = Invoice::with(['supplier', 'vatLines']);
+
+        // Default to current year if no date filters provided
+        $fromDate = $request->filled('from_date') ? $request->from_date : '2025-01-01';
+        $toDate = $request->filled('to_date') ? $request->to_date : null;
+
+        // Apply filters (same logic as index)
+        if ($request->filled('supplier_id')) {
+            $query->where('supplier_id', $request->supplier_id);
+        }
+
+        if ($request->filled('payment_status')) {
+            if ($request->payment_status === 'unpaid') {
+                $query->whereIn('payment_status', ['pending', 'overdue', 'partial']);
+            } else {
+                $query->where('payment_status', $request->payment_status);
+            }
+        }
+
+        $query->where('invoice_date', '>=', $fromDate);
+        if ($toDate) {
+            $query->where('invoice_date', '<=', $toDate);
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('invoice_number', 'like', "%{$search}%")
+                    ->orWhere('supplier_name', 'like', "%{$search}%")
+                    ->orWhere('notes', 'like', "%{$search}%");
+            });
+        }
+
+        // Apply sorting (same logic as index)
+        $sortField = $request->get('sort', 'invoice_date');
+        $sortDirection = $request->get('direction', 'desc');
+
+        $allowedSortFields = [
+            'invoice_number', 'supplier_name', 'invoice_date',
+            'payment_status', 'payment_date', 'subtotal',
+            'vat_amount', 'total_amount',
+        ];
+
+        if (! in_array($sortField, $allowedSortFields)) {
+            $sortField = 'invoice_date';
+        }
+        if (! in_array($sortDirection, ['asc', 'desc'])) {
+            $sortDirection = 'desc';
+        }
+
+        // Clone query for statistics
+        $statsQuery = clone $query;
+
+        // Apply sorting
+        if ($sortField === 'payment_date') {
+            if ($sortDirection === 'desc') {
+                $invoices = $query->orderByRaw('payment_date IS NULL ASC, payment_date DESC')
+                    ->orderBy('id', 'desc')
+                    ->get();
+            } else {
+                $invoices = $query->orderByRaw('payment_date IS NULL ASC, payment_date ASC')
+                    ->orderBy('id', 'desc')
+                    ->get();
+            }
+        } else {
+            $invoices = $query->orderBy($sortField, $sortDirection)
+                ->orderBy('id', 'desc')
+                ->get();
+        }
+
+        // Calculate statistics (same as index method)
+        $filteredStats = [
+            'total_count' => $statsQuery->count(),
+            'total_amount' => $statsQuery->sum('total_amount'),
+            'total_subtotal' => $statsQuery->sum('subtotal'),
+            'total_vat' => $statsQuery->sum('vat_amount'),
+            'paid_count' => (clone $statsQuery)->where('payment_status', 'paid')->count(),
+            'unpaid_count' => (clone $statsQuery)->whereIn('payment_status', ['pending', 'overdue', 'partial'])->count(),
+            'unpaid_total' => (clone $statsQuery)->whereIn('payment_status', ['pending', 'overdue', 'partial'])->sum('total_amount'),
+        ];
+
+        $stats = [
+            'total_unpaid' => Invoice::unpaid()->sum('total_amount'),
+            'total_overdue' => Invoice::unpaid()->where('due_date', '<', now())->sum('total_amount'),
+            'count_unpaid' => Invoice::unpaid()->count(),
+            'count_overdue' => Invoice::unpaid()->where('due_date', '<', now())->count(),
+        ];
+
+        // Generate filename with current date
+        $filename = 'invoices_'.now()->format('Y-m-d').'.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+
+        $callback = function () use ($invoices, $stats, $filteredStats, $request, $fromDate, $toDate) {
+            $file = fopen('php://output', 'w');
+
+            // Header section
+            fputcsv($file, ['Invoices Export']);
+            fputcsv($file, ['Generated:', now()->format('M j, Y H:i:s')]);
+
+            // Show applied filters
+            $activeFilters = [];
+            if ($request->filled('supplier_id')) {
+                $supplier = \App\Models\AccountingSupplier::find($request->supplier_id);
+                $activeFilters[] = 'Supplier: '.($supplier ? $supplier->name : 'Unknown');
+            }
+            if ($request->filled('payment_status')) {
+                $activeFilters[] = 'Status: '.ucfirst($request->payment_status);
+            }
+            if ($request->filled('from_date') || $fromDate !== '2025-01-01') {
+                $activeFilters[] = 'From: '.\Carbon\Carbon::parse($fromDate)->format('M j, Y');
+            }
+            if ($request->filled('to_date')) {
+                $activeFilters[] = 'To: '.\Carbon\Carbon::parse($toDate)->format('M j, Y');
+            }
+            if ($request->filled('search')) {
+                $activeFilters[] = 'Search: '.$request->search;
+            }
+
+            if (! empty($activeFilters)) {
+                fputcsv($file, ['Filters Applied:', implode(', ', $activeFilters)]);
+            } else {
+                fputcsv($file, ['Filters Applied: None']);
+            }
+
+            fputcsv($file, []); // Empty row
+
+            // Overall statistics section
+            fputcsv($file, ['OVERALL STATISTICS']);
+            fputcsv($file, ['Total Unpaid:', '€'.number_format($stats['total_unpaid'], 2), '('.$stats['count_unpaid'].' invoices)']);
+            fputcsv($file, ['Overdue:', '€'.number_format($stats['total_overdue'], 2), '('.$stats['count_overdue'].' invoices)']);
+            fputcsv($file, ['This Month:', '€'.number_format(Invoice::whereMonth('invoice_date', now()->month)->whereYear('invoice_date', now()->year)->sum('total_amount'), 2)]);
+            fputcsv($file, ['Last Month:', '€'.number_format(Invoice::whereMonth('invoice_date', now()->subMonth()->month)->whereYear('invoice_date', now()->subMonth()->year)->sum('total_amount'), 2)]);
+            fputcsv($file, []); // Empty row
+
+            // Filtered results section (if filters are active)
+            if (! empty($activeFilters)) {
+                fputcsv($file, ['FILTERED RESULTS']);
+                fputcsv($file, ['Total Invoices:', $filteredStats['total_count']]);
+                fputcsv($file, ['Total Amount:', '€'.number_format($filteredStats['total_amount'], 2)]);
+                fputcsv($file, ['Total Net:', '€'.number_format($filteredStats['total_subtotal'], 2)]);
+                fputcsv($file, ['Total VAT:', '€'.number_format($filteredStats['total_vat'], 2)]);
+                fputcsv($file, ['Paid Invoices:', $filteredStats['paid_count']]);
+                fputcsv($file, ['Unpaid Invoices:', $filteredStats['unpaid_count'], '(€'.number_format($filteredStats['unpaid_total'], 2).')']);
+                fputcsv($file, []); // Empty row
+            }
+
+            // Invoice table header
+            fputcsv($file, ['INVOICES']);
+            fputcsv($file, [
+                'Invoice #',
+                'Supplier',
+                'Date',
+                'Status',
+                'Paid On',
+                'Net',
+                'VAT',
+                'Total',
+                'Payment Method',
+                'Payment Reference',
+                'Due Date',
+                'Notes',
+            ]);
+
+            // Invoice data rows
+            foreach ($invoices as $invoice) {
+                fputcsv($file, [
+                    $invoice->invoice_number,
+                    $invoice->supplier_name,
+                    $invoice->invoice_date->format('Y-m-d'),
+                    ucfirst($invoice->payment_status),
+                    $invoice->payment_date ? $invoice->payment_date->format('Y-m-d') : '',
+                    number_format($invoice->subtotal, 2),
+                    number_format($invoice->vat_amount, 2),
+                    number_format($invoice->total_amount, 2),
+                    $invoice->payment_method ?? '',
+                    $invoice->payment_reference ?? '',
+                    $invoice->due_date ? $invoice->due_date->format('Y-m-d') : '',
+                    $invoice->notes ?? '',
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 }

@@ -421,7 +421,8 @@ See [Invoice Parser Integration Guide](./docs/features/invoice-parser-integratio
 
 ### Invoice Payment Management System
 Comprehensive supplier payment management with bulk processing and status synchronization.
-- **Payment Date Tracking**: Sortable "Paid On" column for quick payment history reference
+- **Enhanced Payment Date Sorting**: Smart toggle between payment status and payment date sorting - click "Status/Paid On" column to sort by payment date (most recent first)
+- **Comprehensive CSV Export**: Export current view with statistics cards (Total Unpaid, Overdue, etc.) and complete invoice table data, respecting all active filters and sorting
 - **Unified Unpaid Filter**: Combined view of pending, overdue, and partial invoices
 - **Bulk Payment Processing**: Multi-invoice selection with real-time total calculations
 - **Supplier Grouping**: Automatic payment breakdown by supplier in selection interface

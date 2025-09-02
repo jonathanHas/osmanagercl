@@ -129,6 +129,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/{pending}/preview-calculation', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'previewCalculation'])->name('preview-calculation');
     });
 
+    Route::get('/invoices/export', [\App\Http\Controllers\InvoiceController::class, 'exportCsv'])->name('invoices.export');
     Route::resource('invoices', \App\Http\Controllers\InvoiceController::class);
 
     // VAT Rates Management
@@ -140,6 +141,8 @@ Route::middleware('auth')->group(function () {
     // Supplier Management routes
     Route::post('/suppliers/{supplier}/refresh-analytics', [\App\Http\Controllers\AccountingSuppliersController::class, 'refreshAnalytics'])->name('suppliers.refresh-analytics');
     Route::post('/suppliers/{supplier}/toggle-status', [\App\Http\Controllers\AccountingSuppliersController::class, 'toggleStatus'])->name('suppliers.toggle-status');
+    Route::get('/suppliers/outstanding-report', [\App\Http\Controllers\SupplierOutstandingController::class, 'index'])->name('suppliers.outstanding-report');
+    Route::get('/suppliers/outstanding-report/export', [\App\Http\Controllers\SupplierOutstandingController::class, 'exportCsv'])->name('suppliers.outstanding-report.export');
     Route::resource('suppliers', \App\Http\Controllers\AccountingSuppliersController::class);
 
     // Label area routes

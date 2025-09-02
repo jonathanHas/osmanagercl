@@ -37,6 +37,13 @@
                     </svg>
                     VAT Rates
                 </a>
+                <a href="{{ route('invoices.export', request()->all()) }}" 
+                   class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export CSV
+                </a>
                 <div class="flex space-x-1">
                     <a href="{{ route('invoices.create-simple') }}" 
                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
@@ -306,10 +313,23 @@
                             </a>
                         </th>
                         <th class="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider" style="width: 120px;">
-                            <a href="{{ route('invoices.index', array_merge(request()->all(), ['sort' => 'payment_status', 'direction' => $sortField === 'payment_status' && $sortDirection === 'asc' ? 'desc' : 'asc'])) }}" 
+                            @php
+                                // Smart toggle: if currently sorting by payment_status, switch to payment_date, and vice versa
+                                if ($sortField === 'payment_status') {
+                                    $nextSort = 'payment_date';
+                                    $nextDirection = 'desc'; // Most recent payments first by default
+                                } elseif ($sortField === 'payment_date') {
+                                    $nextSort = 'payment_date';
+                                    $nextDirection = $sortDirection === 'asc' ? 'desc' : 'asc';
+                                } else {
+                                    $nextSort = 'payment_status';
+                                    $nextDirection = 'asc';
+                                }
+                            @endphp
+                            <a href="{{ route('invoices.index', array_merge(request()->all(), ['sort' => $nextSort, 'direction' => $nextDirection])) }}" 
                                class="flex items-center space-x-1 hover:text-gray-200">
                                 <span>Status / Paid On</span>
-                                @if($sortField === 'payment_status')
+                                @if($sortField === 'payment_status' || $sortField === 'payment_date')
                                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                         @if($sortDirection === 'asc')
                                             <path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" />

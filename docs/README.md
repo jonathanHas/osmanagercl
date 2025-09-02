@@ -4,7 +4,30 @@ Welcome to the comprehensive documentation for OSManager CL. This documentation 
 
 📚 **New to the docs?** Start with the [Documentation Usage Guide](./DOCUMENTATION_GUIDE.md) to understand how to navigate and contribute to documentation.
 
-## 🆕 Latest Updates (August 2025)
+## 🆕 Latest Updates (August-September 2025)
+
+### Invoice Management Enhancements (2025-09-02)
+Enhanced invoice system with advanced sorting and comprehensive data export capabilities:
+
+- **🔄 Smart Payment Date Sorting**: Click "Status / Paid On" column to toggle between payment status and payment date sorting
+  - **📅 Payment Date Priority**: Most recent payments appear first when sorting by payment date
+  - **📊 NULL Value Handling**: Proper ordering with paid invoices grouped by date, unpaid invoices at end
+  - **↕️ Direction Toggle**: Second click reverses payment date order (oldest to newest)
+  - **🎯 Visual Feedback**: Arrow indicators show current sort field and direction
+- **📊 Comprehensive CSV Export**: One-click export of complete invoice data including statistics
+  - **📈 Statistics Integration**: Includes all summary cards (Total Unpaid, Overdue, This/Last Month)
+  - **🔍 Filter Preservation**: CSV respects all active filters (supplier, status, dates, search terms)
+  - **📋 Complete Data Export**: All invoice fields including payment details, due dates, and notes
+  - **🏷️ Professional Format**: Structured CSV with header info, statistics sections, and detailed table
+  - **📁 Smart Filename**: Auto-generated as `invoices_YYYY-MM-DD.csv`
+
+**Key Benefits**:
+- Chronological payment tracking with intuitive sorting interface
+- Complete data export for accounting and financial analysis
+- Professional CSV format ready for external systems
+- Enhanced productivity through better payment history visibility
+
+See [Invoice Payment Management](./features/invoice-payment-management.md) for complete details.
 
 ### Label System Barcode Scanner Enhancement (2025-08-29)
 Scanner-optimized label queue management with instant barcode scanning and advanced filtering:

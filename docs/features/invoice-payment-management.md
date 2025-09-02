@@ -12,10 +12,14 @@ The Invoice Payment Management System provides comprehensive tools for efficient
 
 ### 1. Enhanced Invoice List with Payment Tracking
 
-#### "Paid On" Date Column
-- **Sortable payment date column** in the main invoices list
-- **Visual indicators**: Green dates for paid invoices, "-" for unpaid
-- **Quick reference** for when payments were made to suppliers
+#### Enhanced "Status / Paid On" Column Sorting (Updated 2025-09-02)
+- **Smart Toggle Sorting**: Click column header to intelligently switch between payment status and payment date sorting
+- **Payment Date Priority**: First click sorts by payment date (most recent payments first)
+- **NULL Value Handling**: Proper ordering with paid invoices sorted by date first, unpaid invoices grouped at end
+- **Direction Toggle**: Subsequent clicks reverse payment date order (oldest to newest)
+- **Visual Indicators**: Green payment dates for paid invoices, status badges for unpaid
+- **Arrow Indicators**: Visual feedback showing current sort field and direction
+- **Compact Design**: Single column maintains clean table layout
 
 #### Unified Payment Status Filtering
 - **"All Unpaid" filter** combines pending, overdue, and partial statuses
@@ -66,6 +70,44 @@ php artisan osaccounts:import-invoices --update-existing --dry-run
 php artisan osaccounts:import-invoices --update-existing --user=1
 ```
 
+### 5. Comprehensive CSV Export System (Added 2025-09-02)
+
+#### Export Current View
+- **One-Click Export**: Green "Export CSV" button in the invoices page header
+- **Filter Preservation**: CSV respects all active filters (supplier, status, dates, search terms)
+- **Sort Preservation**: Export maintains current table sorting (including payment date sorting)
+- **Professional Filename**: Auto-generated as `invoices_YYYY-MM-DD.csv`
+
+#### Comprehensive Data Structure
+```csv
+Invoices Export
+Generated: Sep 2, 2025 10:30:15
+Filters Applied: Status: Paid, From: Aug 1, 2025
+
+OVERALL STATISTICS
+Total Unpaid,€15,423.50,(189 invoices)
+Overdue,€8,234.20,(67 invoices)
+This Month,€45,678.90
+Last Month,€38,901.23
+
+FILTERED RESULTS
+Total Invoices,234
+Total Amount,€98,765.43
+...
+
+INVOICES
+Invoice #,Supplier,Date,Status,Paid On,Net,VAT,Total,Payment Method,Payment Reference,Due Date,Notes
+9644,BreaDelicious,2025-08-15,Paid,2025-08-19,234.78,51.65,286.43,Bank Transfer,TXN-2025-0819,2025-09-14,Monthly supplies
+...
+```
+
+#### Key Features
+- **Statistics Cards Integration**: Includes all summary data from page header
+- **Filtered Results Summary**: Shows breakdown when filters are active
+- **Complete Invoice Data**: All table columns plus payment details, due dates, and notes
+- **Professional Formatting**: Structured sections with clear headers and spacing
+- **Accounting Ready**: Format suitable for accounting software import
+
 ## User Interface Components
 
 ### Invoice List Enhancements
@@ -77,8 +119,7 @@ php artisan osaccounts:import-invoices --update-existing --user=1
 | Invoice # | Invoice number with attachments indicator | Sortable, Clickable |
 | Supplier | Supplier name | Sortable, Filterable |
 | Date | Invoice date | Sortable, Date range filter |
-| Status | Payment status badge | Sortable, Status filter including "All Unpaid" |
-| **Paid On** | Payment date | **NEW**: Sortable, Shows date or "-" |
+| **Status / Paid On** | Combined status badge and payment date | **ENHANCED**: Smart toggle sorting (status ↔ payment date), Shows date or "-" |
 | Net | Net amount | Sortable |
 | VAT | VAT amount | Sortable |
 | Total | Total amount | Sortable |
