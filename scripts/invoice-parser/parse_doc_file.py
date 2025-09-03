@@ -5,6 +5,7 @@ Parse .doc file and extract text content
 
 import sys
 import os
+import shutil
 from docx import Document
 import subprocess
 import tempfile
@@ -35,13 +36,32 @@ def parse_doc_file(file_path):
         try:
             # Create temporary directory for conversion
             with tempfile.TemporaryDirectory() as temp_dir:
+                # Create temporary home directory for LibreOffice
+                temp_home = tempfile.mkdtemp(prefix='libreoffice_')
+                
                 # Convert .doc to .docx using LibreOffice
                 cmd = [
                     'libreoffice', '--headless', '--convert-to', 'docx',
                     '--outdir', temp_dir, file_path
                 ]
                 
-                result = subprocess.run(cmd, capture_output=True, text=True)
+                # Set environment variables for LibreOffice (fixes production www-data user issues)
+                env = os.environ.copy()
+                env.update({
+                    'HOME': temp_home,
+                    'TMPDIR': temp_home,
+                    'XDG_CONFIG_HOME': os.path.join(temp_home, '.config'),
+                    'XDG_DATA_HOME': os.path.join(temp_home, '.local', 'share'),
+                    'XDG_CACHE_HOME': os.path.join(temp_home, '.cache')
+                })
+                
+                result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+                
+                # Clean up temporary home directory
+                try:
+                    shutil.rmtree(temp_home)
+                except Exception as cleanup_error:
+                    print(f"Warning: Failed to clean up temporary directory: {cleanup_error}")
                 
                 if result.returncode != 0:
                     print(f"Error converting file: {result.stderr}")

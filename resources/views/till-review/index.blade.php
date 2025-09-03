@@ -553,7 +553,15 @@
 
                 // Highlight search terms in text
                 highlightSearchTerm(text, searchTerm) {
-                    if (!searchTerm || !searchTerm.trim() || !text) {
+                    // Handle null/undefined text by converting to empty string
+                    if (text === null || text === undefined) {
+                        return '';
+                    }
+                    
+                    // Convert to string to ensure we're working with text
+                    text = String(text);
+                    
+                    if (!searchTerm || !searchTerm.trim()) {
                         return text;
                     }
                     
@@ -570,9 +578,12 @@
                     }
 
                     return this.transactions.map((transaction, index) => {
+                        // Add defensive checks for transaction properties
+                        if (!transaction) return '';
+                        
                         // Get payment type color scheme for receipts
                         const paymentType = transaction.details?.payment_type;
-                        const isReceipt = transaction.type === 'receipt';
+                        const isReceipt = (transaction.type || '') === 'receipt';
                         const colorScheme = isReceipt && paymentType ? this.getPaymentTypeColor(paymentType) : this.getPaymentTypeColor('default');
                         
                         const cardClasses = isReceipt && paymentType ? 
@@ -582,9 +593,9 @@
                         let html = '<div class="' + cardClasses + ' rounded-lg p-4 transition cursor-pointer" onclick="window.tillReviewToggleDetails(' + index + ')">';
                         html += '<div class="flex items-center justify-between">';
                         html += '<div class="flex items-center space-x-4">';
-                        html += '<span class="text-sm font-mono text-gray-600 dark:text-gray-400">' + transaction.time + '</span>';
-                        html += '<span class="px-2 py-1 text-xs font-semibold rounded-full ' + this.getTypeClassString(transaction.type) + '">';
-                        html += transaction.type_display + '</span>';
+                        html += '<span class="text-sm font-mono text-gray-600 dark:text-gray-400">' + (transaction.time || '') + '</span>';
+                        html += '<span class="px-2 py-1 text-xs font-semibold rounded-full ' + this.getTypeClassString(transaction.type || '') + '">';
+                        html += (transaction.type_display || 'Unknown') + '</span>';
                         
                         if (isReceipt && paymentType) {
                             html += '<span class="px-2 py-1 text-xs font-semibold rounded-full ' + colorScheme.badge + '">';
@@ -594,11 +605,11 @@
                         const textColor = isReceipt && paymentType ? colorScheme.text : 'text-gray-900 dark:text-white';
                         // Highlight search term in description
                         const searchTerm = this.filters.search && this.filters.search.trim();
-                        const highlightedDescription = this.highlightSearchTerm(transaction.description, searchTerm);
+                        const highlightedDescription = this.highlightSearchTerm(transaction.description || '', searchTerm);
                         html += '<span class="text-sm ' + textColor + '">' + highlightedDescription + '</span>';
                         html += '</div>';
                         html += '<div class="flex items-center space-x-4">';
-                        html += '<span class="font-semibold ' + textColor + '">€' + this.formatAmount(transaction.amount) + '</span>';
+                        html += '<span class="font-semibold ' + textColor + '">€' + this.formatAmount(transaction.amount || 0) + '</span>';
                         html += '<i class="fas fa-chevron-down text-gray-400 transition-transform ' + (transaction.showDetails ? 'rotate-180' : '') + '"></i>';
                         html += '</div>';
                         html += '</div>';
@@ -613,6 +624,10 @@
                 },
 
                 renderTransactionDetails(transaction) {
+                    if (!transaction || !transaction.details) {
+                        return '';
+                    }
+                    
                     const searchTerm = this.filters.search && this.filters.search.trim();
                     let html = '<div class="mt-4 pt-4 border-t dark:border-gray-600">';
                     html += '<div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">';
@@ -626,7 +641,7 @@
                         html += '<div><span class="text-gray-600 dark:text-gray-400">Ticket ID:</span><span class="ml-2 font-mono">' + highlightedTicketId + '</span></div>';
                     }
                     if (transaction.details.terminal) {
-                        html += '<div><span class="text-gray-600 dark:text-gray-400">Terminal:</span><span class="ml-2">' + transaction.details.terminal + '</span></div>';
+                        html += '<div><span class="text-gray-600 dark:text-gray-400">Terminal:</span><span class="ml-2">' + (transaction.details.terminal || '') + '</span></div>';
                     }
                     if (transaction.details.cashier) {
                         const highlightedCashier = this.highlightSearchTerm(transaction.details.cashier, searchTerm);
@@ -647,21 +662,23 @@
                 },
 
                 renderReceiptLines(transaction) {
-                    if (!transaction.details.lines || transaction.details.lines.length === 0) {
+                    if (!transaction || !transaction.details || !transaction.details.lines || transaction.details.lines.length === 0) {
                         return '';
                     }
 
                     let linesHtml = '';
                     const searchTerm = this.filters.search && this.filters.search.trim();
                     transaction.details.lines.forEach(line => {
+                        if (!line) return;
+                        
                         linesHtml += '<tr class="border-b dark:border-gray-700">';
                         // Highlight search term in product name
-                        const highlightedProduct = this.highlightSearchTerm(line.product, searchTerm);
+                        const highlightedProduct = this.highlightSearchTerm(line.product || '', searchTerm);
                         linesHtml += '<td class="py-1">' + highlightedProduct + '</td>';
-                        linesHtml += '<td class="text-right py-1">' + line.units + '</td>';
-                        linesHtml += '<td class="text-right py-1">€' + this.formatAmount(line.price) + '</td>';
-                        linesHtml += '<td class="text-right py-1">' + (line.tax * 100).toFixed(1) + '%</td>';
-                        linesHtml += '<td class="text-right py-1">€' + this.formatAmount(line.total) + '</td>';
+                        linesHtml += '<td class="text-right py-1">' + (line.units || 0) + '</td>';
+                        linesHtml += '<td class="text-right py-1">€' + this.formatAmount(line.price || 0) + '</td>';
+                        linesHtml += '<td class="text-right py-1">' + ((line.tax || 0) * 100).toFixed(1) + '%</td>';
+                        linesHtml += '<td class="text-right py-1">€' + this.formatAmount(line.total || 0) + '</td>';
                         linesHtml += '</tr>';
                     });
 
