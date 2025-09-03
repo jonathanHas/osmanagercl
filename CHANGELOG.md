@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **📄 DOC/XLS Invoice Attachment Viewing** (2025-09-03)
+  - **Universal Document Viewing**: DOC, DOCX, XLS, XLSX files now viewable directly in browser
+  - **On-Demand PDF Conversion**: LibreOffice headless conversion transforms documents to PDF for browser compatibility
+  - **Seamless User Experience**: Click document icon to view any supported file type without download
+  - **Intelligent Caching**: Converted PDFs cached for instant subsequent views (2-3 seconds first time, instant after)
+  - **Permission-Safe Architecture**: Temporary directory strategy eliminates web server permission conflicts
+  - **Visual File Type Indicators**: Enhanced icons show DOC (blue), XLS (green), PDF (red) with conversion status
+  - **Robust Error Handling**: Graceful fallback to download if LibreOffice conversion fails
+  - **Automatic Cleanup**: Converted files removed when original attachments deleted
+  - **Database Schema**: Added `converted_pdf_path` and `converted_at` columns to track conversions
+  - **Production Ready**: Full deployment support with proper environment variable management
+  - **System Requirement**: LibreOffice must be installed (`sudo apt-get install libreoffice`)
+
 - **🔧 F&V Image Upload Cache Fix** (2025-09-02)
   - **Root Cause Resolution**: Fixed issue where uploaded images appeared successful but didn't show updated images
   - **Cache-Busting Implementation**: Added server timestamp parameters to force browser cache refresh

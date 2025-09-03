@@ -19,15 +19,40 @@ The Invoice Bulk Upload System allows users to upload multiple invoice files sim
 
 ### Supported File Types
 
-- PDF documents
-- Images: JPG, JPEG, PNG
-- Scanned documents: TIFF, TIF
+- **PDF documents**: PDF (directly viewable in browser)
+- **Images**: JPG, JPEG, PNG (directly viewable in browser)
+- **Scanned documents**: TIFF, TIF (download only)
+- **Microsoft Word documents**: DOC, DOCX (viewable via PDF conversion)
+- **Microsoft Excel spreadsheets**: XLS, XLSX (viewable via PDF conversion)
+
+### Document Viewing Capabilities
+
+**Direct Browser Viewing**:
+- PDF and image files can be viewed directly in the browser by clicking the document icon
+- DOC/DOCX and XLS/XLSX files are converted to PDF on-the-fly for browser viewing
+- First-time viewing triggers automatic conversion (2-3 seconds)
+- Subsequent views use cached PDF for instant display
+- Original files remain unchanged and can still be downloaded
 
 ### File Limits
 
 - **Files per batch**: 50 (configurable via `INVOICE_MAX_FILES_PER_BATCH`)
 - **Max file size**: 25MB per file (configurable via `INVOICE_MAX_FILE_SIZE_MB`)
 - **Total batch size**: 500MB (configurable via `INVOICE_MAX_TOTAL_SIZE_MB`)
+
+### System Requirements
+
+**For Document Processing and Viewing**:
+- **LibreOffice**: Required for DOC/XLS to PDF conversion and browser viewing
+  ```bash
+  sudo apt-get install libreoffice
+  ```
+- **Python Dependencies** (for future parser integration): 
+  - `python-docx`: For .docx file processing
+  - `xlrd`: For .xls file processing
+  - These are included in the invoice parser virtual environment
+
+**Note**: LibreOffice is essential for both the bulk upload document processing and the real-time document viewing system. Without it, DOC/XLS files can only be downloaded, not viewed in browser.
 
 ## Database Schema
 

@@ -68,6 +68,28 @@ class TillTransactionRepository
             $query->whereJsonContains('transaction_data->payment_type', $filters['payment_type']);
         }
 
+        // Search filter - search in multiple fields
+        if (! empty($filters['search'])) {
+            $search = strtolower($filters['search']);
+            $query->where(function ($q) use ($search) {
+                // Search receipt and ticket IDs
+                $q->where('receipt_id', 'LIKE', '%'.$search.'%')
+                  ->orWhere('ticket_id', 'LIKE', '%'.$search.'%')
+                  // Search in transaction data for customer, cashier, product names
+                  ->orWhereRaw("LOWER(JSON_EXTRACT(transaction_data, '$.customer')) LIKE ?", ['%'.$search.'%'])
+                  ->orWhereRaw("LOWER(JSON_EXTRACT(transaction_data, '$.cashier')) LIKE ?", ['%'.$search.'%'])
+                  // Search in product names within lines array
+                  ->orWhereRaw("LOWER(JSON_EXTRACT(transaction_data, '$.lines[*].product')) LIKE ?", ['%'.$search.'%'])
+                  // Search in product codes within lines array
+                  ->orWhereRaw("LOWER(JSON_EXTRACT(transaction_data, '$.lines[*].product_code')) LIKE ?", ['%'.$search.'%']);
+                
+                // If search term is numeric, also search for amount
+                if (is_numeric($search)) {
+                    $q->orWhere('amount', '=', floatval($search));
+                }
+            });
+        }
+
         return $query->orderBy('transaction_time')->get();
     }
 
@@ -242,9 +264,42 @@ class TillTransactionRepository
             $search = strtolower($filters['search']);
             $transactions = $transactions->filter(function ($item) use ($search) {
                 $data = is_array($item) ? $item : $item->transaction_data;
-                $searchable = json_encode($data);
-
-                return str_contains(strtolower($searchable), $search);
+                
+                // Search in receipt/ticket IDs (exact match prioritized)
+                if (stripos($data['receipt_id'] ?? '', $search) !== false) {
+                    return true;
+                }
+                if (stripos($data['ticket_id'] ?? '', $search) !== false) {
+                    return true;
+                }
+                
+                // Search in customer name
+                if (stripos($data['customer'] ?? '', $search) !== false) {
+                    return true;
+                }
+                
+                // Search in cashier name
+                if (stripos($data['cashier'] ?? '', $search) !== false) {
+                    return true;
+                }
+                
+                // Search in product names (main feature for users)
+                foreach ($data['lines'] ?? [] as $line) {
+                    if (stripos($line['product'] ?? '', $search) !== false) {
+                        return true;
+                    }
+                    // Also search product codes
+                    if (stripos($line['product_code'] ?? '', $search) !== false) {
+                        return true;
+                    }
+                }
+                
+                // Search for amount as well (e.g., "5.50" to find transactions of that amount)
+                if (is_numeric($search) && abs(floatval($data['amount'] ?? 0) - floatval($search)) < 0.01) {
+                    return true;
+                }
+                
+                return false;
             });
         }
 

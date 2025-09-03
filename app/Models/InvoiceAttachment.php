@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\DocumentConversionService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +18,7 @@ class InvoiceAttachment extends Model
         'original_filename',
         'stored_filename',
         'file_path',
+        'converted_pdf_path',
         'mime_type',
         'file_size',
         'file_hash',
@@ -25,11 +27,13 @@ class InvoiceAttachment extends Model
         'is_primary',
         'uploaded_by',
         'uploaded_at',
+        'converted_at',
         'external_osaccounts_path',
     ];
 
     protected $casts = [
         'uploaded_at' => 'datetime',
+        'converted_at' => 'datetime',
         'file_size' => 'integer',
         'is_primary' => 'boolean',
     ];
@@ -117,7 +121,12 @@ class InvoiceAttachment extends Model
             'text/plain',
         ];
 
-        return in_array($this->mime_type, $viewableMimes);
+        // Also viewable if it can be converted to PDF
+        if (in_array($this->mime_type, $viewableMimes)) {
+            return true;
+        }
+
+        return $this->isConvertible();
     }
 
     /**
@@ -207,9 +216,10 @@ class InvoiceAttachment extends Model
     {
         parent::boot();
 
-        // When attachment is deleted, also delete the file
+        // When attachment is deleted, also delete the file and converted PDF
         static::deleting(function ($attachment) {
             $attachment->deleteFile();
+            $attachment->deleteConvertedPdf();
         });
 
         // Set uploaded_at when creating
@@ -242,5 +252,156 @@ class InvoiceAttachment extends Model
     public function scopeUploadedBy($query, int $userId)
     {
         return $query->where('uploaded_by', $userId);
+    }
+
+    /**
+     * Check if this attachment can be converted to PDF.
+     */
+    public function isConvertible(): bool
+    {
+        $conversionService = new DocumentConversionService;
+
+        return $conversionService->canConvert($this->mime_type);
+    }
+
+    /**
+     * Get or create the converted PDF version of this attachment.
+     */
+    public function getOrCreateConvertedPdf(): ?string
+    {
+        // If already a PDF or image, no conversion needed
+        if ($this->isPdf() || $this->isImage()) {
+            return $this->full_storage_path;
+        }
+
+        // If not convertible, return null
+        if (! $this->isConvertible()) {
+            return null;
+        }
+
+        // If already converted and file exists, return existing
+        if ($this->converted_pdf_path && $this->convertedPdfExists()) {
+            return Storage::disk('private')->path($this->converted_pdf_path);
+        }
+
+        // Convert the document
+        return $this->convertToPdf();
+    }
+
+    /**
+     * Convert this attachment to PDF.
+     */
+    public function convertToPdf(): ?string
+    {
+        $conversionService = new DocumentConversionService;
+
+        $inputPath = $this->full_storage_path;
+
+        // Use a temporary directory for conversion to avoid permission issues
+        $tempOutputDir = sys_get_temp_dir().'/invoice_conversion_'.uniqid();
+        if (! mkdir($tempOutputDir, 0755, true)) {
+            return null;
+        }
+
+        $outputFilename = $conversionService->getConvertedPdfFilename($this->original_filename);
+
+        // Convert to temporary directory first
+        $convertedPath = $conversionService->convertToPdf($inputPath, $tempOutputDir, $outputFilename);
+
+        if ($convertedPath && file_exists($convertedPath)) {
+            // Use temp directory for converted files to avoid permission issues
+            $finalConversionPath = 'temp/conversions/'.$this->invoice_id;
+            if (! Storage::disk('private')->exists($finalConversionPath)) {
+                Storage::disk('private')->makeDirectory($finalConversionPath, 0755, true);
+            }
+
+            // Move the converted file to final location using Laravel's Storage facade
+            $relativeFinalPath = $finalConversionPath.'/'.$outputFilename;
+            $fileContents = file_get_contents($convertedPath);
+
+            if (Storage::disk('private')->put($relativeFinalPath, $fileContents)) {
+                $finalPath = Storage::disk('private')->path($relativeFinalPath);
+                // Set proper permissions on the final file
+                @chmod($finalPath, 0644);
+
+                // Store the relative path in database
+                $this->update([
+                    'converted_pdf_path' => $relativeFinalPath,
+                    'converted_at' => now(),
+                ]);
+
+                // Clean up temp directory
+                if (is_dir($tempOutputDir)) {
+                    // Remove any remaining files first
+                    $files = glob($tempOutputDir.'/*');
+                    foreach ($files as $file) {
+                        if (is_file($file)) {
+                            unlink($file);
+                        }
+                    }
+                    rmdir($tempOutputDir);
+                }
+
+                return $finalPath;
+            }
+        }
+
+        // Clean up temp directory on failure
+        if (is_dir($tempOutputDir)) {
+            array_map('unlink', glob($tempOutputDir.'/*'));
+            rmdir($tempOutputDir);
+        }
+
+        return null;
+    }
+
+    /**
+     * Check if the converted PDF file exists.
+     */
+    public function convertedPdfExists(): bool
+    {
+        return $this->converted_pdf_path &&
+               Storage::disk('private')->exists($this->converted_pdf_path);
+    }
+
+    /**
+     * Get the full path to the converted PDF file.
+     */
+    public function getConvertedPdfPath(): ?string
+    {
+        if ($this->convertedPdfExists()) {
+            return Storage::disk('private')->path($this->converted_pdf_path);
+        }
+
+        return null;
+    }
+
+    /**
+     * Check if this attachment needs conversion for viewing.
+     */
+    public function needsConversion(): bool
+    {
+        return $this->isConvertible() && ! $this->isPdf() && ! $this->isImage();
+    }
+
+    /**
+     * Delete the converted PDF file.
+     */
+    public function deleteConvertedPdf(): bool
+    {
+        if ($this->converted_pdf_path && Storage::disk('private')->exists($this->converted_pdf_path)) {
+            $deleted = Storage::disk('private')->delete($this->converted_pdf_path);
+
+            if ($deleted) {
+                $this->update([
+                    'converted_pdf_path' => null,
+                    'converted_at' => null,
+                ]);
+            }
+
+            return $deleted;
+        }
+
+        return true;
     }
 }

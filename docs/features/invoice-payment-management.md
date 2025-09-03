@@ -71,11 +71,13 @@ php artisan osaccounts:import-invoices --update-existing --dry-run
 php artisan osaccounts:import-invoices --update-existing --user=1
 ```
 
-### 5. Outstanding Invoices Report System (Added 2025-09-02)
+### 5. Outstanding Invoices Report System (Updated 2025-09-03)
 
 #### Date-Based Outstanding Report
 - **Flexible Date Selection**: Choose any date to see what invoices were outstanding at that time
 - **Supplier Grouping**: Invoices automatically grouped by supplier with individual tables
+- **Alphabetical Ordering**: Suppliers sorted alphabetically for easy navigation
+- **Collapsible Interface**: Supplier sections can be expanded/collapsed to show invoice details
 - **Total Calculations**: Per-supplier totals and overall outstanding amount
 - **Payment Status Logic**: Uses `payment_status` field to determine if invoice was outstanding
   - Includes invoices with status: pending, overdue, partial
@@ -89,12 +91,23 @@ php artisan osaccounts:import-invoices --update-existing --user=1
   - Total number of outstanding invoices
   - Total outstanding amount
   - Count of invoices still unpaid
-- **Detailed Tables**: Each supplier gets dedicated table with:
+- **Collapsible Supplier Tables**: Each supplier gets dedicated expandable section with:
+  - Supplier name, total amount, and invoice count always visible
+  - Click to expand: detailed invoice table with individual invoice data
+  - Expand/Collapse All controls for managing multiple suppliers
+- **Detailed Invoice Tables**: When expanded, each supplier table shows:
+  - Checkbox for bulk payment selection
   - Invoice number
-  - Invoice date
-  - Due date
+  - Invoice date (due date removed for cleaner display)
   - Amount
   - Current payment status
+- **Bulk Payment System**: NEW! Mark multiple invoices as paid directly from outstanding report
+  - Individual checkboxes for each invoice
+  - "Select all" checkboxes per supplier (header and table)
+  - Sticky bulk actions bar that stays visible while scrolling
+  - Real-time selection summary with count and total amount
+  - Payment modal with date selection and payment methods
+  - Supplier breakdown in modal showing selected invoices
 - **CSV Export**: Download complete report with all supplier groupings
 - **Warning Indicators**: Highlights invoices still unpaid for manual review
 
@@ -255,6 +268,8 @@ let selectedInvoices = new Map();
 ## Workflow Examples
 
 ### Bulk Payment Workflow
+
+#### From Main Invoices List
 1. **Navigate** to Invoices list
 2. **Filter** for "All Unpaid" or specific supplier
 3. **Select** invoices using checkboxes
@@ -263,6 +278,19 @@ let selectedInvoices = new Map();
 6. **Fill** payment details in modal
 7. **Submit** and receive confirmation
 8. **Page refreshes** showing updated payment status
+
+#### From Outstanding Report (New 2025-09-03)
+1. **Navigate** to Suppliers → Outstanding Report
+2. **Select** report date to analyze what was outstanding
+3. **Expand** supplier sections to view individual invoices
+4. **Select** invoices using individual or supplier-level checkboxes
+5. **Use** sticky bulk actions bar (remains visible while scrolling)
+6. **Click** "Mark as Paid" button in sticky bar
+7. **Set** payment date in modal (useful for backdating payments)
+8. **Choose** payment method and add optional reference
+9. **Review** supplier breakdown with selected invoice details
+10. **Submit** and receive confirmation
+11. **Page refreshes** showing updated payment statuses
 
 ### OSAccounts Sync Workflow
 1. **Navigate** to Management → OSAccounts Import

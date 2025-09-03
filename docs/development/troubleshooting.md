@@ -1369,6 +1369,93 @@ echo 'Disk Path: ' . Storage::disk('local')->path(\$file->temp_path) . PHP_EOL;
 - Test `tempFileExists()` method when making file storage changes
 - Ensure database stores exactly what Storage facade expects for consistency
 
+### Document Conversion Issues (DOC/XLS to PDF Viewing)
+
+#### DOC/XLS Attachment Viewer Shows Blank Page
+
+**Symptoms:**
+- Document icon appears and is clickable
+- Viewer opens but shows blank content
+- Browser shows "Viewing converted PDF version of DOC document" message
+- No PDF content displays in the viewer area
+
+**Root Cause:**
+Document conversion files created via CLI commands (user `jon`) have incorrect permissions for web server access (`www-data`).
+
+**Diagnosis Steps:**
+1. Check if conversion files exist:
+   ```bash
+   ls -la storage/app/private/temp/conversions/
+   ```
+2. Check file ownership - problematic files will show `jon:jon` ownership
+3. Check Laravel logs for conversion errors:
+   ```bash
+   tail -f storage/logs/laravel.log | grep -i "conversion\|libreoffice"
+   ```
+
+**Solution:**
+1. Clear existing conversion files:
+   ```bash
+   rm -rf storage/app/private/temp/conversions/
+   ```
+2. Clear database entries:
+   ```bash
+   php artisan tinker --execute="
+   App\Models\InvoiceAttachment::where('converted_pdf_path', '!=', null)
+       ->update(['converted_pdf_path' => null, 'converted_at' => null]);
+   "
+   ```
+3. Access document through web browser (not CLI) to create proper conversion
+
+**Prevention:**
+- Always test document viewing through web browser, not CLI commands
+- Conversions created by web server will have correct `www-data` ownership
+
+#### LibreOffice Conversion Fails
+
+**Symptoms:**
+- Error: "LibreOffice 24.2 - Fatal Error: The application cannot be started"
+- Error: "User installation could not be completed"
+- Error: "Unable to create directory '/var/www/.cache/dconf': Permission denied"
+
+**Root Cause:**
+LibreOffice requires proper HOME directory and environment variables when running headless.
+
+**Solution:**
+The DocumentConversionService automatically handles this by:
+- Creating temporary HOME directories with proper permissions
+- Setting XDG environment variables for LibreOffice configuration
+- Using `--accept` parameter to avoid profile conflicts
+
+**Manual Check:**
+Verify LibreOffice is installed and working:
+```bash
+soffice --version
+```
+
+If not installed:
+```bash
+sudo apt-get install libreoffice
+```
+
+#### Conversion Performance Issues
+
+**Symptoms:**
+- First-time document viewing takes longer than expected (>5 seconds)
+- Server high CPU usage during conversion
+
+**Optimization:**
+- Conversions are cached - first view is slow, subsequent views instant
+- LibreOffice timeout set to 60 seconds maximum
+- Temporary files cleaned up automatically
+- Consider pre-converting frequently accessed documents
+
+**Monitoring:**
+Check conversion performance:
+```bash
+grep "Document converted successfully" storage/logs/laravel.log
+```
+
 ## 📞 Getting Help
 
 - Check Laravel Blade documentation

@@ -1,4 +1,88 @@
-# Technical Changelog - Order System Implementation
+# Technical Changelog
+
+## 2025-01-24 - Document File Support for Invoice Bulk Upload
+
+### Overview
+Added support for Microsoft Office document formats (.doc, .docx, .xls, .xlsx) to the invoice bulk upload system.
+
+### Files Modified
+
+#### `/config/invoices.php`
+**Status:** ✅ Enhanced  
+**Purpose:** Add document file type support
+
+```php
+// Added extensions
+'allowed_extensions' => ['pdf', 'jpg', 'jpeg', 'png', 'tiff', 'tif', 'doc', 'docx', 'xls', 'xlsx'],
+
+// Added MIME types
+'allowed_mime_types' => [
+    // ... existing types
+    'application/msword',                                                           // .doc
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',    // .docx
+    'application/vnd.ms-excel',                                                    // .xls
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',         // .xlsx
+],
+```
+
+#### `/resources/views/invoices/bulk-upload.blade.php`
+**Status:** ✅ Enhanced  
+**Purpose:** Update file input and icons
+
+```html
+<!-- Updated file input accept attribute -->
+accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.doc,.docx,.xls,.xlsx"
+
+<!-- Added file type icons -->
+<!-- Word Document Icon (blue) -->
+<!-- Excel Document Icon (green) -->
+```
+
+#### `/app/Models/InvoiceUploadFile.php`
+**Status:** ✅ Enhanced  
+**Purpose:** Add document detection methods
+
+```php
+// Added methods
+public function isWordDocument(): bool
+public function isExcelDocument(): bool  
+public function isDocument(): bool
+```
+
+#### `/resources/views/invoices/bulk-upload-preview.blade.php`
+**Status:** ✅ Enhanced  
+**Purpose:** Add document file icons in preview
+
+```php
+@elseif($file->isWordDocument())
+    <!-- Blue Word icon -->
+@elseif($file->isExcelDocument())
+    <!-- Green Excel icon -->
+```
+
+#### `/scripts/invoice-parser/invoice_parser_laravel.py`
+**Status:** ✅ Bug Fixed  
+**Purpose:** Fix XLS file path issue
+
+```python
+# Fixed: Pass full file path instead of filename only
+parsed_data = loughboora.parse_xls(text, file_path)  # Was: filename
+```
+
+### System Dependencies
+- **LibreOffice**: Required for .doc to .docx conversion
+- **Python packages**: python-docx, xlrd (already available in venv)
+
+### Testing Results
+- ✅ Word documents (.doc, .docx) parse successfully
+- ✅ Excel spreadsheets (.xls, .xlsx) parse successfully  
+- ✅ File upload validation works correctly
+- ✅ File icons display properly in UI
+- ✅ Retry functionality works with new formats
+
+---
+
+## 2025-07-30 - Order System Implementation
 
 ## Files Modified
 

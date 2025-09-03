@@ -135,6 +135,36 @@ class InvoiceUploadFile extends Model
     }
 
     /**
+     * Check if file is a Word document.
+     */
+    public function isWordDocument(): bool
+    {
+        return in_array($this->mime_type, [
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ]);
+    }
+
+    /**
+     * Check if file is an Excel spreadsheet.
+     */
+    public function isExcelDocument(): bool
+    {
+        return in_array($this->mime_type, [
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
+    /**
+     * Check if file is a document (Word or Excel).
+     */
+    public function isDocument(): bool
+    {
+        return $this->isWordDocument() || $this->isExcelDocument();
+    }
+
+    /**
      * Check if this PDF can be split (multi-page PDF).
      */
     public function canBeSplit(): bool

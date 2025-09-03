@@ -40,7 +40,7 @@
                         Browse Files
                     </label>
                     <input id="file-input" type="file" class="hidden" multiple 
-                           accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif"
+                           accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.doc,.docx,.xls,.xlsx"
                            @change="handleFileSelect($event)">
                 </div>
 
@@ -67,6 +67,19 @@
                                         </svg>
                                         <svg x-show="file.type.includes('image')" class="w-8 h-8 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
                                             <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
+                                        </svg>
+                                        {{-- Word Document Icon --}}
+                                        <svg x-show="file.type.includes('word') || file.name.toLowerCase().endsWith('.doc') || file.name.toLowerCase().endsWith('.docx')" class="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M4 18h12a2 2 0 002-2V6.414A2 2 0 0017.414 5L14 1.586A2 2 0 0012.586 1H4a2 2 0 00-2 2v13a2 2 0 002 2zm8-13V2l4 4h-3a1 1 0 01-1-1z"/>
+                                        </svg>
+                                        {{-- Excel Document Icon --}}
+                                        <svg x-show="file.type.includes('sheet') || file.name.toLowerCase().endsWith('.xls') || file.name.toLowerCase().endsWith('.xlsx')" class="w-8 h-8 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M4 18h12a2 2 0 002-2V6.414A2 2 0 0017.414 5L14 1.586A2 2 0 0012.586 1H4a2 2 0 00-2 2v13a2 2 0 002 2zm8-13V2l4 4h-3a1 1 0 01-1-1z"/>
+                                        </svg>
+                                        {{-- Generic File Icon for other types --}}
+                                        <svg x-show="!file.type.includes('pdf') && !file.type.includes('image') && !file.type.includes('word') && !file.name.toLowerCase().match(/\\.(doc|docx|xls|xlsx)$/)" class="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                                            <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 1 1 0 000 2H4v10h12V5h-2a1 1 0 100-2 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5z" clip-rule="evenodd"/>
                                         </svg>
                                     </div>
                                     

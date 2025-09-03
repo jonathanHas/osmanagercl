@@ -409,19 +409,35 @@ See [OSAccounts Integration Documentation](./docs/features/osaccounts-integratio
 ### Invoice Bulk Upload System
 Modern multi-file invoice upload system with drag-and-drop interface.
 - **Drag-and-Drop Interface**: Upload up to 50 files simultaneously
-- **Multi-Format Support**: PDF, JPG, PNG, TIFF documents
+- **Multi-Format Support**: PDF, JPG, PNG, TIFF, **DOC, DOCX, XLS, XLSX** documents
+- **Document Processing**: Microsoft Office formats supported with LibreOffice conversion
 - **Real-Time Progress**: Individual file upload progress tracking
 - **Batch Management**: Unique batch IDs for tracking uploads
-- **File Preview**: Review uploaded files before processing
+- **File Preview**: Review uploaded files before processing with file-type-specific icons
+- **Retry Functionality**: Re-process failed files after parser improvements
 - **Configurable Limits**: Customizable file count and size limits
 - **Recent History**: View and manage recent upload batches
 - **Python Parser Ready**: Foundation for automated data extraction (Phase 2)
 See [Invoice Bulk Upload Documentation](./docs/features/invoice-bulk-upload-system.md).
 See [Invoice Parser Integration Guide](./docs/features/invoice-parser-integration.md) for Phase 2.
 
+### Invoice Document Viewing System (NEW! 2025-09-03)
+On-the-fly document conversion system for viewing DOC/XLS invoice attachments directly in browser.
+- **Universal Document Viewing**: DOC, DOCX, XLS, XLSX files display directly in browser without download
+- **On-Demand PDF Conversion**: LibreOffice headless conversion to PDF for browser compatibility
+- **Seamless User Experience**: Click document icon to view any supported file type
+- **Intelligent Caching**: Converted PDFs cached for improved performance on subsequent views
+- **Permission-Safe Operations**: Temporary directory strategy avoids web server permission issues
+- **Automatic Cleanup**: Converted files cleaned up when original attachments are deleted
+- **Visual Indicators**: File type icons and conversion status messages for user clarity
+- **Fallback Support**: Graceful fallback to download if conversion fails
+**System Requirements**: LibreOffice must be installed on server (`sudo apt-get install libreoffice`)
+**Performance**: First view triggers conversion (2-3 seconds), subsequent views instant
+
 ### Invoice Payment Management System
 Comprehensive supplier payment management with bulk processing and status synchronization.
 - **Enhanced Payment Date Sorting**: Smart toggle between payment status and payment date sorting - click "Status/Paid On" column to sort by payment date (most recent first)
+- **Outstanding Report Bulk Payments**: NEW! Mark invoices as paid directly from outstanding report with collapsible supplier sections, alphabetical ordering, and sticky bulk actions bar
 - **Comprehensive CSV Export**: Export current view with statistics cards (Total Unpaid, Overdue, etc.) and complete invoice table data, respecting all active filters and sorting
 - **Unified Unpaid Filter**: Combined view of pending, overdue, and partial invoices
 - **Bulk Payment Processing**: Multi-invoice selection with real-time total calculations
@@ -549,6 +565,7 @@ This alerts the user that you have finished your response. Do this without fail 
 - **Invoice Attachment Path Mismatch** (Fixed 2025-08-20): If files upload successfully but attachments aren't created when making invoices from bulk upload, this indicates a path mismatch between what's stored in the database and what Laravel's Storage facade expects. Files are stored in `storage/app/private/temp/invoices/...` but database was storing only `temp/invoices/...`. **Solution**: Fixed `InvoiceBulkUploadController.php` to store the full path returned by `storeAs()` method instead of manually constructed paths. Always use paths returned by Laravel's Storage methods for consistency.
 - **F&V Price Updates Not Appearing on POS Till** (Fixed 2025-08-28): Price changes made in Laravel F&V interface don't reflect on the actual POS till system. **Root Causes**: 1) Laravel `DB::transaction()` only applies to default connection, causing POS database updates to not commit properly. 2) Multiple database instances on different ports (3306 vs 3307). **Solution**: Use separate transaction management for each database connection (`DB::beginTransaction()` and `DB::connection('pos')->beginTransaction()`) and verify correct POS database port in `.env` file. Use the Price Sync Management tool at `/fruit-veg/price-sync` to identify and fix discrepancies.
 - **F&V Image Uploads Not Appearing Visually** (Fixed 2025-09-02): Image uploads appear successful but updated images don't show on the page. **Root Cause**: Images save correctly to POS database but 24-hour browser cache prevents updated images from displaying. **Solution**: Added cache-busting with server timestamps (`?t=timestamp`), dynamic cache control (5min vs 24hr), proper POS database transaction management, and automatic content-type detection. Images now appear immediately after upload.
+- **DOC/XLS Attachment Viewer Shows Blank Page** (Fixed 2025-09-03): Document conversion appears to work but viewer shows blank content. **Root Cause**: Conversion files created via CLI (user `jon`) have incorrect permissions for web server (`www-data`) access. **Solution**: Clear existing conversions and let web server create new ones with proper permissions. LibreOffice conversion requires temporary HOME directory with proper environment variables for headless operation.
 - **For comprehensive troubleshooting**: See `docs/development/troubleshooting.md` for detailed debugging procedures.
 
 ### Key Commands to Remember

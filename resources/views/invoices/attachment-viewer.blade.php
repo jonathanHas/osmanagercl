@@ -22,13 +22,27 @@
         <div class="bg-gray-800 rounded-lg p-4 mb-6">
             <div class="flex items-center space-x-4">
                 <div class="flex-shrink-0">
-                    @if(strtolower(pathinfo($attachment->original_filename, PATHINFO_EXTENSION)) === 'pdf')
+                    @php
+                        $extension = strtolower(pathinfo($attachment->original_filename, PATHINFO_EXTENSION));
+                    @endphp
+                    
+                    @if($extension === 'pdf')
                         <svg class="w-8 h-8 text-red-500" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
                         </svg>
-                    @elseif(in_array(strtolower(pathinfo($attachment->original_filename, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'gif', 'webp']))
+                    @elseif(in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp']))
                         <svg class="w-8 h-8 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M8.5,13.5L11,16.5L14.5,12L19,18H5M21,19V5C21,3.89 20.1,3 19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19Z" />
+                        </svg>
+                    @elseif(in_array($extension, ['doc', 'docx']))
+                        <svg class="w-8 h-8 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+                            <path d="M8,13V11H16V13H8M8,15V17H16V15H8Z" />
+                        </svg>
+                    @elseif(in_array($extension, ['xls', 'xlsx']))
+                        <svg class="w-8 h-8 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+                            <path d="M7,11H9V13H7V11M7,15H9V17H7V15M11,11H13V13H11V11M11,15H13V17H11V15M15,11H17V13H15V11M15,15H17V17H15V15Z" />
                         </svg>
                     @else
                         <svg class="w-8 h-8 text-gray-500" fill="currentColor" viewBox="0 0 24 24">
@@ -42,6 +56,14 @@
                         {{ $attachment->attachment_type_label }} • {{ $attachment->formatted_file_size }} • 
                         Uploaded {{ $attachment->uploaded_at->format('d/m/Y H:i') }}
                     </p>
+                    @if($attachment->needsConversion())
+                        <p class="text-sm text-blue-400 mt-1">
+                            <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Viewing converted PDF version of {{ strtoupper($extension) }} document
+                        </p>
+                    @endif
                     @if($attachment->description)
                         <p class="text-sm text-gray-300 mt-1">{{ $attachment->description }}</p>
                     @endif
@@ -55,8 +77,8 @@
                 $extension = strtolower(pathinfo($attachment->original_filename, PATHINFO_EXTENSION));
             @endphp
             
-            @if($extension === 'pdf')
-                {{-- PDF Viewer --}}
+            @if($extension === 'pdf' || $attachment->needsConversion())
+                {{-- PDF Viewer (native PDF or converted document) --}}
                 <div class="relative" style="height: 80vh;">
                     <embed src="{{ $viewUrl }}" 
                            type="application/pdf" 
@@ -69,15 +91,27 @@
                             <svg class="w-16 h-16 mx-auto text-gray-500 mb-4" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
                             </svg>
-                            <h3 class="text-lg font-semibold text-gray-300 mb-2">PDF Preview Unavailable</h3>
-                            <p class="text-gray-400 mb-4">Your browser cannot display this PDF inline.</p>
+                            <h3 class="text-lg font-semibold text-gray-300 mb-2">
+                                @if($attachment->needsConversion())
+                                    Converted Document Preview Unavailable
+                                @else
+                                    PDF Preview Unavailable
+                                @endif
+                            </h3>
+                            <p class="text-gray-400 mb-4">
+                                @if($attachment->needsConversion())
+                                    Your browser cannot display the converted PDF inline.
+                                @else
+                                    Your browser cannot display this PDF inline.
+                                @endif
+                            </p>
                             <a href="{{ $viewUrl }}" target="_blank" 
                                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mr-2">
                                 Open in New Tab
                             </a>
                             <a href="{{ $downloadUrl }}" 
                                class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
-                                Download PDF
+                                Download Original
                             </a>
                         </div>
                     </div>

@@ -25,6 +25,11 @@ pip install invoice2data    # Template-based extraction
 pip install pandas          # Data processing
 pip install python-dateutil # Date parsing
 
+# Document processing
+pip install python-docx     # Word document processing
+pip install xlrd            # Excel file processing (.xls)
+pip install openpyxl        # Excel file processing (.xlsx)
+
 # Image processing
 pip install Pillow          # Image manipulation
 pip install opencv-python   # Advanced image processing
@@ -32,6 +37,7 @@ pip install opencv-python   # Advanced image processing
 # System dependencies
 apt-get install tesseract-ocr
 apt-get install poppler-utils  # For pdf2image
+apt-get install libreoffice   # For .doc to .docx conversion
 ```
 
 ### Expected Parser Interface
@@ -39,7 +45,13 @@ apt-get install poppler-utils  # For pdf2image
 The Python parser should accept command-line arguments:
 
 ```bash
+# Supported file types
 python3 /path/to/invoice_parser.py --file /path/to/invoice.pdf --output json
+python3 /path/to/invoice_parser.py --file /path/to/invoice.jpg --output json
+python3 /path/to/invoice_parser.py --file /path/to/invoice.doc --output json
+python3 /path/to/invoice_parser.py --file /path/to/invoice.docx --output json
+python3 /path/to/invoice_parser.py --file /path/to/invoice.xls --output json
+python3 /path/to/invoice_parser.py --file /path/to/invoice.xlsx --output json
 ```
 
 ### Expected JSON Output Format

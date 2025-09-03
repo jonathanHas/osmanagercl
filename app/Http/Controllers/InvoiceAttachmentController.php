@@ -120,6 +120,32 @@ class InvoiceAttachmentController extends Controller
             return $this->download($attachment);
         }
 
+        // For convertible documents (DOC/XLS), serve the converted PDF
+        if ($attachment->needsConversion()) {
+            $convertedPath = $attachment->getOrCreateConvertedPdf();
+
+            if (! $convertedPath) {
+                // Conversion failed, fallback to download
+                return $this->download($attachment);
+            }
+
+            // Serve the converted PDF
+            $headers = [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="'.$attachment->original_filename.'"',
+                'Cache-Control' => 'public, max-age=3600', // Cache for 1 hour
+                'Pragma' => 'public',
+                'X-Content-Type-Options' => 'nosniff',
+                'X-Frame-Options' => 'SAMEORIGIN',
+                'Content-Security-Policy' => "default-src 'none'; object-src 'none'; script-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self';",
+                'Content-Transfer-Encoding' => 'binary',
+                'Accept-Ranges' => 'bytes',
+            ];
+
+            return response()->file($convertedPath, $headers);
+        }
+
+        // For PDFs, images, and text files, serve directly
         $filePath = $attachment->full_storage_path;
         $extension = strtolower(pathinfo($attachment->original_filename, PATHINFO_EXTENSION));
 

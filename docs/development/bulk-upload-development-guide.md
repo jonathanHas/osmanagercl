@@ -37,13 +37,18 @@ database/migrations/
 Edit `config/invoices.php`:
 
 ```php
-'allowed_extensions' => ['pdf', 'jpg', 'jpeg', 'png', 'tiff', 'tif', 'docx'], // Add new
+'allowed_extensions' => ['pdf', 'jpg', 'jpeg', 'png', 'tiff', 'tif', 'doc', 'docx', 'xls', 'xlsx'],
 'allowed_mime_types' => [
     'application/pdf',
     'image/jpeg',
     'image/png',
     'image/tiff',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // Add new
+    // Microsoft Word formats
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    // Microsoft Excel formats
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ],
 ```
 
@@ -51,12 +56,59 @@ Edit `config/invoices.php`:
 
 Edit `resources/views/invoices/bulk-upload.blade.php`:
 
-```javascript
-// In the bulkUpload() Alpine.js component
-allowedExtensions: @json($allowedExtensions), // Already dynamic
+```html
+<!-- Update file input accept attribute -->
+<input type="file" accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.doc,.docx,.xls,.xlsx" multiple>
 
-// Update file input accept attribute
-accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.docx"
+<!-- The allowedExtensions validation is already dynamic from server config -->
+```
+
+### 3. Add Model Methods
+
+Add detection methods to `InvoiceUploadFile.php`:
+
+```php
+/**
+ * Check if file is a Word document.
+ */
+public function isWordDocument(): bool
+{
+    return in_array($this->mime_type, [
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ]);
+}
+
+/**
+ * Check if file is an Excel spreadsheet.
+ */
+public function isExcelDocument(): bool
+{
+    return in_array($this->mime_type, [
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ]);
+}
+
+/**
+ * Check if file is a document (Word or Excel).
+ */
+public function isDocument(): bool
+{
+    return $this->isWordDocument() || $this->isExcelDocument();
+}
+```
+
+### 4. System Dependencies
+
+Ensure these are installed on the server:
+
+```bash
+# For .doc file conversion
+sudo apt-get install libreoffice
+
+# Python dependencies (in parser virtual environment)
+pip install python-docx xlrd
 ```
 
 ### 3. Update Parser (Phase 2)

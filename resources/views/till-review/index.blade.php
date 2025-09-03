@@ -149,7 +149,7 @@
                             <input type="text" 
                                    x-model="filters.search"
                                    @@keyup.debounce.300ms="loadTransactions()"
-                                   placeholder="Receipt ID, product, etc..."
+                                   placeholder="Search products..."
                                    class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
                         </div>
                     </div>
@@ -316,12 +316,30 @@
             <!-- Transactions List -->
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6">
-                    <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-                        Transactions 
-                        <span class="text-sm font-normal text-gray-500 dark:text-gray-400">
-                            (<span x-text="transactionCount"></span> results)
-                        </span>
-                    </h3>
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                            Transactions 
+                            <span class="text-sm font-normal text-gray-500 dark:text-gray-400">
+                                (<span x-text="transactionCount"></span> results)
+                            </span>
+                        </h3>
+                        
+                        <!-- Expand/Collapse Controls -->
+                        <div x-show="transactionCount > 0" class="flex space-x-2">
+                            <span x-show="filters.search && filters.search.trim() !== ''" 
+                                  class="text-xs text-blue-600 dark:text-blue-400 self-center mr-2">
+                                <i class="fas fa-info-circle mr-1"></i>Details auto-expanded for search
+                            </span>
+                            <button @@click="expandAllReceipts()"
+                                    class="px-3 py-1 text-xs bg-blue-100 text-blue-800 rounded-md hover:bg-blue-200 transition">
+                                <i class="fas fa-expand-arrows-alt mr-1"></i>Expand All
+                            </button>
+                            <button @@click="collapseAllReceipts()"
+                                    class="px-3 py-1 text-xs bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200 transition">
+                                <i class="fas fa-compress-arrows-alt mr-1"></i>Collapse All
+                            </button>
+                        </div>
+                    </div>
 
                     <!-- Loading State -->
                     <div x-show="loading" class="text-center py-8">
@@ -502,13 +520,15 @@
                     });
 
                     const data = await response.json();
-                    this.transactions = data.transactions.map(t => ({...t, showDetails: false}));
+                    // Auto-expand receipt details if search is active
+                    const autoExpandDetails = this.filters.search && this.filters.search.trim() !== '';
+                    this.transactions = data.transactions.map(t => ({...t, showDetails: autoExpandDetails && t.type === 'receipt'}));
                     this.transactionCount = data.count;
                     
                     // Calculate filtered summary
                     this.calculateFilteredSummary();
                     
-                    console.log('Transactions loaded:', data.count);
+                    console.log('Transactions loaded:', data.count, autoExpandDetails ? '(auto-expanded for search)' : '');
                 },
 
                 toggleDetails(transaction) {
@@ -529,6 +549,19 @@
 
                 formatAmount(amount) {
                     return parseFloat(amount || 0).toFixed(2);
+                },
+
+                // Highlight search terms in text
+                highlightSearchTerm(text, searchTerm) {
+                    if (!searchTerm || !searchTerm.trim() || !text) {
+                        return text;
+                    }
+                    
+                    // Escape special regex characters in search term
+                    const escaped = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = new RegExp(`(${escaped})`, 'gi');
+                    
+                    return text.replace(regex, '<mark class="bg-yellow-200 dark:bg-yellow-800 dark:text-yellow-100 px-1 rounded">$1</mark>');
                 },
 
                 renderTransactions() {
@@ -559,7 +592,10 @@
                         }
                         
                         const textColor = isReceipt && paymentType ? colorScheme.text : 'text-gray-900 dark:text-white';
-                        html += '<span class="text-sm ' + textColor + '">' + transaction.description + '</span>';
+                        // Highlight search term in description
+                        const searchTerm = this.filters.search && this.filters.search.trim();
+                        const highlightedDescription = this.highlightSearchTerm(transaction.description, searchTerm);
+                        html += '<span class="text-sm ' + textColor + '">' + highlightedDescription + '</span>';
                         html += '</div>';
                         html += '<div class="flex items-center space-x-4">';
                         html += '<span class="font-semibold ' + textColor + '">€' + this.formatAmount(transaction.amount) + '</span>';
@@ -577,23 +613,28 @@
                 },
 
                 renderTransactionDetails(transaction) {
+                    const searchTerm = this.filters.search && this.filters.search.trim();
                     let html = '<div class="mt-4 pt-4 border-t dark:border-gray-600">';
                     html += '<div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">';
                     
                     if (transaction.details.receipt_id) {
-                        html += '<div><span class="text-gray-600 dark:text-gray-400">Receipt ID:</span><span class="ml-2 font-mono">' + transaction.details.receipt_id + '</span></div>';
+                        const highlightedReceiptId = this.highlightSearchTerm(transaction.details.receipt_id, searchTerm);
+                        html += '<div><span class="text-gray-600 dark:text-gray-400">Receipt ID:</span><span class="ml-2 font-mono">' + highlightedReceiptId + '</span></div>';
                     }
                     if (transaction.details.ticket_id) {
-                        html += '<div><span class="text-gray-600 dark:text-gray-400">Ticket ID:</span><span class="ml-2 font-mono">' + transaction.details.ticket_id + '</span></div>';
+                        const highlightedTicketId = this.highlightSearchTerm(transaction.details.ticket_id, searchTerm);
+                        html += '<div><span class="text-gray-600 dark:text-gray-400">Ticket ID:</span><span class="ml-2 font-mono">' + highlightedTicketId + '</span></div>';
                     }
                     if (transaction.details.terminal) {
                         html += '<div><span class="text-gray-600 dark:text-gray-400">Terminal:</span><span class="ml-2">' + transaction.details.terminal + '</span></div>';
                     }
                     if (transaction.details.cashier) {
-                        html += '<div><span class="text-gray-600 dark:text-gray-400">Cashier:</span><span class="ml-2">' + transaction.details.cashier + '</span></div>';
+                        const highlightedCashier = this.highlightSearchTerm(transaction.details.cashier, searchTerm);
+                        html += '<div><span class="text-gray-600 dark:text-gray-400">Cashier:</span><span class="ml-2">' + highlightedCashier + '</span></div>';
                     }
                     if (transaction.details.customer) {
-                        html += '<div><span class="text-gray-600 dark:text-gray-400">Customer:</span><span class="ml-2">' + transaction.details.customer + '</span></div>';
+                        const highlightedCustomer = this.highlightSearchTerm(transaction.details.customer, searchTerm);
+                        html += '<div><span class="text-gray-600 dark:text-gray-400">Customer:</span><span class="ml-2">' + highlightedCustomer + '</span></div>';
                     }
                     if (transaction.details.payment_type) {
                         html += '<div><span class="text-gray-600 dark:text-gray-400">Payment:</span><span class="ml-2">' + transaction.details.payment_type + '</span></div>';
@@ -611,9 +652,12 @@
                     }
 
                     let linesHtml = '';
+                    const searchTerm = this.filters.search && this.filters.search.trim();
                     transaction.details.lines.forEach(line => {
                         linesHtml += '<tr class="border-b dark:border-gray-700">';
-                        linesHtml += '<td class="py-1">' + line.product + '</td>';
+                        // Highlight search term in product name
+                        const highlightedProduct = this.highlightSearchTerm(line.product, searchTerm);
+                        linesHtml += '<td class="py-1">' + highlightedProduct + '</td>';
                         linesHtml += '<td class="text-right py-1">' + line.units + '</td>';
                         linesHtml += '<td class="text-right py-1">€' + this.formatAmount(line.price) + '</td>';
                         linesHtml += '<td class="text-right py-1">' + (line.tax * 100).toFixed(1) + '%</td>';
@@ -793,6 +837,22 @@
                     });
 
                     window.location.href = '/till-review/export?' + params;
+                },
+
+                // Expand all receipt details
+                expandAllReceipts() {
+                    this.transactions = this.transactions.map(t => ({
+                        ...t, 
+                        showDetails: t.type === 'receipt' ? true : t.showDetails
+                    }));
+                },
+
+                // Collapse all receipt details  
+                collapseAllReceipts() {
+                    this.transactions = this.transactions.map(t => ({
+                        ...t,
+                        showDetails: false
+                    }));
                 }
             }
         }

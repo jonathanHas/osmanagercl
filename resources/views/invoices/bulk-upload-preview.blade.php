@@ -170,6 +170,14 @@
                                         <svg class="w-5 h-5 text-blue-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
                                             <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
                                         </svg>
+                                    @elseif($file->isWordDocument())
+                                        <svg class="w-5 h-5 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M4 18h12a2 2 0 002-2V6.414A2 2 0 0017.414 5L14 1.586A2 2 0 0012.586 1H4a2 2 0 00-2 2v13a2 2 0 002 2zm8-13V2l4 4h-3a1 1 0 01-1-1z"/>
+                                        </svg>
+                                    @elseif($file->isExcelDocument())
+                                        <svg class="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M4 18h12a2 2 0 002-2V6.414A2 2 0 0017.414 5L14 1.586A2 2 0 0012.586 1H4a2 2 0 00-2 2v13a2 2 0 002 2zm8-13V2l4 4h-3a1 1 0 01-1-1z"/>
+                                        </svg>
                                     @else
                                         <svg class="w-5 h-5 text-gray-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
                                             <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
@@ -326,7 +334,16 @@
                                         @if($file->page_count > 1) ⚠ Split @else Split @endif
                                     </button>
                                     @endif
-                                    @if($file->status === 'failed' || $file->status === 'uploaded')
+                                    @if($file->status === 'failed')
+                                    <button onclick="retryFile({{ $file->id }})" 
+                                            class="text-amber-400 hover:text-amber-300 text-sm mr-2">
+                                        🔄 Retry
+                                    </button>
+                                    <button onclick="removeFile({{ $file->id }})" 
+                                            class="text-red-400 hover:text-red-300 text-sm">
+                                        Remove
+                                    </button>
+                                    @elseif($file->status === 'uploaded')
                                     <button onclick="removeFile({{ $file->id }})" 
                                             class="text-red-400 hover:text-red-300 text-sm">
                                         Remove
@@ -605,6 +622,31 @@
                     } else {
                         alert(data.error || 'Failed to delete duplicate file');
                     }
+                });
+            }
+        }
+
+        function retryFile(fileId) {
+            if (confirm('Retry parsing this failed invoice?\n\nThis will:\n• Reset the file status to uploaded\n• Clear the error message\n• Re-run the parser with any updated code\n\nAre you sure you want to retry?')) {
+                fetch(`/invoices/bulk-upload/${batchId}/file/${fileId}/retry`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message || 'File queued for retry processing');
+                        window.location.reload();
+                    } else {
+                        alert(data.error || 'Failed to retry file');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while retrying the file');
                 });
             }
         }

@@ -210,8 +210,8 @@ def process_invoice(file_path):
         
         # Special handling for XLS files (Loughboora)
         if file_path.lower().endswith('.xls') and supplier_name != "Loughboora":
-            # For XLS files, use loughboora parser
-            parsed_data = loughboora.parse_xls(text, filename)
+            # For XLS files, use loughboora parser with full file path
+            parsed_data = loughboora.parse_xls(text, file_path)
         else:
             parsed_data = parser.parse_invoice(text, filename)
         

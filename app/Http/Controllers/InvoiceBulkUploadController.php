@@ -648,6 +648,73 @@ class InvoiceBulkUploadController extends Controller
     }
 
     /**
+     * Retry parsing a failed file.
+     */
+    public function retryFile($batchId, $fileId)
+    {
+        $batch = InvoiceBulkUpload::where('batch_id', $batchId)
+            ->where('user_id', auth()->id())
+            ->firstOrFail();
+
+        $file = InvoiceUploadFile::where('id', $fileId)
+            ->where('bulk_upload_id', $batch->id)
+            ->firstOrFail();
+
+        // Check if file can be retried
+        if ($file->status !== 'failed') {
+            return response()->json([
+                'success' => false,
+                'error' => 'Only failed files can be retried. Current status: ' . $file->status,
+            ], 400);
+        }
+
+        try {
+            // Reset file status for retry
+            $file->status = 'uploaded';
+            $file->error_message = null;
+            $file->parsing_confidence = null;
+            $file->anomaly_warnings = null;
+            $file->supplier_detected = null;
+            $file->parsed_data = null;
+            $file->parsed_invoice_date = null;
+            $file->parsed_invoice_number = null;
+            $file->parsed_total_amount = null;
+            $file->parsed_vat_data = null;
+            $file->is_tax_free = false;
+            $file->is_credit_note = false;
+            $file->save();
+
+            // Queue new parsing job
+            \App\Jobs\ParseInvoiceFile::dispatch($file);
+
+            Log::info('File queued for retry parsing', [
+                'file_id' => $file->id,
+                'filename' => $file->original_filename,
+                'batch_id' => $batch->batch_id,
+                'retried_by' => auth()->id(),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'File queued for retry parsing. The page will refresh automatically to show progress.',
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to retry file parsing', [
+                'file_id' => $file->id,
+                'error' => $e->getMessage(),
+                'batch_id' => $batch->batch_id,
+                'user_id' => auth()->id(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to retry file: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Display embedded file viewer page.
      */
     public function fileViewer($batchId, $fileId)

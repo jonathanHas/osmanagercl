@@ -2,11 +2,16 @@ import re
 import sys
 
 def parse_invoice(text, filename):
-    print(f"[DEBUG] Parsing Kellys (Ce&Os Kellys, file=sys.stderr) invoice: {filename}")
+    print(f"[DEBUG] Parsing Kellys (Ce&Os) invoice: {filename}", file=sys.stderr)
 
     try:
         is_credit_note = False
         tax_free = False  # VAT is present
+
+        # === Invoice Number ===
+        invoice_number_match = re.search(r'Invoice No\.[\s]*\n?[\s]*(IN\d+)', text)
+        invoice_number = invoice_number_match.group(1) if invoice_number_match else "Not found"
+        print(f"[DEBUG] Invoice Number: {invoice_number}", file=sys.stderr)
 
         # === Invoice Date ===
         date_match = re.search(r'Invoice Date[:\s]+(\d{2}/\d{2}/\d{4})', text)
@@ -21,6 +26,7 @@ def parse_invoice(text, filename):
         parsed_data = {
             'Filename': filename,
             'Supplier': 'Ce&Os Kellys',
+            'Invoice Number': invoice_number,
             'Invoice Date': invoice_date,
             'Tax Free': tax_free,
             'Credit Note': is_credit_note,

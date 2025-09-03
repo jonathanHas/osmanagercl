@@ -73,7 +73,7 @@
                 </div>
 
                 @if($supplierGroups->count() > 0)
-                    <!-- Expand/Collapse All Controls -->
+                    <!-- Expand/Collapse All Controls and Bulk Actions -->
                     <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-4" x-data="{ expandAll: false }">
                         <div class="p-4">
                             <div class="flex justify-between items-center">
@@ -86,6 +86,34 @@
                         </div>
                     </div>
 
+                    <!-- Bulk Actions Bar (Sticky) -->
+                    <div id="bulk-actions-bar" class="hidden bg-blue-900 rounded-lg p-4 mb-4 sticky top-0 z-40 shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-4">
+                                <span id="selection-count" class="text-blue-100 font-medium">0 invoices selected</span>
+                                <span id="selection-total" class="text-blue-200 text-sm">Total: €0.00</span>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button id="mark-paid-btn" 
+                                        class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                                    Mark as Paid
+                                </button>
+                                <button id="clear-selection-btn" 
+                                        class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                                    Clear Selection
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Breakdown by supplier -->
+                        <div id="supplier-breakdown" class="mt-3 hidden">
+                            <div class="text-blue-200 text-sm font-medium mb-2">Selected by supplier:</div>
+                            <div id="supplier-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                <!-- Supplier breakdowns will be inserted here -->
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Supplier Groups -->
                     <div x-data="{ suppliers: {} }" @toggle-all.window="Object.keys(suppliers).forEach(key => suppliers[key] = $event.detail.expand)">
                         @foreach($supplierGroups as $supplierIndex => $supplierGroup)
@@ -93,16 +121,24 @@
                              x-init="suppliers['{{ $supplierIndex }}'] = false">
                             <div class="p-6">
                                 <!-- Supplier Header - Always Visible -->
-                                <div class="flex justify-between items-center cursor-pointer" 
-                                     @click="suppliers['{{ $supplierIndex }}'] = !suppliers['{{ $supplierIndex }}']">
+                                <div class="flex justify-between items-center">
                                     <div class="flex items-center space-x-3">
+                                        <!-- Select All for Supplier -->
+                                        <input type="checkbox" 
+                                               class="supplier-select-all rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-2" 
+                                               data-supplier-index="{{ $supplierIndex }}"
+                                               autocomplete="off"
+                                               title="Select all invoices for {{ $supplierGroup['supplier_name'] }}">
                                         <!-- Expand/Collapse Icon -->
-                                        <svg class="w-5 h-5 text-gray-500 transition-transform duration-200" 
-                                             :class="suppliers['{{ $supplierIndex }}'] ? 'rotate-90' : ''"
-                                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                                        </svg>
-                                        <h3 class="text-lg font-medium text-gray-900">
+                                        <div class="cursor-pointer" @click="suppliers['{{ $supplierIndex }}'] = !suppliers['{{ $supplierIndex }}']">
+                                            <svg class="w-5 h-5 text-gray-500 transition-transform duration-200" 
+                                                 :class="suppliers['{{ $supplierIndex }}'] ? 'rotate-90' : ''"
+                                                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                            </svg>
+                                        </div>
+                                        <h3 class="text-lg font-medium text-gray-900 cursor-pointer" 
+                                            @click="suppliers['{{ $supplierIndex }}'] = !suppliers['{{ $supplierIndex }}']">
                                             {{ $supplierGroup['supplier_name'] ?: 'Unknown Supplier' }}
                                         </h3>
                                     </div>
@@ -125,6 +161,12 @@
                                     <table class="min-w-full divide-y divide-gray-200">
                                         <thead class="bg-gray-50">
                                             <tr>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-8">
+                                                    <input type="checkbox" 
+                                                           class="supplier-select-all-table rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-2" 
+                                                           data-supplier-index="{{ $supplierIndex }}"
+                                                           autocomplete="off">
+                                                </th>
                                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                     Invoice Number
                                                 </th>
@@ -145,6 +187,17 @@
                                         <tbody class="bg-white divide-y divide-gray-200">
                                             @foreach($supplierGroup['invoices'] as $invoice)
                                                 <tr class="hover:bg-gray-50">
+                                                    <td class="px-6 py-4 whitespace-nowrap">
+                                                        <input type="checkbox" 
+                                                               class="invoice-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-2" 
+                                                               data-invoice-id="{{ $invoice->id }}"
+                                                               data-supplier-index="{{ $supplierIndex }}"
+                                                               data-supplier-id="{{ $supplierGroup['supplier']->id ?? 'unknown' }}"
+                                                               data-supplier-name="{{ $supplierGroup['supplier_name'] }}"
+                                                               data-total-amount="{{ $invoice->total_amount }}"
+                                                               data-invoice-number="{{ $invoice->invoice_number }}"
+                                                               autocomplete="off">
+                                                    </td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                                         {{ $invoice->invoice_number }}
                                                     </td>
@@ -184,7 +237,7 @@
                                         </tbody>
                                         <tfoot class="bg-gray-50">
                                             <tr>
-                                                <td colspan="2" class="px-6 py-3 text-right text-sm font-medium text-gray-900">
+                                                <td colspan="3" class="px-6 py-3 text-right text-sm font-medium text-gray-900">
                                                     Supplier Total:
                                                 </td>
                                                 <td class="px-6 py-3 text-sm font-bold text-gray-900">
@@ -252,4 +305,360 @@
             @endif
         </div>
     </div>
+
+    {{-- Bulk Payment Modal --}}
+    <div id="payment-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-gray-900">Mark Outstanding Invoices as Paid</h3>
+                    <button id="close-modal" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                
+                <form id="bulk-payment-form">
+                    @csrf
+                    
+                    {{-- Selected Invoices Summary --}}
+                    <div class="mb-6">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-3">Selected Invoices</h4>
+                        <div id="modal-supplier-breakdown" class="space-y-3">
+                            <!-- Supplier breakdown will be inserted here -->
+                        </div>
+                    </div>
+                    
+                    {{-- Payment Details --}}
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Payment Date</label>
+                            <input type="date" name="payment_date" id="payment_date" 
+                                   value="{{ now()->format('Y-m-d') }}"
+                                   class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                   required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+                            <select name="payment_method" id="payment_method" 
+                                    class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="cash">Cash</option>
+                                <option value="cheque">Cheque</option>
+                                <option value="credit_card">Credit Card</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Payment Reference (Optional)</label>
+                        <input type="text" name="payment_reference" id="payment_reference" 
+                               placeholder="e.g., Transfer confirmation number, cheque number..."
+                               class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" id="cancel-payment" 
+                                class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                            Cancel
+                        </button>
+                        <button type="submit" 
+                                class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                            Mark as Paid
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    @push('scripts')
+    <script>
+        let selectedInvoices = new Map();
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const invoiceCheckboxes = document.querySelectorAll('.invoice-checkbox');
+            const supplierSelectAllCheckboxes = document.querySelectorAll('.supplier-select-all');
+            const supplierSelectAllTableCheckboxes = document.querySelectorAll('.supplier-select-all-table');
+            const bulkActionsBar = document.getElementById('bulk-actions-bar');
+            const selectionCount = document.getElementById('selection-count');
+            const selectionTotal = document.getElementById('selection-total');
+            const supplierBreakdown = document.getElementById('supplier-breakdown');
+            const supplierList = document.getElementById('supplier-list');
+            const markPaidBtn = document.getElementById('mark-paid-btn');
+            const clearSelectionBtn = document.getElementById('clear-selection-btn');
+            const paymentModal = document.getElementById('payment-modal');
+            const bulkPaymentForm = document.getElementById('bulk-payment-form');
+            
+            // Force clear all checkboxes on page load
+            selectedInvoices.clear();
+            invoiceCheckboxes.forEach(checkbox => checkbox.checked = false);
+            supplierSelectAllCheckboxes.forEach(checkbox => checkbox.checked = false);
+            supplierSelectAllTableCheckboxes.forEach(checkbox => checkbox.checked = false);
+            if (bulkActionsBar) bulkActionsBar.classList.add('hidden');
+            
+            // Handle individual invoice checkboxes
+            invoiceCheckboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        addToSelection(this);
+                    } else {
+                        removeFromSelection(this);
+                    }
+                    updateSelectionDisplay();
+                    updateSupplierSelectAllStates(this.dataset.supplierIndex);
+                });
+            });
+            
+            // Handle supplier select all checkboxes (both header and table)
+            [...supplierSelectAllCheckboxes, ...supplierSelectAllTableCheckboxes].forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    const supplierIndex = this.dataset.supplierIndex;
+                    const supplierInvoices = document.querySelectorAll(`.invoice-checkbox[data-supplier-index="${supplierIndex}"]`);
+                    
+                    supplierInvoices.forEach(invoiceCheckbox => {
+                        invoiceCheckbox.checked = this.checked;
+                        if (this.checked) {
+                            addToSelection(invoiceCheckbox);
+                        } else {
+                            removeFromSelection(invoiceCheckbox);
+                        }
+                    });
+                    
+                    // Sync both supplier checkboxes
+                    const otherSupplierCheckboxes = document.querySelectorAll(`[data-supplier-index="${supplierIndex}"]`);
+                    otherSupplierCheckboxes.forEach(cb => {
+                        if (cb !== this) cb.checked = this.checked;
+                    });
+                    
+                    updateSelectionDisplay();
+                });
+            });
+            
+            // Clear selection button
+            if (clearSelectionBtn) {
+                clearSelectionBtn.addEventListener('click', function() {
+                    selectedInvoices.clear();
+                    invoiceCheckboxes.forEach(checkbox => checkbox.checked = false);
+                    supplierSelectAllCheckboxes.forEach(checkbox => checkbox.checked = false);
+                    supplierSelectAllTableCheckboxes.forEach(checkbox => checkbox.checked = false);
+                    updateSelectionDisplay();
+                });
+            }
+            
+            // Mark as paid button
+            if (markPaidBtn) {
+                markPaidBtn.addEventListener('click', function() {
+                    if (selectedInvoices.size === 0) return;
+                    showPaymentModal();
+                });
+            }
+            
+            // Modal controls
+            if (document.getElementById('close-modal')) {
+                document.getElementById('close-modal').addEventListener('click', hidePaymentModal);
+            }
+            if (document.getElementById('cancel-payment')) {
+                document.getElementById('cancel-payment').addEventListener('click', hidePaymentModal);
+            }
+            
+            // Form submission
+            if (bulkPaymentForm) {
+                bulkPaymentForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    submitBulkPayment();
+                });
+            }
+            
+            function addToSelection(checkbox) {
+                const invoiceData = {
+                    id: checkbox.dataset.invoiceId,
+                    supplierIndex: checkbox.dataset.supplierIndex,
+                    supplierId: checkbox.dataset.supplierId,
+                    supplierName: checkbox.dataset.supplierName,
+                    totalAmount: parseFloat(checkbox.dataset.totalAmount),
+                    invoiceNumber: checkbox.dataset.invoiceNumber
+                };
+                selectedInvoices.set(invoiceData.id, invoiceData);
+            }
+            
+            function removeFromSelection(checkbox) {
+                selectedInvoices.delete(checkbox.dataset.invoiceId);
+            }
+            
+            function updateSelectionDisplay() {
+                const count = selectedInvoices.size;
+                const total = Array.from(selectedInvoices.values())
+                    .reduce((sum, invoice) => sum + invoice.totalAmount, 0);
+                
+                if (count === 0) {
+                    if (bulkActionsBar) bulkActionsBar.classList.add('hidden');
+                } else {
+                    if (bulkActionsBar) bulkActionsBar.classList.remove('hidden');
+                    if (selectionCount) selectionCount.textContent = `${count} invoice${count !== 1 ? 's' : ''} selected`;
+                    if (selectionTotal) selectionTotal.textContent = `Total: €${total.toFixed(2)}`;
+                    
+                    // Update supplier breakdown
+                    updateSupplierBreakdown();
+                }
+            }
+            
+            function updateSupplierBreakdown() {
+                const supplierTotals = new Map();
+                
+                selectedInvoices.forEach(invoice => {
+                    if (!supplierTotals.has(invoice.supplierId)) {
+                        supplierTotals.set(invoice.supplierId, {
+                            name: invoice.supplierName,
+                            count: 0,
+                            total: 0,
+                            invoices: []
+                        });
+                    }
+                    
+                    const supplier = supplierTotals.get(invoice.supplierId);
+                    supplier.count++;
+                    supplier.total += invoice.totalAmount;
+                    supplier.invoices.push(invoice);
+                });
+                
+                if (supplierTotals.size > 1 && supplierBreakdown) {
+                    supplierBreakdown.classList.remove('hidden');
+                    
+                    if (supplierList) {
+                        supplierList.innerHTML = '';
+                        supplierTotals.forEach(supplier => {
+                            const div = document.createElement('div');
+                            div.className = 'bg-blue-800 rounded p-2';
+                            div.innerHTML = `
+                                <div class="text-blue-100 font-medium">${supplier.name}</div>
+                                <div class="text-blue-200 text-sm">${supplier.count} invoice${supplier.count !== 1 ? 's' : ''} - €${supplier.total.toFixed(2)}</div>
+                            `;
+                            supplierList.appendChild(div);
+                        });
+                    }
+                } else {
+                    if (supplierBreakdown) supplierBreakdown.classList.add('hidden');
+                }
+            }
+            
+            function updateSupplierSelectAllStates(supplierIndex) {
+                const supplierInvoices = document.querySelectorAll(`.invoice-checkbox[data-supplier-index="${supplierIndex}"]`);
+                const checkedCount = document.querySelectorAll(`.invoice-checkbox[data-supplier-index="${supplierIndex}"]:checked`).length;
+                const totalCount = supplierInvoices.length;
+                
+                const supplierCheckboxes = document.querySelectorAll(`[data-supplier-index="${supplierIndex}"]`);
+                supplierCheckboxes.forEach(checkbox => {
+                    if (checkbox.classList.contains('supplier-select-all') || checkbox.classList.contains('supplier-select-all-table')) {
+                        checkbox.checked = checkedCount === totalCount && totalCount > 0;
+                        checkbox.indeterminate = checkedCount > 0 && checkedCount < totalCount;
+                    }
+                });
+            }
+            
+            function showPaymentModal() {
+                updateModalSupplierBreakdown();
+                if (paymentModal) {
+                    paymentModal.classList.remove('hidden');
+                    const paymentDateInput = document.getElementById('payment_date');
+                    if (paymentDateInput) paymentDateInput.focus();
+                }
+            }
+            
+            function hidePaymentModal() {
+                if (paymentModal) paymentModal.classList.add('hidden');
+            }
+            
+            function updateModalSupplierBreakdown() {
+                const supplierTotals = new Map();
+                
+                selectedInvoices.forEach(invoice => {
+                    if (!supplierTotals.has(invoice.supplierId)) {
+                        supplierTotals.set(invoice.supplierId, {
+                            name: invoice.supplierName,
+                            count: 0,
+                            total: 0,
+                            invoices: []
+                        });
+                    }
+                    
+                    const supplier = supplierTotals.get(invoice.supplierId);
+                    supplier.count++;
+                    supplier.total += invoice.totalAmount;
+                    supplier.invoices.push(invoice);
+                });
+                
+                const modalBreakdown = document.getElementById('modal-supplier-breakdown');
+                if (modalBreakdown) {
+                    modalBreakdown.innerHTML = '';
+                    
+                    supplierTotals.forEach(supplier => {
+                        const div = document.createElement('div');
+                        div.className = 'bg-gray-100 rounded p-3';
+                        
+                        const invoicesList = supplier.invoices
+                            .map(inv => inv.invoiceNumber)
+                            .join(', ');
+                        
+                        div.innerHTML = `
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <div class="text-gray-800 font-medium">${supplier.name}</div>
+                                    <div class="text-gray-600 text-sm">${invoicesList}</div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="text-gray-800 font-medium">€${supplier.total.toFixed(2)}</div>
+                                    <div class="text-gray-600 text-sm">${supplier.count} invoice${supplier.count !== 1 ? 's' : ''}</div>
+                                </div>
+                            </div>
+                        `;
+                        modalBreakdown.appendChild(div);
+                    });
+                }
+            }
+            
+            function submitBulkPayment() {
+                const formData = new FormData(bulkPaymentForm);
+                const invoiceIds = Array.from(selectedInvoices.keys());
+                
+                // Add invoice IDs to form data
+                invoiceIds.forEach(id => {
+                    formData.append('invoice_ids[]', id);
+                });
+                
+                fetch('{{ route("invoices.bulk-mark-paid") }}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        hidePaymentModal();
+                        // Clear checkboxes and selection state before refresh
+                        selectedInvoices.clear();
+                        invoiceCheckboxes.forEach(checkbox => checkbox.checked = false);
+                        supplierSelectAllCheckboxes.forEach(checkbox => checkbox.checked = false);
+                        supplierSelectAllTableCheckboxes.forEach(checkbox => checkbox.checked = false);
+                        updateSelectionDisplay();
+                        // Show success message
+                        alert(`Success: ${data.message}`);
+                        // Refresh page to show updated payment statuses
+                        window.location.reload();
+                    } else {
+                        alert(data.error || 'Failed to mark invoices as paid');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while processing payment');
+                });
+            }
+        });
+    </script>
+    @endpush
 </x-admin-layout>
