@@ -73,21 +73,55 @@
                 </div>
 
                 @if($supplierGroups->count() > 0)
+                    <!-- Expand/Collapse All Controls -->
+                    <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-4" x-data="{ expandAll: false }">
+                        <div class="p-4">
+                            <div class="flex justify-between items-center">
+                                <h3 class="text-md font-medium text-gray-900">Supplier Details</h3>
+                                <button @click="expandAll = !expandAll; $dispatch('toggle-all', { expand: expandAll })" 
+                                        class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                                    <span x-text="expandAll ? 'Collapse All' : 'Expand All'"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Supplier Groups -->
-                    @foreach($supplierGroups as $supplierGroup)
-                        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
+                    <div x-data="{ suppliers: {} }" @toggle-all.window="Object.keys(suppliers).forEach(key => suppliers[key] = $event.detail.expand)">
+                        @foreach($supplierGroups as $supplierIndex => $supplierGroup)
+                        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6" 
+                             x-init="suppliers['{{ $supplierIndex }}'] = false">
                             <div class="p-6">
-                                <div class="flex justify-between items-center mb-4">
-                                    <h3 class="text-lg font-medium text-gray-900">
-                                        {{ $supplierGroup['supplier_name'] ?: 'Unknown Supplier' }}
-                                    </h3>
+                                <!-- Supplier Header - Always Visible -->
+                                <div class="flex justify-between items-center cursor-pointer" 
+                                     @click="suppliers['{{ $supplierIndex }}'] = !suppliers['{{ $supplierIndex }}']">
+                                    <div class="flex items-center space-x-3">
+                                        <!-- Expand/Collapse Icon -->
+                                        <svg class="w-5 h-5 text-gray-500 transition-transform duration-200" 
+                                             :class="suppliers['{{ $supplierIndex }}'] ? 'rotate-90' : ''"
+                                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                        </svg>
+                                        <h3 class="text-lg font-medium text-gray-900">
+                                            {{ $supplierGroup['supplier_name'] ?: 'Unknown Supplier' }}
+                                        </h3>
+                                    </div>
                                     <div class="text-right">
                                         <div class="text-lg font-bold text-gray-900">€{{ number_format($supplierGroup['total_amount'], 2) }}</div>
                                         <div class="text-sm text-gray-600">{{ $supplierGroup['invoice_count'] }} invoices</div>
                                     </div>
                                 </div>
 
-                                <div class="overflow-x-auto">
+                                <!-- Invoice Details Table - Collapsible -->
+                                <div x-show="suppliers['{{ $supplierIndex }}']" 
+                                     x-transition:enter="transition ease-out duration-200"
+                                     x-transition:enter-start="opacity-0 transform scale-95"
+                                     x-transition:enter-end="opacity-100 transform scale-100"
+                                     x-transition:leave="transition ease-in duration-150"
+                                     x-transition:leave-start="opacity-100 transform scale-100"
+                                     x-transition:leave-end="opacity-0 transform scale-95"
+                                     class="mt-6">
+                                    <div class="overflow-x-auto">
                                     <table class="min-w-full divide-y divide-gray-200">
                                         <thead class="bg-gray-50">
                                             <tr>
@@ -96,9 +130,6 @@
                                                 </th>
                                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                     Invoice Date
-                                                </th>
-                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    Due Date
                                                 </th>
                                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                     Amount
@@ -119,9 +150,6 @@
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                                         {{ $invoice->invoice_date->format('Y-m-d') }}
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                                                        {{ $invoice->due_date ? $invoice->due_date->format('Y-m-d') : 'N/A' }}
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                                         €{{ number_format($invoice->total_amount, 2) }}
@@ -156,7 +184,7 @@
                                         </tbody>
                                         <tfoot class="bg-gray-50">
                                             <tr>
-                                                <td colspan="3" class="px-6 py-3 text-right text-sm font-medium text-gray-900">
+                                                <td colspan="2" class="px-6 py-3 text-right text-sm font-medium text-gray-900">
                                                     Supplier Total:
                                                 </td>
                                                 <td class="px-6 py-3 text-sm font-bold text-gray-900">
@@ -166,10 +194,12 @@
                                             </tr>
                                         </tfoot>
                                     </table>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    @endforeach
+                        @endforeach
+                    </div>
 
                     <!-- Overall Total -->
                     <div class="bg-gray-900 text-white overflow-hidden shadow-sm sm:rounded-lg">

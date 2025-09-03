@@ -57,7 +57,7 @@ class SupplierOutstandingController extends Controller
                 'total_amount' => $totalAmount,
                 'invoice_count' => $invoices->count()
             ];
-        });
+        })->sortBy('supplier_name');
 
         // Calculate overall total
         $overallTotal = $supplierGroups->sum('total_amount');
@@ -100,6 +100,12 @@ class SupplierOutstandingController extends Controller
             ->get();
 
         $supplierGroups = $outstandingInvoices->groupBy('supplier_id');
+        
+        // Sort supplier groups alphabetically by supplier name for CSV export
+        $supplierGroups = $supplierGroups->sortBy(function ($invoices) {
+            $supplier = $invoices->first()->supplier;
+            return $supplier ? $supplier->name : $invoices->first()->supplier_name;
+        });
 
         $filename = "outstanding-invoices-" . $reportDate . ".csv";
 
@@ -126,7 +132,7 @@ class SupplierOutstandingController extends Controller
                 $supplier = $invoices->first()->supplier;
                 $supplierName = $supplier ? $supplier->name : $invoices->first()->supplier_name;
                 fputcsv($file, ['Supplier: ' . ($supplierName ?: 'Unknown Supplier')]);
-                fputcsv($file, ['Invoice Number', 'Invoice Date', 'Due Date', 'Total Amount', 'Payment Status']);
+                fputcsv($file, ['Invoice Number', 'Invoice Date', 'Total Amount', 'Payment Status']);
                 
                 foreach ($invoices as $invoice) {
                     // Determine payment status text for CSV
@@ -139,14 +145,13 @@ class SupplierOutstandingController extends Controller
                     fputcsv($file, [
                         $invoice->invoice_number,
                         $invoice->invoice_date->format('Y-m-d'),
-                        $invoice->due_date ? $invoice->due_date->format('Y-m-d') : 'N/A',
                         number_format($invoice->total_amount, 2),
                         $paymentStatus
                     ]);
                 }
                 
                 // Supplier total
-                fputcsv($file, ['', '', 'Supplier Total:', '€' . number_format($supplierTotal, 2)]);
+                fputcsv($file, ['', 'Supplier Total:', '€' . number_format($supplierTotal, 2), '']);
                 fputcsv($file, []); // Empty row
                 
                 $overallTotal += $supplierTotal;
