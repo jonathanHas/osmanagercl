@@ -91,6 +91,32 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | PDF Repair Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Settings for automatic PDF repair functionality to handle
+    | corrupted PDFs from suppliers like Klee Paper
+    |
+    */
+
+    'pdf_repair' => [
+        // Enable automatic PDF repair during upload
+        'enabled' => env('INVOICE_PDF_REPAIR_ENABLED', true),
+
+        // Maximum file size to attempt repair (in MB)
+        'max_file_size_mb' => env('INVOICE_PDF_REPAIR_MAX_SIZE', 50),
+
+        // Log all repair attempts for debugging
+        'log_repairs' => env('INVOICE_PDF_REPAIR_LOG', true),
+
+        // Known problematic suppliers (for tracking)
+        'problematic_suppliers' => [
+            'Klee Paper',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Invoice Storage Configuration
     |--------------------------------------------------------------------------
     */

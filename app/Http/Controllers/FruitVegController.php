@@ -4,11 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Country;
+use App\Models\PosUnit;
 use App\Models\Product;
 use App\Models\VegClass;
 use App\Models\VegDetails;
 use App\Models\VegPrintQueue;
-use App\Models\VegUnit;
 use App\Repositories\OptimizedSalesRepository;
 use App\Repositories\SalesRepository;
 use App\Services\TillVisibilityService;
@@ -515,7 +515,7 @@ class FruitVegController extends Controller
     {
         $request->validate([
             'product_code' => 'required|string',
-            'unit_id' => 'required|integer|exists:App\Models\VegUnit,id',
+            'unit_id' => 'required|integer|exists:App\Models\PosUnit,ID',
         ]);
 
         // Update or create vegDetails record
@@ -550,7 +550,7 @@ class FruitVegController extends Controller
     {
         $request->validate([
             'product_code' => 'required|string',
-            'class_id' => 'required|integer|exists:App\Models\VegClass,id',
+            'class_id' => 'required|integer|exists:App\Models\VegClass,ID',
         ]);
 
         // Update or create vegDetails record
@@ -593,7 +593,7 @@ class FruitVegController extends Controller
      */
     public function getUnits()
     {
-        $units = VegUnit::orderBy('sort_order')->get();
+        $units = PosUnit::orderBy('ID')->get();
 
         return response()->json($units);
     }

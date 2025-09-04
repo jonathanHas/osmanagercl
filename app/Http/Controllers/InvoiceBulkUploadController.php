@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Jobs\ParseInvoiceFile;
 use App\Models\InvoiceBulkUpload;
 use App\Models\InvoiceUploadFile;
+use App\Rules\RepairablePdf;
 use App\Services\AmazonPaymentAdjustmentService;
 use App\Services\InvoiceParsingService;
+use App\Services\PdfRepairService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -53,12 +55,11 @@ class InvoiceBulkUploadController extends Controller
                 'required',
                 'file',
                 "max:{$maxSizeKB}",
-                "mimetypes:{$allowedMimes}",
+                new RepairablePdf(),
             ],
         ], [
             'files.max' => "You can upload a maximum of {$maxFiles} files at once.",
             'files.*.max' => "Each file must be less than {$maxSizeMB}MB.",
-            'files.*.mimetypes' => 'Only PDF, JPG, PNG, and TIFF files are allowed.',
         ]);
 
         DB::beginTransaction();
@@ -90,7 +91,8 @@ class InvoiceBulkUploadController extends Controller
             foreach ($request->file('files') as $index => $file) {
                 $originalName = $file->getClientOriginalName();
                 $extension = $file->getClientOriginalExtension();
-                $mimeType = $file->getMimeType();
+                // Re-detect MIME type in case file was repaired during validation
+                $mimeType = mime_content_type($file->getPathname()) ?: $file->getMimeType();
                 $fileSize = $file->getSize();
 
                 // Generate unique filename

@@ -101,8 +101,8 @@ class VegDetails extends Model
      */
     public function vegUnit()
     {
-        // Cross-database relationship: POS vegDetails.unitId -> main DB veg_units.id
-        return $this->setConnection('mysql')->belongsTo(VegUnit::class, 'unitId', 'id');
+        // Now correctly references POS database units table
+        return $this->belongsTo(PosUnit::class, 'unitId', 'ID');
     }
 
     /**

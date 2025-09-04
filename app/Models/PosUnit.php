@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class VegClass extends Model
+class PosUnit extends Model
 {
     /**
      * The connection name for the model.
@@ -18,7 +18,7 @@ class VegClass extends Model
      *
      * @var string
      */
-    protected $table = 'class';
+    protected $table = 'units';
 
     /**
      * The primary key for the model.
@@ -40,8 +40,7 @@ class VegClass extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'classNum',
-        'class',
+        'units',
     ];
 
     /**
@@ -49,7 +48,7 @@ class VegClass extends Model
      *
      * @var array
      */
-    protected $appends = ['id', 'name'];
+    protected $appends = ['id', 'name', 'abbreviation'];
 
     /**
      * Get the id attribute (for template compatibility).
@@ -60,26 +59,32 @@ class VegClass extends Model
     }
 
     /**
-     * Get the class name attribute (for backward compatibility).
+     * Get the name attribute.
      */
     public function getNameAttribute()
     {
-        return $this->class;
+        // Expand abbreviations to full names
+        $names = [
+            'kg' => 'kilogram',
+            'each' => 'each',
+        ];
+        
+        return $names[$this->units] ?? $this->units;
     }
 
     /**
-     * Get the sort order attribute (using classNum).
+     * Get the abbreviation attribute.
      */
-    public function getSortOrderAttribute()
+    public function getAbbreviationAttribute()
     {
-        return $this->classNum;
+        return $this->units;
     }
 
     /**
-     * Get the veg details for this class.
+     * Get the veg details for this unit.
      */
     public function vegDetails()
     {
-        return $this->hasMany(VegDetails::class, 'classId', 'ID');
+        return $this->hasMany(VegDetails::class, 'unitId', 'ID');
     }
 }
