@@ -193,7 +193,7 @@
                 </div>
 
                 <div class="price-section">
-                    <div class="price">€{{ number_format($product->current_price, 2) }} <span class="price-unit">{{ ($product->vegDetails->unit_name ?? 'kg') === 'ea' ? 'each' : 'per ' . ($product->vegDetails->unit_name ?? 'kg') }}</span></div>
+                    <div class="price">€{{ number_format($product->current_price, 2) }} <span class="price-unit">{{ ($product->vegDetails->unit_name ?? 'kg') === 'each' ? 'each' : 'per ' . ($product->vegDetails->unit_name ?? 'kg') }}</span></div>
                 </div>
 
                 <div class="info-section">

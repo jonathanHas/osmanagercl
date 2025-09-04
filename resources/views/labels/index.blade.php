@@ -163,7 +163,15 @@
                                     <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                     </svg>
-                                    Clear All (<span id="clear-products-count">{{ count($productsNeedingLabels) }}</span>)
+                                    <span id="clear-button-text">
+                                        Clear
+                                        @if(!empty($filters))
+                                            {{ ucwords(str_replace('_', ' ', implode(', ', $filters))) }}
+                                        @else
+                                            All
+                                        @endif
+                                    </span>
+                                    (<span id="clear-products-count">{{ count($productsNeedingLabels) }}</span>)
                                 </button>
                                 
                                 <!-- Preview Button -->
@@ -572,6 +580,9 @@
                 }
             });
             
+            // Update clear button text before navigating
+            updateClearButtonText();
+            
             // Build URL with filters
             const url = new URL(window.location);
             url.searchParams.delete('filters[]'); // Remove existing filters
@@ -820,17 +831,63 @@
             });
         }
 
+        // Get current active filters
+        function getCurrentFilters() {
+            const filters = [];
+            const filterCheckboxes = document.querySelectorAll('.filter-checkbox');
+            
+            filterCheckboxes.forEach(checkbox => {
+                if (checkbox.checked && checkbox.dataset.filter !== 'all') {
+                    filters.push(checkbox.dataset.filter);
+                }
+            });
+            
+            return filters;
+        }
+        
+        // Get filter display names
+        function getFilterDisplayName(filters) {
+            if (filters.length === 0) {
+                return 'All';
+            }
+            
+            const filterNames = filters.map(filter => {
+                switch(filter) {
+                    case 'new_product': return 'New Products';
+                    case 'price_update': return 'Price Updates';
+                    case 'requeue_label': return 'Scanned/Re-queued';
+                    default: return filter.replace(/_/g, ' ');
+                }
+            });
+            
+            return filterNames.join(', ');
+        }
+        
+        // Update clear button text based on active filters
+        function updateClearButtonText() {
+            const clearButtonTextElement = document.getElementById('clear-button-text');
+            if (!clearButtonTextElement) return;
+            
+            const currentFilters = getCurrentFilters();
+            const filterDisplayName = getFilterDisplayName(currentFilters);
+            
+            clearButtonTextElement.textContent = `Clear ${filterDisplayName}`;
+        }
+
         // Clear all labels function
         function clearAllLabels() {
             const productCount = getCurrentProductIds().length;
+            const currentFilters = getCurrentFilters();
+            const filterDisplayName = getFilterDisplayName(currentFilters);
             
             if (productCount === 0) {
                 alert('No products are currently needing labels.');
                 return;
             }
             
-            // Show confirmation dialog
-            const confirmed = confirm(`Are you sure you want to clear ${productCount} products from the labels queue?\n\nThis will move all products from "Products Needing Labels" to "Recent Label Prints".`);
+            // Show confirmation dialog with filter context
+            const filterContext = currentFilters.length > 0 ? ` (${filterDisplayName})` : '';
+            const confirmed = confirm(`Are you sure you want to clear ${productCount} products${filterContext} from the labels queue?\n\nThis will move these products from "Products Needing Labels" to "Recent Label Prints".`);
             
             if (!confirmed) {
                 return;
@@ -843,12 +900,18 @@
                 clearButton.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Clearing...';
             }
             
+            // Prepare request body with filters
+            const requestBody = {
+                filters: currentFilters
+            };
+            
             fetch('/labels/clear-all', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                }
+                },
+                body: JSON.stringify(requestBody)
             })
             .then(response => response.json())
             .then(data => {

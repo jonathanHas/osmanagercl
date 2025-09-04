@@ -33,11 +33,12 @@ class LabelAreaController extends Controller
         $filters = $request->input('filters', []); // Array of event types to show
 
         // Get recent label print requests (last 7 days)
+        // Increased limit to 200 to allow more restoration options
         $recentLabelPrints = LabelLog::with('product')
             ->eventType(LabelLog::EVENT_LABEL_PRINT)
             ->where('created_at', '>=', now()->subDays(7))
             ->orderBy('created_at', 'desc')
-            ->limit(50)
+            ->limit(200)
             ->get();
 
         // Group recent prints by time windows (5-minute intervals)
@@ -360,14 +361,18 @@ class LabelAreaController extends Controller
     }
 
     /**
-     * Clear all products from the "Products Needing Labels" section.
-     * This moves all products to "Recent Label Prints" by logging label_print events.
+     * Clear products from the "Products Needing Labels" section.
+     * This moves products to "Recent Label Prints" by logging label_print events.
+     * Respects the current filter selection.
      */
     public function clearAllLabels(Request $request)
     {
         try {
-            // Get all products that currently need labels
-            $productsNeedingLabels = $this->getProductsNeedingLabels();
+            // Get filter parameters from request (same as index method)
+            $filters = $request->input('filters', []);
+
+            // Get products that currently need labels with the applied filters
+            $productsNeedingLabels = $this->getProductsNeedingLabels($filters);
             $clearedCount = $productsNeedingLabels->count();
 
             if ($clearedCount === 0) {
@@ -383,10 +388,20 @@ class LabelAreaController extends Controller
                 LabelLog::logLabelPrint($product->CODE);
             }
 
+            // Build a descriptive message based on filters
+            $filterDescription = '';
+            if (! empty($filters)) {
+                $filterNames = array_map(function ($filter) {
+                    return ucwords(str_replace('_', ' ', $filter));
+                }, $filters);
+                $filterDescription = ' ('.implode(', ', $filterNames).')';
+            }
+
             return response()->json([
                 'success' => true,
-                'message' => "Cleared {$clearedCount} products from labels queue",
+                'message' => "Cleared {$clearedCount} products{$filterDescription} from labels queue",
                 'cleared_count' => $clearedCount,
+                'filters_applied' => $filters,
             ]);
         } catch (\Exception $e) {
             return response()->json([
