@@ -50,11 +50,12 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 
 ### 5. Product Information Management
 - **Display Name Editing**: Set custom display names for products with live HTML preview
-- **Country of Origin**: Select and update product origin countries with dropdown
-- **Unit Management**: Edit unit types (kilogram, each, bunch, punnet, bag) with inline editing
-- **Quality Class Assignment**: Set produce quality classes (Extra, I, II, III) for certification
-- **Product Images**: Full image management with upload, preview, and binary storage
+- **Country of Origin**: Select and update product origin countries with dropdown interface (main database)
+- **Unit Management**: Edit unit types (kg, each) with inline editing - **synchronized with POS database** for data consistency
+- **Quality Class Assignment**: Set produce quality classes (I, II, III) for certification - **synchronized with POS database** for accurate classification
+- **Product Images**: Full image management with upload, preview, and binary storage in POS database
 - **Comprehensive Edit Interface**: Dedicated product edit pages with tabbed layout
+- **Cross-Database Synchronization**: Product details maintained across POS and Laravel databases with proper data integrity
 
 ### 6. Dashboard Features
 - **Recently Added to Till Section**: Dynamic display of recently added products with real-time updates
@@ -734,6 +735,18 @@ Direct Alpine.js implementation bypassing Laravel's slot system:
 - Confirm country of origin is set for organic products
 - Check print queue contains the product
 - Verify VegDetails relationship exists
+
+**Class Dropdown Not Working** (Fixed 2025-09-04)
+- Issue: Validation rule mismatch between `VegClass` model primary key (`ID` uppercase) and validation rule (`id` lowercase)
+- Solution: Updated validation rule to use `exists:App\Models\VegClass,ID` (uppercase)
+- Added `id` accessor to VegClass model for template compatibility
+
+**Unit Dropdown Showing Wrong Options** (Fixed 2025-09-04)
+- Issue: VegUnit model incorrectly used main database instead of POS database
+- Showed 5 units (kg, each, bunch, punnet, bag) when POS only has 2 (kg, each)
+- Solution: Created new `PosUnit` model connecting to POS database `units` table
+- Updated `VegDetails` relationship and controller to use `PosUnit`
+- Ensures data consistency with POS system
 
 ### Database Maintenance
 ```sql

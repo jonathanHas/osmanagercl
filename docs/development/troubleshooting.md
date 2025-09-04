@@ -4,6 +4,59 @@ This guide covers common issues and their solutions when developing OSManager CL
 
 ## 🚨 Common Errors
 
+### PDF Upload Validation Failures - Corrupted Headers
+
+**Symptoms:**
+- PDF files fail to upload with "Only PDF, JPG, PNG, TIFF files are allowed" error
+- Browser console shows 422 Unprocessable Content on upload
+- Files appear to be valid PDFs when opened manually
+- Issue occurs with specific suppliers (e.g., Klee Paper)
+
+**Root Cause:**
+Some suppliers generate PDFs with corrupted headers containing PostScript commands before the PDF signature:
+- **Normal PDF**: `%PDF-1.7...`
+- **Corrupted PDF**: `0.566929 w 0 J 0 j [] 0.000000 d\n%PDF-1.7...`
+
+**Diagnosis:**
+```bash
+# Check file header (should show %PDF- at start)
+xxd -l 50 suspicious.pdf | head -1
+
+# Check what system detects as file type
+file suspicious.pdf
+
+# Use our repair service test
+php artisan test:pdf-repair /path/to/suspicious.pdf
+```
+
+**Solution:**
+The system now includes automatic PDF repair. If issues persist:
+
+1. **Check PDF repair is enabled:**
+   ```php
+   // config/invoices.php
+   'pdf_repair' => [
+       'enabled' => env('INVOICE_PDF_REPAIR_ENABLED', true),
+   ],
+   ```
+
+2. **Check repair logs:**
+   ```bash
+   tail -f storage/logs/laravel.log | grep -i "pdf repair"
+   ```
+
+3. **Manual repair for testing:**
+   ```bash
+   php artisan test:pdf-repair /path/to/file.pdf
+   ```
+
+**Technical Details:**
+- **Service**: `App\Services\PdfRepairService`
+- **Validation Rule**: `App\Rules\RepairablePdf` 
+- **Detection**: Scans first 1KB for PDF signature location
+- **Repair**: Strips data before `%PDF-` header
+- **Logging**: All attempts logged for debugging
+
 ### Alpine.js x-for with Table Rows - Expandable Rows Appearing at Bottom
 
 **Symptoms:**

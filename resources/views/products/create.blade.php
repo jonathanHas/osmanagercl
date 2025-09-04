@@ -195,13 +195,25 @@
                                                 </span>';
                                             }
                                         @endphp
-                                        <x-form-group 
-                                            name="code" 
-                                            label="{!! $codeLabel !!}" 
-                                            type="text" 
-                                            :value="$codeValue" 
-                                            required 
-                                            placeholder="Enter code or scan" />
+                                        <div class="relative">
+                                            <x-form-group 
+                                                name="code" 
+                                                label="{!! $codeLabel !!}" 
+                                                type="text" 
+                                                :value="$codeValue" 
+                                                required 
+                                                placeholder="Enter code or scan" />
+                                            
+                                            <!-- Camera Scan Button -->
+                                            <button type="button" 
+                                                    onclick="openBarcodeScanner()" 
+                                                    class="absolute right-2 bottom-2 inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors duration-200">
+                                                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h2m0 0V6a3 3 0 00-3-3H9a3 3 0 00-3 3v6h8zm-7 8h2m-2-4h2m2 0h2m-2 4h2"/>
+                                                </svg>
+                                                Scan
+                                            </button>
+                                        </div>
                                         
                                         @if($categoryConfig && $suggestedBarcode)
                                             <div class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:border-blue-800">
@@ -580,6 +592,181 @@
             </form>
         </div>
     </div>
+
+    <!-- Barcode Scanner Modal -->
+    <div id="barcode-scanner-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full">
+                <div class="p-6">
+                    <!-- Header -->
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Scan Barcode</h3>
+                        <button onclick="closeBarcodeScanner()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Scanner Container -->
+                    <div id="qr-reader" class="mb-4"></div>
+                    
+                    <!-- Status Message -->
+                    <div id="scanner-status" class="text-center text-sm text-gray-600 dark:text-gray-400 mb-4">
+                        Initializing camera...
+                    </div>
+
+                    <!-- Manual Entry Option -->
+                    <div class="border-t pt-4">
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">Or enter barcode manually:</p>
+                        <div class="flex gap-2">
+                            <input type="text" 
+                                   id="manual-barcode-input" 
+                                   placeholder="Enter barcode"
+                                   class="flex-1 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:border-indigo-500 focus:ring-indigo-500">
+                            <button onclick="useManualBarcode()" 
+                                    class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors duration-200">
+                                Use
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include html5-qrcode library -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+    <script>
+        // Barcode Scanner Functions
+        let html5QrCode = null;
+        let scannerActive = false;
+
+        function openBarcodeScanner() {
+            const modal = document.getElementById('barcode-scanner-modal');
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            
+            // Initialize scanner
+            initializeScanner();
+        }
+
+        function closeBarcodeScanner() {
+            const modal = document.getElementById('barcode-scanner-modal');
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+            
+            // Stop scanner if active
+            if (html5QrCode && scannerActive) {
+                html5QrCode.stop().then(() => {
+                    scannerActive = false;
+                }).catch((err) => {
+                    console.error('Failed to stop scanner', err);
+                });
+            }
+        }
+
+        function initializeScanner() {
+            if (scannerActive) return;
+            
+            const statusElement = document.getElementById('scanner-status');
+            statusElement.textContent = 'Requesting camera permission...';
+            
+            html5QrCode = new Html5Qrcode("qr-reader");
+            
+            const config = {
+                fps: 10,
+                qrbox: { width: 250, height: 250 },
+                aspectRatio: 1.0
+            };
+            
+            // Try to use back camera on mobile devices, fall back to any camera
+            Html5Qrcode.getCameras().then(cameras => {
+                if (cameras && cameras.length) {
+                    // Look for back camera
+                    let cameraId = cameras[0].id;
+                    for (let camera of cameras) {
+                        if (camera.label && camera.label.toLowerCase().includes('back')) {
+                            cameraId = camera.id;
+                            break;
+                        }
+                    }
+                    
+                    html5QrCode.start(
+                        cameraId,
+                        config,
+                        (decodedText, decodedResult) => {
+                            // Success callback
+                            onScanSuccess(decodedText);
+                        },
+                        (errorMessage) => {
+                            // Error callback (ignore frequent errors)
+                        }
+                    ).then(() => {
+                        scannerActive = true;
+                        statusElement.textContent = 'Point camera at barcode';
+                    }).catch((err) => {
+                        console.error('Failed to start scanner', err);
+                        statusElement.textContent = 'Camera access denied or not available';
+                    });
+                }
+            }).catch(err => {
+                console.error('Failed to get cameras', err);
+                statusElement.textContent = 'Camera not available on this device';
+            });
+        }
+
+        function onScanSuccess(barcode) {
+            // Vibrate if available (mobile feedback)
+            if (navigator.vibrate) {
+                navigator.vibrate(200);
+            }
+            
+            // Set the barcode value
+            document.getElementById('code').value = barcode;
+            
+            // Show success message
+            const statusElement = document.getElementById('scanner-status');
+            statusElement.textContent = `Barcode scanned: ${barcode}`;
+            statusElement.classList.add('text-green-600', 'font-semibold');
+            
+            // Close scanner after short delay
+            setTimeout(() => {
+                closeBarcodeScanner();
+                // Focus on the barcode field to show the value
+                document.getElementById('code').focus();
+            }, 1000);
+        }
+
+        function useManualBarcode() {
+            const manualInput = document.getElementById('manual-barcode-input');
+            const barcode = manualInput.value.trim();
+            
+            if (barcode) {
+                onScanSuccess(barcode);
+            }
+        }
+
+        // Allow Enter key in manual input
+        document.addEventListener('DOMContentLoaded', function() {
+            const manualInput = document.getElementById('manual-barcode-input');
+            if (manualInput) {
+                manualInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        useManualBarcode();
+                    }
+                });
+            }
+        });
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !document.getElementById('barcode-scanner-modal').classList.contains('hidden')) {
+                closeBarcodeScanner();
+            }
+        });
+    </script>
 
     <script>
         // Track if we have scraped pricing data

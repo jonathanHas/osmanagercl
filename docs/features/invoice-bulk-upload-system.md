@@ -19,11 +19,33 @@ The Invoice Bulk Upload System allows users to upload multiple invoice files sim
 
 ### Supported File Types
 
-- **PDF documents**: PDF (directly viewable in browser)
+- **PDF documents**: PDF (directly viewable in browser, with automatic repair for corrupted files)
 - **Images**: JPG, JPEG, PNG (directly viewable in browser)
 - **Scanned documents**: TIFF, TIF (download only)
 - **Microsoft Word documents**: DOC, DOCX (viewable via PDF conversion)
 - **Microsoft Excel spreadsheets**: XLS, XLSX (viewable via PDF conversion)
+
+### Automatic PDF Repair System ⚡ NEW!
+
+The system now automatically detects and repairs corrupted PDF files during upload, specifically addressing issues with suppliers like **Klee Paper** that generate PDFs with malformed headers.
+
+**Features:**
+- **Automatic Detection**: Identifies PDFs with corrupted headers (extra data before `%PDF-` signature)
+- **Transparent Repair**: Fixes files during validation without user intervention
+- **Supplier Recognition**: Automatically detects problematic suppliers (e.g., "Klee Paper")
+- **Comprehensive Logging**: Tracks all repair attempts for debugging
+- **Configurable**: Can be enabled/disabled via environment settings
+
+**How it works:**
+1. When a PDF is uploaded, the system checks if the PDF signature (`%PDF-`) is at the beginning
+2. If corrupted data is found before the PDF header, it's automatically stripped
+3. The cleaned PDF is validated and processed normally
+4. All repair operations are logged for troubleshooting
+
+**Configuration options:**
+- `INVOICE_PDF_REPAIR_ENABLED=true` - Enable/disable automatic repair
+- `INVOICE_PDF_REPAIR_MAX_SIZE=50` - Maximum file size (MB) to attempt repair
+- `INVOICE_PDF_REPAIR_LOG=true` - Log repair attempts for debugging
 
 ### Document Viewing Capabilities
 
@@ -131,15 +153,28 @@ Configuration is stored in `config/invoices.php`:
     'max_files_per_batch' => env('INVOICE_MAX_FILES_PER_BATCH', 50),
     'max_file_size_mb' => env('INVOICE_MAX_FILE_SIZE_MB', 25),
     'max_total_size_mb' => env('INVOICE_MAX_TOTAL_SIZE_MB', 500),
-    'allowed_extensions' => ['pdf', 'jpg', 'jpeg', 'png', 'tiff', 'tif'],
+    'allowed_extensions' => ['pdf', 'jpg', 'jpeg', 'png', 'tiff', 'tif', 'doc', 'docx', 'xls', 'xlsx'],
     'allowed_mime_types' => [
         'application/pdf',
         'image/jpeg',
         'image/png',
         'image/tiff',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     ],
     'temp_path' => 'temp/invoices',
     'temp_file_lifetime' => 24, // hours
+],
+
+'pdf_repair' => [
+    'enabled' => env('INVOICE_PDF_REPAIR_ENABLED', true),
+    'max_file_size_mb' => env('INVOICE_PDF_REPAIR_MAX_SIZE', 50),
+    'log_repairs' => env('INVOICE_PDF_REPAIR_LOG', true),
+    'problematic_suppliers' => [
+        'Klee Paper',
+    ],
 ],
 ```
 
@@ -344,6 +379,41 @@ Updated `InvoiceBulkUploadController.php` line 126 to store the full path return
 2. Verify file shows in preview with correct parsing
 3. Create invoice from review and confirm attachment appears on invoice detail page
 4. Check that attachment can be viewed/downloaded successfully
+
+### PDF Upload Fails with "File type not allowed" (Fixed 2025-09-04)
+
+**Symptoms:**
+- PDF files fail to upload with validation error "Only PDF, JPG, PNG, TIFF files are allowed"
+- Browser console shows 422 Unprocessable Content error
+- Files appear to be valid PDFs when viewed manually
+- Issue occurs specifically with certain supplier PDFs (e.g., Klee Paper)
+
+**Root Cause:**
+Some suppliers generate PDFs with corrupted headers containing PostScript commands before the PDF signature:
+- Normal PDF starts with: `%PDF-1.7`
+- Corrupted PDF starts with: `0.566929 w 0 J 0 j [] 0.000000 d\n%PDF-1.7`
+- System's MIME type detection reads the PostScript commands and identifies file as "data" instead of "application/pdf"
+- Validation fails before file can be processed
+
+**Solution Implemented:**
+Created automatic PDF repair system that:
+1. **Custom Validation Rule**: `RepairablePdf` rule handles files with PDF extensions but wrong MIME types
+2. **Automatic Detection**: Scans first 1KB of file to find actual PDF signature location
+3. **Transparent Repair**: Removes corrupted data before PDF header during validation
+4. **Supplier Recognition**: Identifies and logs problematic suppliers for tracking
+5. **Seamless Processing**: Repaired files continue through normal upload workflow
+
+**Technical Details:**
+- Service: `App\Services\PdfRepairService`
+- Validation Rule: `App\Rules\RepairablePdf`
+- Configuration: `config/invoices.pdf_repair`
+- Logs: All repair attempts logged to `storage/logs/laravel.log`
+
+**Verification:**
+1. Upload a Klee Paper PDF through bulk upload interface
+2. Check logs for "PDF repair needed" and "PDF repaired successfully" messages
+3. Confirm file uploads without validation errors
+4. Verify file processes normally through the system
 
 ## Related Documentation
 
