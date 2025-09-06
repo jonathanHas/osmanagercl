@@ -15,7 +15,7 @@
             </div>
         </div>
 
-        <form method="POST" action="{{ route('invoices.store-simple') }}" @submit.prevent="submitForm">
+        <form method="POST" action="{{ route('invoices.store-simple') }}" @submit.prevent="submitForm" enctype="multipart/form-data">
             @csrf
             
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -93,6 +93,60 @@
                             <label class="block text-sm font-medium text-gray-400 mb-1">Notes</label>
                             <textarea name="notes" rows="2" x-model="notes"
                                       class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md">{{ old('notes') }}</textarea>
+                        </div>
+                        
+                        {{-- Optional File Upload --}}
+                        <div class="mt-6">
+                            <label class="block text-sm font-medium text-gray-400 mb-2">
+                                Invoice Document (Optional)
+                                <span class="text-xs text-gray-500 ml-1">- PDF, DOC, XLS, Images (max 25MB)</span>
+                            </label>
+                            <div class="relative">
+                                <input type="file" 
+                                       name="invoice_document" 
+                                       accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.tiff,.tif"
+                                       x-ref="fileInput"
+                                       x-on:change="handleFileChange($event)"
+                                       class="hidden">
+                                
+                                <div x-show="!selectedFile" 
+                                     @click="$refs.fileInput.click()"
+                                     class="border-2 border-dashed border-gray-600 hover:border-gray-500 bg-gray-700 hover:bg-gray-650 rounded-lg p-6 text-center cursor-pointer transition-colors">
+                                    <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                    <p class="mt-2 text-sm text-gray-400">
+                                        <span class="font-medium text-blue-400 hover:text-blue-300">Click to upload</span> or drag and drop
+                                    </p>
+                                    <p class="text-xs text-gray-500 mt-1">PDF, DOC, DOCX, XLS, XLSX, JPG, PNG, TIFF up to 25MB</p>
+                                </div>
+                                
+                                <div x-show="selectedFile" class="bg-gray-700 rounded-lg p-4 border border-gray-600">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="flex-shrink-0">
+                                                <svg class="h-8 w-8 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd" />
+                                                </svg>
+                                            </div>
+                                            <div class="min-w-0 flex-1">
+                                                <p class="text-sm font-medium text-gray-100" x-text="selectedFile?.name"></p>
+                                                <p class="text-xs text-gray-400" x-text="formatFileSize(selectedFile?.size)"></p>
+                                            </div>
+                                        </div>
+                                        <button type="button" 
+                                                @click="clearFile()"
+                                                class="ml-4 text-red-400 hover:text-red-300">
+                                            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            @error('invoice_document')
+                                <p class="text-red-400 text-xs mt-1">{{ $message }}</p>
+                            @enderror
                         </div>
                     </div>
 
@@ -224,6 +278,12 @@
                 expenseCategory: '{{ old('expense_category') }}',
                 notes: '{{ old('notes') }}',
                 
+                // Supplier data for auto-population
+                suppliers: @json($suppliers),
+                
+                // File upload
+                selectedFile: null,
+                
                 // VAT amounts
                 standardNet: 0,
                 standardVat: 0,
@@ -251,6 +311,44 @@
                     this.reducedVat = Math.round(this.reducedNet * 0.135 * 100) / 100;
                     this.secondReducedVat = Math.round(this.secondReducedNet * 0.09 * 100) / 100;
                     this.zeroVat = 0; // Always 0 for zero rate
+                },
+                
+                // Watch for supplier changes and auto-populate supplier name
+                init() {
+                    this.$watch('supplierId', (value) => {
+                        if (value && this.suppliers[value]) {
+                            this.supplierName = this.suppliers[value];
+                        } else if (!value) {
+                            // Only clear if user manually clears dropdown, not if they're typing in supplier name
+                            this.supplierName = '';
+                        }
+                    });
+                },
+                
+                // File handling methods
+                handleFileChange(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        // Check file size (25MB limit)
+                        if (file.size > 25 * 1024 * 1024) {
+                            alert('File size must be less than 25MB');
+                            this.clearFile();
+                            return;
+                        }
+                        this.selectedFile = file;
+                    }
+                },
+                
+                clearFile() {
+                    this.selectedFile = null;
+                    this.$refs.fileInput.value = '';
+                },
+                
+                formatFileSize(bytes) {
+                    if (!bytes) return '';
+                    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+                    return Math.round(bytes / Math.pow(1024, i) * 10) / 10 + ' ' + sizes[i];
                 },
                 
                 submitForm(event) {

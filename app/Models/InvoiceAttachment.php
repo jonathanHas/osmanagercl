@@ -108,6 +108,14 @@ class InvoiceAttachment extends Model
     }
 
     /**
+     * Get the minimal embedded viewer URL for this attachment (for iframe embedding).
+     */
+    public function getViewerMinimalUrlAttribute(): string
+    {
+        return route('invoices.attachments.viewer-minimal', $this->id);
+    }
+
+    /**
      * Check if this attachment is viewable in browser.
      */
     public function isViewable(): bool

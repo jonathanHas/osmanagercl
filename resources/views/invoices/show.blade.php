@@ -138,8 +138,9 @@
                                 src="" 
                                 class="w-full border-0 bg-white" 
                                 style="height: 600px;"
-                                sandbox="allow-same-origin"
-                                title="Document Viewer">
+                                sandbox="allow-same-origin allow-scripts allow-forms"
+                                title="Document Viewer"
+                                loading="lazy">
                         </iframe>
                         <div id="viewer-loading" class="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75" style="display: none;">
                             <div class="text-center">
@@ -501,7 +502,7 @@
                     <!-- Action Buttons Row -->
                     <div class="flex justify-center space-x-2 pt-2 border-t border-gray-600">
                         ${attachment.is_viewable ? 
-                            `<button onclick="showInlineViewer('${attachment.view_url}', '${attachment.original_filename}')" class="inline-flex items-center px-2 py-1 text-xs font-medium text-orange-400 hover:text-orange-300 hover:bg-gray-600 rounded-md transition-colors" title="View inline on this page">
+                            `<button onclick="showInlineViewer('${attachment.viewer_minimal_url}', '${attachment.original_filename}')" class="inline-flex items-center px-2 py-1 text-xs font-medium text-orange-400 hover:text-orange-300 hover:bg-gray-600 rounded-md transition-colors" title="View inline on this page">
                                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
                                 </svg>
@@ -705,7 +706,7 @@
             setTimeout(function() {
                 const primaryAttachment = attachments.find(att => att.is_primary && att.is_viewable);
                 if (primaryAttachment) {
-                    showInlineViewer(primaryAttachment.view_url, primaryAttachment.original_filename);
+                    showInlineViewer(primaryAttachment.viewer_minimal_url, primaryAttachment.original_filename);
                 }
             }, 1000);
         });

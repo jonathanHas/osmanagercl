@@ -7,9 +7,12 @@ use App\Models\CostCategory;
 use App\Models\Invoice;
 use App\Models\InvoiceVatLine;
 use App\Models\VatRate;
+use App\Rules\RepairablePdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class InvoiceController extends Controller
 {
@@ -272,6 +275,13 @@ class InvoiceController extends Controller
             'subtotal' => 'required|numeric|min:0',
             'vat_amount' => 'required|numeric|min:0',
             'total_amount' => 'required|numeric|min:0',
+            // Optional file upload
+            'invoice_document' => [
+                'nullable',
+                'file',
+                'max:'.(config('invoices.bulk_upload.max_file_size_mb') * 1024), // Convert MB to KB
+                new RepairablePdf, // This handles both file validation and PDF repair
+            ],
         ]);
 
         // Get supplier defaults if supplier is selected
@@ -289,33 +299,40 @@ class InvoiceController extends Controller
             }
         }
 
-        // Create invoice
-        $invoice = Invoice::create([
-            'invoice_number' => $validated['invoice_number'],
-            'supplier_id' => $validated['supplier_id'],
-            'supplier_name' => $validated['supplier_name'],
-            'invoice_date' => $validated['invoice_date'],
-            'due_date' => $validated['due_date'],
-            'expense_category' => $validated['expense_category'],
-            'notes' => $validated['notes'] ?? null,
-            'payment_status' => 'pending',
-            'subtotal' => $validated['subtotal'],
-            'vat_amount' => $validated['vat_amount'],
-            'total_amount' => $validated['total_amount'],
-            'standard_net' => $validated['standard_net'] ?? 0,
-            'standard_vat' => $validated['standard_vat'] ?? 0,
-            'reduced_net' => $validated['reduced_net'] ?? 0,
-            'reduced_vat' => $validated['reduced_vat'] ?? 0,
-            'second_reduced_net' => $validated['second_reduced_net'] ?? 0,
-            'second_reduced_vat' => $validated['second_reduced_vat'] ?? 0,
-            'zero_net' => $validated['zero_net'] ?? 0,
-            'zero_vat' => $validated['zero_vat'] ?? 0,
-            'created_by' => auth()->id(),
-            'updated_by' => auth()->id(),
-        ]);
+        return DB::transaction(function () use ($validated, $request) {
+            // Create invoice
+            $invoice = Invoice::create([
+                'invoice_number' => $validated['invoice_number'],
+                'supplier_id' => $validated['supplier_id'],
+                'supplier_name' => $validated['supplier_name'],
+                'invoice_date' => $validated['invoice_date'],
+                'due_date' => $validated['due_date'],
+                'expense_category' => $validated['expense_category'],
+                'notes' => $validated['notes'] ?? null,
+                'payment_status' => 'pending',
+                'subtotal' => $validated['subtotal'],
+                'vat_amount' => $validated['vat_amount'],
+                'total_amount' => $validated['total_amount'],
+                'standard_net' => $validated['standard_net'] ?? 0,
+                'standard_vat' => $validated['standard_vat'] ?? 0,
+                'reduced_net' => $validated['reduced_net'] ?? 0,
+                'reduced_vat' => $validated['reduced_vat'] ?? 0,
+                'second_reduced_net' => $validated['second_reduced_net'] ?? 0,
+                'second_reduced_vat' => $validated['second_reduced_vat'] ?? 0,
+                'zero_net' => $validated['zero_net'] ?? 0,
+                'zero_vat' => $validated['zero_vat'] ?? 0,
+                'created_by' => auth()->id(),
+                'updated_by' => auth()->id(),
+            ]);
 
-        return redirect()->route('invoices.show', $invoice)
-            ->with('success', 'Invoice created successfully.');
+            // Handle file upload if present
+            if ($request->hasFile('invoice_document')) {
+                $this->handleInvoiceAttachment($invoice, $request->file('invoice_document'));
+            }
+
+            return redirect()->route('invoices.show', $invoice)
+                ->with('success', 'Invoice created successfully.');
+        });
     }
 
     /**
@@ -796,5 +813,69 @@ class InvoiceController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Handle invoice document attachment upload
+     */
+    private function handleInvoiceAttachment(Invoice $invoice, $uploadedFile): void
+    {
+        try {
+            // Generate unique filename
+            $originalName = $uploadedFile->getClientOriginalName();
+            $extension = $uploadedFile->getClientOriginalExtension();
+            $filename = pathinfo($originalName, PATHINFO_FILENAME).'_'.time().'.'.$extension;
+
+            // Create storage path using config pattern
+            $invoiceDate = Carbon::parse($invoice->invoice_date);
+            $storagePath = str_replace(
+                ['{year}', '{month}', '{invoice_id}'],
+                [$invoiceDate->format('Y'), $invoiceDate->format('m'), $invoice->id],
+                config('invoices.storage.path_pattern')
+            );
+
+            $fullPath = $storagePath.'/'.$filename;
+
+            // Store the file
+            $uploadedFile->storeAs(
+                dirname($fullPath),
+                $filename,
+                config('invoices.storage.disk')
+            );
+
+            // Generate file hash for integrity checking
+            $fileContent = $uploadedFile->get();
+            $fileHash = hash('sha256', $fileContent);
+
+            // Create attachment record
+            $invoice->attachments()->create([
+                'original_filename' => $originalName,
+                'stored_filename' => $filename,
+                'file_path' => $fullPath,
+                'mime_type' => $uploadedFile->getMimeType(),
+                'file_size' => $uploadedFile->getSize(),
+                'file_hash' => $fileHash,
+                'attachment_type' => 'invoice_scan',
+                'is_primary' => true,
+                'uploaded_by' => auth()->id(),
+                'uploaded_at' => now(),
+            ]);
+
+            Log::info('Invoice attachment uploaded successfully', [
+                'invoice_id' => $invoice->id,
+                'filename' => $originalName,
+                'path' => $fullPath,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to upload invoice attachment', [
+                'invoice_id' => $invoice->id,
+                'filename' => $uploadedFile->getClientOriginalName(),
+                'error' => $e->getMessage(),
+            ]);
+
+            // Don't fail the entire invoice creation, just log the error
+            // The invoice will be created without the attachment
+        }
     }
 }

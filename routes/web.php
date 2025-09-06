@@ -88,6 +88,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('invoice-attachments/{attachment}')->name('invoices.attachments.')->group(function () {
         Route::get('/view', [\App\Http\Controllers\InvoiceAttachmentController::class, 'view'])->name('view');
         Route::get('/viewer', [\App\Http\Controllers\InvoiceAttachmentController::class, 'viewEmbedded'])->name('viewer');
+        Route::get('/viewer-minimal', [\App\Http\Controllers\InvoiceAttachmentController::class, 'viewEmbeddedMinimal'])->name('viewer-minimal');
         Route::get('/download', [\App\Http\Controllers\InvoiceAttachmentController::class, 'download'])->name('download');
         Route::patch('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'update'])->name('update');
         Route::delete('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'destroy'])->name('destroy');

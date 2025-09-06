@@ -1,0 +1,1 @@
+This file contains information about the interactions with the Gemini AI.

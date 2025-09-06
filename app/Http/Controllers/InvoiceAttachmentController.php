@@ -88,6 +88,7 @@ class InvoiceAttachmentController extends Controller
                         'is_viewable' => $attachment->isViewable(),
                         'view_url' => $attachment->view_url,
                         'viewer_url' => $attachment->viewer_url,
+                        'viewer_minimal_url' => $attachment->viewer_minimal_url,
                         'download_url' => $attachment->download_url,
                     ];
                 }),
@@ -202,6 +203,25 @@ class InvoiceAttachmentController extends Controller
     }
 
     /**
+     * Display attachment in minimal embedded viewer (for iframe embedding).
+     */
+    public function viewEmbeddedMinimal(InvoiceAttachment $attachment)
+    {
+        if (! $attachment->exists()) {
+            abort(404, 'File not found');
+        }
+
+        if (! $attachment->isViewable()) {
+            return $this->download($attachment);
+        }
+
+        $viewUrl = route('invoices.attachments.view', $attachment);
+        $downloadUrl = route('invoices.attachments.download', $attachment);
+
+        return view('invoices.attachment-viewer-minimal', compact('attachment', 'viewUrl', 'downloadUrl'));
+    }
+
+    /**
      * Download the specified attachment.
      */
     public function download(InvoiceAttachment $attachment)
@@ -312,6 +332,7 @@ class InvoiceAttachmentController extends Controller
                     'is_viewable' => $attachment->isViewable(),
                     'view_url' => $attachment->view_url,
                     'viewer_url' => $attachment->viewer_url,
+                    'viewer_minimal_url' => $attachment->viewer_minimal_url,
                     'download_url' => $attachment->download_url,
                     'uploaded_by' => $attachment->uploader?->name ?? 'System',
                     'uploaded_at' => $attachment->uploaded_at->format('d/m/Y H:i'),
