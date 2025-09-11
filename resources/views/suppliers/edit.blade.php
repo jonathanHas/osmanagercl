@@ -19,7 +19,21 @@
             </div>
         </div>
 
-        {{-- Error Messages --}}
+        {{-- Success Message --}}
+        @if(session('success'))
+            <div class="bg-green-800 border border-green-600 text-green-100 px-4 py-3 rounded mb-6">
+                <i class="fas fa-check-circle mr-2"></i>{{ session('success') }}
+            </div>
+        @endif
+
+        {{-- Error Message --}}
+        @if(session('error'))
+            <div class="bg-red-800 border border-red-600 text-red-100 px-4 py-3 rounded mb-6">
+                <i class="fas fa-exclamation-circle mr-2"></i>{{ session('error') }}
+            </div>
+        @endif
+
+        {{-- Validation Errors --}}
         @if($errors->any())
             <div class="bg-red-800 border border-red-600 text-red-100 px-4 py-3 rounded mb-6">
                 <h4 class="font-medium mb-2">Please fix the following errors:</h4>
@@ -111,6 +125,42 @@
                             @enderror
                         </div>
                     </div>
+                    
+                    {{-- POS Integration Section --}}
+                    @if(!$supplier->is_pos_linked)
+                        <div class="mt-4 p-4 bg-gray-750 rounded-md border border-blue-600">
+                            <div class="flex items-start space-x-3">
+                                <input type="checkbox" name="create_in_pos" id="create_in_pos" value="1" 
+                                       {{ old('create_in_pos') ? 'checked' : '' }}
+                                       class="mt-1 bg-gray-700 border-gray-600 text-blue-600 rounded focus:ring-blue-500 focus:ring-2">
+                                <div>
+                                    <label for="create_in_pos" class="block text-sm font-medium text-blue-300">
+                                        Create in POS system
+                                    </label>
+                                    <p class="text-xs text-gray-400 mt-1">
+                                        This supplier is not linked to the POS system. Check this to create a POS entry and link them.
+                                    </p>
+                                </div>
+                            </div>
+                            @error('create_in_pos')
+                                <p class="text-red-400 text-xs mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    @else
+                        <div class="mt-4 p-4 bg-gray-750 rounded-md border border-purple-600">
+                            <div class="flex items-center space-x-3">
+                                <i class="fas fa-check-circle text-purple-400"></i>
+                                <div>
+                                    <p class="text-sm font-medium text-purple-300">
+                                        POS Integration Active
+                                    </p>
+                                    <p class="text-xs text-gray-400 mt-1">
+                                        This supplier is linked to POS ID: <span class="font-mono text-purple-300">{{ $supplier->external_pos_id }}</span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
                     
                     <div class="mt-4">
                         <label class="block text-sm font-medium text-gray-400 mb-1">Address</label>
@@ -380,7 +430,7 @@
                         Cancel
                     </a>
                     
-                    <button type="submit" 
+                    <button type="submit" id="submitBtn"
                             class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded">
                         Update Supplier
                     </button>
@@ -388,4 +438,12 @@
             </div>
         </form>
     </div>
+
+    <script>
+        document.querySelector('form').addEventListener('submit', function() {
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Updating...';
+        });
+    </script>
 </x-admin-layout>

@@ -954,7 +954,7 @@ class ProductController extends Controller
             // Get VAT rate for the selected tax category to convert inclusive price to exclusive
             $taxCategory = TaxCategory::with('primaryTax')->find($request->tax_category);
             $vatRate = $taxCategory?->primaryTax?->RATE ?? 0.0;
-            
+
             // Convert VAT-inclusive price to VAT-exclusive price for storage
             // PRICESELL should be stored ex-VAT as it's used in getGrossPrice() calculation
             $priceExVat = $vatRate > 0 ? $request->price_sell / (1 + $vatRate) : $request->price_sell;

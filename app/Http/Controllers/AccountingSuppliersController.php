@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AccountingSupplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
@@ -173,7 +174,8 @@ class AccountingSuppliersController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'code' => 'required|string|max:50|unique:accounting_suppliers,code',
+            'code' => 'nullable|string|max:50|unique:accounting_suppliers,code',
+            'create_in_pos' => 'boolean',
             'name' => 'required|string|max:255',
             'supplier_type' => 'required|in:product,service,utility,professional,other',
             'address' => 'nullable|string|max:1000',
@@ -198,6 +200,16 @@ class AccountingSuppliersController extends Controller
             'tags' => 'nullable|string',
         ]);
 
+        // Auto-generate code if not provided
+        if (empty($validated['code'])) {
+            $validated['code'] = $this->generateSupplierCode();
+        }
+
+        // Set default payment terms if not provided
+        if (!isset($validated['payment_terms_days']) || is_null($validated['payment_terms_days'])) {
+            $validated['payment_terms_days'] = 30; // Default 30 days
+        }
+
         // Process tags
         if ($validated['tags']) {
             $tags = array_map('trim', explode(',', $validated['tags']));
@@ -212,21 +224,52 @@ class AccountingSuppliersController extends Controller
         $validated['is_active'] = $validated['status'] === 'active';
 
         try {
+            DB::beginTransaction();
+            
             $supplier = AccountingSupplier::create($validated);
+
+            // Create POS supplier if requested
+            $createInPos = $request->boolean('create_in_pos');
+            if ($createInPos) {
+                $this->createPosSupplier($supplier);
+            }
+
+            DB::commit();
+
+            $message = 'Supplier created successfully.';
+            if ($createInPos) {
+                $message .= ' Also created in POS system.';
+            }
 
             return redirect()
                 ->route('suppliers.show', $supplier)
-                ->with('success', 'Supplier created successfully.');
+                ->with('success', $message);
 
         } catch (\Exception $e) {
+            DB::rollBack();
             Log::error('Failed to create supplier', [
                 'error' => $e->getMessage(),
                 'data' => $validated,
             ]);
 
+            $errorMessage = 'Failed to create supplier.';
+            
+            // Provide more specific error messages
+            if (str_contains($e->getMessage(), 'payment_terms_days')) {
+                $errorMessage .= ' Payment terms issue detected.';
+            } elseif (str_contains($e->getMessage(), 'Duplicate entry')) {
+                $errorMessage .= ' This supplier code already exists.';
+            } elseif (str_contains($e->getMessage(), 'code')) {
+                $errorMessage .= ' Supplier code issue detected.';
+            } elseif (str_contains($e->getMessage(), 'connection')) {
+                $errorMessage .= ' Database connection issue.';
+            } elseif (str_contains($e->getMessage(), 'POS')) {
+                $errorMessage .= ' POS system connection issue.';
+            }
+
             return back()
                 ->withInput()
-                ->with('error', 'Failed to create supplier. Please try again.');
+                ->with('error', $errorMessage . ' Please try again.');
         }
     }
 
@@ -276,6 +319,7 @@ class AccountingSuppliersController extends Controller
     {
         $validated = $request->validate([
             'code' => ['required', 'string', 'max:50', Rule::unique('accounting_suppliers', 'code')->ignore($supplier)],
+            'create_in_pos' => 'boolean',
             'name' => 'required|string|max:255',
             'supplier_type' => 'required|in:product,service,utility,professional,other',
             'address' => 'nullable|string|max:1000',
@@ -308,27 +352,71 @@ class AccountingSuppliersController extends Controller
             $validated['tags'] = null;
         }
 
+        // Set default payment terms if not provided
+        if (!isset($validated['payment_terms_days']) || is_null($validated['payment_terms_days'])) {
+            $validated['payment_terms_days'] = 30; // Default 30 days
+        }
+
         // Update audit fields
         $validated['updated_by'] = Auth::id();
         $validated['is_active'] = $validated['status'] === 'active';
 
         try {
+            DB::beginTransaction();
+            
+            $wasLinked = $supplier->is_pos_linked;
+            $oldName = $supplier->name;
+            
             $supplier->update($validated);
+
+            // Sync name to POS if already linked and name changed
+            if ($wasLinked && $oldName !== $validated['name']) {
+                $supplier->syncNameToPos();
+            }
+
+            // Create POS supplier if requested and not already linked
+            $createInPos = $request->boolean('create_in_pos');
+            if ($createInPos && !$wasLinked) {
+                $this->createPosSupplier($supplier->fresh()); // Fresh to get updated data
+            }
+
+            DB::commit();
+
+            $message = 'Supplier updated successfully.';
+            if ($createInPos && !$supplier->wasRecentlyLinkedToPos) {
+                $message .= ' Also created in POS system.';
+            }
 
             return redirect()
                 ->route('suppliers.show', $supplier)
-                ->with('success', 'Supplier updated successfully.');
+                ->with('success', $message);
 
         } catch (\Exception $e) {
+            DB::rollBack();
             Log::error('Failed to update supplier', [
                 'supplier_id' => $supplier->id,
                 'error' => $e->getMessage(),
                 'data' => $validated,
             ]);
 
+            $errorMessage = 'Failed to update supplier.';
+            
+            // Provide more specific error messages
+            if (str_contains($e->getMessage(), 'payment_terms_days')) {
+                $errorMessage .= ' Payment terms issue detected.';
+            } elseif (str_contains($e->getMessage(), 'Duplicate entry')) {
+                $errorMessage .= ' This supplier code already exists.';
+            } elseif (str_contains($e->getMessage(), 'code')) {
+                $errorMessage .= ' Supplier code issue detected.';
+            } elseif (str_contains($e->getMessage(), 'connection')) {
+                $errorMessage .= ' Database connection issue.';
+            } elseif (str_contains($e->getMessage(), 'POS')) {
+                $errorMessage .= ' POS system connection issue.';
+            }
+
             return back()
                 ->withInput()
-                ->with('error', 'Failed to update supplier. Please try again.');
+                ->with('error', $errorMessage . ' Please try again.');
         }
     }
 
@@ -441,6 +529,72 @@ class AccountingSuppliersController extends Controller
             }
 
             return back()->with('error', 'Failed to update supplier status. Please try again.');
+        }
+    }
+
+    /**
+     * Generate a unique supplier code.
+     */
+    private function generateSupplierCode(): string
+    {
+        // Get the highest existing SUP- code number
+        $lastSupplier = AccountingSupplier::where('code', 'LIKE', 'SUP-%')
+            ->orderByRaw('CAST(SUBSTRING(code, 5) AS UNSIGNED) DESC')
+            ->first();
+
+        if ($lastSupplier) {
+            $lastNumber = (int) substr($lastSupplier->code, 4);
+            $nextNumber = $lastNumber + 1;
+        } else {
+            $nextNumber = 1;
+        }
+
+        return 'SUP-' . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Create a supplier in the POS system.
+     */
+    private function createPosSupplier(AccountingSupplier $supplier): void
+    {
+        try {
+            // Generate POS ID using Laravel supplier ID
+            $posId = 'SUP' . str_pad($supplier->id, 6, '0', STR_PAD_LEFT);
+
+            // Check if POS ID already exists
+            $existingPos = DB::connection('pos')->table('suppliers')
+                ->where('SupplierID', $posId)
+                ->exists();
+
+            if ($existingPos) {
+                // Try alternative ID with timestamp suffix
+                $posId = 'SUP' . str_pad($supplier->id, 6, '0', STR_PAD_LEFT) . now()->format('His');
+            }
+
+            // Create in POS database
+            DB::connection('pos')->table('suppliers')->insert([
+                'SupplierID' => $posId,
+                'Supplier' => $supplier->name,
+            ]);
+
+            // Update Laravel supplier with POS link
+            $supplier->update([
+                'external_pos_id' => $posId,
+                'is_pos_linked' => true,
+            ]);
+
+            Log::info('Created POS supplier', [
+                'supplier_id' => $supplier->id,
+                'pos_id' => $posId,
+                'name' => $supplier->name,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to create POS supplier', [
+                'supplier_id' => $supplier->id,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
         }
     }
 }

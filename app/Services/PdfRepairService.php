@@ -18,19 +18,16 @@ class PdfRepairService
 
     /**
      * Check if a file needs PDF repair
-     *
-     * @param string $filePath
-     * @return bool
      */
     public function needsRepair(string $filePath): bool
     {
-        if (!file_exists($filePath) || !is_readable($filePath)) {
+        if (! file_exists($filePath) || ! is_readable($filePath)) {
             return false;
         }
 
         // Read the first few bytes of the file
         $handle = fopen($filePath, 'rb');
-        if (!$handle) {
+        if (! $handle) {
             return false;
         }
 
@@ -44,14 +41,13 @@ class PdfRepairService
 
         // Check if PDF signature exists elsewhere in the first 1KB
         $offset = $this->detectPdfHeaderOffset($filePath);
-        
+
         return $offset !== false && $offset > 0;
     }
 
     /**
      * Repair a corrupted PDF file
      *
-     * @param string $filePath
      * @return bool True if repair was successful
      */
     public function repair(string $filePath): bool
@@ -59,12 +55,13 @@ class PdfRepairService
         try {
             // Find where the real PDF starts
             $offset = $this->detectPdfHeaderOffset($filePath);
-            
+
             if ($offset === false || $offset === 0) {
                 Log::warning('PDF repair: No valid PDF header found or file already valid', [
                     'file' => $filePath,
                     'offset' => $offset,
                 ]);
+
                 return $offset === 0; // Return true if already valid
             }
 
@@ -76,21 +73,23 @@ class PdfRepairService
 
             // Extract the clean PDF content
             $cleanPdfPath = $this->extractCleanPdf($filePath, $offset);
-            
-            if (!$cleanPdfPath) {
+
+            if (! $cleanPdfPath) {
                 Log::error('PDF repair: Failed to extract clean PDF', [
                     'file' => $filePath,
                 ]);
+
                 return false;
             }
 
             // Replace original file with cleaned version
-            if (!rename($cleanPdfPath, $filePath)) {
+            if (! rename($cleanPdfPath, $filePath)) {
                 Log::error('PDF repair: Failed to replace original file', [
                     'original' => $filePath,
                     'clean' => $cleanPdfPath,
                 ]);
                 @unlink($cleanPdfPath);
+
                 return false;
             }
 
@@ -106,6 +105,7 @@ class PdfRepairService
                 'file' => $filePath,
                 'error' => $e->getMessage(),
             ]);
+
             return false;
         }
     }
@@ -113,13 +113,12 @@ class PdfRepairService
     /**
      * Detect the offset where the PDF header starts
      *
-     * @param string $filePath
      * @return int|false Offset in bytes, or false if not found
      */
     public function detectPdfHeaderOffset(string $filePath): int|false
     {
         $handle = fopen($filePath, 'rb');
-        if (!$handle) {
+        if (! $handle) {
             return false;
         }
 
@@ -129,29 +128,28 @@ class PdfRepairService
 
         // Find PDF signature
         $position = strpos($chunk, self::PDF_SIGNATURE);
-        
+
         return $position;
     }
 
     /**
      * Extract clean PDF content starting from the given offset
      *
-     * @param string $filePath
-     * @param int $offset
      * @return string|false Path to cleaned file, or false on failure
      */
     protected function extractCleanPdf(string $filePath, int $offset): string|false
     {
-        $tempPath = $filePath . '.clean.tmp';
-        
+        $tempPath = $filePath.'.clean.tmp';
+
         $sourceHandle = fopen($filePath, 'rb');
-        if (!$sourceHandle) {
+        if (! $sourceHandle) {
             return false;
         }
 
         $destHandle = fopen($tempPath, 'wb');
-        if (!$destHandle) {
+        if (! $destHandle) {
             fclose($sourceHandle);
+
             return false;
         }
 
@@ -159,7 +157,7 @@ class PdfRepairService
         fseek($sourceHandle, $offset);
 
         // Copy the rest of the file
-        while (!feof($sourceHandle)) {
+        while (! feof($sourceHandle)) {
             $chunk = fread($sourceHandle, 8192);
             if ($chunk === false) {
                 break;
@@ -171,8 +169,9 @@ class PdfRepairService
         fclose($destHandle);
 
         // Verify the cleaned file is valid
-        if (!$this->isValidPdf($tempPath)) {
+        if (! $this->isValidPdf($tempPath)) {
             @unlink($tempPath);
+
             return false;
         }
 
@@ -181,18 +180,15 @@ class PdfRepairService
 
     /**
      * Check if a file is a valid PDF
-     *
-     * @param string $filePath
-     * @return bool
      */
     protected function isValidPdf(string $filePath): bool
     {
-        if (!file_exists($filePath) || filesize($filePath) < 10) {
+        if (! file_exists($filePath) || filesize($filePath) < 10) {
             return false;
         }
 
         $handle = fopen($filePath, 'rb');
-        if (!$handle) {
+        if (! $handle) {
             return false;
         }
 
@@ -205,15 +201,11 @@ class PdfRepairService
 
     /**
      * Get a preview of the corrupted data for logging
-     *
-     * @param string $filePath
-     * @param int $offset
-     * @return string
      */
     protected function getCorruptedDataPreview(string $filePath, int $offset): string
     {
         $handle = fopen($filePath, 'rb');
-        if (!$handle) {
+        if (! $handle) {
             return '';
         }
 
@@ -222,9 +214,9 @@ class PdfRepairService
 
         // Convert to readable format
         $preview = preg_replace('/[\x00-\x1F\x7F-\xFF]/', '.', $preview);
-        
+
         if (strlen($preview) > 50) {
-            $preview = substr($preview, 0, 50) . '...';
+            $preview = substr($preview, 0, 50).'...';
         }
 
         return $preview;
@@ -232,15 +224,12 @@ class PdfRepairService
 
     /**
      * Detect supplier from repaired PDF content
-     *
-     * @param string $filePath
-     * @return string|null
      */
     public function detectSupplier(string $filePath): ?string
     {
         // Quick text search in first few KB of file
         $handle = fopen($filePath, 'rb');
-        if (!$handle) {
+        if (! $handle) {
             return null;
         }
 
@@ -257,9 +246,6 @@ class PdfRepairService
 
     /**
      * Get detailed repair statistics for a file
-     *
-     * @param string $filePath
-     * @return array
      */
     public function getRepairStats(string $filePath): array
     {

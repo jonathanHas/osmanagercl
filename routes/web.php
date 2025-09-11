@@ -4,6 +4,7 @@ use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\CoffeeController;
 use App\Http\Controllers\CoffeeMetadataController;
 use App\Http\Controllers\DeliveryController;
+use App\Http\Controllers\Financials\BankStatementController;
 use App\Http\Controllers\FruitVegController;
 use App\Http\Controllers\KdsController;
 use App\Http\Controllers\LabelAreaController;
@@ -455,6 +456,25 @@ Route::middleware('auth')->group(function () {
 
     // Financial Management routes
     Route::prefix('management')->name('management.')->middleware(['role:admin,manager'])->group(function () {
+        // Bank Statement Import
+        Route::prefix('bank-statements')->name('bank-statements.')->group(function () {
+            Route::get('/', [BankStatementController::class, 'index'])->name('index');
+            Route::post('/', [BankStatementController::class, 'store'])->name('store');
+            Route::get('/reconciliation', [BankStatementController::class, 'reconciliation'])->name('reconciliation');
+            Route::get('/status', [BankStatementController::class, 'getProcessingStatus'])->name('status');
+            Route::get('/history', [BankStatementController::class, 'getUploadHistory'])->name('history');
+            Route::delete('/delete', [BankStatementController::class, 'deleteUpload'])->name('delete');
+            Route::post('/cleanup-duplicates', [BankStatementController::class, 'cleanupDuplicates'])->name('cleanup-duplicates');
+
+            // Analysis routes
+            Route::get('/analysis', [\App\Http\Controllers\Financials\BankStatementAnalysisController::class, 'index'])->name('analysis');
+            Route::post('/analysis/match', [\App\Http\Controllers\Financials\BankStatementAnalysisController::class, 'matchTransaction'])->name('analysis.match');
+            Route::post('/analysis/unmatch', [\App\Http\Controllers\Financials\BankStatementAnalysisController::class, 'unmatchTransaction'])->name('analysis.unmatch');
+            Route::post('/analysis/refresh-pos', [\App\Http\Controllers\Financials\BankStatementAnalysisController::class, 'refreshPOSData'])->name('analysis.refresh-pos');
+            Route::get('/analysis/export', [\App\Http\Controllers\Financials\BankStatementAnalysisController::class, 'export'])->name('analysis.export');
+            Route::post('/analysis/suggest', [\App\Http\Controllers\Financials\BankStatementAnalysisController::class, 'suggestMatches'])->name('analysis.suggest');
+        });
+
         // Financial Dashboard
         Route::get('/financial/dashboard', [\App\Http\Controllers\Management\FinancialDashboardController::class, 'index'])
             ->name('financial.dashboard');
@@ -502,6 +522,13 @@ Route::middleware('auth')->group(function () {
             Route::post('/import-vat-returns', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'importVatReturns'])->name('import-vat-returns');
             Route::get('/stats', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'getImportStats'])->name('stats');
             Route::get('/test-stream', [\App\Http\Controllers\Management\OSAccountsImportController::class, 'testStream'])->name('test-stream');
+        });
+
+        // Cash Lodgements Management
+        Route::prefix('cash-lodgements')->name('cash-lodgements.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Management\CashLodgementController::class, 'index'])->name('index');
+            Route::get('/{lodgement}', [\App\Http\Controllers\Management\CashLodgementController::class, 'show'])->name('show');
+            Route::get('/export/csv', [\App\Http\Controllers\Management\CashLodgementController::class, 'export'])->name('export');
         });
     });
 });

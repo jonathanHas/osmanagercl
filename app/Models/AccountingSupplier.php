@@ -299,4 +299,76 @@ class AccountingSupplier extends Model
 
         return $contact;
     }
+
+    /**
+     * Check if supplier can be linked to POS.
+     */
+    public function canLinkToPos(): bool
+    {
+        return !$this->is_pos_linked && in_array($this->supplier_type, ['product', 'other']);
+    }
+
+    /**
+     * Get POS integration status for display.
+     */
+    public function getPosStatusAttribute(): array
+    {
+        if ($this->is_pos_linked) {
+            return [
+                'status' => 'linked',
+                'message' => 'Linked to POS',
+                'pos_id' => $this->external_pos_id,
+                'color' => 'purple'
+            ];
+        }
+
+        if ($this->canLinkToPos()) {
+            return [
+                'status' => 'linkable',
+                'message' => 'Can be linked to POS',
+                'pos_id' => null,
+                'color' => 'blue'
+            ];
+        }
+
+        return [
+            'status' => 'not_linkable',
+            'message' => 'Not suitable for POS integration',
+            'pos_id' => null,
+            'color' => 'gray'
+        ];
+    }
+
+    /**
+     * Sync supplier name to POS if linked.
+     */
+    public function syncNameToPos(): bool
+    {
+        if (!$this->is_pos_linked || !$this->external_pos_id) {
+            return false;
+        }
+
+        try {
+            \DB::connection('pos')->table('suppliers')
+                ->where('SupplierID', $this->external_pos_id)
+                ->update(['Supplier' => $this->name]);
+
+            \Log::info('Synced supplier name to POS', [
+                'supplier_id' => $this->id,
+                'pos_id' => $this->external_pos_id,
+                'name' => $this->name,
+            ]);
+
+            return true;
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to sync supplier name to POS', [
+                'supplier_id' => $this->id,
+                'pos_id' => $this->external_pos_id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
 }

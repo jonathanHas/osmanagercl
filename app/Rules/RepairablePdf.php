@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 class RepairablePdf implements ValidationRule
 {
     protected array $allowedMimeTypes;
+
     protected ?string $errorMessage = null;
 
     public function __construct()
@@ -34,8 +35,9 @@ class RepairablePdf implements ValidationRule
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        if (!$value instanceof UploadedFile) {
+        if (! $value instanceof UploadedFile) {
             $fail('The file upload failed.');
+
             return;
         }
 
@@ -50,33 +52,37 @@ class RepairablePdf implements ValidationRule
         if ($extension !== 'pdf') {
             // Not a PDF extension, and not a valid MIME type
             $fail('Only PDF, JPG, PNG, TIFF, DOC, DOCX, XLS, and XLSX files are allowed.');
+
             return;
         }
 
         // This has a PDF extension but wrong MIME type - might be corrupted
         // Try to repair it if PDF repair is enabled
-        if (!config('invoices.pdf_repair.enabled', true)) {
+        if (! config('invoices.pdf_repair.enabled', true)) {
             $fail('The PDF file appears to be corrupted and automatic repair is disabled.');
+
             return;
         }
 
         // Create a temporary file to test repair
-        $tempPath = sys_get_temp_dir() . '/' . uniqid('pdf_test_') . '.pdf';
-        
+        $tempPath = sys_get_temp_dir().'/'.uniqid('pdf_test_').'.pdf';
+
         try {
             // Copy uploaded file to temp location
-            if (!copy($value->getPathname(), $tempPath)) {
+            if (! copy($value->getPathname(), $tempPath)) {
                 $fail('Failed to process the PDF file.');
+
                 return;
             }
 
-            $pdfRepairService = new PdfRepairService();
-            
+            $pdfRepairService = new PdfRepairService;
+
             // Check if it needs repair
-            if (!$pdfRepairService->needsRepair($tempPath)) {
+            if (! $pdfRepairService->needsRepair($tempPath)) {
                 // Doesn't need repair but has wrong MIME type
                 @unlink($tempPath);
                 $fail('The file type could not be determined. Please ensure it is a valid PDF.');
+
                 return;
             }
 
@@ -90,9 +96,10 @@ class RepairablePdf implements ValidationRule
             }
 
             // Attempt repair
-            if (!$pdfRepairService->repair($tempPath)) {
+            if (! $pdfRepairService->repair($tempPath)) {
                 @unlink($tempPath);
                 $fail('The PDF file appears to be corrupted and could not be repaired.');
+
                 return;
             }
 
@@ -101,6 +108,7 @@ class RepairablePdf implements ValidationRule
             if ($repairedMimeType !== 'application/pdf') {
                 @unlink($tempPath);
                 $fail('The file could not be processed as a valid PDF.');
+
                 return;
             }
 
@@ -124,7 +132,7 @@ class RepairablePdf implements ValidationRule
                 'file' => $value->getClientOriginalName(),
                 'error' => $e->getMessage(),
             ]);
-            $fail('The PDF file could not be processed: ' . $e->getMessage());
+            $fail('The PDF file could not be processed: '.$e->getMessage());
         }
     }
 }

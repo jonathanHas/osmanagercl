@@ -14,6 +14,32 @@
             </div>
         </div>
 
+        {{-- Success Message --}}
+        @if(session('success'))
+            <div class="bg-green-800 border border-green-600 text-green-100 px-4 py-3 rounded mb-6">
+                <i class="fas fa-check-circle mr-2"></i>{{ session('success') }}
+            </div>
+        @endif
+
+        {{-- Error Message --}}
+        @if(session('error'))
+            <div class="bg-red-800 border border-red-600 text-red-100 px-4 py-3 rounded mb-6">
+                <i class="fas fa-exclamation-circle mr-2"></i>{{ session('error') }}
+            </div>
+        @endif
+
+        {{-- Validation Errors --}}
+        @if($errors->any())
+            <div class="bg-red-800 border border-red-600 text-red-100 px-4 py-3 rounded mb-6">
+                <h4 class="font-medium mb-2">Please fix the following errors:</h4>
+                <ul class="list-disc list-inside text-sm">
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
         {{-- Form --}}
         <form method="POST" action="{{ route('suppliers.store') }}">
             @csrf
@@ -25,10 +51,11 @@
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-400 mb-1">Supplier Code *</label>
-                            <input type="text" name="code" value="{{ old('code') }}" required
+                            <label class="block text-sm font-medium text-gray-400 mb-1">Supplier Code</label>
+                            <input type="text" name="code" value="{{ old('code') }}"
                                    class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md @error('code') border-red-500 @enderror"
-                                   placeholder="e.g. SUP-001">
+                                   placeholder="Leave blank for auto-generated code (e.g. SUP-0001)">
+                            <p class="text-xs text-gray-500 mt-1">Auto-generated if left empty</p>
                             @error('code')
                                 <p class="text-red-400 text-xs mt-1">{{ $message }}</p>
                             @enderror
@@ -74,6 +101,26 @@
                                 <p class="text-red-400 text-xs mt-1">{{ $message }}</p>
                             @enderror
                         </div>
+                    </div>
+                    
+                    {{-- POS Integration Section --}}
+                    <div class="mt-4 p-4 bg-gray-750 rounded-md border border-gray-600">
+                        <div class="flex items-start space-x-3">
+                            <input type="checkbox" name="create_in_pos" id="create_in_pos" value="1" 
+                                   {{ old('create_in_pos') ? 'checked' : '' }}
+                                   class="mt-1 bg-gray-700 border-gray-600 text-blue-600 rounded focus:ring-blue-500 focus:ring-2">
+                            <div>
+                                <label for="create_in_pos" class="block text-sm font-medium text-gray-300">
+                                    Also create in POS system
+                                </label>
+                                <p class="text-xs text-gray-400 mt-1">
+                                    Check this if supplier provides products for sale. This allows products to be linked to this supplier in the POS system.
+                                </p>
+                            </div>
+                        </div>
+                        @error('create_in_pos')
+                            <p class="text-red-400 text-xs mt-1">{{ $message }}</p>
+                        @enderror
                     </div>
                     
                     <div class="mt-4">
@@ -302,7 +349,7 @@
                         Cancel
                     </a>
                     
-                    <button type="submit" 
+                    <button type="submit" id="submitBtn"
                             class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded">
                         Create Supplier
                     </button>
@@ -310,4 +357,12 @@
             </div>
         </form>
     </div>
+
+    <script>
+        document.querySelector('form').addEventListener('submit', function() {
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Creating...';
+        });
+    </script>
 </x-admin-layout>

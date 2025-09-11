@@ -68,7 +68,7 @@ class PosUnit extends Model
             'kg' => 'kilogram',
             'each' => 'each',
         ];
-        
+
         return $names[$this->units] ?? $this->units;
     }
 

@@ -843,6 +843,9 @@ class InvoiceController extends Controller
                 config('invoices.storage.disk')
             );
 
+            // Fix permissions for the created directory and file
+            $this->fixAttachmentPermissions($fullPath);
+
             // Generate file hash for integrity checking
             $fileContent = $uploadedFile->get();
             $fileHash = hash('sha256', $fileContent);
@@ -876,6 +879,76 @@ class InvoiceController extends Controller
 
             // Don't fail the entire invoice creation, just log the error
             // The invoice will be created without the attachment
+        }
+    }
+
+    /**
+     * Fix permissions for attachment files and directories
+     */
+    private function fixAttachmentPermissions(string $filePath): void
+    {
+        try {
+            // Get full system paths
+            $fullStoragePath = Storage::disk(config('invoices.storage.disk'))->path($filePath);
+            $directory = dirname($fullStoragePath);
+
+            // Fix directory permissions recursively
+            $this->fixDirectoryPermissions($directory);
+
+            // Fix file permissions
+            if (file_exists($fullStoragePath)) {
+                chmod($fullStoragePath, 0664);
+                try {
+                    chgrp($fullStoragePath, 'www-data');
+                } catch (\Exception $e) {
+                    Log::debug('Could not change file group ownership', [
+                        'file' => $fullStoragePath,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+        } catch (\Exception $e) {
+            Log::warning('Failed to set permissions for invoice attachment', [
+                'path' => $filePath,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Fix directory permissions recursively
+     */
+    private function fixDirectoryPermissions(string $directory): void
+    {
+        try {
+            // Set directory permissions (775 = rwxrwxr-x)
+            chmod($directory, 0775);
+
+            // Try to set group ownership if possible
+            try {
+                chgrp($directory, 'www-data');
+            } catch (\Exception $e) {
+                Log::debug('Could not change directory group ownership', [
+                    'directory' => $directory,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            // Also ensure parent directories have correct permissions
+            $parentDir = dirname($directory);
+            if (is_dir($parentDir) && $parentDir !== $directory) {
+                // Only process invoices subdirectories, not higher-level storage dirs
+                if (strpos($parentDir, '/invoices/') !== false) {
+                    $this->fixDirectoryPermissions($parentDir);
+                }
+            }
+
+        } catch (\Exception $e) {
+            Log::debug('Could not fix directory permissions', [
+                'directory' => $directory,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 }

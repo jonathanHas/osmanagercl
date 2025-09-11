@@ -164,6 +164,23 @@ class CashReconciliation extends Model
     }
 
     /**
+     * Get cash lodgements linked to this reconciliation
+     */
+    public function cashLodgements(): HasMany
+    {
+        return $this->hasMany(CashLodgementMatch::class)->with('cashLodgement');
+    }
+
+    /**
+     * Get the cash lodgement for this reconciliation's money_id
+     */
+    public function legacyCashLodgement(): BelongsTo
+    {
+        return $this->belongsTo(CashLodgement::class, 'closed_cash_id', 'money_id')
+            ->where('imported_from_legacy', true);
+    }
+
+    /**
      * Scope for filtering by date
      */
     public function scopeForDate($query, $date)
@@ -177,5 +194,101 @@ class CashReconciliation extends Model
     public function scopeForTill($query, $tillId)
     {
         return $query->where('till_id', $tillId);
+    }
+
+    /**
+     * Calculate cash available for lodgement (after float and supplier payments)
+     */
+    public function calculateAvailableToLodge(): float
+    {
+        $totalCash = $this->calculateTotalCash();
+        $totalFloat = $this->note_float + $this->coin_float;
+        $supplierPayments = $this->payments->sum('amount');
+
+        return max(0, $totalCash - $totalFloat - $supplierPayments);
+    }
+
+    /**
+     * Get the total supplier payments made from this till
+     */
+    public function getTotalSupplierPaymentsAttribute(): float
+    {
+        return $this->payments->sum('amount');
+    }
+
+    /**
+     * Get the total float (notes + coins)
+     */
+    public function getTotalFloatAttribute(): float
+    {
+        return $this->note_float + $this->coin_float;
+    }
+
+    /**
+     * Check if this reconciliation has a lodgement record
+     */
+    public function getHasLodgementAttribute(): bool
+    {
+        return $this->legacyCashLodgement !== null || $this->cashLodgements->count() > 0;
+    }
+
+    /**
+     * Get the lodged amount from legacy system
+     */
+    public function getLegacyLodgedAmountAttribute(): float
+    {
+        return $this->legacyCashLodgement?->total_amount ?? 0;
+    }
+
+    /**
+     * Check if this reconciliation is fully matched to lodgements
+     */
+    public function getIsFullyMatchedAttribute(): bool
+    {
+        $availableToLodge = $this->calculateAvailableToLodge();
+        $matchedAmount = $this->cashLodgements->sum('matched_amount');
+
+        return abs($availableToLodge - $matchedAmount) < 0.01;
+    }
+
+    /**
+     * Get variance between available cash and actual lodgement
+     */
+    public function getLodgementVarianceAttribute(): float
+    {
+        $availableToLodge = $this->calculateAvailableToLodge();
+        $legacyLodged = $this->legacy_lodged_amount;
+
+        return $legacyLodged - $availableToLodge;
+    }
+
+    /**
+     * Get lodgement variance as percentage
+     */
+    public function getLodgementVariancePercentageAttribute(): float
+    {
+        $availableToLodge = $this->calculateAvailableToLodge();
+
+        if ($availableToLodge == 0) {
+            return 0;
+        }
+
+        return (abs($this->lodgement_variance) / $availableToLodge) * 100;
+    }
+
+    /**
+     * Scope for reconciliations with lodgement data
+     */
+    public function scopeWithLodgements($query)
+    {
+        return $query->with(['legacyCashLodgement', 'cashLodgements.cashLodgement']);
+    }
+
+    /**
+     * Scope for reconciliations that haven't been matched to lodgements
+     */
+    public function scopeUnmatched($query)
+    {
+        return $query->whereDoesntHave('cashLodgements');
     }
 }

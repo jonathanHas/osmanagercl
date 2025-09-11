@@ -84,6 +84,58 @@ class Invoice extends Model
     }
 
     /**
+     * Get all bank transactions linked through allocations
+     */
+    public function bankTransactions()
+    {
+        return $this->belongsToMany(BankTransaction::class, 'bank_transaction_allocations')
+            ->withPivot('allocated_amount', 'allocation_type', 'notes', 'created_by')
+            ->withTimestamps();
+    }
+
+    /**
+     * Get all bank transaction allocations for this invoice
+     */
+    public function bankAllocations()
+    {
+        return $this->hasMany(BankTransactionAllocation::class);
+    }
+
+    /**
+     * Get the total amount of payments received through bank transactions
+     */
+    public function getTotalPaymentsReceivedAttribute()
+    {
+        return $this->bankAllocations->sum('allocated_amount');
+    }
+
+    /**
+     * Get the outstanding amount after all bank payments
+     */
+    public function getOutstandingAmountAttribute()
+    {
+        return $this->total_amount - $this->total_payments_received;
+    }
+
+    /**
+     * Check if invoice has been partially paid through bank allocations
+     */
+    public function hasPartialPayments()
+    {
+        $totalPayments = $this->total_payments_received;
+
+        return $totalPayments > 0 && $totalPayments < $this->total_amount;
+    }
+
+    /**
+     * Check if invoice is fully paid through bank allocations
+     */
+    public function isFullyPaidByBank()
+    {
+        return abs($this->outstanding_amount) < 0.01;
+    }
+
+    /**
      * Get the supplier for this invoice.
      */
     public function supplier(): BelongsTo

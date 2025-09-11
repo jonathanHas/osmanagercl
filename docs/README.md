@@ -6,6 +6,27 @@ Welcome to the comprehensive documentation for OSManager CL. This documentation 
 
 ## 🆕 Latest Updates (August-September 2025)
 
+### Bank Statement Analysis System (2025-09-09)
+Comprehensive POS vs Bank reconciliation system for accurate financial tracking and variance identification:
+
+- **📊 Daily Reconciliation Grid**: Side-by-side comparison of POS sales against bank lodgements with color-coded status indicators
+- **🤖 Automatic Pattern Detection**: Smart matching for exact amounts, weekend combining, and card settlement timing
+- **🔗 Manual Matching Interface**: Link specific POS days to bank transactions with full audit trail and confidence scoring
+- **📈 Variance Analysis**: Real-time calculation of discrepancies with significance indicators (€50+ or 5%+ variance)
+- **⚡ Performance Caching**: Pre-aggregated POS daily summaries for instant analysis and responsive interface
+- **📋 Export Functionality**: Professional CSV reports with variance analysis for accounting reconciliation
+- **🎯 Pattern Insights**: Learns lodgement patterns (same-day, next-day, weekend combinations) for better predictions
+- **🔍 Unmatched Transaction Tracking**: Clear identification of POS days and bank transactions requiring attention
+
+**Key Benefits**:
+- Validates data accuracy before feeding main Financial Overview Dashboard  
+- Identifies missing lodgements and timing discrepancies instantly
+- Provides stepping stone for troubleshooting financial data integrity
+- Supports multiple matching scenarios (exact, partial, combined, split deposits)
+- Tracks lodgement patterns for improved automatic matching over time
+
+See [Bank Statement Analysis System](./features/bank-statement-analysis.md) for complete details.
+
 ### Invoice Management Enhancements (2025-09-02)
 Enhanced invoice system with advanced sorting, comprehensive data export, and quick attachment viewing:
 
@@ -121,6 +142,49 @@ Comprehensive VAT return management dashboard with proactive alerts:
 - Comprehensive audit trail and export capabilities
 
 See [VAT Dashboard](./features/vat-dashboard.md) for complete details.
+
+### Bank Reconciliation System (2025-09-08)
+AI-powered bank transaction reconciliation with bulk auto-processing and intelligent pattern learning:
+
+- **🤖 Bulk Auto-Reconciliation**: AI system learns payment patterns and processes multiple transactions simultaneously
+  - **🧠 Machine Learning**: Automatically recognizes recurring payments (wages, fees, supplier bills) with confidence scoring
+  - **🎯 Visual Predictions**: Smart prediction badges showing confidence levels and expense categories with intuitive icons
+  - **👁️ Preview & Confirm**: Preview modal shows exactly what will be processed before bulk operations
+- **🔍 Advanced Search & Filtering**: Comprehensive transaction filtering and search capabilities
+  - **📝 Text Search**: Search descriptions, filenames, notes, amounts across all transactions
+  - **📊 Smart Filters**: Status, date range, amount range, and transaction type filtering
+  - **⚡ Real-time Results**: Instant search with debounced input for optimal performance
+- **📚 Intelligent Learning System**: Self-improving accuracy through successful match learning
+  - **🎯 Pattern Recognition**: Creates fingerprints from transaction descriptions for consistent matching
+  - **📈 Confidence Scoring**: Tracks and improves prediction accuracy over time (50-100% confidence)
+  - **🔄 Automatic Updates**: Each successful match increases rule confidence and match count
+- **✅ Seamless UI Integration**: Livewire-powered interface with real-time updates
+  - **☑️ Multi-Select Checkboxes**: Proper reactive binding for bulk transaction selection
+  - **🎨 Visual Status Indicators**: Color-coded prediction badges, selected transaction highlighting
+  - **📱 Mobile Optimized**: Responsive design works on tablets and mobile devices
+
+**Key Benefits**:
+- Process dozens of similar transactions in seconds instead of individually
+- Learn from patterns to improve accuracy over time (e.g., "Jessika Roeske SO" → 85% confidence wages)
+- Handle non-supplier expenses (wages, taxes, fees) without creating fake suppliers
+- Complete audit trail with user tracking and reconciliation history
+- Comprehensive search makes finding specific transaction patterns effortless
+
+See [Bank Reconciliation System](./features/bank-reconciliation-system.md) for complete details.
+
+### Bank Statement Analysis System (NEW! 2025-09-09)
+**Related to Bank Reconciliation** - POS vs Bank reconciliation system providing the data validation foundation for the Financial Overview Dashboard:
+
+- **📊 Daily Reconciliation Grid**: Compare POS sales against bank lodgements with variance analysis
+- **🤖 Smart Pattern Matching**: Automatic detection of exact matches, weekend combining, and card settlement timing
+- **🔗 Manual Matching Tools**: Link specific POS days to bank transactions with full audit trail
+- **⚡ Performance Optimized**: Pre-aggregated POS summaries with instant analysis capabilities
+- **📈 Variance Tracking**: Real-time identification of discrepancies requiring investigation
+- **📋 Professional Reports**: CSV export for accounting reconciliation with comprehensive data
+
+**Key Integration**: Provides validated financial data foundation before building the main Financial Overview Dashboard.
+
+See [Bank Statement Analysis System](./features/bank-statement-analysis.md) for complete details.
 
 ### Cash Reconciliation System (2025-08-11)
 Comprehensive end-of-day cash management with legacy data import:
@@ -371,6 +435,21 @@ Detailed documentation for each major feature.
 
 ### 🏢 Management Systems
 Administrative and operational management tools.
+
+- **[Bank Statement Analysis](./features/bank-statement-analysis.md)** - 🆕 POS vs Bank reconciliation system *(New)*
+  - Daily reconciliation grid comparing POS sales against bank lodgements
+  - Automatic pattern detection (exact matches, weekend combining, card settlements)
+  - Manual matching interface with audit trail and confidence scoring
+  - Variance analysis with significance indicators (€50+ or 5%+ variance)
+  - Pre-aggregated POS summaries for instant analysis
+  - Professional CSV reports for accounting reconciliation
+
+- **[Bank Reconciliation System](./features/bank-reconciliation-system.md)** - AI-powered transaction reconciliation *(Enhanced)*
+  - Bulk auto-reconciliation with machine learning pattern recognition
+  - Advanced search and filtering capabilities
+  - Intelligent learning system with confidence scoring
+  - Multi-select interface with real-time updates
+  - Non-supplier expense handling without fake suppliers
 
 - **[VAT Returns Management](./features/vat-returns.md)** - 🆕 Complete Irish Revenue VAT returns *(New)*
   - ROS-compliant VAT calculations (T1, T2, T3, T4, E1, E2)

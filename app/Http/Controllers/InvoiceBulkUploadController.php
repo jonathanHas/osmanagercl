@@ -8,7 +8,6 @@ use App\Models\InvoiceUploadFile;
 use App\Rules\RepairablePdf;
 use App\Services\AmazonPaymentAdjustmentService;
 use App\Services\InvoiceParsingService;
-use App\Services\PdfRepairService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -55,7 +54,7 @@ class InvoiceBulkUploadController extends Controller
                 'required',
                 'file',
                 "max:{$maxSizeKB}",
-                new RepairablePdf(),
+                new RepairablePdf,
             ],
         ], [
             'files.max' => "You can upload a maximum of {$maxFiles} files at once.",
@@ -666,7 +665,7 @@ class InvoiceBulkUploadController extends Controller
         if ($file->status !== 'failed') {
             return response()->json([
                 'success' => false,
-                'error' => 'Only failed files can be retried. Current status: ' . $file->status,
+                'error' => 'Only failed files can be retried. Current status: '.$file->status,
             ], 400);
         }
 
@@ -711,7 +710,7 @@ class InvoiceBulkUploadController extends Controller
 
             return response()->json([
                 'success' => false,
-                'error' => 'Failed to retry file: ' . $e->getMessage(),
+                'error' => 'Failed to retry file: '.$e->getMessage(),
             ], 500);
         }
     }

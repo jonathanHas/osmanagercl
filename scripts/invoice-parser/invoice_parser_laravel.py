@@ -22,7 +22,7 @@ from parsers import (
     dynamis, three, digitalocean, imbibe, openai, linode, jetbrains, independent,
     mossfield, slievebloom, garryhinch, oxigen, kellys, udea, breadelicious,
     kleepaper, ardu, vico, loughboora, coolnagrower, merrymill, flogas, 
-    oldyard_organics, amazon, default_parser
+    oldyard_organics, amazon, ecobike, default_parser
 )
 
 # Configure logging
@@ -80,6 +80,8 @@ def detect_supplier(text):
         return mossfield, "Mossfield"
     elif "OLDYARD ORGANICS" in upper_text:
         return oldyard_organics, "Oldyard Organics"
+    elif "ECOBIKE" in upper_text or "ECO-BIKE" in upper_text:
+        return ecobike, "EcoBike"
     else:
         return default_parser, "Unknown"
 

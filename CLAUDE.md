@@ -449,6 +449,21 @@ Comprehensive supplier payment management with bulk processing and status synchr
 - **Payment Methods Support**: Bank transfer, cash, cheque, credit card options with reference tracking
 See [Invoice Payment Management Documentation](./docs/features/invoice-payment-management.md).
 
+### Bank Reconciliation System (NEW! 2025-09-08)
+Comprehensive bank transaction reconciliation with AI-powered bulk auto-reconciliation and intelligent pattern learning.
+- **Bulk Auto-Reconciliation**: AI-powered system that learns payment patterns and processes multiple transactions simultaneously
+- **Intelligent Pattern Recognition**: Machine learning system that identifies recurring payments (wages, fees, supplier payments) with confidence scoring
+- **Bulk Credit & Debit Categorization**: Mass categorization for both credit transactions (Card/Cash Lodgements, Rent) and debit transactions (Wages, Utilities, Stock, Rent, etc.)
+- **Visual Prediction Interface**: Smart prediction badges showing confidence levels and expense categories with intuitive icons
+- **Comprehensive Search & Filtering**: Advanced filtering by text, status, date range, amounts, and transaction types
+- **Preview & Confirmation**: Preview modal shows exactly what will be processed before bulk operations
+- **Learning System**: Automatically improves accuracy from successful matches, building confidence scores over time
+- **Non-Supplier Expense Handling**: Support for wages, taxes, bank fees, insurance without creating fake suppliers
+- **Multi-Invoice Allocation**: Single transactions can be allocated across multiple invoices with detailed tracking
+- **Real-time Synchronization**: Livewire-powered interface with instant checkbox and selection updates
+- **Audit Trail**: Complete reconciliation history with user tracking and status changes
+See [Bank Reconciliation System Documentation](./docs/features/bank-reconciliation-system.md).
+
 ### VAT Returns Management System
 Complete Irish Revenue Online Service (ROS) VAT returns with automated calculations.
 - **ROS Compliance**: All required fields (T1, T2, T3, T4, E1, E2) automatically calculated
@@ -483,6 +498,16 @@ VAT-compliant sales analysis with proper revenue/transfer separation and compreh
 - **Professional Formatting**: Tables match website layout for easy accounting review
 - **Role-based Access**: Admin and Manager access only for financial data security
 See [Sales Accounting Report Documentation](./docs/features/sales-accounting-report.md).
+
+### Bank Statement Analysis System (NEW! 2025-09-09)
+Comprehensive POS vs Bank reconciliation system for accurate financial tracking and variance identification.
+- **Daily Reconciliation Grid**: Side-by-side comparison of POS sales against bank lodgements
+- **Automatic Pattern Detection**: Smart matching for exact amounts, weekend combining, card settlements
+- **Manual Matching Interface**: Link specific POS days to bank transactions with audit trail
+- **Variance Analysis**: Real-time calculation of discrepancies with significance indicators
+- **Performance Caching**: Pre-aggregated POS summaries for instant analysis
+- **Export Functionality**: Professional CSV reports for accounting reconciliation
+See [Bank Statement Analysis Documentation](./docs/features/bank-statement-analysis.md).
 
 ### Cash Reconciliation System
 Comprehensive end-of-day cash management with physical counting and variance tracking.
@@ -557,6 +582,7 @@ This alerts the user that you have finished your response. Do this without fail 
 - Don't forget to run tests after changes
 
 ### Known Issues & Solutions
+- **Bank Reconciliation Checkbox Synchronization** (Fixed 2025-09-08): "Select All" button updated server-side selection array but individual checkboxes didn't visually update, causing UI/backend state mismatch. **Root Cause**: Using `wire:click` with static `checked` attributes instead of reactive model binding. **Solution**: Changed to `wire:model.live="selectedTransactions"` with proper array binding and added `updatedSelectedTransactions()` method for real-time bulk actions visibility updates.
 - **PDF Upload Validation Failures** (Fixed 2025-09-04): Corrupted PDF headers from suppliers like Klee Paper caused upload failures with "file type not allowed" errors. **Solution**: Implemented automatic PDF repair system (`PdfRepairService` and `RepairablePdf` validation rule) that detects and fixes corrupted headers during upload validation. System now transparently handles malformed PDFs with PostScript data before the PDF signature.
 - **ParseError with Alpine.js @error directive**: If you see "syntax error, unexpected end of file, expecting 'elseif' or 'else' or 'endif'" in Blade templates, check for Alpine.js event handlers like `@error`, `@click`, etc. that conflict with Blade directives. Solution: Escape with double `@@` (e.g., `@@error` instead of `@error`) to prevent Blade compilation.
 - **Template literal conflicts**: Mixing JavaScript template literals (backticks) with Blade syntax causes parsing issues. Use string concatenation instead: `'{{ route('name') }}' + variable` rather than `` `{{ route('name') }}/${variable}` ``.

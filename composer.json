@@ -10,6 +10,7 @@
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
         "league/csv": "^9.24",
+        "livewire/livewire": "^3.6",
         "picqer/php-barcode-generator": "^3.2"
     },
     "require-dev": {
