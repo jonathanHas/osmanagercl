@@ -121,6 +121,30 @@ $stockQuantity = $product->getCurrentStock(); // Returns float
 - `Address`, `PostCode`, `Country` - Address information
 - `Supplier_Type_ID` - Supplier type classification
 
+#### Laravel-POS Supplier Integration (NEW! 2025-09-11)
+The unified supplier management system enables seamless integration between Laravel and POS suppliers:
+
+**Bi-Directional Creation:**
+- Create suppliers in both Laravel and POS databases simultaneously
+- Laravel interface checkbox: "Also create in POS system"
+- Automatic ID mapping: `SUP` + 6-digit Laravel ID (e.g., `SUP001274`)
+
+**Database Separation:**
+- **Laravel Database (Port 3306)**: `accounting_suppliers` table
+- **POS Database (Port 3307)**: `suppliers` table
+
+**Synchronization Features:**
+- Name changes in Laravel sync to POS automatically
+- Status tracking via `is_pos_linked` flag
+- Transaction-safe operations ensure data integrity
+
+**Integration Fields:**
+```php
+// In accounting_suppliers table
+external_pos_id     // Links to POS SupplierID
+is_pos_linked       // Boolean flag for POS integration status
+```
+
 #### Relationships
 ```php
 // One-to-one with supplier link

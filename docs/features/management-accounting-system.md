@@ -196,35 +196,88 @@ CREATE TABLE cost_categories (
     INDEX idx_code (code)
 );
 
--- Enhanced suppliers table for invoice management
-CREATE TABLE suppliers (
+-- Enhanced suppliers table for invoice management (IMPLEMENTED 2025-09-11)
+-- Now using 'accounting_suppliers' table with full POS integration
+CREATE TABLE accounting_suppliers (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    code VARCHAR(50) NOT NULL UNIQUE,
+    code VARCHAR(50) NOT NULL UNIQUE,           -- Auto-generated SUP-0001, SUP-0002
     name VARCHAR(255) NOT NULL,
     
     -- Contact details
     address TEXT NULL,
     phone VARCHAR(50) NULL,
+    phone_secondary VARCHAR(50) NULL,
+    fax VARCHAR(50) NULL,
     email VARCHAR(255) NULL,
     website VARCHAR(255) NULL,
+    contact_person VARCHAR(255) NULL,
     
     -- Financial details
     vat_number VARCHAR(50) NULL,
+    company_registration VARCHAR(50) NULL,
+    tax_reference VARCHAR(50) NULL,
     default_vat_code VARCHAR(20) NULL,
     default_expense_category VARCHAR(50) NULL,
     payment_terms_days INT DEFAULT 30,
+    bank_account VARCHAR(50) NULL,
+    sort_code VARCHAR(20) NULL,
+    preferred_payment_method ENUM('bacs','cheque','card','cash','other') NULL,
     
-    -- Integration
-    external_id VARCHAR(100) NULL,        -- ID in external system
-    integration_type VARCHAR(50) NULL,    -- 'manual', 'api', 'email'
+    -- Business classification
+    supplier_type ENUM('product','service','utility','professional','other') DEFAULT 'other',
+    status ENUM('active','inactive','suspended','archived') DEFAULT 'active',
+    country_code VARCHAR(2) NULL,              -- For EU suppliers
+    is_eu_supplier BOOLEAN DEFAULT FALSE,      -- VAT return integration
+    
+    -- POS Integration (NEW! 2025-09-11)
+    external_pos_id VARCHAR(50) NULL,          -- Links to POS suppliers.SupplierID
+    is_pos_linked BOOLEAN DEFAULT FALSE,       -- POS integration flag
+    
+    -- Legacy system integration
+    external_osaccounts_id VARCHAR(100) NULL,  -- OSAccounts system ID
+    is_osaccounts_linked BOOLEAN DEFAULT FALSE,
+    osaccounts_last_sync TIMESTAMP NULL,
+    
+    -- Analytics (auto-calculated)
+    total_spent DECIMAL(12,2) DEFAULT 0,
+    invoice_count INT DEFAULT 0,
+    last_invoice_date DATE NULL,
+    last_payment_date DATE NULL,
+    average_invoice_value DECIMAL(10,2) DEFAULT 0,
+    days_since_last_order INT NULL,
+    
+    -- Audit trail
+    created_by BIGINT UNSIGNED NULL,
+    updated_by BIGINT UNSIGNED NULL,
+    notes TEXT NULL,
+    tags JSON NULL,
+    delivery_instructions TEXT NULL,
     
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
+    -- Indexes
     INDEX idx_name (name),
-    INDEX idx_vat_number (vat_number)
+    INDEX idx_code (code),
+    INDEX idx_vat_number (vat_number),
+    INDEX idx_supplier_type (supplier_type),
+    INDEX idx_status (status),
+    INDEX idx_pos_linked (is_pos_linked),
+    INDEX idx_external_pos_id (external_pos_id),
+    INDEX idx_last_invoice_date (last_invoice_date),
+    INDEX idx_supplier_type_status (supplier_type, status),
+    
+    -- Foreign keys
+    FOREIGN KEY (created_by) REFERENCES users(id),
+    FOREIGN KEY (updated_by) REFERENCES users(id)
 );
+
+-- POS Integration: Suppliers also created in POS database (port 3307)
+-- POS suppliers table structure:
+-- SupplierID VARCHAR     -- Generated as SUP + 6-digit Laravel ID
+-- Supplier VARCHAR       -- Synced from accounting_suppliers.name
+-- Phone, Email, Address  -- Optional contact fields
 ```
 
 ### Models & Relationships

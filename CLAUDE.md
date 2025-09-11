@@ -394,6 +394,18 @@ Real-time coffee order tracking system for baristas with optimized performance.
 - **No Queue Dependencies**: Direct polling eliminates queue worker requirements
 See [KDS Documentation](./docs/features/kds-coffee-system.md).
 
+### Unified Supplier Management System (NEW! 2025-09-11)
+Complete supplier management with seamless POS integration and auto-code generation.
+- **Auto-Generated Codes**: Automatic supplier codes (SUP-0001, SUP-0002) with manual override option
+- **POS Integration**: Optional checkbox to create suppliers in both Laravel and POS databases simultaneously
+- **Cross-Database Sync**: Creates entries in both accounting (port 3306) and POS (port 3307) databases
+- **Smart Validation**: Default payment terms (30 days) and comprehensive error handling
+- **User Feedback**: Loading states, success/error messages, and detailed validation errors
+- **Edit Integration**: Link existing suppliers to POS or update POS names when changed
+- **Transaction Safety**: All operations wrapped in database transactions for data integrity
+- **Role-based Access**: Protected routes with appropriate permissions
+See [Supplier Management Documentation](./docs/features/supplier-management.md).
+
 ### OSAccounts Integration System
 Complete invoice and supplier data migration from legacy OSAccounts system.
 - **Supplier Sync Command**: Automatic mapping of POS IDs to OSAccounts IDs

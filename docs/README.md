@@ -6,6 +6,29 @@ Welcome to the comprehensive documentation for OSManager CL. This documentation 
 
 ## 🆕 Latest Updates (August-September 2025)
 
+### Unified Supplier Management System (2025-09-11)
+Complete supplier management with seamless POS integration and intelligent auto-code generation:
+
+- **🔄 Auto-Generated Codes**: Sequential supplier codes (SUP-0001, SUP-0002) with manual override capability
+- **🔗 POS Integration**: Optional checkbox to create suppliers in both Laravel and POS databases simultaneously  
+- **🎯 Cross-Database Sync**: Creates entries in both accounting (port 3306) and POS (port 3307) databases with proper linking
+- **⚡ Smart Validation**: Automatic payment terms defaulting (30 days) and comprehensive error handling with specific messages
+- **💬 Enhanced User Feedback**: Loading states, success/error messages, and detailed validation errors for better UX
+- **📝 Edit Integration**: Link existing suppliers to POS or update POS names when changed in Laravel
+- **🔒 Transaction Safety**: All operations wrapped in database transactions for complete data integrity
+- **🎨 Visual Indicators**: Color-coded status displays (purple for POS-linked, blue for linkable suppliers)
+- **📋 Form Enhancements**: Clear placeholders, auto-focus, disabled states during processing
+- **🔍 Error Specificity**: Detailed error messages for duplicate codes, database issues, POS connection problems
+
+**Key Benefits**:
+- Single entry point for suppliers available across entire system (accounting + POS)
+- Eliminates duplicate data entry and ensures consistency between systems
+- Automatic code generation prevents human errors and ensures uniqueness
+- Flexible integration - choose which suppliers need POS presence based on type
+- Real-time synchronization keeps supplier names in sync across databases
+
+See [Supplier Management System](./features/supplier-management.md) for complete implementation details.
+
 ### Bank Statement Analysis System (2025-09-09)
 Comprehensive POS vs Bank reconciliation system for accurate financial tracking and variance identification:
 
@@ -435,6 +458,14 @@ Detailed documentation for each major feature.
 
 ### 🏢 Management Systems
 Administrative and operational management tools.
+
+- **[Supplier Management](./features/supplier-management.md)** - 🆕 Unified supplier management with POS integration *(New 2025-09-11)*
+  - Auto-generated sequential supplier codes (SUP-0001, SUP-0002)
+  - Optional POS database integration with checkbox selection
+  - Cross-database synchronization (accounting + POS systems)
+  - Enhanced user feedback with loading states and detailed error messages
+  - Transaction-safe operations with comprehensive validation
+  - Smart defaults and intelligent form handling
 
 - **[Bank Statement Analysis](./features/bank-statement-analysis.md)** - 🆕 POS vs Bank reconciliation system *(New)*
   - Daily reconciliation grid comparing POS sales against bank lodgements

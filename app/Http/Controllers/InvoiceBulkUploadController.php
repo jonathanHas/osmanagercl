@@ -755,23 +755,48 @@ class InvoiceBulkUploadController extends Controller
             abort(404, 'File not found or not viewable');
         }
 
-        // Get the full path to the temp file
-        $filePath = $file->temp_file_path;
+        // Check if download is requested
+        $isDownload = request()->has('download');
+        $disposition = $isDownload ? 'attachment' : 'inline';
+
+        // Handle document conversion for viewing
+        if ($file->isDocument()) {
+            // Try to get existing converted PDF first
+            $convertedPdfPath = $file->getConvertedPdfPath();
+            
+            // If no converted PDF exists, convert on-the-fly
+            if (!$convertedPdfPath) {
+                $conversionService = new \App\Services\DocumentConversionService();
+                $tempPath = $file->temp_file_path;
+                $outputDir = dirname($tempPath);
+                
+                $convertedPdfPath = $conversionService->convertToPdf($tempPath, $outputDir);
+                
+                if (!$convertedPdfPath) {
+                    abort(500, 'Unable to convert document for viewing');
+                }
+            }
+            
+            $filePath = $convertedPdfPath;
+            $contentType = 'application/pdf';
+            $displayFilename = pathinfo($file->original_filename, PATHINFO_FILENAME) . '.pdf';
+        } else {
+            // Handle regular files (PDFs and images)
+            $filePath = $file->temp_file_path;
+            $contentType = $file->mime_type;
+            $displayFilename = $file->original_filename;
+        }
 
         if (! file_exists($filePath)) {
             abort(404, 'File not found on disk');
         }
 
-        // Check if download is requested
-        $isDownload = request()->has('download');
-        $disposition = $isDownload ? 'attachment' : 'inline';
-
         // Return file response
         $fileContent = file_get_contents($filePath);
 
         return response($fileContent, 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => $disposition.'; filename="'.$file->original_filename.'"',
+            'Content-Type' => $contentType,
+            'Content-Disposition' => $disposition.'; filename="'.$displayFilename.'"',
             'Cache-Control' => 'private, max-age=600',
         ]);
     }

@@ -113,6 +113,11 @@ class InvoiceUploadFile extends Model
             'image/jpeg',
             'image/png',
             'image/tiff',
+            // Document types that can be converted to PDF for viewing
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ];
 
         return in_array($this->mime_type, $viewableMimes);
@@ -162,6 +167,28 @@ class InvoiceUploadFile extends Model
     public function isDocument(): bool
     {
         return $this->isWordDocument() || $this->isExcelDocument();
+    }
+
+    /**
+     * Get the converted PDF path if it exists for documents.
+     */
+    public function getConvertedPdfPath(): ?string
+    {
+        if (!$this->isDocument()) {
+            return null;
+        }
+
+        // Check if converted PDF exists in the same directory
+        $tempPath = $this->temp_file_path;
+        if (!$tempPath || !file_exists($tempPath)) {
+            return null;
+        }
+
+        $directory = dirname($tempPath);
+        $filename = pathinfo($this->stored_filename, PATHINFO_FILENAME);
+        $pdfPath = $directory . '/' . $filename . '.pdf';
+
+        return file_exists($pdfPath) ? $pdfPath : null;
     }
 
     /**
