@@ -225,10 +225,10 @@ class LabelAreaController extends Controller
         $eventsByBarcode = $candidateEvents->groupBy('barcode');
 
         foreach ($eventsByBarcode as $barcode => $events) {
-            // Get the most recent print event for this barcode (last 7 days)
+            // Get the most recent print event for this barcode (last 30 days - matching the event window)
             $mostRecentPrint = LabelLog::where('barcode', $barcode)
                 ->where('event_type', LabelLog::EVENT_LABEL_PRINT)
-                ->where('created_at', '>=', now()->subDays(7))
+                ->where('created_at', '>=', now()->subDays(30))
                 ->orderBy('created_at', 'desc')
                 ->first();
 
@@ -289,10 +289,10 @@ class LabelAreaController extends Controller
         $eventsByBarcode = $candidateEvents->groupBy('barcode');
 
         foreach ($eventsByBarcode as $barcode => $events) {
-            // Get the most recent print event for this barcode (last 7 days)
+            // Get the most recent print event for this barcode (last 30 days - matching the event window)
             $mostRecentPrint = LabelLog::where('barcode', $barcode)
                 ->where('event_type', LabelLog::EVENT_LABEL_PRINT)
-                ->where('created_at', '>=', now()->subDays(7))
+                ->where('created_at', '>=', now()->subDays(30))
                 ->orderBy('created_at', 'desc')
                 ->first();
 
