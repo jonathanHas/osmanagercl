@@ -73,6 +73,7 @@ Navigate to **Management → Bank Statements → Analysis** or visit `/managemen
 ### Setting Date Range
 - Default: Last 30 days
 - Custom range: Use date picker inputs
+- Quick selection buttons: Current Month, Previous Month, Last 3 Months, This Year
 - Recommended: Review monthly periods for accounting alignment
 
 ### Understanding Status Codes
@@ -206,6 +207,11 @@ Cross-references with:
 - Clear old cache entries
 - Verify database indexes on date columns
 
+**Quick Date Selection Off by One Day** (Fixed 2025-09-11)
+- Issue was timezone conversion in JavaScript formatDate function
+- toISOString() converted local dates to UTC, causing day shifts
+- Fixed by using local date formatting without timezone conversion
+
 ### Data Validation
 Regular checks recommended:
 - Compare POS totals to till reports
@@ -230,5 +236,5 @@ Submit enhancement requests through the standard development process with:
 ---
 
 **Access Level**: Admin, Manager  
-**Last Updated**: 2025-09-09  
-**Version**: 1.0
+**Last Updated**: 2025-09-11  
+**Version**: 1.1
