@@ -14,8 +14,11 @@ use App\Repositories\SalesRepository;
 use App\Services\TillVisibilityService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Intervention\Image\Drivers\Gd\Driver as GdDriver;
+use Intervention\Image\ImageManager;
 
 class FruitVegController extends Controller
 {
@@ -788,14 +791,24 @@ class FruitVegController extends Controller
             }
         }
 
-        // Check for cache-busting parameter - if present, reduce cache time
-        $cacheTime = $request->has('t') ? 300 : 86400; // 5 minutes vs 24 hours
+        $etag = '"' . md5($imageData) . '"';
+
+        if ($request->headers->get('If-None-Match') === $etag) {
+            return response('', 304, [
+                'ETag' => $etag,
+                'Cache-Control' => 'public, max-age=0, must-revalidate',
+            ]);
+        }
+
+        // Cache busting parameter hints if the UI explicitly asked for a fresh image
+        $cacheTime = $request->has('t') ? 300 : 0; // 5 minutes when requested, otherwise force revalidation
 
         // Return the image from the database
         return response($imageData, 200, [
             'Content-Type' => $contentType,
-            'Cache-Control' => "public, max-age={$cacheTime}",
-            'Last-Modified' => gmdate('D, d M Y H:i:s T', $request->get('t', time() - 86400)),
+            'Cache-Control' => "public, max-age={$cacheTime}, must-revalidate",
+            'ETag' => $etag,
+            'Last-Modified' => gmdate('D, d M Y H:i:s T'),
         ]);
     }
 
@@ -920,8 +933,20 @@ class FruitVegController extends Controller
 
         if ($request->hasFile('image')) {
             $imageFile = $request->file('image');
-            $imageData = file_get_contents($imageFile->path());
-            $mimeType = $imageFile->getMimeType();
+
+            $imageManager = new ImageManager(new GdDriver());
+            $image = $imageManager->read($imageFile->getRealPath());
+
+            $image->resize(64, 64, function ($constraint) {
+                $constraint->aspectRatio();
+                $constraint->upsize();
+            });
+
+            $encodedImage = $image->encodeByExtension($this->determineImageExtension($imageFile));
+            $imageData = $encodedImage->toString();
+            $mimeType = $encodedImage->mediaType();
+            $resizedWidth = $image->width();
+            $resizedHeight = $image->height();
 
             // Start transaction on POS database connection
             DB::connection('pos')->beginTransaction();
@@ -944,6 +969,8 @@ class FruitVegController extends Controller
                     'product_id' => $product->ID,
                     'image_size_bytes' => strlen($imageData),
                     'mime_type' => $mimeType,
+                    'width' => $resizedWidth,
+                    'height' => $resizedHeight,
                 ]);
 
                 return response()->json([
@@ -970,6 +997,32 @@ class FruitVegController extends Controller
         }
 
         return response()->json(['success' => false, 'error' => 'No image file provided']);
+    }
+
+    /**
+     * Resolve the target file extension for encoding resized uploads.
+     */
+    private function determineImageExtension(UploadedFile $file): string
+    {
+        $extension = strtolower($file->getClientOriginalExtension() ?: '');
+
+        $normalizedExtension = match ($extension) {
+            'jpeg', 'jpg' => 'jpg',
+            'png' => 'png',
+            'gif' => 'gif',
+            default => null,
+        };
+
+        if ($normalizedExtension) {
+            return $normalizedExtension;
+        }
+
+        return match ($file->getMimeType()) {
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            default => 'png',
+        };
     }
 
     /**
