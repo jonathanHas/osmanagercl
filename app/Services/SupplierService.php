@@ -23,11 +23,23 @@ class SupplierService
     /**
      * Check if a supplier has external integration enabled.
      */
-    public function hasExternalIntegration(?int $supplierId): bool
+    public function hasExternalIntegration(int|string|null $supplierId): bool
     {
-        if (! $supplierId) {
+        if (is_string($supplierId)) {
+            $supplierId = trim($supplierId);
+        }
+
+        if ($supplierId === null || $supplierId === '') {
             return false;
         }
+
+        $normalizedId = filter_var($supplierId, FILTER_VALIDATE_INT);
+
+        if ($normalizedId === false || $normalizedId === 0) {
+            return false;
+        }
+
+        $supplierId = (int) $normalizedId;
 
         foreach ($this->config as $supplier => $settings) {
             if ($settings['enabled'] && in_array($supplierId, $settings['supplier_ids'])) {

@@ -170,14 +170,37 @@
         .btn-secondary:hover {
             background: #4b5563;
         }
+
+        .print-note {
+            margin: 80px 20px 20px;
+            background: #ecfdf5;
+            border-left: 4px solid #10b981;
+            padding: 12px 16px;
+            border-radius: 8px;
+            color: #047857;
+            max-width: 360px;
+            box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.2);
+        }
     </style>
 </head>
 <body>
     <div class="print-controls no-print">
         <button onclick="window.print()" class="btn">Print Labels</button>
-        <button onclick="markAsPrinted()" class="btn btn-secondary">Mark All as Printed</button>
+        @if($showMarkAsPrinted ?? false)
+        <button data-action="mark-as-printed" onclick="markAsPrinted()" class="btn btn-secondary">Mark All as Printed</button>
+        @endif
         <a href="{{ route('fruit-veg.labels') }}" class="btn btn-secondary">Back to Labels</a>
     </div>
+
+    @if(isset($printedBatch))
+    <div class="print-note no-print">
+        <strong class="block text-sm font-semibold">Batch recorded</strong>
+        <p class="mt-1 text-xs leading-snug">
+            We cleared {{ $printedBatch->product_count }} {{ \Illuminate\Support\Str::plural('label', $printedBatch->product_count) }} from the queue at {{ $printedBatch->printed_at->format('d M Y H:i') }}.
+            Use “Restore Last Print” on the labels page if you need them again.
+        </p>
+    </div>
+    @endif
 
     @php
         $chunks = $products->chunk(16); // 16 labels per page (4x4 grid)
@@ -253,12 +276,20 @@
         // Auto-print on load
         window.onload = function() {
             scaleProductNames();
-            // Uncomment the line below to enable auto-print
-            // window.print();
+
+            if (@json($autoPrint ?? false)) {
+                setTimeout(() => window.print(), 200);
+            }
         }
 
         async function markAsPrinted() {
             if (!confirm('Mark all these labels as printed?')) return;
+
+            const markButton = document.querySelector('button[data-action="mark-as-printed"]');
+            if (markButton) {
+                markButton.disabled = true;
+                markButton.textContent = 'Marking...';
+            }
 
             try {
                 const productCodes = @json($products->pluck('CODE'));
@@ -274,15 +305,24 @@
                     })
                 });
 
-                if (response.ok) {
-                    alert('Labels marked as printed successfully!');
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    alert(data.message || 'Labels marked as printed successfully!');
                     window.location.href = '{{ route('fruit-veg.labels') }}';
                 } else {
-                    alert('Failed to mark labels as printed');
+                    const fallbackMessage = 'Failed to mark labels as printed';
+                    const message = data && (data.message || data.error) ? (data.message || data.error) : fallbackMessage;
+                    alert(message);
                 }
             } catch (error) {
                 console.error('Error:', error);
                 alert('An error occurred');
+            } finally {
+                if (markButton) {
+                    markButton.disabled = false;
+                    markButton.textContent = 'Mark All as Printed';
+                }
             }
         }
     </script>

@@ -281,8 +281,24 @@ All endpoints require user authentication via Laravel's session-based auth middl
 
 **Response**: HTML preview of labels ready for printing
 
+### POST /labels/print
+**Description**: Generate the printable label sheet, clear the queue, and persist the print batch.
+
+**Request Body** *(optional)*:
+```json
+{
+  "products": ["F001", "F002"]
+}
+```
+
+**Response**: HTML print view (auto-print friendly)
+
+**Side Effects**:
+- Creates a `veg_label_print_batches` record with the printed codes
+- Removes the printed products from `veg_print_queue`
+
 ### POST /labels/printed
-**Description**: Mark labels as printed and remove from print queue
+**Description**: Mark labels as printed and remove them from the print queue without rendering the print view (used by the preview page button).
 
 **Request Body**:
 ```json
@@ -294,13 +310,25 @@ All endpoints require user authentication via Laravel's session-based auth middl
 **Response**:
 ```json
 {
-  "success": true
+  "success": true,
+  "message": "Labels marked as printed successfully.",
+  "cleared_count": 2,
+  "batch_id": 18
 }
 ```
 
 **Side Effects**:
-- Removes specified products from `veg_print_queue`
-- If no products specified, clears entire print queue
+- Creates a `veg_label_print_batches` record for auditing/restoration
+- Removes the specified products from `veg_print_queue` (or all queued products if none specified)
+
+### POST /labels/restore-last
+**Description**: Restore the most recently printed batch back into the queue.
+
+**Response**: Redirects back to `/fruit-veg/labels` with a flash message.
+
+**Side Effects**:
+- Re-adds every product code from the latest `veg_label_print_batches` entry into `veg_print_queue`
+- Updates the batch `restored_at` timestamp for traceability
 
 ---
 

@@ -8,6 +8,7 @@ use App\Models\PosUnit;
 use App\Models\Product;
 use App\Models\VegClass;
 use App\Models\VegDetails;
+use App\Models\VegLabelPrintBatch;
 use App\Models\VegPrintQueue;
 use App\Repositories\OptimizedSalesRepository;
 use App\Repositories\SalesRepository;
@@ -336,25 +337,17 @@ class FruitVegController extends Controller
      */
     public function labels()
     {
-        // Get products needing labels
         $printQueue = VegPrintQueue::getQueuedProductCodes();
+        $productsNeedingLabels = $this->loadLabelProducts($printQueue);
 
-        $productsNeedingLabels = Product::whereIn('CODE', $printQueue)
-            ->with(['category', 'vegDetails.country', 'vegDetails.vegUnit', 'vegDetails.vegClass'])
-            ->get()
-            ->map(function ($product) {
-                // Get current price from price history or product
-                $lastPriceRecord = DB::table('veg_price_history')
-                    ->where('product_code', $product->CODE)
-                    ->orderBy('changed_at', 'desc')
-                    ->first();
+        $lastPrintedBatch = VegLabelPrintBatch::latest('printed_at')->first();
+        $lastPrintedProducts = collect();
 
-                $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
+        if ($lastPrintedBatch && ! empty($lastPrintedBatch->product_codes)) {
+            $lastPrintedProducts = $this->loadLabelProducts($lastPrintedBatch->product_codes);
+        }
 
-                return $product;
-            });
-
-        return view('fruit-veg.labels', compact('productsNeedingLabels'));
+        return view('fruit-veg.labels', compact('productsNeedingLabels', 'lastPrintedBatch', 'lastPrintedProducts'));
     }
 
     /**
@@ -369,22 +362,51 @@ class FruitVegController extends Controller
             $productCodes = VegPrintQueue::getQueuedProductCodes();
         }
 
-        $products = Product::whereIn('CODE', $productCodes)
-            ->with(['category', 'vegDetails.country', 'vegDetails.vegUnit', 'vegDetails.vegClass'])
-            ->get()
-            ->map(function ($product) {
-                // Get current price from price history or product
-                $lastPriceRecord = DB::table('veg_price_history')
-                    ->where('product_code', $product->CODE)
-                    ->orderBy('changed_at', 'desc')
-                    ->first();
+        $products = $this->loadLabelProducts($productCodes);
 
-                $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
+        if ($products->isEmpty()) {
+            return redirect()->route('fruit-veg.labels')->with('error', 'No products available for preview.');
+        }
 
-                return $product;
-            });
+        return view('fruit-veg.label-preview', [
+            'products' => $products,
+            'autoPrint' => false,
+            'showMarkAsPrinted' => true,
+            'printedBatch' => null,
+        ]);
+    }
 
-        return view('fruit-veg.label-preview', compact('products'));
+    /**
+     * Print F&V labels and clear the queue.
+     */
+    public function printLabels(Request $request)
+    {
+        $productCodes = $request->input('products', []);
+
+        if (empty($productCodes)) {
+            $productCodes = VegPrintQueue::getQueuedProductCodes();
+        }
+
+        $productCodes = $this->sanitizeProductCodes($productCodes);
+
+        if (empty($productCodes)) {
+            return redirect()->route('fruit-veg.labels')->with('error', 'No products available to print.');
+        }
+
+        $products = $this->loadLabelProducts($productCodes);
+
+        if ($products->isEmpty()) {
+            return redirect()->route('fruit-veg.labels')->with('error', 'No valid products found to print.');
+        }
+
+        $printedBatch = $this->recordPrintedBatch($productCodes);
+
+        return view('fruit-veg.label-preview', [
+            'products' => $products,
+            'autoPrint' => true,
+            'showMarkAsPrinted' => false,
+            'printedBatch' => $printedBatch,
+        ]);
     }
 
     /**
@@ -395,14 +417,27 @@ class FruitVegController extends Controller
         $productCodes = $request->input('products', []);
 
         if (empty($productCodes)) {
-            // Clear all from print queue
-            VegPrintQueue::clearQueue();
-        } else {
-            // Clear specific products from print queue
-            VegPrintQueue::removeMultipleFromQueue($productCodes);
+            $productCodes = VegPrintQueue::getQueuedProductCodes();
         }
 
-        return response()->json(['success' => true]);
+        $productCodes = $this->sanitizeProductCodes($productCodes);
+
+        if (empty($productCodes)) {
+            return response()->json([
+                'success' => true,
+                'message' => 'No labels were pending printing.',
+                'cleared_count' => 0,
+            ]);
+        }
+
+        $batch = $this->recordPrintedBatch($productCodes);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Labels marked as printed successfully.',
+            'cleared_count' => $batch->product_count,
+            'batch_id' => $batch->id,
+        ]);
     }
 
     /**
@@ -413,6 +448,32 @@ class FruitVegController extends Controller
         VegPrintQueue::clearQueue();
 
         return redirect()->route('fruit-veg.labels')->with('success', 'All labels cleared from print queue.');
+    }
+
+    /**
+     * Restore the most recent printed batch back into the queue.
+     */
+    public function restoreLastPrintedBatch()
+    {
+        $lastBatch = VegLabelPrintBatch::latest('printed_at')->first();
+
+        if (! $lastBatch) {
+            return redirect()->route('fruit-veg.labels')->with('error', 'No printed batches are available to restore.');
+        }
+
+        $productCodes = $this->sanitizeProductCodes($lastBatch->product_codes ?? []);
+
+        if (empty($productCodes)) {
+            return redirect()->route('fruit-veg.labels')->with('error', 'The last printed batch did not contain any products to restore.');
+        }
+
+        foreach ($productCodes as $code) {
+            VegPrintQueue::addToQueue($code, 'restored_last_print');
+        }
+
+        $lastBatch->update(['restored_at' => now()]);
+
+        return redirect()->route('fruit-veg.labels')->with('success', 'Restored '.count($productCodes).' products from the last printed batch.');
     }
 
     /**
@@ -455,6 +516,69 @@ class FruitVegController extends Controller
         VegPrintQueue::addToQueue($productCode, 'manual_add');
 
         return response()->json(['success' => true, 'message' => 'Product added to print queue.']);
+    }
+
+    /**
+     * Ensure product codes are unique and non-empty.
+     */
+    private function sanitizeProductCodes(array $productCodes): array
+    {
+        $filtered = array_filter($productCodes, fn ($code) => is_string($code) && $code !== '');
+
+        return array_values(array_unique($filtered));
+    }
+
+    /**
+     * Load products with the relationships required for label rendering.
+     */
+    private function loadLabelProducts(array $productCodes)
+    {
+        $productCodes = $this->sanitizeProductCodes($productCodes);
+
+        if (empty($productCodes)) {
+            return collect();
+        }
+
+        $products = Product::whereIn('CODE', $productCodes)
+            ->with(['category', 'vegDetails.country', 'vegDetails.vegUnit', 'vegDetails.vegClass'])
+            ->get()
+            ->map(function ($product) {
+                $lastPriceRecord = DB::table('veg_price_history')
+                    ->where('product_code', $product->CODE)
+                    ->orderBy('changed_at', 'desc')
+                    ->first();
+
+                $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
+
+                return $product;
+            });
+
+        $order = array_flip($productCodes);
+
+        return $products->sortBy(fn ($product) => $order[$product->CODE] ?? PHP_INT_MAX)->values();
+    }
+
+    /**
+     * Persist a printed batch and clear the relevant queue entries.
+     */
+    private function recordPrintedBatch(array $productCodes): VegLabelPrintBatch
+    {
+        $productCodes = $this->sanitizeProductCodes($productCodes);
+
+        if (empty($productCodes)) {
+            throw new \InvalidArgumentException('Cannot record a print batch without product codes.');
+        }
+
+        $batch = VegLabelPrintBatch::create([
+            'product_codes' => $productCodes,
+            'product_count' => count($productCodes),
+            'printed_at' => now(),
+            'user_id' => Auth::id(),
+        ]);
+
+        VegPrintQueue::removeMultipleFromQueue($productCodes);
+
+        return $batch;
     }
 
     /**

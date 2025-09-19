@@ -270,6 +270,11 @@ VegPrintQueue::addToQueue($productCode, $reason);
 VegPrintQueue::removeFromQueue($productCode);
 VegPrintQueue::getQueuedProductCodes();
 VegPrintQueue::clearQueue();
+
+#### VegLabelPrintBatch
+- Records every printed batch so we can audit clears and restore the last set of labels.
+- Schema columns: `id`, `product_codes` (JSON array), `product_count`, `printed_at`, `restored_at`, `user_id`, timestamps.
+- `VegLabelPrintBatch::latest('printed_at')->first()` is used by the UI to surface the last printable group.
 ```
 
 #### Product (Enhanced)
@@ -336,7 +341,9 @@ VegClass::orderBy('sort_order')->get();
 **Label System**
 - `labels()` - Label printing interface
 - `previewLabels()` - Label preview functionality
+- `printLabels()` - Print queued labels, record batch, and clear queue automatically
 - `markLabelsPrinted()` - Clear items from print queue
+- `restoreLastPrintedBatch()` - Requeue the most recent printed batch for re-printing
 
 **Sales Analytics (Enhanced 2025)**
 - `sales()` - Enhanced sales dashboard with advanced navigation and overview chart
@@ -374,7 +381,9 @@ Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
     Route::post('/prices/update', [FruitVegController::class, 'updatePrice'])->name('prices.update');
     Route::get('/labels', [FruitVegController::class, 'labels'])->name('labels');
     Route::get('/labels/preview', [FruitVegController::class, 'previewLabels'])->name('labels.preview');
+    Route::post('/labels/print', [FruitVegController::class, 'printLabels'])->name('labels.print');
     Route::post('/labels/printed', [FruitVegController::class, 'markLabelsPrinted'])->name('labels.printed');
+    Route::post('/labels/restore-last', [FruitVegController::class, 'restoreLastPrintedBatch'])->name('labels.restore-last');
     Route::post('/display/update', [FruitVegController::class, 'updateDisplay'])->name('display.update');
     Route::post('/country/update', [FruitVegController::class, 'updateCountry'])->name('country.update');
     Route::post('/unit/update', [FruitVegController::class, 'updateUnit'])->name('unit.update');

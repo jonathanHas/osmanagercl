@@ -178,8 +178,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/manage', [FruitVegController::class, 'manage'])->name('manage');
         Route::get('/labels', [FruitVegController::class, 'labels'])->name('labels');
         Route::get('/labels/preview', [FruitVegController::class, 'previewLabels'])->name('labels.preview');
+        Route::post('/labels/print', [FruitVegController::class, 'printLabels'])->name('labels.print');
         Route::post('/labels/printed', [FruitVegController::class, 'markLabelsPrinted'])->name('labels.printed');
         Route::post('/labels/clear-all', [FruitVegController::class, 'clearAllLabels'])->name('labels.clear-all');
+        Route::post('/labels/restore-last', [FruitVegController::class, 'restoreLastPrintedBatch'])->name('labels.restore-last');
         Route::post('/labels/remove', [FruitVegController::class, 'removeFromLabels'])->name('labels.remove');
         Route::post('/labels/add', [FruitVegController::class, 'addToLabels'])->name('labels.add');
         Route::post('/display/update', [FruitVegController::class, 'updateDisplay'])->name('display.update');

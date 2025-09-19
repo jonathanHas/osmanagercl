@@ -87,6 +87,6 @@ class VegPrintQueue extends Model
      */
     public static function getQueuedProductCodes(): array
     {
-        return self::pluck('product_code')->toArray();
+        return self::orderBy('added_at')->pluck('product_code')->toArray();
     }
 }

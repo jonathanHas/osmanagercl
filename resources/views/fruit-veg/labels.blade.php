@@ -12,6 +12,53 @@
 
     <div class="py-6">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            @if(session('success'))
+            <div class="mb-6 rounded-lg bg-green-50 border-l-4 border-green-500 p-4 text-sm text-green-700">
+                {{ session('success') }}
+            </div>
+            @endif
+
+            @if(session('error'))
+            <div class="mb-6 rounded-lg bg-red-50 border-l-4 border-red-500 p-4 text-sm text-red-700">
+                {{ session('error') }}
+            </div>
+            @endif
+
+            @if(isset($lastPrintedBatch) && ($lastPrintedBatch->product_count ?? 0) > 0)
+            <div class="bg-white rounded-lg shadow mb-6 p-6">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div>
+                        <h3 class="text-lg font-medium text-gray-900">Last Printed Batch</h3>
+                        <p class="mt-1 text-sm text-gray-500">
+                            Printed {{ $lastPrintedBatch->printed_at->diffForHumans() }} · {{ $lastPrintedBatch->product_count }} {{ \Illuminate\Support\Str::plural('label', $lastPrintedBatch->product_count) }}
+                        </p>
+                        @if($lastPrintedProducts->isNotEmpty())
+                        <p class="mt-2 text-sm text-gray-500">
+                            Includes: {{ $lastPrintedProducts->take(5)->pluck('NAME')->join(', ') }}@if($lastPrintedBatch->product_count > 5) and {{ $lastPrintedBatch->product_count - 5 }} more@endif
+                        </p>
+                        @endif
+                        @if($lastPrintedBatch->restored_at)
+                        <p class="mt-2 text-xs text-gray-400">
+                            Last restored {{ $lastPrintedBatch->restored_at->diffForHumans() }}
+                        </p>
+                        @endif
+                    </div>
+                    <div class="flex gap-3">
+                        <form action="{{ route('fruit-veg.labels.restore-last') }}" method="POST" onsubmit="return confirm('Restore the last printed batch back into the queue?')">
+                            @csrf
+                            <button type="submit" 
+                                    class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                                <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                Restore Last Print
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            @endif
+
             <!-- Action Buttons -->
             @if($productsNeedingLabels->count() > 0)
             <div class="bg-white rounded-lg shadow mb-6 p-6">
@@ -19,7 +66,7 @@
                     <div>
                         <h3 class="text-lg font-medium text-gray-900">Products Needing Labels</h3>
                         <p class="mt-1 text-sm text-gray-500">
-                            {{ $productsNeedingLabels->count() }} products need labels printed
+                            {{ $productsNeedingLabels->count() }} products currently queued for printing
                         </p>
                     </div>
                     <div class="flex gap-3">
@@ -32,13 +79,15 @@
                             </svg>
                             Preview All Labels
                         </a>
-                        <form action="{{ route('fruit-veg.labels.preview') }}" method="GET" target="_blank" class="inline">
+                        <form action="{{ route('fruit-veg.labels.print') }}" method="POST" target="_blank" class="inline">
+                            @csrf
                             <button type="submit" 
-                                    class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                                    class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                                    title="Opens a printable page and clears these labels from the queue.">
                                 <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                 </svg>
-                                Print All Labels
+                                Print &amp; Clear All Labels
                             </button>
                         </form>
                         <form action="{{ route('fruit-veg.labels.clear-all') }}" method="POST" class="inline" onsubmit="return confirm('Are you sure you want to clear all labels from the print queue? This cannot be undone.')">
