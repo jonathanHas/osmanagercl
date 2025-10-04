@@ -246,14 +246,37 @@
                                         <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                                             @if($product->isService())
                                                 <span class="text-gray-500 dark:text-gray-400">N/A</span>
-                                            @elseif($product->stockCurrent)
-                                                <span class="text-green-600 dark:text-green-400 font-semibold">{{ number_format($product->stockCurrent->UNITS, 1) }}</span>
-                                                @if($product->stockCurrent->LOCATION && $product->stockCurrent->LOCATION !== '0')
-                                                    <br><small class="text-gray-400 dark:text-gray-500">{{ $product->stockCurrent->LOCATION }}</small>
-                                                @endif
                                             @else
-                                                <span class="text-gray-400 dark:text-gray-500">0.0</span>
-                                                <br><small class="text-red-400 dark:text-red-500">No stock record</small>
+                                                <div x-data="{
+                                                        editing: false,
+                                                        stockUnits: {{ $product->stockCurrent ? $product->stockCurrent->UNITS : 0 }},
+                                                        originalStock: {{ $product->stockCurrent ? $product->stockCurrent->UNITS : 0 }},
+                                                        hasStockRecord: {{ $product->stockCurrent ? 'true' : 'false' }}
+                                                     }">
+                                                    <div x-show="!editing"
+                                                         @@click="editing = true; $nextTick(() => $refs.stockInput.select())"
+                                                         class="cursor-pointer hover:bg-blue-50 dark:hover:bg-gray-700 px-2 py-1 rounded transition-colors">
+                                                        <span :class="stockUnits > 0 ? 'text-green-600 dark:text-green-400 font-semibold' : 'text-gray-400 dark:text-gray-500'"
+                                                              x-text="parseFloat(stockUnits).toFixed(1)"></span>
+                                                        
+                                                        @if($product->stockCurrent && $product->stockCurrent->LOCATION && $product->stockCurrent->LOCATION !== '0')
+                                                            <small class="text-gray-400 dark:text-gray-500 block">{{ $product->stockCurrent->LOCATION }}</small>
+                                                        @endif
+                                                        <span x-show="!hasStockRecord" class="text-xs text-red-400 dark:text-red-500 block">No stock record</span>
+                                                    </div>
+                                                    <div x-show="editing" x-cloak class="flex items-center gap-1">
+                                                        <input type="number"
+                                                               x-ref="stockInput"
+                                                               x-model="stockUnits"
+                                                               step="0.1"
+                                                               min="0"
+                                                               max="9999.99"
+                                                               @@keyup.enter="updateStock('{{ $product->ID }}', stockUnits).then((success) => { if(success) { hasStockRecord = true; editing = false; originalStock = stockUnits; } })"
+                                                               @@keyup.escape="editing = false; stockUnits = originalStock"
+                                                               @@blur="updateStock('{{ $product->ID }}', stockUnits).then((success) => { if(success) { hasStockRecord = true; editing = false; originalStock = stockUnits; } })"
+                                                               class="w-20 text-sm border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded focus:ring-indigo-500 focus:border-indigo-500">
+                                                    </div>
+                                                </div>
                                             @endif
                                         </td>
                                         <td class="px-4 py-4 whitespace-nowrap text-sm font-medium">
@@ -296,7 +319,7 @@
             // Get the show suppliers checkbox and supplier dropdown
             const showSuppliersCheckbox = document.querySelector('input[name="show_suppliers"]');
             const supplierDropdown = document.getElementById('supplier-dropdown');
-            
+
             if (showSuppliersCheckbox && supplierDropdown) {
                 // Add event listener to toggle supplier dropdown
                 showSuppliersCheckbox.addEventListener('change', function() {
@@ -313,6 +336,55 @@
                 });
             }
         });
+
+        // Function to update stock via AJAX
+        async function updateStock(productId, stockUnits) {
+            try {
+                const response = await fetch('/products/' + productId + '/update-stock', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ stock_units: stockUnits })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    showToast('Stock updated successfully', 'success');
+                    return true;
+                } else {
+                    showToast(data.error || data.message || 'Failed to update stock', 'error');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error updating stock:', error);
+                showToast('Failed to update stock: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        // Function to show toast notifications
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg text-white transform transition-all duration-300 ${
+                type === 'success' ? 'bg-green-500' :
+                type === 'error' ? 'bg-red-500' :
+                'bg-blue-500'
+            }`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            // Animate in
+            setTimeout(() => toast.classList.add('opacity-100'), 10);
+
+            // Remove after 3 seconds
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
     </script>
     @endpush
 </x-admin-layout>

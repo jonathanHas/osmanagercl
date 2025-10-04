@@ -34,7 +34,10 @@
                         </p>
                         @if($lastPrintedProducts->isNotEmpty())
                         <p class="mt-2 text-sm text-gray-500">
-                            Includes: {{ $lastPrintedProducts->take(5)->pluck('NAME')->join(', ') }}@if($lastPrintedBatch->product_count > 5) and {{ $lastPrintedBatch->product_count - 5 }} more@endif
+                            Includes: {{ $lastPrintedProducts->take(5)->pluck('NAME')->join(', ') }}
+                            @if($lastPrintedBatch->product_count > 5)
+                                and {{ $lastPrintedBatch->product_count - 5 }} more
+                            @endif
                         </p>
                         @endif
                         @if($lastPrintedBatch->restored_at)
