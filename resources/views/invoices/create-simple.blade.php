@@ -4,16 +4,143 @@
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-2xl font-bold text-gray-100">Create Invoice (Simple)</h2>
             <div class="flex space-x-2">
-                <a href="{{ route('invoices.create') }}" 
+                <a href="{{ route('invoices.create') }}"
                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded text-sm">
                     Detailed Invoice
                 </a>
-                <a href="{{ route('invoices.index') }}" 
+                <a href="{{ route('invoices.index') }}"
                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
                     Back to Invoices
                 </a>
             </div>
         </div>
+
+        {{-- Success Banner for Invoice Created --}}
+        @if(session('invoice_created'))
+            @php
+                $invoice = session('invoice_created');
+            @endphp
+            <div class="mb-6 bg-green-900/30 border border-green-700 rounded-lg p-4">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                    <div class="ml-3 flex-1">
+                        <h3 class="text-sm font-medium text-green-400">Invoice Created Successfully!</h3>
+                        <div class="mt-2 text-sm text-green-300">
+                            <p>
+                                <strong>{{ $invoice['invoice_number'] }}</strong> for
+                                <strong>€{{ number_format($invoice['total_amount'], 2) }}</strong>
+                                ({{ $invoice['supplier_name'] }}) on {{ $invoice['invoice_date'] }}
+                            </p>
+                        </div>
+                        <div class="mt-3 flex space-x-3">
+                            <a href="{{ route('invoices.show', $invoice['id']) }}"
+                               class="text-sm font-medium text-green-400 hover:text-green-300 underline">
+                                View Invoice →
+                            </a>
+                            <a href="{{ route('invoices.create-simple') }}"
+                               class="text-sm font-medium text-gray-400 hover:text-gray-300">
+                                Clear Supplier
+                            </a>
+                        </div>
+                    </div>
+                    <div class="ml-auto pl-3">
+                        <div class="flex items-center">
+                            <button type="button"
+                                    onclick="this.closest('.bg-green-900\\/30').remove()"
+                                    class="inline-flex rounded-md text-green-400 hover:text-green-300 focus:outline-none">
+                                <span class="sr-only">Dismiss</span>
+                                <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        {{-- Duplicate Warning Banner --}}
+        @if(session('duplicate_found'))
+            @php
+                $duplicates = session('duplicate_found')['invoices'];
+            @endphp
+            <div class="mb-6 bg-yellow-900/30 border border-yellow-700 rounded-lg p-4">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                    <div class="ml-3 flex-1">
+                        <h3 class="text-sm font-medium text-yellow-400">Possible Duplicate Invoice Detected!</h3>
+                        <div class="mt-2 text-sm text-yellow-300">
+                            <p class="mb-2">The following similar invoice(s) already exist:</p>
+                            <ul class="list-disc list-inside space-y-1">
+                                @foreach($duplicates as $dup)
+                                    <li>
+                                        <strong>{{ $dup['invoice_number'] }}</strong> -
+                                        {{ $dup['supplier_name'] }} -
+                                        {{ $dup['invoice_date'] }} -
+                                        €{{ number_format($dup['total_amount'], 2) }}
+                                        <a href="{{ route('invoices.show', $dup['id']) }}"
+                                           class="text-yellow-200 hover:text-yellow-100 underline ml-2"
+                                           target="_blank">
+                                            View →
+                                        </a>
+                                    </li>
+                                @endforeach
+                            </ul>
+                            <p class="mt-3 text-xs text-yellow-400">
+                                <strong>Detection criteria:</strong> Same supplier, within ±1 day, within ±€0.50
+                            </p>
+                        </div>
+                        <div class="mt-4 flex space-x-3">
+                            <button type="button"
+                                    onclick="document.getElementById('force-create-form').submit()"
+                                    class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded text-sm">
+                                Create Anyway
+                            </button>
+                            <button type="button"
+                                    onclick="window.location.href='{{ route('invoices.create-simple') }}'"
+                                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded text-sm">
+                                Start Fresh
+                            </button>
+                        </div>
+                    </div>
+                    <div class="ml-auto pl-3">
+                        <div class="flex items-center">
+                            <button type="button"
+                                    onclick="this.closest('.bg-yellow-900\\/30').remove()"
+                                    class="inline-flex rounded-md text-yellow-400 hover:text-yellow-300 focus:outline-none">
+                                <span class="sr-only">Dismiss</span>
+                                <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Hidden form for force creation --}}
+            <form id="force-create-form" method="POST" action="{{ route('invoices.store-simple') }}" style="display: none;">
+                @csrf
+                <input type="hidden" name="force" value="1">
+                @foreach(old() as $key => $value)
+                    @if(is_array($value))
+                        @foreach($value as $k => $v)
+                            <input type="hidden" name="{{ $key }}[{{ $k }}]" value="{{ $v }}">
+                        @endforeach
+                    @else
+                        <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                    @endif
+                @endforeach
+            </form>
+        @endif
 
         <form method="POST" action="{{ route('invoices.store-simple') }}" @submit.prevent="submitForm" enctype="multipart/form-data">
             @csrf
@@ -333,6 +460,16 @@
                 
                 // Watch for supplier changes and auto-populate supplier name
                 init() {
+                    // Check for supplier_id in query parameter (from previous submission)
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const supplierIdFromUrl = urlParams.get('supplier_id');
+
+                    if (supplierIdFromUrl && this.suppliers[supplierIdFromUrl]) {
+                        // Pre-select the supplier from previous invoice
+                        this.supplierId = supplierIdFromUrl;
+                        this.supplierName = this.suppliers[supplierIdFromUrl];
+                    }
+
                     this.$watch('supplierId', (value) => {
                         if (value && this.suppliers[value]) {
                             this.supplierName = this.suppliers[value];

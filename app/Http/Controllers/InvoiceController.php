@@ -282,6 +282,8 @@ class InvoiceController extends Controller
                 'max:'.(config('invoices.bulk_upload.max_file_size_mb') * 1024), // Convert MB to KB
                 new RepairablePdf, // This handles both file validation and PDF repair
             ],
+            // Force create duplicate
+            'force' => 'nullable|boolean',
         ]);
 
         // Get supplier defaults if supplier is selected
@@ -296,6 +298,33 @@ class InvoiceController extends Controller
                     $validated['due_date'] = Carbon::parse($validated['invoice_date'])
                         ->addDays($supplier->payment_terms_days);
                 }
+            }
+        }
+
+        // Check for duplicate invoices (unless force is true)
+        if (! ($request->input('force') == 1)) {
+            $duplicates = $this->checkForDuplicates(
+                $validated['supplier_id'],
+                $validated['supplier_name'],
+                $validated['invoice_date'],
+                $validated['total_amount']
+            );
+
+            if ($duplicates->isNotEmpty()) {
+                // Found duplicate(s), redirect back with warning
+                return redirect()->back()
+                    ->withInput()
+                    ->with('duplicate_found', [
+                        'invoices' => $duplicates->map(function ($invoice) {
+                            return [
+                                'id' => $invoice->id,
+                                'invoice_number' => $invoice->invoice_number,
+                                'supplier_name' => $invoice->supplier_name,
+                                'invoice_date' => $invoice->invoice_date->format('d/m/Y'),
+                                'total_amount' => $invoice->total_amount,
+                            ];
+                        })->toArray(),
+                    ]);
             }
         }
 
@@ -335,8 +364,15 @@ class InvoiceController extends Controller
                 $this->handleInvoiceAttachment($invoice, $request->file('invoice_document'));
             }
 
-            return redirect()->route('invoices.show', $invoice)
-                ->with('success', 'Invoice created successfully.');
+            // Redirect back to create form with supplier preserved for batch entry
+            return redirect()->route('invoices.create-simple', ['supplier_id' => $validated['supplier_id']])
+                ->with('invoice_created', [
+                    'id' => $invoice->id,
+                    'invoice_number' => $invoice->invoice_number,
+                    'supplier_name' => $invoice->supplier_name,
+                    'total_amount' => $invoice->total_amount,
+                    'invoice_date' => $invoice->invoice_date->format('d/m/Y'),
+                ]);
         });
     }
 
@@ -955,5 +991,46 @@ class InvoiceController extends Controller
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Check for duplicate invoices based on supplier, date, and amount.
+     *
+     * Duplicates are defined as invoices with:
+     * - Same supplier (by ID or name)
+     * - Invoice date within ±1 day
+     * - Total amount within ±€0.50
+     *
+     * @param  int|null  $supplierId
+     * @param  string  $supplierName
+     * @param  string  $invoiceDate
+     * @param  float  $totalAmount
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    private function checkForDuplicates($supplierId, $supplierName, $invoiceDate, $totalAmount)
+    {
+        $date = Carbon::parse($invoiceDate);
+        $dateStart = $date->copy()->subDay();
+        $dateEnd = $date->copy()->addDay();
+
+        $amountMin = $totalAmount - 0.50;
+        $amountMax = $totalAmount + 0.50;
+
+        $query = Invoice::query();
+
+        // Match by supplier ID if available, otherwise by supplier name
+        if ($supplierId) {
+            $query->where('supplier_id', $supplierId);
+        } else {
+            $query->where('supplier_name', $supplierName);
+        }
+
+        // Match by date range (±1 day)
+        $query->whereBetween('invoice_date', [$dateStart, $dateEnd]);
+
+        // Match by amount range (±€0.50)
+        $query->whereBetween('total_amount', [$amountMin, $amountMax]);
+
+        return $query->get();
     }
 }
