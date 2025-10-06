@@ -19,46 +19,62 @@
         @if(session('invoice_created'))
             @php
                 $invoice = session('invoice_created');
+                $supplierName = $invoice['supplier_name'] ?? 'No supplier selected';
             @endphp
-            <div class="mb-6 bg-green-900/30 border border-green-700 rounded-lg p-4">
-                <div class="flex items-start">
-                    <div class="flex-shrink-0">
-                        <svg class="h-6 w-6 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                        </svg>
-                    </div>
-                    <div class="ml-3 flex-1">
-                        <h3 class="text-sm font-medium text-green-400">Invoice Created Successfully!</h3>
-                        <div class="mt-2 text-sm text-green-300">
-                            <p>
-                                <strong>{{ $invoice['invoice_number'] }}</strong> for
-                                <strong>€{{ number_format($invoice['total_amount'], 2) }}</strong>
-                                ({{ $invoice['supplier_name'] }}) on {{ $invoice['invoice_date'] }}
-                            </p>
-                        </div>
-                        <div class="mt-3 flex space-x-3">
-                            <a href="{{ route('invoices.show', $invoice['id']) }}"
-                               class="text-sm font-medium text-green-400 hover:text-green-300 underline">
-                                View Invoice →
-                            </a>
-                            <a href="{{ route('invoices.create-simple') }}"
-                               class="text-sm font-medium text-gray-400 hover:text-gray-300">
-                                Clear Supplier
-                            </a>
-                        </div>
-                    </div>
-                    <div class="ml-auto pl-3">
-                        <div class="flex items-center">
-                            <button type="button"
-                                    onclick="this.closest('.bg-green-900\\/30').remove()"
-                                    class="inline-flex rounded-md text-green-400 hover:text-green-300 focus:outline-none">
-                                <span class="sr-only">Dismiss</span>
-                                <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+            <div class="mb-6" data-invoice-banner>
+                <div class="relative overflow-hidden rounded-2xl border border-emerald-500/40 bg-gradient-to-r from-emerald-950 via-emerald-900/95 to-emerald-800/90 p-5 shadow-xl">
+                    <div class="pointer-events-none absolute -top-16 -right-8 h-40 w-40 rounded-full bg-emerald-500/20 blur-3xl"></div>
+                    <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex items-start gap-4">
+                            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-300 ring-1 ring-inset ring-emerald-400/40">
+                                <svg class="h-7 w-7" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
                                 </svg>
-                            </button>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-emerald-300/80">Invoice saved</p>
+                                <h3 class="text-lg font-semibold text-emerald-100">{{ $invoice['invoice_number'] }} created</h3>
+                                <p class="mt-1 text-sm text-emerald-100/80">
+                                    Total <span class="font-semibold text-white">€{{ number_format($invoice['total_amount'], 2) }}</span>
+                                    for <span class="font-medium text-white/90">{{ $supplierName }}</span> on
+                                    <span class="text-white/80">{{ $invoice['invoice_date'] }}</span>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                            <div class="grid w-full grid-cols-1 gap-3 text-sm text-emerald-200 sm:w-auto sm:grid-cols-2">
+                                <div class="rounded-xl border border-emerald-400/20 bg-emerald-950/60 px-4 py-3 shadow-inner">
+                                    <p class="text-xs uppercase tracking-wide text-emerald-300/70">Supplier</p>
+                                    <p class="mt-1 font-medium text-white/90">{{ $supplierName }}</p>
+                                </div>
+                                <div class="rounded-xl border border-emerald-400/20 bg-emerald-950/60 px-4 py-3 shadow-inner">
+                                    <p class="text-xs uppercase tracking-wide text-emerald-300/70">Invoice Date</p>
+                                    <p class="mt-1 font-medium text-white/90">{{ $invoice['invoice_date'] }}</p>
+                                </div>
+                            </div>
+
+                            <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                                <a href="{{ route('invoices.show', $invoice['id']) }}"
+                                   class="inline-flex items-center justify-center rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20">
+                                    View Invoice
+                                </a>
+                                <a href="{{ route('invoices.create-simple') }}"
+                                   class="inline-flex items-center justify-center rounded-lg border border-emerald-400/40 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:border-emerald-300 hover:text-white">
+                                    Start Fresh
+                                </a>
+                            </div>
                         </div>
                     </div>
+
+                    <button type="button"
+                            onclick="this.closest('[data-invoice-banner]').remove()"
+                            class="absolute right-3 top-3 rounded-full p-2 text-emerald-200 transition hover:bg-white/10 hover:text-white focus:outline-none">
+                        <span class="sr-only">Dismiss</span>
+                        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                        </svg>
+                    </button>
                 </div>
             </div>
         @endif
