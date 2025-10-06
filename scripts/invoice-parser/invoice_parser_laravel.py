@@ -21,8 +21,8 @@ from parse_doc_file import parse_doc_file
 from parsers import (
     dynamis, three, digitalocean, imbibe, openai, linode, jetbrains, independent,
     mossfield, slievebloom, garryhinch, oxigen, kellys, udea, breadelicious,
-    kleepaper, ardu, vico, loughboora, coolnagrower, merrymill, flogas, 
-    oldyard_organics, amazon, ecobike, dunany_flour, default_parser
+    kleepaper, ardu, vico, loughboora, coolnagrower, merrymill, flogas,
+    oldyard_organics, amazon, ecobike, dunany_flour, beechlawn, default_parser
 )
 
 # Configure logging
@@ -84,6 +84,8 @@ def detect_supplier(text):
         return ecobike, "EcoBike"
     elif "DUNANY FLOUR" in upper_text or "DUNANY FLOUR ORGANIC" in upper_text:
         return dunany_flour, "Dunany Flour"
+    elif "BEECHLAWN" in upper_text or "BEECHLAWN ORGANIC FARM" in upper_text:
+        return beechlawn, "Beechlawn"
     else:
         return default_parser, "Unknown"
 
