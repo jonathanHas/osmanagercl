@@ -120,3 +120,44 @@ def extract_data_from_xls(filename):
     except Exception as e:
         logging.error(f"An unexpected error occurred while processing XLS file {filename}: {e}")
         return ""
+
+def extract_text_from_image(image_path):
+    """
+    Extracts text from an image file (JPEG, PNG) using OCR.
+    Includes preprocessing to improve OCR accuracy for handwritten or low-quality images.
+    Returns: (text, extraction_method)
+    """
+    from PIL import Image, ImageEnhance, ImageFilter
+
+    logging.info(f"Extracting text from image: {image_path}")
+
+    try:
+        # Load the image
+        image = Image.open(image_path)
+
+        # Preprocess the image for better OCR accuracy
+        # Convert to grayscale
+        image = image.convert('L')
+
+        # Enhance contrast
+        enhancer = ImageEnhance.Contrast(image)
+        image = enhancer.enhance(2.0)
+
+        # Sharpen the image
+        image = image.filter(ImageFilter.SHARPEN)
+
+        # Perform OCR with configuration optimized for invoices
+        # --psm 6: Assume a single uniform block of text
+        # --oem 3: Use both legacy and LSTM OCR engine
+        text = pytesseract.image_to_string(image, config='--psm 6 --oem 3')
+
+        if not text.strip():
+            logging.warning(f"OCR extracted no text from {image_path}. Check image quality.")
+            return "", "ocr_failed"
+
+        logging.info(f"Successfully extracted {len(text)} characters from image.")
+        return text, "image_ocr"
+
+    except Exception as e:
+        logging.error(f"Image OCR extraction failed for {image_path}: {e}")
+        return "", "ocr_failed"

@@ -371,11 +371,165 @@
                                     </span>
                                     @endif
                                     @if($file->status === 'parsed' || $file->status === 'review')
-                                    <button onclick="viewParsedData({{ $file->id }})" 
+                                    <button onclick="viewParsedData({{ $file->id }})"
                                             class="text-green-400 hover:text-green-300 text-sm">
                                         View Data
                                     </button>
                                     @endif
+                                    <button x-data onclick="document.getElementById('edit-form-{{ $file->id }}').classList.toggle('hidden')"
+                                            class="text-blue-400 hover:text-blue-300 text-sm ml-2">
+                                        <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                        </svg>
+                                        Edit/Enter Data
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {{-- Collapsible Edit Form Row --}}
+                        <tr id="edit-form-{{ $file->id }}" class="hidden bg-gray-700/50">
+                            <td colspan="5" class="p-6">
+                                <div class="bg-gray-800 rounded-lg p-6">
+                                    <h4 class="text-lg font-semibold text-gray-100 mb-4">
+                                        Edit/Enter Invoice Data - {{ $file->original_filename }}
+                                    </h4>
+
+                                    <form id="parsed-data-form-{{ $file->id }}" onsubmit="saveParsedData(event, {{ $file->id }}, '{{ $batch->batch_id }}')">
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {{-- Supplier Selection --}}
+                                            <div class="col-span-2">
+                                                <label class="block text-sm font-medium text-gray-300 mb-2">
+                                                    Supplier <span class="text-red-400">*</span>
+                                                </label>
+                                                <select name="supplier_name"
+                                                        id="supplier_dropdown_{{ $file->id }}"
+                                                        class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:border-blue-500 focus:outline-none"
+                                                        onchange="if(this.value) document.getElementById('supplier_custom_{{ $file->id }}').value = ''"
+                                                        required>
+                                                    <option value="">-- Select Supplier or Type New --</option>
+                                                    @foreach($suppliers as $supplier)
+                                                        <option value="{{ $supplier->name }}"
+                                                                {{ ($file->supplier_detected == $supplier->name || ($file->parsed_data['supplier_name'] ?? '') == $supplier->name) ? 'selected' : '' }}>
+                                                            {{ $supplier->name }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                                <p class="text-xs text-gray-400 mt-1">Or type a new supplier name directly</p>
+                                                @php
+                                                    // Only pre-populate custom field if supplier is not in dropdown
+                                                    $detectedSupplier = $file->supplier_detected ?? ($file->parsed_data['supplier_name'] ?? '');
+                                                    $isInDropdown = $suppliers->contains('name', $detectedSupplier);
+                                                    $customFieldValue = !$isInDropdown ? $detectedSupplier : '';
+                                                @endphp
+                                                <input type="text"
+                                                       name="supplier_name_custom"
+                                                       id="supplier_custom_{{ $file->id }}"
+                                                       placeholder="Or type new supplier name"
+                                                       class="w-full px-3 py-2 mt-2 bg-gray-700 border border-gray-600 rounded text-white focus:border-blue-500 focus:outline-none text-sm"
+                                                       oninput="if(this.value) { this.form.supplier_name.value = this.value; document.getElementById('supplier_dropdown_{{ $file->id }}').value = ''; }"
+                                                       value="{{ $customFieldValue }}">
+                                            </div>
+
+                                            {{-- Supplier Invoice Reference --}}
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-300 mb-2">
+                                                    Supplier Invoice Reference
+                                                    <span class="text-xs text-gray-400 font-normal">(optional)</span>
+                                                </label>
+                                                <input type="text"
+                                                       name="supplier_invoice_reference"
+                                                       value="{{ $file->parsed_invoice_number ?? ($file->parsed_data['supplier_invoice_reference'] ?? '') }}"
+                                                       placeholder="e.g., INV-2024-001234"
+                                                       class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:border-blue-500 focus:outline-none">
+                                                <p class="text-xs text-gray-400 mt-1">The supplier's original invoice number (if available)</p>
+                                            </div>
+
+                                            {{-- Invoice Date --}}
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-300 mb-2">Invoice Date</label>
+                                                <input type="date"
+                                                       name="invoice_date"
+                                                       value="{{ $file->parsed_invoice_date ?? ($file->parsed_data['invoice_date'] ?? '') }}"
+                                                       class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:border-blue-500 focus:outline-none">
+                                            </div>
+
+                                            {{-- VAT 0% Net --}}
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-300 mb-2">VAT 0% (Net Amount)</label>
+                                                <input type="number"
+                                                       step="0.01"
+                                                       min="0"
+                                                       name="vat_0_net"
+                                                       value="{{ $file->parsed_data['vat_breakdown']['vat_0']['net'] ?? 0 }}"
+                                                       class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:border-blue-500 focus:outline-none">
+                                            </div>
+
+                                            {{-- VAT 9% Net --}}
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-300 mb-2">VAT 9% (Net Amount)</label>
+                                                <input type="number"
+                                                       step="0.01"
+                                                       min="0"
+                                                       name="vat_9_net"
+                                                       value="{{ $file->parsed_data['vat_breakdown']['vat_9']['net'] ?? 0 }}"
+                                                       class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:border-blue-500 focus:outline-none">
+                                            </div>
+
+                                            {{-- VAT 13.5% Net --}}
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-300 mb-2">VAT 13.5% (Net Amount)</label>
+                                                <input type="number"
+                                                       step="0.01"
+                                                       min="0"
+                                                       name="vat_13_5_net"
+                                                       value="{{ $file->parsed_data['vat_breakdown']['vat_13_5']['net'] ?? 0 }}"
+                                                       class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:border-blue-500 focus:outline-none">
+                                            </div>
+
+                                            {{-- VAT 23% Net --}}
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-300 mb-2">VAT 23% (Net Amount)</label>
+                                                <input type="number"
+                                                       step="0.01"
+                                                       min="0"
+                                                       name="vat_23_net"
+                                                       value="{{ $file->parsed_data['vat_breakdown']['vat_23']['net'] ?? 0 }}"
+                                                       class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:border-blue-500 focus:outline-none">
+                                            </div>
+
+                                            {{-- Checkboxes --}}
+                                            <div class="col-span-2 flex space-x-6">
+                                                <label class="flex items-center text-sm text-gray-300">
+                                                    <input type="checkbox"
+                                                           name="is_tax_free"
+                                                           value="1"
+                                                           {{ ($file->is_tax_free || ($file->parsed_data['is_tax_free'] ?? false)) ? 'checked' : '' }}
+                                                           class="mr-2">
+                                                    Tax Free
+                                                </label>
+                                                <label class="flex items-center text-sm text-gray-300">
+                                                    <input type="checkbox"
+                                                           name="is_credit_note"
+                                                           value="1"
+                                                           {{ ($file->is_credit_note || ($file->parsed_data['is_credit_note'] ?? false)) ? 'checked' : '' }}
+                                                           class="mr-2">
+                                                    Credit Note
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div class="mt-6 flex justify-end space-x-2">
+                                            <button type="button"
+                                                    onclick="document.getElementById('edit-form-{{ $file->id }}').classList.add('hidden')"
+                                                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                                                Cancel
+                                            </button>
+                                            <button type="submit"
+                                                    class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                                                Save Data
+                                            </button>
+                                        </div>
+                                    </form>
                                 </div>
                             </td>
                         </tr>
@@ -795,11 +949,13 @@
         }
         
         function createInvoicesFromReview() {
+            // Get payment inputs (used for Amazon invoices)
+            const paymentInputs = document.querySelectorAll('input[name^="actual_payment["]');
+
             @if($hasAmazonPending)
             // Check that Amazon invoices have payment amounts entered
             const amazonMissingPayments = [];
-            const paymentInputs = document.querySelectorAll('input[name^="actual_payment["]');
-            
+
             paymentInputs.forEach(input => {
                 if (!input.value || input.value.trim() === '') {
                     const fileRow = input.closest('tr');
@@ -811,12 +967,12 @@
                     }
                 }
             });
-            
+
             if (amazonMissingPayments.length > 0) {
                 alert('Please enter payment amounts for all Amazon invoices:\n\n' + amazonMissingPayments.join('\n'));
                 return;
             }
-            
+
             if (!confirm('Process Amazon invoices with payment adjustments?\n\nThis will:\n• Create invoices with actual EUR amounts paid\n• Calculate correct VAT breakdown\n• Apply exchange rate differences\n\nAre you sure you want to proceed?')) {
                 return;
             }
@@ -825,10 +981,9 @@
                 return;
             }
             @endif
-            
-            // Collect payment adjustment data
+
+            // Collect payment adjustment data (if any Amazon invoices)
             const paymentData = {};
-            // Reuse the paymentInputs variable from above
             paymentInputs.forEach(input => {
                 if (input.value && input.value.trim() !== '') {
                     const fileId = input.name.match(/\[(\d+)\]/)[1];
@@ -1151,6 +1306,63 @@
                 });
             });
         });
+
+        // Save parsed data (edit form submission)
+        function saveParsedData(event, fileId, batchId) {
+            event.preventDefault();
+
+            const form = event.target;
+            const formData = new FormData(form);
+
+            // Convert FormData to JSON
+            const data = {
+                supplier_invoice_reference: formData.get('supplier_invoice_reference'),
+                invoice_date: formData.get('invoice_date'),
+                supplier_name: formData.get('supplier_name'),
+                is_tax_free: formData.get('is_tax_free') ? true : false,
+                is_credit_note: formData.get('is_credit_note') ? true : false,
+                vat_0_net: formData.get('vat_0_net'),
+                vat_9_net: formData.get('vat_9_net'),
+                vat_13_5_net: formData.get('vat_13_5_net'),
+                vat_23_net: formData.get('vat_23_net'),
+            };
+
+            // Show loading state
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
+
+            fetch(`/invoices/bulk-upload/${batchId}/file/${fileId}/parsed-data`, {
+                method: 'PUT',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Data saved successfully!');
+                    // Close the form
+                    document.getElementById(`edit-form-${fileId}`).classList.add('hidden');
+                    // Reload page to show updated data
+                    window.location.reload();
+                } else {
+                    alert(data.error || 'Failed to save data');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while saving data');
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            });
+        }
     </script>
     @endpush
 </x-admin-layout>

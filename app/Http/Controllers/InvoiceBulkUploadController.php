@@ -262,10 +262,16 @@ class InvoiceBulkUploadController extends Controller
         // For Amazon pending view, show specific messaging
         $isAmazonPendingView = $request->has('amazon_pending') && $request->amazon_pending == '1';
 
+        // Get all suppliers for dropdown (from accounting_suppliers table)
+        $suppliers = \App\Models\AccountingSupplier::where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         return view('invoices.bulk-upload-preview', [
             'batch' => $batch,
             'files' => $files,
             'isAmazonPendingView' => $isAmazonPendingView,
+            'suppliers' => $suppliers,
             'filters' => [
                 'supplier' => $request->supplier,
                 'status' => $request->status,
@@ -931,6 +937,113 @@ class InvoiceBulkUploadController extends Controller
             return response()->json([
                 'success' => false,
                 'error' => 'PDF splitting failed: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Update parsed data for an upload file
+     */
+    public function updateParsedData($batchId, $fileId, Request $request)
+    {
+        // Verify batch belongs to user
+        $batch = InvoiceBulkUpload::where('batch_id', $batchId)
+            ->where('user_id', auth()->id())
+            ->firstOrFail();
+
+        // Get the file
+        $file = InvoiceUploadFile::where('id', $fileId)
+            ->where('bulk_upload_id', $batch->id)
+            ->firstOrFail();
+
+        // Validate input
+        $validated = $request->validate([
+            'supplier_invoice_reference' => 'nullable|string|max:255',
+            'invoice_date' => 'nullable|date_format:Y-m-d',
+            'supplier_name' => 'required|string|max:255',
+            'is_tax_free' => 'boolean',
+            'is_credit_note' => 'boolean',
+            'vat_0_net' => 'nullable|numeric|min:0',
+            'vat_9_net' => 'nullable|numeric|min:0',
+            'vat_13_5_net' => 'nullable|numeric|min:0',
+            'vat_23_net' => 'nullable|numeric|min:0',
+        ]);
+
+        try {
+            // Update parsed_data JSON field
+            $parsedData = $file->parsed_data ?? [];
+
+            // Update with validated data
+            $parsedData['supplier_invoice_reference'] = $validated['supplier_invoice_reference'] ?? null;
+            $parsedData['invoice_date'] = $validated['invoice_date'] ?? null;
+            $parsedData['supplier_name'] = $validated['supplier_name'];
+            $parsedData['is_tax_free'] = $validated['is_tax_free'] ?? false;
+            $parsedData['is_credit_note'] = $validated['is_credit_note'] ?? false;
+
+            // Update VAT breakdown
+            $vatBreakdown = [
+                'vat_0' => [
+                    'net' => floatval($validated['vat_0_net'] ?? 0),
+                    'vat' => 0.00
+                ],
+                'vat_9' => [
+                    'net' => floatval($validated['vat_9_net'] ?? 0),
+                    'vat' => floatval($validated['vat_9_net'] ?? 0) * 0.09
+                ],
+                'vat_13_5' => [
+                    'net' => floatval($validated['vat_13_5_net'] ?? 0),
+                    'vat' => floatval($validated['vat_13_5_net'] ?? 0) * 0.135
+                ],
+                'vat_23' => [
+                    'net' => floatval($validated['vat_23_net'] ?? 0),
+                    'vat' => floatval($validated['vat_23_net'] ?? 0) * 0.23
+                ],
+            ];
+
+            $parsedData['vat_breakdown'] = $vatBreakdown;
+
+            // Calculate total amount
+            $totalAmount =
+                floatval($validated['vat_0_net'] ?? 0) +
+                floatval($validated['vat_9_net'] ?? 0) * 1.09 +
+                floatval($validated['vat_13_5_net'] ?? 0) * 1.135 +
+                floatval($validated['vat_23_net'] ?? 0) * 1.23;
+
+            $parsedData['total_amount'] = $totalAmount;
+
+            // Save to database
+            $file->parsed_data = $parsedData;
+            $file->parsed_vat_data = $vatBreakdown; // Also save to separate field for InvoiceCreationService
+            $file->parsed_invoice_number = $validated['supplier_invoice_reference'] ?? null;  // Store as parsed_invoice_number for InvoiceCreationService
+            $file->parsed_invoice_date = $validated['invoice_date'] ?? null;
+            $file->parsed_total_amount = $totalAmount;
+            $file->supplier_detected = $validated['supplier_name'];
+            $file->is_tax_free = $validated['is_tax_free'] ?? false;
+            $file->is_credit_note = $validated['is_credit_note'] ?? false;
+
+            // Update status to 'review' if it was in failed/uploaded state
+            if (in_array($file->status, ['uploaded', 'failed', 'parsing'])) {
+                $file->status = 'review';
+            }
+
+            $file->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Parsed data updated successfully',
+                'data' => $parsedData
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to update parsed data', [
+                'file_id' => $fileId,
+                'error' => $e->getMessage(),
+                'user_id' => auth()->id(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to update parsed data: ' . $e->getMessage()
             ], 500);
         }
     }

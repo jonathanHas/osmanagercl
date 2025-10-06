@@ -106,16 +106,16 @@ class InvoiceCreationService
                     ]);
                 }
 
-                // Generate invoice number if not parsed
-                $invoiceNumber = $file->parsed_invoice_number;
-                if (empty($invoiceNumber)) {
-                    // Generate a unique invoice number
-                    $invoiceNumber = 'BU-'.date('Y').'-'.str_pad($file->id, 6, '0', STR_PAD_LEFT);
-                }
+                // Always generate system invoice number (consistent sequential)
+                $invoiceNumber = 'BU-'.date('Y').'-'.str_pad($file->id, 6, '0', STR_PAD_LEFT);
+
+                // Get supplier's invoice reference if available
+                $supplierInvoiceReference = $file->parsed_invoice_number;
 
                 // Create invoice
                 $invoice = Invoice::create([
                     'invoice_number' => $invoiceNumber,
+                    'supplier_invoice_reference' => $supplierInvoiceReference,
                     'supplier_id' => $supplier->id,
                     'supplier_name' => $supplier->name,
                     'invoice_date' => $file->parsed_invoice_date ?: now(),

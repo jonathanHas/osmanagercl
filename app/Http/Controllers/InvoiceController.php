@@ -255,7 +255,7 @@ class InvoiceController extends Controller
     public function storeSimple(Request $request)
     {
         $validated = $request->validate([
-            'invoice_number' => 'required|string|max:100',
+            'supplier_invoice_reference' => 'nullable|string|max:255',  // Supplier's original invoice number
             'supplier_id' => 'nullable|exists:accounting_suppliers,id',
             'supplier_name' => 'required|string|max:255',
             'invoice_date' => 'required|date',
@@ -300,9 +300,10 @@ class InvoiceController extends Controller
         }
 
         return DB::transaction(function () use ($validated, $request) {
-            // Create invoice
+            // Create invoice with temporary number
             $invoice = Invoice::create([
-                'invoice_number' => $validated['invoice_number'],
+                'invoice_number' => 'TEMP-'.uniqid(),  // Temporary, will be updated
+                'supplier_invoice_reference' => $validated['supplier_invoice_reference'] ?? null,
                 'supplier_id' => $validated['supplier_id'],
                 'supplier_name' => $validated['supplier_name'],
                 'invoice_date' => $validated['invoice_date'],
@@ -324,6 +325,10 @@ class InvoiceController extends Controller
                 'created_by' => auth()->id(),
                 'updated_by' => auth()->id(),
             ]);
+
+            // Generate invoice number based on invoice ID (consistent with bulk upload)
+            $invoiceNumber = 'INV-'.date('Y').'-'.str_pad($invoice->id, 6, '0', STR_PAD_LEFT);
+            $invoice->update(['invoice_number' => $invoiceNumber]);
 
             // Handle file upload if present
             if ($request->hasFile('invoice_document')) {

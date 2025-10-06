@@ -113,6 +113,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/{batchId}/file/{fileId}/retry', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'retryFile'])->name('retry-file');
         Route::get('/{batchId}/file/{fileId}/thumbnails', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'getThumbnails'])->name('get-thumbnails');
         Route::post('/{batchId}/file/{fileId}/split', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'splitPdf'])->name('split-pdf');
+        Route::put('/{batchId}/file/{fileId}/parsed-data', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'updateParsedData'])->name('update-parsed-data');
     });
 
     Route::post('/invoices/bulk-mark-paid', [\App\Http\Controllers\InvoiceController::class, 'bulkMarkPaid'])->name('invoices.bulk-mark-paid');

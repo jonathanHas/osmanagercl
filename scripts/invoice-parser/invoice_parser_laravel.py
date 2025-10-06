@@ -16,13 +16,13 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import utilities and parsers
-from utils import extract_text, extract_data_from_xls
+from utils import extract_text, extract_data_from_xls, extract_text_from_image
 from parse_doc_file import parse_doc_file
 from parsers import (
     dynamis, three, digitalocean, imbibe, openai, linode, jetbrains, independent,
     mossfield, slievebloom, garryhinch, oxigen, kellys, udea, breadelicious,
     kleepaper, ardu, vico, loughboora, coolnagrower, merrymill, flogas,
-    oldyard_organics, amazon, ecobike, dunany_flour, beechlawn, default_parser
+    oldyard_organics, amazon, ecobike, dunany_flour, beechlawn, mentons, default_parser
 )
 
 # Configure logging
@@ -86,6 +86,8 @@ def detect_supplier(text):
         return dunany_flour, "Dunany Flour"
     elif "BEECHLAWN" in upper_text or "BEECHLAWN ORGANIC FARM" in upper_text:
         return beechlawn, "Beechlawn"
+    elif "MENTON" in upper_text or "MENTONS" in upper_text:
+        return mentons, "Menton's Organic Farm"
     else:
         return default_parser, "Unknown"
 
@@ -195,7 +197,13 @@ def process_invoice(file_path):
             logging.info(f"Processing XLS: {filename}")
             text = extract_data_from_xls(file_path)
             response['metadata']['parsing_method'] = 'xls'
-            
+
+        elif file_path.lower().endswith(('.jpg', '.jpeg', '.png', '.tiff', '.tif')):
+            logging.info(f"Processing Image: {filename}")
+            text, extraction_method = extract_text_from_image(file_path)
+            response['metadata']['parsing_method'] = extraction_method
+            response['metadata']['ocr_used'] = True
+
         else:
             response['errors'].append({
                 'code': 'UNSUPPORTED_FILE_TYPE',
