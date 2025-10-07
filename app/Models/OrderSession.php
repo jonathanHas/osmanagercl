@@ -12,6 +12,9 @@ class OrderSession extends Model
         'user_id',
         'supplier_id',
         'order_date',
+        'coverage_days',
+        'coverage_ends_on',
+        'sales_history_weeks',
         'status',
         'total_items',
         'total_value',
@@ -20,6 +23,7 @@ class OrderSession extends Model
 
     protected $casts = [
         'order_date' => 'date',
+        'coverage_ends_on' => 'date',
         'total_value' => 'decimal:2',
     ];
 

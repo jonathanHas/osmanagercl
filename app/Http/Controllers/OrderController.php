@@ -52,12 +52,30 @@ class OrderController extends Controller
         $request->validate([
             'supplier_id' => 'required|exists:App\Models\Supplier,SupplierID',
             'order_date' => 'required|date|after_or_equal:today',
+            'coverage_end_date' => 'required|date',
+            'sales_history_weeks' => 'nullable|integer|min:1|max:26',
         ]);
 
         $orderDate = Carbon::parse($request->order_date);
+        $coverageEndDate = Carbon::parse($request->coverage_end_date);
+
+        if ($coverageEndDate->lessThan($orderDate)) {
+            return back()
+                ->withErrors(['coverage_end_date' => 'Coverage end must be on or after the delivery date.'])
+                ->withInput();
+        }
+
+        $coverageDays = $orderDate->diffInDays($coverageEndDate) + 1;
+        $salesHistoryWeeks = (int) $request->input('sales_history_weeks', 8);
+
         $orderSession = $this->orderService->generateOrderSuggestions(
             $request->supplier_id,
-            $orderDate
+            $orderDate,
+            [
+                'coverage_days' => $coverageDays,
+                'coverage_ends_on' => $coverageEndDate,
+                'sales_history_weeks' => $salesHistoryWeeks,
+            ]
         );
 
         return redirect()->route('orders.show', $orderSession)
@@ -184,10 +202,18 @@ class OrderController extends Controller
     public function duplicate(OrderSession $order): RedirectResponse
     {
         $newOrderDate = Carbon::now()->addDays(7); // Default next week
+        $coverageDays = $order->coverage_days ?? 7;
+        $salesHistoryWeeks = $order->sales_history_weeks ?? 8;
+        $coverageEndDate = $newOrderDate->copy()->addDays(max(1, $coverageDays) - 1);
 
         $newOrderSession = $this->orderService->generateOrderSuggestions(
             $order->supplier_id,
-            $newOrderDate
+            $newOrderDate,
+            [
+                'coverage_days' => $coverageDays,
+                'coverage_ends_on' => $coverageEndDate,
+                'sales_history_weeks' => $salesHistoryWeeks,
+            ]
         );
 
         return redirect()->route('orders.show', $newOrderSession)
@@ -367,5 +393,23 @@ class OrderController extends Controller
                 'total_value' => $updatedItem->orderSession->total_value,
             ],
         ]);
+    }
+
+    /**
+     * Mockup with real Vico data for UI testing.
+     */
+    public function mockupVicoLive(): View
+    {
+        $supplierId = '84'; // Vico supplier ID
+       $orderDate = now()->addDays(3);
+
+        // Generate temporary order session
+        $orderSession = $this->orderService->generateOrderSuggestions($supplierId, $orderDate, [
+            'coverage_days' => 14,
+            'coverage_ends_on' => $orderDate->copy()->addDays(13),
+            'sales_history_weeks' => 8,
+        ]);
+
+        return view('orders.mockup-vico-live', compact('orderSession'));
     }
 }

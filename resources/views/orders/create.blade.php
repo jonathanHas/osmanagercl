@@ -33,19 +33,54 @@
                         </div>
 
                         <!-- Order Date -->
+                        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                            <div>
+                                <label for="order_date" class="block text-sm font-medium text-gray-700">
+                                    Delivery Date
+                                </label>
+                                <input type="date" name="order_date" id="order_date" required
+                                       value="{{ old('order_date', now()->addDays(7)->format('Y-m-d')) }}"
+                                       min="{{ now()->format('Y-m-d') }}"
+                                       class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                @error('order_date')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                                <p class="mt-1 text-sm text-gray-500">
+                                    Default picks next week. Adjust if the delivery schedule is different.
+                                </p>
+                            </div>
+
+                            <div>
+                                <label for="coverage_end_date" class="block text-sm font-medium text-gray-700">
+                                    Cover Inventory Until
+                                </label>
+                                <input type="date" name="coverage_end_date" id="coverage_end_date" required
+                                       value="{{ old('coverage_end_date', now()->addDays(21)->format('Y-m-d')) }}"
+                                       min="{{ now()->format('Y-m-d') }}"
+                                       class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                @error('coverage_end_date')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                                <p class="mt-1 text-sm text-gray-500">
+                                    We’ll size the order to keep shelves stocked through this date (including product safety buffers).
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Sales History Window -->
                         <div>
-                            <label for="order_date" class="block text-sm font-medium text-gray-700">
-                                Delivery Date
+                            <label for="sales_history_weeks" class="block text-sm font-medium text-gray-700">
+                                Weeks of Sales to Analyse
                             </label>
-                            <input type="date" name="order_date" id="order_date" required
-                                   value="{{ old('order_date', now()->addDays(7)->format('Y-m-d')) }}"
-                                   min="{{ now()->format('Y-m-d') }}"
-                                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                            @error('order_date')
+                            <input type="number" name="sales_history_weeks" id="sales_history_weeks"
+                                   value="{{ old('sales_history_weeks', 8) }}"
+                                   min="1" max="26"
+                                   class="mt-1 block w-32 border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            @error('sales_history_weeks')
                                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                             @enderror
                             <p class="mt-1 text-sm text-gray-500">
-                                Default is set to next week. Orders are typically placed 5-7 days before delivery.
+                                Defaults to the last 8 weeks. Increase for seasonal suppliers or reduce for fast-moving categories.
                             </p>
                         </div>
 
@@ -61,13 +96,13 @@
                                     <h3 class="text-sm font-medium text-blue-800">
                                         How Order Generation Works
                                     </h3>
-                                    <div class="mt-2 text-sm text-blue-700">
+                                    <div class="mt-2 text-sm text-blue-700 space-y-1">
+                                        <p>Select the delivery date, how long the order should carry your inventory, and how many weeks of sales to review.</p>
                                         <ul class="list-disc pl-5 space-y-1">
-                                            <li>Analyzes 4-week sales averages for each product</li>
-                                            <li>Considers current stock levels</li>
-                                            <li>Applies safety stock factors (1.5 weeks supply)</li>
-                                            <li>Learns from your previous adjustments</li>
-                                            <li>Categorizes items by review priority</li>
+                                            <li>Projects demand from the chosen sales history (defaults to 8 weeks).</li>
+                                            <li>Targets coverage through the date you select, honouring each product’s safety buffer.</li>
+                                            <li>Pulls live stock levels and adjusts for previous manual tweaks.</li>
+                                            <li>Flags items by review priority so you know what needs attention first.</li>
                                         </ul>
                                     </div>
                                 </div>
@@ -110,6 +145,8 @@
                                     @csrf
                                     <input type="hidden" name="supplier_id" value="{{ $udeaSupplier->SupplierID }}">
                                     <input type="hidden" name="order_date" value="{{ now()->addDays(7)->format('Y-m-d') }}">
+                                    <input type="hidden" name="coverage_end_date" value="{{ now()->addDays(21)->format('Y-m-d') }}">
+                                    <input type="hidden" name="sales_history_weeks" value="8">
                                     
                                     <button type="submit" 
                                             class="w-full bg-green-500 hover:bg-green-700 text-white font-bold py-3 px-4 rounded inline-flex items-center justify-center">

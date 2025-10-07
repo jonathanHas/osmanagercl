@@ -25,13 +25,32 @@ class OrderService
     /**
      * Generate order suggestions for a supplier.
      */
-    public function generateOrderSuggestions(string $supplierId, Carbon $orderDate): OrderSession
+    public function generateOrderSuggestions(string $supplierId, Carbon $orderDate, array $options = []): OrderSession
     {
+        $coverageDays = max(1, (int) ($options['coverage_days'] ?? 7));
+        $coverageWeeks = ($options['coverage_weeks'] ?? null) !== null
+            ? max(0.1, (float) $options['coverage_weeks'])
+            : $coverageDays / 7;
+        $salesHistoryWeeks = max(1, min(26, (int) ($options['sales_history_weeks'] ?? 8)));
+        $coverageEndsOn = $options['coverage_ends_on'] ?? null;
+        if ($coverageEndsOn instanceof Carbon) {
+            $coverageEndsOn = $coverageEndsOn->copy();
+        } elseif (is_string($coverageEndsOn)) {
+            $coverageEndsOn = Carbon::parse($coverageEndsOn);
+        }
+
+        if (! $coverageEndsOn) {
+            $coverageEndsOn = $orderDate->copy()->addDays($coverageDays - 1);
+        }
+
         // Create new order session
         $orderSession = OrderSession::create([
             'user_id' => Auth::id(),
             'supplier_id' => $supplierId,
             'order_date' => $orderDate,
+            'coverage_days' => $coverageDays,
+            'coverage_ends_on' => $coverageEndsOn,
+            'sales_history_weeks' => $salesHistoryWeeks,
             'status' => 'draft',
         ]);
 
@@ -43,7 +62,11 @@ class OrderService
 
         foreach ($products as $product) {
             try {
-                $suggestion = $this->calculateProductSuggestion($product);
+                $suggestion = $this->calculateProductSuggestion($product, [
+                    'coverage_days' => $coverageDays,
+                    'coverage_weeks' => $coverageWeeks,
+                    'sales_history_weeks' => $salesHistoryWeeks,
+                ]);
 
                 if ($suggestion['suggested_quantity'] > 0 || $suggestion['force_include']) {
                     $orderItems[] = [
@@ -105,21 +128,36 @@ class OrderService
     /**
      * Calculate suggestion for a single product.
      */
-    public function calculateProductSuggestion(Product $product): array
+    public function calculateProductSuggestion(Product $product, array $options = []): array
     {
         // Get product settings
         $settings = ProductOrderSetting::where('product_id', $product->ID)->first();
         $safetyFactor = $settings?->safety_stock_factor ?? 1.5;
+        $coverageDays = max(1, (int) ($options['coverage_days'] ?? 7));
+        $coverageWeeks = ($options['coverage_weeks'] ?? null) !== null
+            ? max(0.1, (float) $options['coverage_weeks'])
+            : $coverageDays / 7;
+        $salesHistoryWeeks = max(1, min(26, (int) ($options['sales_history_weeks'] ?? 8)));
+        $targetWeeks = max($coverageWeeks, $safetyFactor);
 
-        // Get sales data (4-week average)
+        // Get sales data (8-week history & derived averages)
         $salesStats = $this->salesRepository->getProductSalesStatistics($product->ID);
-        $avgWeeklySales = $salesStats['avg_monthly_sales'] / 4.33; // Convert monthly to weekly
+        $weeklySales = $this->salesRepository->getProductWeeklySales($product->ID, $salesHistoryWeeks);
+        $weeklyUnits = array_map(static fn ($week) => (float) ($week['units'] ?? 0), $weeklySales);
+        $weeksWindow = count($weeklyUnits);
+        $avgWeeklySalesFromHistory = $weeksWindow > 0 ? array_sum($weeklyUnits) / $weeksWindow : null;
+        $avgWeeklySales = $avgWeeklySalesFromHistory ?? ($salesStats['avg_monthly_sales'] / 4.33);
+        $peakWeeklySales = ! empty($weeklyUnits) ? max($weeklyUnits) : 0;
+        if ($peakWeeklySales <= 0 && $avgWeeklySales > 0) {
+            $peakWeeklySales = $avgWeeklySales;
+        }
 
         // Get current stock
         $currentStock = $this->getCurrentStock($product->ID);
 
-        // Base calculation: (Weekly Average × Safety Factor) - Current Stock
-        $baseQuantity = max(0, ($avgWeeklySales * $safetyFactor) - $currentStock);
+        // Base calculation: (Weekly Average × Target Weeks) - Current Stock
+        $desiredUnits = $avgWeeklySales * $targetWeeks;
+        $baseQuantity = max(0, $desiredUnits - $currentStock);
 
         // Apply learned adjustments
         $adjustedQuantity = $this->applyLearningAdjustments($product->ID, $baseQuantity);
@@ -129,8 +167,13 @@ class OrderService
         $caseUnits = $supplierLink?->CaseUnits ?? 1;
 
         // Calculate case quantities
-        $suggestedCases = $caseUnits > 1 ? ceil($adjustedQuantity / $caseUnits) : $adjustedQuantity;
-        $finalUnitsAfterCaseRounding = $caseUnits > 1 ? $suggestedCases * $caseUnits : $adjustedQuantity;
+        if ($caseUnits > 1) {
+            $suggestedCases = ceil($adjustedQuantity / $caseUnits);
+            $finalUnitsAfterCaseRounding = $suggestedCases * $caseUnits;
+        } else {
+            $finalUnitsAfterCaseRounding = (int) ceil($adjustedQuantity);
+            $suggestedCases = $finalUnitsAfterCaseRounding;
+        }
 
         // Determine review priority
         $reviewPriority = $this->determineReviewPriority($product, $settings);
@@ -152,10 +195,18 @@ class OrderService
         $salesHistory = $this->salesRepository->getProductSalesHistory($product->ID, 6);
         $totalSales6m = array_sum(array_column($salesHistory, 'units'));
         $lastSaleDate = $this->getLastSaleDate($product->ID);
+        $weeklySalesTotal = array_sum($weeklyUnits);
+
+        $suggestedQuantity = $caseUnits > 1
+            ? round($finalUnitsAfterCaseRounding, 3)
+            : (int) $finalUnitsAfterCaseRounding;
+        $suggestedCasesValue = $caseUnits > 1
+            ? round($suggestedCases, 3)
+            : (int) $suggestedCases;
 
         return [
-            'suggested_quantity' => round($finalUnitsAfterCaseRounding, 3),
-            'suggested_cases' => round($suggestedCases, 3),
+            'suggested_quantity' => $suggestedQuantity,
+            'suggested_cases' => $suggestedCasesValue,
             'case_units' => $caseUnits,
             'unit_cost' => $unitCost,
             'review_priority' => $reviewPriority,
@@ -165,6 +216,9 @@ class OrderService
                 'avg_weekly_sales' => round($avgWeeklySales, 2),
                 'current_stock' => $currentStock,
                 'safety_factor' => $safetyFactor,
+                'coverage_days' => $coverageDays,
+                'coverage_weeks' => round($coverageWeeks, 2),
+                'target_weeks' => round($targetWeeks, 2),
                 'base_calculation' => round($baseQuantity, 3),
                 'adjusted_calculation' => round($adjustedQuantity, 3),
                 'case_units' => $caseUnits,
@@ -173,6 +227,12 @@ class OrderService
                 'last_month_sales' => $salesStats['last_month_sales'],
                 'total_sales_6m' => $totalSales6m,
                 'sales_history' => $salesHistory,
+                'weekly_sales' => $weeklySales,
+                'peak_weekly_sales' => round($peakWeeklySales, 2),
+                'weekly_sales_total' => round($weeklySalesTotal, 2),
+                'weekly_sales_window_weeks' => $weeksWindow,
+                'sales_history_weeks' => $salesHistoryWeeks,
+                'avg_weekly_sales_source' => $avgWeeklySalesFromHistory !== null ? 'weekly_history' : 'monthly_average',
                 'last_sale_date' => $lastSaleDate,
                 'stock_days_remaining' => $avgWeeklySales > 0 ? round(($currentStock / $avgWeeklySales) * 7, 1) : 999,
                 'cost_source' => $this->getCostSource($supplierLink, $product, $unitCost),

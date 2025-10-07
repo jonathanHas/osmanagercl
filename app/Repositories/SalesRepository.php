@@ -58,6 +58,58 @@ class SalesRepository
     }
 
     /**
+     * Get weekly sales for a product for the last N weeks (oldest first).
+     *
+     * @param  int  $weeksBack  Number of weeks to retrieve (default 8)
+     * @return array<int, array<string, mixed>>
+     */
+    public function getProductWeeklySales(string $productId, int $weeksBack = 8): array
+    {
+        $weeksBack = max(1, $weeksBack);
+
+        $endOfCurrentWeek = Carbon::now()->endOfWeek();
+        $startRange = $endOfCurrentWeek->copy()->subWeeks($weeksBack - 1)->startOfWeek();
+
+        // Prepare default structure for each week (oldest first)
+        $weeklyBuckets = [];
+        $cursor = $startRange->copy();
+
+        for ($i = 0; $i < $weeksBack; $i++) {
+            $weekStart = $cursor->copy()->startOfWeek();
+            $weekEnd = $cursor->copy()->endOfWeek();
+            $key = $weekStart->format('Y-m-d');
+
+            $weeklyBuckets[$key] = [
+                'week_start' => $weekStart->format('Y-m-d'),
+                'week_end' => $weekEnd->format('Y-m-d'),
+                'label' => $weekStart->format('d M'),
+                'units' => 0.0,
+            ];
+
+            $cursor->addWeek();
+        }
+
+        // Fetch actual sales grouped by week (ISO week starts on Monday)
+        $weeklySales = StockDiary::where('PRODUCT', $productId)
+            ->sales()
+            ->where('DATENEW', '>=', $startRange)
+            ->select(
+                DB::raw("DATE_FORMAT(DATE_SUB(DATENEW, INTERVAL WEEKDAY(DATENEW) DAY), '%Y-%m-%d') as week_start"),
+                DB::raw('SUM(ABS(UNITS)) as total_units')
+            )
+            ->groupBy('week_start')
+            ->get();
+
+        foreach ($weeklySales as $sale) {
+            if (isset($weeklyBuckets[$sale->week_start])) {
+                $weeklyBuckets[$sale->week_start]['units'] = (float) $sale->total_units;
+            }
+        }
+
+        return array_values($weeklyBuckets);
+    }
+
+    /**
      * Get sales statistics for a product.
      *
      * @return array

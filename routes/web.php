@@ -251,6 +251,15 @@ Route::middleware('auth')->group(function () {
     Route::post('/deliveries/{delivery}/update-costs', [DeliveryController::class, 'updateCosts'])->name('deliveries.update-costs');
     Route::post('/delivery-items/{item}/refresh-barcode', [DeliveryController::class, 'refreshBarcode'])->name('delivery-items.refresh-barcode');
 
+    // Order Management mockup routes (for UI testing)
+    Route::get('/orders/mockups', fn() => view('orders.mockup-index'))->name('orders.mockups');
+    Route::get('/orders/mockup/1-charts', fn() => view('orders.mockup-1-charts'))->name('orders.mockup.1');
+    Route::get('/orders/mockup/2-compact', fn() => view('orders.mockup-2-compact'))->name('orders.mockup.2');
+    Route::get('/orders/mockup/3-dashboard', fn() => view('orders.mockup-3-dashboard'))->name('orders.mockup.3');
+
+    // Real data mockup (Vico supplier)
+    Route::get('/orders/mockup/vico-live', [OrderController::class, 'mockupVicoLive'])->name('orders.mockup.vico-live');
+
     // Order Management routes
     Route::resource('orders', OrderController::class);
     Route::post('/orders/{order}/complete', [OrderController::class, 'complete'])->name('orders.complete');
