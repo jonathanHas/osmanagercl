@@ -4,6 +4,7 @@ namespace App\Repositories;
 
 use App\Models\Product;
 use App\Models\StockDiary;
+use App\Models\SalesDailySummary;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -89,20 +90,37 @@ class SalesRepository
             $cursor->addWeek();
         }
 
-        // Fetch actual sales grouped by week (ISO week starts on Monday)
-        $weeklySales = StockDiary::where('PRODUCT', $productId)
-            ->sales()
-            ->where('DATENEW', '>=', $startRange)
-            ->select(
-                DB::raw("DATE_FORMAT(DATE_SUB(DATENEW, INTERVAL WEEKDAY(DATENEW) DAY), '%Y-%m-%d') as week_start"),
-                DB::raw('SUM(ABS(UNITS)) as total_units')
-            )
+        // Try to use imported daily summaries first (fast path)
+        $summaryWeekly = SalesDailySummary::where('product_id', $productId)
+            ->whereBetween('sale_date', [$startRange, $endOfCurrentWeek])
+            ->selectRaw("DATE_FORMAT(DATE_SUB(sale_date, INTERVAL WEEKDAY(sale_date) DAY), '%Y-%m-%d') as week_start")
+            ->selectRaw('SUM(total_units) as total_units')
             ->groupBy('week_start')
-            ->get();
+            ->pluck('total_units', 'week_start')
+            ->toArray();
 
-        foreach ($weeklySales as $sale) {
-            if (isset($weeklyBuckets[$sale->week_start])) {
-                $weeklyBuckets[$sale->week_start]['units'] = (float) $sale->total_units;
+        if (! empty($summaryWeekly)) {
+            foreach ($summaryWeekly as $weekStart => $units) {
+                if (isset($weeklyBuckets[$weekStart])) {
+                    $weeklyBuckets[$weekStart]['units'] = (float) $units;
+                }
+            }
+        } else {
+            // Fallback to live POS data if summaries are missing
+            $weeklySales = StockDiary::where('PRODUCT', $productId)
+                ->sales()
+                ->where('DATENEW', '>=', $startRange)
+                ->select(
+                    DB::raw("DATE_FORMAT(DATE_SUB(DATENEW, INTERVAL WEEKDAY(DATENEW) DAY), '%Y-%m-%d') as week_start"),
+                    DB::raw('SUM(ABS(UNITS)) as total_units')
+                )
+                ->groupBy('week_start')
+                ->get();
+
+            foreach ($weeklySales as $sale) {
+                if (isset($weeklyBuckets[$sale->week_start])) {
+                    $weeklyBuckets[$sale->week_start]['units'] = (float) $sale->total_units;
+                }
             }
         }
 
@@ -119,29 +137,51 @@ class SalesRepository
         $currentDate = Carbon::now();
         $lastYear = $currentDate->copy()->subYear();
 
-        // Total sales last 12 months
-        $totalSales = StockDiary::where('PRODUCT', $productId)
-            ->sales()
-            ->where('DATENEW', '>=', $lastYear)
-            ->sum(DB::raw('ABS(UNITS)'));
+        $summaryQuery = SalesDailySummary::where('product_id', $productId);
+        $hasSummaryData = $summaryQuery->exists();
 
-        // Average monthly sales
-        $avgMonthlySales = $totalSales / 12;
+        if ($hasSummaryData) {
+            // Total sales last 12 months
+            $totalSales = (float) SalesDailySummary::where('product_id', $productId)
+                ->whereBetween('sale_date', [$lastYear, $currentDate])
+                ->sum('total_units');
 
-        // Sales this month
-        $thisMonthSales = StockDiary::where('PRODUCT', $productId)
-            ->sales()
-            ->whereYear('DATENEW', $currentDate->year)
-            ->whereMonth('DATENEW', $currentDate->month)
-            ->sum(DB::raw('ABS(UNITS)'));
+            $avgMonthlySales = $totalSales / 12;
 
-        // Sales last month
-        $lastMonth = $currentDate->copy()->subMonth();
-        $lastMonthSales = StockDiary::where('PRODUCT', $productId)
-            ->sales()
-            ->whereYear('DATENEW', $lastMonth->year)
-            ->whereMonth('DATENEW', $lastMonth->month)
-            ->sum(DB::raw('ABS(UNITS)'));
+            // Sales this month
+            $thisMonthSales = (float) SalesDailySummary::where('product_id', $productId)
+                ->whereYear('sale_date', $currentDate->year)
+                ->whereMonth('sale_date', $currentDate->month)
+                ->sum('total_units');
+
+            // Sales last month
+            $lastMonth = $currentDate->copy()->subMonth();
+            $lastMonthSales = (float) SalesDailySummary::where('product_id', $productId)
+                ->whereYear('sale_date', $lastMonth->year)
+                ->whereMonth('sale_date', $lastMonth->month)
+                ->sum('total_units');
+        } else {
+            // Fallback to live POS queries
+            $totalSales = StockDiary::where('PRODUCT', $productId)
+                ->sales()
+                ->where('DATENEW', '>=', $lastYear)
+                ->sum(DB::raw('ABS(UNITS)'));
+
+            $avgMonthlySales = $totalSales / 12;
+
+            $thisMonthSales = StockDiary::where('PRODUCT', $productId)
+                ->sales()
+                ->whereYear('DATENEW', $currentDate->year)
+                ->whereMonth('DATENEW', $currentDate->month)
+                ->sum(DB::raw('ABS(UNITS)'));
+
+            $lastMonth = $currentDate->copy()->subMonth();
+            $lastMonthSales = StockDiary::where('PRODUCT', $productId)
+                ->sales()
+                ->whereYear('DATENEW', $lastMonth->year)
+                ->whereMonth('DATENEW', $lastMonth->month)
+                ->sum(DB::raw('ABS(UNITS)'));
+        }
 
         // Calculate trend
         $trend = 'stable';

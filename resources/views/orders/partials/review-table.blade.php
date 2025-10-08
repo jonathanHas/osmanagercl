@@ -1,9 +1,65 @@
 @php
-    $displayItems = $displayItems ?? $orderSession->items;
-    $reviewCount = $orderSession->items->where('review_priority', 'review')->count();
-    $standardCount = $orderSession->items->where('review_priority', 'standard')->count();
-    $safeCount = $orderSession->items->where('review_priority', 'safe')->count();
-    $totalItems = $orderSession->items->count();
+    $incomingItems = $displayItems ?? null;
+    if ($incomingItems && ! $incomingItems instanceof \Illuminate\Support\Collection) {
+        $incomingItems = collect($incomingItems);
+    }
+    $sortMode = request()->input('sort', 'sales');
+    $showAll = request()->boolean('show_all', false);
+    $baseItems = $orderSession->items;
+
+    $sortedItems = match ($sortMode) {
+        'name' => $baseItems->sortBy(function ($item) {
+            return strtoupper($item->product->NAME ?? '');
+        })->values(),
+        'priority' => $baseItems->sortBy(function ($item) {
+            return match ($item->review_priority) {
+                'review' => 0,
+                'standard' => 1,
+                default => 2,
+            };
+        })->values(),
+        'value' => $baseItems->sortByDesc(function ($item) {
+            return (float) $item->total_cost;
+        })->values(),
+        default => $baseItems->sortByDesc(function ($item) {
+            $context = $item->context_data ?? [];
+            if (isset($context['weekly_sales']) && is_array($context['weekly_sales'])) {
+                $total = collect($context['weekly_sales'])->sum(function ($week) {
+                    return (float) ($week['units'] ?? 0);
+                });
+                if ($total > 0) {
+                    return $total;
+                }
+            }
+
+            return (float) ($context['avg_weekly_sales'] ?? 0);
+        })->values(),
+    };
+
+    $displayItems = $incomingItems
+        ? $sortedItems->filter(fn ($item) => $incomingItems->contains('id', $item->id))->values()
+        : $sortedItems;
+
+    if (! $showAll) {
+        $displayItems = $displayItems->filter(function ($item) {
+            $finalUnits = (float) ($item->final_quantity ?? 0);
+            if ($finalUnits <= 0) {
+                $finalUnits = (float) ($item->suggested_quantity ?? 0);
+            }
+
+            return $finalUnits > 0;
+        })->values();
+    }
+
+    $reviewCount = $displayItems->where('review_priority', 'review')->count();
+    $standardCount = $displayItems->where('review_priority', 'standard')->count();
+    $safeCount = $displayItems->where('review_priority', 'safe')->count();
+    $totalItems = $displayItems->count();
+    $hiddenCount = $showAll ? 0 : ($sortedItems->count() - $displayItems->count());
+    $currentQuery = request()->query();
+    $toggleQuery = $currentQuery;
+    $toggleQuery['show_all'] = $showAll ? 0 : 1;
+    $toggleUrl = request()->url().'?'.http_build_query($toggleQuery);
     $globalMaxWeeklySales = $displayItems->map(function ($item) {
         $context = $item->context_data ?? [];
         $weekly = $context['weekly_sales'] ?? [];
@@ -28,6 +84,22 @@
         <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200">All ({{ $totalItems }})</button>
     </div>
     <div class="flex items-center space-x-3">
+        <a href="{{ $toggleUrl }}"
+           class="px-3 py-2 rounded-md border {{ $showAll ? 'border-indigo-500 text-indigo-600' : 'border-gray-300 text-gray-600' }} text-sm hover:bg-gray-100">
+            {{ $showAll ? 'Hide unordered' : 'Show unordered'.($hiddenCount > 0 ? ' ('.$hiddenCount.')' : '') }}
+        </a>
+        <form method="GET" class="flex items-center space-x-2 text-sm text-gray-600">
+            @foreach(request()->except('sort') as $paramKey => $paramValue)
+                <input type="hidden" name="{{ $paramKey }}" value="{{ $paramValue }}">
+            @endforeach
+            <label for="order-sort" class="font-medium text-gray-500">Sort</label>
+            <select id="order-sort" name="sort" class="border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500" onchange="this.form.submit()">
+                <option value="sales" {{ $sortMode === 'sales' ? 'selected' : '' }}>Sales ↓</option>
+                <option value="name" {{ $sortMode === 'name' ? 'selected' : '' }}>Name A-Z</option>
+                <option value="priority" {{ $sortMode === 'priority' ? 'selected' : '' }}>Priority</option>
+                <option value="value" {{ $sortMode === 'value' ? 'selected' : '' }}>Value ↓</option>
+            </select>
+        </form>
         @isset($backLink)
             <a href="{{ $backLink }}" class="px-4 py-2 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700">
                 ← Back
@@ -59,6 +131,14 @@
             </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
+            @if($displayItems->isEmpty())
+                <tr>
+                    <td colspan="8" class="px-4 py-8 text-center text-sm text-gray-500">
+                        No products have an order quantity greater than zero.
+                        <a href="{{ $toggleUrl }}" class="text-indigo-600 hover:underline">Show unordered items</a>
+                    </td>
+                </tr>
+            @endif
             @foreach($displayItems as $item)
                 @php
                     $product = $item->product;
@@ -94,15 +174,22 @@
                     $quantityLabel = $isCaseProduct ? 'cases' : 'units';
                     $quantityPrecision = $isCaseProduct ? 3 : 0;
                     $afterStock = $currentStock + $finalUnits;
-                    $referenceDemand = max($globalMaxWeeklySales, 1);
 
-                    // Calculate percentages relative to global max
-                    $currentPct = $referenceDemand > 0 ? ($currentStock / $referenceDemand) * 100 : 0;
-                    $afterPct = $referenceDemand > 0 ? ($afterStock / $referenceDemand) * 100 : 100;
-                    $currentPositiveHeight = $currentPct > 0 ? min($currentPct, 180) : 0;
-                    $currentNegativeHeight = $currentPct < 0 ? min(abs($currentPct), 180) : 0;
-                    $afterPositiveHeight = $afterPct > 0 ? min($afterPct, 220) : 0;
-                    $afterNegativeHeight = $afterPct < 0 ? min(abs($afterPct), 180) : 0;
+                    // For visual comparison (bar heights) - use global max across all products
+                    $referenceDemand = max($globalMaxWeeklySales, 1);
+                    $currentHeightPct = $referenceDemand > 0 ? ($currentStock / $referenceDemand) * 100 : 0;
+                    $afterHeightPct = $referenceDemand > 0 ? ($afterStock / $referenceDemand) * 100 : 100;
+
+                    // For percentage labels - use individual product's peak for intuitive display
+                    $productPeakDemand = max($peakWeeklySales, 1);
+                    $currentPct = $productPeakDemand > 0 ? ($currentStock / $productPeakDemand) * 100 : 0;
+                    $afterPct = $productPeakDemand > 0 ? ($afterStock / $productPeakDemand) * 100 : 100;
+
+                    // Bar heights use global scaling for cross-product comparison
+                    $currentPositiveHeight = $currentHeightPct > 0 ? min($currentHeightPct, 180) : 0;
+                    $currentNegativeHeight = $currentHeightPct < 0 ? min(abs($currentHeightPct), 180) : 0;
+                    $afterPositiveHeight = $afterHeightPct > 0 ? min($afterHeightPct, 220) : 0;
+                    $afterNegativeHeight = $afterHeightPct < 0 ? min(abs($afterHeightPct), 180) : 0;
 
                     // Priority colors
                     $borderColor = match($item->review_priority) {
@@ -159,28 +246,22 @@
                     </td>
                     <td class="px-4 py-4 align-bottom">
                         <!-- Bars and Chart Container -->
-                        <div class="flex items-end gap-3" style="min-height: 140px; position: relative; padding: 16px 0;">
+                        <div class="flex items-end gap-6" style="min-height: 160px; position: relative; padding: 20px 0;">
                             <!-- Reference Grid Lines -->
-                            <div class="absolute inset-x-0" style="top: 16px; height: 72px; pointer-events: none;">
-                                <div class="absolute inset-x-0 top-0 border-t border-gray-300 border-dashed"></div>
-                                <div class="absolute inset-x-0" style="top: 36px; border-top: 1px dashed rgba(148, 163, 184, 0.5);"></div>
-                                <div class="absolute inset-x-0 bottom-0 border-t border-gray-200"></div>
-                                <div class="absolute left-2 -top-2 text-[10px] text-gray-500 font-medium">100%</div>
-                                <div class="absolute left-2" style="top: 34px;">
-                                    <span class="text-[10px] text-gray-400 font-medium">50%</span>
-                                </div>
-                                <div class="absolute left-2 -bottom-3 text-[10px] text-gray-400 font-medium">0%</div>
+                            <div class="absolute inset-x-0" style="top: 12px; height: 96px; pointer-events: none;">
+                                <div class="absolute inset-x-12 top-0 border-t border-gray-300 border-dashed" title="Visual reference lines for comparing bar heights"></div>
+                                <div class="absolute inset-x-12" style="top: 48px; border-top: 1px dashed rgba(148, 163, 184, 0.5);"></div>
+                                <div class="absolute inset-x-12 bottom-0 border-t border-gray-200"></div>
                             </div>
                             <!-- Current Stock Bar (Left) -->
-                            <div style="width: 46px;">
-                                <div class="text-xs font-medium text-gray-600 mb-1 text-center">Now</div>
-                                <div class="w-10 bg-gray-200 rounded-full relative overflow-visible mx-auto" style="height: 72px;">
-                                    <div class="absolute top-0 left-0 right-0 h-0.5 bg-gray-400 z-10" title="100% = Highest weekly sales in list"></div>
+                            <div class="flex flex-col items-center" style="width: 60px;">
+                                <div class="w-10 bg-gray-200 rounded-b-full relative overflow-visible mx-auto" style="height: 88px;">
+                                    <div class="absolute top-0 left-0 right-0 h-0.5 bg-gray-400 z-10" title="Reference line: Bar heights scaled to highest sales across all products"></div>
                                     @if($currentNegativeHeight > 0)
-                                        <div class="absolute top-0 left-0 right-0 bg-red-500 rounded-full" style="height: {{ $currentNegativeHeight }}%;" title="Short {{ number_format(abs($currentStock), 0) }} units ({{ round(abs($currentPct)) }}% of max week)"></div>
+                                        <div class="absolute top-0 left-0 right-0 bg-red-500 rounded-t-full" style="height: {{ $currentNegativeHeight }}%;" title="Short {{ number_format(abs($currentStock), 0) }} units ({{ round(abs($currentPct)) }}% of this product's peak: {{ number_format($peakWeeklySales, 1) }})"></div>
                                     @endif
                                     @if($currentPositiveHeight > 0)
-                                        <div class="absolute bottom-0 left-0 right-0 bg-{{ $stockColor }}-500 rounded-full" style="height: {{ $currentPositiveHeight }}%;" title="{{ max($currentStock, 0) }} units = {{ round($currentPct) }}% of max week"></div>
+                                        <div class="absolute bottom-0 left-0 right-0 bg-{{ $stockColor }}-500 rounded-b-full" style="height: {{ $currentPositiveHeight }}%;" title="{{ max($currentStock, 0) }} units = {{ round($currentPct) }}% of this product's peak ({{ number_format($peakWeeklySales, 1) }})"></div>
                                     @endif
                                     @if($currentPositiveHeight > 100)
                                         <div class="absolute -top-4 left-1/2 transform -translate-x-1/2 text-[10px] text-{{ $stockColor }}-600 font-semibold">+{{ round($currentPct - 100) }}%</div>
@@ -189,61 +270,40 @@
                             </div>
 
                             <!-- Chart -->
-                            <div style="height: 60px; position: relative; flex: 1;">
-                                <canvas id="chart_{{ $item->id }}"></canvas>
+                            <div style="height: 88px; position: relative; flex: 1;">
+                                <canvas id="chart_{{ $item->id }}" style="margin: 0 8px;"></canvas>
                             </div>
 
                             <!-- After Delivery Bar (Right) -->
-                            <div style="width: 46px;">
-                                <div class="text-xs font-medium text-gray-600 mb-1 text-center">After</div>
-                                <div class="w-10 bg-gray-200 rounded-full relative overflow-visible mx-auto" style="height: 72px;">
-                                    <div class="absolute top-0 left-0 right-0 h-0.5 bg-gray-400 z-10" title="100% = Highest weekly sales in list"></div>
-                                    @if($afterNegativeHeight > 0)
-                                        <div class="absolute top-0 left-0 right-0 bg-red-500 rounded-full" style="height: {{ $afterNegativeHeight }}%;" title="Short {{ number_format(abs($afterStock), 0) }} units ({{ round(abs($afterPct)) }}% of max week)"></div>
-                                    @endif
-                                    @if($afterPositiveHeight > 0)
-                                        <div class="absolute bottom-0 left-0 right-0 bg-green-500 rounded-full" style="height: {{ $afterPositiveHeight }}%;" title="{{ max($afterStock, 0) }} units = {{ round($afterPct) }}% of max week"></div>
-                                    @endif
-                                    @if($afterPositiveHeight > 100)
-                                        <div class="absolute -top-4 left-1/2 transform -translate-x-1/2 text-[10px] text-green-600 font-semibold">+{{ round($afterPct - 100) }}%</div>
-                                    @endif
+                            <div class="flex flex-col items-center" style="width: 60px;">
+                                <div class="w-10 bg-gray-200 rounded-b-full relative overflow-visible mx-auto" style="height: 88px;">
+                                    <div class="absolute top-0 left-0 right-0 h-0.5 bg-gray-400 z-10" title="Reference line: Bar heights scaled to highest sales across all products"></div>
+                                    <div id="after-bar-negative-{{ $item->id }}" class="absolute top-0 left-0 right-0 bg-red-500 rounded-t-full" style="height: {{ $afterNegativeHeight }}%; display: {{ $afterNegativeHeight > 0 ? 'block' : 'none' }};" title="Short {{ number_format(abs($afterStock), 0) }} units ({{ round(abs($afterPct)) }}% of this product's peak: {{ number_format($peakWeeklySales, 1) }})"></div>
+                                    <div id="after-bar-positive-{{ $item->id }}" class="absolute bottom-0 left-0 right-0 bg-green-500 rounded-b-full" style="height: {{ $afterPositiveHeight }}%; display: {{ $afterPositiveHeight > 0 ? 'block' : 'none' }};" title="{{ max($afterStock, 0) }} units = {{ round($afterPct) }}% of this product's peak ({{ number_format($peakWeeklySales, 1) }})"></div>
+                                    <div id="after-bar-overflow-{{ $item->id }}" class="absolute -top-4 left-1/2 transform -translate-x-1/2 text-[10px] text-green-600 font-semibold" style="display: {{ $afterPositiveHeight > 100 ? 'block' : 'none' }};">+{{ round($afterPct - 100) }}%</div>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Text Labels Row -->
-                        <div class="flex gap-3 mt-1">
-                            <div class="text-center" style="width: 40px;">
-                                <div class="text-xs font-bold text-{{ $stockColor }}-600">
-                                    {{ number_format($currentStock, 0) }}
-                                    @if($isCaseProduct)
-                                        <span class="block text-[10px] text-gray-500">{{ number_format($currentStock / max($caseUnits, 1), 1) }} cases</span>
-                                    @else
-                                        <span class="block text-[10px] text-gray-500">units</span>
-                                    @endif
-                                </div>
-                                <div class="text-xs text-gray-500">{{ round($currentPct) }}% max</div>
-                            </div>
-                            <div class="flex-1 text-center">
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
-                                    Weekly avg: {{ number_format($avgWeeklySales, 1) }} • Peak: {{ number_format($peakWeeklySales, 1) }}
+                        <div class="flex items-center justify-between mt-2 text-xs text-gray-600">
+                            <div class="text-left">
+                                <span class="font-semibold text-{{ $stockColor }}-600">{{ number_format($currentStock, 0) }}</span>
+                                <span class="text-[11px] text-gray-500">
+                                    ({{ $isCaseProduct ? number_format($currentStock / max($caseUnits, 1), 1).' cs' : 'u' }}, {{ round($currentPct) }}%)
                                 </span>
+                            </div>
+                            <div class="px-2 py-0.5 bg-gray-100 rounded text-gray-700 font-medium">
+                                avg {{ number_format($avgWeeklySales, 1) }} · peak {{ number_format($peakWeeklySales, 1) }}
                                 @if(isset($contextData['coverage_weeks']))
-                                    <div class="text-[11px] text-gray-500 mt-0.5">
-                                        Covering {{ number_format($contextData['coverage_weeks'], 1) }} wk (target {{ number_format($contextData['target_weeks'] ?? $contextData['coverage_weeks'], 1) }} wk)
-                                    </div>
+                                    · cover {{ number_format($contextData['coverage_weeks'], 1) }}→{{ number_format($contextData['target_weeks'] ?? $contextData['coverage_weeks'], 1) }} wk
                                 @endif
                             </div>
-                            <div class="text-center" style="width: 40px;">
-                                <div class="text-xs font-bold text-green-600">
-                                    {{ number_format($afterStock, 0) }}
-                                    @if($isCaseProduct)
-                                        <span class="block text-[10px] text-gray-500">{{ number_format($afterStock / max($caseUnits, 1), 1) }} cases</span>
-                                    @else
-                                        <span class="block text-[10px] text-gray-500">units</span>
-                                    @endif
-                                </div>
-                                <div class="text-xs text-green-600 font-medium">{{ round($afterPct) }}% max{{ $afterPct > 100 ? '↑' : '' }}</div>
+                            <div class="text-right">
+                                <span id="after-stock-value-{{ $item->id }}" class="font-semibold text-green-600">{{ number_format($afterStock, 0) }}</span>
+                                <span id="after-stock-label-{{ $item->id }}" class="text-[11px] text-gray-500">
+                                    ({{ $isCaseProduct ? number_format($afterStock / max($caseUnits, 1), 1).' cs' : 'u' }}, {{ round($afterPct) }}%)
+                                </span>
                             </div>
                         </div>
                     </td>
@@ -260,20 +320,31 @@
                     </td>
                     <td class="px-4 py-4">
                         <div class="flex items-center justify-center space-x-1">
-                            <button class="w-8 h-8 bg-red-100 hover:bg-red-200 text-red-700 rounded font-bold" type="button">−</button>
+                            <button class="qty-decrease w-8 h-8 bg-red-100 hover:bg-red-200 text-red-700 rounded font-bold"
+                                    type="button"
+                                    data-item-id="{{ $item->id }}">−</button>
                             <input type="number"
+                                   id="qty-input-{{ $item->id }}"
                                    value="{{ number_format($displayOrderQuantity, $quantityPrecision, '.', '') }}"
                                    step="1"
-                                   class="w-20 text-center text-lg font-bold border-2 border-gray-300 rounded py-1">
-                            <button class="w-8 h-8 bg-green-100 hover:bg-green-200 text-green-700 rounded font-bold" type="button">+</button>
+                                   data-item-id="{{ $item->id }}"
+                                   data-current-stock="{{ $currentStock }}"
+                                   data-case-units="{{ $caseUnits }}"
+                                   data-is-case-product="{{ $isCaseProduct ? 1 : 0 }}"
+                                   data-product-peak="{{ $peakWeeklySales }}"
+                                   data-global-max="{{ $globalMaxWeeklySales }}"
+                                   class="qty-input w-20 text-center text-lg font-bold border-2 border-gray-300 rounded py-1">
+                            <button class="qty-increase w-8 h-8 bg-green-100 hover:bg-green-200 text-green-700 rounded font-bold"
+                                    type="button"
+                                    data-item-id="{{ $item->id }}">+</button>
                         </div>
                         <div class="text-center text-xs text-gray-500 mt-1">
-                            {{ $quantityLabel }} · {{ number_format($finalUnits, 0) }} units
+                            {{ $quantityLabel }} · <span id="units-label-{{ $item->id }}">{{ number_format($finalUnits, 0) }}</span> units
                         </div>
                     </td>
                     <td class="px-4 py-4 text-right">
-                        <div class="text-lg font-bold text-gray-900">€{{ number_format($item->total_cost, 2) }}</div>
-                        <div class="text-sm text-gray-500">€{{ number_format($item->unit_cost, 2) }}/unit</div>
+                        <div id="total-cost-{{ $item->id }}" class="text-lg font-bold text-gray-900">€{{ number_format($item->total_cost, 2) }}</div>
+                        <div class="text-sm text-gray-500">€<span id="unit-cost-{{ $item->id }}">{{ number_format($item->unit_cost, 2) }}</span>/unit</div>
                     </td>
                     <td class="px-4 py-4 text-center">
                         @if($item->auto_approved)
@@ -349,6 +420,9 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        layout: {
+                            padding: 0
+                        },
                         interaction: {
                             mode: 'index',
                             intersect: false
@@ -375,7 +449,8 @@
                             y: {
                                 display: false,
                                 beginAtZero: true,
-                                suggestedMax: globalMaxSales > 0 ? globalMaxSales * 1.1 : (maxDataPoint > 0 ? maxDataPoint * 1.2 : 10)
+                                max: globalMaxSales > 0 ? globalMaxSales : 10,
+                                grace: 0
                             }
                         },
                         elements: {
@@ -385,5 +460,237 @@
                 });
             })();
         @endforeach
+    });
+
+    // Real-time quantity update and bar chart recalculation
+    document.addEventListener('DOMContentLoaded', function() {
+        const debounceTimers = {};
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+        // Save quantity to server via AJAX
+        function saveQuantityToServer(itemId, quantity) {
+            const input = document.getElementById(`qty-input-${itemId}`);
+            if (!input) return;
+
+            const isCaseProduct = input.dataset.isCaseProduct === '1';
+            const caseUnits = parseFloat(input.dataset.caseUnits) || 1;
+
+            // Show loading state
+            input.classList.add('border-blue-400', 'bg-blue-50');
+            input.disabled = true;
+
+            // Determine endpoint and parameter based on product type
+            const baseUrl = window.location.origin;
+            const endpoint = isCaseProduct
+                ? `${baseUrl}/order-items/${itemId}/cases`
+                : `${baseUrl}/order-items/${itemId}/quantity`;
+            const paramName = isCaseProduct ? 'cases' : 'quantity';
+            const data = { [paramName]: quantity };
+
+            fetch(endpoint, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify(data),
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => {
+                        throw new Error(err.message || `HTTP ${response.status}: ${response.statusText}`);
+                    }).catch(() => {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Success - show green flash
+                    input.classList.remove('border-blue-400', 'bg-blue-50');
+                    input.classList.add('border-green-400', 'bg-green-50');
+                    setTimeout(() => {
+                        input.classList.remove('border-green-400', 'bg-green-50');
+                    }, 1000);
+
+                    // Update cost displays
+                    const totalCostEl = document.getElementById(`total-cost-${itemId}`);
+                    if (totalCostEl && data.item.total_cost !== undefined) {
+                        totalCostEl.textContent = '€' + parseFloat(data.item.total_cost).toFixed(2);
+                    }
+
+                    // Update order totals if provided
+                    if (data.order_totals) {
+                        // You can add order total display elements here if needed
+                        console.log('Order totals updated:', data.order_totals);
+                    }
+                } else {
+                    // Error from server
+                    input.classList.remove('border-blue-400', 'bg-blue-50');
+                    input.classList.add('border-red-400', 'bg-red-50');
+                    setTimeout(() => {
+                        input.classList.remove('border-red-400', 'bg-red-50');
+                    }, 2000);
+                    alert(data.error || 'Failed to save quantity');
+                }
+            })
+            .catch(error => {
+                // Network or other error
+                console.error('Error saving quantity:', error);
+                input.classList.remove('border-blue-400', 'bg-blue-50');
+                input.classList.add('border-red-400', 'bg-red-50');
+                setTimeout(() => {
+                    input.classList.remove('border-red-400', 'bg-red-50');
+                }, 2000);
+                alert('Failed to save quantity:\n' + error.message + '\n\nEndpoint: ' + endpoint);
+            })
+            .finally(() => {
+                input.disabled = false;
+            });
+        }
+
+        // Debounced save for input changes
+        function debouncedSave(itemId, quantity) {
+            if (debounceTimers[itemId]) {
+                clearTimeout(debounceTimers[itemId]);
+            }
+            debounceTimers[itemId] = setTimeout(() => {
+                saveQuantityToServer(itemId, quantity);
+            }, 800);
+        }
+
+        function updateAfterStockBar(itemId) {
+            const input = document.getElementById(`qty-input-${itemId}`);
+            if (!input) return;
+
+            const currentStock = parseFloat(input.dataset.currentStock) || 0;
+            const caseUnits = parseFloat(input.dataset.caseUnits) || 1;
+            const isCaseProduct = input.dataset.isCaseProduct === '1';
+            const productPeak = parseFloat(input.dataset.productPeak) || 1;
+            const globalMax = parseFloat(input.dataset.globalMax) || 1;
+            const orderQuantity = parseFloat(input.value) || 0;
+
+            // Calculate new units based on whether it's a case product
+            const newUnits = isCaseProduct ? (orderQuantity * caseUnits) : orderQuantity;
+            const afterStock = currentStock + newUnits;
+
+            // Calculate percentages for display (relative to product peak)
+            const afterPct = productPeak > 0 ? (afterStock / productPeak) * 100 : 100;
+
+            // Calculate bar height (relative to global max for visual comparison)
+            const referenceDemand = Math.max(globalMax, 1);
+            const afterHeightPct = referenceDemand > 0 ? (afterStock / referenceDemand) * 100 : 100;
+
+            // Update bar heights
+            const positiveBar = document.getElementById(`after-bar-positive-${itemId}`);
+            const negativeBar = document.getElementById(`after-bar-negative-${itemId}`);
+            const overflowLabel = document.getElementById(`after-bar-overflow-${itemId}`);
+
+            if (afterStock >= 0) {
+                // Positive stock
+                const heightPct = Math.min(afterHeightPct, 220);
+                if (positiveBar) {
+                    positiveBar.style.height = `${heightPct}%`;
+                    positiveBar.style.display = heightPct > 0 ? 'block' : 'none';
+                    positiveBar.title = `${Math.round(afterStock)} units = ${Math.round(afterPct)}% of this product's peak (${productPeak.toFixed(1)})`;
+                }
+                if (negativeBar) {
+                    negativeBar.style.display = 'none';
+                }
+                if (overflowLabel) {
+                    if (afterHeightPct > 100) {
+                        overflowLabel.textContent = `+${Math.round(afterPct - 100)}%`;
+                        overflowLabel.style.display = 'block';
+                    } else {
+                        overflowLabel.style.display = 'none';
+                    }
+                }
+            } else {
+                // Negative stock (shortfall)
+                const heightPct = Math.min(Math.abs(afterHeightPct), 180);
+                if (negativeBar) {
+                    negativeBar.style.height = `${heightPct}%`;
+                    negativeBar.style.display = 'block';
+                    negativeBar.title = `Short ${Math.round(Math.abs(afterStock))} units (${Math.round(Math.abs(afterPct))}% of this product's peak: ${productPeak.toFixed(1)})`;
+                }
+                if (positiveBar) {
+                    positiveBar.style.display = 'none';
+                }
+                if (overflowLabel) {
+                    overflowLabel.style.display = 'none';
+                }
+            }
+
+            // Update text labels
+            const afterStockValue = document.getElementById(`after-stock-value-${itemId}`);
+            const afterStockLabel = document.getElementById(`after-stock-label-${itemId}`);
+            const unitsLabel = document.getElementById(`units-label-${itemId}`);
+
+            if (afterStockValue) {
+                afterStockValue.textContent = Math.round(afterStock).toLocaleString();
+            }
+            if (afterStockLabel) {
+                const displayValue = isCaseProduct
+                    ? `${(afterStock / Math.max(caseUnits, 1)).toFixed(1)} cs`
+                    : 'u';
+                afterStockLabel.textContent = `(${displayValue}, ${Math.round(afterPct)}%)`;
+            }
+            if (unitsLabel) {
+                unitsLabel.textContent = Math.round(newUnits).toLocaleString();
+            }
+        }
+
+        // Handle input changes (debounced save)
+        document.querySelectorAll('.qty-input').forEach(input => {
+            input.addEventListener('input', function() {
+                const itemId = this.dataset.itemId;
+                const quantity = parseFloat(this.value) || 0;
+
+                // Update visual bar immediately
+                updateAfterStockBar(itemId);
+
+                // Save to server with debounce
+                debouncedSave(itemId, quantity);
+            });
+        });
+
+        // Handle +/- buttons (immediate save)
+        document.querySelectorAll('.qty-decrease').forEach(button => {
+            button.addEventListener('click', function() {
+                const itemId = this.dataset.itemId;
+                const input = document.getElementById(`qty-input-${itemId}`);
+                if (input) {
+                    const currentValue = parseFloat(input.value) || 0;
+                    const newValue = Math.max(0, currentValue - 1);
+                    input.value = newValue;
+
+                    // Update visual bar immediately
+                    updateAfterStockBar(itemId);
+
+                    // Save immediately (no debounce for buttons)
+                    saveQuantityToServer(itemId, newValue);
+                }
+            });
+        });
+
+        document.querySelectorAll('.qty-increase').forEach(button => {
+            button.addEventListener('click', function() {
+                const itemId = this.dataset.itemId;
+                const input = document.getElementById(`qty-input-${itemId}`);
+                if (input) {
+                    const currentValue = parseFloat(input.value) || 0;
+                    const newValue = currentValue + 1;
+                    input.value = newValue;
+
+                    // Update visual bar immediately
+                    updateAfterStockBar(itemId);
+
+                    // Save immediately (no debounce for buttons)
+                    saveQuantityToServer(itemId, newValue);
+                }
+            });
+        });
     });
 </script>

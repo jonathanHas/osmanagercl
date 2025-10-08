@@ -9,10 +9,19 @@ The order generation system automates the calculation of required stock quantiti
 ## Core Features
 
 ### 1. Automated Quantity Calculation
-- **Sales-Based Forecasting**: Uses 4-week rolling average of sales data
+- **Sales-Based Forecasting**: Uses an imported weekly sales history window (default 8 weeks, configurable per order) backed by `sales_daily_summary`
 - **Stock Integration**: Real-time current stock levels from STOCKCURRENT table
-- **Safety Stock**: Configurable safety stock levels (default: 1.5 weeks supply)
-- **Reorder Point Logic**: `Suggested Qty = (Weekly Avg × Safety Factor) - Current Stock`
+- **Safety Stock & Coverage**: Configurable safety stock levels (default: 1.5 weeks supply) merged with the user-selected coverage window (e.g. cover through a specific date)
+- **Reorder Point Logic**: `Suggested Qty = (Weekly Avg × Target Coverage Weeks) - Current Stock` with target coverage = `max(user coverage, safety factor)`
+
+### 2025-09 Enhancements
+- **Flexible Coverage Controls**: The order creation form now captures *Delivery Date*, *Cover inventory until*, and *Weeks of sales to analyse*. These values are persisted on `order_sessions` (`coverage_days`, `coverage_ends_on`, `sales_history_weeks`) and drive the suggestion engine.
+- **Sales Import Acceleration**: `OrderService` consults `sales_daily_summary` (populated via `/sales-import` or the CLI import commands) for both weekly breakdowns and aggregate stats. If summaries are missing we gracefully fall back to POS live data.
+- **Rich Review Layout**: The shared Blade partial `orders/partials/review-table` powers both the live `/orders/{order}` screen and the Vico mockup. It introduces:
+  - Global chart scaling, percentage grid lines, and condensed captions directly under each trend line.
+  - A default sort by recent sales volume, with alternate sort modes (name, priority, value).
+  - A toggle to hide/show unordered items (`show_all` query parameter); when hidden only products with a positive ordered quantity are displayed.
+  - Inline comparisons between suggested vs final quantities, ensuring the “After” stock bars reflect final user adjustments.
 
 ### 2. Product Classification System
 Products are classified into three review priority levels:
@@ -147,7 +156,8 @@ class OrderController {
 #### Step 1: Initialize Order Session
 1. Select supplier (defaults to Udea)
 2. Set target delivery date
-3. Create draft order session
+3. Specify coverage end date and sales history window (defaults: cover three weeks, analyse eight weeks)
+4. Create draft order session (coverage metadata persisted on the session)
 
 #### Step 2: Calculate Suggestions
 1. Query all products for selected supplier
@@ -335,6 +345,11 @@ Code,Ordered,Qty,SKU,Content,Description,Price,Sale,Total
 - Predictive analytics
 - AI-powered demand forecasting
 - Voice-controlled order review
+
+## Operational Notes
+- **Database Migration**: Run `php artisan migrate` to add `coverage_days`, `coverage_ends_on`, and `sales_history_weeks` columns to `order_sessions`.
+- **Sales Cache**: Keep `sales_daily_summary` populated via `/sales-import` (UI) or CLI (`php artisan sales:import-daily`, `php artisan sales:import-monthly`) so order generation uses the fast summaries.
+- **UI Parameters**: The order review table accepts `?sort=sales|name|priority|value` and `?show_all=1` to control sort order and whether unordered items are visible.
 
 ---
 
