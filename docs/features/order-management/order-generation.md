@@ -23,6 +23,11 @@ The order generation system automates the calculation of required stock quantiti
   - A toggle to hide/show unordered items (`show_all` query parameter); when hidden only products with a positive ordered quantity are displayed.
   - Inline comparisons between suggested vs final quantities, ensuring the “After” stock bars reflect final user adjustments.
 
+### 2025-10 Enhancements
+- **Category-Specific Coverage Overrides**: Suppliers with curated groups (initially Udea’s cheese and refrigerated catalogues) expose additional “cover until” fields during order generation. The values are persisted to `order_sessions.coverage_overrides` and reapplied whenever the session is regenerated.
+- **Interactive Coverage Editing**: Draft orders now surface the per-category windows on the review screen, allowing buyers to tweak short-dated categories and trigger an in-place recalculation without affecting longer-life products.
+- **Scoped Regeneration**: Updating a category from the review header recalculates only the matching products, preserving quantities the buyer already adjusted in other groups while keeping totals in sync.
+
 ### 2. Product Classification System
 Products are classified into three review priority levels:
 
@@ -77,9 +82,13 @@ The system tracks manual adjustments to improve future suggestions:
 - user_id (foreign key to users)
 - supplier_id (foreign key to SUPPLIERS)
 - order_date (target delivery date)
+- coverage_days (int, derived from delivery → cover-until)
+- coverage_ends_on (date, nullable)
+- coverage_overrides (json, nullable; keyed by category group)
 - status (draft, submitted, completed)
 - total_items (count)
 - total_value (decimal)
+- sales_history_weeks (tinyint)
 - created_at, updated_at
 ```
 

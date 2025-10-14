@@ -266,6 +266,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/orders/{order}/duplicate', [OrderController::class, 'duplicate'])->name('orders.duplicate');
     Route::get('/orders/{order}/export', [OrderController::class, 'export'])->name('orders.export');
     Route::get('/orders/{order}/statistics', [OrderController::class, 'statistics'])->name('orders.statistics');
+    Route::patch('/orders/{order}/coverage-overrides', [OrderController::class, 'updateCategoryCoverage'])->name('orders.coverage-overrides');
     Route::patch('/order-items/{orderItem}/quantity', [OrderController::class, 'updateQuantity'])->name('order-items.update-quantity');
     Route::patch('/order-items/{orderItem}/cases', [OrderController::class, 'updateCaseQuantity'])->name('order-items.update-cases');
     Route::patch('/order-items/{orderItem}/cost', [OrderController::class, 'updateItemCost'])->name('order-items.update-cost');

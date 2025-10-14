@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\ProductOrderSetting;
 use App\Models\StockCurrent;
 use App\Repositories\SalesRepository;
+use App\Support\SpecialOrderCategories;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -32,40 +33,188 @@ class OrderService
             ? max(0.1, (float) $options['coverage_weeks'])
             : $coverageDays / 7;
         $salesHistoryWeeks = max(1, min(26, (int) ($options['sales_history_weeks'] ?? 8)));
-        $coverageEndsOn = $options['coverage_ends_on'] ?? null;
-        if ($coverageEndsOn instanceof Carbon) {
-            $coverageEndsOn = $coverageEndsOn->copy();
-        } elseif (is_string($coverageEndsOn)) {
-            $coverageEndsOn = Carbon::parse($coverageEndsOn);
-        }
+        $coverageEndsOn = $this->normaliseCoverageEnd($options['coverage_ends_on'] ?? null, $orderDate, $coverageDays);
 
-        if (! $coverageEndsOn) {
-            $coverageEndsOn = $orderDate->copy()->addDays($coverageDays - 1);
-        }
+        $categoryGroups = $options['category_groups'] ?? SpecialOrderCategories::forSupplier($supplierId);
+        $categoryOverrides = $options['category_overrides'] ?? [];
 
-        // Create new order session
         $orderSession = OrderSession::create([
             'user_id' => Auth::id(),
             'supplier_id' => $supplierId,
             'order_date' => $orderDate,
             'coverage_days' => $coverageDays,
             'coverage_ends_on' => $coverageEndsOn,
+            'coverage_overrides' => $categoryOverrides,
             'sales_history_weeks' => $salesHistoryWeeks,
             'status' => 'draft',
         ]);
 
-        // Get all products for this supplier
-        $products = $this->getSupplierProducts($supplierId);
+        return $this->buildOrderItemsForSession($orderSession, [
+            'coverage_days' => $coverageDays,
+            'coverage_weeks' => $coverageWeeks,
+            'coverage_ends_on' => $coverageEndsOn,
+            'sales_history_weeks' => $salesHistoryWeeks,
+            'category_groups' => $categoryGroups,
+            'category_overrides' => $categoryOverrides,
+        ]);
+    }
 
+    /**
+     * Recalculate an existing order session with updated configuration.
+     */
+    public function regenerateOrderSession(OrderSession $orderSession, array $options = []): OrderSession
+    {
+        if (! $orderSession->isEditable()) {
+            throw new \RuntimeException('Only draft order sessions can be regenerated.');
+        }
+
+        $orderDate = $options['order_date'] ?? $orderSession->order_date ?? Carbon::now();
+        if (! $orderDate instanceof Carbon) {
+            $orderDate = Carbon::parse($orderDate);
+        }
+
+        $coverageDays = max(1, (int) ($options['coverage_days'] ?? $orderSession->coverage_days ?? 7));
+        $coverageWeeks = ($options['coverage_weeks'] ?? null) !== null
+            ? max(0.1, (float) $options['coverage_weeks'])
+            : $coverageDays / 7;
+        $salesHistoryWeeks = max(
+            1,
+            min(26, (int) ($options['sales_history_weeks'] ?? $orderSession->sales_history_weeks ?? 8))
+        );
+        $coverageEndsOn = $this->normaliseCoverageEnd(
+            $options['coverage_ends_on'] ?? $orderSession->coverage_ends_on,
+            $orderDate,
+            $coverageDays
+        );
+        $categoryGroups = $options['category_groups'] ?? SpecialOrderCategories::forSupplier((string) $orderSession->supplier_id);
+        $categoryOverrides = $options['category_overrides'] ?? ($orderSession->coverage_overrides ?? []);
+        $rebuildGroupsOption = $options['rebuild_groups'] ?? null;
+        $rebuildGroups = null;
+
+        if (is_array($rebuildGroupsOption)) {
+            $rebuildGroups = [];
+            foreach ($rebuildGroupsOption as $groupKey) {
+                if (is_string($groupKey) && array_key_exists($groupKey, $categoryGroups)) {
+                    $rebuildGroups[] = $groupKey;
+                }
+            }
+            $rebuildGroups = array_values(array_unique($rebuildGroups));
+            if (empty($rebuildGroups)) {
+                $rebuildGroups = null;
+            }
+        }
+
+        if ($rebuildGroups === null) {
+            $orderSession->items()->delete();
+        } else {
+            $itemsToRebuild = $orderSession->items()
+                ->with('product')
+                ->get()
+                ->filter(function ($item) use ($categoryGroups, $rebuildGroups) {
+                    $productCategory = $item->product->CATEGORY ?? null;
+                    if ($productCategory === null) {
+                        $contextGroup = $item->context_data['category_group_key'] ?? null;
+
+                        return $contextGroup !== null && in_array($contextGroup, $rebuildGroups, true);
+                    }
+
+                    foreach ($rebuildGroups as $groupKey) {
+                        $codes = $categoryGroups[$groupKey]['category_codes'] ?? [];
+                        if (in_array($productCategory, $codes, true)) {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                })
+                ->pluck('id');
+
+            if ($itemsToRebuild->isNotEmpty()) {
+                OrderItem::whereIn('id', $itemsToRebuild)->delete();
+            }
+        }
+
+        $orderSession->update([
+            'order_date' => $orderDate,
+            'coverage_days' => $coverageDays,
+            'coverage_ends_on' => $coverageEndsOn,
+            'coverage_overrides' => $categoryOverrides,
+            'sales_history_weeks' => $salesHistoryWeeks,
+        ]);
+
+        return $this->buildOrderItemsForSession($orderSession->fresh(), [
+            'coverage_days' => $coverageDays,
+            'coverage_weeks' => $coverageWeeks,
+            'coverage_ends_on' => $coverageEndsOn,
+            'sales_history_weeks' => $salesHistoryWeeks,
+            'category_groups' => $categoryGroups,
+            'category_overrides' => $categoryOverrides,
+            'rebuild_groups' => $rebuildGroups,
+        ]);
+    }
+
+    /**
+     * Build order items for a session (initial generation or regeneration).
+     *
+     * @param  array<string, mixed>  $options
+     */
+    protected function buildOrderItemsForSession(OrderSession $orderSession, array $options): OrderSession
+    {
+        $coverageDays = (int) ($options['coverage_days'] ?? 7);
+        $coverageWeeks = (float) ($options['coverage_weeks'] ?? ($coverageDays / 7));
+        $coverageEndsOn = $options['coverage_ends_on'] ?? null;
+        $salesHistoryWeeks = (int) ($options['sales_history_weeks'] ?? 8);
+        $categoryGroups = $options['category_groups'] ?? [];
+        $categoryOverrides = $options['category_overrides'] ?? [];
+        $rebuildGroups = $options['rebuild_groups'] ?? null;
+        if (is_array($rebuildGroups)) {
+            $rebuildGroups = array_values(array_unique(array_filter($rebuildGroups, static fn ($value) => $value !== null)));
+            if (empty($rebuildGroups)) {
+                $rebuildGroups = null;
+            }
+        } else {
+            $rebuildGroups = null;
+        }
+
+        $categoryMap = [];
+        foreach ($categoryGroups as $groupKey => $definition) {
+            foreach ($definition['category_codes'] ?? [] as $code) {
+                $categoryMap[(string) $code] = $groupKey;
+            }
+        }
+
+        $products = $this->getSupplierProducts($orderSession->supplier_id);
         $orderItems = [];
-        $processedCount = 0;
 
         foreach ($products as $product) {
             try {
+                $groupKey = $categoryMap[$product->CATEGORY ?? ''] ?? null;
+
+                if ($rebuildGroups !== null && (! $groupKey || ! in_array($groupKey, $rebuildGroups, true))) {
+                    continue;
+                }
+
+                $override = $groupKey ? ($categoryOverrides[$groupKey] ?? null) : null;
+
+                $productCoverageDays = max(1, (int) ($override['coverage_days'] ?? $coverageDays));
+                $productCoverageWeeks = ($override['coverage_days'] ?? null) !== null
+                    ? max(0.1, (float) ($productCoverageDays / 7))
+                    : $coverageWeeks;
+                $productCoverageEnd = $override['coverage_ends_on'] ?? $coverageEndsOn;
+                if ($productCoverageEnd !== null && ! $productCoverageEnd instanceof Carbon) {
+                    $productCoverageEnd = Carbon::parse($productCoverageEnd);
+                }
+
                 $suggestion = $this->calculateProductSuggestion($product, [
-                    'coverage_days' => $coverageDays,
-                    'coverage_weeks' => $coverageWeeks,
+                    'coverage_days' => $productCoverageDays,
+                    'coverage_weeks' => $productCoverageWeeks,
                     'sales_history_weeks' => $salesHistoryWeeks,
+                    'category_group_key' => $groupKey,
+                    'category_group_label' => $groupKey
+                        ? ($categoryGroups[$groupKey]['label'] ?? ucfirst($groupKey))
+                        : null,
+                    'coverage_override' => $override,
+                    'coverage_ends_on' => $productCoverageEnd,
                 ]);
 
                 if ($suggestion['suggested_quantity'] > 0 || $suggestion['force_include']) {
@@ -87,42 +236,52 @@ class OrderService
                     ];
                 }
             } catch (\Exception $e) {
-                // Log the error but continue processing other products
                 \Log::warning("Failed to calculate suggestion for product {$product->ID}: ".$e->getMessage());
-
                 continue;
             }
 
-            $processedCount++;
-
-            // Process in batches to avoid memory issues
             if (count($orderItems) >= 100) {
                 OrderItem::insert($orderItems);
                 $orderItems = [];
             }
         }
 
-        // Insert remaining items
         if (! empty($orderItems)) {
             OrderItem::insert($orderItems);
         }
 
-        // Update totals
         $orderSession->updateTotals();
 
-        // Sort order items by suggested quantity (desc), then by total sales (desc)
         $orderSession = $orderSession->fresh(['items.product']);
         $sortedItems = $orderSession->items->sortByDesc(function ($item) {
             $salesTotal = $item->context_data['total_sales_6m'] ?? 0;
 
-            // Primary sort: suggested quantity, Secondary sort: total sales
             return ($item->suggested_quantity * 10000) + $salesTotal;
         });
 
-        // Update the collection
         $orderSession->setRelation('items', $sortedItems);
 
         return $orderSession;
+    }
+
+    /**
+     * Normalise coverage end input into a Carbon instance.
+     */
+    protected function normaliseCoverageEnd(mixed $coverageEndsOn, Carbon $orderDate, int $coverageDays): Carbon
+    {
+        if ($coverageEndsOn instanceof Carbon) {
+            return $coverageEndsOn->copy();
+        }
+
+        if ($coverageEndsOn instanceof \DateTimeInterface) {
+            return Carbon::instance($coverageEndsOn);
+        }
+
+        if (is_string($coverageEndsOn)) {
+            return Carbon::parse($coverageEndsOn);
+        }
+
+        return $orderDate->copy()->addDays(max(1, $coverageDays) - 1);
     }
 
     /**
@@ -139,6 +298,13 @@ class OrderService
             : $coverageDays / 7;
         $salesHistoryWeeks = max(1, min(26, (int) ($options['sales_history_weeks'] ?? 8)));
         $targetWeeks = max($coverageWeeks, $safetyFactor);
+        $categoryGroupKey = $options['category_group_key'] ?? null;
+        $categoryGroupLabel = $options['category_group_label'] ?? null;
+        $coverageOverride = $options['coverage_override'] ?? null;
+        $coverageEndsOnOption = $options['coverage_ends_on'] ?? null;
+        if ($coverageEndsOnOption !== null && ! $coverageEndsOnOption instanceof Carbon) {
+            $coverageEndsOnOption = Carbon::parse($coverageEndsOnOption);
+        }
 
         // Get sales data (8-week history & derived averages)
         $salesStats = $this->salesRepository->getProductSalesStatistics($product->ID);
@@ -217,13 +383,14 @@ class OrderService
                 'current_stock' => $currentStock,
                 'safety_factor' => $safetyFactor,
                 'coverage_days' => $coverageDays,
-                'coverage_weeks' => round($coverageWeeks, 2),
-                'target_weeks' => round($targetWeeks, 2),
-                'base_calculation' => round($baseQuantity, 3),
-                'adjusted_calculation' => round($adjustedQuantity, 3),
-                'case_units' => $caseUnits,
-                'is_case_product' => $caseUnits > 1,
-                'sales_trend' => $salesStats['trend'],
+            'coverage_weeks' => round($coverageWeeks, 2),
+            'target_weeks' => round($targetWeeks, 2),
+            'coverage_ends_on' => $coverageEndsOnOption?->toDateString(),
+            'base_calculation' => round($baseQuantity, 3),
+            'adjusted_calculation' => round($adjustedQuantity, 3),
+            'case_units' => $caseUnits,
+            'is_case_product' => $caseUnits > 1,
+            'sales_trend' => $salesStats['trend'],
                 'last_month_sales' => $salesStats['last_month_sales'],
                 'total_sales_6m' => $totalSales6m,
                 'sales_history' => $salesHistory,
@@ -237,10 +404,14 @@ class OrderService
                 'stock_days_remaining' => $avgWeeklySales > 0 ? round(($currentStock / $avgWeeklySales) * 7, 1) : 999,
                 'cost_source' => $this->getCostSource($supplierLink, $product, $unitCost),
                 'cost_per_ordering_unit' => $unitCost,
-                'units_per_case' => $caseUnits,
-                'has_cost_data' => $unitCost > 0,
-            ],
-        ];
+            'units_per_case' => $caseUnits,
+            'has_cost_data' => $unitCost > 0,
+            'category_group_key' => $categoryGroupKey,
+            'category_group_label' => $categoryGroupLabel,
+            'coverage_override_applied' => ! empty($coverageOverride),
+            'coverage_override' => $coverageOverride,
+        ],
+    ];
     }
 
     /**

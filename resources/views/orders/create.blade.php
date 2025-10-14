@@ -67,6 +67,53 @@
                             </div>
                         </div>
 
+                        @php
+                            $categoryGroupMap = $specialCategoryGroups ?? [];
+                            $oldCategoryOverrides = old('category_overrides', []);
+                        @endphp
+
+                        @if(!empty($categoryGroupMap))
+                            <div id="category-coverage-wrapper" class="hidden">
+                                <div class="border border-blue-200 rounded-md p-4 bg-blue-50/50">
+                                    <h3 class="text-sm font-semibold text-blue-900 flex items-center gap-2">
+                                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2"></path>
+                                        </svg>
+                                        Category Coverage Overrides
+                                    </h3>
+                                    <p class="mt-1 text-sm text-blue-700">
+                                        Fine-tune short-dated categories for this supplier. Leave blank to reuse the global cover-until date.
+                                    </p>
+
+                                    @foreach($categoryGroupMap as $supplierId => $groups)
+                                        <div class="mt-4 space-y-4 category-coverage-block hidden" data-category-coverage="{{ $supplierId }}">
+                                            @foreach($groups as $key => $group)
+                                                <div>
+                                                    <label for="category_{{ $key }}_coverage" class="block text-sm font-medium text-gray-700">
+                                                        {{ $group['label'] ?? \Illuminate\Support\Str::headline($key) }}
+                                                    </label>
+                                                    <input
+                                                        type="date"
+                                                        name="category_overrides[{{ $key }}][coverage_end_date]"
+                                                        id="category_{{ $key }}_coverage"
+                                                        value="{{ old('category_overrides.'.$key.'.coverage_end_date') }}"
+                                                        class="mt-1 block w-full sm:w-60 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                        min="{{ now()->format('Y-m-d') }}"
+                                                    >
+                                                    @error('category_overrides.'.$key.'.coverage_end_date')
+                                                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                                    @enderror
+                                                    <p class="mt-1 text-xs text-gray-500">
+                                                        Default: {{ $group['default_coverage_days'] ?? '—' }} day window.
+                                                    </p>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+
                         <!-- Sales History Window -->
                         <div>
                             <label for="sales_history_weeks" class="block text-sm font-medium text-gray-700">
@@ -131,6 +178,43 @@
                     </form>
                 </div>
             </div>
+
+            @if(!empty($categoryGroupMap))
+                <script>
+                    document.addEventListener('DOMContentLoaded', function () {
+                        const supplierSelect = document.getElementById('supplier_id');
+                        const wrapper = document.getElementById('category-coverage-wrapper');
+                        const blocks = document.querySelectorAll('.category-coverage-block');
+
+                        if (!supplierSelect || !wrapper) {
+                            return;
+                        }
+
+                        function toggleBlocks() {
+                            const selected = supplierSelect.value;
+                            let hasMatch = false;
+
+                            blocks.forEach(function (block) {
+                                if (block.getAttribute('data-category-coverage') === selected) {
+                                    block.classList.remove('hidden');
+                                    hasMatch = true;
+                                } else {
+                                    block.classList.add('hidden');
+                                }
+                            });
+
+                            if (hasMatch) {
+                                wrapper.classList.remove('hidden');
+                            } else {
+                                wrapper.classList.add('hidden');
+                            }
+                        }
+
+                        supplierSelect.addEventListener('change', toggleBlocks);
+                        toggleBlocks();
+                    });
+                </script>
+            @endif
 
             <!-- Quick Actions for Frequent Suppliers -->
             @if($suppliers->where('Supplier', 'like', '%Udea%')->first())

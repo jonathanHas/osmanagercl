@@ -103,6 +103,33 @@
     if ($globalMaxWeeklySales <= 0) {
         $globalMaxWeeklySales = 1;
     }
+
+    $categoryGroups = $categoryGroups ?? [];
+    $coverageOverrides = $orderSession->coverage_overrides ?? [];
+    $categoryCoverageMeta = [];
+    $globalCoverageDateRaw = optional($orderSession->coverage_ends_on)?->toDateString();
+    $globalCoverageDateFormatted = $globalCoverageDateRaw
+        ? \Carbon\Carbon::parse($globalCoverageDateRaw)->format('D j M Y')
+        : null;
+    $globalCoverageDays = $orderSession->coverage_days;
+    $oldCategoryKey = old('category_key');
+
+    foreach ($categoryGroups as $groupKey => $definition) {
+        $override = $coverageOverrides[$groupKey] ?? null;
+        $effectiveDate = $override['coverage_ends_on'] ?? $globalCoverageDateRaw;
+        $effectiveDays = $override['coverage_days'] ?? $globalCoverageDays;
+
+        $categoryCoverageMeta[$groupKey] = [
+            'label' => $definition['label'] ?? \Illuminate\Support\Str::headline($groupKey),
+            'effective_date' => $effectiveDate,
+            'effective_days' => $effectiveDays,
+            'formatted_date' => $effectiveDate
+                ? \Carbon\Carbon::parse($effectiveDate)->format('D j M Y')
+                : null,
+            'override_active' => $override !== null,
+            'default_hint' => $definition['default_coverage_days'] ?? null,
+        ];
+    }
 @endphp
 
 <!-- Filter Bar -->
@@ -147,10 +174,95 @@
 
 <!-- Cheese Products Table -->
 @if($cheeseProducts->count() > 0)
+@php
+    $cheeseCoverage = $categoryCoverageMeta['cheese'] ?? null;
+    $cheeseInputValue = $cheeseCoverage
+        ? ($oldCategoryKey === 'cheese'
+            ? old('coverage_end_date', $cheeseCoverage['override_active'] ? $cheeseCoverage['effective_date'] : '')
+            : ($cheeseCoverage['override_active'] ? $cheeseCoverage['effective_date'] : ''))
+        : '';
+@endphp
 <div class="mb-6">
-    <h3 class="text-lg font-semibold text-gray-900 mb-3 px-2 py-2 bg-yellow-50 rounded-t-lg border-b-2 border-yellow-400">
-        🧀 Cheese ({{ $cheeseProducts->count() }})
-    </h3>
+    @if($cheeseCoverage)
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3 py-2 bg-yellow-50 rounded-t-lg border-b-2 border-yellow-400">
+            <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                🧀 Cheese ({{ $cheeseProducts->count() }})
+            </h3>
+            <div class="flex items-center gap-3 text-sm sm:text-xs text-blue-800">
+                <div>
+                    {{ $cheeseCoverage['formatted_date'] ?? ($globalCoverageDateFormatted ?? 'Global schedule') }}
+                    <span class="block text-xs text-blue-600">
+                        {{ $cheeseCoverage['effective_days'] ?? '—' }} day window
+                        @if($cheeseCoverage['override_active'])
+                            • override active
+                        @else
+                            • using global target
+                        @endif
+                    </span>
+                </div>
+                @if($orderSession->isEditable())
+                    <details class="relative">
+                        <summary class="text-xs font-medium text-blue-600 hover:text-blue-700 cursor-pointer list-none">
+                            Adjust
+                        </summary>
+                        <div class="absolute right-0 mt-2 w-60 bg-white border border-blue-200 shadow-xl rounded-md p-3 z-30">
+                            <form method="POST" action="{{ route('orders.coverage-overrides', $orderSession) }}" class="space-y-3">
+                                @csrf
+                                @method('PATCH')
+                                <input type="hidden" name="category_key" value="cheese">
+                                <label for="cheese-coverage-input" class="block text-xs font-semibold text-gray-700">
+                                    Cover until
+                                </label>
+                                <input
+                                    type="date"
+                                    id="cheese-coverage-input"
+                                    name="coverage_end_date"
+                                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                    value="{{ $cheeseInputValue }}"
+                                    min="{{ optional($orderSession->order_date)?->format('Y-m-d') ?? now()->format('Y-m-d') }}"
+                                >
+                                <p class="text-xs text-gray-500">
+                                    Leave blank and use “Use global” to fall back to {{ $globalCoverageDateFormatted ?? 'the system default' }}.
+                                </p>
+                                @if($cheeseCoverage['default_hint'])
+                                    <p class="text-xs text-gray-400">
+                                        Suggested window: {{ $cheeseCoverage['default_hint'] }} days.
+                                    </p>
+                                @endif
+                                @error('coverage_end_date')
+                                    @if($oldCategoryKey === 'cheese')
+                                        <p class="text-xs text-red-600">{{ $message }}</p>
+                                    @endif
+                                @enderror
+                                <div class="flex justify-end gap-2">
+                                    @if($cheeseCoverage['override_active'])
+                                        <button
+                                            type="submit"
+                                            name="clear"
+                                            value="1"
+                                            class="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded"
+                                        >
+                                            Use global
+                                        </button>
+                                    @endif
+                                    <button
+                                        type="submit"
+                                        class="px-3 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded"
+                                    >
+                                        Save
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </details>
+                @endif
+            </div>
+        </div>
+    @else
+        <h3 class="text-lg font-semibold text-gray-900 px-2 py-2 bg-yellow-50 rounded-t-lg border-b-2 border-yellow-400">
+            🧀 Cheese ({{ $cheeseProducts->count() }})
+        </h3>
+    @endif
     <div class="bg-white rounded-b-lg shadow overflow-hidden">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
@@ -398,10 +510,95 @@
 
 <!-- Refrigerated Products Table -->
 @if($refrigeratedProducts->count() > 0)
+@php
+    $refrigeratedCoverage = $categoryCoverageMeta['refrigerated'] ?? null;
+    $refrigeratedInputValue = $refrigeratedCoverage
+        ? ($oldCategoryKey === 'refrigerated'
+            ? old('coverage_end_date', $refrigeratedCoverage['override_active'] ? $refrigeratedCoverage['effective_date'] : '')
+            : ($refrigeratedCoverage['override_active'] ? $refrigeratedCoverage['effective_date'] : ''))
+        : '';
+@endphp
 <div class="mb-6">
-    <h3 class="text-lg font-semibold text-gray-900 mb-3 px-2 py-2 bg-cyan-50 rounded-t-lg border-b-2 border-cyan-400">
-        ❄️ Refrigerated ({{ $refrigeratedProducts->count() }})
-    </h3>
+    @if($refrigeratedCoverage)
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3 py-2 bg-cyan-50 rounded-t-lg border-b-2 border-cyan-400">
+            <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                ❄️ Refrigerated ({{ $refrigeratedProducts->count() }})
+            </h3>
+            <div class="flex items-center gap-3 text-sm sm:text-xs text-blue-800">
+                <div>
+                    {{ $refrigeratedCoverage['formatted_date'] ?? ($globalCoverageDateFormatted ?? 'Global schedule') }}
+                    <span class="block text-xs text-blue-600">
+                        {{ $refrigeratedCoverage['effective_days'] ?? '—' }} day window
+                        @if($refrigeratedCoverage['override_active'])
+                            • override active
+                        @else
+                            • using global target
+                        @endif
+                    </span>
+                </div>
+                @if($orderSession->isEditable())
+                    <details class="relative">
+                        <summary class="text-xs font-medium text-blue-600 hover:text-blue-700 cursor-pointer list-none">
+                            Adjust
+                        </summary>
+                        <div class="absolute right-0 mt-2 w-60 bg-white border border-blue-200 shadow-xl rounded-md p-3 z-30">
+                            <form method="POST" action="{{ route('orders.coverage-overrides', $orderSession) }}" class="space-y-3">
+                                @csrf
+                                @method('PATCH')
+                                <input type="hidden" name="category_key" value="refrigerated">
+                                <label for="refrigerated-coverage-input" class="block text-xs font-semibold text-gray-700">
+                                    Cover until
+                                </label>
+                                <input
+                                    type="date"
+                                    id="refrigerated-coverage-input"
+                                    name="coverage_end_date"
+                                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                    value="{{ $refrigeratedInputValue }}"
+                                    min="{{ optional($orderSession->order_date)?->format('Y-m-d') ?? now()->format('Y-m-d') }}"
+                                >
+                                <p class="text-xs text-gray-500">
+                                    Leave blank and choose “Use global” to fall back to {{ $globalCoverageDateFormatted ?? 'the system default' }}.
+                                </p>
+                                @if($refrigeratedCoverage['default_hint'])
+                                    <p class="text-xs text-gray-400">
+                                        Suggested window: {{ $refrigeratedCoverage['default_hint'] }} days.
+                                    </p>
+                                @endif
+                                @error('coverage_end_date')
+                                    @if($oldCategoryKey === 'refrigerated')
+                                        <p class="text-xs text-red-600">{{ $message }}</p>
+                                    @endif
+                                @enderror
+                                <div class="flex justify-end gap-2">
+                                    @if($refrigeratedCoverage['override_active'])
+                                        <button
+                                            type="submit"
+                                            name="clear"
+                                            value="1"
+                                            class="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded"
+                                        >
+                                            Use global
+                                        </button>
+                                    @endif
+                                    <button
+                                        type="submit"
+                                        class="px-3 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded"
+                                    >
+                                        Save
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </details>
+                @endif
+            </div>
+        </div>
+    @else
+        <h3 class="text-lg font-semibold text-gray-900 px-2 py-2 bg-cyan-50 rounded-t-lg border-b-2 border-cyan-400">
+            ❄️ Refrigerated ({{ $refrigeratedProducts->count() }})
+        </h3>
+    @endif
     <div class="bg-white rounded-b-lg shadow overflow-hidden">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">

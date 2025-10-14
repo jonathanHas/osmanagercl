@@ -15,6 +15,7 @@ class OrderSession extends Model
         'coverage_days',
         'coverage_ends_on',
         'sales_history_weeks',
+        'coverage_overrides',
         'status',
         'total_items',
         'total_value',
@@ -25,6 +26,7 @@ class OrderSession extends Model
         'order_date' => 'date',
         'coverage_ends_on' => 'date',
         'total_value' => 'decimal:2',
+        'coverage_overrides' => 'array',
     ];
 
     /**

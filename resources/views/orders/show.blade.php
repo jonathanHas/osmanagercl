@@ -83,6 +83,7 @@
                 'displayItems' => $displayItems,
                 'backLink' => route('orders.index'),
                 'primaryActions' => $primaryActions,
+                'categoryGroups' => $categoryGroups,
             ])
         </div>
     </div>

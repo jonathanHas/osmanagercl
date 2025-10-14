@@ -6,6 +6,7 @@ use App\Models\OrderItem;
 use App\Models\OrderSession;
 use App\Models\Supplier;
 use App\Services\OrderService;
+use App\Support\SpecialOrderCategories;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -41,7 +42,9 @@ class OrderController extends Controller
     {
         $suppliers = Supplier::orderBy('Supplier')->get();
 
-        return view('orders.create', compact('suppliers'));
+        $specialCategoryGroups = SpecialOrderCategories::mapSuppliers($suppliers);
+
+        return view('orders.create', compact('suppliers', 'specialCategoryGroups'));
     }
 
     /**
@@ -54,6 +57,8 @@ class OrderController extends Controller
             'order_date' => 'required|date|after_or_equal:today',
             'coverage_end_date' => 'required|date',
             'sales_history_weeks' => 'nullable|integer|min:1|max:26',
+            'category_overrides' => 'nullable|array',
+            'category_overrides.*.coverage_end_date' => 'nullable|date|after_or_equal:order_date',
         ]);
 
         $orderDate = Carbon::parse($request->order_date);
@@ -65,6 +70,10 @@ class OrderController extends Controller
                 ->withInput();
         }
 
+        $specialGroups = SpecialOrderCategories::forSupplier((string) $request->supplier_id);
+        $rawOverrides = $request->input('category_overrides', []);
+        $categoryOverrides = $this->normaliseCategoryOverrides($rawOverrides, $specialGroups, $orderDate);
+
         $coverageDays = $orderDate->diffInDays($coverageEndDate) + 1;
         $salesHistoryWeeks = (int) $request->input('sales_history_weeks', 8);
 
@@ -75,6 +84,8 @@ class OrderController extends Controller
                 'coverage_days' => $coverageDays,
                 'coverage_ends_on' => $coverageEndDate,
                 'sales_history_weeks' => $salesHistoryWeeks,
+                'category_overrides' => $categoryOverrides,
+                'category_groups' => $specialGroups,
             ]
         );
 
@@ -94,8 +105,129 @@ class OrderController extends Controller
         ]);
 
         $statistics = $this->orderService->getOrderStatistics($order);
+        $categoryGroups = SpecialOrderCategories::forSupplier((string) $order->supplier_id);
 
-        return view('orders.show', compact('order', 'statistics'));
+        return view('orders.show', compact('order', 'statistics', 'categoryGroups'));
+    }
+
+    /**
+     * Update category-specific coverage overrides and rebuild an order session.
+     */
+    public function updateCategoryCoverage(Request $request, OrderSession $order): RedirectResponse
+    {
+        if (! $order->isEditable()) {
+            return back()->with('error', 'Only draft orders can be recalculated.');
+        }
+
+        $order->loadMissing('supplier');
+
+        $categoryGroups = SpecialOrderCategories::forSupplier((string) $order->supplier_id);
+
+        if (empty($categoryGroups)) {
+            return back()->with('error', 'This supplier does not support category-specific coverage.');
+        }
+
+        $existingOverrides = $order->coverage_overrides ?? [];
+        $orderDate = $order->order_date instanceof Carbon
+            ? $order->order_date->copy()
+            : Carbon::parse($order->order_date ?? now());
+        $orderDateRule = $orderDate->format('Y-m-d');
+
+        $singleGroupKey = $request->input('category_key');
+
+        if ($singleGroupKey !== null) {
+            if (! array_key_exists($singleGroupKey, $categoryGroups)) {
+                return back()->with('error', 'Unknown category override selection.');
+            }
+
+            $request->validate([
+                'coverage_end_date' => 'nullable|date|after_or_equal:'.$orderDateRule,
+            ]);
+
+            $clearOverride = $request->boolean('clear');
+            $newOverrides = $existingOverrides;
+            $updatedPayload = $clearOverride
+                ? null
+                : $this->buildOverrideEntry(
+                    $request->input('coverage_end_date'),
+                    $categoryGroups[$singleGroupKey],
+                    $orderDate
+                );
+
+            if ($updatedPayload === null) {
+                unset($newOverrides[$singleGroupKey]);
+            } else {
+                $newOverrides[$singleGroupKey] = $updatedPayload;
+            }
+
+            $existingValue = $existingOverrides[$singleGroupKey] ?? null;
+            $newValue = $newOverrides[$singleGroupKey] ?? null;
+
+            if ($existingValue === $newValue) {
+                $label = $categoryGroups[$singleGroupKey]['label'] ?? $singleGroupKey;
+                return back()->with('info', 'No changes detected for '.$label.'.');
+            }
+
+            $this->orderService->regenerateOrderSession($order, [
+                'coverage_days' => $order->coverage_days,
+                'coverage_ends_on' => $order->coverage_ends_on,
+                'sales_history_weeks' => $order->sales_history_weeks,
+                'category_overrides' => $newOverrides,
+                'category_groups' => $categoryGroups,
+                'order_date' => $orderDate,
+                'rebuild_groups' => [$singleGroupKey],
+            ]);
+
+            $label = $categoryGroups[$singleGroupKey]['label'] ?? ucfirst($singleGroupKey);
+
+            return redirect()
+                ->route('orders.show', $order->fresh())
+                ->with('success', 'Updated coverage for '.$label.'.');
+        }
+
+        $request->validate([
+            'category_overrides' => 'required|array',
+            'category_overrides.*.coverage_end_date' => 'nullable|date|after_or_equal:'.$orderDateRule,
+        ]);
+
+        $rawOverrides = $request->input('category_overrides', []);
+        $normalisedOverrides = $this->normaliseCategoryOverrides(
+            $rawOverrides,
+            $categoryGroups,
+            $orderDate
+        );
+
+        $mergedOverrides = $existingOverrides;
+        foreach ($normalisedOverrides as $key => $payload) {
+            $mergedOverrides[$key] = $payload;
+        }
+
+        $changedGroups = [];
+        foreach ($categoryGroups as $key => $group) {
+            $before = $existingOverrides[$key] ?? null;
+            $after = $mergedOverrides[$key] ?? null;
+            if ($before !== $after) {
+                $changedGroups[] = $key;
+            }
+        }
+
+        if (empty($changedGroups)) {
+            return back()->with('info', 'No category coverage updates detected.');
+        }
+
+        $this->orderService->regenerateOrderSession($order, [
+            'coverage_days' => $order->coverage_days,
+            'coverage_ends_on' => $order->coverage_ends_on,
+            'sales_history_weeks' => $order->sales_history_weeks,
+            'category_overrides' => $mergedOverrides,
+            'category_groups' => $categoryGroups,
+            'order_date' => $orderDate,
+            'rebuild_groups' => $changedGroups,
+        ]);
+
+        return redirect()
+            ->route('orders.show', $order->fresh())
+            ->with('success', 'Category coverage updated and order regenerated.');
     }
 
     /**
@@ -125,6 +257,69 @@ class OrderController extends Controller
 
         return redirect()->route('orders.index')
             ->with('success', 'Order deleted successfully.');
+    }
+
+    /**
+     * Normalise category override payload against known groups.
+     *
+     * @param  array<string, array<string, string|null>>  $rawOverrides
+     * @param  array<string, array<string, mixed>>  $categoryGroups
+     * @return array<string, array<string, string|int>>
+     */
+    protected function normaliseCategoryOverrides(array $rawOverrides, array $categoryGroups, Carbon $orderDate): array
+    {
+        $normalised = [];
+
+        foreach ($rawOverrides as $key => $payload) {
+            if (! array_key_exists($key, $categoryGroups)) {
+                continue;
+            }
+
+            $entry = $this->buildOverrideEntry(
+                $payload['coverage_end_date'] ?? null,
+                $categoryGroups[$key],
+                $orderDate
+            );
+
+            if ($entry !== null) {
+                $normalised[$key] = $entry;
+            }
+        }
+
+        return $normalised;
+    }
+
+    /**
+     * Build a normalised override entry for a category group.
+     */
+    protected function buildOverrideEntry(?string $requestedDate, array $groupDefinition, Carbon $orderDate): ?array
+    {
+        if ($requestedDate === null || $requestedDate === '') {
+            return null;
+        }
+
+        try {
+            $overrideEnd = Carbon::parse($requestedDate)->startOfDay();
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        if ($overrideEnd->lessThan($orderDate)) {
+            return null;
+        }
+
+        $coverageDays = $orderDate->diffInDays($overrideEnd) + 1;
+
+        $entry = [
+            'coverage_ends_on' => $overrideEnd->toDateString(),
+            'coverage_days' => $coverageDays,
+        ];
+
+        if (! empty($groupDefinition['label'])) {
+            $entry['label'] = $groupDefinition['label'];
+        }
+
+        return $entry;
     }
 
     /**
