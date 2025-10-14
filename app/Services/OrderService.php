@@ -104,6 +104,8 @@ class OrderService
             }
         }
 
+        $rebuiltProductIds = collect();
+
         if ($rebuildGroups === null) {
             $orderSession->items()->delete();
         } else {
@@ -126,11 +128,15 @@ class OrderService
                     }
 
                     return false;
-                })
-                ->pluck('id');
+                });
+
+            $rebuiltProductIds = $itemsToRebuild->pluck('product_id')
+                ->filter()
+                ->unique()
+                ->values();
 
             if ($itemsToRebuild->isNotEmpty()) {
-                OrderItem::whereIn('id', $itemsToRebuild)->delete();
+                OrderItem::whereIn('id', $itemsToRebuild->pluck('id'))->delete();
             }
         }
 
@@ -150,6 +156,7 @@ class OrderService
             'category_groups' => $categoryGroups,
             'category_overrides' => $categoryOverrides,
             'rebuild_groups' => $rebuildGroups,
+            'target_product_ids' => $rebuiltProductIds->all(),
         ]);
     }
 
@@ -183,7 +190,18 @@ class OrderService
             }
         }
 
-        $products = $this->getSupplierProducts($orderSession->supplier_id);
+        $targetProductIds = $options['target_product_ids'] ?? [];
+        if (! is_array($targetProductIds)) {
+            $targetProductIds = [];
+        }
+        $targetProductIds = array_values(array_unique(array_filter($targetProductIds, static fn ($id) => ! empty($id))));
+
+        $products = $this->getSupplierProducts(
+            $orderSession->supplier_id,
+            $rebuildGroups,
+            $categoryGroups,
+            $targetProductIds
+        );
         $orderItems = [];
 
         foreach ($products as $product) {
@@ -486,13 +504,39 @@ class OrderService
     /**
      * Get products for a supplier.
      */
-    protected function getSupplierProducts(string $supplierId): Collection
+    protected function getSupplierProducts(
+        string $supplierId,
+        ?array $groupFilter = null,
+        array $categoryGroups = [],
+        array $targetProductIds = []
+    ): Collection
     {
         $sixMonthsAgo = Carbon::now()->subMonths(6);
-
-        return Product::whereHas('supplierLinks', function ($query) use ($supplierId) {
+        $query = Product::whereHas('supplierLinks', function ($query) use ($supplierId) {
             $query->where('SupplierID', $supplierId);
-        })
+        });
+
+        if (! empty($targetProductIds)) {
+            $query->whereIn('ID', $targetProductIds);
+        } elseif ($groupFilter !== null) {
+            $categoryCodes = [];
+            foreach ($groupFilter as $groupKey) {
+                $codes = $categoryGroups[$groupKey]['category_codes'] ?? [];
+                foreach ($codes as $code) {
+                    $categoryCodes[] = $code;
+                }
+            }
+
+            $categoryCodes = array_values(array_unique(array_filter($categoryCodes)));
+
+            if (empty($categoryCodes)) {
+                return collect();
+            }
+
+            $query->whereIn('CATEGORY', $categoryCodes);
+        }
+
+        return $query
             ->whereHas('stocking') // Only include products that are stocked
             ->whereHas('stockDiary', function ($query) use ($sixMonthsAgo) {
                 // Only include products with sales in last 6 months

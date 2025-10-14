@@ -27,6 +27,8 @@ The order generation system automates the calculation of required stock quantiti
 - **Category-Specific Coverage Overrides**: Suppliers with curated groups (initially Udea’s cheese and refrigerated catalogues) expose additional “cover until” fields during order generation. The values are persisted to `order_sessions.coverage_overrides` and reapplied whenever the session is regenerated.
 - **Interactive Coverage Editing**: Draft orders now surface the per-category windows on the review screen, allowing buyers to tweak short-dated categories and trigger an in-place recalculation without affecting longer-life products.
 - **Scoped Regeneration**: Updating a category from the review header recalculates only the matching products, preserving quantities the buyer already adjusted in other groups while keeping totals in sync.
+- **Snappier Adjustments**: Category edits reuse the existing order rows when possible and only fetch supplier products that belong to the affected groups, dramatically reducing regeneration time on large catalogues.
+- **Unified Review Graph**: The order review chart now plots current stock and projected stock directly onto the sales trend, eliminating the old “tank” bars and ensuring all values share the same scale.
 
 ### 2. Product Classification System
 Products are classified into three review priority levels:
