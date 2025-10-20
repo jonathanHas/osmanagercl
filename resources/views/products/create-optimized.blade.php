@@ -336,19 +336,6 @@
                                            class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:border-indigo-500 focus:ring-indigo-500">
                                 </div>
 
-                                <div>
-                                    <label for="supplier_cost" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Supplier Cost (€)
-                                    </label>
-                                    <input type="number" 
-                                           id="supplier_cost" 
-                                           name="supplier_cost" 
-                                           value="{{ old('supplier_cost') }}" 
-                                           step="0.01" 
-                                           min="0"
-                                           class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:border-indigo-500 focus:ring-indigo-500"
-                                           placeholder="Auto-filled from cost">
-                                </div>
                             </div>
                         </div>
 
@@ -707,17 +694,6 @@
         document.getElementById('price_sell').addEventListener('input', updatePricingBreakdown);
         document.getElementById('has_delivery_cost').addEventListener('change', updatePricingBreakdown);
         document.getElementById('tax_category').addEventListener('change', updatePricingBreakdown);
-
-        // Auto-fill supplier cost from cost price
-        document.getElementById('price_buy').addEventListener('input', function() {
-            const costPrice = parseFloat(this.value);
-            if (!isNaN(costPrice) && costPrice > 0) {
-                const supplierCostField = document.getElementById('supplier_cost');
-                if (!supplierCostField.value) {
-                    supplierCostField.value = costPrice.toFixed(2);
-                }
-            }
-        });
 
         // Auto-calculate stock cost from cost price and initial stock
         function updateStockCost() {

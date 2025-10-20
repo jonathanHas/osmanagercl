@@ -79,7 +79,6 @@ Create a new product with enhanced VAT handling.
     "supplier_id": "supplier-id",
     "supplier_code": "SUP-CODE-001", 
     "units_per_case": 12,
-    "supplier_cost": 10.00,
     "include_in_stocking": true,
     "delivery_item_id": 123
 }
@@ -108,6 +107,9 @@ $priceExVat = $vatRate > 0 ? $request->price_sell / (1 + $vatRate) : $request->p
 - `include_in_stocking`: boolean, defaults to true
 
 **Response:** Redirect to product detail page with success message
+
+**Notes:**
+- Supplier link cost is automatically populated from `price_buy`; there is no dedicated `supplier_cost` input in the form.
 
 ---
 

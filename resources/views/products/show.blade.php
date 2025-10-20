@@ -413,11 +413,11 @@
                                         @endif
                                         
                                         <!-- Units per Case -->
-                                        @if($product->supplierLink && $product->supplierLink->UnitsPerCase > 1)
+                                        @if($product->supplierLink && $product->supplierLink->CaseUnits > 1)
                                             <div>
                                                 <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Units per Case</dt>
                                                 <dd class="mt-1 text-base text-gray-900 dark:text-gray-100">
-                                                    {{ $product->supplierLink->UnitsPerCase }} units
+                                                    {{ $product->supplierLink->CaseUnits }} units
                                                 </dd>
                                             </div>
                                         @endif

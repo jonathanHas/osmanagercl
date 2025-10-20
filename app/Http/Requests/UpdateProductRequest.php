@@ -61,7 +61,6 @@ class UpdateProductRequest extends FormRequest
             'supplier_id' => 'nullable|exists:pos.suppliers,SupplierID',
             'supplier_code' => 'nullable|string|max:100',
             'units_per_case' => 'nullable|integer|min:1|max:9999',
-            'supplier_cost' => 'nullable|numeric|min:0|max:999999.99',
 
             // Stock Management
             'include_in_stocking' => 'boolean',

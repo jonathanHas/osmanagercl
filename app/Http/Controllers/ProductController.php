@@ -771,6 +771,7 @@ class ProductController extends Controller
         $taxCategory = TaxCategory::with('primaryTax')->find($product->TAXCAT);
         $vatRate = $taxCategory?->primaryTax?->RATE ?? 0.0;
         $grossPrice = $vatRate > 0 ? $product->PRICESELL * (1 + $vatRate) : $product->PRICESELL;
+        $grossPrice = number_format((float) $grossPrice, 2, '.', '');
 
         // Prepare data for form population
         $prefillData = [
@@ -782,8 +783,7 @@ class ProductController extends Controller
             'display_name' => $product->DISPLAY,
             'supplier_id' => $supplierLink?->SupplierID,
             'supplier_code' => $supplierLink?->SupplierCode,
-            'units_per_case' => $supplierLink?->UnitsPerCase ?? 1,
-            'supplier_cost' => $supplierLink?->CostPrice,
+            'units_per_case' => $supplierLink?->CaseUnits ?? 1,
         ];
 
         // Check if product is in stocking management
@@ -850,7 +850,7 @@ class ProductController extends Controller
                         'SupplierID' => $request->supplier_id,
                         'SupplierCode' => $request->supplier_code,
                         'CaseUnits' => $request->units_per_case ?? 1,
-                        'Cost' => $request->supplier_cost ?? $request->price_buy,
+                        'Cost' => $request->price_buy,
                         'stocked' => true,
                     ]);
                 }
@@ -982,17 +982,18 @@ class ProductController extends Controller
                     $supplierLink->update([
                         'SupplierID' => $request->supplier_id,
                         'SupplierCode' => $request->supplier_code,
-                        'UnitsPerCase' => $request->units_per_case ?? 1,
-                        'CostPrice' => $request->supplier_cost ?? $request->price_buy,
+                        'CaseUnits' => $request->units_per_case ?? 1,
+                        'Cost' => $request->price_buy,
                     ]);
                 } else {
                     // Create new supplier link
                     \App\Models\SupplierLink::create([
-                        'ProductCode' => $product->CODE,
+                        'Barcode' => $product->CODE,
                         'SupplierID' => $request->supplier_id,
                         'SupplierCode' => $request->supplier_code,
-                        'UnitsPerCase' => $request->units_per_case ?? 1,
-                        'CostPrice' => $request->supplier_cost ?? $request->price_buy,
+                        'CaseUnits' => $request->units_per_case ?? 1,
+                        'Cost' => $request->price_buy,
+                        'stocked' => true,
                     ]);
                 }
             }
