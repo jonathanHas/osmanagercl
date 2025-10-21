@@ -116,6 +116,32 @@
             'default_hint' => $definition['default_coverage_days'] ?? null,
         ];
     }
+
+    $formatQuantityDisplay = static function (float $value, int $precision = 3): string {
+        $roundedWhole = round($value);
+        if (abs($value - $roundedWhole) < 0.0005) {
+            return number_format($roundedWhole, 0);
+        }
+
+        $formatted = number_format($value, $precision);
+        if (str_contains($formatted, '.')) {
+            $formatted = rtrim(rtrim($formatted, '0'), '.');
+        }
+
+        return $formatted;
+    };
+
+    $formatQuantityInput = static function (float $value, int $precision = 3): string {
+        $roundedWhole = round($value);
+        if (abs($value - $roundedWhole) < 0.0005) {
+            return (string) $roundedWhole;
+        }
+
+        $formatted = number_format($value, $precision, '.', '');
+        $formatted = rtrim(rtrim($formatted, '0'), '.');
+
+        return $formatted === '' ? '0' : $formatted;
+    };
 @endphp
 
 <!-- Filter Bar -->
@@ -257,8 +283,7 @@
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                     <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-32">Total Sales</th>
                     <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase" style="width: 320px;">Stock Levels & Sales Trend</th>
-                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-32">Suggested</th>
-                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-40">Order Qty</th>
+                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-48">Suggested & Order</th>
                     <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase w-32">Cost</th>
                     <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-32">Action</th>
                 </tr>
@@ -289,6 +314,10 @@
                     }
                     $caseUnits = $contextData['case_units'] ?? 1;
                     $isCaseProduct = $contextData['is_case_product'] ?? ($caseUnits > 1);
+                    $supplierCode = $contextData['supplier_code'] ?? optional($product->supplierLink)->SupplierCode;
+                    if (is_string($supplierCode)) {
+                        $supplierCode = trim($supplierCode);
+                    }
                     $suggestedUnits = (float) ($item->suggested_quantity ?? 0);
                     $suggestedCases = $caseUnits > 1
                         ? (float) ($item->suggested_cases ?? ($caseUnits > 0 ? $suggestedUnits / $caseUnits : 0))
@@ -302,6 +331,15 @@
                     $quantityLabel = $isCaseProduct ? 'cases' : 'units';
                     $quantityPrecision = $isCaseProduct ? 3 : 0;
                     $afterStock = $currentStock + $finalUnits;
+                    $orderInputValue = $formatQuantityInput($displayOrderQuantity, $quantityPrecision);
+                    $suggestedDisplayText = $formatQuantityDisplay($suggestedDisplayQuantity, $quantityPrecision);
+                    $orderDisplayText = $formatQuantityDisplay($displayOrderQuantity, $quantityPrecision);
+                    $currentStockCaseText = $isCaseProduct
+                        ? $formatQuantityDisplay($currentStock / max($caseUnits, 1), 3)
+                        : null;
+                    $afterStockCaseText = $isCaseProduct
+                        ? $formatQuantityDisplay($afterStock / max($caseUnits, 1), 3)
+                        : null;
 
                     // For percentage labels - use individual product's peak for intuitive display
                     $productPeakDemand = max($peakWeeklySales, 1);
@@ -343,13 +381,29 @@
                     <td class="px-4 py-4">
                         <div class="font-medium text-gray-900">{!! strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product')) !!}</div>
                         <div class="text-sm text-gray-500">
-                            Code: {{ $product->CODE ?? 'N/A' }} • {{ $avgWeeklySales > 0 ? number_format($avgWeeklySales, 1) : '0' }}/week avg
+                            Code: {{ $product->CODE ?? 'N/A' }}@if($caseUnits > 1) • {{ rtrim(rtrim(number_format($caseUnits, 2), '0'), '.') }} units/case @endif
                         </div>
+                        @if($supplierCode)
+                            <div class="mt-1 flex items-center gap-2 text-xs text-gray-500">
+                                <span class="uppercase tracking-wide text-[11px] text-slate-400">Supplier</span>
+                                <span class="font-mono text-sm text-slate-600" id="supplier-code-{{ $item->id }}">{{ $supplierCode }}</span>
+                                <button type="button"
+                                        class="copy-supplier-code text-[11px] font-medium text-blue-600 hover:text-blue-700"
+                                        data-supplier-code="{{ $supplierCode }}"
+                                        title="Copy supplier code">
+                                    Copy
+                                </button>
+                            </div>
+                        @endif
                     </td>
                     <td class="px-4 py-4">
                         <div class="text-center">
                             <div class="text-2xl font-bold text-blue-600">{{ number_format($totalPeriodSales, 0) }}</div>
                             <div class="text-xs text-gray-500 mb-1">total sold</div>
+                            <div class="mt-2 flex items-center justify-center gap-6 text-xs text-gray-600">
+                                <span>avg {{ number_format($avgWeeklySales, 1) }}</span>
+                                <span>peak {{ number_format($peakWeeklySales, 1) }}</span>
+                            </div>
                             <div class="w-full bg-gray-200 rounded-full h-2">
                                 <div class="bg-{{ $stockColor }}-500 h-2 rounded-full" style="width: {{ max(min($currentPct, 100), 0) }}%"></div>
                             </div>
@@ -367,70 +421,76 @@
                             <div class="relative" style="height: 110px;">
                                 <canvas id="chart_{{ $item->id }}" class="w-full h-full"></canvas>
                             </div>
-                            <div class="flex items-center justify-center gap-6 text-[11px] text-gray-500">
-                                <span class="inline-flex items-center gap-1">
-                                    <span class="inline-flex w-2.5 h-2.5 rounded-full bg-slate-400"></span>
-                                    Current stock
-                                </span>
-                                <span class="inline-flex items-center gap-1">
-                                    <span class="inline-flex w-2.5 h-2.5 rounded-full bg-green-500"></span>
-                                    After order
-                                </span>
-                            </div>
-                            <div class="flex items-center justify-between text-xs text-gray-600">
-                                <div class="text-left">
-                                    <span class="font-semibold text-{{ $stockColor }}-600">{{ number_format($currentStock, 0) }}</span>
-                                    <span class="text-[11px] text-gray-500">
-                                        ({{ $isCaseProduct ? number_format($currentStock / max($caseUnits, 1), 1).' cs' : 'u' }}, {{ round($currentPct) }}%)
-                                    </span>
+                            <div class="flex flex-col gap-2 text-xs text-gray-600">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div>
+                                        <div class="text-[11px] uppercase tracking-wide text-slate-500">Current stock</div>
+                                        <div class="text-xl font-semibold text-{{ $stockColor }}-600">{{ number_format($currentStock, 0) }}</div>
+                                        <div class="text-[11px] text-gray-500">
+                                            @if($isCaseProduct)
+                                                {{ $currentStockCaseText }} cases
+                                            @else
+                                                {{ number_format($currentStock, 0) }} units
+                                            @endif
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-[11px] uppercase tracking-wide text-slate-500">After order</div>
+                                        <div id="after-stock-value-{{ $item->id }}" class="text-2xl font-semibold text-green-600">{{ number_format($afterStock, 0) }}</div>
+                                        <div id="after-stock-subtext-{{ $item->id }}" class="text-[11px] text-gray-500">
+                                            @if($isCaseProduct)
+                                                {{ $afterStockCaseText }} cases
+                                            @else
+                                                {{ number_format($afterStock, 0) }} units
+                                            @endif
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="px-2 py-0.5 bg-gray-100 rounded text-gray-700 font-medium">
-                                    avg {{ number_format($avgWeeklySales, 1) }} · peak {{ number_format($peakWeeklySales, 1) }}
-                                    @if(isset($contextData['coverage_weeks']))
-                                        · cover {{ number_format($contextData['coverage_weeks'], 1) }}→{{ number_format($contextData['target_weeks'] ?? $contextData['coverage_weeks'], 1) }} wk
-                                    @endif
-                                </div>
-                                <div class="text-right">
-                                    <span id="after-stock-value-{{ $item->id }}" class="font-semibold text-green-600">{{ number_format($afterStock, 0) }}</span>
-                                    <span id="after-stock-label-{{ $item->id }}" class="text-[11px] text-gray-500">
-                                        ({{ $isCaseProduct ? number_format($afterStock / max($caseUnits, 1), 1).' cs' : 'u' }}, {{ round($afterPct) }}%)
-                                    </span>
-                                </div>
+                                @if(isset($contextData['coverage_weeks']))
+                                    <div class="flex justify-end text-[11px] text-gray-500">
+                                        Cover {{ number_format($contextData['coverage_weeks'], 1) }}→{{ number_format($contextData['target_weeks'] ?? $contextData['coverage_weeks'], 1) }} wk
+                                    </div>
+                                @endif
                             </div>
                         </div>
-                    </td>
-                    <td class="px-4 py-4 text-center">
-                        <div class="text-xl font-bold text-purple-700">
-                            {{ number_format($suggestedDisplayQuantity, $quantityPrecision) }} {{ $quantityLabel }}
-                        </div>
-                        <div class="text-sm text-gray-600">{{ number_format($suggestedUnits, 0) }} units</div>
-                        @if(abs($finalUnits - $suggestedUnits) > 0.001)
-                            <div class="mt-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-600">
-                                Final: {{ number_format($displayOrderQuantity, $quantityPrecision) }} {{ $quantityLabel }}
-                            </div>
-                        @endif
                     </td>
                     <td class="px-4 py-4">
-                        <div class="flex items-center justify-center space-x-1">
-                            <button class="qty-decrease w-8 h-8 bg-red-100 hover:bg-red-200 text-red-700 rounded font-bold"
-                                    type="button"
-                                    data-item-id="{{ $item->id }}">−</button>
-                            <input type="number"
-                                   id="qty-input-{{ $item->id }}"
-                                   value="{{ number_format($displayOrderQuantity, $quantityPrecision, '.', '') }}"
-                                   step="1"
-                                   data-item-id="{{ $item->id }}"
-                                   data-current-stock="{{ $currentStock }}"
-                                   data-case-units="{{ $caseUnits }}"
-                                   data-is-case-product="{{ $isCaseProduct ? 1 : 0 }}"
-                                   data-product-peak="{{ $peakWeeklySales }}"
-                                   class="qty-input w-20 text-center text-lg font-bold border-2 border-gray-300 rounded py-1">
-                            <button class="qty-increase w-8 h-8 bg-green-100 hover:bg-green-200 text-green-700 rounded font-bold"
-                                    type="button"
-                                    data-item-id="{{ $item->id }}">+</button>
-                        </div>
-                        <div class="text-center text-xs text-gray-500 mt-1">
-                            {{ $quantityLabel }} · <span id="units-label-{{ $item->id }}">{{ number_format($finalUnits, 0) }}</span> units
+                        <div class="flex flex-col items-center gap-3">
+                            <div class="text-center">
+                                <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Suggested</div>
+                                <div class="mt-1 text-xl font-bold text-purple-700">
+                                    {{ $suggestedDisplayText }} {{ $quantityLabel }}
+                                </div>
+                                <div class="text-xs text-gray-500">{{ number_format($suggestedUnits, 0) }} units</div>
+                            </div>
+                            <div class="flex items-center justify-center gap-1">
+                                <button class="qty-decrease w-8 h-8 bg-red-100 hover:bg-red-200 text-red-700 rounded font-bold"
+                                        type="button"
+                                        data-item-id="{{ $item->id }}">−</button>
+                                <input type="number"
+                                       id="qty-input-{{ $item->id }}"
+                                       value="{{ $orderInputValue }}"
+                                       step="1"
+                                       data-item-id="{{ $item->id }}"
+                                       data-current-stock="{{ $currentStock }}"
+                                       data-case-units="{{ $caseUnits }}"
+                                       data-is-case-product="{{ $isCaseProduct ? 1 : 0 }}"
+                                       data-product-peak="{{ $peakWeeklySales }}"
+                                       data-quantity-precision="{{ $quantityPrecision }}"
+                                       class="qty-input w-20 text-center text-lg font-bold border-2 border-gray-300 rounded py-1">
+                                <button class="qty-increase w-8 h-8 bg-green-100 hover:bg-green-200 text-green-700 rounded font-bold"
+                                        type="button"
+                                        data-item-id="{{ $item->id }}">+</button>
+                            </div>
+                            <div class="text-xs text-gray-500 text-center">
+                                Order: <span id="units-label-{{ $item->id }}">{{ number_format($finalUnits, 0) }}</span> units
+                                <span class="text-gray-400">(<span id="order-quantity-display-{{ $item->id }}">{{ $orderDisplayText }}</span> {{ $quantityLabel }})</span>
+                            </div>
+                            @if(abs($finalUnits - $suggestedUnits) > 0.001)
+                                <div class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-600">
+                                    Adjusted from {{ $suggestedDisplayText }} {{ $quantityLabel }}
+                                </div>
+                            @endif
                         </div>
                     </td>
                     <td class="px-4 py-4 text-right">
@@ -555,8 +615,7 @@
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                     <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-32">Total Sales</th>
                     <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase" style="width: 320px;">Stock Levels & Sales Trend</th>
-                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-32">Suggested</th>
-                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-40">Order Qty</th>
+                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-48">Suggested & Order</th>
                     <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase w-32">Cost</th>
                     <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-32">Action</th>
                 </tr>
@@ -587,6 +646,10 @@
                     }
                     $caseUnits = $contextData['case_units'] ?? 1;
                     $isCaseProduct = $contextData['is_case_product'] ?? ($caseUnits > 1);
+                    $supplierCode = $contextData['supplier_code'] ?? optional($product->supplierLink)->SupplierCode;
+                    if (is_string($supplierCode)) {
+                        $supplierCode = trim($supplierCode);
+                    }
                     $suggestedUnits = (float) ($item->suggested_quantity ?? 0);
                     $suggestedCases = $caseUnits > 1
                         ? (float) ($item->suggested_cases ?? ($caseUnits > 0 ? $suggestedUnits / $caseUnits : 0))
@@ -600,6 +663,15 @@
                     $quantityLabel = $isCaseProduct ? 'cases' : 'units';
                     $quantityPrecision = $isCaseProduct ? 3 : 0;
                     $afterStock = $currentStock + $finalUnits;
+                    $orderInputValue = $formatQuantityInput($displayOrderQuantity, $quantityPrecision);
+                    $suggestedDisplayText = $formatQuantityDisplay($suggestedDisplayQuantity, $quantityPrecision);
+                    $orderDisplayText = $formatQuantityDisplay($displayOrderQuantity, $quantityPrecision);
+                    $currentStockCaseText = $isCaseProduct
+                        ? $formatQuantityDisplay($currentStock / max($caseUnits, 1), 3)
+                        : null;
+                    $afterStockCaseText = $isCaseProduct
+                        ? $formatQuantityDisplay($afterStock / max($caseUnits, 1), 3)
+                        : null;
 
                     // For percentage labels - use individual product's peak for intuitive display
                     $productPeakDemand = max($peakWeeklySales, 1);
@@ -641,13 +713,29 @@
                     <td class="px-4 py-4">
                         <div class="font-medium text-gray-900">{!! strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product')) !!}</div>
                         <div class="text-sm text-gray-500">
-                            Code: {{ $product->CODE ?? 'N/A' }} • {{ $avgWeeklySales > 0 ? number_format($avgWeeklySales, 1) : '0' }}/week avg
+                            Code: {{ $product->CODE ?? 'N/A' }}@if($caseUnits > 1) • {{ rtrim(rtrim(number_format($caseUnits, 2), '0'), '.') }} units/case @endif
                         </div>
+                        @if($supplierCode)
+                            <div class="mt-1 flex items-center gap-2 text-xs text-gray-500">
+                                <span class="uppercase tracking-wide text-[11px] text-slate-400">Supplier</span>
+                                <span class="font-mono text-sm text-slate-600" id="supplier-code-{{ $item->id }}">{{ $supplierCode }}</span>
+                                <button type="button"
+                                        class="copy-supplier-code text-[11px] font-medium text-blue-600 hover:text-blue-700"
+                                        data-supplier-code="{{ $supplierCode }}"
+                                        title="Copy supplier code">
+                                    Copy
+                                </button>
+                            </div>
+                        @endif
                     </td>
                     <td class="px-4 py-4">
                         <div class="text-center">
                             <div class="text-2xl font-bold text-blue-600">{{ number_format($totalPeriodSales, 0) }}</div>
                             <div class="text-xs text-gray-500 mb-1">total sold</div>
+                            <div class="mt-2 flex items-center justify-center gap-6 text-xs text-gray-600">
+                                <span>avg {{ number_format($avgWeeklySales, 1) }}</span>
+                                <span>peak {{ number_format($peakWeeklySales, 1) }}</span>
+                            </div>
                             <div class="w-full bg-gray-200 rounded-full h-2">
                                 <div class="bg-{{ $stockColor }}-500 h-2 rounded-full" style="width: {{ max(min($currentPct, 100), 0) }}%"></div>
                             </div>
@@ -665,70 +753,76 @@
                             <div class="relative" style="height: 110px;">
                                 <canvas id="chart_{{ $item->id }}" class="w-full h-full"></canvas>
                             </div>
-                            <div class="flex items-center justify-center gap-6 text-[11px] text-gray-500">
-                                <span class="inline-flex items-center gap-1">
-                                    <span class="inline-flex w-2.5 h-2.5 rounded-full bg-slate-400"></span>
-                                    Current stock
-                                </span>
-                                <span class="inline-flex items-center gap-1">
-                                    <span class="inline-flex w-2.5 h-2.5 rounded-full bg-green-500"></span>
-                                    After order
-                                </span>
-                            </div>
-                            <div class="flex items-center justify-between text-xs text-gray-600">
-                                <div class="text-left">
-                                    <span class="font-semibold text-{{ $stockColor }}-600">{{ number_format($currentStock, 0) }}</span>
-                                    <span class="text-[11px] text-gray-500">
-                                        ({{ $isCaseProduct ? number_format($currentStock / max($caseUnits, 1), 1).' cs' : 'u' }}, {{ round($currentPct) }}%)
-                                    </span>
+                            <div class="flex flex-col gap-2 text-xs text-gray-600">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div>
+                                        <div class="text-[11px] uppercase tracking-wide text-slate-500">Current stock</div>
+                                        <div class="text-xl font-semibold text-{{ $stockColor }}-600">{{ number_format($currentStock, 0) }}</div>
+                                        <div class="text-[11px] text-gray-500">
+                                            @if($isCaseProduct)
+                                                {{ $currentStockCaseText }} cases
+                                            @else
+                                                {{ number_format($currentStock, 0) }} units
+                                            @endif
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-[11px] uppercase tracking-wide text-slate-500">After order</div>
+                                        <div id="after-stock-value-{{ $item->id }}" class="text-2xl font-semibold text-green-600">{{ number_format($afterStock, 0) }}</div>
+                                        <div id="after-stock-subtext-{{ $item->id }}" class="text-[11px] text-gray-500">
+                                            @if($isCaseProduct)
+                                                {{ $afterStockCaseText }} cases
+                                            @else
+                                                {{ number_format($afterStock, 0) }} units
+                                            @endif
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="px-2 py-0.5 bg-gray-100 rounded text-gray-700 font-medium">
-                                    avg {{ number_format($avgWeeklySales, 1) }} · peak {{ number_format($peakWeeklySales, 1) }}
-                                    @if(isset($contextData['coverage_weeks']))
-                                        · cover {{ number_format($contextData['coverage_weeks'], 1) }}→{{ number_format($contextData['target_weeks'] ?? $contextData['coverage_weeks'], 1) }} wk
-                                    @endif
-                                </div>
-                                <div class="text-right">
-                                    <span id="after-stock-value-{{ $item->id }}" class="font-semibold text-green-600">{{ number_format($afterStock, 0) }}</span>
-                                    <span id="after-stock-label-{{ $item->id }}" class="text-[11px] text-gray-500">
-                                        ({{ $isCaseProduct ? number_format($afterStock / max($caseUnits, 1), 1).' cs' : 'u' }}, {{ round($afterPct) }}%)
-                                    </span>
-                                </div>
+                                @if(isset($contextData['coverage_weeks']))
+                                    <div class="flex justify-end text-[11px] text-gray-500">
+                                        Cover {{ number_format($contextData['coverage_weeks'], 1) }}→{{ number_format($contextData['target_weeks'] ?? $contextData['coverage_weeks'], 1) }} wk
+                                    </div>
+                                @endif
                             </div>
                         </div>
-                    </td>
-                    <td class="px-4 py-4 text-center">
-                        <div class="text-xl font-bold text-purple-700">
-                            {{ number_format($suggestedDisplayQuantity, $quantityPrecision) }} {{ $quantityLabel }}
-                        </div>
-                        <div class="text-sm text-gray-600">{{ number_format($suggestedUnits, 0) }} units</div>
-                        @if(abs($finalUnits - $suggestedUnits) > 0.001)
-                            <div class="mt-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-600">
-                                Final: {{ number_format($displayOrderQuantity, $quantityPrecision) }} {{ $quantityLabel }}
-                            </div>
-                        @endif
                     </td>
                     <td class="px-4 py-4">
-                        <div class="flex items-center justify-center space-x-1">
-                            <button class="qty-decrease w-8 h-8 bg-red-100 hover:bg-red-200 text-red-700 rounded font-bold"
-                                    type="button"
-                                    data-item-id="{{ $item->id }}">−</button>
-                            <input type="number"
-                                   id="qty-input-{{ $item->id }}"
-                                   value="{{ number_format($displayOrderQuantity, $quantityPrecision, '.', '') }}"
-                                   step="1"
-                                   data-item-id="{{ $item->id }}"
-                                   data-current-stock="{{ $currentStock }}"
-                                   data-case-units="{{ $caseUnits }}"
-                                   data-is-case-product="{{ $isCaseProduct ? 1 : 0 }}"
-                                   data-product-peak="{{ $peakWeeklySales }}"
-                                   class="qty-input w-20 text-center text-lg font-bold border-2 border-gray-300 rounded py-1">
-                            <button class="qty-increase w-8 h-8 bg-green-100 hover:bg-green-200 text-green-700 rounded font-bold"
-                                    type="button"
-                                    data-item-id="{{ $item->id }}">+</button>
-                        </div>
-                        <div class="text-center text-xs text-gray-500 mt-1">
-                            {{ $quantityLabel }} · <span id="units-label-{{ $item->id }}">{{ number_format($finalUnits, 0) }}</span> units
+                        <div class="flex flex-col items-center gap-3">
+                            <div class="text-center">
+                                <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Suggested</div>
+                                <div class="mt-1 text-xl font-bold text-purple-700">
+                                    {{ $suggestedDisplayText }} {{ $quantityLabel }}
+                                </div>
+                                <div class="text-xs text-gray-500">{{ number_format($suggestedUnits, 0) }} units</div>
+                            </div>
+                            <div class="flex items-center justify-center gap-1">
+                                <button class="qty-decrease w-8 h-8 bg-red-100 hover:bg-red-200 text-red-700 rounded font-bold"
+                                        type="button"
+                                        data-item-id="{{ $item->id }}">−</button>
+                                <input type="number"
+                                       id="qty-input-{{ $item->id }}"
+                                       value="{{ $orderInputValue }}"
+                                       step="1"
+                                       data-item-id="{{ $item->id }}"
+                                       data-current-stock="{{ $currentStock }}"
+                                       data-case-units="{{ $caseUnits }}"
+                                       data-is-case-product="{{ $isCaseProduct ? 1 : 0 }}"
+                                       data-product-peak="{{ $peakWeeklySales }}"
+                                       data-quantity-precision="{{ $quantityPrecision }}"
+                                       class="qty-input w-20 text-center text-lg font-bold border-2 border-gray-300 rounded py-1">
+                                <button class="qty-increase w-8 h-8 bg-green-100 hover:bg-green-200 text-green-700 rounded font-bold"
+                                        type="button"
+                                        data-item-id="{{ $item->id }}">+</button>
+                            </div>
+                            <div class="text-xs text-gray-500 text-center">
+                                Order: <span id="units-label-{{ $item->id }}">{{ number_format($finalUnits, 0) }}</span> units
+                                <span class="text-gray-400">(<span id="order-quantity-display-{{ $item->id }}">{{ $orderDisplayText }}</span> {{ $quantityLabel }})</span>
+                            </div>
+                            @if(abs($finalUnits - $suggestedUnits) > 0.001)
+                                <div class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-600">
+                                    Adjusted from {{ $suggestedDisplayText }} {{ $quantityLabel }}
+                                </div>
+                            @endif
                         </div>
                     </td>
                     <td class="px-4 py-4 text-right">
@@ -768,8 +862,7 @@
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                     <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-32">Total Sales</th>
                     <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase" style="width: 320px;">Stock Levels & Sales Trend</th>
-                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-32">Suggested</th>
-                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-40">Order Qty</th>
+                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-48">Suggested & Order</th>
                     <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase w-32">Cost</th>
                     <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-32">Action</th>
                 </tr>
@@ -800,6 +893,10 @@
                     }
                     $caseUnits = $contextData['case_units'] ?? 1;
                     $isCaseProduct = $contextData['is_case_product'] ?? ($caseUnits > 1);
+                    $supplierCode = $contextData['supplier_code'] ?? optional($product->supplierLink)->SupplierCode;
+                    if (is_string($supplierCode)) {
+                        $supplierCode = trim($supplierCode);
+                    }
                     $suggestedUnits = (float) ($item->suggested_quantity ?? 0);
                     $suggestedCases = $caseUnits > 1
                         ? (float) ($item->suggested_cases ?? ($caseUnits > 0 ? $suggestedUnits / $caseUnits : 0))
@@ -813,6 +910,15 @@
                     $quantityLabel = $isCaseProduct ? 'cases' : 'units';
                     $quantityPrecision = $isCaseProduct ? 3 : 0;
                     $afterStock = $currentStock + $finalUnits;
+                    $orderInputValue = $formatQuantityInput($displayOrderQuantity, $quantityPrecision);
+                    $suggestedDisplayText = $formatQuantityDisplay($suggestedDisplayQuantity, $quantityPrecision);
+                    $orderDisplayText = $formatQuantityDisplay($displayOrderQuantity, $quantityPrecision);
+                    $currentStockCaseText = $isCaseProduct
+                        ? $formatQuantityDisplay($currentStock / max($caseUnits, 1), 3)
+                        : null;
+                    $afterStockCaseText = $isCaseProduct
+                        ? $formatQuantityDisplay($afterStock / max($caseUnits, 1), 3)
+                        : null;
 
                     // For percentage labels - use individual product's peak for intuitive display
                     $productPeakDemand = max($peakWeeklySales, 1);
@@ -854,13 +960,29 @@
                     <td class="px-4 py-4">
                         <div class="font-medium text-gray-900">{!! strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product')) !!}</div>
                         <div class="text-sm text-gray-500">
-                            Code: {{ $product->CODE ?? 'N/A' }} • {{ $avgWeeklySales > 0 ? number_format($avgWeeklySales, 1) : '0' }}/week avg
+                            Code: {{ $product->CODE ?? 'N/A' }}@if($caseUnits > 1) • {{ rtrim(rtrim(number_format($caseUnits, 2), '0'), '.') }} units/case @endif
                         </div>
+                        @if($supplierCode)
+                            <div class="mt-1 flex items-center gap-2 text-xs text-gray-500">
+                                <span class="uppercase tracking-wide text-[11px] text-slate-400">Supplier</span>
+                                <span class="font-mono text-sm text-slate-600" id="supplier-code-{{ $item->id }}">{{ $supplierCode }}</span>
+                                <button type="button"
+                                        class="copy-supplier-code text-[11px] font-medium text-blue-600 hover:text-blue-700"
+                                        data-supplier-code="{{ $supplierCode }}"
+                                        title="Copy supplier code">
+                                    Copy
+                                </button>
+                            </div>
+                        @endif
                     </td>
                     <td class="px-4 py-4">
                         <div class="text-center">
                             <div class="text-2xl font-bold text-blue-600">{{ number_format($totalPeriodSales, 0) }}</div>
                             <div class="text-xs text-gray-500 mb-1">total sold</div>
+                            <div class="mt-2 flex items-center justify-center gap-6 text-xs text-gray-600">
+                                <span>avg {{ number_format($avgWeeklySales, 1) }}</span>
+                                <span>peak {{ number_format($peakWeeklySales, 1) }}</span>
+                            </div>
                             <div class="w-full bg-gray-200 rounded-full h-2">
                                 <div class="bg-{{ $stockColor }}-500 h-2 rounded-full" style="width: {{ max(min($currentPct, 100), 0) }}%"></div>
                             </div>
@@ -878,70 +1000,76 @@
                             <div class="relative" style="height: 110px;">
                                 <canvas id="chart_{{ $item->id }}" class="w-full h-full"></canvas>
                             </div>
-                            <div class="flex items-center justify-center gap-6 text-[11px] text-gray-500">
-                                <span class="inline-flex items-center gap-1">
-                                    <span class="inline-flex w-2.5 h-2.5 rounded-full bg-slate-400"></span>
-                                    Current stock
-                                </span>
-                                <span class="inline-flex items-center gap-1">
-                                    <span class="inline-flex w-2.5 h-2.5 rounded-full bg-green-500"></span>
-                                    After order
-                                </span>
-                            </div>
-                            <div class="flex items-center justify-between text-xs text-gray-600">
-                                <div class="text-left">
-                                    <span class="font-semibold text-{{ $stockColor }}-600">{{ number_format($currentStock, 0) }}</span>
-                                    <span class="text-[11px] text-gray-500">
-                                        ({{ $isCaseProduct ? number_format($currentStock / max($caseUnits, 1), 1).' cs' : 'u' }}, {{ round($currentPct) }}%)
-                                    </span>
+                            <div class="flex flex-col gap-2 text-xs text-gray-600">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div>
+                                        <div class="text-[11px] uppercase tracking-wide text-slate-500">Current stock</div>
+                                        <div class="text-xl font-semibold text-{{ $stockColor }}-600">{{ number_format($currentStock, 0) }}</div>
+                                        <div class="text-[11px] text-gray-500">
+                                            @if($isCaseProduct)
+                                                {{ $currentStockCaseText }} cases
+                                            @else
+                                                {{ number_format($currentStock, 0) }} units
+                                            @endif
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-[11px] uppercase tracking-wide text-slate-500">After order</div>
+                                        <div id="after-stock-value-{{ $item->id }}" class="text-2xl font-semibold text-green-600">{{ number_format($afterStock, 0) }}</div>
+                                        <div id="after-stock-subtext-{{ $item->id }}" class="text-[11px] text-gray-500">
+                                            @if($isCaseProduct)
+                                                {{ $afterStockCaseText }} cases
+                                            @else
+                                                {{ number_format($afterStock, 0) }} units
+                                            @endif
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="px-2 py-0.5 bg-gray-100 rounded text-gray-700 font-medium">
-                                    avg {{ number_format($avgWeeklySales, 1) }} · peak {{ number_format($peakWeeklySales, 1) }}
-                                    @if(isset($contextData['coverage_weeks']))
-                                        · cover {{ number_format($contextData['coverage_weeks'], 1) }}→{{ number_format($contextData['target_weeks'] ?? $contextData['coverage_weeks'], 1) }} wk
-                                    @endif
-                                </div>
-                                <div class="text-right">
-                                    <span id="after-stock-value-{{ $item->id }}" class="font-semibold text-green-600">{{ number_format($afterStock, 0) }}</span>
-                                    <span id="after-stock-label-{{ $item->id }}" class="text-[11px] text-gray-500">
-                                        ({{ $isCaseProduct ? number_format($afterStock / max($caseUnits, 1), 1).' cs' : 'u' }}, {{ round($afterPct) }}%)
-                                    </span>
-                                </div>
+                                @if(isset($contextData['coverage_weeks']))
+                                    <div class="flex justify-end text-[11px] text-gray-500">
+                                        Cover {{ number_format($contextData['coverage_weeks'], 1) }}→{{ number_format($contextData['target_weeks'] ?? $contextData['coverage_weeks'], 1) }} wk
+                                    </div>
+                                @endif
                             </div>
                         </div>
-                    </td>
-                    <td class="px-4 py-4 text-center">
-                        <div class="text-xl font-bold text-purple-700">
-                            {{ number_format($suggestedDisplayQuantity, $quantityPrecision) }} {{ $quantityLabel }}
-                        </div>
-                        <div class="text-sm text-gray-600">{{ number_format($suggestedUnits, 0) }} units</div>
-                        @if(abs($finalUnits - $suggestedUnits) > 0.001)
-                            <div class="mt-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-600">
-                                Final: {{ number_format($displayOrderQuantity, $quantityPrecision) }} {{ $quantityLabel }}
-                            </div>
-                        @endif
                     </td>
                     <td class="px-4 py-4">
-                        <div class="flex items-center justify-center space-x-1">
-                            <button class="qty-decrease w-8 h-8 bg-red-100 hover:bg-red-200 text-red-700 rounded font-bold"
-                                    type="button"
-                                    data-item-id="{{ $item->id }}">−</button>
-                            <input type="number"
-                                   id="qty-input-{{ $item->id }}"
-                                   value="{{ number_format($displayOrderQuantity, $quantityPrecision, '.', '') }}"
-                                   step="1"
-                                   data-item-id="{{ $item->id }}"
-                                   data-current-stock="{{ $currentStock }}"
-                                   data-case-units="{{ $caseUnits }}"
-                                   data-is-case-product="{{ $isCaseProduct ? 1 : 0 }}"
-                                   data-product-peak="{{ $peakWeeklySales }}"
-                                   class="qty-input w-20 text-center text-lg font-bold border-2 border-gray-300 rounded py-1">
-                            <button class="qty-increase w-8 h-8 bg-green-100 hover:bg-green-200 text-green-700 rounded font-bold"
-                                    type="button"
-                                    data-item-id="{{ $item->id }}">+</button>
-                        </div>
-                        <div class="text-center text-xs text-gray-500 mt-1">
-                            {{ $quantityLabel }} · <span id="units-label-{{ $item->id }}">{{ number_format($finalUnits, 0) }}</span> units
+                        <div class="flex flex-col items-center gap-3">
+                            <div class="text-center">
+                                <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Suggested</div>
+                                <div class="mt-1 text-xl font-bold text-purple-700">
+                                    {{ $suggestedDisplayText }} {{ $quantityLabel }}
+                                </div>
+                                <div class="text-xs text-gray-500">{{ number_format($suggestedUnits, 0) }} units</div>
+                            </div>
+                            <div class="flex items-center justify-center gap-1">
+                                <button class="qty-decrease w-8 h-8 bg-red-100 hover:bg-red-200 text-red-700 rounded font-bold"
+                                        type="button"
+                                        data-item-id="{{ $item->id }}">−</button>
+                                <input type="number"
+                                       id="qty-input-{{ $item->id }}"
+                                       value="{{ $orderInputValue }}"
+                                       step="1"
+                                       data-item-id="{{ $item->id }}"
+                                       data-current-stock="{{ $currentStock }}"
+                                       data-case-units="{{ $caseUnits }}"
+                                       data-is-case-product="{{ $isCaseProduct ? 1 : 0 }}"
+                                       data-product-peak="{{ $peakWeeklySales }}"
+                                       data-quantity-precision="{{ $quantityPrecision }}"
+                                       class="qty-input w-20 text-center text-lg font-bold border-2 border-gray-300 rounded py-1">
+                                <button class="qty-increase w-8 h-8 bg-green-100 hover:bg-green-200 text-green-700 rounded font-bold"
+                                        type="button"
+                                        data-item-id="{{ $item->id }}">+</button>
+                            </div>
+                            <div class="text-xs text-gray-500 text-center">
+                                Order: <span id="units-label-{{ $item->id }}">{{ number_format($finalUnits, 0) }}</span> units
+                                <span class="text-gray-400">(<span id="order-quantity-display-{{ $item->id }}">{{ $orderDisplayText }}</span> {{ $quantityLabel }})</span>
+                            </div>
+                            @if(abs($finalUnits - $suggestedUnits) > 0.001)
+                                <div class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-600">
+                                    Adjusted from {{ $suggestedDisplayText }} {{ $quantityLabel }}
+                                </div>
+                            @endif
                         </div>
                     </td>
                     <td class="px-4 py-4 text-right">
@@ -981,8 +1109,7 @@
                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                     <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-32">Total Sales</th>
                     <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase" style="width: 320px;">Stock Levels & Sales Trend</th>
-                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-32">Suggested</th>
-                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-40">Order Qty</th>
+                    <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-48">Suggested & Order</th>
                     <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase w-32">Cost</th>
                     <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-32">Action</th>
                 </tr>
@@ -1013,6 +1140,10 @@
                     }
                     $caseUnits = $contextData['case_units'] ?? 1;
                     $isCaseProduct = $contextData['is_case_product'] ?? ($caseUnits > 1);
+                    $supplierCode = $contextData['supplier_code'] ?? optional($product->supplierLink)->SupplierCode;
+                    if (is_string($supplierCode)) {
+                        $supplierCode = trim($supplierCode);
+                    }
                     $suggestedUnits = (float) ($item->suggested_quantity ?? 0);
                     $suggestedCases = $caseUnits > 1
                         ? (float) ($item->suggested_cases ?? ($caseUnits > 0 ? $suggestedUnits / $caseUnits : 0))
@@ -1026,6 +1157,15 @@
                     $quantityLabel = $isCaseProduct ? 'cases' : 'units';
                     $quantityPrecision = $isCaseProduct ? 3 : 0;
                     $afterStock = $currentStock + $finalUnits;
+                    $orderInputValue = $formatQuantityInput($displayOrderQuantity, $quantityPrecision);
+                    $suggestedDisplayText = $formatQuantityDisplay($suggestedDisplayQuantity, $quantityPrecision);
+                    $orderDisplayText = $formatQuantityDisplay($displayOrderQuantity, $quantityPrecision);
+                    $currentStockCaseText = $isCaseProduct
+                        ? $formatQuantityDisplay($currentStock / max($caseUnits, 1), 3)
+                        : null;
+                    $afterStockCaseText = $isCaseProduct
+                        ? $formatQuantityDisplay($afterStock / max($caseUnits, 1), 3)
+                        : null;
 
                     // For percentage labels - use individual product's peak for intuitive display
                     $productPeakDemand = max($peakWeeklySales, 1);
@@ -1067,13 +1207,29 @@
                     <td class="px-4 py-4">
                         <div class="font-medium text-gray-900">{!! strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product')) !!}</div>
                         <div class="text-sm text-gray-500">
-                            Code: {{ $product->CODE ?? 'N/A' }} • {{ $avgWeeklySales > 0 ? number_format($avgWeeklySales, 1) : '0' }}/week avg
+                            Code: {{ $product->CODE ?? 'N/A' }}@if($caseUnits > 1) • {{ rtrim(rtrim(number_format($caseUnits, 2), '0'), '.') }} units/case @endif
                         </div>
+                        @if($supplierCode)
+                            <div class="mt-1 flex items-center gap-2 text-xs text-gray-500">
+                                <span class="uppercase tracking-wide text-[11px] text-slate-400">Supplier</span>
+                                <span class="font-mono text-sm text-slate-600" id="supplier-code-{{ $item->id }}">{{ $supplierCode }}</span>
+                                <button type="button"
+                                        class="copy-supplier-code text-[11px] font-medium text-blue-600 hover:text-blue-700"
+                                        data-supplier-code="{{ $supplierCode }}"
+                                        title="Copy supplier code">
+                                    Copy
+                                </button>
+                            </div>
+                        @endif
                     </td>
                     <td class="px-4 py-4">
                         <div class="text-center">
                             <div class="text-2xl font-bold text-blue-600">{{ number_format($totalPeriodSales, 0) }}</div>
                             <div class="text-xs text-gray-500 mb-1">total sold</div>
+                            <div class="mt-2 flex items-center justify-center gap-6 text-xs text-gray-600">
+                                <span>avg {{ number_format($avgWeeklySales, 1) }}</span>
+                                <span>peak {{ number_format($peakWeeklySales, 1) }}</span>
+                            </div>
                             <div class="w-full bg-gray-200 rounded-full h-2">
                                 <div class="bg-{{ $stockColor }}-500 h-2 rounded-full" style="width: {{ max(min($currentPct, 100), 0) }}%"></div>
                             </div>
@@ -1091,70 +1247,76 @@
                             <div class="relative" style="height: 110px;">
                                 <canvas id="chart_{{ $item->id }}" class="w-full h-full"></canvas>
                             </div>
-                            <div class="flex items-center justify-center gap-6 text-[11px] text-gray-500">
-                                <span class="inline-flex items-center gap-1">
-                                    <span class="inline-flex w-2.5 h-2.5 rounded-full bg-slate-400"></span>
-                                    Current stock
-                                </span>
-                                <span class="inline-flex items-center gap-1">
-                                    <span class="inline-flex w-2.5 h-2.5 rounded-full bg-green-500"></span>
-                                    After order
-                                </span>
-                            </div>
-                            <div class="flex items-center justify-between text-xs text-gray-600">
-                                <div class="text-left">
-                                    <span class="font-semibold text-{{ $stockColor }}-600">{{ number_format($currentStock, 0) }}</span>
-                                    <span class="text-[11px] text-gray-500">
-                                        ({{ $isCaseProduct ? number_format($currentStock / max($caseUnits, 1), 1).' cs' : 'u' }}, {{ round($currentPct) }}%)
-                                    </span>
+                            <div class="flex flex-col gap-2 text-xs text-gray-600">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div>
+                                        <div class="text-[11px] uppercase tracking-wide text-slate-500">Current stock</div>
+                                        <div class="text-xl font-semibold text-{{ $stockColor }}-600">{{ number_format($currentStock, 0) }}</div>
+                                        <div class="text-[11px] text-gray-500">
+                                            @if($isCaseProduct)
+                                                {{ $currentStockCaseText }} cases
+                                            @else
+                                                {{ number_format($currentStock, 0) }} units
+                                            @endif
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-[11px] uppercase tracking-wide text-slate-500">After order</div>
+                                        <div id="after-stock-value-{{ $item->id }}" class="text-2xl font-semibold text-green-600">{{ number_format($afterStock, 0) }}</div>
+                                        <div id="after-stock-subtext-{{ $item->id }}" class="text-[11px] text-gray-500">
+                                            @if($isCaseProduct)
+                                                {{ $afterStockCaseText }} cases
+                                            @else
+                                                {{ number_format($afterStock, 0) }} units
+                                            @endif
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="px-2 py-0.5 bg-gray-100 rounded text-gray-700 font-medium">
-                                    avg {{ number_format($avgWeeklySales, 1) }} · peak {{ number_format($peakWeeklySales, 1) }}
-                                    @if(isset($contextData['coverage_weeks']))
-                                        · cover {{ number_format($contextData['coverage_weeks'], 1) }}→{{ number_format($contextData['target_weeks'] ?? $contextData['coverage_weeks'], 1) }} wk
-                                    @endif
-                                </div>
-                                <div class="text-right">
-                                    <span id="after-stock-value-{{ $item->id }}" class="font-semibold text-green-600">{{ number_format($afterStock, 0) }}</span>
-                                    <span id="after-stock-label-{{ $item->id }}" class="text-[11px] text-gray-500">
-                                        ({{ $isCaseProduct ? number_format($afterStock / max($caseUnits, 1), 1).' cs' : 'u' }}, {{ round($afterPct) }}%)
-                                    </span>
-                                </div>
+                                @if(isset($contextData['coverage_weeks']))
+                                    <div class="flex justify-end text-[11px] text-gray-500">
+                                        Cover {{ number_format($contextData['coverage_weeks'], 1) }}→{{ number_format($contextData['target_weeks'] ?? $contextData['coverage_weeks'], 1) }} wk
+                                    </div>
+                                @endif
                             </div>
                         </div>
-                    </td>
-                    <td class="px-4 py-4 text-center">
-                        <div class="text-xl font-bold text-purple-700">
-                            {{ number_format($suggestedDisplayQuantity, $quantityPrecision) }} {{ $quantityLabel }}
-                        </div>
-                        <div class="text-sm text-gray-600">{{ number_format($suggestedUnits, 0) }} units</div>
-                        @if(abs($finalUnits - $suggestedUnits) > 0.001)
-                            <div class="mt-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-600">
-                                Final: {{ number_format($displayOrderQuantity, $quantityPrecision) }} {{ $quantityLabel }}
-                            </div>
-                        @endif
                     </td>
                     <td class="px-4 py-4">
-                        <div class="flex items-center justify-center space-x-1">
-                            <button class="qty-decrease w-8 h-8 bg-red-100 hover:bg-red-200 text-red-700 rounded font-bold"
-                                    type="button"
-                                    data-item-id="{{ $item->id }}">−</button>
-                            <input type="number"
-                                   id="qty-input-{{ $item->id }}"
-                                   value="{{ number_format($displayOrderQuantity, $quantityPrecision, '.', '') }}"
-                                   step="1"
-                                   data-item-id="{{ $item->id }}"
-                                   data-current-stock="{{ $currentStock }}"
-                                   data-case-units="{{ $caseUnits }}"
-                                   data-is-case-product="{{ $isCaseProduct ? 1 : 0 }}"
-                                   data-product-peak="{{ $peakWeeklySales }}"
-                                   class="qty-input w-20 text-center text-lg font-bold border-2 border-gray-300 rounded py-1">
-                            <button class="qty-increase w-8 h-8 bg-green-100 hover:bg-green-200 text-green-700 rounded font-bold"
-                                    type="button"
-                                    data-item-id="{{ $item->id }}">+</button>
-                        </div>
-                        <div class="text-center text-xs text-gray-500 mt-1">
-                            {{ $quantityLabel }} · <span id="units-label-{{ $item->id }}">{{ number_format($finalUnits, 0) }}</span> units
+                        <div class="flex flex-col items-center gap-3">
+                            <div class="text-center">
+                                <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Suggested</div>
+                                <div class="mt-1 text-xl font-bold text-purple-700">
+                                    {{ $suggestedDisplayText }} {{ $quantityLabel }}
+                                </div>
+                                <div class="text-xs text-gray-500">{{ number_format($suggestedUnits, 0) }} units</div>
+                            </div>
+                            <div class="flex items-center justify-center gap-1">
+                                <button class="qty-decrease w-8 h-8 bg-red-100 hover:bg-red-200 text-red-700 rounded font-bold"
+                                        type="button"
+                                        data-item-id="{{ $item->id }}">−</button>
+                                <input type="number"
+                                       id="qty-input-{{ $item->id }}"
+                                       value="{{ $orderInputValue }}"
+                                       step="1"
+                                       data-item-id="{{ $item->id }}"
+                                       data-current-stock="{{ $currentStock }}"
+                                       data-case-units="{{ $caseUnits }}"
+                                       data-is-case-product="{{ $isCaseProduct ? 1 : 0 }}"
+                                       data-product-peak="{{ $peakWeeklySales }}"
+                                       data-quantity-precision="{{ $quantityPrecision }}"
+                                       class="qty-input w-20 text-center text-lg font-bold border-2 border-gray-300 rounded py-1">
+                                <button class="qty-increase w-8 h-8 bg-green-100 hover:bg-green-200 text-green-700 rounded font-bold"
+                                        type="button"
+                                        data-item-id="{{ $item->id }}">+</button>
+                            </div>
+                            <div class="text-xs text-gray-500 text-center">
+                                Order: <span id="units-label-{{ $item->id }}">{{ number_format($finalUnits, 0) }}</span> units
+                                <span class="text-gray-400">(<span id="order-quantity-display-{{ $item->id }}">{{ $orderDisplayText }}</span> {{ $quantityLabel }})</span>
+                            </div>
+                            @if(abs($finalUnits - $suggestedUnits) > 0.001)
+                                <div class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-600">
+                                    Adjusted from {{ $suggestedDisplayText }} {{ $quantityLabel }}
+                                </div>
+                            @endif
                         </div>
                     </td>
                     <td class="px-4 py-4 text-right">
@@ -1202,6 +1364,24 @@
         window.chartsInitialized = true;
 
         window.productCharts = window.productCharts || {};
+        const clampPrecision = precision => Math.min(Math.max(precision, 0), 3);
+        const formatNumberForDisplay = (value, precision = 3) => {
+            if (!Number.isFinite(value)) {
+                return '0';
+            }
+
+            const safePrecision = clampPrecision(precision);
+            const factor = 10 ** safePrecision;
+            const rounded = Math.round(value * factor) / factor;
+            if (Math.abs(rounded - Math.round(rounded)) < 0.0005) {
+                return Math.round(rounded).toLocaleString();
+            }
+
+            return rounded.toLocaleString(undefined, {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: safePrecision
+            });
+        };
 
         @foreach($cheeseProducts->merge($refrigeratedProducts)->merge($caseProducts)->merge($unitProducts) as $item)
             @php
@@ -1240,6 +1420,7 @@
 
                 const labels = @json($weekLabels);
                 const dataPoints = @json($weekUnits);
+                const averageUnits = {{ $avgWeeklySalesValue }};
                 const currentStock = {{ $currentStockValue }};
                 const afterStock = {{ $afterStockValue }};
                 const peakWeeklySales = {{ $peakWeeklySalesValue }};
@@ -1250,6 +1431,7 @@
 
                 const extendedLabels = labels.concat(['Current stock', 'After order']);
                 const salesData = dataPoints.concat([null, null]);
+                const averageLineData = labels.map(() => averageUnits).concat([null, null]);
 
                 // Set point colors - grey for 0 sales, regular color otherwise
                 const primaryColor = '{{ $item->review_priority === "review" ? "rgb(239, 68, 68)" : ($item->review_priority === "standard" ? "rgb(234, 179, 8)" : "rgb(34, 197, 94)") }}';
@@ -1268,7 +1450,7 @@
                 afterStockData[extendedLabels.length - 1] = afterStock;
 
                 const salesMax = dataPoints.length ? Math.max(...dataPoints) : 0;
-                const chartMax = Math.max(salesMax, currentStock, afterStock, peakWeeklySales, 1);
+                const chartMax = Math.max(salesMax, currentStock, afterStock, peakWeeklySales, averageUnits, 1);
                 const chartMin = Math.min(0, currentStock, afterStock);
 
                 const chart = new Chart(chartEl, {
@@ -1276,6 +1458,18 @@
                     data: {
                         labels: extendedLabels,
                         datasets: [{
+                            label: 'Average weekly',
+                            data: averageLineData,
+                            borderColor: 'rgba(100, 116, 139, 0.7)',
+                            borderWidth: 1.5,
+                            borderDash: [6, 4],
+                            pointRadius: 0,
+                            pointHoverRadius: 0,
+                            fill: false,
+                            tension: 0,
+                            spanGaps: true,
+                            order: 0
+                        },{
                             label: 'Sales',
                             data: salesData,
                             borderColor: primaryColor,
@@ -1349,6 +1543,12 @@
                                 displayColors: false,
                                 callbacks: {
                                     label: function(context) {
+                                        if (context.dataset.label === 'Average weekly') {
+                                            if (Number.isNaN(context.parsed.y)) {
+                                                return null;
+                                            }
+                                            return `Avg weekly · ${averageUnits.toFixed(1)} units`;
+                                        }
                                         if (context.dataset.label === 'Sales') {
                                             const value = Math.round(context.parsed.y);
                                              if (Number.isNaN(value)) {
@@ -1417,6 +1617,7 @@
                 chart.$currentPct = currentPct;
                 chart.$afterPct = afterPct;
                 chart.$currentUnits = currentStock;
+                chart.$averageUnits = averageUnits;
                 window.productCharts['{{ $item->id }}'] = chart;
             })();
         @endforeach
@@ -1529,6 +1730,7 @@
             const caseUnits = parseFloat(input.dataset.caseUnits) || 1;
             const isCaseProduct = input.dataset.isCaseProduct === '1';
             const productPeak = parseFloat(input.dataset.productPeak) || 1;
+            const quantityPrecision = parseInt(input.dataset.quantityPrecision || (isCaseProduct ? 3 : 0), 10);
             const orderQuantity = parseFloat(input.value) || 0;
 
             // Calculate new units based on whether it's a case product
@@ -1542,20 +1744,24 @@
             const chart = window.productCharts ? window.productCharts[itemId] : null;
             if (chart) {
                 const labelsLength = chart.data.labels.length;
-                const afterDataset = chart.data.datasets[2]; // After order dataset
-                afterDataset.data[labelsLength - 1] = afterStock;
+                const afterDataset = chart.data.datasets.find(dataset => dataset.label === 'After order');
+                if (afterDataset) {
+                    afterDataset.data[labelsLength - 1] = afterStock;
+                }
 
                 chart.$afterPct = afterPct;
 
-                const salesDataset = chart.data.datasets[0].data;
-                const salesMax = salesDataset.reduce((max, value) => {
+                const salesDataset = chart.data.datasets.find(dataset => dataset.label === 'Sales');
+                const salesData = salesDataset ? salesDataset.data : [];
+                const salesMax = salesData.reduce((max, value) => {
                     if (value === null || Number.isNaN(value)) {
                         return max;
                     }
                     return Math.max(max, value);
                 }, 0);
 
-                const axisMax = Math.max(salesMax, chart.$currentStock || 0, afterStock, productPeak, 1);
+                const averageBaseline = chart.$averageUnits || 0;
+                const axisMax = Math.max(salesMax, chart.$currentStock || 0, afterStock, productPeak, averageBaseline, 1);
                 const axisMin = Math.min(0, chart.$currentStock || 0, afterStock);
 
                 chart.options.scales.y.min = axisMin < 0 ? axisMin * 1.1 : 0;
@@ -1566,20 +1772,25 @@
 
             // Update text labels
             const afterStockValue = document.getElementById(`after-stock-value-${itemId}`);
-            const afterStockLabel = document.getElementById(`after-stock-label-${itemId}`);
+            const afterStockSubtext = document.getElementById(`after-stock-subtext-${itemId}`);
             const unitsLabel = document.getElementById(`units-label-${itemId}`);
+            const orderDisplay = document.getElementById(`order-quantity-display-${itemId}`);
 
             if (afterStockValue) {
                 afterStockValue.textContent = Math.round(afterStock).toLocaleString();
             }
-            if (afterStockLabel) {
+            if (afterStockSubtext) {
                 const displayValue = isCaseProduct
-                    ? `${(afterStock / Math.max(caseUnits, 1)).toFixed(1)} cs`
-                    : 'u';
-                afterStockLabel.textContent = `(${displayValue}, ${Math.round(afterPct)}%)`;
+                    ? `${formatNumberForDisplay(afterStock / Math.max(caseUnits, 1), quantityPrecision || 3)} cases`
+                    : `${Math.round(afterStock).toLocaleString()} units`;
+                afterStockSubtext.textContent = displayValue;
             }
             if (unitsLabel) {
                 unitsLabel.textContent = Math.round(newUnits).toLocaleString();
+            }
+            if (orderDisplay) {
+                const orderValue = Number(orderQuantity);
+                orderDisplay.textContent = formatNumberForDisplay(orderValue, quantityPrecision);
             }
         }
 
@@ -1630,6 +1841,63 @@
 
                     // Save immediately (no debounce for buttons)
                     saveQuantityToServer(itemId, newValue);
+                }
+            });
+        });
+
+        const copyButtons = document.querySelectorAll('.copy-supplier-code');
+        const fallbackCopy = (code, button, onSuccess, originalLabel) => {
+            const showFailure = () => {
+                button.textContent = 'Copy failed';
+                setTimeout(() => {
+                    button.textContent = originalLabel;
+                }, 1600);
+            };
+
+            try {
+                const temp = document.createElement('textarea');
+                temp.value = code;
+                temp.setAttribute('readonly', '');
+                temp.style.position = 'absolute';
+                temp.style.left = '-9999px';
+                document.body.appendChild(temp);
+                temp.select();
+                const succeeded = document.execCommand('copy');
+                document.body.removeChild(temp);
+                if (succeeded) {
+                    onSuccess();
+                } else {
+                    showFailure();
+                }
+            } catch (error) {
+                console.error('Failed to copy supplier code', error);
+                showFailure();
+            }
+        };
+
+        copyButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const code = this.dataset.supplierCode || '';
+                if (!code) {
+                    return;
+                }
+
+                const originalLabel = this.dataset.originalLabel || this.textContent.trim() || 'Copy';
+                this.dataset.originalLabel = originalLabel;
+
+                const showCopied = () => {
+                    this.textContent = 'Copied';
+                    setTimeout(() => {
+                        this.textContent = originalLabel;
+                    }, 1600);
+                };
+
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(code)
+                        .then(showCopied)
+                        .catch(() => fallbackCopy(code, this, showCopied, originalLabel));
+                } else {
+                    fallbackCopy(code, this, showCopied, originalLabel);
                 }
             });
         });
