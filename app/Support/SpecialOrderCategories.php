@@ -30,6 +30,17 @@ class SpecialOrderCategories
                     ],
                 ],
             ],
+            'independent' => [
+                'supplier_ids' => ['37'],
+                'name_contains' => ['independent'],
+                'groups' => [
+                    'refrigerated' => [
+                        'label' => 'Refrigerated',
+                        'category_codes' => ['002'],
+                        'default_coverage_days' => 5,
+                    ],
+                ],
+            ],
         ];
     }
 
