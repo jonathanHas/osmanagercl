@@ -30,6 +30,11 @@ The order generation system automates the calculation of required stock quantiti
 - **Snappier Adjustments**: Category edits reuse the existing order rows when possible and only fetch supplier products that belong to the affected groups, dramatically reducing regeneration time on large catalogues.
 - **Unified Review Graph**: The order review chart now plots current stock and projected stock directly onto the sales trend, eliminating the old “tank” bars and ensuring all values share the same scale.
 
+### 2025-11 Enhancements
+- **Refined Product Panel Layout**: The review table trims non-essential legends from each chart cell and elevates the current/after stock figures with larger typography, keeping the focus on actionable quantities.
+- **Supplier Code Utilities**: Each row now exposes the linked supplier code with a one-click copy affordance, reducing the friction of sharing codes with supplier portals or support teams.
+- **Smarter Case Formatting**: Suggested and ordered case quantities collapse cleanly to whole numbers (e.g. `1` instead of `1.000`) while still displaying fractional values when buyers adjust partial cases.
+
 ### 2. Product Classification System
 Products are classified into three review priority levels:
 

@@ -1,5 +1,6 @@
 import './bootstrap';
 import Alpine from 'alpinejs';
+import './modules/order-date-range-picker';
 
 // Dual Alpine.js approach:
 // - Livewire pages use their bundled Alpine.js (inject_assets: true)

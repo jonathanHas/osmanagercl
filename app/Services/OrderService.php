@@ -338,10 +338,11 @@ class OrderService
 
         // Get current stock
         $currentStock = $this->getCurrentStock($product->ID);
+        $usableStock = max($currentStock, 0);
 
         // Base calculation: (Weekly Average × Target Weeks) - Current Stock
         $desiredUnits = $avgWeeklySales * $targetWeeks;
-        $baseQuantity = max(0, $desiredUnits - $currentStock);
+        $baseQuantity = max(0, $desiredUnits - $usableStock);
 
         // Apply learned adjustments
         $adjustedQuantity = $this->applyLearningAdjustments($product->ID, $baseQuantity);
@@ -399,16 +400,17 @@ class OrderService
             'context_data' => [
                 'avg_weekly_sales' => round($avgWeeklySales, 2),
                 'current_stock' => $currentStock,
+                'effective_stock' => $usableStock,
                 'safety_factor' => $safetyFactor,
                 'coverage_days' => $coverageDays,
-            'coverage_weeks' => round($coverageWeeks, 2),
-            'target_weeks' => round($targetWeeks, 2),
-            'coverage_ends_on' => $coverageEndsOnOption?->toDateString(),
-            'base_calculation' => round($baseQuantity, 3),
-            'adjusted_calculation' => round($adjustedQuantity, 3),
-            'case_units' => $caseUnits,
-            'is_case_product' => $caseUnits > 1,
-            'sales_trend' => $salesStats['trend'],
+                'coverage_weeks' => round($coverageWeeks, 2),
+                'target_weeks' => round($targetWeeks, 2),
+                'coverage_ends_on' => $coverageEndsOnOption?->toDateString(),
+                'base_calculation' => round($baseQuantity, 3),
+                'adjusted_calculation' => round($adjustedQuantity, 3),
+                'case_units' => $caseUnits,
+                'is_case_product' => $caseUnits > 1,
+                'sales_trend' => $salesStats['trend'],
                 'last_month_sales' => $salesStats['last_month_sales'],
                 'total_sales_6m' => $totalSales6m,
                 'sales_history' => $salesHistory,
@@ -422,14 +424,14 @@ class OrderService
                 'stock_days_remaining' => $avgWeeklySales > 0 ? round(($currentStock / $avgWeeklySales) * 7, 1) : 999,
                 'cost_source' => $this->getCostSource($supplierLink, $product, $unitCost),
                 'cost_per_ordering_unit' => $unitCost,
-            'units_per_case' => $caseUnits,
-            'has_cost_data' => $unitCost > 0,
-            'category_group_key' => $categoryGroupKey,
-            'category_group_label' => $categoryGroupLabel,
-            'coverage_override_applied' => ! empty($coverageOverride),
-            'coverage_override' => $coverageOverride,
-        ],
-    ];
+                'units_per_case' => $caseUnits,
+                'has_cost_data' => $unitCost > 0,
+                'category_group_key' => $categoryGroupKey,
+                'category_group_label' => $categoryGroupLabel,
+                'coverage_override_applied' => ! empty($coverageOverride),
+                'coverage_override' => $coverageOverride,
+            ],
+        ];
     }
 
     /**

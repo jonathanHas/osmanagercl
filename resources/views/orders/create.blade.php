@@ -41,6 +41,8 @@
                                 <input type="date" name="order_date" id="order_date" required
                                        value="{{ old('order_date', now()->addDays(7)->format('Y-m-d')) }}"
                                        min="{{ now()->format('Y-m-d') }}"
+                                       data-range-group="order-coverage"
+                                       data-range-role="start"
                                        class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                                 @error('order_date')
                                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -57,6 +59,7 @@
                                 <input type="date" name="coverage_end_date" id="coverage_end_date" required
                                        value="{{ old('coverage_end_date', now()->addDays(21)->format('Y-m-d')) }}"
                                        min="{{ now()->format('Y-m-d') }}"
+                                       data-range-group="order-coverage"
                                        class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                                 @error('coverage_end_date')
                                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -99,6 +102,9 @@
                                                         value="{{ old('category_overrides.'.$key.'.coverage_end_date') }}"
                                                         class="mt-1 block w-full sm:w-60 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
                                                         min="{{ now()->format('Y-m-d') }}"
+                                                        data-range-group="category-override-{{ $supplierId }}-{{ $key }}"
+                                                        data-range-role="end"
+                                                        data-range-anchor-field="#order_date"
                                                     >
                                                     @error('category_overrides.'.$key.'.coverage_end_date')
                                                         <p class="mt-1 text-sm text-red-600">{{ $message }}</p>

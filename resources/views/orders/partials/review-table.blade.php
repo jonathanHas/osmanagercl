@@ -232,6 +232,9 @@
                                     class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
                                     value="{{ $cheeseInputValue }}"
                                     min="{{ optional($orderSession->order_date)?->format('Y-m-d') ?? now()->format('Y-m-d') }}"
+                                    data-range-group="coverage-cheese-{{ $orderSession->id }}"
+                                    data-range-role="end"
+                                    data-range-anchor="{{ optional($orderSession->order_date)?->format('Y-m-d') }}"
                                 >
                                 <p class="text-xs text-gray-500">
                                     Leave blank and use “Use global” to fall back to {{ $globalCoverageDateFormatted ?? 'the system default' }}.
@@ -405,13 +408,26 @@
                                 <span>peak {{ number_format($peakWeeklySales, 1) }}</span>
                             </div>
                             <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div class="bg-{{ $stockColor }}-500 h-2 rounded-full" style="width: {{ max(min($currentPct, 100), 0) }}%"></div>
+                                <div
+                                    id="stock-level-bar-{{ $item->id }}"
+                                    class="bg-{{ $stockColor }}-500 h-2 rounded-full"
+                                    data-stock-color="{{ $stockColor }}"
+                                    style="width: {{ max(min($currentPct, 100), 0) }}%"
+                                ></div>
                             </div>
-                            <div class="text-xs text-{{ $stockColor }}-600 font-medium mt-1">
-                                @if($currentPct < 30) 🚨 CRITICAL
-                                @elseif($currentPct < 50) ⚠️ Low
-                                @elseif($currentPct < 100) ✓ Moderate
-                                @else ✓ Good
+                            <div
+                                id="stock-level-label-{{ $item->id }}"
+                                class="text-xs text-{{ $stockColor }}-600 font-medium mt-1"
+                                data-stock-color="{{ $stockColor }}"
+                            >
+                                @if($currentPct < 30)
+                                    🚨 CRITICAL
+                                @elseif($currentPct < 50)
+                                    ⚠️ Low
+                                @elseif($currentPct < 100)
+                                    ✓ Moderate
+                                @else
+                                    ✓ Good
                                 @endif
                             </div>
                         </div>
@@ -425,8 +441,28 @@
                                 <div class="flex items-start justify-between gap-2">
                                     <div>
                                         <div class="text-[11px] uppercase tracking-wide text-slate-500">Current stock</div>
-                                        <div class="text-xl font-semibold text-{{ $stockColor }}-600">{{ number_format($currentStock, 0) }}</div>
-                                        <div class="text-[11px] text-gray-500">
+                                        <div class="flex items-center gap-2">
+                                            <div id="current-stock-value-{{ $item->id }}" class="text-xl font-semibold text-{{ $stockColor }}-600" data-stock-color="{{ $stockColor }}">{{ number_format($currentStock, 0) }}</div>
+                                            @if($product?->ID && $currentStock < 0)
+                                                <button
+                                                    type="button"
+                                                    class="reset-stock-button inline-flex items-center gap-1 rounded border border-green-200 px-2 py-1 text-[11px] font-semibold text-green-600 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-200"
+                                                    data-product-id="{{ $product->ID }}"
+                                                    data-item-id="{{ $item->id }}"
+                                                    data-case-units="{{ $caseUnits }}"
+                                                    data-is-case-product="{{ $isCaseProduct ? 1 : 0 }}"
+                                                    data-product-name="{{ e($product->NAME ?? 'Product') }}"
+                                                    title="Set stock to zero"
+                                                    aria-label="Set stock to zero for {{ e($product->NAME ?? 'product') }}"
+                                                >
+                                                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5 10 5l5.5 5.5M10 5v10.5" />
+                                                    </svg>
+                                                    <span>0</span>
+                                                </button>
+                                            @endif
+                                        </div>
+                                        <div id="current-stock-subtext-{{ $item->id }}" class="text-[11px] text-gray-500">
                                             @if($isCaseProduct)
                                                 {{ $currentStockCaseText }} cases
                                             @else
@@ -564,6 +600,9 @@
                                     class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
                                     value="{{ $refrigeratedInputValue }}"
                                     min="{{ optional($orderSession->order_date)?->format('Y-m-d') ?? now()->format('Y-m-d') }}"
+                                    data-range-group="coverage-refrigerated-{{ $orderSession->id }}"
+                                    data-range-role="end"
+                                    data-range-anchor="{{ optional($orderSession->order_date)?->format('Y-m-d') }}"
                                 >
                                 <p class="text-xs text-gray-500">
                                     Leave blank and choose “Use global” to fall back to {{ $globalCoverageDateFormatted ?? 'the system default' }}.
@@ -737,13 +776,26 @@
                                 <span>peak {{ number_format($peakWeeklySales, 1) }}</span>
                             </div>
                             <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div class="bg-{{ $stockColor }}-500 h-2 rounded-full" style="width: {{ max(min($currentPct, 100), 0) }}%"></div>
+                                <div
+                                    id="stock-level-bar-{{ $item->id }}"
+                                    class="bg-{{ $stockColor }}-500 h-2 rounded-full"
+                                    data-stock-color="{{ $stockColor }}"
+                                    style="width: {{ max(min($currentPct, 100), 0) }}%"
+                                ></div>
                             </div>
-                            <div class="text-xs text-{{ $stockColor }}-600 font-medium mt-1">
-                                @if($currentPct < 30) 🚨 CRITICAL
-                                @elseif($currentPct < 50) ⚠️ Low
-                                @elseif($currentPct < 100) ✓ Moderate
-                                @else ✓ Good
+                            <div
+                                id="stock-level-label-{{ $item->id }}"
+                                class="text-xs text-{{ $stockColor }}-600 font-medium mt-1"
+                                data-stock-color="{{ $stockColor }}"
+                            >
+                                @if($currentPct < 30)
+                                    🚨 CRITICAL
+                                @elseif($currentPct < 50)
+                                    ⚠️ Low
+                                @elseif($currentPct < 100)
+                                    ✓ Moderate
+                                @else
+                                    ✓ Good
                                 @endif
                             </div>
                         </div>
@@ -757,8 +809,28 @@
                                 <div class="flex items-start justify-between gap-2">
                                     <div>
                                         <div class="text-[11px] uppercase tracking-wide text-slate-500">Current stock</div>
-                                        <div class="text-xl font-semibold text-{{ $stockColor }}-600">{{ number_format($currentStock, 0) }}</div>
-                                        <div class="text-[11px] text-gray-500">
+                                        <div class="flex items-center gap-2">
+                                            <div id="current-stock-value-{{ $item->id }}" class="text-xl font-semibold text-{{ $stockColor }}-600" data-stock-color="{{ $stockColor }}">{{ number_format($currentStock, 0) }}</div>
+                                            @if($product?->ID && $currentStock < 0)
+                                                <button
+                                                    type="button"
+                                                    class="reset-stock-button inline-flex items-center gap-1 rounded border border-green-200 px-2 py-1 text-[11px] font-semibold text-green-600 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-200"
+                                                    data-product-id="{{ $product->ID }}"
+                                                    data-item-id="{{ $item->id }}"
+                                                    data-case-units="{{ $caseUnits }}"
+                                                    data-is-case-product="{{ $isCaseProduct ? 1 : 0 }}"
+                                                    data-product-name="{{ e($product->NAME ?? 'Product') }}"
+                                                    title="Set stock to zero"
+                                                    aria-label="Set stock to zero for {{ e($product->NAME ?? 'product') }}"
+                                                >
+                                                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5 10 5l5.5 5.5M10 5v10.5" />
+                                                    </svg>
+                                                    <span>0</span>
+                                                </button>
+                                            @endif
+                                        </div>
+                                        <div id="current-stock-subtext-{{ $item->id }}" class="text-[11px] text-gray-500">
                                             @if($isCaseProduct)
                                                 {{ $currentStockCaseText }} cases
                                             @else
@@ -984,13 +1056,26 @@
                                 <span>peak {{ number_format($peakWeeklySales, 1) }}</span>
                             </div>
                             <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div class="bg-{{ $stockColor }}-500 h-2 rounded-full" style="width: {{ max(min($currentPct, 100), 0) }}%"></div>
+                                <div
+                                    id="stock-level-bar-{{ $item->id }}"
+                                    class="bg-{{ $stockColor }}-500 h-2 rounded-full"
+                                    data-stock-color="{{ $stockColor }}"
+                                    style="width: {{ max(min($currentPct, 100), 0) }}%"
+                                ></div>
                             </div>
-                            <div class="text-xs text-{{ $stockColor }}-600 font-medium mt-1">
-                                @if($currentPct < 30) 🚨 CRITICAL
-                                @elseif($currentPct < 50) ⚠️ Low
-                                @elseif($currentPct < 100) ✓ Moderate
-                                @else ✓ Good
+                            <div
+                                id="stock-level-label-{{ $item->id }}"
+                                class="text-xs text-{{ $stockColor }}-600 font-medium mt-1"
+                                data-stock-color="{{ $stockColor }}"
+                            >
+                                @if($currentPct < 30)
+                                    🚨 CRITICAL
+                                @elseif($currentPct < 50)
+                                    ⚠️ Low
+                                @elseif($currentPct < 100)
+                                    ✓ Moderate
+                                @else
+                                    ✓ Good
                                 @endif
                             </div>
                         </div>
@@ -1004,8 +1089,28 @@
                                 <div class="flex items-start justify-between gap-2">
                                     <div>
                                         <div class="text-[11px] uppercase tracking-wide text-slate-500">Current stock</div>
-                                        <div class="text-xl font-semibold text-{{ $stockColor }}-600">{{ number_format($currentStock, 0) }}</div>
-                                        <div class="text-[11px] text-gray-500">
+                                        <div class="flex items-center gap-2">
+                                            <div id="current-stock-value-{{ $item->id }}" class="text-xl font-semibold text-{{ $stockColor }}-600" data-stock-color="{{ $stockColor }}">{{ number_format($currentStock, 0) }}</div>
+                                            @if($product?->ID && $currentStock < 0)
+                                                <button
+                                                    type="button"
+                                                    class="reset-stock-button inline-flex items-center gap-1 rounded border border-green-200 px-2 py-1 text-[11px] font-semibold text-green-600 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-200"
+                                                    data-product-id="{{ $product->ID }}"
+                                                    data-item-id="{{ $item->id }}"
+                                                    data-case-units="{{ $caseUnits }}"
+                                                    data-is-case-product="{{ $isCaseProduct ? 1 : 0 }}"
+                                                    data-product-name="{{ e($product->NAME ?? 'Product') }}"
+                                                    title="Set stock to zero"
+                                                    aria-label="Set stock to zero for {{ e($product->NAME ?? 'product') }}"
+                                                >
+                                                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5 10 5l5.5 5.5M10 5v10.5" />
+                                                    </svg>
+                                                    <span>0</span>
+                                                </button>
+                                            @endif
+                                        </div>
+                                        <div id="current-stock-subtext-{{ $item->id }}" class="text-[11px] text-gray-500">
                                             @if($isCaseProduct)
                                                 {{ $currentStockCaseText }} cases
                                             @else
@@ -1231,13 +1336,26 @@
                                 <span>peak {{ number_format($peakWeeklySales, 1) }}</span>
                             </div>
                             <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div class="bg-{{ $stockColor }}-500 h-2 rounded-full" style="width: {{ max(min($currentPct, 100), 0) }}%"></div>
+                                <div
+                                    id="stock-level-bar-{{ $item->id }}"
+                                    class="bg-{{ $stockColor }}-500 h-2 rounded-full"
+                                    data-stock-color="{{ $stockColor }}"
+                                    style="width: {{ max(min($currentPct, 100), 0) }}%"
+                                ></div>
                             </div>
-                            <div class="text-xs text-{{ $stockColor }}-600 font-medium mt-1">
-                                @if($currentPct < 30) 🚨 CRITICAL
-                                @elseif($currentPct < 50) ⚠️ Low
-                                @elseif($currentPct < 100) ✓ Moderate
-                                @else ✓ Good
+                            <div
+                                id="stock-level-label-{{ $item->id }}"
+                                class="text-xs text-{{ $stockColor }}-600 font-medium mt-1"
+                                data-stock-color="{{ $stockColor }}"
+                            >
+                                @if($currentPct < 30)
+                                    🚨 CRITICAL
+                                @elseif($currentPct < 50)
+                                    ⚠️ Low
+                                @elseif($currentPct < 100)
+                                    ✓ Moderate
+                                @else
+                                    ✓ Good
                                 @endif
                             </div>
                         </div>
@@ -1251,8 +1369,28 @@
                                 <div class="flex items-start justify-between gap-2">
                                     <div>
                                         <div class="text-[11px] uppercase tracking-wide text-slate-500">Current stock</div>
-                                        <div class="text-xl font-semibold text-{{ $stockColor }}-600">{{ number_format($currentStock, 0) }}</div>
-                                        <div class="text-[11px] text-gray-500">
+                                        <div class="flex items-center gap-2">
+                                            <div id="current-stock-value-{{ $item->id }}" class="text-xl font-semibold text-{{ $stockColor }}-600" data-stock-color="{{ $stockColor }}">{{ number_format($currentStock, 0) }}</div>
+                                            @if($product?->ID && $currentStock < 0)
+                                                <button
+                                                    type="button"
+                                                    class="reset-stock-button inline-flex items-center gap-1 rounded border border-green-200 px-2 py-1 text-[11px] font-semibold text-green-600 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-200"
+                                                    data-product-id="{{ $product->ID }}"
+                                                    data-item-id="{{ $item->id }}"
+                                                    data-case-units="{{ $caseUnits }}"
+                                                    data-is-case-product="{{ $isCaseProduct ? 1 : 0 }}"
+                                                    data-product-name="{{ e($product->NAME ?? 'Product') }}"
+                                                    title="Set stock to zero"
+                                                    aria-label="Set stock to zero for {{ e($product->NAME ?? 'product') }}"
+                                                >
+                                                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5 10 5l5.5 5.5M10 5v10.5" />
+                                                    </svg>
+                                                    <span>0</span>
+                                                </button>
+                                            @endif
+                                        </div>
+                                        <div id="current-stock-subtext-{{ $item->id }}" class="text-[11px] text-gray-500">
                                             @if($isCaseProduct)
                                                 {{ $currentStockCaseText }} cases
                                             @else
@@ -1359,29 +1497,73 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 @endonce
 <script>
+    const clampPrecision = precision => Math.min(Math.max(precision, 0), 3);
+
+    const formatNumberForDisplay = (value, precision = 3) => {
+        if (!Number.isFinite(value)) {
+            return '0';
+        }
+
+        const safePrecision = clampPrecision(precision);
+        const factor = 10 ** safePrecision;
+        const rounded = Math.round(value * factor) / factor;
+        if (Math.abs(rounded - Math.round(rounded)) < 0.0005) {
+            return Math.round(rounded).toLocaleString();
+        }
+
+        return rounded.toLocaleString(undefined, {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: safePrecision
+        });
+    };
+
+    const stockToneForPercent = (percent) => {
+        if (percent < 50) {
+            return 'red';
+        }
+        if (percent < 100) {
+            return 'yellow';
+        }
+
+        return 'green';
+    };
+
+    const stockStatusLabelForPercent = (percent) => {
+        if (percent < 30) {
+            return '🚨 CRITICAL';
+        }
+        if (percent < 50) {
+            return '⚠️ Low';
+        }
+        if (percent < 100) {
+            return '✓ Moderate';
+        }
+
+        return '✓ Good';
+    };
+
+    const applyStockToneClass = (element, tone, mode = 'text') => {
+        if (!element) {
+            return;
+        }
+
+        const tones = ['red', 'yellow', 'green'];
+        tones.forEach(color => {
+            const className = mode === 'bar'
+                ? `bg-${color}-500`
+                : `text-${color}-600`;
+            element.classList.remove(className);
+        });
+
+        element.classList.add(mode === 'bar' ? `bg-${tone}-500` : `text-${tone}-600`);
+        element.dataset.stockColor = tone;
+    };
+
     document.addEventListener('DOMContentLoaded', function() {
         if (window.chartsInitialized) return;
         window.chartsInitialized = true;
 
         window.productCharts = window.productCharts || {};
-        const clampPrecision = precision => Math.min(Math.max(precision, 0), 3);
-        const formatNumberForDisplay = (value, precision = 3) => {
-            if (!Number.isFinite(value)) {
-                return '0';
-            }
-
-            const safePrecision = clampPrecision(precision);
-            const factor = 10 ** safePrecision;
-            const rounded = Math.round(value * factor) / factor;
-            if (Math.abs(rounded - Math.round(rounded)) < 0.0005) {
-                return Math.round(rounded).toLocaleString();
-            }
-
-            return rounded.toLocaleString(undefined, {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: safePrecision
-            });
-        };
 
         @foreach($cheeseProducts->merge($refrigeratedProducts)->merge($caseProducts)->merge($unitProducts) as $item)
             @php
@@ -1627,6 +1809,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         const debounceTimers = {};
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const baseUrl = window.location.origin;
 
         // Save quantity to server via AJAX
         function saveQuantityToServer(itemId, quantity) {
@@ -1641,7 +1824,6 @@
             input.disabled = true;
 
             // Determine endpoint and parameter based on product type
-            const baseUrl = window.location.origin;
             const endpoint = isCaseProduct
                 ? `${baseUrl}/order-items/${itemId}/cases`
                 : `${baseUrl}/order-items/${itemId}/quantity`;
@@ -1733,6 +1915,10 @@
             const quantityPrecision = parseInt(input.dataset.quantityPrecision || (isCaseProduct ? 3 : 0), 10);
             const orderQuantity = parseFloat(input.value) || 0;
 
+            const currentPct = productPeak > 0 ? (currentStock / productPeak) * 100 : 0;
+            const tone = stockToneForPercent(currentPct);
+            const statusLabel = stockStatusLabelForPercent(currentPct);
+
             // Calculate new units based on whether it's a case product
             const newUnits = isCaseProduct ? (orderQuantity * caseUnits) : orderQuantity;
             const afterStock = currentStock + newUnits;
@@ -1740,16 +1926,25 @@
             // Calculate percentages for display (relative to product peak)
             const afterPct = productPeak > 0 ? (afterStock / productPeak) * 100 : 100;
 
-            // Update Chart.js dataset point
+            // Update Chart.js dataset points
             const chart = window.productCharts ? window.productCharts[itemId] : null;
             if (chart) {
                 const labelsLength = chart.data.labels.length;
+
                 const afterDataset = chart.data.datasets.find(dataset => dataset.label === 'After order');
                 if (afterDataset) {
                     afterDataset.data[labelsLength - 1] = afterStock;
                 }
 
+                const currentDataset = chart.data.datasets.find(dataset => dataset.label === 'Current stock');
+                if (currentDataset) {
+                    currentDataset.data[labelsLength - 2] = currentStock;
+                }
+
+                chart.$currentStock = currentStock;
+                chart.$currentPct = currentPct;
                 chart.$afterPct = afterPct;
+                chart.$currentUnits = currentStock;
 
                 const salesDataset = chart.data.datasets.find(dataset => dataset.label === 'Sales');
                 const salesData = salesDataset ? salesDataset.data : [];
@@ -1761,8 +1956,8 @@
                 }, 0);
 
                 const averageBaseline = chart.$averageUnits || 0;
-                const axisMax = Math.max(salesMax, chart.$currentStock || 0, afterStock, productPeak, averageBaseline, 1);
-                const axisMin = Math.min(0, chart.$currentStock || 0, afterStock);
+                const axisMax = Math.max(salesMax, currentStock, afterStock, productPeak, averageBaseline, 1);
+                const axisMin = Math.min(0, currentStock, afterStock);
 
                 chart.options.scales.y.min = axisMin < 0 ? axisMin * 1.1 : 0;
                 chart.options.scales.y.max = axisMax > 0 ? axisMax * 1.15 : 10;
@@ -1770,7 +1965,34 @@
                 chart.update('none');
             }
 
-            // Update text labels
+            // Update current stock displays
+            const currentValueEl = document.getElementById(`current-stock-value-${itemId}`);
+            if (currentValueEl) {
+                currentValueEl.textContent = Math.round(currentStock).toLocaleString();
+                applyStockToneClass(currentValueEl, tone, 'text');
+            }
+
+            const currentSubtextEl = document.getElementById(`current-stock-subtext-${itemId}`);
+            if (currentSubtextEl) {
+                const displayValue = isCaseProduct
+                    ? `${formatNumberForDisplay(currentStock / Math.max(caseUnits, 1), quantityPrecision || 3)} cases`
+                    : `${Math.round(currentStock).toLocaleString()} units`;
+                currentSubtextEl.textContent = displayValue;
+            }
+
+            const barEl = document.getElementById(`stock-level-bar-${itemId}`);
+            if (barEl) {
+                barEl.style.width = `${Math.max(0, Math.min(currentPct, 100))}%`;
+                applyStockToneClass(barEl, tone, 'bar');
+            }
+
+            const statusEl = document.getElementById(`stock-level-label-${itemId}`);
+            if (statusEl) {
+                statusEl.textContent = statusLabel;
+                applyStockToneClass(statusEl, tone, 'text');
+            }
+
+            // Update after-order text labels
             const afterStockValue = document.getElementById(`after-stock-value-${itemId}`);
             const afterStockSubtext = document.getElementById(`after-stock-subtext-${itemId}`);
             const unitsLabel = document.getElementById(`units-label-${itemId}`);
@@ -1842,6 +2064,85 @@
                     // Save immediately (no debounce for buttons)
                     saveQuantityToServer(itemId, newValue);
                 }
+            });
+        });
+
+        document.querySelectorAll('.reset-stock-button').forEach(button => {
+            button.addEventListener('click', function() {
+                if (this.dataset.loading === '1') {
+                    return;
+                }
+
+                const productId = this.dataset.productId;
+                const itemId = this.dataset.itemId;
+                if (!productId || !itemId) {
+                    return;
+                }
+
+                const productName = this.dataset.productName || 'this product';
+                const confirmationMessage = `Set stock for ${productName} to 0?`;
+                if (!window.confirm(confirmationMessage)) {
+                    return;
+                }
+
+                this.dataset.loading = '1';
+                this.disabled = true;
+                this.classList.add('opacity-60', 'cursor-not-allowed');
+
+                fetch(`${baseUrl}/products/${encodeURIComponent(productId)}/update-stock`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ stock_units: 0 }),
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => {
+                            throw new Error(err.message || `HTTP ${response.status}: ${response.statusText}`);
+                        }).catch(() => {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.error || 'Failed to reset stock');
+                    }
+
+                    const input = document.getElementById(`qty-input-${itemId}`);
+                    if (input) {
+                        input.dataset.currentStock = '0';
+                    }
+
+                    updateStockVisuals(itemId);
+
+                    this.classList.add('bg-green-100');
+                    this.title = 'Stock reset to zero';
+                    this.setAttribute('aria-disabled', 'true');
+
+                    const span = this.querySelector('span');
+                    if (span) {
+                        span.textContent = '0';
+                    }
+
+                    setTimeout(() => {
+                        this.style.display = 'none';
+                    }, 800);
+                })
+                .catch(error => {
+                    console.error('Failed to reset stock', error);
+                    alert('Failed to reset stock:\n' + error.message);
+                    this.disabled = false;
+                    this.classList.remove('opacity-60', 'cursor-not-allowed');
+                    this.dataset.loading = '0';
+                })
+                .finally(() => {
+                    this.blur();
+                });
             });
         });
 
