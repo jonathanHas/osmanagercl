@@ -42,6 +42,46 @@
                         </button>
                     </div>
 
+                    @if(auth()->user()->hasRole('admin'))
+                    <div class="border-b border-gray-800 px-4 py-3">
+                        <div class="flex items-center justify-between gap-2">
+                            <a href="{{ route('fruit-veg.manage') }}"
+                               title="Manage Fruit &amp; Veg"
+                               aria-label="Manage Fruit &amp; Veg"
+                               class="group flex h-10 w-10 items-center justify-center rounded-lg bg-gray-800 text-gray-400 transition hover:bg-green-600/20 hover:text-green-400 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2 focus:ring-offset-gray-900">
+                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5.5Q13.3 3 16 2.5" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5.5Q10.7 3 8 2.5" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.5C8.75 6.5 6.25 9.17 6.25 12.63 6.25 16.33 8.75 19.5 12 19.5 15.25 19.5 17.75 16.33 17.75 12.63 17.75 9.17 15.25 6.5 12 6.5Z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.25 12.25c.6.4 1.55.87 2.75.87s2.15-.47 2.75-.87" />
+                                </svg>
+                                <span class="sr-only">Manage Fruit &amp; Veg</span>
+                            </a>
+
+                            <a href="{{ route('invoices.bulk-upload.index') }}"
+                               title="Upload Invoices"
+                               aria-label="Upload Invoices"
+                               class="group flex h-10 w-10 items-center justify-center rounded-lg bg-gray-800 text-gray-400 transition hover:bg-indigo-600/20 hover:text-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-gray-900">
+                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <span class="sr-only">Upload Invoices</span>
+                            </a>
+
+                            <a href="{{ route('suppliers.outstanding-report') }}"
+                               title="Suppliers Outstanding Report"
+                               aria-label="Suppliers Outstanding Report"
+                               class="group flex h-10 w-10 items-center justify-center rounded-lg bg-gray-800 text-gray-400 transition hover:bg-amber-600/20 hover:text-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-gray-900">
+                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="8" stroke-width="2" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .794-3 2s1.343 2 3 2 3 .794 3 2-1.343 2-3 2m0-8c1.657 0 3 .794 3 2m-3-6v12m0-12V4m0 12v2" />
+                                </svg>
+                                <span class="sr-only">Suppliers Outstanding Report</span>
+                            </a>
+                        </div>
+                    </div>
+                    @endif
+
                     <!-- Navigation -->
                     <nav class="flex-1 overflow-y-auto space-y-1 px-2 py-4">
                         <!-- OPERATIONS SECTION -->

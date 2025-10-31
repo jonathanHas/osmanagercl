@@ -270,6 +270,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/order-items/{orderItem}/quantity', [OrderController::class, 'updateQuantity'])->name('order-items.update-quantity');
     Route::patch('/order-items/{orderItem}/cases', [OrderController::class, 'updateCaseQuantity'])->name('order-items.update-cases');
     Route::patch('/order-items/{orderItem}/cost', [OrderController::class, 'updateItemCost'])->name('order-items.update-cost');
+    Route::patch('/order-items/{orderItem}/priority', [OrderController::class, 'updateItemPriority'])->name('order-items.update-priority');
     Route::post('/orders/{order}/bulk-update', [OrderController::class, 'bulkUpdate'])->name('orders.bulk-update');
     Route::post('/orders/{order}/auto-approve-safe', [OrderController::class, 'autoApproveSafeItems'])->name('orders.auto-approve-safe');
     Route::post('/products/update-priority', [OrderController::class, 'updateProductPriority'])->name('products.update-priority');

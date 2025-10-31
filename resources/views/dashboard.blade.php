@@ -155,61 +155,64 @@
             </div>
             @endif
 
-            <!-- Quick Actions -->
+            <!-- Quick Links -->
             <div class="bg-white overflow-hidden shadow rounded-lg">
                 <div class="p-6">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <a href="{{ route('products.index') }}" class="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
-                            <div class="flex-shrink-0">
-                                <svg class="h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                </svg>
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Quick Links</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <a href="{{ route('fruit-veg.manage') }}" class="group relative flex items-center justify-between rounded-xl border border-green-100 bg-white p-5 shadow-sm transition hover:shadow-md focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-green-500">
+                            <div class="flex items-center">
+                                <div class="flex h-12 w-12 items-center justify-center rounded-full bg-green-50 text-green-600">
+                                    <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5.5Q13.3 3 16 2.5" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5.5Q10.7 3 8 2.5" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.5C8.75 6.5 6.25 9.17 6.25 12.63 6.25 16.33 8.75 19.5 12 19.5 15.25 19.5 17.75 16.33 17.75 12.63 17.75 9.17 15.25 6.5 12 6.5Z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.25 12.25c.6.4 1.55.87 2.75.87s2.15-.47 2.75-.87" />
+                                    </svg>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-base font-semibold text-gray-900">Manage Fruit &amp; Veg</p>
+                                    <p class="mt-1 text-sm text-gray-500">Update availability, pricing, and labels.</p>
+                                </div>
                             </div>
-                            <div class="flex-1 min-w-0">
-                                <span class="absolute inset-0" aria-hidden="true"></span>
-                                <p class="text-sm font-medium text-gray-900">View Products</p>
-                                <p class="text-sm text-gray-500">Browse all items</p>
-                            </div>
+                            <svg class="h-5 w-5 text-gray-300 transition group-hover:text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                            </svg>
                         </a>
 
-                        <a href="{{ route('products.index') }}?active_only=1" class="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
-                            <div class="flex-shrink-0">
-                                <svg class="h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
+                        <a href="{{ route('invoices.bulk-upload.index') }}" class="group relative flex items-center justify-between rounded-xl border border-indigo-100 bg-white p-5 shadow-sm transition hover:shadow-md focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
+                            <div class="flex items-center">
+                                <div class="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                                    <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-base font-semibold text-gray-900">Upload Invoices</p>
+                                    <p class="mt-1 text-sm text-gray-500">Start a new bulk upload batch.</p>
+                                </div>
                             </div>
-                            <div class="flex-1 min-w-0">
-                                <span class="absolute inset-0" aria-hidden="true"></span>
-                                <p class="text-sm font-medium text-gray-900">Active Items</p>
-                                <p class="text-sm text-gray-500">Currently available</p>
-                            </div>
+                            <svg class="h-5 w-5 text-gray-300 transition group-hover:text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                            </svg>
                         </a>
 
-                        <a href="#" class="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
-                            <div class="flex-shrink-0">
-                                <svg class="h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                </svg>
+                        <a href="{{ route('suppliers.outstanding-report') }}" class="group relative flex items-center justify-between rounded-xl border border-amber-100 bg-white p-5 shadow-sm transition hover:shadow-md focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-amber-500">
+                            <div class="flex items-center">
+                                <div class="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+                                    <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <circle cx="12" cy="12" r="8" stroke-width="2" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .794-3 2s1.343 2 3 2 3 .794 3 2-1.343 2-3 2m0-8c1.657 0 3 .794 3 2m-3-6v12m0-12V4m0 12v2" />
+                                    </svg>
+                                </div>
+                                <div class="ml-4">
+                                    <p class="text-base font-semibold text-gray-900">Outstanding Suppliers</p>
+                                    <p class="mt-1 text-sm text-gray-500">Review balances and follow-ups.</p>
+                                </div>
                             </div>
-                            <div class="flex-1 min-w-0">
-                                <span class="absolute inset-0" aria-hidden="true"></span>
-                                <p class="text-sm font-medium text-gray-900">Reports</p>
-                                <p class="text-sm text-gray-500">View analytics</p>
-                            </div>
-                        </a>
-
-                        <a href="#" class="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
-                            <div class="flex-shrink-0">
-                                <svg class="h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                </svg>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <span class="absolute inset-0" aria-hidden="true"></span>
-                                <p class="text-sm font-medium text-gray-900">Settings</p>
-                                <p class="text-sm text-gray-500">Configure system</p>
-                            </div>
+                            <svg class="h-5 w-5 text-gray-300 transition group-hover:text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                            </svg>
                         </a>
                     </div>
                 </div>

@@ -768,10 +768,15 @@ class OrderService
      */
     public function updateProductPriority(string $productId, string $priority): ProductOrderSetting
     {
-        return ProductOrderSetting::updateOrCreate(
-            ['product_id' => $productId],
-            ['review_priority' => $priority]
-        );
+        $setting = ProductOrderSetting::firstOrNew(['product_id' => $productId]);
+
+        $setting->review_priority = $priority;
+        $setting->auto_approve = $priority === 'safe';
+        $setting->last_updated = now();
+
+        $setting->save();
+
+        return $setting;
     }
 
     /**

@@ -147,10 +147,46 @@
 <!-- Filter Bar -->
 <div class="bg-white rounded-lg shadow mb-6 p-4 flex items-center justify-between">
     <div class="flex space-x-2">
-        <button class="px-4 py-2 bg-red-600 text-white rounded-lg font-medium">🔴 Review ({{ $reviewCount }})</button>
-        <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200">🟡 Standard ({{ $standardCount }})</button>
-        <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200">🟢 Safe ({{ $safeCount }})</button>
-        <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200">All ({{ $totalItems }})</button>
+        <button
+            type="button"
+            class="priority-filter-button px-4 py-2 rounded-lg font-medium text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
+            data-priority-filter="review"
+            data-active-classes="bg-red-600 text-white shadow-sm hover:bg-red-700"
+            data-inactive-classes="bg-gray-100 text-gray-700 hover:bg-gray-200"
+            aria-pressed="false"
+        >
+            🔴 Review (<span data-priority-count="review">{{ $reviewCount }}</span>)
+        </button>
+        <button
+            type="button"
+            class="priority-filter-button px-4 py-2 rounded-lg font-medium text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
+            data-priority-filter="standard"
+            data-active-classes="bg-amber-500 text-white shadow-sm hover:bg-amber-600"
+            data-inactive-classes="bg-gray-100 text-gray-700 hover:bg-gray-200"
+            aria-pressed="false"
+        >
+            🟡 Standard (<span data-priority-count="standard">{{ $standardCount }}</span>)
+        </button>
+        <button
+            type="button"
+            class="priority-filter-button px-4 py-2 rounded-lg font-medium text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
+            data-priority-filter="safe"
+            data-active-classes="bg-green-500 text-white shadow-sm hover:bg-green-600"
+            data-inactive-classes="bg-gray-100 text-gray-700 hover:bg-gray-200"
+            aria-pressed="false"
+        >
+            🟢 Safe (<span data-priority-count="safe">{{ $safeCount }}</span>)
+        </button>
+        <button
+            type="button"
+            class="priority-filter-button px-4 py-2 rounded-lg font-medium text-sm bg-indigo-600 text-white shadow-sm hover:bg-indigo-700 transition"
+            data-priority-filter="all"
+            data-active-classes="bg-indigo-600 text-white shadow-sm hover:bg-indigo-700"
+            data-inactive-classes="bg-gray-100 text-gray-700 hover:bg-gray-200"
+            aria-pressed="true"
+        >
+            All (<span data-priority-count="all">{{ $totalItems }}</span>)
+        </button>
     </div>
     <div class="flex items-center space-x-3">
         <a href="{{ $toggleUrl }}"
@@ -194,7 +230,7 @@
             : ($cheeseCoverage['override_active'] ? $cheeseCoverage['effective_date'] : ''))
         : '';
 @endphp
-<div class="mb-6">
+<div class="mb-6" data-priority-section="cheese">
     @if($cheeseCoverage)
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3 py-2 bg-yellow-50 rounded-t-lg border-b-2 border-yellow-400">
             <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -296,6 +332,7 @@
                 @php
                     $product = $item->product;
                     $contextData = $item->context_data ?? [];
+                    $safeProductName = strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product'));
                     $currentStock = $contextData['current_stock'] ?? 0;
                     $avgWeeklySales = $contextData['avg_weekly_sales'] ?? 0;
                     $weeklySales = $contextData['weekly_sales'] ?? [];
@@ -363,10 +400,10 @@
                     $stockColor = $currentPct < 50 ? 'red' : ($currentPct < 100 ? 'yellow' : 'green');
                 @endphp
 
-                <tr class="hover:bg-{{ $stockColor }}-50 border-l-4 {{ $borderColor }}" style="height: 180px;">
+                <tr data-order-item-id="{{ $item->id }}" data-priority="{{ $item->review_priority }}" class="hover:bg-{{ $stockColor }}-50 border-l-4 {{ $borderColor }}" style="height: 180px;">
                     <td class="px-4 py-4">
-                        <div class="w-8 h-8 {{ $iconBg }} rounded-full flex items-center justify-center">
-                            <span class="font-bold text-sm">
+                        <div data-priority-indicator="{{ $item->id }}" class="w-8 h-8 {{ $iconBg }} rounded-full flex items-center justify-center">
+                            <span data-priority-symbol="{{ $item->id }}" class="font-bold text-sm">
                                 @switch($item->review_priority)
                                     @case('review')
                                         !
@@ -382,7 +419,19 @@
                         </div>
                     </td>
                     <td class="px-4 py-4">
-                        <div class="font-medium text-gray-900">{!! strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product')) !!}</div>
+                        <div class="font-medium text-gray-900">
+                            @if(($product->ID ?? null) !== null)
+                                <a href="{{ route('products.edit', $product->ID) }}"
+                                   class="text-indigo-600 hover:text-indigo-800"
+                                   target="_blank"
+                                   rel="noopener"
+                                   title="Edit {{ $safeProductName }}">
+                                    {!! $safeProductName !!}
+                                </a>
+                            @else
+                                {!! $safeProductName !!}
+                            @endif
+                        </div>
                         <div class="text-sm text-gray-500">
                             Code: {{ $product->CODE ?? 'N/A' }}@if($caseUnits > 1) • {{ rtrim(rtrim(number_format($caseUnits, 2), '0'), '.') }} units/case @endif
                         </div>
@@ -398,6 +447,26 @@
                                 </button>
                             </div>
                         @endif
+                        <div class="mt-2 flex items-center gap-2 text-xs">
+                            <label for="priority-select-{{ $item->id }}" class="uppercase tracking-wide text-[11px] text-slate-400">
+                                Priority
+                            </label>
+                            <select
+                                id="priority-select-{{ $item->id }}"
+                                class="priority-selector border-gray-200 rounded-md text-xs focus:ring-indigo-500 focus:border-indigo-500"
+                                data-item-id="{{ $item->id }}"
+                                data-product-id="{{ $product->ID ?? '' }}"
+                                data-current-priority="{{ $item->review_priority }}"
+                                aria-label="Adjust priority for {{ $safeProductName }}"
+                            >
+                                <option value="review" {{ $item->review_priority === 'review' ? 'selected' : '' }}>🔴 Requires review</option>
+                                <option value="standard" {{ $item->review_priority === 'standard' ? 'selected' : '' }}>🟡 Standard</option>
+                                <option value="safe" {{ $item->review_priority === 'safe' ? 'selected' : '' }}>🟢 Safe to over-order</option>
+                            </select>
+                            <span class="hidden text-[11px] text-green-600" data-priority-feedback="{{ $item->id }}">
+                                Saved
+                            </span>
+                        </div>
                     </td>
                     <td class="px-4 py-4">
                         <div class="text-center">
@@ -535,11 +604,17 @@
                     </td>
                     <td class="px-4 py-4 text-center">
                         @if($item->auto_approved)
-                            <button class="px-4 py-2 bg-green-600 text-white rounded-lg font-medium text-sm">
+                            <button
+                                type="button"
+                                data-approval-button="{{ $item->id }}"
+                                class="px-4 py-2 bg-green-600 text-white rounded-lg font-medium text-sm">
                                 ✓ Approved
                             </button>
                         @else
-                            <button class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 text-sm">
+                            <button
+                                type="button"
+                                data-approval-button="{{ $item->id }}"
+                                class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 text-sm">
                                 Approve
                             </button>
                         @endif
@@ -562,7 +637,7 @@
             : ($refrigeratedCoverage['override_active'] ? $refrigeratedCoverage['effective_date'] : ''))
         : '';
 @endphp
-<div class="mb-6">
+<div class="mb-6" data-priority-section="refrigerated">
     @if($refrigeratedCoverage)
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3 py-2 bg-cyan-50 rounded-t-lg border-b-2 border-cyan-400">
             <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -664,6 +739,7 @@
                 @php
                     $product = $item->product;
                     $contextData = $item->context_data ?? [];
+                    $safeProductName = strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product'));
                     $currentStock = $contextData['current_stock'] ?? 0;
                     $avgWeeklySales = $contextData['avg_weekly_sales'] ?? 0;
                     $weeklySales = $contextData['weekly_sales'] ?? [];
@@ -731,10 +807,10 @@
                     $stockColor = $currentPct < 50 ? 'red' : ($currentPct < 100 ? 'yellow' : 'green');
                 @endphp
 
-                <tr class="hover:bg-{{ $stockColor }}-50 border-l-4 {{ $borderColor }}" style="height: 180px;">
+                <tr data-order-item-id="{{ $item->id }}" data-priority="{{ $item->review_priority }}" class="hover:bg-{{ $stockColor }}-50 border-l-4 {{ $borderColor }}" style="height: 180px;">
                     <td class="px-4 py-4">
-                        <div class="w-8 h-8 {{ $iconBg }} rounded-full flex items-center justify-center">
-                            <span class="font-bold text-sm">
+                        <div data-priority-indicator="{{ $item->id }}" class="w-8 h-8 {{ $iconBg }} rounded-full flex items-center justify-center">
+                            <span data-priority-symbol="{{ $item->id }}" class="font-bold text-sm">
                                 @switch($item->review_priority)
                                     @case('review')
                                         !
@@ -750,7 +826,19 @@
                         </div>
                     </td>
                     <td class="px-4 py-4">
-                        <div class="font-medium text-gray-900">{!! strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product')) !!}</div>
+                        <div class="font-medium text-gray-900">
+                            @if(($product->ID ?? null) !== null)
+                                <a href="{{ route('products.edit', $product->ID) }}"
+                                   class="text-indigo-600 hover:text-indigo-800"
+                                   target="_blank"
+                                   rel="noopener"
+                                   title="Edit {{ $safeProductName }}">
+                                    {!! $safeProductName !!}
+                                </a>
+                            @else
+                                {!! $safeProductName !!}
+                            @endif
+                        </div>
                         <div class="text-sm text-gray-500">
                             Code: {{ $product->CODE ?? 'N/A' }}@if($caseUnits > 1) • {{ rtrim(rtrim(number_format($caseUnits, 2), '0'), '.') }} units/case @endif
                         </div>
@@ -766,6 +854,26 @@
                                 </button>
                             </div>
                         @endif
+                        <div class="mt-2 flex items-center gap-2 text-xs">
+                            <label for="priority-select-{{ $item->id }}" class="uppercase tracking-wide text-[11px] text-slate-400">
+                                Priority
+                            </label>
+                            <select
+                                id="priority-select-{{ $item->id }}"
+                                class="priority-selector border-gray-200 rounded-md text-xs focus:ring-indigo-500 focus:border-indigo-500"
+                                data-item-id="{{ $item->id }}"
+                                data-product-id="{{ $product->ID ?? '' }}"
+                                data-current-priority="{{ $item->review_priority }}"
+                                aria-label="Adjust priority for {{ $safeProductName }}"
+                            >
+                                <option value="review" {{ $item->review_priority === 'review' ? 'selected' : '' }}>🔴 Requires review</option>
+                                <option value="standard" {{ $item->review_priority === 'standard' ? 'selected' : '' }}>🟡 Standard</option>
+                                <option value="safe" {{ $item->review_priority === 'safe' ? 'selected' : '' }}>🟢 Safe to over-order</option>
+                            </select>
+                            <span class="hidden text-[11px] text-green-600" data-priority-feedback="{{ $item->id }}">
+                                Saved
+                            </span>
+                        </div>
                     </td>
                     <td class="px-4 py-4">
                         <div class="text-center">
@@ -903,11 +1011,17 @@
                     </td>
                     <td class="px-4 py-4 text-center">
                         @if($item->auto_approved)
-                            <button class="px-4 py-2 bg-green-600 text-white rounded-lg font-medium text-sm">
+                            <button
+                                type="button"
+                                data-approval-button="{{ $item->id }}"
+                                class="px-4 py-2 bg-green-600 text-white rounded-lg font-medium text-sm">
                                 ✓ Approved
                             </button>
                         @else
-                            <button class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 text-sm">
+                            <button
+                                type="button"
+                                data-approval-button="{{ $item->id }}"
+                                class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 text-sm">
                                 Approve
                             </button>
                         @endif
@@ -922,7 +1036,7 @@
 
 <!-- Case Products Table -->
 @if($caseProducts->count() > 0)
-<div class="mb-6">
+<div class="mb-6" data-priority-section="case">
     <h3 class="text-lg font-semibold text-gray-900 mb-3 px-2 py-2 bg-blue-50 rounded-t-lg border-b-2 border-blue-400">
         📦 Case Products ({{ $caseProducts->count() }})
     </h3>
@@ -944,6 +1058,7 @@
                 @php
                     $product = $item->product;
                     $contextData = $item->context_data ?? [];
+                    $safeProductName = strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product'));
                     $currentStock = $contextData['current_stock'] ?? 0;
                     $avgWeeklySales = $contextData['avg_weekly_sales'] ?? 0;
                     $weeklySales = $contextData['weekly_sales'] ?? [];
@@ -1011,10 +1126,10 @@
                     $stockColor = $currentPct < 50 ? 'red' : ($currentPct < 100 ? 'yellow' : 'green');
                 @endphp
 
-                <tr class="hover:bg-{{ $stockColor }}-50 border-l-4 {{ $borderColor }}" style="height: 180px;">
+                <tr data-order-item-id="{{ $item->id }}" data-priority="{{ $item->review_priority }}" class="hover:bg-{{ $stockColor }}-50 border-l-4 {{ $borderColor }}" style="height: 180px;">
                     <td class="px-4 py-4">
-                        <div class="w-8 h-8 {{ $iconBg }} rounded-full flex items-center justify-center">
-                            <span class="font-bold text-sm">
+                        <div data-priority-indicator="{{ $item->id }}" class="w-8 h-8 {{ $iconBg }} rounded-full flex items-center justify-center">
+                            <span data-priority-symbol="{{ $item->id }}" class="font-bold text-sm">
                                 @switch($item->review_priority)
                                     @case('review')
                                         !
@@ -1030,7 +1145,19 @@
                         </div>
                     </td>
                     <td class="px-4 py-4">
-                        <div class="font-medium text-gray-900">{!! strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product')) !!}</div>
+                        <div class="font-medium text-gray-900">
+                            @if(($product->ID ?? null) !== null)
+                                <a href="{{ route('products.edit', $product->ID) }}"
+                                   class="text-indigo-600 hover:text-indigo-800"
+                                   target="_blank"
+                                   rel="noopener"
+                                   title="Edit {{ $safeProductName }}">
+                                    {!! $safeProductName !!}
+                                </a>
+                            @else
+                                {!! $safeProductName !!}
+                            @endif
+                        </div>
                         <div class="text-sm text-gray-500">
                             Code: {{ $product->CODE ?? 'N/A' }}@if($caseUnits > 1) • {{ rtrim(rtrim(number_format($caseUnits, 2), '0'), '.') }} units/case @endif
                         </div>
@@ -1046,6 +1173,26 @@
                                 </button>
                             </div>
                         @endif
+                        <div class="mt-2 flex items-center gap-2 text-xs">
+                            <label for="priority-select-{{ $item->id }}" class="uppercase tracking-wide text-[11px] text-slate-400">
+                                Priority
+                            </label>
+                            <select
+                                id="priority-select-{{ $item->id }}"
+                                class="priority-selector border-gray-200 rounded-md text-xs focus:ring-indigo-500 focus:border-indigo-500"
+                                data-item-id="{{ $item->id }}"
+                                data-product-id="{{ $product->ID ?? '' }}"
+                                data-current-priority="{{ $item->review_priority }}"
+                                aria-label="Adjust priority for {{ $safeProductName }}"
+                            >
+                                <option value="review" {{ $item->review_priority === 'review' ? 'selected' : '' }}>🔴 Requires review</option>
+                                <option value="standard" {{ $item->review_priority === 'standard' ? 'selected' : '' }}>🟡 Standard</option>
+                                <option value="safe" {{ $item->review_priority === 'safe' ? 'selected' : '' }}>🟢 Safe to over-order</option>
+                            </select>
+                            <span class="hidden text-[11px] text-green-600" data-priority-feedback="{{ $item->id }}">
+                                Saved
+                            </span>
+                        </div>
                     </td>
                     <td class="px-4 py-4">
                         <div class="text-center">
@@ -1183,11 +1330,17 @@
                     </td>
                     <td class="px-4 py-4 text-center">
                         @if($item->auto_approved)
-                            <button class="px-4 py-2 bg-green-600 text-white rounded-lg font-medium text-sm">
+                            <button
+                                type="button"
+                                data-approval-button="{{ $item->id }}"
+                                class="px-4 py-2 bg-green-600 text-white rounded-lg font-medium text-sm">
                                 ✓ Approved
                             </button>
                         @else
-                            <button class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 text-sm">
+                            <button
+                                type="button"
+                                data-approval-button="{{ $item->id }}"
+                                class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 text-sm">
                                 Approve
                             </button>
                         @endif
@@ -1202,7 +1355,7 @@
 
 <!-- Unit Products Table -->
 @if($unitProducts->count() > 0)
-<div class="mb-6">
+<div class="mb-6" data-priority-section="unit">
     <h3 class="text-lg font-semibold text-gray-900 mb-3 px-2 py-2 bg-green-50 rounded-t-lg border-b-2 border-green-400">
         🔢 Unit Products ({{ $unitProducts->count() }})
     </h3>
@@ -1224,6 +1377,7 @@
                 @php
                     $product = $item->product;
                     $contextData = $item->context_data ?? [];
+                    $safeProductName = strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product'));
                     $currentStock = $contextData['current_stock'] ?? 0;
                     $avgWeeklySales = $contextData['avg_weekly_sales'] ?? 0;
                     $weeklySales = $contextData['weekly_sales'] ?? [];
@@ -1291,10 +1445,10 @@
                     $stockColor = $currentPct < 50 ? 'red' : ($currentPct < 100 ? 'yellow' : 'green');
                 @endphp
 
-                <tr class="hover:bg-{{ $stockColor }}-50 border-l-4 {{ $borderColor }}" style="height: 180px;">
+                <tr data-order-item-id="{{ $item->id }}" data-priority="{{ $item->review_priority }}" class="hover:bg-{{ $stockColor }}-50 border-l-4 {{ $borderColor }}" style="height: 180px;">
                     <td class="px-4 py-4">
-                        <div class="w-8 h-8 {{ $iconBg }} rounded-full flex items-center justify-center">
-                            <span class="font-bold text-sm">
+                        <div data-priority-indicator="{{ $item->id }}" class="w-8 h-8 {{ $iconBg }} rounded-full flex items-center justify-center">
+                            <span data-priority-symbol="{{ $item->id }}" class="font-bold text-sm">
                                 @switch($item->review_priority)
                                     @case('review')
                                         !
@@ -1310,7 +1464,19 @@
                         </div>
                     </td>
                     <td class="px-4 py-4">
-                        <div class="font-medium text-gray-900">{!! strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product')) !!}</div>
+                        <div class="font-medium text-gray-900">
+                            @if(($product->ID ?? null) !== null)
+                                <a href="{{ route('products.edit', $product->ID) }}"
+                                   class="text-indigo-600 hover:text-indigo-800"
+                                   target="_blank"
+                                   rel="noopener"
+                                   title="Edit {{ $safeProductName }}">
+                                    {!! $safeProductName !!}
+                                </a>
+                            @else
+                                {!! $safeProductName !!}
+                            @endif
+                        </div>
                         <div class="text-sm text-gray-500">
                             Code: {{ $product->CODE ?? 'N/A' }}@if($caseUnits > 1) • {{ rtrim(rtrim(number_format($caseUnits, 2), '0'), '.') }} units/case @endif
                         </div>
@@ -1326,6 +1492,26 @@
                                 </button>
                             </div>
                         @endif
+                        <div class="mt-2 flex items-center gap-2 text-xs">
+                            <label for="priority-select-{{ $item->id }}" class="uppercase tracking-wide text-[11px] text-slate-400">
+                                Priority
+                            </label>
+                            <select
+                                id="priority-select-{{ $item->id }}"
+                                class="priority-selector border-gray-200 rounded-md text-xs focus:ring-indigo-500 focus:border-indigo-500"
+                                data-item-id="{{ $item->id }}"
+                                data-product-id="{{ $product->ID ?? '' }}"
+                                data-current-priority="{{ $item->review_priority }}"
+                                aria-label="Adjust priority for {{ $safeProductName }}"
+                            >
+                                <option value="review" {{ $item->review_priority === 'review' ? 'selected' : '' }}>🔴 Requires review</option>
+                                <option value="standard" {{ $item->review_priority === 'standard' ? 'selected' : '' }}>🟡 Standard</option>
+                                <option value="safe" {{ $item->review_priority === 'safe' ? 'selected' : '' }}>🟢 Safe to over-order</option>
+                            </select>
+                            <span class="hidden text-[11px] text-green-600" data-priority-feedback="{{ $item->id }}">
+                                Saved
+                            </span>
+                        </div>
                     </td>
                     <td class="px-4 py-4">
                         <div class="text-center">
@@ -1463,11 +1649,17 @@
                     </td>
                     <td class="px-4 py-4 text-center">
                         @if($item->auto_approved)
-                            <button class="px-4 py-2 bg-green-600 text-white rounded-lg font-medium text-sm">
+                            <button
+                                type="button"
+                                data-approval-button="{{ $item->id }}"
+                                class="px-4 py-2 bg-green-600 text-white rounded-lg font-medium text-sm">
                                 ✓ Approved
                             </button>
                         @else
-                            <button class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 text-sm">
+                            <button
+                                type="button"
+                                data-approval-button="{{ $item->id }}"
+                                class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 text-sm">
                                 Approve
                             </button>
                         @endif
@@ -1479,6 +1671,10 @@
     </div>
 </div>
 @endif
+
+<div data-priority-empty-state class="hidden bg-white rounded-lg shadow p-8 text-center text-gray-500">
+    No items match the selected priority filter.
+</div>
 
 @if($cheeseProducts->count() === 0 && $refrigeratedProducts->count() === 0 && $caseProducts->count() === 0 && $unitProducts->count() === 0)
     <div class="bg-white rounded-lg shadow p-8 text-center text-gray-500">
@@ -1810,6 +2006,243 @@
         const debounceTimers = {};
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
         const baseUrl = window.location.origin;
+        const priorityStates = {
+            review: {
+                border: 'border-red-500',
+                icon: ['bg-red-100', 'text-red-600'],
+                symbol: '!',
+            },
+            standard: {
+                border: 'border-yellow-500',
+                icon: ['bg-yellow-100', 'text-yellow-600'],
+                symbol: '●',
+            },
+            safe: {
+                border: 'border-green-500',
+                icon: ['bg-green-100', 'text-green-600'],
+                symbol: '✓',
+            },
+        };
+        const priorityBorderClasses = ['border-red-500', 'border-yellow-500', 'border-green-500'];
+        const priorityIconClasses = ['bg-red-100', 'text-red-600', 'bg-yellow-100', 'text-yellow-600', 'bg-green-100', 'text-green-600'];
+        const approvalButtonBlueClasses = ['bg-blue-600', 'hover:bg-blue-700'];
+        const approvalButtonGreenClasses = ['bg-green-600'];
+        const priorityFeedbackTimers = {};
+        const priorityFilterButtons = document.querySelectorAll('[data-priority-filter]');
+        const priorityCountElements = document.querySelectorAll('[data-priority-count]');
+        const priorityEmptyState = document.querySelector('[data-priority-empty-state]');
+        let currentPriorityFilter = 'all';
+
+        const applyClassList = (element, classes, action) => {
+            if (!element || !classes) {
+                return;
+            }
+
+            classes.split(/\s+/).filter(Boolean).forEach(className => {
+                element.classList[action](className);
+            });
+        };
+
+        const updatePriorityButtons = (activeFilter) => {
+            priorityFilterButtons.forEach(button => {
+                const activeClasses = button.dataset.activeClasses || '';
+                const inactiveClasses = button.dataset.inactiveClasses || '';
+                applyClassList(button, activeClasses, 'remove');
+                applyClassList(button, inactiveClasses, 'remove');
+
+                if ((button.dataset.priorityFilter || 'all') === activeFilter) {
+                    applyClassList(button, activeClasses, 'add');
+                    button.setAttribute('aria-pressed', 'true');
+                } else {
+                    applyClassList(button, inactiveClasses, 'add');
+                    button.setAttribute('aria-pressed', 'false');
+                }
+            });
+        };
+
+        const applyPriorityFilter = (filter) => {
+            const rows = document.querySelectorAll('tr[data-priority]');
+
+            if (rows.length === 0) {
+                if (priorityEmptyState) {
+                    priorityEmptyState.classList.add('hidden');
+                }
+                priorityCountElements.forEach(element => {
+                    const key = element.dataset.priorityCount;
+                    if (key) {
+                        element.textContent = '0';
+                    }
+                });
+                return;
+            }
+
+            const counts = {
+                review: 0,
+                standard: 0,
+                safe: 0,
+                all: rows.length,
+            };
+
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const rowPriority = row.dataset.priority || 'standard';
+                counts[rowPriority] = (counts[rowPriority] ?? 0) + 1;
+
+                const matches = filter === 'all' || rowPriority === filter;
+                row.classList.toggle('hidden', !matches);
+
+                if (matches) {
+                    visibleCount++;
+                }
+            });
+
+            document.querySelectorAll('[data-priority-section]').forEach(section => {
+                const sectionRows = section.querySelectorAll('tbody tr[data-priority]');
+                const sectionVisible = Array.from(sectionRows).some(row => !row.classList.contains('hidden'));
+                section.classList.toggle('hidden', !sectionVisible);
+            });
+
+            priorityCountElements.forEach(element => {
+                const key = element.dataset.priorityCount;
+                if (key && counts[key] !== undefined) {
+                    element.textContent = counts[key];
+                }
+            });
+
+            if (priorityEmptyState) {
+                priorityEmptyState.classList.toggle('hidden', visibleCount > 0);
+            }
+        };
+
+        function showPriorityFeedback(itemId, message, isError = false) {
+            const feedback = document.querySelector(`[data-priority-feedback="${itemId}"]`);
+            if (!feedback) {
+                return;
+            }
+
+            feedback.textContent = message;
+            feedback.classList.remove('hidden', 'text-green-600', 'text-red-600');
+            feedback.classList.add(isError ? 'text-red-600' : 'text-green-600');
+
+            if (priorityFeedbackTimers[itemId]) {
+                clearTimeout(priorityFeedbackTimers[itemId]);
+            }
+
+            priorityFeedbackTimers[itemId] = setTimeout(() => {
+                feedback.classList.add('hidden');
+            }, isError ? 4000 : 1500);
+        }
+
+        function applyPriorityStyles(itemId, priority, autoApproved) {
+            const state = priorityStates[priority];
+            if (!state) {
+                return;
+            }
+
+            const row = document.querySelector(`tr[data-order-item-id="${itemId}"]`);
+            if (row) {
+                row.dataset.priority = priority;
+                priorityBorderClasses.forEach(cls => row.classList.remove(cls));
+                row.classList.add(state.border);
+            }
+
+            const indicator = document.querySelector(`[data-priority-indicator="${itemId}"]`);
+            if (indicator) {
+                priorityIconClasses.forEach(cls => indicator.classList.remove(cls));
+                state.icon.forEach(cls => indicator.classList.add(cls));
+            }
+
+            const symbol = document.querySelector(`[data-priority-symbol="${itemId}"]`);
+            if (symbol) {
+                symbol.textContent = state.symbol;
+            }
+
+            const approvalButton = document.querySelector(`[data-approval-button="${itemId}"]`);
+            if (approvalButton) {
+                approvalButton.classList.remove(...approvalButtonBlueClasses);
+                approvalButton.classList.remove(...approvalButtonGreenClasses);
+
+                if (autoApproved) {
+                    approvalButton.classList.add(...approvalButtonGreenClasses);
+                    approvalButton.textContent = '✓ Approved';
+                } else {
+                    approvalButton.classList.add(...approvalButtonBlueClasses);
+                    approvalButton.textContent = 'Approve';
+                }
+            }
+        }
+
+        function persistPriority(itemId, priority, previousPriority, selectEl) {
+            if (!priorityStates[priority]) {
+                return;
+            }
+
+            const endpoint = `${baseUrl}/order-items/${itemId}/priority`;
+            const payload = {
+                priority,
+                apply_to_product: true,
+            };
+
+            selectEl.disabled = true;
+            selectEl.classList.remove('border-red-400', 'bg-red-50', 'border-green-400', 'bg-green-50');
+            selectEl.classList.add('border-blue-400', 'bg-blue-50');
+
+            fetch(endpoint, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json()
+                            .catch(() => ({}))
+                            .then(err => {
+                                throw new Error(err.message || `HTTP ${response.status}: ${response.statusText}`);
+                            });
+                    }
+
+                    return response.json();
+                })
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.error || 'Failed to update priority');
+                    }
+
+                    const updatedPriority = data.item?.review_priority || priority;
+                    const autoApproved = Boolean(data.item?.auto_approved);
+
+                    selectEl.dataset.currentPriority = updatedPriority;
+                    selectEl.dataset.previousPriority = updatedPriority;
+                    selectEl.classList.remove('border-blue-400', 'bg-blue-50');
+                    selectEl.classList.add('border-green-400', 'bg-green-50');
+                    setTimeout(() => {
+                        selectEl.classList.remove('border-green-400', 'bg-green-50');
+                    }, 1000);
+
+                    applyPriorityStyles(itemId, updatedPriority, autoApproved);
+                    applyPriorityFilter(currentPriorityFilter);
+                    showPriorityFeedback(itemId, data.message || 'Saved');
+                })
+                .catch(error => {
+                    console.error('Priority update error:', error);
+                    selectEl.classList.remove('border-blue-400', 'bg-blue-50');
+                    selectEl.classList.add('border-red-400', 'bg-red-50');
+                    setTimeout(() => {
+                        selectEl.classList.remove('border-red-400', 'bg-red-50');
+                    }, 2000);
+                    selectEl.value = previousPriority;
+
+                    showPriorityFeedback(itemId, error.message || 'Failed to save priority', true);
+                })
+                .finally(() => {
+                    selectEl.disabled = false;
+                });
+        }
 
         // Save quantity to server via AJAX
         function saveQuantityToServer(itemId, quantity) {
@@ -2016,7 +2449,40 @@
             }
         }
 
+        priorityFilterButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                currentPriorityFilter = this.dataset.priorityFilter || 'all';
+                updatePriorityButtons(currentPriorityFilter);
+                applyPriorityFilter(currentPriorityFilter);
+            });
+        });
+
+        updatePriorityButtons(currentPriorityFilter);
+        applyPriorityFilter(currentPriorityFilter);
+
         // Handle input changes (debounced save)
+        document.querySelectorAll('.priority-selector').forEach(select => {
+            select.addEventListener('focus', function() {
+                this.dataset.previousPriority = this.value;
+            });
+
+            select.addEventListener('change', function() {
+                const itemId = this.dataset.itemId;
+                if (!itemId) {
+                    return;
+                }
+
+                const newPriority = this.value;
+                const currentPriority = this.dataset.currentPriority || this.dataset.previousPriority || newPriority;
+
+                if (newPriority === currentPriority) {
+                    return;
+                }
+
+                persistPriority(itemId, newPriority, currentPriority, this);
+            });
+        });
+
         document.querySelectorAll('.qty-input').forEach(input => {
             input.addEventListener('input', function() {
                 const itemId = this.dataset.itemId;

@@ -11,10 +11,11 @@ class SupplierOutstandingController extends Controller
     public function index(Request $request)
     {
         $reportDate = $request->get('report_date', now()->format('Y-m-d'));
+        $showPreviousPayments = $request->boolean('show_previous_payments', false);
 
         // If no date provided, show form only
         if (! $request->filled('report_date')) {
-            return view('suppliers.outstanding-report', compact('reportDate'));
+            return view('suppliers.outstanding-report', compact('reportDate', 'showPreviousPayments'));
         }
 
         $reportDateTime = Carbon::parse($reportDate)->endOfDay();
@@ -41,20 +42,39 @@ class SupplierOutstandingController extends Controller
             ->get();
 
         // Group by supplier and calculate totals
-        $supplierGroups = $outstandingInvoices->groupBy('supplier_id')->map(function ($invoices, $supplierId) {
+        $supplierGroups = $outstandingInvoices->groupBy('supplier_id')->map(function ($invoices, $supplierId) use ($reportDateTime, $showPreviousPayments) {
             $supplier = $invoices->first()->supplier;
             $totalAmount = $invoices->sum('total_amount');
 
             // Fallback to supplier_name from invoice if no supplier relationship
             $supplierName = $supplier ? $supplier->name : $invoices->first()->supplier_name;
 
-            return [
+            $allInvoices = $invoices;
+
+            // Get last 2 paid invoices for this supplier if requested
+            if ($showPreviousPayments && $supplierId) {
+                $previousPayments = Invoice::where('supplier_id', $supplierId)
+                    ->where('payment_status', 'paid')
+                    ->whereNotNull('payment_date')
+                    ->where('payment_date', '<=', $reportDateTime)
+                    ->orderBy('payment_date', 'desc')
+                    ->limit(2)
+                    ->get();
+
+                // Merge with outstanding invoices and sort by invoice date
+                $allInvoices = $invoices->merge($previousPayments)->sortBy('invoice_date');
+            }
+
+            $groupData = [
                 'supplier' => $supplier,
                 'supplier_name' => $supplierName,
                 'invoices' => $invoices,
+                'all_invoices' => $allInvoices,
                 'total_amount' => $totalAmount,
                 'invoice_count' => $invoices->count(),
             ];
+
+            return $groupData;
         })->sortBy('supplier_name');
 
         // Calculate overall total
@@ -71,13 +91,15 @@ class SupplierOutstandingController extends Controller
             'supplierGroups',
             'overallTotal',
             'totalInvoiceCount',
-            'unpaidInvoices'
+            'unpaidInvoices',
+            'showPreviousPayments'
         ));
     }
 
     public function exportCsv(Request $request)
     {
         $reportDate = $request->get('report_date', now()->format('Y-m-d'));
+        $showPreviousPayments = $request->boolean('show_previous_payments', false);
         $reportDateTime = Carbon::parse($reportDate)->endOfDay();
 
         $outstandingInvoices = Invoice::with(['supplier', 'vatLines'])
@@ -106,6 +128,26 @@ class SupplierOutstandingController extends Controller
             return $supplier ? $supplier->name : $invoices->first()->supplier_name;
         });
 
+        // Merge with previous payments if requested for CSV
+        if ($showPreviousPayments) {
+            $supplierGroups = $supplierGroups->map(function ($invoices, $supplierId) use ($reportDateTime) {
+                if ($supplierId) {
+                    $previousPayments = Invoice::where('supplier_id', $supplierId)
+                        ->where('payment_status', 'paid')
+                        ->whereNotNull('payment_date')
+                        ->where('payment_date', '<=', $reportDateTime)
+                        ->orderBy('payment_date', 'desc')
+                        ->limit(2)
+                        ->get();
+
+                    // Merge and sort by invoice date
+                    return $invoices->merge($previousPayments)->sortBy('invoice_date');
+                }
+
+                return $invoices;
+            });
+        }
+
         $filename = 'outstanding-invoices-'.$reportDate.'.csv';
 
         $headers = [
@@ -113,30 +155,45 @@ class SupplierOutstandingController extends Controller
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ];
 
-        $callback = function () use ($supplierGroups, $reportDate) {
+        $callback = function () use ($supplierGroups, $reportDate, $reportDateTime, $showPreviousPayments) {
             $file = fopen('php://output', 'w');
 
             // Write header
             fputcsv($file, ['Outstanding Invoices Report - '.$reportDate]);
+            if ($showPreviousPayments) {
+                fputcsv($file, ['(with previous payments for reference - shown chronologically)']);
+            }
             fputcsv($file, []); // Empty row
 
             $overallTotal = 0;
-            $totalInvoices = 0;
+            $totalOutstandingInvoices = 0;
 
             foreach ($supplierGroups as $supplierId => $invoices) {
                 $supplier = $invoices->first()->supplier;
-                $supplierTotal = $invoices->sum('total_amount');
+                $supplierName = $supplier ? $supplier->name : $invoices->first()->supplier_name;
+
+                // Calculate only outstanding total for supplier
+                $supplierTotal = $invoices->filter(function ($invoice) use ($reportDateTime) {
+                    return in_array($invoice->payment_status, ['pending', 'overdue', 'partial']) ||
+                           ($invoice->payment_status === 'paid' && $invoice->payment_date && $invoice->payment_date > $reportDateTime);
+                })->sum('total_amount');
 
                 // Supplier header
-                $supplier = $invoices->first()->supplier;
-                $supplierName = $supplier ? $supplier->name : $invoices->first()->supplier_name;
                 fputcsv($file, ['Supplier: '.($supplierName ?: 'Unknown Supplier')]);
-                fputcsv($file, ['Invoice Number', 'Invoice Date', 'Total Amount', 'Payment Status']);
+                fputcsv($file, ['Invoice Number', 'Invoice Date', 'Total Amount', 'Payment Status', 'Payment Date', 'Type']);
 
                 foreach ($invoices as $invoice) {
+                    // Determine if outstanding
+                    $isOutstanding = in_array($invoice->payment_status, ['pending', 'overdue', 'partial']) ||
+                                    ($invoice->payment_status === 'paid' && $invoice->payment_date && $invoice->payment_date > $reportDateTime);
+
                     // Determine payment status text for CSV
                     if ($invoice->payment_status === 'paid' && $invoice->payment_date) {
-                        $paymentStatus = 'Paid after report date ('.$invoice->payment_date->format('Y-m-d').')';
+                        if ($invoice->payment_date > $reportDateTime) {
+                            $paymentStatus = 'Paid after report date';
+                        } else {
+                            $paymentStatus = 'Paid';
+                        }
                     } else {
                         $paymentStatus = ucfirst($invoice->payment_status);
                     }
@@ -146,21 +203,26 @@ class SupplierOutstandingController extends Controller
                         $invoice->invoice_date->format('Y-m-d'),
                         number_format($invoice->total_amount, 2),
                         $paymentStatus,
+                        $invoice->payment_date ? $invoice->payment_date->format('Y-m-d') : 'N/A',
+                        $isOutstanding ? 'OUTSTANDING' : 'Reference',
                     ]);
                 }
 
-                // Supplier total
-                fputcsv($file, ['', 'Supplier Total:', '€'.number_format($supplierTotal, 2), '']);
+                // Supplier total (outstanding only)
+                fputcsv($file, ['', 'Outstanding Total:', '€'.number_format($supplierTotal, 2), '', '', '']);
                 fputcsv($file, []); // Empty row
 
                 $overallTotal += $supplierTotal;
-                $totalInvoices += $invoices->count();
+                $totalOutstandingInvoices += $invoices->filter(function ($invoice) use ($reportDateTime) {
+                    return in_array($invoice->payment_status, ['pending', 'overdue', 'partial']) ||
+                           ($invoice->payment_status === 'paid' && $invoice->payment_date && $invoice->payment_date > $reportDateTime);
+                })->count();
             }
 
             // Overall totals
             fputcsv($file, ['Overall Summary']);
             fputcsv($file, ['Total Suppliers:', $supplierGroups->count()]);
-            fputcsv($file, ['Total Invoices:', $totalInvoices]);
+            fputcsv($file, ['Total Outstanding Invoices:', $totalOutstandingInvoices]);
             fputcsv($file, ['Total Outstanding Amount:', '€'.number_format($overallTotal, 2)]);
 
             fclose($file);

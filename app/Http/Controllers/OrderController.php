@@ -591,6 +591,48 @@ class OrderController extends Controller
     }
 
     /**
+     * Update review priority for an individual order item (AJAX).
+     */
+    public function updateItemPriority(Request $request, OrderItem $orderItem): JsonResponse
+    {
+        $request->validate([
+            'priority' => 'required|in:safe,standard,review',
+            'apply_to_product' => 'sometimes|boolean',
+        ]);
+
+        $priority = $request->input('priority');
+        $applyToProduct = $request->boolean('apply_to_product', true);
+
+        $orderItem->review_priority = $priority;
+        $orderItem->auto_approved = $priority === 'safe';
+        $orderItem->save();
+
+        $setting = null;
+
+        if ($applyToProduct && $orderItem->product_id) {
+            $setting = $this->orderService->updateProductPriority(
+                $orderItem->product_id,
+                $priority
+            );
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => sprintf(
+                'Marked %s as %s',
+                $orderItem->product?->NAME ?? 'product',
+                ucfirst($priority)
+            ),
+            'item' => [
+                'id' => $orderItem->id,
+                'review_priority' => $orderItem->review_priority,
+                'auto_approved' => (bool) $orderItem->auto_approved,
+            ],
+            'setting' => $setting,
+        ]);
+    }
+
+    /**
      * Mockup with real Vico data for UI testing.
      */
     public function mockupVicoLive(): View

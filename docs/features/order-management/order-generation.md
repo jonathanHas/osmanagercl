@@ -33,6 +33,7 @@ The order generation system automates the calculation of required stock quantiti
 ### 2025-11 Enhancements
 - **Refined Product Panel Layout**: The review table trims non-essential legends from each chart cell and elevates the current/after stock figures with larger typography, keeping the focus on actionable quantities.
 - **Supplier Code Utilities**: Each row now exposes the linked supplier code with a one-click copy affordance, reducing the friction of sharing codes with supplier portals or support teams.
+- **Priority Shortcuts**: Inline priority selectors let buyers mark items as 🔴 review, 🟡 standard, or 🟢 safe. Choosing safe persists to `product_order_settings`, flips the row to auto-approved, and influences future order suggestions.
 - **Smarter Case Formatting**: Suggested and ordered case quantities collapse cleanly to whole numbers (e.g. `1` instead of `1.000`) while still displaying fractional values when buyers adjust partial cases.
 
 ### 2. Product Classification System
@@ -55,6 +56,8 @@ Products are classified into three review priority levels:
 - Volatile demand patterns
 - New products without sales history
 - Products with recent waste issues
+
+Use the **Priority** dropdown on each order row to override a product’s classification in real time. Safe classifications automatically enable auto-approval and are remembered for subsequent orders via `product_order_settings`.
 
 ### 3. Smart Interface Design
 

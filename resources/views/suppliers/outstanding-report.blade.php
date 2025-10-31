@@ -5,7 +5,7 @@
                 Outstanding Invoices Report
             </h2>
             @if(isset($supplierGroups))
-                <a href="{{ route('suppliers.outstanding-report.export', ['report_date' => $reportDate]) }}" 
+                <a href="{{ route('suppliers.outstanding-report.export', ['report_date' => $reportDate, 'show_previous_payments' => $showPreviousPayments ? '1' : '0']) }}"
                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
                     <i class="fas fa-download mr-2"></i>Export CSV
                 </a>
@@ -19,23 +19,38 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
                 <div class="p-6">
                     <h3 class="text-lg font-medium text-gray-900 mb-4">Select Report Date</h3>
-                    <form method="GET" action="{{ route('suppliers.outstanding-report') }}" class="flex items-center space-x-4">
-                        <div class="flex-1 max-w-xs">
-                            <label for="report_date" class="block text-sm font-medium text-gray-700 mb-1">
-                                Report Date
-                            </label>
-                            <input type="date" 
-                                   id="report_date" 
-                                   name="report_date" 
-                                   value="{{ $reportDate }}"
-                                   max="{{ now()->format('Y-m-d') }}"
-                                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    <form method="GET" action="{{ route('suppliers.outstanding-report') }}" class="space-y-4">
+                        <div class="flex items-center space-x-4">
+                            <div class="flex-1 max-w-xs">
+                                <label for="report_date" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Report Date
+                                </label>
+                                <input type="date"
+                                       id="report_date"
+                                       name="report_date"
+                                       value="{{ $reportDate }}"
+                                       max="{{ now()->format('Y-m-d') }}"
+                                       class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div class="pt-6">
+                                <button type="submit"
+                                        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md text-sm font-medium">
+                                    Generate Report
+                                </button>
+                            </div>
                         </div>
-                        <div class="pt-6">
-                            <button type="submit" 
-                                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md text-sm font-medium">
-                                Generate Report
-                            </button>
+
+                        <div class="flex items-center">
+                            <input type="checkbox"
+                                   id="show_previous_payments"
+                                   name="show_previous_payments"
+                                   value="1"
+                                   {{ $showPreviousPayments ? 'checked' : '' }}
+                                   class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                            <label for="show_previous_payments" class="ml-2 block text-sm text-gray-700">
+                                Show last 2 payments for each supplier
+                                <span class="text-gray-500">(helps identify skipped invoices)</span>
+                            </label>
                         </div>
                     </form>
                     <p class="mt-2 text-sm text-gray-600">
@@ -185,50 +200,71 @@
                                             </tr>
                                         </thead>
                                         <tbody class="bg-white divide-y divide-gray-200">
-                                            @foreach($supplierGroup['invoices'] as $invoice)
-                                                <tr class="hover:bg-gray-50">
+                                            @foreach($supplierGroup['all_invoices'] as $invoice)
+                                                @php
+                                                    // Determine if this is an outstanding invoice
+                                                    $isOutstanding = in_array($invoice->payment_status, ['pending', 'overdue', 'partial']) ||
+                                                                    ($invoice->payment_status === 'paid' && $invoice->payment_date && $invoice->payment_date > Carbon\Carbon::parse($reportDate));
+
+                                                    $statusColors = [
+                                                        'pending' => 'bg-yellow-100 text-yellow-800',
+                                                        'overdue' => 'bg-red-100 text-red-800',
+                                                        'paid' => 'bg-green-100 text-green-800',
+                                                        'partial' => 'bg-orange-100 text-orange-800',
+                                                    ];
+                                                    $statusColor = $statusColors[$invoice->payment_status] ?? 'bg-gray-100 text-gray-800';
+
+                                                    // Use different row background for paid vs outstanding
+                                                    $rowBgClass = $isOutstanding ? 'bg-white hover:bg-gray-50' : 'bg-green-50 hover:bg-green-100';
+                                                @endphp
+                                                <tr class="{{ $rowBgClass }}">
                                                     <td class="px-6 py-4 whitespace-nowrap">
-                                                        <input type="checkbox" 
-                                                               class="invoice-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-2" 
-                                                               data-invoice-id="{{ $invoice->id }}"
-                                                               data-supplier-index="{{ $supplierIndex }}"
-                                                               data-supplier-id="{{ $supplierGroup['supplier']->id ?? 'unknown' }}"
-                                                               data-supplier-name="{{ $supplierGroup['supplier_name'] }}"
-                                                               data-total-amount="{{ $invoice->total_amount }}"
-                                                               data-invoice-number="{{ $invoice->invoice_number }}"
-                                                               autocomplete="off">
+                                                        @if($isOutstanding)
+                                                            <input type="checkbox"
+                                                                   class="invoice-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-2"
+                                                                   data-invoice-id="{{ $invoice->id }}"
+                                                                   data-supplier-index="{{ $supplierIndex }}"
+                                                                   data-supplier-id="{{ $supplierGroup['supplier']->id ?? 'unknown' }}"
+                                                                   data-supplier-name="{{ $supplierGroup['supplier_name'] }}"
+                                                                   data-total-amount="{{ $invoice->total_amount }}"
+                                                                   data-invoice-number="{{ $invoice->invoice_number }}"
+                                                                   autocomplete="off">
+                                                        @else
+                                                            <span class="text-green-600" title="Already paid before report date">
+                                                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                                                </svg>
+                                                            </span>
+                                                        @endif
                                                     </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium {{ $isOutstanding ? 'text-gray-900' : 'text-green-900' }}">
                                                         {{ $invoice->invoice_number }}
+                                                        @if(!$isOutstanding)
+                                                            <span class="ml-1 text-xs text-green-600 font-normal">(ref)</span>
+                                                        @endif
                                                     </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm {{ $isOutstanding ? 'text-gray-700' : 'text-green-700' }}">
                                                         {{ $invoice->invoice_date->format('Y-m-d') }}
                                                     </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium {{ $isOutstanding ? 'text-gray-900' : 'text-green-800' }}">
                                                         €{{ number_format($invoice->total_amount, 2) }}
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap">
-                                                        @php
-                                                            $statusColors = [
-                                                                'pending' => 'bg-yellow-100 text-yellow-800',
-                                                                'overdue' => 'bg-red-100 text-red-800',
-                                                                'paid' => 'bg-green-100 text-green-800',
-                                                                'partial' => 'bg-orange-100 text-orange-800',
-                                                            ];
-                                                            $statusColor = $statusColors[$invoice->payment_status] ?? 'bg-gray-100 text-gray-800';
-                                                        @endphp
                                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $statusColor }}">
                                                             {{ ucfirst($invoice->payment_status) }}
                                                         </span>
                                                         @if($invoice->payment_status === 'paid' && $invoice->payment_date)
-                                                            <div class="text-xs text-gray-600 mt-1">
+                                                            <div class="text-xs {{ $isOutstanding ? 'text-gray-600' : 'text-green-600' }} mt-1">
                                                                 Paid: {{ $invoice->payment_date->format('Y-m-d') }}
+                                                                @if($invoice->payment_method)
+                                                                    <br>{{ ucfirst(str_replace('_', ' ', $invoice->payment_method)) }}
+                                                                @endif
                                                             </div>
                                                         @endif
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                        <a href="{{ route('invoices.show', $invoice) }}" 
-                                                           class="text-blue-600 hover:text-blue-900">
+                                                        <a href="{{ route('invoices.show', $invoice) }}"
+                                                           class="{{ $isOutstanding ? 'text-blue-600 hover:text-blue-900' : 'text-green-700 hover:text-green-900' }}">
                                                             View Invoice
                                                         </a>
                                                     </td>
@@ -248,6 +284,19 @@
                                         </tfoot>
                                     </table>
                                     </div>
+
+                                    @if($showPreviousPayments)
+                                        <div class="mt-4 bg-blue-50 rounded-lg p-3 border border-blue-200">
+                                            <p class="text-xs text-blue-800 flex items-center">
+                                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                </svg>
+                                                <strong class="mr-1">Legend:</strong>
+                                                <span class="bg-white px-2 py-0.5 rounded mr-2">White rows</span> = Outstanding invoices
+                                                <span class="bg-green-50 px-2 py-0.5 rounded border border-green-200 ml-2">Green rows (ref)</span> = Previous payments for reference
+                                            </p>
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
                         </div>

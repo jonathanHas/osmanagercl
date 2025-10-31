@@ -218,12 +218,40 @@
                                         ({{ round($file->parsing_confidence * 100) }}% confidence)
                                     </span>
                                 @endif
-                                @if($file->supplier_detected)
-                                    <span class="ml-2 text-xs text-gray-400">
-                                        [{{ $file->supplier_detected }}]
-                                    </span>
+
+                                {{-- Parsed Amount Summary --}}
+                                @if(in_array($file->status, ['parsed', 'review', 'amazon_pending', 'completed']) && $file->parsed_total_amount)
+                                    <div class="mt-2 text-xs text-gray-300">
+                                        <div class="font-semibold text-green-400">
+                                            Total: €{{ number_format($file->parsed_total_amount, 2) }}
+                                            @if($file->supplier_detected)
+                                                <span class="ml-2">| {{ $file->supplier_detected }}</span>
+                                            @endif
+                                        </div>
+                                        @if($file->parsed_vat_data)
+                                            @php
+                                                // Collect non-zero VAT rates for compact display
+                                                $vatSummary = [];
+                                                foreach (['vat_0' => '0%', 'vat_9' => '9%', 'vat_13_5' => '13.5%', 'vat_23' => '23%'] as $key => $rate) {
+                                                    if (isset($file->parsed_vat_data[$key])) {
+                                                        $netAmount = is_array($file->parsed_vat_data[$key])
+                                                            ? ($file->parsed_vat_data[$key]['net'] ?? 0)
+                                                            : $file->parsed_vat_data[$key];
+                                                        if ($netAmount > 0) {
+                                                            $vatSummary[] = $rate . ' (€' . number_format($netAmount, 2) . ')';
+                                                        }
+                                                    }
+                                                }
+                                            @endphp
+                                            @if(count($vatSummary) > 0)
+                                                <div class="text-gray-400 mt-1">
+                                                    VAT: {{ implode(' | ', $vatSummary) }}
+                                                </div>
+                                            @endif
+                                        @endif
+                                    </div>
                                 @endif
-                                
+
                                 {{-- Amazon Payment Adjustment --}}
                                 @php
                                     $adjustmentService = app(\App\Services\AmazonPaymentAdjustmentService::class);
