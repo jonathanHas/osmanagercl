@@ -845,14 +845,79 @@ class ProductController extends Controller
 
                 // Create supplier link if supplier information provided
                 if ($request->supplier_id && $request->supplier_code) {
-                    SupplierLink::create([
-                        'Barcode' => $request->code,
-                        'SupplierID' => $request->supplier_id,
-                        'SupplierCode' => $request->supplier_code,
-                        'CaseUnits' => $request->units_per_case ?? 1,
-                        'Cost' => $request->price_buy,
-                        'stocked' => true,
-                    ]);
+                    try {
+                        SupplierLink::create([
+                            'Barcode' => $request->code,
+                            'SupplierID' => $request->supplier_id,
+                            'SupplierCode' => $request->supplier_code,
+                            'CaseUnits' => $request->units_per_case ?? 1,
+                            'Cost' => $request->price_buy,
+                            'stocked' => true,
+                        ]);
+                    } catch (\Illuminate\Database\QueryException $e) {
+                        // Check if it's a duplicate entry error
+                        if (str_contains($e->getMessage(), 'Duplicate entry') && str_contains($e->getMessage(), 'link_index')) {
+
+                            // Check if user confirmed override
+                            if ($request->boolean('force_override', false)) {
+                                // Find and delete the conflicting supplier link
+                                $conflictingLink = SupplierLink::where('SupplierCode', $request->supplier_code)
+                                    ->where('SupplierID', $request->supplier_id)
+                                    ->first();
+
+                                if ($conflictingLink) {
+                                    \Log::info('Removing conflicting supplier link during product creation', [
+                                        'old_product_barcode' => $conflictingLink->Barcode,
+                                        'new_product_code' => $request->code,
+                                        'supplier_code' => $request->supplier_code,
+                                        'supplier_id' => $request->supplier_id,
+                                        'user_id' => auth()->id(),
+                                    ]);
+
+                                    $conflictingLink->delete();
+                                }
+
+                                // Now create the supplier link for the new product
+                                SupplierLink::create([
+                                    'Barcode' => $request->code,
+                                    'SupplierID' => $request->supplier_id,
+                                    'SupplierCode' => $request->supplier_code,
+                                    'CaseUnits' => $request->units_per_case ?? 1,
+                                    'Cost' => $request->price_buy,
+                                    'stocked' => true,
+                                ]);
+                            } else {
+                                // Rollback the transaction and return error
+                                DB::connection('pos')->rollBack();
+
+                                // Find the conflicting product to show helpful error
+                                $conflictingLink = SupplierLink::where('SupplierCode', $request->supplier_code)
+                                    ->where('SupplierID', $request->supplier_id)
+                                    ->with(['product', 'supplier'])
+                                    ->first();
+
+                                $errorMessage = 'This supplier code is already linked to another product';
+                                if ($conflictingLink) {
+                                    $errorMessage .= ': "'.($conflictingLink->product?->NAME ?? 'Unknown').'" ('.$conflictingLink->Barcode.')';
+                                }
+
+                                return back()
+                                    ->withInput()
+                                    ->withErrors([
+                                        'supplier_code' => $errorMessage,
+                                        'duplicate_conflict' => json_encode([
+                                            'product_id' => $conflictingLink->product?->ID,
+                                            'product_name' => $conflictingLink->product?->NAME,
+                                            'product_barcode' => $conflictingLink->Barcode,
+                                            'supplier_name' => $conflictingLink->supplier?->NAME,
+                                        ]),
+                                    ]);
+                            }
+                        } else {
+                            // Re-throw if it's a different database error
+                            throw $e;
+                        }
+                    }
                 }
 
                 // Log the new product event
@@ -975,26 +1040,97 @@ class ProductController extends Controller
 
             // Update supplier link if provided
             if ($request->supplier_id) {
-                $supplierLink = $product->supplierLinks->first();
+                try {
+                    $supplierLink = $product->supplierLinks->first();
 
-                if ($supplierLink) {
-                    // Update existing supplier link
-                    $supplierLink->update([
-                        'SupplierID' => $request->supplier_id,
-                        'SupplierCode' => $request->supplier_code,
-                        'CaseUnits' => $request->units_per_case ?? 1,
-                        'Cost' => $request->price_buy,
-                    ]);
-                } else {
-                    // Create new supplier link
-                    \App\Models\SupplierLink::create([
-                        'Barcode' => $product->CODE,
-                        'SupplierID' => $request->supplier_id,
-                        'SupplierCode' => $request->supplier_code,
-                        'CaseUnits' => $request->units_per_case ?? 1,
-                        'Cost' => $request->price_buy,
-                        'stocked' => true,
-                    ]);
+                    if ($supplierLink) {
+                        // Update existing supplier link
+                        $supplierLink->update([
+                            'SupplierID' => $request->supplier_id,
+                            'SupplierCode' => $request->supplier_code,
+                            'CaseUnits' => $request->units_per_case ?? 1,
+                            'Cost' => $request->price_buy,
+                        ]);
+                    } else {
+                        // Create new supplier link
+                        \App\Models\SupplierLink::create([
+                            'Barcode' => $product->CODE,
+                            'SupplierID' => $request->supplier_id,
+                            'SupplierCode' => $request->supplier_code,
+                            'CaseUnits' => $request->units_per_case ?? 1,
+                            'Cost' => $request->price_buy,
+                            'stocked' => true,
+                        ]);
+                    }
+                } catch (\Illuminate\Database\QueryException $e) {
+                    // Check if it's a duplicate entry error
+                    if (str_contains($e->getMessage(), 'Duplicate entry') && str_contains($e->getMessage(), 'link_index')) {
+
+                        // Check if user confirmed override
+                        if ($request->boolean('force_override', false)) {
+                            // Find and delete the conflicting supplier link
+                            $conflictingLink = \App\Models\SupplierLink::where('SupplierCode', $request->supplier_code)
+                                ->where('SupplierID', $request->supplier_id)
+                                ->first();
+
+                            if ($conflictingLink) {
+                                \Log::info('Removing conflicting supplier link due to override', [
+                                    'old_product_barcode' => $conflictingLink->Barcode,
+                                    'new_product_id' => $product->ID,
+                                    'supplier_code' => $request->supplier_code,
+                                    'supplier_id' => $request->supplier_id,
+                                    'user_id' => auth()->id(),
+                                ]);
+
+                                $conflictingLink->delete();
+                            }
+
+                            // Now create/update the supplier link for this product
+                            if ($supplierLink) {
+                                $supplierLink->update([
+                                    'SupplierID' => $request->supplier_id,
+                                    'SupplierCode' => $request->supplier_code,
+                                    'CaseUnits' => $request->units_per_case ?? 1,
+                                    'Cost' => $request->price_buy,
+                                ]);
+                            } else {
+                                \App\Models\SupplierLink::create([
+                                    'Barcode' => $product->CODE,
+                                    'SupplierID' => $request->supplier_id,
+                                    'SupplierCode' => $request->supplier_code,
+                                    'CaseUnits' => $request->units_per_case ?? 1,
+                                    'Cost' => $request->price_buy,
+                                    'stocked' => true,
+                                ]);
+                            }
+                        } else {
+                            // Find the conflicting product to show helpful error
+                            $conflictingLink = \App\Models\SupplierLink::where('SupplierCode', $request->supplier_code)
+                                ->where('SupplierID', $request->supplier_id)
+                                ->with(['product', 'supplier'])
+                                ->first();
+
+                            $errorMessage = 'This supplier code is already linked to another product';
+                            if ($conflictingLink) {
+                                $errorMessage .= ': "'.($conflictingLink->product?->NAME ?? 'Unknown').'" ('.$conflictingLink->Barcode.')';
+                            }
+
+                            return back()
+                                ->withInput()
+                                ->withErrors([
+                                    'supplier_code' => $errorMessage,
+                                    'duplicate_conflict' => json_encode([
+                                        'product_id' => $conflictingLink->product?->ID,
+                                        'product_name' => $conflictingLink->product?->NAME,
+                                        'product_barcode' => $conflictingLink->Barcode,
+                                        'supplier_name' => $conflictingLink->supplier?->NAME,
+                                    ]),
+                                ]);
+                        }
+                    } else {
+                        // Re-throw if it's a different database error
+                        throw $e;
+                    }
                 }
             }
 
@@ -1112,6 +1248,130 @@ class ProductController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch UDEA pricing: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Check for duplicate supplier link (AJAX endpoint for real-time validation).
+     */
+    public function checkSupplierLinkDuplicate(Request $request)
+    {
+        $request->validate([
+            'supplier_code' => 'required|string',
+            'supplier_id' => 'required|integer',
+            'current_product_id' => 'nullable|string', // UUID of product being edited (null for new products)
+        ]);
+
+        try {
+            $supplierCode = $request->input('supplier_code');
+            $supplierId = $request->input('supplier_id');
+            $currentProductId = $request->input('current_product_id');
+
+            // Find existing supplier link with this combination
+            $existingLink = \App\Models\SupplierLink::where('SupplierCode', $supplierCode)
+                ->where('SupplierID', $supplierId)
+                ->with(['product', 'supplier'])
+                ->first();
+
+            // No duplicate found
+            if (! $existingLink) {
+                return response()->json([
+                    'duplicate' => false,
+                ]);
+            }
+
+            // Check if it's the same product (allowed when editing)
+            if ($currentProductId && $existingLink->Barcode === $existingLink->product?->CODE) {
+                $currentProduct = Product::find($currentProductId);
+                if ($currentProduct && $currentProduct->CODE === $existingLink->Barcode) {
+                    return response()->json([
+                        'duplicate' => false,
+                    ]);
+                }
+            }
+
+            // Duplicate found - return conflict details
+            return response()->json([
+                'duplicate' => true,
+                'conflict' => [
+                    'product_id' => $existingLink->product?->ID,
+                    'product_name' => $existingLink->product?->NAME,
+                    'product_barcode' => $existingLink->Barcode,
+                    'supplier_name' => $existingLink->supplier?->NAME,
+                    'supplier_code' => $existingLink->SupplierCode,
+                    'supplier_id' => $existingLink->SupplierID,
+                    'edit_url' => $existingLink->product ? route('products.edit', $existingLink->product->ID) : null,
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to check supplier link duplicate', [
+                'supplier_code' => $request->input('supplier_code'),
+                'supplier_id' => $request->input('supplier_id'),
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to check for duplicates: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Check if a barcode already exists (AJAX endpoint for real-time validation).
+     */
+    public function checkBarcodeDuplicate(Request $request)
+    {
+        $request->validate([
+            'barcode' => 'required|string',
+        ]);
+
+        try {
+            $barcode = $request->input('barcode');
+
+            // Find existing product with this barcode
+            $existingProduct = Product::where('CODE', $barcode)
+                ->with(['category', 'supplierLinks.supplier'])
+                ->first();
+
+            // No duplicate found
+            if (! $existingProduct) {
+                return response()->json([
+                    'exists' => false,
+                ]);
+            }
+
+            // Get primary supplier link
+            $supplierLink = $existingProduct->supplierLinks->first();
+
+            // Product exists - return details
+            return response()->json([
+                'exists' => true,
+                'product' => [
+                    'id' => $existingProduct->ID,
+                    'name' => $existingProduct->NAME,
+                    'barcode' => $existingProduct->CODE,
+                    'category_name' => $existingProduct->category?->NAME,
+                    'supplier_name' => $supplierLink?->supplier?->Supplier,
+                    'supplier_code' => $supplierLink?->SupplierCode,
+                    'selling_price' => $existingProduct->getGrossPrice(),
+                    'cost_price' => $existingProduct->PRICEBUY,
+                    'edit_url' => route('products.edit', $existingProduct->ID),
+                    'view_url' => route('products.show', $existingProduct->ID),
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to check barcode duplicate', [
+                'barcode' => $request->input('barcode'),
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to check barcode: '.$e->getMessage(),
             ], 500);
         }
     }

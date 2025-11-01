@@ -74,6 +74,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/products/{id}/toggle-till-visibility', [ProductController::class, 'toggleTillVisibility'])->name('products.toggle-till-visibility');
     Route::get('/products/{id}/print-label', [ProductController::class, 'printLabel'])->name('products.print-label');
 
+    // Product AJAX API routes (for real-time validation)
+    Route::post('/api/products/check-barcode-duplicate', [ProductController::class, 'checkBarcodeDuplicate'])->name('api.products.check-barcode-duplicate');
+    Route::post('/api/products/check-supplier-link-duplicate', [ProductController::class, 'checkSupplierLinkDuplicate'])->name('api.products.check-supplier-link-duplicate');
+
     // Invoice Management routes - specific routes BEFORE resource routes
     Route::get('/invoices/create-simple', [\App\Http\Controllers\InvoiceController::class, 'createSimple'])->name('invoices.create-simple');
     Route::post('/invoices/store-simple', [\App\Http\Controllers\InvoiceController::class, 'storeSimple'])->name('invoices.store-simple');

@@ -47,6 +47,9 @@
                     <input type="hidden" name="from" value="{{ $fromContext }}">
                 @endif
 
+                <!-- Hidden field for override confirmation -->
+                <input type="hidden" id="force_override" name="force_override" value="0">
+
                 <!-- Main Content Grid -->
                 <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
                     <!-- Left Column -->
@@ -141,12 +144,38 @@
                                     <label for="supplier_code" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                         Supplier Code
                                     </label>
-                                    <input type="text" 
-                                           id="supplier_code" 
-                                           name="supplier_code" 
+                                    <input type="text"
+                                           id="supplier_code"
+                                           name="supplier_code"
                                            value="{{ old('supplier_code', $prefillData['supplier_code']) }}"
                                            class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:border-indigo-500 focus:ring-indigo-500"
                                            placeholder="Supplier's product code">
+
+                                    <!-- Duplicate Warning (initially hidden) -->
+                                    <div id="duplicate-warning" class="mt-2 hidden">
+                                        <div class="flex items-start p-3 bg-yellow-50 dark:bg-yellow-900 border border-yellow-300 dark:border-yellow-700 rounded-md">
+                                            <svg class="w-5 h-5 text-yellow-600 dark:text-yellow-400 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                                            </svg>
+                                            <div class="flex-1">
+                                                <p class="text-sm font-medium text-yellow-800 dark:text-yellow-300">
+                                                    This supplier code is already linked to:
+                                                </p>
+                                                <p id="conflict-product-info" class="text-sm text-yellow-700 dark:text-yellow-400 mt-1"></p>
+                                                <a id="conflict-product-link" href="#" target="_blank" class="text-sm text-blue-600 dark:text-blue-400 hover:underline mt-1 inline-block">
+                                                    View conflicting product →
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Checking Status -->
+                                    <div id="duplicate-checking" class="mt-2 hidden">
+                                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                                            <span class="inline-block animate-spin mr-1">⏳</span>
+                                            Checking for duplicates...
+                                        </p>
+                                    </div>
                                 </div>
 
                                 <div>
@@ -368,6 +397,71 @@
                     </div>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal for Supplier Link Override -->
+    <div id="override-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white dark:bg-gray-800">
+            <div class="mt-3">
+                <!-- Modal Header -->
+                <div class="flex items-center justify-between pb-3 border-b border-gray-200 dark:border-gray-700">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center">
+                        <svg class="w-6 h-6 text-yellow-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                        </svg>
+                        Supplier Link Conflict
+                    </h3>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="mt-4 space-y-4">
+                    <p class="text-sm text-gray-700 dark:text-gray-300">
+                        This supplier code is already linked to another product. If you proceed, the supplier code will be reassigned to this product.
+                    </p>
+
+                    <div class="bg-gray-100 dark:bg-gray-700 rounded-lg p-4">
+                        <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Conflicting Product Details:</h4>
+                        <dl class="space-y-2 text-sm">
+                            <div class="flex">
+                                <dt class="font-medium text-gray-700 dark:text-gray-300 w-32">Product Name:</dt>
+                                <dd id="modal-product-name" class="text-gray-900 dark:text-gray-100"></dd>
+                            </div>
+                            <div class="flex">
+                                <dt class="font-medium text-gray-700 dark:text-gray-300 w-32">Barcode:</dt>
+                                <dd id="modal-product-barcode" class="text-gray-900 dark:text-gray-100 font-mono"></dd>
+                            </div>
+                            <div class="flex">
+                                <dt class="font-medium text-gray-700 dark:text-gray-300 w-32">Supplier:</dt>
+                                <dd id="modal-supplier-name" class="text-gray-900 dark:text-gray-100"></dd>
+                            </div>
+                        </dl>
+                        <a id="modal-product-link" href="#" target="_blank" class="mt-3 inline-block text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                            View product details →
+                        </a>
+                    </div>
+
+                    <div class="bg-yellow-50 dark:bg-yellow-900 border border-yellow-300 dark:border-yellow-700 rounded-md p-3">
+                        <p class="text-sm text-yellow-800 dark:text-yellow-300">
+                            <strong>⚠️ Warning:</strong> The supplier code will be removed from the product listed above and assigned to the current product.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="mt-6 flex items-center justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button type="button"
+                            onclick="closeOverrideModal()"
+                            class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-md transition-colors duration-200">
+                        Cancel
+                    </button>
+                    <button type="button"
+                            onclick="confirmOverride()"
+                            class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors duration-200">
+                        Proceed & Reassign
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -622,6 +716,176 @@
                 initializeTillVisibilityPreview();
             } catch (e) {
                 console.log('Till visibility preview initialization skipped:', e.message);
+            }
+
+            // Initialize supplier link duplicate checking
+            try {
+                initializeSupplierLinkDuplicateCheck();
+            } catch (e) {
+                console.log('Supplier link duplicate check initialization skipped:', e.message);
+            }
+        });
+
+        // Supplier Link Duplicate Checking
+        let duplicateCheckTimeout = null;
+        let currentConflict = null;
+        let isCheckingDuplicate = false;
+
+        function initializeSupplierLinkDuplicateCheck() {
+            const supplierCodeField = document.getElementById('supplier_code');
+            const supplierIdField = document.getElementById('supplier_id');
+            const form = supplierCodeField?.closest('form');
+
+            if (!supplierCodeField || !supplierIdField || !form) return;
+
+            // Add change listeners for real-time checking
+            supplierCodeField.addEventListener('input', debounceCheckDuplicate);
+            supplierIdField.addEventListener('change', checkDuplicate);
+
+            // Intercept form submission
+            form.addEventListener('submit', handleFormSubmit);
+
+            // Check on page load if fields have values
+            if (supplierCodeField.value && supplierIdField.value) {
+                checkDuplicate();
+            }
+        }
+
+        function debounceCheckDuplicate() {
+            clearTimeout(duplicateCheckTimeout);
+            duplicateCheckTimeout = setTimeout(checkDuplicate, 500);
+        }
+
+        async function checkDuplicate() {
+            const supplierCodeField = document.getElementById('supplier_code');
+            const supplierIdField = document.getElementById('supplier_id');
+            const warningDiv = document.getElementById('duplicate-warning');
+            const checkingDiv = document.getElementById('duplicate-checking');
+
+            if (!supplierCodeField || !supplierIdField) return;
+
+            const supplierCode = supplierCodeField.value.trim();
+            const supplierId = supplierIdField.value;
+
+            // Hide warning and checking if fields are empty
+            if (!supplierCode || !supplierId) {
+                warningDiv.classList.add('hidden');
+                checkingDiv.classList.add('hidden');
+                currentConflict = null;
+                return;
+            }
+
+            // Show checking status
+            warningDiv.classList.add('hidden');
+            checkingDiv.classList.remove('hidden');
+            isCheckingDuplicate = true;
+
+            try {
+                const response = await fetch('/api/products/check-supplier-link-duplicate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        supplier_code: supplierCode,
+                        supplier_id: parseInt(supplierId),
+                        current_product_id: '{{ $product->ID }}',
+                    }),
+                });
+
+                const data = await response.json();
+                checkingDiv.classList.add('hidden');
+                isCheckingDuplicate = false;
+
+                if (data.duplicate && data.conflict) {
+                    // Show warning with conflict details
+                    currentConflict = data.conflict;
+                    displayDuplicateWarning(data.conflict);
+                } else {
+                    // No duplicate found
+                    warningDiv.classList.add('hidden');
+                    currentConflict = null;
+                }
+            } catch (error) {
+                console.error('Error checking for duplicates:', error);
+                checkingDiv.classList.add('hidden');
+                isCheckingDuplicate = false;
+            }
+        }
+
+        function displayDuplicateWarning(conflict) {
+            const warningDiv = document.getElementById('duplicate-warning');
+            const productInfo = document.getElementById('conflict-product-info');
+            const productLink = document.getElementById('conflict-product-link');
+
+            productInfo.textContent = `${conflict.product_name} (${conflict.product_barcode}) - Supplier: ${conflict.supplier_name}`;
+            productLink.href = conflict.edit_url || '#';
+
+            warningDiv.classList.remove('hidden');
+        }
+
+        function handleFormSubmit(e) {
+            const forceOverrideField = document.getElementById('force_override');
+
+            // If there's a conflict and override is not set, show modal
+            if (currentConflict && forceOverrideField.value === '0') {
+                e.preventDefault();
+                showOverrideModal(currentConflict);
+                return false;
+            }
+
+            // Allow form to submit normally
+            return true;
+        }
+
+        function showOverrideModal(conflict) {
+            const modal = document.getElementById('override-modal');
+            const modalProductName = document.getElementById('modal-product-name');
+            const modalProductBarcode = document.getElementById('modal-product-barcode');
+            const modalSupplierName = document.getElementById('modal-supplier-name');
+            const modalProductLink = document.getElementById('modal-product-link');
+
+            if (!modal) return;
+
+            // Populate modal with conflict details
+            modalProductName.textContent = conflict.product_name || 'Unknown';
+            modalProductBarcode.textContent = conflict.product_barcode || 'N/A';
+            modalSupplierName.textContent = conflict.supplier_name || 'Unknown';
+            modalProductLink.href = conflict.edit_url || '#';
+
+            // Show modal
+            modal.classList.remove('hidden');
+        }
+
+        function closeOverrideModal() {
+            const modal = document.getElementById('override-modal');
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+        }
+
+        function confirmOverride() {
+            const forceOverrideField = document.getElementById('force_override');
+            const form = forceOverrideField.closest('form');
+
+            // Set override flag
+            forceOverrideField.value = '1';
+
+            // Close modal
+            closeOverrideModal();
+
+            // Submit form
+            if (form) {
+                form.submit();
+            }
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('override-modal')?.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeOverrideModal();
             }
         });
     </script>

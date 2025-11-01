@@ -14,7 +14,7 @@ Route::prefix('test-scraper')->group(function () {
     Route::get('/debug-search-raw', [TestScraperController::class, 'debugSearchRaw']);
 });
 
-Route::middleware('auth')->prefix('test-scraper')->group(function () {
+Route::middleware('auth:web')->prefix('test-scraper')->group(function () {
     Route::post('/product-data', [TestScraperController::class, 'proxyProductData']);
     Route::get('/connection-test', [TestScraperController::class, 'testConnection']);
     Route::post('/clear-cache', [TestScraperController::class, 'clearCache']);
@@ -26,10 +26,12 @@ Route::middleware('auth')->prefix('test-scraper')->group(function () {
     Route::get('/debug-login-page', [TestScraperController::class, 'debugLoginPage']);
 });
 
-// Delivery API routes for real-time scanning
-Route::middleware('auth')->prefix('deliveries')->group(function () {
+// Delivery API routes for real-time scanning (using web guard for session authentication)
+Route::middleware('auth:web')->prefix('deliveries')->group(function () {
     Route::post('/{delivery}/scan', [DeliveryController::class, 'processScan']);
     Route::get('/{delivery}/stats', [DeliveryController::class, 'getStats']);
     Route::patch('/{delivery}/items/{item}/quantity', [DeliveryController::class, 'adjustQuantity']);
     Route::post('/{delivery}/items', [DeliveryController::class, 'createDeliveryItem']);
 });
+
+// Product API routes moved to web.php for session authentication
