@@ -174,19 +174,19 @@ class InvoiceUploadFile extends Model
      */
     public function getConvertedPdfPath(): ?string
     {
-        if (!$this->isDocument()) {
+        if (! $this->isDocument()) {
             return null;
         }
 
         // Check if converted PDF exists in the same directory
         $tempPath = $this->temp_file_path;
-        if (!$tempPath || !file_exists($tempPath)) {
+        if (! $tempPath || ! file_exists($tempPath)) {
             return null;
         }
 
         $directory = dirname($tempPath);
         $filename = pathinfo($this->stored_filename, PATHINFO_FILENAME);
-        $pdfPath = $directory . '/' . $filename . '.pdf';
+        $pdfPath = $directory.'/'.$filename.'.pdf';
 
         return file_exists($pdfPath) ? $pdfPath : null;
     }

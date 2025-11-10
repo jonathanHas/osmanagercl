@@ -5,9 +5,7 @@ namespace App\Console\Commands;
 use App\Models\CashLodgement;
 use App\Models\CashLodgementMatch;
 use App\Models\CashReconciliation;
-use Carbon\Carbon;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 
 class AutoMatchCashLodgements extends Command
 {
@@ -76,14 +74,16 @@ class AutoMatchCashLodgements extends Command
             // Skip if already matched
             if ($lodgement->matches->count() > 0) {
                 $alreadyMatched++;
+
                 return;
             }
 
             // Look for reconciliation with same Money ID
             $reconciliation = CashReconciliation::where('closed_cash_id', $lodgement->money_id)->first();
 
-            if (!$reconciliation) {
+            if (! $reconciliation) {
                 $noReconciliation++;
+
                 return;
             }
 
@@ -98,7 +98,7 @@ class AutoMatchCashLodgements extends Command
             $matchType = $this->getMatchType($availableToLodge, $lodgedAmount);
 
             if ($confidence >= $minConfidence) {
-                if (!$dryRun) {
+                if (! $dryRun) {
                     // Create the match record
                     CashLodgementMatch::create([
                         'cash_lodgement_id' => $lodgement->id,

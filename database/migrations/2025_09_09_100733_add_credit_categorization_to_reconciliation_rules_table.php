@@ -36,7 +36,7 @@ return new class extends Migration
                 'expense_description',
                 'is_non_supplier_expense',
                 'credit_category',
-                'reconciliation_type'
+                'reconciliation_type',
             ]);
         });
     }

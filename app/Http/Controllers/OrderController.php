@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Category;
 use App\Models\OrderItem;
 use App\Models\OrderSession;
 use App\Models\Supplier;
@@ -98,8 +99,53 @@ class OrderController extends Controller
      */
     public function show(OrderSession $order): View
     {
+        $context = $this->prepareOrderSessionContext($order);
+
+        return view('orders.show', [
+            'order' => $order,
+            'statistics' => $context['statistics'],
+            'categoryGroups' => $context['categoryGroups'],
+        ]);
+    }
+
+    /**
+     * Display the order review interface using the A2 layout experiment.
+     */
+    public function showLayoutA2(OrderSession $order): View
+    {
+        $context = $this->prepareOrderSessionContext($order);
+
+        return view('orders.show-layout-a2', [
+            'order' => $order,
+            'statistics' => $context['statistics'],
+            'categoryGroups' => $context['categoryGroups'],
+        ]);
+    }
+
+    /**
+     * Display the order review interface using the dense A2 layout.
+     */
+    public function showLayoutA2Dense(OrderSession $order): View
+    {
+        $context = $this->prepareOrderSessionContext($order);
+
+        return view('orders.show-layout-a2-dense', [
+            'order' => $order,
+            'statistics' => $context['statistics'],
+            'categoryGroups' => $context['categoryGroups'],
+        ]);
+    }
+
+    /**
+     * Display the order review interface in grid view layout.
+     */
+    public function gridView(OrderSession $order): View
+    {
+        // Eager load all necessary relationships
         $order->load([
-            'items.product.supplierLinks',
+            'items' => function ($query) {
+                $query->with(['product.supplier']);
+            },
             'supplier',
             'user',
         ]);
@@ -107,7 +153,7 @@ class OrderController extends Controller
         $statistics = $this->orderService->getOrderStatistics($order);
         $categoryGroups = SpecialOrderCategories::forSupplier((string) $order->supplier_id);
 
-        return view('orders.show', compact('order', 'statistics', 'categoryGroups'));
+        return view('orders.grid-view', compact('order', 'statistics', 'categoryGroups'));
     }
 
     /**
@@ -165,6 +211,7 @@ class OrderController extends Controller
 
             if ($existingValue === $newValue) {
                 $label = $categoryGroups[$singleGroupKey]['label'] ?? $singleGroupKey;
+
                 return back()->with('info', 'No changes detected for '.$label.'.');
             }
 
@@ -257,6 +304,28 @@ class OrderController extends Controller
 
         return redirect()->route('orders.index')
             ->with('success', 'Order deleted successfully.');
+    }
+
+    /**
+     * Load shared relationships and derived data for order detail views.
+     *
+     * @return array{statistics: array<string, mixed>, categoryGroups: array<string, mixed>}
+     */
+    protected function prepareOrderSessionContext(OrderSession $order): array
+    {
+        $order->load([
+            'items.product.supplierLinks.supplier',
+            'supplier',
+            'user',
+        ]);
+
+        $statistics = $this->orderService->getOrderStatistics($order);
+        $categoryGroups = SpecialOrderCategories::forSupplier((string) $order->supplier_id);
+
+        return [
+            'statistics' => $statistics,
+            'categoryGroups' => $categoryGroups,
+        ];
     }
 
     /**
@@ -638,7 +707,7 @@ class OrderController extends Controller
     public function mockupVicoLive(): View
     {
         $supplierId = '84'; // Vico supplier ID
-       $orderDate = now()->addDays(3);
+        $orderDate = now()->addDays(3);
 
         // Generate temporary order session
         $orderSession = $this->orderService->generateOrderSuggestions($supplierId, $orderDate, [

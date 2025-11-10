@@ -915,7 +915,7 @@ class FruitVegController extends Controller
             }
         }
 
-        $etag = '"' . md5($imageData) . '"';
+        $etag = '"'.md5($imageData).'"';
 
         if ($request->headers->get('If-None-Match') === $etag) {
             return response('', 304, [
@@ -1058,7 +1058,7 @@ class FruitVegController extends Controller
         if ($request->hasFile('image')) {
             $imageFile = $request->file('image');
 
-            $imageManager = new ImageManager(new GdDriver());
+            $imageManager = new ImageManager(new GdDriver);
             $image = $imageManager->read($imageFile->getRealPath());
 
             $image->resize(64, 64, function ($constraint) {

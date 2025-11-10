@@ -206,7 +206,7 @@ class AccountingSuppliersController extends Controller
         }
 
         // Set default payment terms if not provided
-        if (!isset($validated['payment_terms_days']) || is_null($validated['payment_terms_days'])) {
+        if (! isset($validated['payment_terms_days']) || is_null($validated['payment_terms_days'])) {
             $validated['payment_terms_days'] = 30; // Default 30 days
         }
 
@@ -225,7 +225,7 @@ class AccountingSuppliersController extends Controller
 
         try {
             DB::beginTransaction();
-            
+
             $supplier = AccountingSupplier::create($validated);
 
             // Create POS supplier if requested
@@ -253,7 +253,7 @@ class AccountingSuppliersController extends Controller
             ]);
 
             $errorMessage = 'Failed to create supplier.';
-            
+
             // Provide more specific error messages
             if (str_contains($e->getMessage(), 'payment_terms_days')) {
                 $errorMessage .= ' Payment terms issue detected.';
@@ -269,7 +269,7 @@ class AccountingSuppliersController extends Controller
 
             return back()
                 ->withInput()
-                ->with('error', $errorMessage . ' Please try again.');
+                ->with('error', $errorMessage.' Please try again.');
         }
     }
 
@@ -353,7 +353,7 @@ class AccountingSuppliersController extends Controller
         }
 
         // Set default payment terms if not provided
-        if (!isset($validated['payment_terms_days']) || is_null($validated['payment_terms_days'])) {
+        if (! isset($validated['payment_terms_days']) || is_null($validated['payment_terms_days'])) {
             $validated['payment_terms_days'] = 30; // Default 30 days
         }
 
@@ -363,10 +363,10 @@ class AccountingSuppliersController extends Controller
 
         try {
             DB::beginTransaction();
-            
+
             $wasLinked = $supplier->is_pos_linked;
             $oldName = $supplier->name;
-            
+
             $supplier->update($validated);
 
             // Sync name to POS if already linked and name changed
@@ -376,14 +376,14 @@ class AccountingSuppliersController extends Controller
 
             // Create POS supplier if requested and not already linked
             $createInPos = $request->boolean('create_in_pos');
-            if ($createInPos && !$wasLinked) {
+            if ($createInPos && ! $wasLinked) {
                 $this->createPosSupplier($supplier->fresh()); // Fresh to get updated data
             }
 
             DB::commit();
 
             $message = 'Supplier updated successfully.';
-            if ($createInPos && !$supplier->wasRecentlyLinkedToPos) {
+            if ($createInPos && ! $supplier->wasRecentlyLinkedToPos) {
                 $message .= ' Also created in POS system.';
             }
 
@@ -400,7 +400,7 @@ class AccountingSuppliersController extends Controller
             ]);
 
             $errorMessage = 'Failed to update supplier.';
-            
+
             // Provide more specific error messages
             if (str_contains($e->getMessage(), 'payment_terms_days')) {
                 $errorMessage .= ' Payment terms issue detected.';
@@ -416,7 +416,7 @@ class AccountingSuppliersController extends Controller
 
             return back()
                 ->withInput()
-                ->with('error', $errorMessage . ' Please try again.');
+                ->with('error', $errorMessage.' Please try again.');
         }
     }
 
@@ -549,7 +549,7 @@ class AccountingSuppliersController extends Controller
             $nextNumber = 1;
         }
 
-        return 'SUP-' . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        return 'SUP-'.str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -559,7 +559,7 @@ class AccountingSuppliersController extends Controller
     {
         try {
             // Generate POS ID using Laravel supplier ID
-            $posId = 'SUP' . str_pad($supplier->id, 6, '0', STR_PAD_LEFT);
+            $posId = 'SUP'.str_pad($supplier->id, 6, '0', STR_PAD_LEFT);
 
             // Check if POS ID already exists
             $existingPos = DB::connection('pos')->table('suppliers')
@@ -568,7 +568,7 @@ class AccountingSuppliersController extends Controller
 
             if ($existingPos) {
                 // Try alternative ID with timestamp suffix
-                $posId = 'SUP' . str_pad($supplier->id, 6, '0', STR_PAD_LEFT) . now()->format('His');
+                $posId = 'SUP'.str_pad($supplier->id, 6, '0', STR_PAD_LEFT).now()->format('His');
             }
 
             // Create in POS database

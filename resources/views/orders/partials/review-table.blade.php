@@ -93,6 +93,13 @@
     $categoryGroups = $categoryGroups ?? [];
     $coverageOverrides = $orderSession->coverage_overrides ?? [];
     $categoryCoverageMeta = [];
+
+    // Load all min_stock_override values at once to avoid N+1 queries
+    $productIds = $displayItems->pluck('product_id')->unique()->filter()->toArray();
+    $minStockOverrides = \App\Models\ProductOrderSetting::whereIn('product_id', $productIds)
+        ->whereNotNull('min_stock_override')
+        ->pluck('min_stock_override', 'product_id')
+        ->toArray();
     $globalCoverageDateRaw = optional($orderSession->coverage_ends_on)?->toDateString();
     $globalCoverageDateFormatted = $globalCoverageDateRaw
         ? \Carbon\Carbon::parse($globalCoverageDateRaw)->format('D j M Y')
@@ -331,7 +338,17 @@
                 @foreach($cheeseProducts as $item)
                 @php
                     $product = $item->product;
+                    // Decode context_data if it's a string (should be auto-cast to array, but be defensive)
                     $contextData = $item->context_data ?? [];
+                    if (is_string($contextData)) {
+                        $contextData = json_decode($contextData, true) ?? [];
+                    }
+
+                    // Merge current min_stock_override from pre-loaded array (may have been updated after order session created)
+                    if (isset($minStockOverrides[$product->ID])) {
+                        $contextData['min_stock_override'] = $minStockOverrides[$product->ID];
+                    }
+
                     $safeProductName = strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product'));
                     $currentStock = $contextData['current_stock'] ?? 0;
                     $avgWeeklySales = $contextData['avg_weekly_sales'] ?? 0;
@@ -476,6 +493,14 @@
                                 <span>avg {{ number_format($avgWeeklySales, 1) }}</span>
                                 <span>peak {{ number_format($peakWeeklySales, 1) }}</span>
                             </div>
+                            @include('orders.partials.min-stock-editor', [
+                                'item' => $item,
+                                'product' => $product,
+                                'contextData' => $contextData,
+                                'orderSession' => $orderSession,
+                                'isCaseProduct' => $isCaseProduct,
+                                'caseUnits' => $caseUnits,
+                            ])
                             <div class="w-full bg-gray-200 rounded-full h-2">
                                 <div
                                     id="stock-level-bar-{{ $item->id }}"
@@ -483,21 +508,6 @@
                                     data-stock-color="{{ $stockColor }}"
                                     style="width: {{ max(min($currentPct, 100), 0) }}%"
                                 ></div>
-                            </div>
-                            <div
-                                id="stock-level-label-{{ $item->id }}"
-                                class="text-xs text-{{ $stockColor }}-600 font-medium mt-1"
-                                data-stock-color="{{ $stockColor }}"
-                            >
-                                @if($currentPct < 30)
-                                    🚨 CRITICAL
-                                @elseif($currentPct < 50)
-                                    ⚠️ Low
-                                @elseif($currentPct < 100)
-                                    ✓ Moderate
-                                @else
-                                    ✓ Good
-                                @endif
                             </div>
                         </div>
                     </td>
@@ -563,10 +573,10 @@
                         <div class="flex flex-col items-center gap-3">
                             <div class="text-center">
                                 <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Suggested</div>
-                                <div class="mt-1 text-xl font-bold text-purple-700">
+                                <div id="suggested-display-{{ $item->id }}" class="mt-1 text-xl font-bold text-purple-700">
                                     {{ $suggestedDisplayText }} {{ $quantityLabel }}
                                 </div>
-                                <div class="text-xs text-gray-500">{{ number_format($suggestedUnits, 0) }} units</div>
+                                <div id="suggested-units-{{ $item->id }}" class="text-xs text-gray-500">{{ number_format($suggestedUnits, 0) }} units</div>
                             </div>
                             <div class="flex items-center justify-center gap-1">
                                 <button class="qty-decrease w-8 h-8 bg-red-100 hover:bg-red-200 text-red-700 rounded font-bold"
@@ -738,7 +748,17 @@
                 @foreach($refrigeratedProducts as $item)
                 @php
                     $product = $item->product;
+                    // Decode context_data if it's a string (should be auto-cast to array, but be defensive)
                     $contextData = $item->context_data ?? [];
+                    if (is_string($contextData)) {
+                        $contextData = json_decode($contextData, true) ?? [];
+                    }
+
+                    // Merge current min_stock_override from pre-loaded array (may have been updated after order session created)
+                    if (isset($minStockOverrides[$product->ID])) {
+                        $contextData['min_stock_override'] = $minStockOverrides[$product->ID];
+                    }
+
                     $safeProductName = strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product'));
                     $currentStock = $contextData['current_stock'] ?? 0;
                     $avgWeeklySales = $contextData['avg_weekly_sales'] ?? 0;
@@ -883,6 +903,14 @@
                                 <span>avg {{ number_format($avgWeeklySales, 1) }}</span>
                                 <span>peak {{ number_format($peakWeeklySales, 1) }}</span>
                             </div>
+                            @include('orders.partials.min-stock-editor', [
+                                'item' => $item,
+                                'product' => $product,
+                                'contextData' => $contextData,
+                                'orderSession' => $orderSession,
+                                'isCaseProduct' => $isCaseProduct,
+                                'caseUnits' => $caseUnits,
+                            ])
                             <div class="w-full bg-gray-200 rounded-full h-2">
                                 <div
                                     id="stock-level-bar-{{ $item->id }}"
@@ -890,21 +918,6 @@
                                     data-stock-color="{{ $stockColor }}"
                                     style="width: {{ max(min($currentPct, 100), 0) }}%"
                                 ></div>
-                            </div>
-                            <div
-                                id="stock-level-label-{{ $item->id }}"
-                                class="text-xs text-{{ $stockColor }}-600 font-medium mt-1"
-                                data-stock-color="{{ $stockColor }}"
-                            >
-                                @if($currentPct < 30)
-                                    🚨 CRITICAL
-                                @elseif($currentPct < 50)
-                                    ⚠️ Low
-                                @elseif($currentPct < 100)
-                                    ✓ Moderate
-                                @else
-                                    ✓ Good
-                                @endif
                             </div>
                         </div>
                     </td>
@@ -970,10 +983,10 @@
                         <div class="flex flex-col items-center gap-3">
                             <div class="text-center">
                                 <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Suggested</div>
-                                <div class="mt-1 text-xl font-bold text-purple-700">
+                                <div id="suggested-display-{{ $item->id }}" class="mt-1 text-xl font-bold text-purple-700">
                                     {{ $suggestedDisplayText }} {{ $quantityLabel }}
                                 </div>
-                                <div class="text-xs text-gray-500">{{ number_format($suggestedUnits, 0) }} units</div>
+                                <div id="suggested-units-{{ $item->id }}" class="text-xs text-gray-500">{{ number_format($suggestedUnits, 0) }} units</div>
                             </div>
                             <div class="flex items-center justify-center gap-1">
                                 <button class="qty-decrease w-8 h-8 bg-red-100 hover:bg-red-200 text-red-700 rounded font-bold"
@@ -1057,7 +1070,17 @@
                 @foreach($caseProducts as $item)
                 @php
                     $product = $item->product;
+                    // Decode context_data if it's a string (should be auto-cast to array, but be defensive)
                     $contextData = $item->context_data ?? [];
+                    if (is_string($contextData)) {
+                        $contextData = json_decode($contextData, true) ?? [];
+                    }
+
+                    // Merge current min_stock_override from pre-loaded array (may have been updated after order session created)
+                    if (isset($minStockOverrides[$product->ID])) {
+                        $contextData['min_stock_override'] = $minStockOverrides[$product->ID];
+                    }
+
                     $safeProductName = strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product'));
                     $currentStock = $contextData['current_stock'] ?? 0;
                     $avgWeeklySales = $contextData['avg_weekly_sales'] ?? 0;
@@ -1202,6 +1225,14 @@
                                 <span>avg {{ number_format($avgWeeklySales, 1) }}</span>
                                 <span>peak {{ number_format($peakWeeklySales, 1) }}</span>
                             </div>
+                            @include('orders.partials.min-stock-editor', [
+                                'item' => $item,
+                                'product' => $product,
+                                'contextData' => $contextData,
+                                'orderSession' => $orderSession,
+                                'isCaseProduct' => $isCaseProduct,
+                                'caseUnits' => $caseUnits,
+                            ])
                             <div class="w-full bg-gray-200 rounded-full h-2">
                                 <div
                                     id="stock-level-bar-{{ $item->id }}"
@@ -1209,21 +1240,6 @@
                                     data-stock-color="{{ $stockColor }}"
                                     style="width: {{ max(min($currentPct, 100), 0) }}%"
                                 ></div>
-                            </div>
-                            <div
-                                id="stock-level-label-{{ $item->id }}"
-                                class="text-xs text-{{ $stockColor }}-600 font-medium mt-1"
-                                data-stock-color="{{ $stockColor }}"
-                            >
-                                @if($currentPct < 30)
-                                    🚨 CRITICAL
-                                @elseif($currentPct < 50)
-                                    ⚠️ Low
-                                @elseif($currentPct < 100)
-                                    ✓ Moderate
-                                @else
-                                    ✓ Good
-                                @endif
                             </div>
                         </div>
                     </td>
@@ -1289,10 +1305,10 @@
                         <div class="flex flex-col items-center gap-3">
                             <div class="text-center">
                                 <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Suggested</div>
-                                <div class="mt-1 text-xl font-bold text-purple-700">
+                                <div id="suggested-display-{{ $item->id }}" class="mt-1 text-xl font-bold text-purple-700">
                                     {{ $suggestedDisplayText }} {{ $quantityLabel }}
                                 </div>
-                                <div class="text-xs text-gray-500">{{ number_format($suggestedUnits, 0) }} units</div>
+                                <div id="suggested-units-{{ $item->id }}" class="text-xs text-gray-500">{{ number_format($suggestedUnits, 0) }} units</div>
                             </div>
                             <div class="flex items-center justify-center gap-1">
                                 <button class="qty-decrease w-8 h-8 bg-red-100 hover:bg-red-200 text-red-700 rounded font-bold"
@@ -1376,7 +1392,17 @@
                 @foreach($unitProducts as $item)
                 @php
                     $product = $item->product;
+                    // Decode context_data if it's a string (should be auto-cast to array, but be defensive)
                     $contextData = $item->context_data ?? [];
+                    if (is_string($contextData)) {
+                        $contextData = json_decode($contextData, true) ?? [];
+                    }
+
+                    // Merge current min_stock_override from pre-loaded array (may have been updated after order session created)
+                    if (isset($minStockOverrides[$product->ID])) {
+                        $contextData['min_stock_override'] = $minStockOverrides[$product->ID];
+                    }
+
                     $safeProductName = strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product'));
                     $currentStock = $contextData['current_stock'] ?? 0;
                     $avgWeeklySales = $contextData['avg_weekly_sales'] ?? 0;
@@ -1521,6 +1547,14 @@
                                 <span>avg {{ number_format($avgWeeklySales, 1) }}</span>
                                 <span>peak {{ number_format($peakWeeklySales, 1) }}</span>
                             </div>
+                            @include('orders.partials.min-stock-editor', [
+                                'item' => $item,
+                                'product' => $product,
+                                'contextData' => $contextData,
+                                'orderSession' => $orderSession,
+                                'isCaseProduct' => $isCaseProduct,
+                                'caseUnits' => $caseUnits,
+                            ])
                             <div class="w-full bg-gray-200 rounded-full h-2">
                                 <div
                                     id="stock-level-bar-{{ $item->id }}"
@@ -1528,21 +1562,6 @@
                                     data-stock-color="{{ $stockColor }}"
                                     style="width: {{ max(min($currentPct, 100), 0) }}%"
                                 ></div>
-                            </div>
-                            <div
-                                id="stock-level-label-{{ $item->id }}"
-                                class="text-xs text-{{ $stockColor }}-600 font-medium mt-1"
-                                data-stock-color="{{ $stockColor }}"
-                            >
-                                @if($currentPct < 30)
-                                    🚨 CRITICAL
-                                @elseif($currentPct < 50)
-                                    ⚠️ Low
-                                @elseif($currentPct < 100)
-                                    ✓ Moderate
-                                @else
-                                    ✓ Good
-                                @endif
                             </div>
                         </div>
                     </td>
@@ -1608,10 +1627,10 @@
                         <div class="flex flex-col items-center gap-3">
                             <div class="text-center">
                                 <div class="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Suggested</div>
-                                <div class="mt-1 text-xl font-bold text-purple-700">
+                                <div id="suggested-display-{{ $item->id }}" class="mt-1 text-xl font-bold text-purple-700">
                                     {{ $suggestedDisplayText }} {{ $quantityLabel }}
                                 </div>
-                                <div class="text-xs text-gray-500">{{ number_format($suggestedUnits, 0) }} units</div>
+                                <div id="suggested-units-{{ $item->id }}" class="text-xs text-gray-500">{{ number_format($suggestedUnits, 0) }} units</div>
                             </div>
                             <div class="flex items-center justify-center gap-1">
                                 <button class="qty-decrease w-8 h-8 bg-red-100 hover:bg-red-200 text-red-700 rounded font-bold"
@@ -1724,20 +1743,6 @@
         return 'green';
     };
 
-    const stockStatusLabelForPercent = (percent) => {
-        if (percent < 30) {
-            return '🚨 CRITICAL';
-        }
-        if (percent < 50) {
-            return '⚠️ Low';
-        }
-        if (percent < 100) {
-            return '✓ Moderate';
-        }
-
-        return '✓ Good';
-    };
-
     const applyStockToneClass = (element, tone, mode = 'text') => {
         if (!element) {
             return;
@@ -1806,10 +1811,12 @@
                 const afterPct = {{ $afterPctValue }};
                 const isCaseProduct = {{ $isCaseProductValue ? 'true' : 'false' }};
                 const caseUnits = {{ $caseUnitsValue }};
+                const minStockOverride = {{ isset($contextData['min_stock_override']) && $contextData['min_stock_override'] > 0 ? $contextData['min_stock_override'] : 'null' }};
 
                 const extendedLabels = labels.concat(['Current stock', 'After order']);
                 const salesData = dataPoints.concat([null, null]);
                 const averageLineData = labels.map(() => averageUnits).concat([null, null]);
+                const minStockLineData = minStockOverride !== null ? labels.map(() => minStockOverride).concat([null, null]) : null;
 
                 // Set point colors - grey for 0 sales, regular color otherwise
                 const primaryColor = '{{ $item->review_priority === "review" ? "rgb(239, 68, 68)" : ($item->review_priority === "standard" ? "rgb(234, 179, 8)" : "rgb(34, 197, 94)") }}';
@@ -1828,26 +1835,42 @@
                 afterStockData[extendedLabels.length - 1] = afterStock;
 
                 const salesMax = dataPoints.length ? Math.max(...dataPoints) : 0;
-                const chartMax = Math.max(salesMax, currentStock, afterStock, peakWeeklySales, averageUnits, 1);
+                const chartMax = Math.max(salesMax, currentStock, afterStock, peakWeeklySales, averageUnits, minStockOverride || 0, 1);
                 const chartMin = Math.min(0, currentStock, afterStock);
 
-                const chart = new Chart(chartEl, {
-                    type: 'line',
-                    data: {
-                        labels: extendedLabels,
-                        datasets: [{
-                            label: 'Average weekly',
-                            data: averageLineData,
-                            borderColor: 'rgba(100, 116, 139, 0.7)',
-                            borderWidth: 1.5,
-                            borderDash: [6, 4],
-                            pointRadius: 0,
-                            pointHoverRadius: 0,
-                            fill: false,
-                            tension: 0,
-                            spanGaps: true,
-                            order: 0
-                        },{
+                // Build datasets array
+                const datasets = [{
+                    label: 'Average weekly',
+                    data: averageLineData,
+                    borderColor: 'rgba(100, 116, 139, 0.7)',
+                    borderWidth: 1.5,
+                    borderDash: [6, 4],
+                    pointRadius: 0,
+                    pointHoverRadius: 0,
+                    fill: false,
+                    tension: 0,
+                    spanGaps: true,
+                    order: 0
+                }];
+
+                // Add min stock override line if set
+                if (minStockOverride !== null && minStockLineData !== null) {
+                    datasets.push({
+                        label: 'Min Stock Override',
+                        data: minStockLineData,
+                        borderColor: 'rgb(249, 115, 22)', // Orange
+                        borderWidth: 2,
+                        borderDash: [8, 4],
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        fill: false,
+                        tension: 0,
+                        spanGaps: true,
+                        order: 0
+                    });
+                }
+
+                datasets.push({
                             label: 'Sales',
                             data: salesData,
                             borderColor: primaryColor,
@@ -1897,7 +1920,13 @@
                             pointBorderColor: 'white',
                             borderColor: 'transparent',
                             order: 3
-                        }]
+                        });
+
+                const chart = new Chart(chartEl, {
+                    type: 'line',
+                    data: {
+                        labels: extendedLabels,
+                        datasets: datasets
                     },
                     options: {
                         responsive: true,
@@ -1926,6 +1955,12 @@
                                                 return null;
                                             }
                                             return `Avg weekly · ${averageUnits.toFixed(1)} units`;
+                                        }
+                                        if (context.dataset.label === 'Min Stock Override') {
+                                            if (Number.isNaN(context.parsed.y)) {
+                                                return null;
+                                            }
+                                            return `Min Stock Override · ${minStockOverride.toFixed(0)} units`;
                                         }
                                         if (context.dataset.label === 'Sales') {
                                             const value = Math.round(context.parsed.y);
@@ -2350,7 +2385,6 @@
 
             const currentPct = productPeak > 0 ? (currentStock / productPeak) * 100 : 0;
             const tone = stockToneForPercent(currentPct);
-            const statusLabel = stockStatusLabelForPercent(currentPct);
 
             // Calculate new units based on whether it's a case product
             const newUnits = isCaseProduct ? (orderQuantity * caseUnits) : orderQuantity;
@@ -2417,12 +2451,6 @@
             if (barEl) {
                 barEl.style.width = `${Math.max(0, Math.min(currentPct, 100))}%`;
                 applyStockToneClass(barEl, tone, 'bar');
-            }
-
-            const statusEl = document.getElementById(`stock-level-label-${itemId}`);
-            if (statusEl) {
-                statusEl.textContent = statusLabel;
-                applyStockToneClass(statusEl, tone, 'text');
             }
 
             // Update after-order text labels

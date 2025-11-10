@@ -75,4 +75,3 @@ class FruitVegProductImageTest extends TestCase
         $this->assertSame(64, max($width, $height));
     }
 }
-

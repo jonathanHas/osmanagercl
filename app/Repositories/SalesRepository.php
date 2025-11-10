@@ -3,8 +3,8 @@
 namespace App\Repositories;
 
 use App\Models\Product;
-use App\Models\StockDiary;
 use App\Models\SalesDailySummary;
+use App\Models\StockDiary;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 

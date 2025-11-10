@@ -349,7 +349,7 @@
                                         Not Stocked
                                     </span>
                                 @endif
-                                <button type="button" 
+                                <button type="button"
                                         onclick="toggleStocking('{{ $product->ID }}', {{ $product->stocking ? 'false' : 'true' }})"
                                         class="inline-flex items-center px-2 py-1 text-xs font-medium rounded border {{ $product->stocking ? 'border-red-300 text-red-700 hover:bg-red-50 dark:border-red-600 dark:text-red-400 dark:hover:bg-red-900/20' : 'border-green-300 text-green-700 hover:bg-green-50 dark:border-green-600 dark:text-green-400 dark:hover:bg-green-900/20' }} transition-colors duration-200">
                                     {{ $product->stocking ? 'Remove' : 'Add' }}
@@ -359,6 +359,165 @@
                                 {{ $product->stocking ? 'Included in ordering operations' : 'Excluded from automated ordering' }}
                             </p>
                         </div>
+
+                        <!-- Minimum Stock Override (Admin/Manager Only) -->
+                        @if(auth()->user()->hasAnyRole(['admin', 'manager']))
+                            <div x-data="{
+                                editing: false,
+                                value: '{{ $orderSettings?->min_stock_override ?? '' }}',
+                                originalValue: '{{ $orderSettings?->min_stock_override ?? '' }}',
+                                saving: false,
+                                error: null
+                            }">
+                                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Minimum Stock Override</h3>
+                                <div class="flex items-center space-x-3">
+                                    <!-- Display Mode -->
+                                    <div x-show="!editing" class="flex items-center space-x-2">
+                                        @if($orderSettings?->min_stock_override)
+                                            <span class="inline-flex items-center px-3 py-1 text-lg font-semibold rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clip-rule="evenodd"/>
+                                                </svg>
+                                                {{ number_format($orderSettings->min_stock_override, 0) }} units
+                                            </span>
+                                        @else
+                                            <span class="text-lg text-gray-500 dark:text-gray-400">Not set</span>
+                                        @endif
+                                        <button type="button"
+                                                @@click="editing = true"
+                                                class="inline-flex items-center px-2 py-1 text-xs font-medium rounded border border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-600 dark:text-blue-400 dark:hover:bg-blue-900/20 transition-colors duration-200">
+                                            {{ $orderSettings?->min_stock_override ? 'Edit' : 'Set' }}
+                                        </button>
+                                    </div>
+
+                                    <!-- Edit Mode -->
+                                    <div x-show="editing" class="flex items-center space-x-2">
+                                        <input type="number"
+                                               x-model="value"
+                                               step="1"
+                                               min="0"
+                                               placeholder="Enter minimum stock"
+                                               class="w-32 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-gray-100"
+                                               @@keydown.enter="
+                                                   saving = true;
+                                                   error = null;
+                                                   fetch('{{ route('products.update-min-stock-override', $product->ID) }}', {
+                                                       method: 'PATCH',
+                                                       headers: {
+                                                           'Content-Type': 'application/json',
+                                                           'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                                           'Accept': 'application/json'
+                                                       },
+                                                       body: JSON.stringify({ min_stock_override: value !== '' ? value : null })
+                                                   })
+                                                   .then(response => response.json())
+                                                   .then(data => {
+                                                       if (data.message) {
+                                                           originalValue = value;
+                                                           editing = false;
+                                                           window.location.reload(); // Reload to show updated value
+                                                       } else {
+                                                           error = 'Failed to update';
+                                                       }
+                                                   })
+                                                   .catch(err => {
+                                                       error = 'Network error';
+                                                   })
+                                                   .finally(() => {
+                                                       saving = false;
+                                                   })
+                                               "
+                                               @@keydown.escape="editing = false; value = originalValue">
+                                        <button type="button"
+                                                @@click="
+                                                    saving = true;
+                                                    error = null;
+                                                    fetch('{{ route('products.update-min-stock-override', $product->ID) }}', {
+                                                        method: 'PATCH',
+                                                        headers: {
+                                                            'Content-Type': 'application/json',
+                                                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                                            'Accept': 'application/json'
+                                                        },
+                                                        body: JSON.stringify({ min_stock_override: value !== '' ? value : null })
+                                                    })
+                                                    .then(response => response.json())
+                                                    .then(data => {
+                                                        if (data.message) {
+                                                            originalValue = value;
+                                                            editing = false;
+                                                            window.location.reload(); // Reload to show updated value
+                                                        } else {
+                                                            error = 'Failed to update';
+                                                        }
+                                                    })
+                                                    .catch(err => {
+                                                        error = 'Network error';
+                                                    })
+                                                    .finally(() => {
+                                                        saving = false;
+                                                    })
+                                                "
+                                                :disabled="saving"
+                                                class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50">
+                                            <span x-show="!saving">Save</span>
+                                            <span x-show="saving">Saving...</span>
+                                        </button>
+                                        <button type="button"
+                                                @@click="editing = false; value = originalValue"
+                                                :disabled="saving"
+                                                class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-gray-300 text-gray-700 hover:bg-gray-400 disabled:opacity-50 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500">
+                                            Cancel
+                                        </button>
+                                        @if($orderSettings?->min_stock_override)
+                                            <button type="button"
+                                                    @@click="
+                                                        value = '';
+                                                        saving = true;
+                                                        error = null;
+                                                        fetch('{{ route('products.update-min-stock-override', $product->ID) }}', {
+                                                            method: 'PATCH',
+                                                            headers: {
+                                                                'Content-Type': 'application/json',
+                                                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                                                'Accept': 'application/json'
+                                                            },
+                                                            body: JSON.stringify({ min_stock_override: null })
+                                                        })
+                                                        .then(response => response.json())
+                                                        .then(data => {
+                                                            if (data.message) {
+                                                                originalValue = '';
+                                                                editing = false;
+                                                                window.location.reload();
+                                                            } else {
+                                                                error = 'Failed to remove';
+                                                            }
+                                                        })
+                                                        .catch(err => {
+                                                            error = 'Network error';
+                                                        })
+                                                        .finally(() => {
+                                                            saving = false;
+                                                        })
+                                                    "
+                                                    :disabled="saving"
+                                                    class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+                                                Remove
+                                            </button>
+                                        @endif
+                                    </div>
+                                </div>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    @if($orderSettings?->min_stock_override)
+                                        System will maintain at least this stock level when ordering
+                                    @else
+                                        Optional: Override calculated minimum stock level (uses higher of calculated vs override)
+                                    @endif
+                                </p>
+                                <p x-show="error" x-text="error" class="text-xs text-red-600 dark:text-red-400 mt-1"></p>
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -929,7 +1088,8 @@
 
         let salesChart = null;
         const productId = '{{ $product->ID }}';
-        
+        const minStockOverride = {{ $orderSettings?->min_stock_override ?? 'null' }};
+
         // Initialize chart with existing data
         document.addEventListener('DOMContentLoaded', function() {
             @if(isset($salesHistory) && count($salesHistory) > 0)
@@ -955,26 +1115,53 @@
             gradient.addColorStop(0, 'rgba(99, 102, 241, 0.8)');
             gradient.addColorStop(1, 'rgba(99, 102, 241, 0.1)');
             
+            // Build datasets array
+            const datasets = [{
+                label: 'Units Sold',
+                data: data,
+                backgroundColor: gradient,
+                borderColor: 'rgb(99, 102, 241)',
+                borderWidth: 2,
+                borderRadius: 8,
+                borderSkipped: false,
+                order: 2
+            }];
+
+            // Add minimum stock override line if set
+            if (minStockOverride !== null && minStockOverride > 0) {
+                datasets.push({
+                    type: 'line',
+                    label: 'Min Stock Override',
+                    data: Array(labels.length).fill(minStockOverride),
+                    borderColor: 'rgb(249, 115, 22)', // Orange
+                    borderWidth: 2,
+                    borderDash: [8, 4], // Dotted line
+                    pointRadius: 0,
+                    pointHoverRadius: 0,
+                    fill: false,
+                    tension: 0,
+                    order: 1
+                });
+            }
+
             salesChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: labels,
-                    datasets: [{
-                        label: 'Units Sold',
-                        data: data,
-                        backgroundColor: gradient,
-                        borderColor: 'rgb(99, 102, 241)',
-                        borderWidth: 2,
-                        borderRadius: 8,
-                        borderSkipped: false,
-                    }]
+                    datasets: datasets
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
                         legend: {
-                            display: false
+                            display: minStockOverride !== null && minStockOverride > 0,
+                            position: 'top',
+                            labels: {
+                                color: 'rgb(107, 114, 128)',
+                                usePointStyle: true,
+                                padding: 15
+                            }
                         },
                         tooltip: {
                             backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -983,9 +1170,12 @@
                             bodyColor: 'white',
                             borderColor: 'rgb(99, 102, 241)',
                             borderWidth: 1,
-                            displayColors: false,
+                            displayColors: true,
                             callbacks: {
                                 label: function(context) {
+                                    if (context.dataset.label === 'Min Stock Override') {
+                                        return 'Min Stock: ' + context.parsed.y.toFixed(0) + ' units';
+                                    }
                                     return 'Units Sold: ' + context.parsed.y.toFixed(1);
                                 }
                             }

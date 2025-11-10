@@ -47,8 +47,6 @@ class SpecialOrderCategories
     /**
      * Retrieve the special groups for a supplier.
      *
-     * @param  string|null  $supplierId
-     * @param  string|null  $supplierName
      * @return array<string, array<string, mixed>>
      */
     public static function forSupplier(?string $supplierId, ?string $supplierName = null): array
@@ -72,7 +70,6 @@ class SpecialOrderCategories
     /**
      * Map suppliers to their groups for easy view consumption.
      *
-     * @param  iterable  $suppliers
      * @return array<string, array<string, mixed>>
      */
     public static function mapSuppliers(iterable $suppliers): array
@@ -107,7 +104,6 @@ class SpecialOrderCategories
     /**
      * Determine whether the supplier name matches any of the provided fragments.
      *
-     * @param  string  $supplierName
      * @param  array<int, string>  $fragments
      */
     protected static function nameMatches(string $supplierName, array $fragments): bool

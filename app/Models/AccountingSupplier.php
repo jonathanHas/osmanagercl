@@ -305,7 +305,7 @@ class AccountingSupplier extends Model
      */
     public function canLinkToPos(): bool
     {
-        return !$this->is_pos_linked && in_array($this->supplier_type, ['product', 'other']);
+        return ! $this->is_pos_linked && in_array($this->supplier_type, ['product', 'other']);
     }
 
     /**
@@ -318,7 +318,7 @@ class AccountingSupplier extends Model
                 'status' => 'linked',
                 'message' => 'Linked to POS',
                 'pos_id' => $this->external_pos_id,
-                'color' => 'purple'
+                'color' => 'purple',
             ];
         }
 
@@ -327,7 +327,7 @@ class AccountingSupplier extends Model
                 'status' => 'linkable',
                 'message' => 'Can be linked to POS',
                 'pos_id' => null,
-                'color' => 'blue'
+                'color' => 'blue',
             ];
         }
 
@@ -335,7 +335,7 @@ class AccountingSupplier extends Model
             'status' => 'not_linkable',
             'message' => 'Not suitable for POS integration',
             'pos_id' => null,
-            'color' => 'gray'
+            'color' => 'gray',
         ];
     }
 
@@ -344,7 +344,7 @@ class AccountingSupplier extends Model
      */
     public function syncNameToPos(): bool
     {
-        if (!$this->is_pos_linked || !$this->external_pos_id) {
+        if (! $this->is_pos_linked || ! $this->external_pos_id) {
             return false;
         }
 

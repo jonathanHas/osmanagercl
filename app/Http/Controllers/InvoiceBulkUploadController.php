@@ -769,23 +769,23 @@ class InvoiceBulkUploadController extends Controller
         if ($file->isDocument()) {
             // Try to get existing converted PDF first
             $convertedPdfPath = $file->getConvertedPdfPath();
-            
+
             // If no converted PDF exists, convert on-the-fly
-            if (!$convertedPdfPath) {
-                $conversionService = new \App\Services\DocumentConversionService();
+            if (! $convertedPdfPath) {
+                $conversionService = new \App\Services\DocumentConversionService;
                 $tempPath = $file->temp_file_path;
                 $outputDir = dirname($tempPath);
-                
+
                 $convertedPdfPath = $conversionService->convertToPdf($tempPath, $outputDir);
-                
-                if (!$convertedPdfPath) {
+
+                if (! $convertedPdfPath) {
                     abort(500, 'Unable to convert document for viewing');
                 }
             }
-            
+
             $filePath = $convertedPdfPath;
             $contentType = 'application/pdf';
-            $displayFilename = pathinfo($file->original_filename, PATHINFO_FILENAME) . '.pdf';
+            $displayFilename = pathinfo($file->original_filename, PATHINFO_FILENAME).'.pdf';
         } else {
             // Handle regular files (PDFs and images)
             $filePath = $file->temp_file_path;
@@ -984,19 +984,19 @@ class InvoiceBulkUploadController extends Controller
             $vatBreakdown = [
                 'vat_0' => [
                     'net' => floatval($validated['vat_0_net'] ?? 0),
-                    'vat' => 0.00
+                    'vat' => 0.00,
                 ],
                 'vat_9' => [
                     'net' => floatval($validated['vat_9_net'] ?? 0),
-                    'vat' => floatval($validated['vat_9_net'] ?? 0) * 0.09
+                    'vat' => floatval($validated['vat_9_net'] ?? 0) * 0.09,
                 ],
                 'vat_13_5' => [
                     'net' => floatval($validated['vat_13_5_net'] ?? 0),
-                    'vat' => floatval($validated['vat_13_5_net'] ?? 0) * 0.135
+                    'vat' => floatval($validated['vat_13_5_net'] ?? 0) * 0.135,
                 ],
                 'vat_23' => [
                     'net' => floatval($validated['vat_23_net'] ?? 0),
-                    'vat' => floatval($validated['vat_23_net'] ?? 0) * 0.23
+                    'vat' => floatval($validated['vat_23_net'] ?? 0) * 0.23,
                 ],
             ];
 
@@ -1031,7 +1031,7 @@ class InvoiceBulkUploadController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Parsed data updated successfully',
-                'data' => $parsedData
+                'data' => $parsedData,
             ]);
 
         } catch (\Exception $e) {
@@ -1043,7 +1043,7 @@ class InvoiceBulkUploadController extends Controller
 
             return response()->json([
                 'success' => false,
-                'error' => 'Failed to update parsed data: ' . $e->getMessage()
+                'error' => 'Failed to update parsed data: '.$e->getMessage(),
             ], 500);
         }
     }

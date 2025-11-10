@@ -103,8 +103,8 @@ class CashLodgementDiagnosticController extends Controller
         $bankTransactions = BankTransaction::whereBetween('transaction_date', [$startDate, $endDate])
             ->where(function ($query) {
                 $query->where('description', 'like', '%lodgement%')
-                      ->orWhere('description', 'like', '%cash%')
-                      ->orWhere('credit_category', 'cash_lodgement');
+                    ->orWhere('description', 'like', '%cash%')
+                    ->orWhere('credit_category', 'cash_lodgement');
             })
             ->with(['user', 'allocations'])
             ->orderBy('transaction_date', 'desc')
@@ -115,8 +115,8 @@ class CashLodgementDiagnosticController extends Controller
             'total_transactions' => BankTransaction::count(),
             'cash_related' => BankTransaction::where(function ($query) {
                 $query->where('description', 'like', '%lodgement%')
-                      ->orWhere('description', 'like', '%cash%')
-                      ->orWhere('credit_category', 'cash_lodgement');
+                    ->orWhere('description', 'like', '%cash%')
+                    ->orWhere('credit_category', 'cash_lodgement');
             })->count(),
             'pending_status' => BankTransaction::where('status', 'pending')->count(),
             'matched_status' => BankTransaction::where('status', 'matched')->count(),
@@ -155,12 +155,12 @@ class CashLodgementDiagnosticController extends Controller
         // 9. Users involved in the system
         $systemUsers = User::whereIn('id', function ($query) {
             $query->select('created_by')->from('cash_lodgements')->whereNotNull('created_by')
-                  ->union(
-                      DB::table('cash_reconciliations')->select('created_by')->whereNotNull('created_by')
-                  )
-                  ->union(
-                      DB::table('cash_lodgement_matches')->select('matched_by')->whereNotNull('matched_by')
-                  );
+                ->union(
+                    DB::table('cash_reconciliations')->select('created_by')->whereNotNull('created_by')
+                )
+                ->union(
+                    DB::table('cash_lodgement_matches')->select('matched_by')->whereNotNull('matched_by')
+                );
         })->get();
 
         return view('management.cash-lodgements.diagnostic', compact(
@@ -213,7 +213,7 @@ class CashLodgementDiagnosticController extends Controller
             ? Carbon::parse($request->end_date)
             : Carbon::now();
 
-        $filename = 'cash_lodgements_diagnostic_' . $startDate->format('Y-m-d') . '_to_' . $endDate->format('Y-m-d') . '.csv';
+        $filename = 'cash_lodgements_diagnostic_'.$startDate->format('Y-m-d').'_to_'.$endDate->format('Y-m-d').'.csv';
 
         return response()->streamDownload(function () use ($startDate, $endDate) {
             $handle = fopen('php://output', 'w');
@@ -228,7 +228,7 @@ class CashLodgementDiagnosticController extends Controller
             fputcsv($handle, ['=== CASH LODGEMENTS ===']);
             fputcsv($handle, [
                 'ID', 'Money ID', 'Lodgement Date', 'Cash Amount', 'Cheque Amount',
-                'Total Amount', 'Till Name', 'Type', 'Matched', 'Legacy Import', 'Created At'
+                'Total Amount', 'Till Name', 'Type', 'Matched', 'Legacy Import', 'Created At',
             ]);
 
             $lodgements = CashLodgement::whereBetween('lodgement_date', [$startDate, $endDate])->get();
@@ -255,7 +255,7 @@ class CashLodgementDiagnosticController extends Controller
         }, $filename, [
             'Content-Type' => 'text/csv',
             'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
-            'Content-Disposition' => 'attachment; filename=' . $filename,
+            'Content-Disposition' => 'attachment; filename='.$filename,
             'Expires' => '0',
             'Pragma' => 'public',
         ]);

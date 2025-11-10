@@ -7,7 +7,106 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **📚 Documentation Refactoring** (2025-11-03)
+  - **CLAUDE.md Cleanup**: Reduced from 646 lines to 229 lines (65% reduction)
+    - Removed detailed feature descriptions (moved to Features Index)
+    - Removed detailed known issues (moved to Known Issues document)
+    - Removed detailed development commands (moved to Quick Start Guide)
+    - Removed AI assistant guidelines (moved to AI Assistant Guide)
+    - Now serves as concise entry point with links to detailed documentation
+  - **New Documentation Files**:
+    - `docs/FEATURES_INDEX.md` - Complete feature catalog organized by category
+    - `docs/development/ai-assistant-guide.md` - Comprehensive guidelines for AI assistants
+    - `docs/development/known-issues.md` - Detailed known issues and solutions
+    - `docs/development/quick-start-guide.md` - Complete development setup and commands
+  - **Improved Organization**: Better separation of concerns with focused, maintainable documents
+  - **Enhanced Navigation**: Clear links between related documentation files
+  - **Better Maintainability**: Easier to update specific sections without editing large files
+
 ### Added
+
+- **📦 Minimum Stock Level Override System** (2025-11-03)
+  - **User-Controlled Stock Levels**: Admin and Manager users can now set custom minimum stock levels for individual products
+    - Override system uses absolute units (e.g., 50 units) for clear, direct control
+    - Smart calculation: System uses whichever is higher - calculated minimum or user override
+    - Preserves existing ordering intelligence while giving power users precise control
+  - **Product Detail Page Integration**: Inline editing interface on product pages
+    - Yellow badge displays current override value when set
+    - Click-to-edit functionality with save/cancel/remove options
+    - Real-time AJAX updates without page reload
+    - Visual feedback during save operations
+    - Only visible to Admin and Manager roles
+  - **Order Calculation Integration**: Seamlessly integrated into order suggestion system
+    - OrderService automatically applies override when calculating order quantities
+    - Context data includes both calculated minimum and override value for transparency
+    - Indicates when override is active in order context information
+  - **Order Review Table Display**: Min stock override shown in stock levels section
+    - Orange badge displays override value for products with custom minimums
+    - Appears between current/after stock and coverage information
+    - Visible across all order table sections (Cheese, Refrigerated, Case, Unit products)
+  - **Order Review Table Editing**: Inline editing of min stock directly from orders page (Admin/Manager only)
+    - Click pencil icon in orange badge to edit min stock override
+    - Compact inline editor with number input, save, and cancel buttons
+    - Enter to save, Escape to cancel editing
+    - **Dynamic Real-time Updates** (2025-11-04): Changes apply instantly without page reload
+      - Order quantity automatically recalculates based on new minimum stock level
+      - "After Order" stock value updates immediately
+      - Orange dotted line on chart moves to new minimum stock level
+      - Green ring and "✓ Saved!" indicator provide immediate visual feedback
+      - All updates happen seamlessly in <1 second
+    - "Set Min Stock" button appears for products without override set
+    - Non-admin users see display-only badge
+  - **Sales Graph Visualization**: Orange dotted line shows minimum stock level
+    - Horizontal line overlays monthly sales bars when override is set (product detail page)
+    - Legend automatically displays when min stock override is active
+    - Tooltip shows "Min Stock: X units" when hovering over line
+    - Clear visual reference for stock planning and analysis
+  - **Order Table Mini Charts**: Orange dotted line appears on weekly sales charts
+    - Mini charts in order review table show min stock override as orange dotted line
+    - Consistent visualization across product detail and order review pages
+    - Tooltip displays "Min Stock Override · X units" when hovering
+    - Automatically scales chart to include override level
+  - **Database Schema**: New `min_stock_override` column in `product_order_settings` table
+    - Nullable decimal field (10,2) for flexible precision
+    - Automatically created/updated with product order settings
+    - Persists across all order sessions
+  - **Permission-Based Access**: Restricted to Admin and Manager roles only
+    - Authorization checks in controller and view
+    - Clear error messages for unauthorized access attempts
+  - **API Support**: RESTful endpoint for updating min stock overrides
+    - Route: `PATCH /products/{id}/min-stock-override`
+    - Supports both setting and removing overrides
+    - JSON responses for AJAX requests
+    - Comprehensive validation (numeric, min: 0, max: 999,999.99)
+    - **Enhanced Response** (2025-11-04): Returns recalculated order data for instant UI updates
+      - Includes new suggested quantity after min stock change
+      - Returns updated "after order" stock level
+      - Provides complete context data for seamless dynamic updates
+
+- **🔍 Real-time Product Duplicate Detection** (2025-11-01)
+  - **Barcode Duplicate Detection**: Instant validation when creating products
+    - Real-time AJAX validation with 500ms debounce for optimal performance
+    - Warning appears before user fills out entire form, saving time
+    - Shows conflicting product name, supplier, and direct link to edit existing product
+    - "Edit Existing Product" button for quick navigation to conflicting product
+    - "Use Different Barcode" button to clear field and try again
+    - Full-width warning placement for maximum visibility
+  - **Supplier Link Duplicate Detection with Override**: Smart duplicate handling for supplier codes
+    - Real-time validation when entering supplier codes on create/edit forms
+    - Warning modal shows conflicting product details before submission
+    - User-controlled override with confirmation modal for intentional duplicates
+    - Automatic conflict resolution: removes old link, assigns code to new product
+    - Complete audit trail logging all override actions with metadata
+    - Transaction-safe operations with rollback on failure
+    - Visual feedback with yellow warning colors and clear conflict information
+  - **Enhanced User Experience**: Comprehensive duplicate prevention system
+    - Prevents accidental duplicate product creation
+    - Allows intentional supplier code reassignment with proper warnings
+    - Direct navigation to conflicting products for quick resolution
+    - Session-based authentication for AJAX endpoints
+    - CSRF protection on all validation requests
 
 - **📄 DOC/XLS Invoice Attachment Viewing** (2025-09-03)
   - **Universal Document Viewing**: DOC, DOCX, XLS, XLSX files now viewable directly in browser
@@ -82,6 +181,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Audit Trail Preservation**: Maintains complete price change history during sync operations
 
 ### Fixed
+
+- **🔧 Product Duplicate Detection Showing "Unknown" Supplier** (2025-11-01)
+  - **Root Cause**: Code accessing wrong supplier model field name (`NAME` instead of `Supplier`)
+  - **Symptoms**: Real-time duplicate warnings displayed "Supplier: Unknown" or "Supplier: No supplier"
+  - **Solution**: Fixed all 4 instances in ProductController (lines 912, 1126, 1301, 1357)
+  - **Impact**: Duplicate detection now shows correct supplier names (e.g., "Infinity", "Natural Medicine")
+  - **Discovery Method**: Used tinker to inspect Supplier model schema
+  - **Testing**: Verified with both barcode and supplier link duplicate detection
 
 - **🚨 F&V Price Updates Not Appearing on POS Till** (2025-08-28) - **CRITICAL BUG FIX**
   - **Cross-Database Transaction Issue**: Laravel `DB::transaction()` only applied to default connection

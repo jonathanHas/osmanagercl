@@ -14,6 +14,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SalesImportController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\TestScraperController;
+use App\Http\Controllers\UdeaDiagnosticsController;
 use App\Http\Controllers\UserManagementController;
 use Illuminate\Support\Facades\Route;
 
@@ -67,12 +68,14 @@ Route::middleware('auth')->group(function () {
     Route::patch('/products/{id}/category', [ProductController::class, 'updateCategory'])->name('products.update-category');
     Route::patch('/products/{id}/price', [ProductController::class, 'updatePrice'])->name('products.update-price');
     Route::patch('/products/{id}/cost', [ProductController::class, 'updateCost'])->name('products.update-cost');
+    Route::patch('/products/{id}/min-stock-override', [ProductController::class, 'updateMinStockOverride'])->name('products.update-min-stock-override');
     Route::patch('/products/{id}/barcode', [ProductController::class, 'updateBarcode'])->name('products.update-barcode');
     Route::patch('/products/{id}/display', [ProductController::class, 'updateDisplay'])->name('products.update-display');
     Route::post('/products/{id}/update-stock', [ProductController::class, 'updateStock'])->name('products.update-stock');
     Route::post('/products/{id}/toggle-stocking', [ProductController::class, 'toggleStocking'])->name('products.toggle-stocking');
     Route::post('/products/{id}/toggle-till-visibility', [ProductController::class, 'toggleTillVisibility'])->name('products.toggle-till-visibility');
     Route::get('/products/{id}/print-label', [ProductController::class, 'printLabel'])->name('products.print-label');
+    Route::get('/tools/udea-debug', UdeaDiagnosticsController::class)->name('tools.udea-debug');
 
     // Product AJAX API routes (for real-time validation)
     Route::post('/api/products/check-barcode-duplicate', [ProductController::class, 'checkBarcodeDuplicate'])->name('api.products.check-barcode-duplicate');
@@ -256,10 +259,14 @@ Route::middleware('auth')->group(function () {
     Route::post('/delivery-items/{item}/refresh-barcode', [DeliveryController::class, 'refreshBarcode'])->name('delivery-items.refresh-barcode');
 
     // Order Management mockup routes (for UI testing)
-    Route::get('/orders/mockups', fn() => view('orders.mockup-index'))->name('orders.mockups');
-    Route::get('/orders/mockup/1-charts', fn() => view('orders.mockup-1-charts'))->name('orders.mockup.1');
-    Route::get('/orders/mockup/2-compact', fn() => view('orders.mockup-2-compact'))->name('orders.mockup.2');
-    Route::get('/orders/mockup/3-dashboard', fn() => view('orders.mockup-3-dashboard'))->name('orders.mockup.3');
+    Route::get('/orders/mockups', fn () => view('orders.mockup-index'))->name('orders.mockups');
+    Route::get('/orders/mockup/1-charts', fn () => view('orders.mockup-1-charts'))->name('orders.mockup.1');
+    Route::get('/orders/mockup/2-compact', fn () => view('orders.mockup-2-compact'))->name('orders.mockup.2');
+    Route::get('/orders/mockup/3-dashboard', fn () => view('orders.mockup-3-dashboard'))->name('orders.mockup.3');
+    Route::get('/orders/mockup/layout-experiments', fn () => view('orders.mockup-layout-experiments'))->name('orders.mockup.layout-experiments');
+    Route::get('/orders/mockup/layout-experiments2', fn () => view('orders.mockup-layout-experiments2'))->name('orders.mockup.layout-experiments2');
+    Route::get('/orders/mockup/layout-experiments4', fn () => view('orders.mockup-layout-experiments4'))->name('orders.mockup.layout-experiments4');
+    Route::get('/orders/mockup/layout-experiments3', fn () => view('orders.mockup-layout-experiments3'))->name('orders.mockup.layout-experiments3');
 
     // Real data mockup (Vico supplier)
     Route::get('/orders/mockup/vico-live', [OrderController::class, 'mockupVicoLive'])->name('orders.mockup.vico-live');
@@ -269,6 +276,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/orders/{order}/complete', [OrderController::class, 'complete'])->name('orders.complete');
     Route::post('/orders/{order}/duplicate', [OrderController::class, 'duplicate'])->name('orders.duplicate');
     Route::get('/orders/{order}/export', [OrderController::class, 'export'])->name('orders.export');
+    Route::get('/orders/{order}/grid-view', [OrderController::class, 'gridView'])->name('orders.grid-view');
+    Route::get('/orders/{order}/layout-a2', [OrderController::class, 'showLayoutA2'])->name('orders.layout-a2');
+    Route::get('/orders/{order}/layout-a2-dense', [OrderController::class, 'showLayoutA2Dense'])->name('orders.layout-a2-dense');
     Route::get('/orders/{order}/statistics', [OrderController::class, 'statistics'])->name('orders.statistics');
     Route::patch('/orders/{order}/coverage-overrides', [OrderController::class, 'updateCategoryCoverage'])->name('orders.coverage-overrides');
     Route::patch('/order-items/{orderItem}/quantity', [OrderController::class, 'updateQuantity'])->name('order-items.update-quantity');

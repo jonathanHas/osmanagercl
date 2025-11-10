@@ -255,6 +255,7 @@ class OrderService
                 }
             } catch (\Exception $e) {
                 \Log::warning("Failed to calculate suggestion for product {$product->ID}: ".$e->getMessage());
+
                 continue;
             }
 
@@ -341,7 +342,16 @@ class OrderService
         $usableStock = max($currentStock, 0);
 
         // Base calculation: (Weekly Average × Target Weeks) - Current Stock
-        $desiredUnits = $avgWeeklySales * $targetWeeks;
+        $calculatedMin = $avgWeeklySales * $targetWeeks;
+
+        // Check for user-specified minimum stock override
+        $minStockOverride = $settings?->min_stock_override;
+
+        // Use whichever is higher: calculated minimum or override
+        $desiredUnits = $minStockOverride !== null
+            ? max($calculatedMin, $minStockOverride)
+            : $calculatedMin;
+
         $baseQuantity = max(0, $desiredUnits - $usableStock);
 
         // Apply learned adjustments
@@ -430,6 +440,9 @@ class OrderService
                 'category_group_label' => $categoryGroupLabel,
                 'coverage_override_applied' => ! empty($coverageOverride),
                 'coverage_override' => $coverageOverride,
+                'min_stock_override' => $minStockOverride,
+                'calculated_min_stock' => round($calculatedMin, 2),
+                'min_stock_override_active' => $minStockOverride !== null && $minStockOverride > $calculatedMin,
             ],
         ];
     }
@@ -511,8 +524,7 @@ class OrderService
         ?array $groupFilter = null,
         array $categoryGroups = [],
         array $targetProductIds = []
-    ): Collection
-    {
+    ): Collection {
         $sixMonthsAgo = Carbon::now()->subMonths(6);
         $query = Product::whereHas('supplierLinks', function ($query) use ($supplierId) {
             $query->where('SupplierID', $supplierId);

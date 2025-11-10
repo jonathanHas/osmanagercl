@@ -551,6 +551,240 @@ Class I - Ireland
 - **Backward Compatible**: Empty display names fall back to product name
 - **Cross-Module**: Works for all product categories, not just F&V
 
+### Real-time Duplicate Detection (2025-11-01)
+
+The product creation and editing system now includes comprehensive real-time duplicate detection to prevent data inconsistencies and guide users to the correct workflow.
+
+#### Barcode Duplicate Detection
+
+**Overview**: When creating a new product, the system checks in real-time if the barcode already exists and guides the user to edit the existing product instead.
+
+**Key Features**:
+
+1. **Instant Detection**
+   - Real-time AJAX validation as user types (500ms debounce)
+   - Full-width prominent warning panel with orange styling
+   - Checks triggered automatically on barcode field input
+
+2. **Comprehensive Product Information**
+   - **Product Name**: Current product using this barcode
+   - **Category**: Product's category classification
+   - **Supplier**: Linked supplier name
+   - **Price**: Current selling price (inc VAT)
+
+3. **User Actions**
+   - **"Edit Existing Product"** button: Direct navigation to edit page
+   - **"Use Different Barcode"** button: Clears field and refocuses for new input
+   - Visual loading indicator during check
+
+4. **User Experience Benefits**
+   - **Prevents Wasted Time**: Warns before filling entire form
+   - **Guides Workflow**: Direct path to edit existing product
+   - **Prevents Duplicates**: Stops accidental duplicate product creation
+   - **Smart Navigation**: Maintains context when navigating to edit
+
+**Technical Implementation**:
+
+```php
+// API Endpoint
+Route::post('/api/products/check-barcode-duplicate', [ProductController::class, 'checkBarcodeDuplicate']);
+
+// Controller Method
+public function checkBarcodeDuplicate(Request $request)
+{
+    $barcode = $request->input('barcode');
+    $existingProduct = Product::where('CODE', $barcode)
+        ->with(['category', 'supplierLinks.supplier'])
+        ->first();
+
+    if ($existingProduct) {
+        return response()->json([
+            'exists' => true,
+            'product' => [
+                'id' => $existingProduct->ID,
+                'name' => $existingProduct->NAME,
+                'category_name' => $existingProduct->category?->NAME,
+                'supplier_name' => $existingProduct->supplierLinks->first()?->supplier?->Supplier,
+                'edit_url' => route('products.edit', $existingProduct->ID),
+            ]
+        ]);
+    }
+}
+```
+
+**JavaScript Integration**:
+
+```javascript
+// Real-time barcode checking
+function initializeBarcodeCheck() {
+    const barcodeField = document.getElementById('code');
+    barcodeField.addEventListener('input', debounceCheckBarcode);
+}
+
+async function checkBarcode() {
+    const response = await fetch('/api/products/check-barcode-duplicate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+        },
+        body: JSON.stringify({ barcode: barcode }),
+    });
+
+    const data = await response.json();
+    if (data.exists) {
+        displayBarcodeWarning(data.product);
+    }
+}
+```
+
+#### Supplier Link Duplicate Detection with Override
+
+**Overview**: Prevents duplicate `(SupplierCode, SupplierID)` combinations in the supplier_link table while allowing authorized overrides when needed.
+
+**The Problem**:
+- The POS database has a unique composite index on `(SupplierCode, SupplierID)`
+- Attempting to assign the same supplier code to a different product causes database errors
+- Users need ability to reassign codes when suppliers change products
+
+**Key Features**:
+
+1. **Real-time Warning (Edit Form)**
+   - Checks as user enters supplier code (500ms debounce)
+   - Yellow warning panel shows conflicting product details
+   - Displays: Product name, barcode, supplier name
+   - Link to view/edit conflicting product
+
+2. **Override Confirmation Modal**
+   - Intercepts form submission when duplicate detected
+   - Shows detailed conflict information
+   - Clear warning about what will happen
+   - Two options:
+     - **Cancel**: Return to editing
+     - **Proceed & Reassign**: Remove from old product, assign to current
+
+3. **Automatic Resolution**
+   - Deletes supplier link from old product
+   - Creates/updates link for current product
+   - Complete audit trail logged
+   - Transaction-safe operation
+
+4. **Audit Trail**
+   - Logs all override actions with:
+     - Old product barcode
+     - New product ID
+     - Supplier code and ID
+     - User ID who made the change
+   - Accessible in application logs
+
+**Technical Implementation**:
+
+```php
+// API Endpoint for real-time checking
+Route::post('/api/products/check-supplier-link-duplicate',
+    [ProductController::class, 'checkSupplierLinkDuplicate']);
+
+// Controller - Duplicate Detection
+public function checkSupplierLinkDuplicate(Request $request)
+{
+    $existingLink = SupplierLink::where('SupplierCode', $request->supplier_code)
+        ->where('SupplierID', $request->supplier_id)
+        ->with(['product', 'supplier'])
+        ->first();
+
+    if ($existingLink && $existingLink->Barcode !== $currentProduct->CODE) {
+        return response()->json([
+            'duplicate' => true,
+            'conflict' => [
+                'product_name' => $existingLink->product?->NAME,
+                'product_barcode' => $existingLink->Barcode,
+                'supplier_name' => $existingLink->supplier?->Supplier,
+                'edit_url' => route('products.edit', $existingLink->product->ID),
+            ]
+        ]);
+    }
+}
+
+// Controller - Override Handling
+try {
+    $supplierLink->update([
+        'SupplierCode' => $request->supplier_code,
+        'SupplierID' => $request->supplier_id,
+    ]);
+} catch (QueryException $e) {
+    if (str_contains($e->getMessage(), 'Duplicate entry')) {
+        if ($request->boolean('force_override')) {
+            // Delete conflicting link
+            $conflictingLink->delete();
+
+            // Log the action
+            Log::info('Removing conflicting supplier link due to override', [
+                'old_product_barcode' => $conflictingLink->Barcode,
+                'new_product_id' => $product->ID,
+                'user_id' => auth()->id(),
+            ]);
+
+            // Retry update
+            $supplierLink->update([...]);
+        } else {
+            // Show error with conflict details
+            return back()->withErrors([
+                'supplier_code' => 'This code is already linked to: ' .
+                    $conflictingLink->product?->NAME
+            ]);
+        }
+    }
+}
+```
+
+**User Workflow**:
+
+1. **User edits product** and changes supplier code
+2. **System detects duplicate** via real-time AJAX check
+3. **Warning appears** showing conflicting product details
+4. **User clicks save** → Modal intercepts submission
+5. **Modal shows**:
+   - Conflicting product name and barcode
+   - Current supplier name
+   - Link to view other product
+   - Clear warning about reassignment
+6. **User confirms** → Supplier link reassigned
+7. **Audit logged** → Complete trail of change
+
+**Benefits**:
+
+- ✅ **Prevents Database Errors**: No more integrity constraint violations
+- ✅ **Informed Decisions**: Users see exactly what will change
+- ✅ **Flexible Workflow**: Allows legitimate reassignments when needed
+- ✅ **Data Integrity**: Transaction-safe with automatic rollback on failure
+- ✅ **Full Auditability**: Complete log of all override actions
+- ✅ **Better UX**: Clear warnings instead of cryptic error messages
+
+**Routes**:
+
+```php
+// Web routes (uses session authentication)
+Route::post('/api/products/check-barcode-duplicate',
+    [ProductController::class, 'checkBarcodeDuplicate']);
+Route::post('/api/products/check-supplier-link-duplicate',
+    [ProductController::class, 'checkSupplierLinkDuplicate']);
+```
+
+**Form Fields**:
+
+```html
+<!-- Hidden override flag -->
+<input type="hidden" id="force_override" name="force_override" value="0">
+
+<!-- Set to 1 when user confirms override -->
+<script>
+function confirmOverride() {
+    document.getElementById('force_override').value = '1';
+    form.submit();
+}
+</script>
+```
+
 ### Enhanced Product Search & Filtering (2025)
 
 The product listing page has been improved with better supplier filtering capabilities.
@@ -655,11 +889,19 @@ public function user_can_update_product_display_name()
 **Cause**: Route not found or validation failure
 **Solution**: Verify route registration and check validation rules
 
+#### Issue: Supplier name showing as "Unknown" in duplicate warnings
+**Symptoms**: Real-time duplicate detection warnings show "Supplier: Unknown" instead of actual supplier name
+**Cause**: Code using wrong supplier model field name (`NAME` instead of `Supplier`)
+**Solution**: The Supplier model uses `Supplier` as the column name for supplier names, not `NAME`. This has been fixed in all relevant locations (ProductController lines 912, 1126, 1301, 1357).
+**Fixed**: 2025-11-01
+
 ### Debug Tips
 - Check `storage/logs/laravel.log` for validation errors
 - Verify POS database connection in `.env` file
 - Use browser developer tools to inspect AJAX requests
 - Check that Product model fillable array includes updated fields
+- For duplicate detection issues, check browser console for AJAX errors
+- Verify routes are cached: `php artisan route:cache`
 
 ### FAQ
 

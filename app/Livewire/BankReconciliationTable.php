@@ -630,7 +630,7 @@ class BankReconciliationTable extends Component
         $currentFrom = \Carbon\Carbon::parse($this->dateFrom ?? now());
         $currentTo = \Carbon\Carbon::parse($this->dateTo ?? now());
 
-        // If current range spans multiple months, move both dates forward by one month  
+        // If current range spans multiple months, move both dates forward by one month
         // Otherwise, move to the complete next month
         $this->dateFrom = $currentFrom->addMonth()->startOfMonth()->format('Y-m-d');
         $this->dateTo = $currentFrom->endOfMonth()->format('Y-m-d');

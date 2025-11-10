@@ -8,8 +8,11 @@ use App\Http\Requests\UpdateProductRequest;
 use App\Models\Category;
 use App\Models\LabelLog;
 use App\Models\LabelTemplate;
+use App\Models\OrderItem;
+use App\Models\OrderSession;
 use App\Models\Product;
 use App\Models\ProductMetadata;
+use App\Models\ProductOrderSetting;
 use App\Models\Stocking;
 use App\Models\Supplier;
 use App\Models\SupplierLink;
@@ -20,9 +23,12 @@ use App\Repositories\CategoryRepository;
 use App\Repositories\ProductRepository;
 use App\Repositories\SalesRepository;
 use App\Services\LabelService;
+use App\Services\OrderService;
 use App\Services\SupplierService;
 use App\Services\TillVisibilityService;
 use App\Services\UdeaScrapingService;
+use App\Support\SpecialOrderCategories;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -199,6 +205,9 @@ class ProductController extends Controller
         // Get all categories for the category selector
         $allCategories = $this->getAllCategoriesForDropdown();
 
+        // Get order settings for this product (if any)
+        $orderSettings = ProductOrderSetting::where('product_id', $id)->first();
+
         return view('products.show', [
             'product' => $product,
             'taxCategories' => $taxCategories,
@@ -210,6 +219,7 @@ class ProductController extends Controller
             'from' => $from,
             'isVisibleOnTill' => $isVisibleOnTill,
             'allCategories' => $allCategories,
+            'orderSettings' => $orderSettings,
         ]);
     }
 
@@ -909,7 +919,7 @@ class ProductController extends Controller
                                             'product_id' => $conflictingLink->product?->ID,
                                             'product_name' => $conflictingLink->product?->NAME,
                                             'product_barcode' => $conflictingLink->Barcode,
-                                            'supplier_name' => $conflictingLink->supplier?->NAME,
+                                            'supplier_name' => $conflictingLink->supplier?->Supplier,
                                         ]),
                                     ]);
                             }
@@ -1123,7 +1133,7 @@ class ProductController extends Controller
                                         'product_id' => $conflictingLink->product?->ID,
                                         'product_name' => $conflictingLink->product?->NAME,
                                         'product_barcode' => $conflictingLink->Barcode,
-                                        'supplier_name' => $conflictingLink->supplier?->NAME,
+                                        'supplier_name' => $conflictingLink->supplier?->Supplier,
                                     ]),
                                 ]);
                         }
@@ -1298,7 +1308,7 @@ class ProductController extends Controller
                     'product_id' => $existingLink->product?->ID,
                     'product_name' => $existingLink->product?->NAME,
                     'product_barcode' => $existingLink->Barcode,
-                    'supplier_name' => $existingLink->supplier?->NAME,
+                    'supplier_name' => $existingLink->supplier?->Supplier,
                     'supplier_code' => $existingLink->SupplierCode,
                     'supplier_id' => $existingLink->SupplierID,
                     'edit_url' => $existingLink->product ? route('products.edit', $existingLink->product->ID) : null,
@@ -1629,5 +1639,228 @@ class ProductController extends Controller
             ->sortBy('category_path');
 
         return $categories;
+    }
+
+    /**
+     * Update the minimum stock override for a product.
+     * Only Admin and Manager users can set this override.
+     */
+    public function updateMinStockOverride(Request $request, string $id, OrderService $orderService)
+    {
+        \Log::info('=== MIN STOCK UPDATE START ===', [
+            'product_id' => $id,
+            'value' => $request->min_stock_override,
+            'is_json' => $request->expectsJson(),
+        ]);
+
+        // Authorization check: Admin and Manager only
+        if (! auth()->user()->hasAnyRole(['admin', 'manager'])) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Unauthorized. Only Admin and Manager users can set minimum stock overrides.'], 403);
+            }
+            abort(403, 'Unauthorized. Only Admin and Manager users can set minimum stock overrides.');
+        }
+
+        $request->validate([
+            'min_stock_override' => 'nullable|numeric|min:0|max:999999.99',
+            'order_session_id' => 'nullable|integer|exists:order_sessions,id',
+        ]);
+
+        // Get the product
+        $product = Product::find($id);
+
+        if (! $product) {
+            $product = $this->productRepository->findById($id);
+        }
+
+        if (! $product) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Product not found'], 404);
+            }
+            abort(404, 'Product not found');
+        }
+
+        try {
+            // Get or create product order settings
+            $settings = ProductOrderSetting::firstOrCreate(
+                ['product_id' => $product->ID],
+                [
+                    'review_priority' => 'standard',
+                    'auto_approve' => false,
+                    'safety_stock_factor' => 1.5,
+                    'last_updated' => now(),
+                ]
+            );
+
+            // Update min stock override (null to remove override)
+            $minStockValue = $request->min_stock_override !== null
+                ? (float) $request->min_stock_override
+                : null;
+
+            $settings->min_stock_override = $minStockValue;
+            $settings->last_updated = now();
+            $settings->save();
+
+            \Log::info('=== MIN STOCK SAVED ===', ['value' => $minStockValue]);
+
+            // Recalculate order quantity with new minimum stock override
+            $recalculatedData = null;
+            if ($request->expectsJson()) {
+                \Log::info('=== STARTING RECALCULATION ===', ['product_type' => get_class($product)]);
+
+                try {
+                    $orderItem = null;
+                    $recalculationOptions = [];
+
+                    if ($request->order_session_id) {
+                        $orderSession = OrderSession::with('supplier')->find($request->order_session_id);
+
+                        if ($orderSession) {
+                            $orderItem = OrderItem::where('order_session_id', $orderSession->id)
+                                ->where('product_id', $product->ID)
+                                ->first();
+
+                            $coverageDays = max(1, (int) ($orderSession->coverage_days ?? 7));
+                            $coverageWeeks = max(0.1, (float) ($coverageDays / 7));
+                            $coverageEndsOn = $orderSession->coverage_ends_on;
+                            $salesHistoryWeeks = max(
+                                1,
+                                min(26, (int) ($orderSession->sales_history_weeks ?? 8))
+                            );
+
+                            $recalculationOptions = [
+                                'coverage_days' => $coverageDays,
+                                'coverage_weeks' => $coverageWeeks,
+                                'sales_history_weeks' => $salesHistoryWeeks,
+                                'coverage_ends_on' => $coverageEndsOn,
+                            ];
+
+                            $categoryGroups = SpecialOrderCategories::forSupplier(
+                                (string) $orderSession->supplier_id,
+                                optional($orderSession->supplier)->Supplier ?? null
+                            );
+                            $coverageOverrides = $orderSession->coverage_overrides ?? [];
+
+                            $groupKey = null;
+                            if (! empty($categoryGroups)) {
+                                $productCategory = $product->CATEGORY ?? null;
+                                if ($productCategory !== null) {
+                                    foreach ($categoryGroups as $key => $definition) {
+                                        if (in_array($productCategory, $definition['category_codes'] ?? [], true)) {
+                                            $groupKey = $key;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if ($groupKey === null && $orderItem && is_array($orderItem->context_data)) {
+                                    $groupKey = $orderItem->context_data['category_group_key'] ?? null;
+                                }
+                            }
+
+                            if ($groupKey) {
+                                $recalculationOptions['category_group_key'] = $groupKey;
+                                $recalculationOptions['category_group_label'] = SpecialOrderCategories::labelForGroup(
+                                    $groupKey,
+                                    $categoryGroups
+                                );
+
+                                $groupOverride = $coverageOverrides[$groupKey] ?? null;
+                                if ($groupOverride) {
+                                    $recalculationOptions['coverage_override'] = $groupOverride;
+
+                                    if (! empty($groupOverride['coverage_days'])) {
+                                        $overrideDays = max(1, (int) $groupOverride['coverage_days']);
+                                        $recalculationOptions['coverage_days'] = $overrideDays;
+                                        $recalculationOptions['coverage_weeks'] = max(
+                                            0.1,
+                                            (float) ($overrideDays / 7)
+                                        );
+                                    }
+
+                                    if (! empty($groupOverride['coverage_ends_on'])) {
+                                        try {
+                                            $recalculationOptions['coverage_ends_on'] = Carbon::parse($groupOverride['coverage_ends_on']);
+                                        } catch (\Throwable $parseException) {
+                                            $recalculationOptions['coverage_ends_on'] = $groupOverride['coverage_ends_on'];
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    $suggestion = $orderService->calculateProductSuggestion($product, $recalculationOptions);
+                    \Log::info('=== RECALCULATION SUCCESS ===');
+
+                    if ($suggestion) {
+                        $currentStock = $suggestion['context_data']['current_stock'] ?? 0;
+                        $suggestedQuantity = $suggestion['suggested_quantity'] ?? 0;
+                        $afterOrderStock = $currentStock + $suggestedQuantity;
+
+                        $recalculatedData = [
+                            'suggested_quantity' => $suggestedQuantity,
+                            'after_order_stock' => $afterOrderStock,
+                            'context_data' => $suggestion['context_data'],
+                        ];
+
+                        if ($orderItem) {
+                            $orderItem->suggested_quantity = $suggestedQuantity;
+                            $orderItem->final_quantity = $suggestedQuantity;
+                            $orderItem->suggested_cases = $suggestion['suggested_cases'] ?? 0;
+                            $orderItem->final_cases = $suggestion['suggested_cases'] ?? 0;
+                            $orderItem->total_cost = $suggestedQuantity * $orderItem->unit_cost;
+                            $orderItem->context_data = $suggestion['context_data'];
+                            $orderItem->save();
+                            $orderItem->refresh();
+                            \Log::info('=== ORDER ITEM UPDATED ===', ['item_id' => $orderItem->id]);
+                        }
+                    }
+                } catch (\Exception $e) {
+                    // If recalculation fails, still return success for the min stock update
+                    // Just don't include recalculated data
+                    \Log::warning('=== RECALCULATION FAILED ===', [
+                        'product_id' => $product->ID,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                    ]);
+                }
+            }
+
+        } catch (\Exception $e) {
+            \Log::error('=== MIN STOCK UPDATE EXCEPTION ===', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Failed to update minimum stock override: '.$e->getMessage()], 500);
+            }
+            throw $e;
+        }
+
+        if ($request->expectsJson()) {
+            $response = [
+                'message' => $minStockValue !== null
+                    ? 'Minimum stock override set successfully.'
+                    : 'Minimum stock override removed successfully.',
+                'min_stock_override' => $minStockValue,
+                'product_id' => $product->ID,
+            ];
+
+            // Add recalculated order data if available
+            if ($recalculatedData) {
+                $response['recalculated'] = $recalculatedData;
+            }
+
+            \Log::info('=== MIN STOCK UPDATE SUCCESS ===', $response);
+
+            return response()->json($response);
+        }
+
+        return redirect()
+            ->route('products.show', $id)
+            ->with('success', $minStockValue !== null
+                ? 'Minimum stock override set successfully.'
+                : 'Minimum stock override removed successfully.');
     }
 }
