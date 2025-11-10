@@ -15,6 +15,9 @@ class UdeaDiagnosticsController extends Controller
         $error = null;
         $supplierCode = trim((string) $request->query('supplier_code'));
 
+        $connectionTest = null;
+        $runConnectionTest = $request->boolean('run_connection_test');
+
         if ($supplierCode !== '') {
             $cacheKey = "udea_product_{$supplierCode}";
             $forceRefresh = $request->boolean('fresh');
@@ -43,6 +46,17 @@ class UdeaDiagnosticsController extends Controller
             }
         }
 
-        return view('tools.udea-debug', compact('result', 'error', 'supplierCode'));
+        if ($runConnectionTest) {
+            $connectionTest = $udeaService->testConnection();
+        }
+
+        return view('tools.udea-debug', [
+            'result' => $result,
+            'error' => $error,
+            'supplierCode' => $supplierCode,
+            'debugInfo' => $udeaService->getLastDebugInfo(),
+            'connectionTest' => $connectionTest,
+            'ranConnectionTest' => $runConnectionTest,
+        ]);
     }
 }

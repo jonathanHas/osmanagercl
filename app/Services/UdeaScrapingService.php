@@ -5,6 +5,7 @@ namespace App\Services;
 use Exception;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -15,6 +16,8 @@ class UdeaScrapingService
     private array $config;
 
     private ?string $sessionCookie = null;
+
+    private array $lastDebugInfo = [];
 
     public function __construct()
     {
@@ -45,10 +48,31 @@ class UdeaScrapingService
     public function getProductData(string $productCode): ?array
     {
         $cacheKey = "udea_product_{$productCode}";
+        $this->resetDebug($productCode, $cacheKey);
 
-        return Cache::remember($cacheKey, $this->config['cache_ttl'], function () use ($productCode) {
-            return $this->scrapeProductData($productCode);
-        });
+        if (Cache::has($cacheKey)) {
+            $this->addDebug('cache_hit', [
+                'cache_key' => $cacheKey,
+                'ttl' => $this->config['cache_ttl'],
+            ]);
+
+            return Cache::get($cacheKey);
+        }
+
+        $this->addDebug('cache_miss', [
+            'cache_key' => $cacheKey,
+            'ttl' => $this->config['cache_ttl'],
+        ]);
+
+        $data = $this->scrapeProductData($productCode);
+        Cache::put($cacheKey, $data, $this->config['cache_ttl']);
+
+        return $data;
+    }
+
+    public function getLastDebugInfo(): array
+    {
+        return $this->lastDebugInfo;
     }
 
     private function scrapeProductData(string $productCode): ?array
@@ -56,14 +80,17 @@ class UdeaScrapingService
         try {
             if (! $this->ensureAuthenticated()) {
                 Log::warning('Udea scraping failed: Authentication failed');
+                $this->addDebug('authentication_failed');
 
                 return null;
             }
+            $this->addDebug('authentication_success');
 
             sleep($this->config['rate_limit_delay']);
 
             // Use the correct search URL format with English language preference
             $searchUrl = "/search/?qry={$productCode}";
+            $this->addDebug('search_request', ['url' => $searchUrl]);
             $response = $this->client->get($searchUrl, [
                 'headers' => [
                     'Accept-Language' => 'en-US,en;q=0.9,nl;q=0.1',
@@ -75,11 +102,16 @@ class UdeaScrapingService
                     'status' => $response->getStatusCode(),
                     'product_code' => $productCode,
                 ]);
+                $this->addDebug('search_failed', ['status' => $response->getStatusCode()]);
 
                 return null;
             }
 
             $html = (string) $response->getBody();
+            $this->addDebug('search_response', [
+                'status' => $response->getStatusCode(),
+                'html_length' => strlen($html),
+            ]);
 
             // Detect language version for debugging
             $isDutch = strpos($html, '/producten/product/') !== false;
@@ -91,6 +123,10 @@ class UdeaScrapingService
                 'english_detected' => $isEnglish,
                 'search_url' => $searchUrl,
             ]);
+            $this->addDebug('language_detection', [
+                'dutch_detected' => $isDutch,
+                'english_detected' => $isEnglish,
+            ]);
 
             return $this->parseProductData($html, $productCode);
 
@@ -99,6 +135,7 @@ class UdeaScrapingService
                 'error' => $e->getMessage(),
                 'product_code' => $productCode,
             ]);
+            $this->addDebug('http_exception', ['message' => $e->getMessage()]);
 
             return null;
         } catch (Exception $e) {
@@ -106,6 +143,7 @@ class UdeaScrapingService
                 'error' => $e->getMessage(),
                 'product_code' => $productCode,
             ]);
+            $this->addDebug('unexpected_exception', ['message' => $e->getMessage()]);
 
             return null;
         }
@@ -114,6 +152,8 @@ class UdeaScrapingService
     private function ensureAuthenticated(): bool
     {
         if ($this->sessionCookie) {
+            $this->addDebug('authentication_reuse_session');
+
             return true;
         }
 
@@ -121,6 +161,10 @@ class UdeaScrapingService
             // Use the correct login URL
             $loginPage = $this->client->get('/users');
             $loginHtml = (string) $loginPage->getBody();
+            $this->addDebug('authentication_login_page', [
+                'status' => $loginPage->getStatusCode(),
+                'html_length' => strlen($loginHtml),
+            ]);
 
             // Udea doesn't seem to use CSRF tokens, but let's try to extract one anyway
             $csrfToken = $this->extractCsrfToken($loginHtml);
@@ -136,10 +180,18 @@ class UdeaScrapingService
             if ($csrfToken) {
                 $formData['_token'] = $csrfToken;
             }
+            $this->addDebug('authentication_payload_ready', [
+                'has_csrf' => (bool) $csrfToken,
+                'has_credentials' => (bool) $this->config['username'] && (bool) $this->config['password'],
+            ]);
 
             $loginResponse = $this->client->post('/users/login', [
                 'form_params' => $formData,
                 'allow_redirects' => false,
+            ]);
+            $this->addDebug('authentication_post_response', [
+                'status_code' => $loginResponse->getStatusCode(),
+                'location' => $loginResponse->getHeader('Location')[0] ?? null,
             ]);
 
             // Check for successful login (could be 302 redirect or 200 with success indication)
@@ -147,6 +199,7 @@ class UdeaScrapingService
             if ($statusCode === 302 || $statusCode === 200) {
                 $this->sessionCookie = 'authenticated';
                 Log::info('Udea authentication successful', ['status' => $statusCode]);
+                $this->addDebug('authentication_set_cookie', ['status_code' => $statusCode]);
 
                 return true;
             }
@@ -155,11 +208,15 @@ class UdeaScrapingService
                 'status_code' => $statusCode,
                 'response_preview' => substr((string) $loginResponse->getBody(), 0, 500),
             ]);
+            $this->addDebug('authentication_failed_response', [
+                'status_code' => $statusCode,
+            ]);
 
             return false;
 
         } catch (Exception $e) {
             Log::error('Udea authentication failed', ['error' => $e->getMessage()]);
+            $this->addDebug('authentication_exception', ['error' => $e->getMessage()]);
 
             return false;
         }
@@ -358,6 +415,10 @@ class UdeaScrapingService
                 'html_length' => strlen($html),
                 'prices_found' => $priceMatches[1] ?? [],
             ]);
+            $this->addDebug('no_product_data_found', [
+                'html_length' => strlen($html),
+                'prices_found' => $priceMatches[1] ?? [],
+            ]);
 
             return null;
         }
@@ -374,6 +435,9 @@ class UdeaScrapingService
         Log::info('Udea scraping successful', [
             'product_code' => $productCode,
             'data_found' => array_filter($data, fn ($v) => ! is_null($v)),
+        ]);
+        $this->addDebug('scrape_success', [
+            'fields' => array_keys(array_filter($data, fn ($v) => ! is_null($v))),
         ]);
 
         return $data;
@@ -393,16 +457,22 @@ class UdeaScrapingService
                 // Look for detail link
                 if (preg_match('/<a[^>]*href="(https:\/\/www\.udea\.nl\/product(?:en|s)\/product\/[^"]+)"[^>]*class="[^"]*detail-image[^"]*"/', $searchFromPos, $matches)) {
                     $detailUrl = $matches[1];
+                    $this->addDebug('detail_page_found', ['url' => $detailUrl]);
 
                     // Fetch the product detail page
                     $response = $this->client->get($detailUrl);
                     $detailHtml = (string) $response->getBody();
+                    $this->addDebug('detail_page_response', [
+                        'status' => $response->getStatusCode(),
+                        'html_length' => strlen($detailHtml),
+                    ]);
 
                     // Extract EAN/barcode - Try multiple patterns
 
                     // Pattern 1: HTML table format - <td class="wt-semi">EAN</td><td>8711521021925</td>
                     if (preg_match('/<td[^>]*class="[^"]*wt-semi[^"]*"[^>]*>(?:EAN|Barcode|GTIN)<\/td>\s*<td[^>]*>(\d{8,13})<\/td>/i', $detailHtml, $barcodeMatches)) {
                         $barcode = $barcodeMatches[1];
+                        $this->addDebug('barcode_extracted', ['pattern' => 'html_table', 'barcode' => $barcode]);
 
                         Log::info('Extracted barcode from table format', [
                             'barcode' => $barcode,
@@ -416,6 +486,7 @@ class UdeaScrapingService
                     // Pattern 2: Alternative table format - <td>EAN</td><td>8711521021925</td> (without class)
                     if (preg_match('/<td[^>]*>(?:EAN|Barcode|GTIN)<\/td>\s*<td[^>]*>(\d{8,13})<\/td>/i', $detailHtml, $barcodeMatches)) {
                         $barcode = $barcodeMatches[1];
+                        $this->addDebug('barcode_extracted', ['pattern' => 'simple_table', 'barcode' => $barcode]);
 
                         Log::info('Extracted barcode from simple table format', [
                             'barcode' => $barcode,
@@ -429,6 +500,7 @@ class UdeaScrapingService
                     // Pattern 3: Original format - "EAN: 8718976017046" or similar
                     if (preg_match('/(?:EAN|Barcode):\s*(\d{8,13})/', $detailHtml, $barcodeMatches)) {
                         $barcode = $barcodeMatches[1];
+                        $this->addDebug('barcode_extracted', ['pattern' => 'colon', 'barcode' => $barcode]);
 
                         Log::info('Extracted barcode from colon format', [
                             'barcode' => $barcode,
@@ -444,6 +516,8 @@ class UdeaScrapingService
                         // Validate it's likely an EAN-13
                         $potentialEan = $barcodeMatches[1];
                         if (strlen($potentialEan) == 13 && substr($potentialEan, 0, 2) == '87') {
+                            $this->addDebug('barcode_extracted', ['pattern' => 'fallback_13_digits', 'barcode' => $potentialEan]);
+
                             Log::info('Extracted EAN-13', [
                                 'barcode' => $potentialEan,
                                 'detail_url' => $detailUrl,
@@ -452,7 +526,12 @@ class UdeaScrapingService
                             return $potentialEan;
                         }
                     }
+                    $this->addDebug('barcode_not_found_on_detail', ['url' => $detailUrl]);
+                } else {
+                    $this->addDebug('detail_page_missing');
                 }
+            } else {
+                $this->addDebug('products_list_not_found');
             }
 
             return null;
@@ -598,6 +677,10 @@ class UdeaScrapingService
                 'form_params' => $loginData,
                 'allow_redirects' => false,
             ]);
+            $this->addDebug('authentication_post', [
+                'status_code' => $loginResponse->getStatusCode(),
+                'has_location' => $loginResponse->hasHeader('Location'),
+            ]);
 
             $responseBody = (string) $loginResponse->getBody();
             $debug['step_4_login_response'] = [
@@ -616,6 +699,7 @@ class UdeaScrapingService
 
             if ($isSuccess) {
                 $this->sessionCookie = 'authenticated';
+                $this->addDebug('authentication_set_cookie');
             }
 
             return [
@@ -642,6 +726,29 @@ class UdeaScrapingService
         }
 
         return round((microtime(true) - $start) * 1000, 2);
+    }
+
+    private function resetDebug(string $productCode, string $cacheKey): void
+    {
+        $this->lastDebugInfo = [
+            'product_code' => $productCode,
+            'cache_key' => $cacheKey,
+            'started_at' => Carbon::now()->toIso8601String(),
+            'steps' => [],
+        ];
+    }
+
+    private function addDebug(string $step, array $context = []): void
+    {
+        if (! isset($this->lastDebugInfo['steps'])) {
+            $this->lastDebugInfo['steps'] = [];
+        }
+
+        $this->lastDebugInfo['steps'][] = [
+            'step' => $step,
+            'context' => $context,
+            'timestamp' => Carbon::now()->toIso8601String(),
+        ];
     }
 
     public function clearCache(?string $productCode = null): void
