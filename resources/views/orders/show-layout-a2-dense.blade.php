@@ -142,6 +142,10 @@
                     default => 'rgb(34, 197, 94)',
                 };
 
+                $orderSettings = $product->orderSettings ?? null;
+                $isShortDated = (bool) ($orderSettings?->is_short_dated ?? false);
+                $shelfLifeDays = $orderSettings?->shelf_life_days ?? null;
+
                 return [
                     'id' => $item->id,
                     'model' => $item,
@@ -156,6 +160,8 @@
                         'category' => $categoryLabel,
                         'supplier_code' => $supplierCode,
                     ],
+                    'is_short_dated' => $isShortDated,
+                    'shelf_life_days' => $shelfLifeDays,
                     'stats' => [
                         'total_sales' => $totalSales,
                         'average' => $avgWeeklySales,
@@ -200,6 +206,9 @@
             'safe' => $itemsCollection->where('priority', 'safe')->count(),
         ];
         $priorityCounts['all'] = $itemsCollection->count();
+        $orderedItemsCount = $itemsCollection
+            ->filter(static fn ($item) => (float) ($item['order']['final_units'] ?? 0) > 0)
+            ->count();
 
         $chartPayloads = $itemsCollection->map(static function ($item) {
             return [
@@ -308,19 +317,44 @@
             </div>
 
             <div class="bg-white rounded-lg shadow-sm p-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div class="flex flex-wrap gap-2">
-                    <button type="button" class="priority-filter-button px-4 py-2 rounded-full text-sm font-semibold bg-white border border-rose-200 text-rose-600 hover:bg-rose-50" data-priority-filter="review" data-active-classes="bg-rose-600 text-white border-rose-600" data-inactive-classes="bg-white border border-rose-200 text-rose-600">
-                        🔴 Review (<span data-priority-count="review">{{ $priorityCounts['review'] }}</span>)
-                    </button>
-                    <button type="button" class="priority-filter-button px-4 py-2 rounded-full text-sm font-semibold bg-white border border-amber-200 text-amber-600 hover:bg-amber-50" data-priority-filter="standard" data-active-classes="bg-amber-500 text-white border-amber-500" data-inactive-classes="bg-white border border-amber-200 text-amber-600">
-                        🟡 Standard (<span data-priority-count="standard">{{ $priorityCounts['standard'] }}</span>)
-                    </button>
-                    <button type="button" class="priority-filter-button px-4 py-2 rounded-full text-sm font-semibold bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50" data-priority-filter="safe" data-active-classes="bg-emerald-500 text-white border-emerald-500" data-inactive-classes="bg-white border border-emerald-200 text-emerald-600">
-                        🟢 Safe (<span data-priority-count="safe">{{ $priorityCounts['safe'] }}</span>)
-                    </button>
-                    <button type="button" class="priority-filter-button px-4 py-2 rounded-full text-sm font-semibold bg-slate-900 text-white" data-priority-filter="all" data-active-classes="bg-slate-900 text-white" data-inactive-classes="bg-white border border-slate-200 text-slate-700" aria-pressed="true">
-                        All (<span data-priority-count="all">{{ $priorityCounts['all'] }}</span>)
-                    </button>
+                <div class="flex w-full flex-col gap-3 lg:flex-1">
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" class="priority-filter-button px-4 py-2 rounded-full text-sm font-semibold bg-white border border-rose-200 text-rose-600 hover:bg-rose-50" data-priority-filter="review" data-active-classes="bg-rose-600 text-white border-rose-600" data-inactive-classes="bg-white border border-rose-200 text-rose-600">
+                            🔴 Review (<span data-priority-count="review">{{ $priorityCounts['review'] }}</span>)
+                        </button>
+                        <button type="button" class="priority-filter-button px-4 py-2 rounded-full text-sm font-semibold bg-white border border-amber-200 text-amber-600 hover:bg-amber-50" data-priority-filter="standard" data-active-classes="bg-amber-500 text-white border-amber-500" data-inactive-classes="bg-white border border-amber-200 text-amber-600">
+                            🟡 Standard (<span data-priority-count="standard">{{ $priorityCounts['standard'] }}</span>)
+                        </button>
+                        <button type="button" class="priority-filter-button px-4 py-2 rounded-full text-sm font-semibold bg-white border border-emerald-200 text-emerald-600 hover:bg-emerald-50" data-priority-filter="safe" data-active-classes="bg-emerald-500 text-white border-emerald-500" data-inactive-classes="bg-white border border-emerald-200 text-emerald-600">
+                            🟢 Safe (<span data-priority-count="safe">{{ $priorityCounts['safe'] }}</span>)
+                        </button>
+                        <button type="button" class="priority-filter-button px-4 py-2 rounded-full text-sm font-semibold bg-slate-900 text-white" data-priority-filter="all" data-active-classes="bg-slate-900 text-white" data-inactive-classes="bg-white border border-slate-200 text-slate-700" aria-pressed="true">
+                            All (<span data-priority-count="all">{{ $priorityCounts['all'] }}</span>)
+                        </button>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
+                        <span class="text-[11px] uppercase tracking-[0.3em] text-slate-400">Products</span>
+                        <button
+                            type="button"
+                            class="quantity-filter-button px-4 py-2 rounded-full text-sm font-semibold border border-slate-900 bg-slate-900 text-white"
+                            data-quantity-filter="ordered"
+                            data-active-classes="border-slate-900 bg-slate-900 text-white"
+                            data-inactive-classes="border-slate-200 bg-white text-slate-700"
+                            aria-pressed="true"
+                        >
+                            Ordered only ({{ $orderedItemsCount }})
+                        </button>
+                        <button
+                            type="button"
+                            class="quantity-filter-button px-4 py-2 rounded-full text-sm font-semibold border border-slate-200 bg-white text-slate-700"
+                            data-quantity-filter="all"
+                            data-active-classes="border-slate-900 bg-slate-900 text-white"
+                            data-inactive-classes="border-slate-200 bg-white text-slate-700"
+                            aria-pressed="false"
+                        >
+                            All products ({{ $priorityCounts['all'] }})
+                        </button>
+                    </div>
                 </div>
                 <div class="flex flex-wrap gap-2">
                     @if($order->isEditable())
@@ -352,24 +386,34 @@
                         $minStockForDisplay = $card['stats']['min_stock'];
                         $isCaseProduct = $card['order']['is_case_product'];
                         $caseUnits = $card['order']['case_units'];
+                        $hasOrderedQuantity = (float) ($card['order']['final_units'] ?? 0) > 0;
                     @endphp
                     <article
-                        class="overflow-hidden bg-white transition border-l-4 border-transparent"
+                        class="overflow-hidden bg-white transition border-l-4 {{ $card['is_short_dated'] ? 'border-amber-500 bg-amber-50/30' : 'border-transparent' }}"
                         data-order-item-card="true"
                         data-order-item-id="{{ $card['id'] }}"
                         data-priority="{{ $card['priority'] }}"
+                        data-ordered="{{ $hasOrderedQuantity ? '1' : '0' }}"
+                        data-short-dated="{{ $card['is_short_dated'] ? '1' : '0' }}"
                     >
                         <div class="order-card-dense-shell md:flex md:items-stretch">
                             <aside class="order-card-dense-side hidden bg-slate-900/95 text-slate-200 md:block md:w-64 md:min-w-[16rem] md:max-w-[16rem] md:flex-none">
                                 <div class="flex h-full flex-col">
                                     <div class="pb-3">
-                                        <h3 class="mt-2 text-base font-semibold text-white leading-snug break-words">
+                                        <h3 class="mt-2 text-base font-semibold text-white leading-snug break-words flex items-start gap-2">
                                             @if(($productModel->ID ?? null))
-                                                <a href="{{ route('products.edit', $productModel->ID) }}" target="_blank" class="hover:underline">
+                                                <a href="{{ route('products.edit', $productModel->ID) }}" target="_blank" class="hover:underline flex-1">
                                                     {{ $card['product']['name'] }}
                                                 </a>
                                             @else
-                                                {{ $card['product']['name'] }}
+                                                <span class="flex-1">{{ $card['product']['name'] }}</span>
+                                            @endif
+                                            @if($card['is_short_dated'])
+                                                <span class="text-amber-400 flex-none" title="Short-dated product{{ $card['shelf_life_days'] ? ' (' . $card['shelf_life_days'] . ' days shelf life)' : '' }}">
+                                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                                    </svg>
+                                                </span>
                                             @endif
                                         </h3>
                                         <p class="mt-1 text-xs text-slate-400 leading-relaxed">
@@ -383,6 +427,18 @@
                                             <dt class="text-slate-500 uppercase tracking-wide text-[10px]">Unit cost</dt>
                                             <dd class="mt-1 text-sm font-semibold text-emerald-200">{{ $currencySymbol }}{{ number_format($card['unit_cost'], 2) }}</dd>
                                         </div>
+                                        @if($card['is_short_dated'])
+                                            <div>
+                                                <dt class="text-slate-500 uppercase tracking-wide text-[10px]">Shelf life</dt>
+                                                <dd class="mt-1 text-sm font-semibold text-amber-300">
+                                                    @if($card['shelf_life_days'])
+                                                        {{ $card['shelf_life_days'] }} days
+                                                    @else
+                                                        <span class="text-amber-400/80">Short-dated</span>
+                                                    @endif
+                                                </dd>
+                                            </div>
+                                        @endif
                                     </dl>
 
                                     <div class="mt-auto border-t border-slate-800/60 pt-3 text-xs space-y-2">
@@ -517,7 +573,7 @@
             </div>
 
             <div data-priority-empty-state class="hidden rounded-xl border border-slate-200 bg-white p-12 text-center text-slate-500">
-                No items match the selected priority.
+                No items match the selected filters.
             </div>
         </div>
     </div>
@@ -530,6 +586,7 @@
             const chartPayloads = @json($chartPayloads);
             const cardsContainer = document.getElementById('order-a2-card-container');
             const priorityButtons = document.querySelectorAll('.priority-filter-button');
+            const quantityButtons = document.querySelectorAll('.quantity-filter-button');
             const emptyState = document.querySelector('[data-priority-empty-state]');
             const priorityCounts = {
                 review: {{ $priorityCounts['review'] }},
@@ -539,7 +596,8 @@
             };
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
             const debounceTimers = {};
-            let currentFilter = 'all';
+            let currentPriorityFilter = 'all';
+            let currentQuantityFilter = 'ordered';
 
             window.productCharts = window.productCharts || {};
 
@@ -650,14 +708,51 @@
 
             chartPayloads.forEach(renderChart);
 
-            const applyFilter = (filter) => {
-                currentFilter = filter;
+            const updatePriorityButtonStates = () => {
+                priorityButtons.forEach((button) => {
+                    const buttonFilter = button.dataset.priorityFilter || 'all';
+                    const activeClasses = (button.dataset.activeClasses || '').split(' ').filter(Boolean);
+                    const inactiveClasses = (button.dataset.inactiveClasses || '').split(' ').filter(Boolean);
+
+                    button.classList.remove(...activeClasses, ...inactiveClasses);
+                    if (buttonFilter === currentPriorityFilter) {
+                        button.classList.add(...activeClasses);
+                        button.setAttribute('aria-pressed', 'true');
+                    } else {
+                        button.classList.add(...inactiveClasses);
+                        button.setAttribute('aria-pressed', 'false');
+                    }
+                });
+            };
+
+            const updateQuantityButtonStates = () => {
+                quantityButtons.forEach((button) => {
+                    const buttonFilter = button.dataset.quantityFilter || 'all';
+                    const activeClasses = (button.dataset.activeClasses || '').split(' ').filter(Boolean);
+                    const inactiveClasses = (button.dataset.inactiveClasses || '').split(' ').filter(Boolean);
+
+                    button.classList.remove(...activeClasses, ...inactiveClasses);
+                    if (buttonFilter === currentQuantityFilter) {
+                        button.classList.add(...activeClasses);
+                        button.setAttribute('aria-pressed', 'true');
+                    } else {
+                        button.classList.add(...inactiveClasses);
+                        button.setAttribute('aria-pressed', 'false');
+                    }
+                });
+            };
+
+            const applyFilters = () => {
                 const cards = cardsContainer?.querySelectorAll('[data-order-item-card]') ?? [];
                 let visibleCount = 0;
 
                 cards.forEach((card) => {
                     const priority = card.dataset.priority || 'standard';
-                    const isVisible = filter === 'all' || priority === filter;
+                    const matchesPriority = currentPriorityFilter === 'all' || priority === currentPriorityFilter;
+                    const isOrdered = card.dataset.ordered === '1';
+                    const matchesQuantity = currentQuantityFilter === 'all'
+                        || (currentQuantityFilter === 'ordered' && isOrdered);
+                    const isVisible = matchesPriority && matchesQuantity;
                     card.classList.toggle('hidden', !isVisible);
                     if (isVisible) {
                         visibleCount += 1;
@@ -668,28 +763,25 @@
                     emptyState.classList.toggle('hidden', visibleCount !== 0);
                 }
 
-                priorityButtons.forEach((button) => {
-                    const buttonFilter = button.dataset.priorityFilter || 'all';
-                    const activeClasses = (button.dataset.activeClasses || '').split(' ').filter(Boolean);
-                    const inactiveClasses = (button.dataset.inactiveClasses || '').split(' ').filter(Boolean);
-
-                    button.classList.remove(...activeClasses, ...inactiveClasses);
-                    if (buttonFilter === filter) {
-                        button.classList.add(...activeClasses);
-                        button.setAttribute('aria-pressed', 'true');
-                    } else {
-                        button.classList.add(...inactiveClasses);
-                        button.setAttribute('aria-pressed', 'false');
-                    }
-                });
+                updatePriorityButtonStates();
+                updateQuantityButtonStates();
             };
 
             priorityButtons.forEach((button) => {
                 button.addEventListener('click', () => {
-                    applyFilter(button.dataset.priorityFilter || 'all');
+                    currentPriorityFilter = button.dataset.priorityFilter || 'all';
+                    applyFilters();
                 });
             });
-            applyFilter('all');
+
+            quantityButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    currentQuantityFilter = button.dataset.quantityFilter || 'all';
+                    applyFilters();
+                });
+            });
+
+            applyFilters();
 
             const updatePriorityCounts = () => {
                 const cards = cardsContainer?.querySelectorAll('[data-order-item-card]') ?? [];
@@ -831,7 +923,7 @@
 
                         applyPriorityVisuals(itemId, updatedPriority, autoApproved);
                         updatePriorityCounts();
-                        applyFilter(currentPriorityFilter);
+                        applyFilters();
                         showPriorityFeedback(itemId, data.message || 'Priority saved');
                     })
                     .catch((error) => {
@@ -870,6 +962,16 @@
                 const costImpactLabel = document.getElementById(`cost-impact-${itemId}`);
                 if (costImpactLabel) {
                     costImpactLabel.textContent = `${currencySymbol}${(orderedUnits * unitCost).toFixed(2)}`;
+                }
+
+                const card = document.querySelector(`[data-order-item-id="${itemId}"]`);
+                if (card) {
+                    const previousState = card.dataset.ordered;
+                    const hasQuantity = orderedUnits > 0.0001;
+                    card.dataset.ordered = hasQuantity ? '1' : '0';
+                    if (previousState !== card.dataset.ordered && currentQuantityFilter === 'ordered') {
+                        applyFilters();
+                    }
                 }
 
                 const chart = window.productCharts ? window.productCharts[itemId] : null;

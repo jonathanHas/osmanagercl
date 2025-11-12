@@ -447,6 +447,14 @@ class Product extends Model
     }
 
     /**
+     * Get the order settings for this product from the Laravel database.
+     */
+    public function orderSettings(): HasOne
+    {
+        return $this->hasOne(ProductOrderSetting::class, 'product_id', 'ID');
+    }
+
+    /**
      * Get the creation date for this product.
      *
      * @return \Illuminate\Support\Carbon|null

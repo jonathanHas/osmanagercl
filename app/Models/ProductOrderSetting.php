@@ -7,6 +7,13 @@ use Illuminate\Database\Eloquent\Model;
 class ProductOrderSetting extends Model
 {
     /**
+     * The database connection that should be used by the model.
+     *
+     * @var string
+     */
+    protected $connection = 'mysql';
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var array<int, string>
@@ -20,6 +27,7 @@ class ProductOrderSetting extends Model
         'min_order_quantity',
         'max_order_quantity',
         'shelf_life_days',
+        'is_short_dated',
         'notes',
         'last_updated',
     ];
@@ -35,6 +43,7 @@ class ProductOrderSetting extends Model
         'min_order_quantity' => 'decimal:2',
         'max_order_quantity' => 'decimal:2',
         'shelf_life_days' => 'integer',
+        'is_short_dated' => 'boolean',
         'auto_approve' => 'boolean',
     ];
 }

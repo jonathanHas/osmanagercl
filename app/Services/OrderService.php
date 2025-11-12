@@ -484,11 +484,12 @@ class OrderService
 
         // Auto-classify based on product characteristics
         $shelfLifeDays = $settings?->shelf_life_days;
+        $isShortDated = (bool) ($settings?->is_short_dated ?? false);
         $isCase = ($product->supplier?->CASEUNITS ?? 1) > 1;
 
         // High priority items (require careful review)
-        if ($shelfLifeDays && $shelfLifeDays < 7) {
-            return 'review'; // Short shelf life
+        if ($isShortDated || ($shelfLifeDays && $shelfLifeDays < 7)) {
+            return 'review'; // Short-dated or short shelf life
         }
 
         if ($product->SELLPRICE > 50) {

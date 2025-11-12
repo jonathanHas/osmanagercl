@@ -2,26 +2,30 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Category;
 use App\Models\OrderItem;
 use App\Models\OrderSession;
 use App\Models\Supplier;
 use App\Services\OrderService;
+use App\Services\SalesDataSyncService;
 use App\Support\SpecialOrderCategories;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class OrderController extends Controller
 {
     protected OrderService $orderService;
 
-    public function __construct(OrderService $orderService)
+    protected SalesDataSyncService $salesDataSyncService;
+
+    public function __construct(OrderService $orderService, SalesDataSyncService $salesDataSyncService)
     {
         $this->orderService = $orderService;
+        $this->salesDataSyncService = $salesDataSyncService;
     }
 
     /**
@@ -77,6 +81,24 @@ class OrderController extends Controller
 
         $coverageDays = $orderDate->diffInDays($coverageEndDate) + 1;
         $salesHistoryWeeks = (int) $request->input('sales_history_weeks', 8);
+
+        try {
+            $importLog = $this->salesDataSyncService->ensureDailySummariesAreFresh($salesHistoryWeeks);
+
+            if ($importLog !== null) {
+                session()->flash('info', sprintf(
+                    'Sales data imported for %s through %s.',
+                    optional($importLog->start_date)->format('M j, Y'),
+                    optional($importLog->end_date)->format('M j, Y')
+                ));
+            }
+        } catch (\Throwable $exception) {
+            Log::warning('Automatic sales import failed prior to order generation', [
+                'error' => $exception->getMessage(),
+            ]);
+
+            session()->flash('warning', 'We could not refresh sales data automatically; using the most recent import instead.');
+        }
 
         $orderSession = $this->orderService->generateOrderSuggestions(
             $request->supplier_id,
@@ -315,6 +337,7 @@ class OrderController extends Controller
     {
         $order->load([
             'items.product.supplierLinks.supplier',
+            'items.product.orderSettings',
             'supplier',
             'user',
         ]);

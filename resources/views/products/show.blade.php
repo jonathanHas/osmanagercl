@@ -518,6 +518,183 @@
                                 <p x-show="error" x-text="error" class="text-xs text-red-600 dark:text-red-400 mt-1"></p>
                             </div>
                         @endif
+
+                        <!-- Short-Dated Product Settings (Admin/Manager Only) -->
+                        @if(auth()->user()->hasAnyRole(['admin', 'manager']))
+                            <div x-data="{
+                                editingShelfLife: false,
+                                isShortDated: {{ $orderSettings?->is_short_dated ? 'true' : 'false' }},
+                                shelfLifeDays: '{{ $orderSettings?->shelf_life_days ?? '' }}',
+                                originalShelfLifeDays: '{{ $orderSettings?->shelf_life_days ?? '' }}',
+                                saving: false,
+                                error: null
+                            }">
+                                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Short-Dated Product</h3>
+
+                                <!-- Short-Dated Checkbox -->
+                                <div class="flex items-center space-x-3 mb-3">
+                                    <label class="flex items-center space-x-2 cursor-pointer">
+                                        <input type="checkbox"
+                                               x-model="isShortDated"
+                                               @@change="
+                                                   saving = true;
+                                                   error = null;
+                                                   fetch('{{ route('products.update-short-dated-settings', $product->ID) }}', {
+                                                       method: 'PATCH',
+                                                       headers: {
+                                                           'Content-Type': 'application/json',
+                                                           'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                                           'Accept': 'application/json'
+                                                       },
+                                                       body: JSON.stringify({
+                                                           is_short_dated: isShortDated,
+                                                           shelf_life_days: shelfLifeDays !== '' ? shelfLifeDays : null
+                                                       })
+                                                   })
+                                                   .then(response => response.json())
+                                                   .then(data => {
+                                                       if (data.message) {
+                                                           // Success - no reload needed for checkbox
+                                                       } else {
+                                                           error = 'Failed to update';
+                                                           isShortDated = !isShortDated; // Revert
+                                                       }
+                                                   })
+                                                   .catch(err => {
+                                                       error = 'Network error';
+                                                       isShortDated = !isShortDated; // Revert
+                                                   })
+                                                   .finally(() => {
+                                                       saving = false;
+                                                   })
+                                               "
+                                               class="rounded border-gray-300 text-amber-600 focus:ring-amber-500 dark:border-gray-600 dark:bg-gray-700"
+                                               :disabled="saving">
+                                        <span class="text-sm font-medium" :class="isShortDated ? 'text-amber-700 dark:text-amber-400' : 'text-gray-700 dark:text-gray-300'">
+                                            Flag as short-dated
+                                        </span>
+                                    </label>
+                                    <span x-show="saving" class="text-xs text-gray-500">Saving...</span>
+                                </div>
+
+                                <!-- Shelf Life Days -->
+                                <div x-show="isShortDated" class="space-y-2">
+                                    <div class="flex items-center space-x-3">
+                                        <!-- Display Mode -->
+                                        <div x-show="!editingShelfLife" class="flex items-center space-x-2">
+                                            <span class="text-sm text-gray-700 dark:text-gray-300">
+                                                Shelf life:
+                                                <span class="font-semibold" :class="shelfLifeDays ? 'text-amber-700 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'">
+                                                    <span x-text="shelfLifeDays || 'Not specified'"></span>
+                                                    <span x-show="shelfLifeDays"> days</span>
+                                                </span>
+                                            </span>
+                                            <button type="button"
+                                                    @@click="editingShelfLife = true"
+                                                    class="inline-flex items-center px-2 py-1 text-xs font-medium rounded border border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-600 dark:text-amber-400 dark:hover:bg-amber-900/20 transition-colors duration-200">
+                                                <span x-text="shelfLifeDays ? 'Edit' : 'Set'"></span>
+                                            </button>
+                                        </div>
+
+                                        <!-- Edit Mode -->
+                                        <div x-show="editingShelfLife" class="flex items-center space-x-2">
+                                            <input type="number"
+                                                   x-model="shelfLifeDays"
+                                                   step="1"
+                                                   min="0"
+                                                   placeholder="Days"
+                                                   class="w-24 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-gray-100"
+                                                   @@keydown.enter="
+                                                       saving = true;
+                                                       error = null;
+                                                       fetch('{{ route('products.update-short-dated-settings', $product->ID) }}', {
+                                                           method: 'PATCH',
+                                                           headers: {
+                                                               'Content-Type': 'application/json',
+                                                               'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                                               'Accept': 'application/json'
+                                                           },
+                                                           body: JSON.stringify({
+                                                               is_short_dated: isShortDated,
+                                                               shelf_life_days: shelfLifeDays !== '' ? shelfLifeDays : null
+                                                           })
+                                                       })
+                                                       .then(response => response.json())
+                                                       .then(data => {
+                                                           if (data.message) {
+                                                               originalShelfLifeDays = shelfLifeDays;
+                                                               editingShelfLife = false;
+                                                           } else {
+                                                               error = 'Failed to update';
+                                                           }
+                                                       })
+                                                       .catch(err => {
+                                                           error = 'Network error';
+                                                       })
+                                                       .finally(() => {
+                                                           saving = false;
+                                                       })
+                                                   "
+                                                   @@keydown.escape="editingShelfLife = false; shelfLifeDays = originalShelfLifeDays">
+                                            <button type="button"
+                                                    @@click="
+                                                        saving = true;
+                                                        error = null;
+                                                        fetch('{{ route('products.update-short-dated-settings', $product->ID) }}', {
+                                                            method: 'PATCH',
+                                                            headers: {
+                                                                'Content-Type': 'application/json',
+                                                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                                                'Accept': 'application/json'
+                                                            },
+                                                            body: JSON.stringify({
+                                                                is_short_dated: isShortDated,
+                                                                shelf_life_days: shelfLifeDays !== '' ? shelfLifeDays : null
+                                                            })
+                                                        })
+                                                        .then(response => response.json())
+                                                        .then(data => {
+                                                            if (data.message) {
+                                                                originalShelfLifeDays = shelfLifeDays;
+                                                                editingShelfLife = false;
+                                                            } else {
+                                                                error = 'Failed to update';
+                                                            }
+                                                        })
+                                                        .catch(err => {
+                                                            error = 'Network error';
+                                                        })
+                                                        .finally(() => {
+                                                            saving = false;
+                                                        })
+                                                    "
+                                                    :disabled="saving"
+                                                    class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50">
+                                                <span x-show="!saving">Save</span>
+                                                <span x-show="saving">Saving...</span>
+                                            </button>
+                                            <button type="button"
+                                                    @@click="editingShelfLife = false; shelfLifeDays = originalShelfLifeDays"
+                                                    :disabled="saving"
+                                                    class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-gray-300 text-gray-700 hover:bg-gray-400 disabled:opacity-50 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500">
+                                                Cancel
+                                            </button>
+                                            <span x-show="shelfLifeDays" class="text-xs text-gray-500">days</span>
+                                        </div>
+                                    </div>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                                        Optional: Specify how many days this product typically remains fresh
+                                    </p>
+                                </div>
+
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                    <span x-show="!isShortDated">Products flagged as short-dated will be highlighted on the orders page</span>
+                                    <span x-show="isShortDated && !shelfLifeDays" class="text-amber-600 dark:text-amber-400">⚠️ This product is flagged as short-dated</span>
+                                    <span x-show="isShortDated && shelfLifeDays" class="text-amber-600 dark:text-amber-400">⚠️ This product has a shelf life of <span x-text="shelfLifeDays"></span> days</span>
+                                </p>
+                                <p x-show="error" x-text="error" class="text-xs text-red-600 dark:text-red-400 mt-1"></p>
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>

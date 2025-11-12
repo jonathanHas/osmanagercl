@@ -802,6 +802,9 @@ class ProductController extends Controller
         // Check if product is visible on till
         $showOnTill = $this->tillVisibilityService->isVisibleOnTill($product->ID);
 
+        // Get product order settings (for short-dated flag and shelf life)
+        $orderSettings = ProductOrderSetting::where('product_id', $product->ID)->first();
+
         // Context information for navigation
         $fromDelivery = $request->query('from_delivery');
         $fromContext = $request->query('from');
@@ -816,6 +819,7 @@ class ProductController extends Controller
             'udeaSupplierIds',
             'includeInStocking',
             'showOnTill',
+            'orderSettings',
             'fromDelivery',
             'fromContext'
         ));
@@ -1165,6 +1169,26 @@ class ProductController extends Controller
                 $product->ID,
                 $request->boolean('show_on_till', true)
             );
+
+            // Update short-dated product settings (Admin/Manager only)
+            if (auth()->user()->hasAnyRole(['admin', 'manager'])) {
+                $orderSettings = ProductOrderSetting::firstOrCreate(
+                    ['product_id' => $product->ID],
+                    [
+                        'review_priority' => 'standard',
+                        'auto_approve' => false,
+                        'safety_stock_factor' => 1.5,
+                        'last_updated' => now(),
+                    ]
+                );
+
+                $orderSettings->is_short_dated = $request->boolean('is_short_dated', false);
+                $orderSettings->shelf_life_days = $request->shelf_life_days !== null
+                    ? (int) $request->shelf_life_days
+                    : null;
+                $orderSettings->last_updated = now();
+                $orderSettings->save();
+            }
 
             // Ensure STOCKCURRENT exists (create if missing)
             if (! $product->stockCurrent) {
@@ -1862,5 +1886,86 @@ class ProductController extends Controller
             ->with('success', $minStockValue !== null
                 ? 'Minimum stock override set successfully.'
                 : 'Minimum stock override removed successfully.');
+    }
+
+    /**
+     * Update short-dated product settings.
+     * Only Admin and Manager users can modify these settings.
+     */
+    public function updateShortDatedSettings(Request $request, string $id)
+    {
+        // Authorization check: Admin and Manager only
+        if (! auth()->user()->hasAnyRole(['admin', 'manager'])) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Unauthorized. Only Admin and Manager users can modify short-dated settings.'], 403);
+            }
+            abort(403, 'Unauthorized. Only Admin and Manager users can modify short-dated settings.');
+        }
+
+        $request->validate([
+            'is_short_dated' => 'required|boolean',
+            'shelf_life_days' => 'nullable|integer|min:0|max:999',
+        ]);
+
+        // Get the product
+        $product = Product::find($id);
+
+        if (! $product) {
+            $product = $this->productRepository->findById($id);
+        }
+
+        if (! $product) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Product not found'], 404);
+            }
+            abort(404, 'Product not found');
+        }
+
+        try {
+            // Get or create product order settings
+            $settings = ProductOrderSetting::firstOrCreate(
+                ['product_id' => $product->ID],
+                [
+                    'review_priority' => 'standard',
+                    'auto_approve' => false,
+                    'safety_stock_factor' => 1.5,
+                    'last_updated' => now(),
+                ]
+            );
+
+            // Update short-dated settings
+            $settings->is_short_dated = $request->boolean('is_short_dated');
+            $settings->shelf_life_days = $request->shelf_life_days !== null
+                ? (int) $request->shelf_life_days
+                : null;
+            $settings->last_updated = now();
+            $settings->save();
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Short-dated settings updated successfully.',
+                    'is_short_dated' => $settings->is_short_dated,
+                    'shelf_life_days' => $settings->shelf_life_days,
+                    'product_id' => $product->ID,
+                ]);
+            }
+
+            return redirect()
+                ->route('products.show', $id)
+                ->with('success', 'Short-dated settings updated successfully.');
+        } catch (\Exception $e) {
+            \Log::error('Failed to update short-dated settings', [
+                'product_id' => $id,
+                'error' => $e->getMessage(),
+            ]);
+
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Failed to update short-dated settings.'], 500);
+            }
+
+            return redirect()
+                ->route('products.show', $id)
+                ->with('error', 'Failed to update short-dated settings.');
+        }
     }
 }

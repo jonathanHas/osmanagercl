@@ -369,6 +369,68 @@
                             </div>
                         </div>
 
+                        <!-- Short-Dated Product Settings (Admin/Manager Only) -->
+                        @if(auth()->user()->hasAnyRole(['admin', 'manager']))
+                            <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+                                <div class="border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
+                                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Short-Dated Product</h3>
+                                    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                        Flag products with short shelf life for special attention during ordering
+                                    </p>
+                                </div>
+
+                                <div class="space-y-4">
+                                    <!-- Short-Dated Checkbox -->
+                                    <div class="flex items-start">
+                                        <input type="checkbox"
+                                               id="is_short_dated"
+                                               name="is_short_dated"
+                                               value="1"
+                                               {{ old('is_short_dated', $orderSettings?->is_short_dated) ? 'checked' : '' }}
+                                               class="mt-1 rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                                        <label for="is_short_dated" class="ml-3 block text-sm text-gray-700 dark:text-gray-300">
+                                            <span class="font-medium">Flag as short-dated</span>
+                                            <span class="block text-xs text-gray-500 mt-1">
+                                                Products flagged as short-dated will be highlighted on the orders page and automatically set to "review" priority
+                                            </span>
+                                        </label>
+                                    </div>
+
+                                    <!-- Shelf Life Days -->
+                                    <div>
+                                        <label for="shelf_life_days" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Shelf Life (Days)
+                                            <span class="text-gray-500 font-normal">- Optional</span>
+                                        </label>
+                                        <input type="number"
+                                               id="shelf_life_days"
+                                               name="shelf_life_days"
+                                               value="{{ old('shelf_life_days', $orderSettings?->shelf_life_days) }}"
+                                               min="0"
+                                               max="999"
+                                               step="1"
+                                               class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:border-amber-500 focus:ring-amber-500"
+                                               placeholder="e.g., 7">
+                                        <p class="text-xs text-gray-500 mt-1">
+                                            Specify how many days this product typically remains fresh (optional but recommended for short-dated items)
+                                        </p>
+                                    </div>
+
+                                    <!-- Info box -->
+                                    <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                                        <div class="flex items-start">
+                                            <svg class="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                            </svg>
+                                            <p class="ml-3 text-xs text-amber-800 dark:text-amber-200">
+                                                Short-dated products will display with an amber border and warning icon on the orders page, helping you adjust quantities carefully to avoid waste.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+
                         <!-- Action Buttons -->
                         <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
                             <div class="flex items-center justify-end space-x-4">

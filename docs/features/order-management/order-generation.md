@@ -17,6 +17,7 @@ The order generation system automates the calculation of required stock quantiti
 ### 2025-09 Enhancements
 - **Flexible Coverage Controls**: The order creation form now captures *Delivery Date*, *Cover inventory until*, and *Weeks of sales to analyse*. These values are persisted on `order_sessions` (`coverage_days`, `coverage_ends_on`, `sales_history_weeks`) and drive the suggestion engine.
 - **Sales Import Acceleration**: `OrderService` consults `sales_daily_summary` (populated via `/sales-import` or the CLI import commands) for both weekly breakdowns and aggregate stats. If summaries are missing we gracefully fall back to POS live data.
+- **Automatic Sales Import Kickoff**: Submitting the order wizard now attempts to run the daily sales import for any missing days (up to yesterday) so that `sales_daily_summary` stays fresh without requiring the operator to visit `/sales-import` first. Failures are logged and surfaced as a warning, but they no longer block order generation.
 - **Rich Review Layout**: The shared Blade partial `orders/partials/review-table` powers both the live `/orders/{order}` screen and the Vico mockup. It introduces:
   - Global chart scaling, percentage grid lines, and condensed captions directly under each trend line.
   - A default sort by recent sales volume, with alternate sort modes (name, priority, value).

@@ -68,6 +68,10 @@ class UpdateProductRequest extends FormRequest
             // Display Settings
             'display_name' => 'nullable|string|max:255',
             'show_on_till' => 'boolean',
+
+            // Short-Dated Product Settings
+            'is_short_dated' => 'boolean',
+            'shelf_life_days' => 'nullable|integer|min:0|max:999',
         ];
     }
 
@@ -119,6 +123,7 @@ class UpdateProductRequest extends FormRequest
             'is_com' => $this->boolean('is_com'),
             'include_in_stocking' => $this->boolean('include_in_stocking'),
             'show_on_till' => $this->boolean('show_on_till'),
+            'is_short_dated' => $this->boolean('is_short_dated'),
         ]);
 
         // Convert integer fields
