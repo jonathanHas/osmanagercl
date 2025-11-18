@@ -60,176 +60,194 @@
         };
 
         $priorityOrder = ['review' => 0, 'standard' => 1, 'safe' => 2];
+        $allItemsCollection = $order->items ?? collect();
 
-        $itemsCollection = $order->items
-            ->map(function ($item) use ($formatQuantityDisplay, $formatQuantityInput, $priorityOrder, $order) {
-                $product = $item->product;
-                $contextData = $item->context_data ?? [];
-                if (is_string($contextData)) {
-                    $contextData = json_decode($contextData, true) ?? [];
-                }
+        $currentQuantityFilter = request()->input('quantity_filter', 'ordered');
+        if (! in_array($currentQuantityFilter, ['ordered', 'all'], true)) {
+            $currentQuantityFilter = 'ordered';
+        }
 
-                $weeklySales = $contextData['weekly_sales'] ?? [];
-                $weekLabels = array_map(static fn ($week) => $week['label'] ?? '', $weeklySales);
-                $weekUnitsRaw = array_map(static fn ($week) => (float) ($week['units'] ?? 0), $weeklySales);
-                if (empty($weekLabels)) {
-                    $historyWeeks = max((int) ($contextData['sales_history_weeks'] ?? 8), 1);
-                    $weekLabels = array_map(static fn ($index) => 'W'.($index + 1), range(0, $historyWeeks - 1));
-                }
-                if (count($weekUnitsRaw) !== count($weekLabels)) {
-                    $weekUnitsRaw = array_pad($weekUnitsRaw, count($weekLabels), 0.0);
-                }
-                $weekUnits = array_map(static fn ($value) => round($value, 2), $weekUnitsRaw);
-                $totalSales = array_sum($weekUnits);
-                $avgWeeklySales = $contextData['avg_weekly_sales'] ?? ($totalSales > 0 && count($weekUnits) > 0 ? $totalSales / max(count($weekUnits), 1) : 0);
-                $peakWeeklySales = $contextData['peak_weekly_sales'] ?? (count($weekUnits) > 0 ? max($weekUnits) : $avgWeeklySales);
-                if ($peakWeeklySales <= 0 && $avgWeeklySales > 0) {
-                    $peakWeeklySales = $avgWeeklySales;
-                }
-                $peakWeeklySales = (float) max($peakWeeklySales, 0);
-                $peakIndex = 0;
-                if (count($weekUnits) > 0) {
-                    $peakIndex = array_keys($weekUnits, max($weekUnits), true)[0] ?? 0;
-                }
+        $orderedItemsCollection = $allItemsCollection
+            ->filter(static fn ($item) => (float) ($item->final_quantity ?? 0) > 0)
+            ->values();
+        $orderedItemsCount = $orderedItemsCollection->count();
+        $allProductsCount = $allItemsCollection->count();
 
-                $caseUnits = (float) ($contextData['case_units'] ?? $item->case_units ?? 1);
-                if ($caseUnits <= 0) {
-                    $caseUnits = 1;
-                }
-                $isCaseProduct = (bool) ($contextData['is_case_product'] ?? ($caseUnits > 1));
-                $suggestedUnits = (float) ($item->suggested_quantity ?? 0);
-                $finalUnits = (float) ($item->final_quantity ?? $suggestedUnits);
-                $suggestedCases = $isCaseProduct
-                    ? (float) ($item->suggested_cases ?? ($caseUnits > 0 ? $suggestedUnits / $caseUnits : 0))
-                    : null;
-                $finalCases = $isCaseProduct
-                    ? (float) ($item->final_cases ?? ($caseUnits > 0 ? $finalUnits / $caseUnits : 0))
-                    : null;
+        $items = $currentQuantityFilter === 'all'
+            ? $allItemsCollection
+            : $orderedItemsCollection;
 
-                $displayQuantity = $isCaseProduct ? $finalCases : $finalUnits;
-                $suggestedDisplayQuantity = $isCaseProduct ? ($suggestedCases ?? 0) : $suggestedUnits;
-                $quantityLabel = $isCaseProduct ? 'cases' : 'units';
-                $quantityPrecision = $isCaseProduct ? 3 : 0;
+        $priorityCounts = [
+            'review' => $items->filter(static fn ($item) => ($item->review_priority ?? 'standard') === 'review')->count(),
+            'standard' => $items->filter(static fn ($item) => ($item->review_priority ?? 'standard') === 'standard')->count(),
+            'safe' => $items->filter(static fn ($item) => ($item->review_priority ?? 'standard') === 'safe')->count(),
+        ];
+        $priorityCounts['all'] = $items->count();
 
-                $currentStock = (float) ($contextData['current_stock'] ?? 0);
-                $afterStock = $currentStock + $finalUnits;
-                $minStock = $contextData['min_stock_override']
-                    ?? $contextData['min_stock']
-                    ?? ($contextData['calculated_min_stock'] ?? null);
-                $unitCost = (float) ($item->unit_cost ?? 0);
-                $costImpact = $finalUnits * $unitCost;
+        $calculateTotalSales = static function ($item): float {
+            $contextData = $item->context_data ?? [];
+            if (is_string($contextData)) {
+                $contextData = json_decode($contextData, true) ?? [];
+            }
 
-                $productName = strip_tags(html_entity_decode($product->NAME ?? $contextData['product_name'] ?? 'Unknown product'));
-                $productCode = $product->CODE ?? $product->REFERENCE ?? $contextData['product_code'] ?? 'N/A';
-                $supplierLink = $product?->supplierLinks?->first();
-                $supplierName = $contextData['supplier_name']
-                    ?? optional($supplierLink?->supplier)->Supplier
-                    ?? ($order->supplier->Supplier ?? 'Supplier');
-                $categoryLabel = $contextData['category_path'] ?? ($product->CATEGORY ?? 'General');
-                $supplierCode = $contextData['supplier_code']
-                    ?? ($supplierLink->SupplierCode ?? null);
+            $weeklySales = $contextData['weekly_sales'] ?? [];
+            $weekUnitsRaw = array_map(static fn ($week) => (float) ($week['units'] ?? 0), $weeklySales);
+            if (empty($weekUnitsRaw)) {
+                $historyWeeks = max((int) ($contextData['sales_history_weeks'] ?? 8), 1);
+                $weekUnitsRaw = array_fill(0, $historyWeeks, 0.0);
+            }
 
+            return array_sum($weekUnitsRaw);
+        };
+
+        $itemsForDisplay = $items
+            ->sortBy(static function ($item) use ($priorityOrder, $calculateTotalSales) {
                 $priority = $item->review_priority ?? 'standard';
-                $priorityLabel = match ($priority) {
-                    'review' => 'Requires review',
-                    'safe' => 'Safe',
-                    default => 'Standard',
-                };
+                $priorityRank = $priorityOrder[$priority] ?? 3;
+                $totalSales = $calculateTotalSales($item);
 
-                $chartColor = match ($priority) {
-                    'review' => 'rgb(248, 113, 113)',
-                    'standard' => 'rgb(251, 191, 36)',
-                    default => 'rgb(34, 197, 94)',
-                };
-
-                $orderSettings = $product->orderSettings ?? null;
-                $isShortDated = (bool) ($orderSettings?->is_short_dated ?? false);
-                $shelfLifeDays = $orderSettings?->shelf_life_days ?? null;
-
-                return [
-                    'id' => $item->id,
-                    'model' => $item,
-                    'product_model' => $product,
-                    'priority' => $priority,
-                    'priority_label' => $priorityLabel,
-                    'auto_approved' => (bool) $item->auto_approved,
-                    'product' => [
-                        'name' => $productName,
-                        'code' => $productCode,
-                        'supplier' => $supplierName,
-                        'category' => $categoryLabel,
-                        'supplier_code' => $supplierCode,
-                    ],
-                    'is_short_dated' => $isShortDated,
-                    'shelf_life_days' => $shelfLifeDays,
-                    'stats' => [
-                        'total_sales' => $totalSales,
-                        'average' => $avgWeeklySales,
-                        'peak' => $peakWeeklySales,
-                        'current_stock' => $currentStock,
-                        'after_stock' => $afterStock,
-                        'min_stock' => $minStock,
-                    ],
-                    'order' => [
-                        'display_quantity' => $formatQuantityDisplay((float) $displayQuantity, $quantityPrecision),
-                        'suggested_display' => $formatQuantityDisplay((float) $suggestedDisplayQuantity, $quantityPrecision),
-                        'input_value' => $formatQuantityInput((float) $displayQuantity, $quantityPrecision),
-                        'reset_value' => $formatQuantityInput((float) $suggestedDisplayQuantity, $quantityPrecision),
-                        'quantity_label' => $quantityLabel,
-                        'quantity_precision' => $quantityPrecision,
-                        'suggested_units' => $suggestedUnits,
-                        'final_units' => $finalUnits,
-                        'case_units' => $caseUnits,
-                        'is_case_product' => $isCaseProduct,
-                    ],
-                    'unit_cost' => $unitCost,
-                    'cost_impact' => $costImpact,
-                    'context_data' => $contextData,
-                    'chart' => [
-                        'labels' => $weekLabels,
-                        'sales' => $weekUnits,
-                        'min_stock' => $minStock,
-                        'peak_index' => $peakIndex,
-                        'color' => $chartColor,
-                    ],
-                ];
-            })
-            ->sortBy(static function ($item) use ($priorityOrder) {
-                $priorityRank = $priorityOrder[$item['priority']] ?? 3;
-                return ($priorityRank * 1_000_000) - ($item['stats']['total_sales'] ?? 0);
+                return ($priorityRank * 1_000_000) - $totalSales;
             })
             ->values();
 
-        $priorityCounts = [
-            'review' => $itemsCollection->where('priority', 'review')->count(),
-            'standard' => $itemsCollection->where('priority', 'standard')->count(),
-            'safe' => $itemsCollection->where('priority', 'safe')->count(),
-        ];
-        $priorityCounts['all'] = $itemsCollection->count();
-        $orderedItemsCount = $itemsCollection
-            ->filter(static fn ($item) => (float) ($item['order']['final_units'] ?? 0) > 0)
-            ->count();
+        $buildCardData = static function ($item) use ($formatQuantityDisplay, $formatQuantityInput, $order): array {
+            $product = $item->product;
+            $contextData = $item->context_data ?? [];
+            if (is_string($contextData)) {
+                $contextData = json_decode($contextData, true) ?? [];
+            }
 
-        $chartPayloads = $itemsCollection->map(static function ($item) {
+            $weeklySales = $contextData['weekly_sales'] ?? [];
+            $weekLabels = array_map(static fn ($week) => $week['label'] ?? '', $weeklySales);
+            $weekUnitsRaw = array_map(static fn ($week) => (float) ($week['units'] ?? 0), $weeklySales);
+            if (empty($weekLabels)) {
+                $historyWeeks = max((int) ($contextData['sales_history_weeks'] ?? 8), 1);
+                $weekLabels = array_map(static fn ($index) => 'W'.($index + 1), range(0, $historyWeeks - 1));
+            }
+            if (count($weekUnitsRaw) !== count($weekLabels)) {
+                $weekUnitsRaw = array_pad($weekUnitsRaw, count($weekLabels), 0.0);
+            }
+            $weekUnits = array_map(static fn ($value) => round($value, 2), $weekUnitsRaw);
+            $totalSales = array_sum($weekUnits);
+            $avgWeeklySales = $contextData['avg_weekly_sales'] ?? ($totalSales > 0 && count($weekUnits) > 0 ? $totalSales / max(count($weekUnits), 1) : 0);
+            $peakWeeklySales = $contextData['peak_weekly_sales'] ?? (count($weekUnits) > 0 ? max($weekUnits) : $avgWeeklySales);
+            if ($peakWeeklySales <= 0 && $avgWeeklySales > 0) {
+                $peakWeeklySales = $avgWeeklySales;
+            }
+            $peakWeeklySales = (float) max($peakWeeklySales, 0);
+            $peakIndex = 0;
+            if (count($weekUnits) > 0) {
+                $peakIndex = array_keys($weekUnits, max($weekUnits), true)[0] ?? 0;
+            }
+
+            $caseUnits = (float) ($contextData['case_units'] ?? $item->case_units ?? 1);
+            if ($caseUnits <= 0) {
+                $caseUnits = 1;
+            }
+            $isCaseProduct = (bool) ($contextData['is_case_product'] ?? ($caseUnits > 1));
+            $suggestedUnits = (float) ($item->suggested_quantity ?? 0);
+            $finalUnits = (float) ($item->final_quantity ?? $suggestedUnits);
+            $suggestedCases = $isCaseProduct
+                ? (float) ($item->suggested_cases ?? ($caseUnits > 0 ? $suggestedUnits / $caseUnits : 0))
+                : null;
+            $finalCases = $isCaseProduct
+                ? (float) ($item->final_cases ?? ($caseUnits > 0 ? $finalUnits / $caseUnits : 0))
+                : null;
+
+            $displayQuantity = $isCaseProduct ? $finalCases : $finalUnits;
+            $suggestedDisplayQuantity = $isCaseProduct ? ($suggestedCases ?? 0) : $suggestedUnits;
+            $quantityLabel = $isCaseProduct ? 'cases' : 'units';
+            $quantityPrecision = $isCaseProduct ? 3 : 0;
+
+            $currentStock = (float) ($contextData['current_stock'] ?? 0);
+            $afterStock = $currentStock + $finalUnits;
+            $minStock = $contextData['min_stock_override']
+                ?? $contextData['min_stock']
+                ?? ($contextData['calculated_min_stock'] ?? null);
+            $minStockOverride = $contextData['min_stock_override'] ?? null;
+            $unitCost = (float) ($item->unit_cost ?? 0);
+            $costImpact = $finalUnits * $unitCost;
+
+            $productName = strip_tags(html_entity_decode($product->NAME ?? $contextData['product_name'] ?? 'Unknown product'));
+            $productCode = $product->CODE ?? $product->REFERENCE ?? $contextData['product_code'] ?? 'N/A';
+            $supplierLink = $product?->supplierLinks?->first();
+            $supplierName = $contextData['supplier_name']
+                ?? optional($supplierLink?->supplier)->Supplier
+                ?? ($order->supplier->Supplier ?? 'Supplier');
+            $categoryLabel = $contextData['category_path'] ?? ($product->CATEGORY ?? 'General');
+            $supplierCode = $contextData['supplier_code']
+                ?? ($supplierLink->SupplierCode ?? null);
+
+            $priority = $item->review_priority ?? 'standard';
+            $priorityLabel = match ($priority) {
+                'review' => 'Requires review',
+                'safe' => 'Safe',
+                default => 'Standard',
+            };
+
+            $chartColor = match ($priority) {
+                'review' => 'rgb(248, 113, 113)',
+                'standard' => 'rgb(251, 191, 36)',
+                default => 'rgb(34, 197, 94)',
+            };
+
+            $orderSettings = $product->orderSettings ?? null;
+            $isShortDated = (bool) ($orderSettings?->is_short_dated ?? false);
+            $shelfLifeDays = $orderSettings?->shelf_life_days ?? null;
+
             return [
-                'id' => $item['id'],
-                'labels' => $item['chart']['labels'],
-                'sales' => $item['chart']['sales'],
-                'minStock' => $item['chart']['min_stock'],
-                'current' => $item['stats']['current_stock'],
-                'after' => $item['stats']['after_stock'],
-                'peakIndex' => $item['chart']['peak_index'],
-                'color' => $item['chart']['color'],
-                'total' => $item['stats']['total_sales'],
-                'peak' => $item['stats']['peak'],
-                'caseUnits' => $item['order']['case_units'],
-                'isCaseProduct' => $item['order']['is_case_product'],
+                'id' => $item->id,
+                'priority' => $priority,
+                'priority_label' => $priorityLabel,
+                'auto_approved' => (bool) $item->auto_approved,
+                'product' => [
+                    'name' => $productName,
+                    'code' => $productCode,
+                    'supplier' => $supplierName,
+                    'category' => $categoryLabel,
+                    'supplier_code' => $supplierCode,
+                ],
+                'is_short_dated' => $isShortDated,
+                'shelf_life_days' => $shelfLifeDays,
+                'stats' => [
+                    'total_sales' => $totalSales,
+                    'average' => $avgWeeklySales,
+                    'peak' => $peakWeeklySales,
+                    'current_stock' => $currentStock,
+                    'after_stock' => $afterStock,
+                    'min_stock' => $minStock,
+                ],
+                'order' => [
+                    'display_quantity' => $formatQuantityDisplay((float) $displayQuantity, $quantityPrecision),
+                    'suggested_display' => $formatQuantityDisplay((float) $suggestedDisplayQuantity, $quantityPrecision),
+                    'input_value' => $formatQuantityInput((float) $displayQuantity, $quantityPrecision),
+                    'reset_value' => $formatQuantityInput((float) $suggestedDisplayQuantity, $quantityPrecision),
+                    'quantity_label' => $quantityLabel,
+                    'quantity_precision' => $quantityPrecision,
+                    'suggested_units' => $suggestedUnits,
+                    'final_units' => $finalUnits,
+                    'case_units' => $caseUnits,
+                    'is_case_product' => $isCaseProduct,
+                ],
+                'unit_cost' => $unitCost,
+                'cost_impact' => $costImpact,
+                'min_stock_override' => $minStockOverride,
+                'chart' => [
+                    'labels' => $weekLabels,
+                    'sales' => $weekUnits,
+                    'min_stock' => $minStock,
+                    'peak_index' => $peakIndex,
+                    'color' => $chartColor,
+                ],
             ];
-        });
+        };
 
         $reviewCount = $priorityCounts['review'];
         $standardCount = $priorityCounts['standard'];
         $safeCount = $priorityCounts['safe'];
+
+        $orderedFilterUrl = request()->fullUrlWithQuery(['quantity_filter' => 'ordered']);
+        $allFilterUrl = request()->fullUrlWithQuery(['quantity_filter' => 'all']);
     @endphp
 
     <style>
@@ -334,26 +352,20 @@
                     </div>
                     <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
                         <span class="text-[11px] uppercase tracking-[0.3em] text-slate-400">Products</span>
-                        <button
-                            type="button"
-                            class="quantity-filter-button px-4 py-2 rounded-full text-sm font-semibold border border-slate-900 bg-slate-900 text-white"
-                            data-quantity-filter="ordered"
-                            data-active-classes="border-slate-900 bg-slate-900 text-white"
-                            data-inactive-classes="border-slate-200 bg-white text-slate-700"
-                            aria-pressed="true"
+                        <a
+                            href="{{ $orderedFilterUrl }}"
+                            class="quantity-filter-button px-4 py-2 rounded-full text-sm font-semibold {{ $currentQuantityFilter === 'ordered' ? 'border border-slate-900 bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-700' }}"
+                            aria-pressed="{{ $currentQuantityFilter === 'ordered' ? 'true' : 'false' }}"
                         >
                             Ordered only ({{ $orderedItemsCount }})
-                        </button>
-                        <button
-                            type="button"
-                            class="quantity-filter-button px-4 py-2 rounded-full text-sm font-semibold border border-slate-200 bg-white text-slate-700"
-                            data-quantity-filter="all"
-                            data-active-classes="border-slate-900 bg-slate-900 text-white"
-                            data-inactive-classes="border-slate-200 bg-white text-slate-700"
-                            aria-pressed="false"
+                        </a>
+                        <a
+                            href="{{ $allFilterUrl }}"
+                            class="quantity-filter-button px-4 py-2 rounded-full text-sm font-semibold {{ $currentQuantityFilter === 'all' ? 'border border-slate-900 bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-700' }}"
+                            aria-pressed="{{ $currentQuantityFilter === 'all' ? 'true' : 'false' }}"
                         >
-                            All products ({{ $priorityCounts['all'] }})
-                        </button>
+                            All products ({{ $allProductsCount }})
+                        </a>
                     </div>
                 </div>
                 <div class="flex flex-wrap gap-2">
@@ -378,15 +390,29 @@
             </div>
 
             <div class="order-a2-dense divide-y divide-slate-200 border border-slate-200 rounded-lg" id="order-a2-card-container">
-                @forelse($itemsCollection as $card)
+                @forelse($itemsForDisplay as $itemModel)
                     @php
-                        $itemModel = $card['model'];
-                        $productModel = $card['product_model'];
-                        $contextData = $card['context_data'];
+                        $card = $buildCardData($itemModel);
+                        $productModel = $itemModel->product;
+                        $minStockOverride = $card['min_stock_override'];
                         $minStockForDisplay = $card['stats']['min_stock'];
                         $isCaseProduct = $card['order']['is_case_product'];
                         $caseUnits = $card['order']['case_units'];
                         $hasOrderedQuantity = (float) ($card['order']['final_units'] ?? 0) > 0;
+                        $chartPayload = [
+                            'id' => $card['id'],
+                            'labels' => $card['chart']['labels'],
+                            'sales' => $card['chart']['sales'],
+                            'minStock' => $card['chart']['min_stock'],
+                            'current' => $card['stats']['current_stock'],
+                            'after' => $card['stats']['after_stock'],
+                            'peakIndex' => $card['chart']['peak_index'],
+                            'color' => $card['chart']['color'],
+                            'total' => $card['stats']['total_sales'],
+                            'peak' => $card['stats']['peak'],
+                            'caseUnits' => $caseUnits,
+                            'isCaseProduct' => $isCaseProduct,
+                        ];
                     @endphp
                     <article
                         class="overflow-hidden bg-white transition border-l-4 {{ $card['is_short_dated'] ? 'border-amber-500 bg-amber-50/30' : 'border-transparent' }}"
@@ -503,7 +529,12 @@
                                             </div>
                                         </div>
                                         <div class="order-card-dense-chart mt-2">
-                                            <canvas id="order-card-chart-{{ $card['id'] }}" class="order-a2-canvas" aria-label="Sales trend"></canvas>
+                                            <canvas
+                                                id="order-card-chart-{{ $card['id'] }}"
+                                                class="order-a2-canvas"
+                                                aria-label="Sales trend"
+                                                data-chart-payload='@json($chartPayload)'
+                                            ></canvas>
                                         </div>
                                         <div class="mt-1 text-[10px] font-semibold uppercase tracking-wide text-orange-600">
                                             Min stock target · {{ $minStockForDisplay !== null ? number_format($minStockForDisplay, 0) : 'Not set' }}
@@ -553,7 +584,7 @@
                                             </button>
                                         </div>
                                         @include('orders.partials.min-stock-editor', [
-                                            'contextData' => $contextData,
+                                            'minStockOverride' => $minStockOverride,
                                             'product' => $productModel,
                                             'item' => $itemModel,
                                             'orderSession' => $order,
@@ -583,26 +614,31 @@
     @endonce
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const chartPayloads = @json($chartPayloads);
+            const chartCanvases = document.querySelectorAll('[data-chart-payload]');
             const cardsContainer = document.getElementById('order-a2-card-container');
             const priorityButtons = document.querySelectorAll('.priority-filter-button');
-            const quantityButtons = document.querySelectorAll('.quantity-filter-button');
             const emptyState = document.querySelector('[data-priority-empty-state]');
-            const priorityCounts = {
-                review: {{ $priorityCounts['review'] }},
-                standard: {{ $priorityCounts['standard'] }},
-                safe: {{ $priorityCounts['safe'] }},
-                all: {{ $priorityCounts['all'] }},
-            };
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
             const debounceTimers = {};
             let currentPriorityFilter = 'all';
-            let currentQuantityFilter = 'ordered';
+            const currentQuantityFilter = @json($currentQuantityFilter);
 
             window.productCharts = window.productCharts || {};
 
-            const renderChart = (payload) => {
-                const ctx = document.getElementById(`order-card-chart-${payload.id}`);
+            const renderChart = (canvas) => {
+                const payloadRaw = canvas.dataset.chartPayload || '';
+                if (!payloadRaw) {
+                    return;
+                }
+
+                let payload;
+                try {
+                    payload = JSON.parse(payloadRaw);
+                } catch {
+                    return;
+                }
+
+                const ctx = canvas.getContext('2d');
                 if (!ctx) {
                     return;
                 }
@@ -706,7 +742,7 @@
                 window.productCharts[payload.id] = chart;
             };
 
-            chartPayloads.forEach(renderChart);
+            chartCanvases.forEach(renderChart);
 
             const updatePriorityButtonStates = () => {
                 priorityButtons.forEach((button) => {
@@ -725,23 +761,6 @@
                 });
             };
 
-            const updateQuantityButtonStates = () => {
-                quantityButtons.forEach((button) => {
-                    const buttonFilter = button.dataset.quantityFilter || 'all';
-                    const activeClasses = (button.dataset.activeClasses || '').split(' ').filter(Boolean);
-                    const inactiveClasses = (button.dataset.inactiveClasses || '').split(' ').filter(Boolean);
-
-                    button.classList.remove(...activeClasses, ...inactiveClasses);
-                    if (buttonFilter === currentQuantityFilter) {
-                        button.classList.add(...activeClasses);
-                        button.setAttribute('aria-pressed', 'true');
-                    } else {
-                        button.classList.add(...inactiveClasses);
-                        button.setAttribute('aria-pressed', 'false');
-                    }
-                });
-            };
-
             const applyFilters = () => {
                 const cards = cardsContainer?.querySelectorAll('[data-order-item-card]') ?? [];
                 let visibleCount = 0;
@@ -749,10 +768,7 @@
                 cards.forEach((card) => {
                     const priority = card.dataset.priority || 'standard';
                     const matchesPriority = currentPriorityFilter === 'all' || priority === currentPriorityFilter;
-                    const isOrdered = card.dataset.ordered === '1';
-                    const matchesQuantity = currentQuantityFilter === 'all'
-                        || (currentQuantityFilter === 'ordered' && isOrdered);
-                    const isVisible = matchesPriority && matchesQuantity;
+                    const isVisible = matchesPriority;
                     card.classList.toggle('hidden', !isVisible);
                     if (isVisible) {
                         visibleCount += 1;
@@ -764,19 +780,11 @@
                 }
 
                 updatePriorityButtonStates();
-                updateQuantityButtonStates();
             };
 
             priorityButtons.forEach((button) => {
                 button.addEventListener('click', () => {
                     currentPriorityFilter = button.dataset.priorityFilter || 'all';
-                    applyFilters();
-                });
-            });
-
-            quantityButtons.forEach((button) => {
-                button.addEventListener('click', () => {
-                    currentQuantityFilter = button.dataset.quantityFilter || 'all';
                     applyFilters();
                 });
             });
@@ -965,16 +973,23 @@
                 }
 
                 const card = document.querySelector(`[data-order-item-id="${itemId}"]`);
+                const chart = window.productCharts ? window.productCharts[itemId] : null;
                 if (card) {
                     const previousState = card.dataset.ordered;
                     const hasQuantity = orderedUnits > 0.0001;
                     card.dataset.ordered = hasQuantity ? '1' : '0';
-                    if (previousState !== card.dataset.ordered && currentQuantityFilter === 'ordered') {
+                    if (currentQuantityFilter === 'ordered' && previousState === '1' && !hasQuantity) {
+                        if (chart) {
+                            chart.destroy();
+                            delete window.productCharts[itemId];
+                        }
+                        card.remove();
+                        updatePriorityCounts();
                         applyFilters();
+                        return;
                     }
                 }
 
-                const chart = window.productCharts ? window.productCharts[itemId] : null;
                 if (chart) {
                     const labelsLength = chart.data.labels.length;
                     const afterDataset = chart.data.datasets.find((dataset) => dataset.label === 'After');

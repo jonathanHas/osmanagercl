@@ -1,5 +1,10 @@
 @php
-    $minStockOverride = $contextData['min_stock_override'] ?? null;
+    $contextData = $contextData ?? [];
+    if (is_string($contextData)) {
+        $contextData = json_decode($contextData, true) ?? [];
+    }
+
+    $minStockOverride = $minStockOverride ?? ($contextData['min_stock_override'] ?? null);
     $initialValue = $minStockOverride !== null && $minStockOverride !== '' ? (string) $minStockOverride : '';
     $canEditMinStock = auth()->user()->hasAnyRole(['admin', 'manager'])
         && isset($product)
@@ -105,13 +110,32 @@
                                     afterSubtext = afterCases + ' cases';
                                 }
 
-                                document.getElementById('suggested-display-' + component.itemId).textContent = suggestedDisplay + ' ' + quantityLabel;
-                                document.getElementById('suggested-units-' + component.itemId).textContent = suggestedUnits.toFixed(0) + ' units';
-                                document.getElementById('after-stock-value-' + component.itemId).textContent = afterStockDisplay;
-                                document.getElementById('after-stock-subtext-' + component.itemId).textContent = afterSubtext;
-                                document.getElementById('qty-input-' + component.itemId).value = isCaseProduct && caseUnits > 0
-                                    ? (suggestedUnits / caseUnits).toFixed(1)
-                                    : suggestedUnits.toFixed(0);
+                                const suggestedDisplayEl = document.getElementById('suggested-display-' + component.itemId);
+                                if (suggestedDisplayEl) {
+                                    suggestedDisplayEl.textContent = suggestedDisplay + ' ' + quantityLabel;
+                                }
+
+                                const suggestedUnitsEl = document.getElementById('suggested-units-' + component.itemId);
+                                if (suggestedUnitsEl) {
+                                    suggestedUnitsEl.textContent = suggestedUnits.toFixed(0) + ' units';
+                                }
+
+                                const afterStockValueEl = document.getElementById('after-stock-value-' + component.itemId);
+                                if (afterStockValueEl) {
+                                    afterStockValueEl.textContent = afterStockDisplay;
+                                }
+
+                                const afterStockSubtextEl = document.getElementById('after-stock-subtext-' + component.itemId);
+                                if (afterStockSubtextEl) {
+                                    afterStockSubtextEl.textContent = afterSubtext;
+                                }
+
+                                const qtyInputEl = document.getElementById('qty-input-' + component.itemId);
+                                if (qtyInputEl) {
+                                    qtyInputEl.value = isCaseProduct && caseUnits > 0
+                                        ? (suggestedUnits / caseUnits).toFixed(1)
+                                        : suggestedUnits.toFixed(0);
+                                }
                             }
                         } else {
                             component.error = 'Failed: ' + (data.error || 'Unknown error');

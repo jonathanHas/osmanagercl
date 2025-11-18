@@ -36,6 +36,10 @@ class DeliveryService
             // Detect CSV format based on headers and supplier
             $headers = $csv->getHeader();
             $isIndependentFormat = $this->detectIndependentCsvFormat($headers, $supplierId);
+            $isNaturalMedicineFormat = $this->detectNaturalMedicineCsvFormat($headers, $supplierId);
+
+            // Determine format name for logging
+            $formatName = $isNaturalMedicineFormat ? 'natural_medicine' : ($isIndependentFormat ? 'independent' : 'udea');
 
             // Create delivery header
             $delivery = Delivery::create([
@@ -46,7 +50,7 @@ class DeliveryService
                 'import_data' => [
                     'filename' => basename($filePath),
                     'imported_at' => now(),
-                    'format' => $isIndependentFormat ? 'independent' : 'udea',
+                    'format' => $formatName,
                 ],
             ]);
 
@@ -55,9 +59,13 @@ class DeliveryService
 
             foreach ($records as $record) {
                 // Parse CSV row based on detected format
-                $item = $isIndependentFormat
-                    ? $this->parseIndependentCsv($record)
-                    : $this->parseDeliveryRow($record);
+                if ($isNaturalMedicineFormat) {
+                    $item = $this->parseNaturalMedicineCsv($record);
+                } elseif ($isIndependentFormat) {
+                    $item = $this->parseIndependentCsv($record);
+                } else {
+                    $item = $this->parseDeliveryRow($record);
+                }
 
                 // Check if product exists in our system and get SupplierLink data
                 $product = $this->findProductBySupplierCode($item['code'], $supplierId);
@@ -104,7 +112,7 @@ class DeliveryService
                     'outer_code' => $supplierLink?->OuterCode, // Case barcode
                 ];
 
-                // Add Independent-specific pricing fields if available
+                // Add supplier-specific pricing fields if available
                 if ($isIndependentFormat) {
                     $deliveryItemData = array_merge($deliveryItemData, [
                         'sale_price' => $item['sale_price'] ?? null,
@@ -114,6 +122,12 @@ class DeliveryService
                         'line_value_ex_vat' => $item['line_value_ex_vat'] ?? null,
                         'unit_cost_including_tax' => $item['unit_cost_including_tax'] ?? null,
                     ]);
+                } elseif ($isNaturalMedicineFormat) {
+                    $deliveryItemData = array_merge($deliveryItemData, [
+                        'sale_price' => $item['sale_price'] ?? null,
+                        'tax_rate' => $item['tax_rate'] ?? null,
+                        'normalized_tax_rate' => $item['normalized_tax_rate'] ?? null,
+                    ]);
                 }
 
                 $deliveryItem = DeliveryItem::create($deliveryItemData);
@@ -122,7 +136,8 @@ class DeliveryService
 
                 // If new product, queue barcode retrieval
                 if (! $product) {
-                    $this->queueBarcodeRetrieval($deliveryItem, $isIndependentFormat);
+                    // For Natural Medicine, use the same retrieval as Independent (no special scraping service yet)
+                    $this->queueBarcodeRetrieval($deliveryItem, $isIndependentFormat || $isNaturalMedicineFormat);
                 }
             }
 
@@ -160,6 +175,27 @@ class DeliveryService
 
         // Consider it Independent format if most key headers match
         return count($matchingOriginal) >= 6; // At least 6 out of 8 headers match
+    }
+
+    /**
+     * Detect if CSV is in Natural Medicine Company format
+     */
+    private function detectNaturalMedicineCsvFormat(array $headers, int $supplierId): bool
+    {
+        // Get Natural Medicine supplier configuration
+        $naturalMedicineConfig = config('suppliers.external_links.natural_medicine');
+
+        // Check if supplier ID matches Natural Medicine suppliers
+        if ($naturalMedicineConfig && in_array($supplierId, $naturalMedicineConfig['supplier_ids'] ?? [])) {
+            return true;
+        }
+
+        // Check for Natural Medicine-specific headers
+        $naturalMedicineHeaders = ['Stock_Code', 'Tr_Price', 'VAT_Percent', 'Validation_Status', 'SourcePDF'];
+        $matchingHeaders = array_intersect($headers, $naturalMedicineHeaders);
+
+        // Consider it Natural Medicine format if at least 4 key headers match
+        return count($matchingHeaders) >= 4;
     }
 
     /**
@@ -268,6 +304,43 @@ class DeliveryService
             // Legacy fields for backward compatibility
             'rsp' => $rsp,
             'unit_cost_including_tax_legacy' => $unitCost + $unitTaxAmount,
+        ];
+    }
+
+    /**
+     * Parse Natural Medicine Company CSV row into structured data
+     */
+    private function parseNaturalMedicineCsv(array $row): array
+    {
+        // Extract basic fields from Natural Medicine CSV format
+        $stockCode = trim($row['Stock_Code'] ?? '');
+        $description = trim($row['Description'] ?? '');
+        $quantity = (int) ($row['Qty'] ?? 0);
+        $tradePrice = (float) ($row['Tr_Price'] ?? 0);
+        $total = (float) ($row['Total'] ?? 0);
+        $vatPercent = (float) ($row['VAT_Percent'] ?? 0);
+        $rrp = (float) ($row['RRP'] ?? 0);
+
+        // Natural Medicine supplies in individual units (not cases)
+        // Unless the product description indicates otherwise
+        $unitsPerCase = 1;
+
+        return [
+            'code' => $stockCode,
+            'ordered_quantity' => $quantity,
+            'quantity' => $quantity,
+            'description' => $description,
+            'unit_cost' => $tradePrice,
+            'sale_price' => $rrp,
+            'tax_rate' => $vatPercent,
+            'normalized_tax_rate' => $this->normalizeIrishVatRate($vatPercent),
+            'total_cost' => $total,
+            'units_per_case' => $unitsPerCase,
+            'sku' => $unitsPerCase, // Use units per case as SKU for consistency
+            'content' => $this->formatContentString($unitsPerCase),
+            // Additional Natural Medicine specific fields
+            'rrp' => $rrp,
+            'vat_percent' => $vatPercent,
         ];
     }
 

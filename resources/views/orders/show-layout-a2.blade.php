@@ -115,6 +115,7 @@
                 $minStock = $contextData['min_stock_override']
                     ?? $contextData['min_stock']
                     ?? ($contextData['calculated_min_stock'] ?? null);
+                $minStockOverride = $contextData['min_stock_override'] ?? null;
                 $unitCost = (float) ($item->unit_cost ?? 0);
                 $costImpact = $finalUnits * $unitCost;
 
@@ -177,7 +178,7 @@
                     ],
                     'unit_cost' => $unitCost,
                     'cost_impact' => $costImpact,
-                    'context_data' => $contextData,
+                    'min_stock_override' => $minStockOverride,
                     'chart' => [
                         'labels' => $weekLabels,
                         'sales' => $weekUnits,
@@ -202,23 +203,6 @@
         $orderedItemsCount = $itemsCollection
             ->filter(static fn ($item) => (float) ($item['order']['final_units'] ?? 0) > 0)
             ->count();
-
-        $chartPayloads = $itemsCollection->map(static function ($item) {
-            return [
-                'id' => $item['id'],
-                'labels' => $item['chart']['labels'],
-                'sales' => $item['chart']['sales'],
-                'minStock' => $item['chart']['min_stock'],
-                'current' => $item['stats']['current_stock'],
-                'after' => $item['stats']['after_stock'],
-                'peakIndex' => $item['chart']['peak_index'],
-                'color' => $item['chart']['color'],
-                'total' => $item['stats']['total_sales'],
-                'peak' => $item['stats']['peak'],
-                'caseUnits' => $item['order']['case_units'],
-                'isCaseProduct' => $item['order']['is_case_product'],
-            ];
-        });
 
         $reviewCount = $priorityCounts['review'];
         $standardCount = $priorityCounts['standard'];
@@ -343,11 +327,25 @@
                     @php
                         $itemModel = $card['model'];
                         $productModel = $card['product_model'];
-                        $contextData = $card['context_data'];
+                        $minStockOverride = $card['min_stock_override'];
                         $minStockForDisplay = $card['stats']['min_stock'];
                         $isCaseProduct = $card['order']['is_case_product'];
                         $caseUnits = $card['order']['case_units'];
                         $hasOrderedQuantity = (float) ($card['order']['final_units'] ?? 0) > 0;
+                        $chartPayload = [
+                            'id' => $card['id'],
+                            'labels' => $card['chart']['labels'],
+                            'sales' => $card['chart']['sales'],
+                            'minStock' => $card['chart']['min_stock'],
+                            'current' => $card['stats']['current_stock'],
+                            'after' => $card['stats']['after_stock'],
+                            'peakIndex' => $card['chart']['peak_index'],
+                            'color' => $card['chart']['color'],
+                            'total' => $card['stats']['total_sales'],
+                            'peak' => $card['stats']['peak'],
+                            'caseUnits' => $caseUnits,
+                            'isCaseProduct' => $isCaseProduct,
+                        ];
                     @endphp
                     <article
                         class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition"
@@ -458,7 +456,12 @@
                                             </div>
                                         </div>
                                         <div class="mt-4 h-64">
-                                            <canvas id="order-card-chart-{{ $card['id'] }}" class="order-a2-canvas" aria-label="Sales trend"></canvas>
+                                            <canvas
+                                                id="order-card-chart-{{ $card['id'] }}"
+                                                class="order-a2-canvas"
+                                                aria-label="Sales trend"
+                                                data-chart-payload='@json($chartPayload)'
+                                            ></canvas>
                                         </div>
                                         <div class="mt-3 text-xs font-semibold uppercase tracking-wide text-orange-600">
                                             Min stock target · {{ $minStockForDisplay !== null ? number_format($minStockForDisplay, 0) : 'Not set' }}
@@ -508,7 +511,7 @@
                                             </button>
                                         </div>
                                         @include('orders.partials.min-stock-editor', [
-                                            'contextData' => $contextData,
+                                            'minStockOverride' => $minStockOverride,
                                             'product' => $productModel,
                                             'item' => $itemModel,
                                             'orderSession' => $order,
@@ -538,7 +541,7 @@
     @endonce
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const chartPayloads = @json($chartPayloads);
+            const chartCanvases = document.querySelectorAll('[data-chart-payload]');
             const cardsContainer = document.getElementById('order-a2-card-container');
             const priorityButtons = document.querySelectorAll('.priority-filter-button');
             const quantityButtons = document.querySelectorAll('.quantity-filter-button');
@@ -556,8 +559,20 @@
 
             window.productCharts = window.productCharts || {};
 
-            const renderChart = (payload) => {
-                const ctx = document.getElementById(`order-card-chart-${payload.id}`);
+            const renderChart = (canvas) => {
+                const payloadRaw = canvas.dataset.chartPayload || '';
+                if (!payloadRaw) {
+                    return;
+                }
+
+                let payload;
+                try {
+                    payload = JSON.parse(payloadRaw);
+                } catch {
+                    return;
+                }
+
+                const ctx = canvas.getContext('2d');
                 if (!ctx) {
                     return;
                 }
@@ -661,7 +676,7 @@
                 window.productCharts[payload.id] = chart;
             };
 
-            chartPayloads.forEach(renderChart);
+            chartCanvases.forEach(renderChart);
 
             const updatePriorityButtonStates = () => {
                 priorityButtons.forEach((button) => {

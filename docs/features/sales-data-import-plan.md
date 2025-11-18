@@ -817,6 +817,11 @@ This implementation will transform the sales analytics from a slow, frustrating 
   - 778 real POS records validated with 0.00% variance
   - Performance: Full month validation in <45 seconds
 
+#### ✅ Phase 8: On-Demand Sync Hooks - COMPLETED
+- **✅ SalesDataSyncService.php** - Determines missing `sales_daily_summary` gaps and backfills them automatically.
+- **✅ Order workflow integration** - `/orders/create` triggers the sync before generating suggestions so buyers no longer have to visit `/sales-import` first; failures are logged and surfaced as non-blocking warnings.
+- **✅ Observability** - Import attempts emit info-level logs with the synced window plus flash messaging that confirms when fresh data was pulled in-line.
+
 #### ✅ Testing & Validation - COMPLETED
 - **✅ Migration testing** - All tables created successfully
 - **✅ Import system testing** - Verified with sample data

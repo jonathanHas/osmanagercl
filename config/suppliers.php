@@ -69,6 +69,45 @@ return [
                 'format_version' => 'enhanced', // Using enhanced format with detailed breakdown
             ],
         ],
+
+        'natural_medicine' => [
+            // Supplier IDs in the database for Natural Medicine Company
+            'supplier_ids' => [65], // Natural Medicine supplier ID
+
+            // External image URL template
+            // {SUPPLIER_CODE} will be replaced with the supplier's 5-digit stock code
+            'image_url' => null, // No known image CDN
+
+            // Supplier website search URL template
+            // {SUPPLIER_CODE} will be replaced with the supplier's product code
+            'website_search' => null, // No known search URL
+
+            // Display name for the supplier
+            'display_name' => 'Natural Medicine Company',
+
+            // Enable/disable this integration
+            'enabled' => true,
+
+            // CSV format configuration
+            'csv_format' => [
+                // Standard headers for Natural Medicine invoices
+                'headers' => [
+                    'Stock_Code', 'Description', 'Unit', 'RRP',
+                    'Qty', 'Tr_Price', 'Disc_Percent', 'Total',
+                    'VAT_Percent', 'Calculated_Total', 'Validation_Status', 'SourcePDF',
+                ],
+                'primary_quantity_field' => 'Qty', // Quantity ordered/delivered
+                'price_field' => 'Tr_Price', // Trade/wholesale price per unit
+                'total_field' => 'Total', // Line total (Qty × Tr_Price)
+                'vat_field' => 'VAT_Percent', // VAT rate (23.0, 13.5, or 0.0)
+                'stock_code_field' => 'Stock_Code', // 5-digit supplier SKU
+                'rrp_field' => 'RRP', // Recommended retail price
+                'tax_handling' => 'separate_column', // VAT is separate column
+                'price_includes_tax' => false, // Tr_Price excludes VAT
+                'has_validation' => true, // Validation_Status column present
+                'format_version' => 'tnmc_standard', // Natural Medicine standard format
+            ],
+        ],
     ],
 
     /*

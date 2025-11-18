@@ -631,17 +631,42 @@ class DeliveryController extends Controller
 
             // Get supplier configuration
             $independentConfig = config('suppliers.external_links.independent');
+            $naturalMedicineConfig = config('suppliers.external_links.natural_medicine');
+
             $isIndependentSupplier = $independentConfig && in_array($supplierId, $independentConfig['supplier_ids'] ?? []);
+            $isNaturalMedicineSupplier = $naturalMedicineConfig && in_array($supplierId, $naturalMedicineConfig['supplier_ids'] ?? []);
 
             // Detect format based on headers
             $independentHeaders = ['Code', 'Product', 'Ordered', 'Qty', 'RSP', 'Price', 'Tax', 'Value'];
             $udeaHeaders = ['Code', 'Description', 'SKU', 'Content', 'Ordered', 'Qty', 'Price', 'Sale', 'Total'];
+            $naturalMedicineHeaders = ['Stock_Code', 'Description', 'Qty', 'Tr_Price', 'Total', 'VAT_Percent'];
 
             $matchingIndependentHeaders = array_intersect($headers, $independentHeaders);
             $matchingUdeaHeaders = array_intersect($headers, $udeaHeaders);
+            $matchingNaturalMedicineHeaders = array_intersect($headers, $naturalMedicineHeaders);
 
+            // Validate Natural Medicine format
+            if ($isNaturalMedicineSupplier || count($matchingNaturalMedicineHeaders) >= 5) {
+                $requiredNaturalMedicineHeaders = ['Stock_Code', 'Description', 'Qty', 'Tr_Price', 'Total'];
+                $missingHeaders = array_diff($requiredNaturalMedicineHeaders, $headers);
+                if (! empty($missingHeaders)) {
+                    throw new \Exception('Natural Medicine CSV format missing required headers: '.implode(', ', $missingHeaders));
+                }
+
+                // Validate at least one row of data
+                $records = iterator_to_array($csv->getRecords());
+                if (empty($records)) {
+                    throw new \Exception('CSV file contains no data rows');
+                }
+
+                // Validate first row has required fields
+                $firstRow = reset($records);
+                if (empty($firstRow['Stock_Code']) || empty($firstRow['Description'])) {
+                    throw new \Exception('Natural Medicine CSV format requires Stock_Code and Description fields to be populated');
+                }
+            }
             // Validate Independent format
-            if ($isIndependentSupplier || count($matchingIndependentHeaders) >= 6) {
+            elseif ($isIndependentSupplier || count($matchingIndependentHeaders) >= 6) {
                 $missingHeaders = array_diff($independentHeaders, $headers);
                 if (! empty($missingHeaders)) {
                     throw new \Exception('Independent CSV format missing required headers: '.implode(', ', $missingHeaders));
@@ -669,7 +694,8 @@ class DeliveryController extends Controller
             }
             // Unknown format
             else {
-                throw new \Exception('CSV format not recognized. Expected Independent Health Foods format with headers: '.
+                throw new \Exception('CSV format not recognized. Expected Natural Medicine format with headers: '.
+                                   implode(', ', $naturalMedicineHeaders).' OR Independent Health Foods format with headers: '.
                                    implode(', ', $independentHeaders).' OR Udea format with headers: '.
                                    implode(', ', $udeaHeaders));
             }
