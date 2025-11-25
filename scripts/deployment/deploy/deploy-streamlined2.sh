@@ -173,6 +173,20 @@ main() {
     fi
     
     git add -A
+    
+    # Update version marker before committing (use latest git commit hash)
+    if [[ -f "$DEV_DIR/.env" ]]; then
+        NEW_VERSION=$(git rev-parse --short HEAD)
+        if grep -q "^APP_VERSION=" "$DEV_DIR/.env"; then
+            sed -i.bak -E "s/^APP_VERSION=.*/APP_VERSION=${NEW_VERSION}/" "$DEV_DIR/.env"
+            rm -f "$DEV_DIR/.env.bak"
+            log "Updated APP_VERSION in .env to $NEW_VERSION"
+        else
+            echo "APP_VERSION=${NEW_VERSION}" >> "$DEV_DIR/.env"
+            log "Appended APP_VERSION=${NEW_VERSION} to .env"
+        fi
+        git add .env
+    fi
     git commit -m "$COMMIT_MSG"
     git push origin "$CURRENT_BRANCH"
     
