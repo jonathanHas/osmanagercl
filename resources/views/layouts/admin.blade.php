@@ -439,6 +439,18 @@
                             </div>
                         </div>
                     </div>
+
+                    <div class="mt-auto border-t border-gray-800 px-4 py-3 text-xs text-gray-500">
+                        @php($buildVersion = \App\Support\AppVersion::current())
+                        <div class="flex items-center justify-between">
+                            <span class="uppercase tracking-wide text-[10px] text-gray-400">Build</span>
+                            <span class="font-mono text-sm text-gray-300">{{ $buildVersion }}</span>
+                        </div>
+                        <div class="mt-1 flex items-center justify-between text-[11px] text-gray-400">
+                            <span>Env</span>
+                            <span class="uppercase tracking-wide">{{ config('app.env') }}</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
