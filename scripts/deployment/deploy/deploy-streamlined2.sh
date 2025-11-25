@@ -310,7 +310,7 @@ main() {
         if [[ -z "$BUILD_HASH" ]]; then
             BUILD_HASH=$(date +%Y%m%d%H%M%S)
         fi
-        php -r "if (!is_dir(getcwd().'/storage/app')) { mkdir(getcwd().'/storage/app', 0775, true); } file_put_contents(getcwd().'/storage/app/build-version', '${BUILD_HASH}');"
+        php -r "\$dir = getcwd().'/storage/app'; if (!is_dir(\$dir)) { mkdir(\$dir, 0775, true); } file_put_contents(\$dir.'/build-version', '${BUILD_HASH}');"
         echo "Build version set to ${BUILD_HASH}"
 
         echo "🔐 Setting file permissions..."
