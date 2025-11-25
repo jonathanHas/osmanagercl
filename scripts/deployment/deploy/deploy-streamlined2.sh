@@ -310,7 +310,13 @@ main() {
         if [[ -z "$BUILD_HASH" ]]; then
             BUILD_HASH=$(date +%Y%m%d%H%M%S)
         fi
-        BUILD_HASH_VAL="$BUILD_HASH" php -r '$dir = getcwd()."/storage/app"; if (!is_dir($dir)) { mkdir($dir, 0775, true); } $value = getenv("BUILD_HASH_VAL"); if ($value === false || $value === "") { $value = date("YmdHis"); } file_put_contents($dir."/build-version", $value);'
+        export DEPLOY_BUILD_VERSION="$BUILD_HASH"
+        php -r '$dir = getcwd()."/storage/app";
+            if (!is_dir($dir)) { mkdir($dir, 0775, true); }
+            $value = getenv("DEPLOY_BUILD_VERSION");
+            if ($value === false || $value === "") { $value = date("YmdHis"); }
+            file_put_contents($dir."/build-version", $value);'
+        unset DEPLOY_BUILD_VERSION
         echo "Build version set to ${BUILD_HASH}"
 
         echo "🔐 Setting file permissions..."
