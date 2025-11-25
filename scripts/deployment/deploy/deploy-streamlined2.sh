@@ -305,6 +305,11 @@ main() {
         echo "📦 Installing composer dependencies on production..."
         composer install --no-dev --optimize-autoloader --no-interaction
 
+        echo "🏷️ Recording build version..."
+        BUILD_HASH=$(git rev-parse --short HEAD 2>/dev/null || date +%Y%m%d%H%M%S)
+        mkdir -p storage/app
+        echo "$BUILD_HASH" > storage/app/build-version
+
         echo "🔐 Setting file permissions..."
         sudo chown -R www-data:www-data .
         sudo chmod -R 755 .

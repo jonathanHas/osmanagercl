@@ -17,12 +17,29 @@ class AppVersion
             return self::$cached = $configured;
         }
 
+        $fileVersion = self::readBuildVersionFile();
+        if ($fileVersion !== null) {
+            return self::$cached = $fileVersion;
+        }
+
         $commit = self::resolveGitCommit();
         if ($commit !== null) {
             return self::$cached = substr($commit, 0, 7);
         }
 
         return self::$cached = 'dev';
+    }
+
+    protected static function readBuildVersionFile(): ?string
+    {
+        $path = storage_path('app/build-version');
+        if (! is_readable($path)) {
+            return null;
+        }
+
+        $value = trim((string) file_get_contents($path));
+
+        return $value !== '' ? $value : null;
     }
 
     protected static function resolveGitCommit(): ?string
