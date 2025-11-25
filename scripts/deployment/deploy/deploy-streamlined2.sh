@@ -306,9 +306,12 @@ main() {
         composer install --no-dev --optimize-autoloader --no-interaction
 
         echo "🏷️ Recording build version..."
-        BUILD_HASH=$(git rev-parse --short HEAD 2>/dev/null || date +%Y%m%d%H%M%S)
-        mkdir -p storage/app
-        echo "$BUILD_HASH" > storage/app/build-version
+        BUILD_HASH=$(git rev-parse --short HEAD 2>/dev/null)
+        if [[ -z "$BUILD_HASH" ]]; then
+            BUILD_HASH=$(date +%Y%m%d%H%M%S)
+        fi
+        php -r "if (!is_dir(getcwd().'/storage/app')) { mkdir(getcwd().'/storage/app', 0775, true); } file_put_contents(getcwd().'/storage/app/build-version', '${BUILD_HASH}');"
+        echo "Build version set to ${BUILD_HASH}"
 
         echo "🔐 Setting file permissions..."
         sudo chown -R www-data:www-data .
