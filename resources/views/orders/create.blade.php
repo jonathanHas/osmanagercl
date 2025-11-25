@@ -196,6 +196,13 @@
                             return;
                         }
 
+                        function setInputsDisabled(container, disabled) {
+                            const inputs = container.querySelectorAll('input, select, textarea');
+                            inputs.forEach(input => {
+                                input.disabled = disabled;
+                            });
+                        }
+
                         function toggleBlocks() {
                             const selected = supplierSelect.value;
                             let hasMatch = false;
@@ -203,9 +210,11 @@
                             blocks.forEach(function (block) {
                                 if (block.getAttribute('data-category-coverage') === selected) {
                                     block.classList.remove('hidden');
+                                    setInputsDisabled(block, false);
                                     hasMatch = true;
                                 } else {
                                     block.classList.add('hidden');
+                                    setInputsDisabled(block, true);
                                 }
                             });
 

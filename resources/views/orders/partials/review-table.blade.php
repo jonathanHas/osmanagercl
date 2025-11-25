@@ -351,7 +351,11 @@
 
                     $safeProductName = strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product'));
                     $currentStock = $contextData['current_stock'] ?? 0;
-                    $avgWeeklySales = $contextData['avg_weekly_sales'] ?? 0;
+                    $avgWeeklySales = (float) ($contextData['avg_weekly_sales'] ?? 0);
+                    $safetyFactorWeeks = isset($contextData['safety_factor'])
+                        ? (float) $contextData['safety_factor']
+                        : 1.5;
+                    $safetyStockUnits = $avgWeeklySales * $safetyFactorWeeks;
                     $weeklySales = $contextData['weekly_sales'] ?? [];
                     $totalPeriodSales = collect($weeklySales)->sum(function ($week) {
                         return (float) ($week['units'] ?? 0);
@@ -483,6 +487,13 @@
                             <span class="hidden text-[11px] text-green-600" data-priority-feedback="{{ $item->id }}">
                                 Saved
                             </span>
+                        </div>
+                        <div class="mt-2 text-xs text-slate-500 leading-tight">
+                            <span class="uppercase tracking-wide text-[10px] text-slate-400">Safety stock floor</span>
+                            <div class="flex flex-wrap gap-2 text-[11px] text-slate-600">
+                                <span>{{ number_format($safetyFactorWeeks, 1) }} wk minimum</span>
+                                <span>≈ {{ number_format($safetyStockUnits, 0) }} units</span>
+                            </div>
                         </div>
                     </td>
                     <td class="px-4 py-4">
@@ -761,7 +772,11 @@
 
                     $safeProductName = strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product'));
                     $currentStock = $contextData['current_stock'] ?? 0;
-                    $avgWeeklySales = $contextData['avg_weekly_sales'] ?? 0;
+                    $avgWeeklySales = (float) ($contextData['avg_weekly_sales'] ?? 0);
+                    $safetyFactorWeeks = isset($contextData['safety_factor'])
+                        ? (float) $contextData['safety_factor']
+                        : 1.5;
+                    $safetyStockUnits = $avgWeeklySales * $safetyFactorWeeks;
                     $weeklySales = $contextData['weekly_sales'] ?? [];
                     $totalPeriodSales = collect($weeklySales)->sum(function ($week) {
                         return (float) ($week['units'] ?? 0);
@@ -893,6 +908,13 @@
                             <span class="hidden text-[11px] text-green-600" data-priority-feedback="{{ $item->id }}">
                                 Saved
                             </span>
+                        </div>
+                        <div class="mt-2 text-xs text-slate-500 leading-tight">
+                            <span class="uppercase tracking-wide text-[10px] text-slate-400">Safety stock floor</span>
+                            <div class="flex flex-wrap gap-2 text-[11px] text-slate-600">
+                                <span>{{ number_format($safetyFactorWeeks, 1) }} wk minimum</span>
+                                <span>≈ {{ number_format($safetyStockUnits, 0) }} units</span>
+                            </div>
                         </div>
                     </td>
                     <td class="px-4 py-4">
@@ -1083,7 +1105,11 @@
 
                     $safeProductName = strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product'));
                     $currentStock = $contextData['current_stock'] ?? 0;
-                    $avgWeeklySales = $contextData['avg_weekly_sales'] ?? 0;
+                    $avgWeeklySales = (float) ($contextData['avg_weekly_sales'] ?? 0);
+                    $safetyFactorWeeks = isset($contextData['safety_factor'])
+                        ? (float) $contextData['safety_factor']
+                        : 1.5;
+                    $safetyStockUnits = $avgWeeklySales * $safetyFactorWeeks;
                     $weeklySales = $contextData['weekly_sales'] ?? [];
                     $totalPeriodSales = collect($weeklySales)->sum(function ($week) {
                         return (float) ($week['units'] ?? 0);
@@ -1215,6 +1241,13 @@
                             <span class="hidden text-[11px] text-green-600" data-priority-feedback="{{ $item->id }}">
                                 Saved
                             </span>
+                        </div>
+                        <div class="mt-2 text-xs text-slate-500 leading-tight">
+                            <span class="uppercase tracking-wide text-[10px] text-slate-400">Safety stock floor</span>
+                            <div class="flex flex-wrap gap-2 text-[11px] text-slate-600">
+                                <span>{{ number_format($safetyFactorWeeks, 1) }} wk minimum</span>
+                                <span>≈ {{ number_format($safetyStockUnits, 0) }} units</span>
+                            </div>
                         </div>
                     </td>
                     <td class="px-4 py-4">
@@ -1405,7 +1438,11 @@
 
                     $safeProductName = strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product'));
                     $currentStock = $contextData['current_stock'] ?? 0;
-                    $avgWeeklySales = $contextData['avg_weekly_sales'] ?? 0;
+                    $avgWeeklySales = (float) ($contextData['avg_weekly_sales'] ?? 0);
+                    $safetyFactorWeeks = isset($contextData['safety_factor'])
+                        ? (float) $contextData['safety_factor']
+                        : 1.5;
+                    $safetyStockUnits = $avgWeeklySales * $safetyFactorWeeks;
                     $weeklySales = $contextData['weekly_sales'] ?? [];
                     $totalPeriodSales = collect($weeklySales)->sum(function ($week) {
                         return (float) ($week['units'] ?? 0);
@@ -1537,6 +1574,13 @@
                             <span class="hidden text-[11px] text-green-600" data-priority-feedback="{{ $item->id }}">
                                 Saved
                             </span>
+                        </div>
+                        <div class="mt-2 text-xs text-slate-500 leading-tight">
+                            <span class="uppercase tracking-wide text-[10px] text-slate-400">Safety stock floor</span>
+                            <div class="flex flex-wrap gap-2 text-[11px] text-slate-600">
+                                <span>{{ number_format($safetyFactorWeeks, 1) }} wk minimum</span>
+                                <span>≈ {{ number_format($safetyStockUnits, 0) }} units</span>
+                            </div>
                         </div>
                     </td>
                     <td class="px-4 py-4">
