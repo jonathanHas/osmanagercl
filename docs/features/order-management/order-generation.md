@@ -248,9 +248,13 @@ class OrderController {
 
 ### Udea CSV Format
 ```csv
-Code,Ordered,Qty,SKU,Content,Description,Price,Sale,Total
-115,1,5,6,"1 kilogram","Broccoli, . Biologisch Klasse I NL",3.17,6.98,95.10
+Code,Cases,Units,Content,Description,Price,Sale,Total
+115,1.000,12.000,"Case of 12","Broccoli, Biologisch Klasse I NL",3.17,3.17,38.04
 ```
+
+- Rows are sorted by case quantity (ascending) so buyers can identify the smallest case picks quickly.
+- Case columns collapse to `0` for unit-only products while the Units column always reflects the final quantity.
+- `SKU` and `Ordered` are no longer exported; suppliers rely on their own codes (`Code`) plus the content/description data.
 
 ### Custom Formats
 - Excel export with formulas

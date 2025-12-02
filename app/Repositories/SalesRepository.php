@@ -376,4 +376,105 @@ class SalesRepository
                 return $item;
             });
     }
+
+    /**
+     * Get Christmas window comparison for a product across multiple years.
+     *
+     * @param  string  $productId  Product ID
+     * @param  array  $years  Years to compare (e.g., [2024, 2023])
+     * @param  Carbon  $startDate  Christmas period start (e.g., Dec 10)
+     * @param  Carbon  $endDate  Christmas period end (e.g., Dec 26)
+     * @return array
+     */
+    public function getChristmasWindowComparison(string $productId, array $years, Carbon $startDate, Carbon $endDate): array
+    {
+        $windows = [];
+
+        foreach ($years as $year) {
+            // Adjust dates to the specified year
+            $periodStart = $startDate->copy()->setYear($year);
+            $periodEnd = $endDate->copy()->setYear($year);
+
+            // Get daily sales for this period from sales_daily_summary (fast path)
+            $dailySales = SalesDailySummary::where('product_id', $productId)
+                ->whereBetween('sale_date', [$periodStart, $periodEnd])
+                ->orderBy('sale_date')
+                ->get();
+
+            // If no data in daily summary, try STOCKDIARY (fallback)
+            if ($dailySales->isEmpty()) {
+                $stockDiarySales = StockDiary::where('PRODUCT', $productId)
+                    ->sales()
+                    ->whereBetween('DATENEW', [$periodStart, $periodEnd])
+                    ->selectRaw('DATE(DATENEW) as sale_date')
+                    ->selectRaw('SUM(ABS(UNITS)) as total_units')
+                    ->groupBy('sale_date')
+                    ->orderBy('sale_date')
+                    ->get();
+
+                // Convert to daily sales format
+                $dailySales = $stockDiarySales->map(function ($item) use ($productId) {
+                    return (object) [
+                        'product_id' => $productId,
+                        'sale_date' => Carbon::parse($item->sale_date),
+                        'total_units' => (float) $item->total_units,
+                    ];
+                });
+            }
+
+            // Group into weeks for visualization
+            $weeklyBreakdown = $this->groupIntoWeeks($dailySales, $periodStart, $periodEnd);
+
+            $totalUnits = $dailySales->sum('total_units');
+            $days = $periodStart->diffInDays($periodEnd) + 1;
+            $weeksEquivalent = $days / 7;
+
+            $windows[] = [
+                'year' => $year,
+                'date_range' => $periodStart->format('M d').' - '.$periodEnd->format('M d'),
+                'weekly_breakdown' => $weeklyBreakdown,
+                'total_units' => (float) $totalUnits,
+                'weekly_average' => $weeksEquivalent > 0 ? $totalUnits / $weeksEquivalent : 0,
+                'days' => $days,
+            ];
+        }
+
+        return $windows;
+    }
+
+    /**
+     * Helper method to group daily sales into weeks.
+     *
+     * @param  \Illuminate\Support\Collection  $dailySales  Collection of daily sales
+     * @param  Carbon  $startDate  Period start date
+     * @param  Carbon  $endDate  Period end date
+     * @return array
+     */
+    protected function groupIntoWeeks($dailySales, Carbon $startDate, Carbon $endDate): array
+    {
+        $weeklyBreakdown = [];
+        $currentWeekStart = $startDate->copy()->startOfWeek();
+        $weekNum = 1;
+
+        while ($currentWeekStart <= $endDate) {
+            $currentWeekEnd = $currentWeekStart->copy()->endOfWeek();
+
+            // Sum sales for this week
+            $weekSales = $dailySales->filter(function ($sale) use ($currentWeekStart, $currentWeekEnd) {
+                $saleDate = $sale->sale_date instanceof Carbon ? $sale->sale_date : Carbon::parse($sale->sale_date);
+
+                return $saleDate->between($currentWeekStart, $currentWeekEnd);
+            })->sum('total_units');
+
+            $weeklyBreakdown[] = [
+                'label' => 'W'.$weekNum.' ('.$currentWeekStart->format('M d').')',
+                'units' => (float) $weekSales,
+            ];
+
+            $currentWeekStart->addWeek();
+            $weekNum++;
+        }
+
+        return $weeklyBreakdown;
+    }
 }

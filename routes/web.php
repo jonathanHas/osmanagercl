@@ -280,6 +280,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/orders/{order}/grid-view', [OrderController::class, 'gridView'])->name('orders.grid-view');
     Route::get('/orders/{order}/layout-a2', [OrderController::class, 'showLayoutA2'])->name('orders.layout-a2');
     Route::get('/orders/{order}/layout-a2-dense', [OrderController::class, 'showLayoutA2Dense'])->name('orders.layout-a2-dense');
+    Route::get('/orders/{order}/christmas-review', [OrderController::class, 'showChristmasReview'])->name('orders.christmas-review');
     Route::get('/orders/{order}/statistics', [OrderController::class, 'statistics'])->name('orders.statistics');
     Route::patch('/orders/{order}/coverage-overrides', [OrderController::class, 'updateCategoryCoverage'])->name('orders.coverage-overrides');
     Route::patch('/order-items/{orderItem}/quantity', [OrderController::class, 'updateQuantity'])->name('order-items.update-quantity');

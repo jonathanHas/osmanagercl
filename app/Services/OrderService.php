@@ -46,6 +46,8 @@ class OrderService
             'coverage_ends_on' => $coverageEndsOn,
             'coverage_overrides' => $categoryOverrides,
             'sales_history_weeks' => $salesHistoryWeeks,
+            'christmas_comparison_enabled' => $options['christmas_comparison_enabled'] ?? false,
+            'christmas_window_config' => $options['christmas_window_config'] ?? null,
             'status' => 'draft',
         ]);
 
@@ -56,6 +58,8 @@ class OrderService
             'sales_history_weeks' => $salesHistoryWeeks,
             'category_groups' => $categoryGroups,
             'category_overrides' => $categoryOverrides,
+            'christmas_comparison_enabled' => $orderSession->christmas_comparison_enabled,
+            'christmas_window_config' => $orderSession->christmas_window_config,
         ]);
     }
 
@@ -233,6 +237,8 @@ class OrderService
                         : null,
                     'coverage_override' => $override,
                     'coverage_ends_on' => $productCoverageEnd,
+                    'christmas_comparison_enabled' => $options['christmas_comparison_enabled'] ?? false,
+                    'christmas_window_config' => $options['christmas_window_config'] ?? null,
                 ]);
 
                 if ($suggestion['suggested_quantity'] > 0 || $suggestion['force_include']) {
@@ -354,6 +360,65 @@ class OrderService
 
         $baseQuantity = max(0, $desiredUnits - $usableStock);
 
+        // Christmas comparison logic (if enabled)
+        $christmasData = null;
+        if (($options['christmas_comparison_enabled'] ?? false) === true) {
+            $config = $options['christmas_window_config'] ?? [];
+            $years = $config['comparison_years'] ?? [];
+
+            if (!empty($years) && isset($config['date_range']['start']) && isset($config['date_range']['end'])) {
+                try {
+                    $startDate = Carbon::parse($config['date_range']['start']);
+                    $endDate = Carbon::parse($config['date_range']['end']);
+
+                    // Fetch Christmas windows
+                    $christmasWindows = $this->salesRepository->getChristmasWindowComparison(
+                        $product->ID,
+                        $years,
+                        $startDate,
+                        $endDate
+                    );
+
+                    // Calculate average Christmas weekly rate across all years
+                    $weeklyRates = array_column($christmasWindows, 'weekly_average');
+                    $avgChristmasWeekly = !empty($weeklyRates)
+                        ? array_sum($weeklyRates) / count($weeklyRates)
+                        : 0;
+
+                    // Calculate Christmas-based desired units
+                    $desiredUnitsChristmas = $avgChristmasWeekly * $targetWeeks;
+                    $baseQuantityChristmas = max(0, $desiredUnitsChristmas - $usableStock);
+
+                    // Determine which to use (max mode)
+                    $selectedQuantity = max($baseQuantity, $baseQuantityChristmas);
+                    $selectedMode = $selectedQuantity === $baseQuantityChristmas ? 'christmas' : 'regular';
+
+                    // Store Christmas comparison data for context
+                    $christmasData = [
+                        'enabled' => true,
+                        'years' => $years,
+                        'date_range' => $config['date_range'],
+                        'christmas_windows' => $christmasWindows,
+                        'stats' => [
+                            'regular_weekly_avg' => round($avgWeeklySales, 2),
+                            'christmas_weekly_avg' => round($avgChristmasWeekly, 2),
+                            'regular_suggested' => round($baseQuantity, 2),
+                            'christmas_suggested' => round($baseQuantityChristmas, 2),
+                            'selected_quantity' => round($selectedQuantity, 2),
+                            'selected_mode' => $selectedMode,
+                            'delta' => round($baseQuantityChristmas - $baseQuantity, 2),
+                        ],
+                    ];
+
+                    // Use the selected (higher) quantity
+                    $baseQuantity = $selectedQuantity;
+                } catch (\Exception $e) {
+                    // If Christmas calculation fails, log and continue with regular calculation
+                    \Log::warning('Christmas comparison failed for product '.$product->ID.': '.$e->getMessage());
+                }
+            }
+        }
+
         // Apply learned adjustments
         $adjustedQuantity = $this->applyLearningAdjustments($product->ID, $baseQuantity);
 
@@ -443,6 +508,7 @@ class OrderService
                 'min_stock_override' => $minStockOverride,
                 'calculated_min_stock' => round($calculatedMin, 2),
                 'min_stock_override_active' => $minStockOverride !== null && $minStockOverride > $calculatedMin,
+                'christmas_comparison' => $christmasData, // Christmas comparison data (if enabled)
             ],
         ];
     }
@@ -706,7 +772,11 @@ class OrderService
             ->where('final_quantity', '>', 0)
             ->get();
 
-        $csv = "Code,Ordered,Cases,Units,SKU,Content,Description,Price,Sale,Total\n";
+        $items = $items->sortBy(function ($item) {
+            return $item->case_units > 1 ? (float) $item->final_cases : 0;
+        })->values();
+
+        $csv = "Code,Cases,Units,Content,Description,Price,Sale,Total\n";
 
         foreach ($items as $item) {
             $product = $item->product;
@@ -717,8 +787,6 @@ class OrderService
             $code = $supplierLink?->SupplierCode ?? $product->CODE;
             $description = $product->NAME;
 
-            // For case products, show case quantity; for unit products, show unit quantity
-            $orderQuantity = $item->case_units > 1 ? $item->final_cases : $item->final_quantity;
             $caseDisplay = $item->case_units > 1 ? $item->final_cases : '';
             $unitDisplay = $item->final_quantity;
 
@@ -731,12 +799,10 @@ class OrderService
                 : ($product->PACKAGE_SIZE ?? '1 unit');
 
             $csv .= sprintf(
-                "%s,%d,%.3f,%.3f,%s,\"%s\",\"%s\",%.2f,%.2f,%.2f\n",
+                "%s,%.3f,%.3f,\"%s\",\"%s\",%.2f,%.2f,%.2f\n",
                 $code,
-                1, // Ordered (always 1 for simplicity)
-                $caseDisplay,
+                $caseDisplay !== '' ? $caseDisplay : 0,
                 $unitDisplay,
-                $product->ID,
                 $content,
                 $description,
                 $unitPrice,

@@ -16,6 +16,8 @@ class OrderSession extends Model
         'coverage_ends_on',
         'sales_history_weeks',
         'coverage_overrides',
+        'christmas_comparison_enabled',
+        'christmas_window_config',
         'status',
         'total_items',
         'total_value',
@@ -27,6 +29,8 @@ class OrderSession extends Model
         'coverage_ends_on' => 'date',
         'total_value' => 'decimal:2',
         'coverage_overrides' => 'array',
+        'christmas_comparison_enabled' => 'boolean',
+        'christmas_window_config' => 'array',
     ];
 
     /**

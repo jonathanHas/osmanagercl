@@ -64,6 +64,11 @@ class OrderController extends Controller
             'sales_history_weeks' => 'nullable|integer|min:1|max:26',
             'category_overrides' => 'nullable|array',
             'category_overrides.*.coverage_end_date' => 'nullable|date|after_or_equal:order_date',
+            'christmas_comparison_enabled' => 'nullable|boolean',
+            'christmas_start_date' => 'nullable|required_if:christmas_comparison_enabled,true|date',
+            'christmas_end_date' => 'nullable|required_if:christmas_comparison_enabled,true|date|after_or_equal:christmas_start_date',
+            'comparison_years' => 'nullable|array',
+            'comparison_years.*' => 'integer|min:2020|max:' . date('Y'),
         ]);
 
         $orderDate = Carbon::parse($request->order_date);
@@ -81,6 +86,21 @@ class OrderController extends Controller
 
         $coverageDays = $orderDate->diffInDays($coverageEndDate) + 1;
         $salesHistoryWeeks = (int) $request->input('sales_history_weeks', 8);
+
+        // Handle Christmas comparison parameters
+        $christmasEnabled = $request->boolean('christmas_comparison_enabled', false);
+        $christmasConfig = null;
+
+        if ($christmasEnabled && $request->filled(['christmas_start_date', 'christmas_end_date', 'comparison_years'])) {
+            $christmasConfig = [
+                'comparison_years' => array_map('intval', $request->input('comparison_years', [])),
+                'date_range' => [
+                    'start' => $request->input('christmas_start_date'),
+                    'end' => $request->input('christmas_end_date'),
+                ],
+                'calculation_mode' => 'max', // Always use max mode as per plan
+            ];
+        }
 
         try {
             $importLog = $this->salesDataSyncService->ensureDailySummariesAreFresh($salesHistoryWeeks);
@@ -109,6 +129,8 @@ class OrderController extends Controller
                 'sales_history_weeks' => $salesHistoryWeeks,
                 'category_overrides' => $categoryOverrides,
                 'category_groups' => $specialGroups,
+                'christmas_comparison_enabled' => $christmasEnabled,
+                'christmas_window_config' => $christmasConfig,
             ]
         );
 
@@ -119,8 +141,13 @@ class OrderController extends Controller
     /**
      * Display the order review interface.
      */
-    public function show(OrderSession $order): View
+    public function show(OrderSession $order): View|RedirectResponse
     {
+        // If Christmas mode is enabled, redirect to Christmas review page
+        if ($order->christmas_comparison_enabled) {
+            return redirect()->route('orders.christmas-review', $order);
+        }
+
         $context = $this->prepareOrderSessionContext($order);
 
         return view('orders.show', [
@@ -133,8 +160,13 @@ class OrderController extends Controller
     /**
      * Display the order review interface using the A2 layout experiment.
      */
-    public function showLayoutA2(OrderSession $order): View
+    public function showLayoutA2(OrderSession $order): View|RedirectResponse
     {
+        // If Christmas mode is enabled, redirect to Christmas review page
+        if ($order->christmas_comparison_enabled) {
+            return redirect()->route('orders.christmas-review', $order);
+        }
+
         $context = $this->prepareOrderSessionContext($order);
 
         return view('orders.show-layout-a2', [
@@ -152,6 +184,25 @@ class OrderController extends Controller
         $context = $this->prepareOrderSessionContext($order);
 
         return view('orders.show-layout-a2-dense', [
+            'order' => $order,
+            'statistics' => $context['statistics'],
+            'categoryGroups' => $context['categoryGroups'],
+        ]);
+    }
+
+    /**
+     * Display the Christmas comparison review page.
+     */
+    public function showChristmasReview(OrderSession $order): View|RedirectResponse
+    {
+        // If Christmas mode is not enabled, redirect to normal review
+        if (!$order->christmas_comparison_enabled) {
+            return redirect()->route('orders.show', $order);
+        }
+
+        $context = $this->prepareOrderSessionContext($order);
+
+        return view('orders.show-christmas', [
             'order' => $order,
             'statistics' => $context['statistics'],
             'categoryGroups' => $context['categoryGroups'],

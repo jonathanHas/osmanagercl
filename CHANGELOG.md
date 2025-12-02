@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **🎄 Christmas Comparison Feature** (2025-12-01)
+  - **Seasonal Order Planning**: Compare recent sales with historical Christmas period sales when generating orders
+    - Flexible date range selection (e.g., Dec 10-26) with custom start/end dates
+    - Multi-year comparison: Select 1-2 previous years (2024, 2023)
+    - Max mode: Automatically uses higher of regular or Christmas-based suggestions
+    - Opt-in design: Feature enabled via toggle, doesn't affect normal ordering
+  - **Dual-Window Comparison Display**: Side-by-side stats showing recent vs Christmas data
+    - Recent sales column: 8-week (or custom) average and suggested quantity
+    - Christmas sales column: Historical Christmas average and suggested quantity
+    - Green checkmark indicates which suggestion was selected (higher)
+    - Delta indicator shows difference if >5 units
+  - **Enhanced Visual Timeline Charts**: Extended Chart.js graphs with multiple datasets
+    - Timeline: Recent weeks | Current/After stock | Christmas 2024 | Christmas 2023
+    - Distinct colors: Blue (recent), Purple (2024), Pink (2023)
+    - Interactive legend to toggle datasets
+    - Hover tooltips display quantities for all data points
+    - Larger graphs: 640x220px (2x previous size) for better visibility
+  - **December Banner Prompt**: Auto-suggestion when creating December orders
+    - Promotional banner with one-click enable
+    - Dismissible without enabling feature
+  - **Technical Implementation**:
+    - New files: `show-christmas.blade.php`, `review-table-christmas.blade.php`
+    - Enhanced: `OrderService`, `SalesRepository`, `OrderController`
+    - Zero-risk deployment: Separate Christmas review files, original pages untouched
+    - JSON storage: No new database tables, uses `christmas_window_config` JSON column
+  - **Documentation**: See [Christmas Comparison Feature Guide](./docs/features/order-management/christmas-comparison.md)
+
+- **📊 Graph Size Expansion** (2025-12-01)
+  - **Larger Charts in Christmas Review**: Doubled graph dimensions for better visibility
+    - Column width: 320px → 640px
+    - Chart height: 110px → 220px
+    - Row height: 180px → 360px
+    - Better utilization of available white space
+    - Desktop-optimized fixed dimensions
+  - **Improved Data Visibility**: Easier to see patterns in extended timeline with Christmas data
+    - Multiple datasets more clearly distinguishable
+    - Legend and tooltip interactions more accessible
+    - Better for analyzing seasonal trends
+
 ### Changed
 
 - **📚 Documentation Refactoring** (2025-11-03)

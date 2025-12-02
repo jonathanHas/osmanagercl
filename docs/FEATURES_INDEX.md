@@ -5,6 +5,7 @@ This document provides a comprehensive overview of all features in the OSManager
 **Quick Navigation:**
 - [Product Management](#product-management)
 - [Supplier Management](#supplier-management)
+- [Order Management](#order-management)
 - [Financial Systems](#financial-systems)
 - [Analytics & Reporting](#analytics--reporting)
 - [POS Integration](#pos-integration)
@@ -126,6 +127,51 @@ Complete supplier management with seamless POS integration and auto-code generat
 - **Role-based Access**: Protected routes with appropriate permissions
 
 📖 [Supplier Management Documentation](./features/supplier-management.md)
+
+---
+
+## Order Management
+
+### Order Generation System
+Intelligent order suggestion system with sales history analysis and coverage planning.
+- **Sales-Driven Suggestions**: Automatic quantity calculations based on weekly sales averages
+- **Coverage Window**: Configure target coverage period (e.g., 2 weeks, 3 weeks)
+- **Category Overrides**: Different coverage periods for different product categories (Cheese, Refrigerated, etc.)
+- **Safety Stock Factors**: Per-product safety multipliers for high-demand items
+- **Current Stock Integration**: Automatically accounts for existing inventory
+- **Case Product Support**: Smart rounding for case-based ordering (6-packs, 12-packs, etc.)
+- **Priority Classification**: Products flagged as "Review", "Standard", or "Safe" based on analysis
+- **Min Stock Override**: User-defined minimum stock levels with absolute unit control
+
+📖 [Order Generation Documentation](./features/order-management/order-generation.md)
+
+### Christmas Comparison Feature (NEW! 2025-12-01)
+Seasonal order planning with historical Christmas sales comparison.
+- **Dual-Window Analysis**: Compare recent sales (8-week) vs historical Christmas periods
+- **Flexible Date Range**: Custom start/end dates (e.g., Dec 10-26) for comparison window
+- **Multi-Year Comparison**: Select 1-2 previous years (2024, 2023) for analysis
+- **Max Mode Calculation**: Automatically uses higher of regular or Christmas-based suggestions
+- **Side-by-Side Display**: Visual comparison panels showing both recommendations
+- **Enhanced Timeline Charts**: Extended Chart.js graphs (640x220px) with multiple datasets
+  - Blue line: Recent sales trend
+  - Purple line: Christmas 2024 historical data
+  - Pink line: Christmas 2023 historical data
+  - Interactive legend and hover tooltips
+- **December Banner**: Auto-suggestion when creating orders with December delivery dates
+- **Delta Indicators**: Highlights significant differences (>5 units) between suggestions
+- **Opt-In Design**: Feature enabled via toggle, doesn't affect normal ordering workflow
+- **Zero-Risk Deployment**: Separate Christmas review pages, original order system untouched
+
+📖 [Christmas Comparison Documentation](./features/order-management/christmas-comparison.md)
+
+### Order Review & Adjustment
+Interactive review interface with inline editing and approval workflow.
+- **Product-Level Charts**: Chart.js graphs showing sales trends, stock levels, and projections
+- **Inline Quantity Editing**: Adjust suggested quantities with +/- buttons or direct input
+- **Priority Filtering**: Filter by Review/Standard/Safe classification
+- **Approval Workflow**: Complete orders when ready, mark items for adjustment
+- **Export to CSV**: Download order for external processing
+- **Multiple Layout Options**: A2, A2 Dense, Grid View for different preferences
 
 ---
 

@@ -137,6 +137,78 @@
                             </p>
                         </div>
 
+                        <!-- Christmas Comparison Section -->
+                        <div class="mt-6 border rounded-lg p-4 bg-gradient-to-r from-blue-50 to-purple-50">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox"
+                                       name="christmas_comparison_enabled"
+                                       id="christmas-toggle"
+                                       value="1"
+                                       class="rounded border-purple-300 text-purple-600 focus:ring-purple-500">
+                                <span class="font-semibold text-slate-900">
+                                    🎄 Show Christmas comparison data
+                                </span>
+                            </label>
+                            <p class="text-sm text-slate-600 mt-1 ml-6">
+                                Compare with historical Christmas sales to see seasonal demand patterns
+                            </p>
+
+                            <div id="christmas-settings" class="mt-4 space-y-4 hidden">
+                                <!-- Date Range Selector -->
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label for="christmas_start_date" class="block text-sm font-medium text-gray-700">
+                                            Christmas period start
+                                        </label>
+                                        <input type="date"
+                                               name="christmas_start_date"
+                                               id="christmas_start_date"
+                                               value="{{ date('Y') }}-12-10"
+                                               class="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:ring-purple-500 focus:border-purple-500">
+                                    </div>
+                                    <div>
+                                        <label for="christmas_end_date" class="block text-sm font-medium text-gray-700">
+                                            Christmas period end
+                                        </label>
+                                        <input type="date"
+                                               name="christmas_end_date"
+                                               id="christmas_end_date"
+                                               value="{{ date('Y') }}-12-26"
+                                               class="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm focus:ring-purple-500 focus:border-purple-500">
+                                    </div>
+                                </div>
+
+                                <!-- Year Selector -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                                        Compare with these years
+                                    </label>
+                                    <div class="flex gap-3">
+                                        <label class="flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer hover:bg-white bg-white">
+                                            <input type="checkbox" name="comparison_years[]" value="{{ date('Y') - 1 }}" checked>
+                                            <span class="font-medium">{{ date('Y') - 1 }}</span>
+                                        </label>
+                                        <label class="flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer hover:bg-white bg-white">
+                                            <input type="checkbox" name="comparison_years[]" value="{{ date('Y') - 2 }}" checked>
+                                            <span class="font-medium">{{ date('Y') - 2 }}</span>
+                                        </label>
+                                        @if(date('Y') > 2024)
+                                        <label class="flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer hover:bg-white bg-white">
+                                            <input type="checkbox" name="comparison_years[]" value="{{ date('Y') - 3 }}">
+                                            <span class="font-medium">{{ date('Y') - 3 }}</span>
+                                        </label>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <!-- Info box -->
+                                <div class="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800">
+                                    <strong>Note:</strong> System will automatically use the higher of regular or Christmas suggestions.
+                                    You can adjust quantities manually after generation.
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Information Panel -->
                         <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
                             <div class="flex">
@@ -230,6 +302,24 @@
                     });
                 </script>
             @endif
+
+            <!-- Christmas Toggle JavaScript -->
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    const christmasToggle = document.getElementById('christmas-toggle');
+                    const christmasSettings = document.getElementById('christmas-settings');
+
+                    if (christmasToggle && christmasSettings) {
+                        christmasToggle.addEventListener('change', function() {
+                            if (this.checked) {
+                                christmasSettings.classList.remove('hidden');
+                            } else {
+                                christmasSettings.classList.add('hidden');
+                            }
+                        });
+                    }
+                });
+            </script>
 
             <!-- Quick Actions for Frequent Suppliers -->
             @if($suppliers->where('Supplier', 'like', '%Udea%')->first())
