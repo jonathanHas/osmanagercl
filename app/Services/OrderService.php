@@ -7,6 +7,7 @@ use App\Models\OrderItem;
 use App\Models\OrderSession;
 use App\Models\Product;
 use App\Models\ProductOrderSetting;
+use App\Models\SalesDailySummary;
 use App\Models\StockCurrent;
 use App\Repositories\SalesRepository;
 use App\Support\SpecialOrderCategories;
@@ -245,6 +246,7 @@ class OrderService
         $allChristmasData = collect();
         $christmasEnabled = $options['christmas_comparison_enabled'] ?? false;
         $christmasConfig = $options['christmas_window_config'] ?? null;
+        \Log::debug('Christmas pre-fetch check: enabled='.$christmasEnabled.', hasConfig='.($christmasConfig !== null));
         if ($christmasEnabled && $christmasConfig) {
             $years = $christmasConfig['comparison_years'] ?? [];
             $startDate = isset($christmasConfig['date_range']['start'])
@@ -254,13 +256,17 @@ class OrderService
                 ? Carbon::parse($christmasConfig['date_range']['end'])
                 : null;
 
+            \Log::debug('Christmas pre-fetch: years='.json_encode($years).', start='.$startDate.', end='.$endDate);
+
             if (! empty($years) && $startDate && $endDate) {
+                $tChristmas = microtime(true);
                 $allChristmasData = $this->salesRepository->getBulkChristmasWindowComparison(
                     $productIds,
                     $years,
                     $startDate,
                     $endDate
                 );
+                \Log::debug('Christmas pre-fetch completed in '.round((microtime(true) - $tChristmas) * 1000).'ms, got '.count($allChristmasData).' products');
             }
         }
 
@@ -465,6 +471,8 @@ class OrderService
             $config = $options['christmas_window_config'] ?? [];
             $years = $config['comparison_years'] ?? [];
 
+            \Log::debug('Christmas calculation for product '.$product->ID.': years='.json_encode($years).', has prefetched='.isset($prefetchedData['christmas_data']));
+
             if (! empty($years) && isset($config['date_range']['start']) && isset($config['date_range']['end'])) {
                 try {
                     // Use pre-fetched Christmas data if available, otherwise query
@@ -475,6 +483,8 @@ class OrderService
                             Carbon::parse($config['date_range']['start']),
                             Carbon::parse($config['date_range']['end'])
                         );
+
+                    \Log::debug('Christmas windows for '.$product->ID.': '.json_encode($christmasWindows));
 
                     // Calculate average Christmas weekly rate across all years
                     $weeklyRates = array_column($christmasWindows, 'weekly_average');
@@ -788,14 +798,11 @@ class OrderService
             return collect();
         }
 
-        // Step 5: Get products with sales in last 6 months (using GROUP BY, much faster than subquery)
-        $productsWithSales = DB::connection('pos')
-            ->table('STOCKDIARY')
-            ->whereIn('PRODUCT', $stockedProductIds)
-            ->where('REASON', -1)
-            ->where('DATENEW', '>=', $sixMonthsAgo)
+        // Step 5: Get products with sales in last 6 months (using sales_daily_summary - pre-aggregated, much faster)
+        $productsWithSales = SalesDailySummary::whereIn('product_id', $stockedProductIds)
+            ->where('sale_date', '>=', $sixMonthsAgo->format('Y-m-d'))
             ->distinct()
-            ->pluck('PRODUCT')
+            ->pluck('product_id')
             ->toArray();
 
         \Log::debug('getSupplierProducts Step 5: After sales filter (6mo): '.count($productsWithSales).' products');

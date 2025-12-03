@@ -680,6 +680,7 @@ class SalesRepository
 
     /**
      * Get Christmas window comparison for multiple products in bulk.
+     * Includes weekly breakdown data needed for chart visualization.
      *
      * @param  array  $productIds  Array of product IDs
      * @param  array  $years  Years to compare (e.g., [2024, 2023])
@@ -697,14 +698,16 @@ class SalesRepository
         $days = $startDate->diffInDays($endDate) + 1;
         $weeksEquivalent = $days / 7;
 
-        // Fetch all data for all years in bulk
-        $allData = collect();
+        // Fetch all data for all years in bulk - including weekly breakdown
+        $allYearlyTotals = collect();
+        $allWeeklyData = collect();
+
         foreach ($years as $year) {
             $periodStart = $startDate->copy()->setYear($year);
             $periodEnd = $endDate->copy()->setYear($year);
 
-            // Try sales_daily_summary first
-            $yearData = SalesDailySummary::whereIn('product_id', $productIds)
+            // Get totals per product
+            $yearTotals = SalesDailySummary::whereIn('product_id', $productIds)
                 ->whereBetween('sale_date', [$periodStart, $periodEnd])
                 ->selectRaw('product_id')
                 ->selectRaw('SUM(total_units) as total_units')
@@ -713,8 +716,8 @@ class SalesRepository
                 ->keyBy('product_id');
 
             // Fallback to STOCKDIARY if needed
-            if ($yearData->isEmpty()) {
-                $yearData = StockDiary::whereIn('PRODUCT', $productIds)
+            if ($yearTotals->isEmpty()) {
+                $yearTotals = StockDiary::whereIn('PRODUCT', $productIds)
                     ->sales()
                     ->whereBetween('DATENEW', [$periodStart, $periodEnd])
                     ->selectRaw('PRODUCT as product_id')
@@ -724,7 +727,30 @@ class SalesRepository
                     ->keyBy('product_id');
             }
 
-            $allData[$year] = $yearData;
+            $allYearlyTotals[$year] = $yearTotals;
+
+            // Get weekly breakdown data per product
+            $weeklyData = SalesDailySummary::whereIn('product_id', $productIds)
+                ->whereBetween('sale_date', [$periodStart, $periodEnd])
+                ->selectRaw('product_id')
+                ->selectRaw("DATE_FORMAT(DATE_SUB(sale_date, INTERVAL WEEKDAY(sale_date) DAY), '%Y-%m-%d') as week_start")
+                ->selectRaw('SUM(total_units) as total_units')
+                ->groupBy('product_id', 'week_start')
+                ->get();
+
+            // Fallback to STOCKDIARY if needed
+            if ($weeklyData->isEmpty()) {
+                $weeklyData = StockDiary::whereIn('PRODUCT', $productIds)
+                    ->sales()
+                    ->whereBetween('DATENEW', [$periodStart, $periodEnd])
+                    ->selectRaw('PRODUCT as product_id')
+                    ->selectRaw("DATE_FORMAT(DATE_SUB(DATENEW, INTERVAL WEEKDAY(DATENEW) DAY), '%Y-%m-%d') as week_start")
+                    ->selectRaw('SUM(ABS(UNITS)) as total_units')
+                    ->groupBy('PRODUCT', 'week_start')
+                    ->get();
+            }
+
+            $allWeeklyData[$year] = $weeklyData->groupBy('product_id');
         }
 
         // Build result for each product
@@ -733,13 +759,20 @@ class SalesRepository
             foreach ($years as $year) {
                 $periodStart = $startDate->copy()->setYear($year);
                 $periodEnd = $endDate->copy()->setYear($year);
-                $yearData = $allData[$year][$productId] ?? null;
+                $yearData = $allYearlyTotals[$year][$productId] ?? null;
                 $totalUnits = (float) ($yearData->total_units ?? 0);
+
+                // Build weekly breakdown for this product/year
+                $weeklyBreakdown = $this->buildWeeklyBreakdownFromData(
+                    $allWeeklyData[$year][$productId] ?? collect(),
+                    $periodStart,
+                    $periodEnd
+                );
 
                 $windows[] = [
                     'year' => $year,
                     'date_range' => $periodStart->format('M d').' - '.$periodEnd->format('M d'),
-                    'weekly_breakdown' => [], // Simplified for bulk - full breakdown not needed
+                    'weekly_breakdown' => $weeklyBreakdown,
                     'total_units' => $totalUnits,
                     'weekly_average' => $weeksEquivalent > 0 ? $totalUnits / $weeksEquivalent : 0,
                     'days' => $days,
@@ -749,6 +782,39 @@ class SalesRepository
         }
 
         return $result;
+    }
+
+    /**
+     * Build weekly breakdown array from pre-fetched data.
+     */
+    protected function buildWeeklyBreakdownFromData($weeklyData, Carbon $startDate, Carbon $endDate): array
+    {
+        $weeklyBreakdown = [];
+        $currentWeekStart = $startDate->copy()->startOfWeek();
+        $weekNum = 1;
+
+        while ($currentWeekStart <= $endDate) {
+            $weekKey = $currentWeekStart->format('Y-m-d');
+
+            // Find matching week data
+            $weekSales = 0.0;
+            foreach ($weeklyData as $row) {
+                if ($row->week_start === $weekKey) {
+                    $weekSales = (float) $row->total_units;
+                    break;
+                }
+            }
+
+            $weeklyBreakdown[] = [
+                'label' => 'W'.$weekNum.' ('.$currentWeekStart->format('M d').')',
+                'units' => $weekSales,
+            ];
+
+            $currentWeekStart->addWeek();
+            $weekNum++;
+        }
+
+        return $weeklyBreakdown;
     }
 
     /**
@@ -882,21 +948,15 @@ class SalesRepository
             return collect();
         }
 
-        // Use GROUP BY with MAX instead of correlated subquery - MUCH faster
-        $lastSales = DB::connection('pos')
-            ->table('STOCKDIARY')
-            ->whereIn('PRODUCT', $productIds)
-            ->where('REASON', -1)
-            ->selectRaw('PRODUCT as product_id, MAX(DATENEW) as last_sale')
-            ->groupBy('PRODUCT')
-            ->get()
-            ->keyBy('product_id');
+        // Use sales_daily_summary which is pre-aggregated and indexed - MUCH faster than STOCKDIARY
+        $lastSales = SalesDailySummary::whereIn('product_id', $productIds)
+            ->selectRaw('product_id, MAX(sale_date) as last_sale')
+            ->groupBy('product_id')
+            ->pluck('last_sale', 'product_id');
 
         $result = collect();
         foreach ($productIds as $productId) {
-            $result[$productId] = isset($lastSales[$productId])
-                ? Carbon::parse($lastSales[$productId]->last_sale)->format('Y-m-d')
-                : null;
+            $result[$productId] = $lastSales[$productId] ?? null;
         }
 
         return $result;
