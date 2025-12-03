@@ -660,12 +660,16 @@ class SalesRepository
             \Log::debug('getBulkProductWeeklySales: STOCKDIARY fallback took '.round((microtime(true) - $t2) * 1000).'ms');
         }
 
+        // Group data by product_id ONCE upfront (O(n) instead of O(n*m))
+        $groupedData = $summaryData->groupBy('product_id');
+
         // Build result structure
         $result = collect();
         foreach ($productIds as $productId) {
             $productWeeks = $weekBuckets;
 
-            $productData = $summaryData->where('product_id', $productId);
+            // Direct access O(1) instead of filtering O(n)
+            $productData = $groupedData->get($productId, collect());
             foreach ($productData as $weekData) {
                 if (isset($productWeeks[$weekData->week_start])) {
                     $productWeeks[$weekData->week_start]['units'] = (float) $weekData->total_units;
@@ -916,12 +920,16 @@ class SalesRepository
             ->groupBy('PRODUCT', 'month_key')
             ->get();
 
+        // Group data by product_id ONCE upfront (O(n) instead of O(n*m))
+        $groupedData = $salesData->groupBy('product_id');
+
         // Build result for each product
         $result = collect();
         foreach ($productIds as $productId) {
             $productMonths = $monthTemplate;
 
-            $productData = $salesData->where('product_id', $productId);
+            // Direct access O(1) instead of filtering O(n)
+            $productData = $groupedData->get($productId, collect());
             foreach ($productData as $monthData) {
                 if (isset($productMonths[$monthData->month_key])) {
                     $productMonths[$monthData->month_key]['units'] = (float) $monthData->total_units;
