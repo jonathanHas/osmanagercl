@@ -384,7 +384,6 @@ class SalesRepository
      * @param  array  $years  Years to compare (e.g., [2024, 2023])
      * @param  Carbon  $startDate  Christmas period start (e.g., Dec 10)
      * @param  Carbon  $endDate  Christmas period end (e.g., Dec 26)
-     * @return array
      */
     public function getChristmasWindowComparison(string $productId, array $years, Carbon $startDate, Carbon $endDate): array
     {
@@ -448,7 +447,6 @@ class SalesRepository
      * @param  \Illuminate\Support\Collection  $dailySales  Collection of daily sales
      * @param  Carbon  $startDate  Period start date
      * @param  Carbon  $endDate  Period end date
-     * @return array
      */
     protected function groupIntoWeeks($dailySales, Carbon $startDate, Carbon $endDate): array
     {
@@ -476,5 +474,431 @@ class SalesRepository
         }
 
         return $weeklyBreakdown;
+    }
+
+    // ============================================================================
+    // BULK METHODS FOR ORDER GENERATION OPTIMIZATION
+    // These methods fetch data for multiple products in a single query
+    // ============================================================================
+
+    /**
+     * Get sales statistics for multiple products in bulk.
+     *
+     * @param  array  $productIds  Array of product IDs
+     * @return \Illuminate\Support\Collection Keyed by product_id
+     */
+    public function getBulkProductSalesStatistics(array $productIds): \Illuminate\Support\Collection
+    {
+        if (empty($productIds)) {
+            return collect();
+        }
+
+        $currentDate = Carbon::now();
+        $lastYear = $currentDate->copy()->subYear();
+        $lastMonth = $currentDate->copy()->subMonth();
+
+        // Check if we have data in sales_daily_summary
+        $hasSummaryData = SalesDailySummary::whereIn('product_id', $productIds)->exists();
+
+        if ($hasSummaryData) {
+            // Get all stats in a single query from pre-aggregated table
+            $stats = SalesDailySummary::whereIn('product_id', $productIds)
+                ->whereBetween('sale_date', [$lastYear, $currentDate])
+                ->selectRaw('product_id')
+                ->selectRaw('SUM(total_units) as total_sales_12m')
+                ->selectRaw('SUM(CASE WHEN YEAR(sale_date) = ? AND MONTH(sale_date) = ? THEN total_units ELSE 0 END) as this_month_sales', [
+                    $currentDate->year,
+                    $currentDate->month,
+                ])
+                ->selectRaw('SUM(CASE WHEN YEAR(sale_date) = ? AND MONTH(sale_date) = ? THEN total_units ELSE 0 END) as last_month_sales', [
+                    $lastMonth->year,
+                    $lastMonth->month,
+                ])
+                ->groupBy('product_id')
+                ->get()
+                ->keyBy('product_id')
+                ->map(function ($item) {
+                    $totalSales = (float) ($item->total_sales_12m ?? 0);
+                    $avgMonthlySales = $totalSales / 12;
+                    $thisMonth = (float) ($item->this_month_sales ?? 0);
+                    $lastMonth = (float) ($item->last_month_sales ?? 0);
+
+                    $trend = 'stable';
+                    if ($lastMonth > 0) {
+                        $percentChange = (($thisMonth - $lastMonth) / $lastMonth) * 100;
+                        if ($percentChange > 10) {
+                            $trend = 'up';
+                        } elseif ($percentChange < -10) {
+                            $trend = 'down';
+                        }
+                    }
+
+                    return [
+                        'total_sales_12m' => $totalSales,
+                        'avg_monthly_sales' => round($avgMonthlySales, 1),
+                        'this_month_sales' => $thisMonth,
+                        'last_month_sales' => $lastMonth,
+                        'trend' => $trend,
+                    ];
+                });
+        } else {
+            // Fallback to live POS queries
+            $stats = StockDiary::whereIn('PRODUCT', $productIds)
+                ->sales()
+                ->where('DATENEW', '>=', $lastYear)
+                ->selectRaw('PRODUCT as product_id')
+                ->selectRaw('SUM(ABS(UNITS)) as total_sales_12m')
+                ->selectRaw('SUM(CASE WHEN YEAR(DATENEW) = ? AND MONTH(DATENEW) = ? THEN ABS(UNITS) ELSE 0 END) as this_month_sales', [
+                    $currentDate->year,
+                    $currentDate->month,
+                ])
+                ->selectRaw('SUM(CASE WHEN YEAR(DATENEW) = ? AND MONTH(DATENEW) = ? THEN ABS(UNITS) ELSE 0 END) as last_month_sales', [
+                    $lastMonth->year,
+                    $lastMonth->month,
+                ])
+                ->groupBy('PRODUCT')
+                ->get()
+                ->keyBy('product_id')
+                ->map(function ($item) {
+                    $totalSales = (float) ($item->total_sales_12m ?? 0);
+                    $avgMonthlySales = $totalSales / 12;
+                    $thisMonth = (float) ($item->this_month_sales ?? 0);
+                    $lastMonth = (float) ($item->last_month_sales ?? 0);
+
+                    $trend = 'stable';
+                    if ($lastMonth > 0) {
+                        $percentChange = (($thisMonth - $lastMonth) / $lastMonth) * 100;
+                        if ($percentChange > 10) {
+                            $trend = 'up';
+                        } elseif ($percentChange < -10) {
+                            $trend = 'down';
+                        }
+                    }
+
+                    return [
+                        'total_sales_12m' => $totalSales,
+                        'avg_monthly_sales' => round($avgMonthlySales, 1),
+                        'this_month_sales' => $thisMonth,
+                        'last_month_sales' => $lastMonth,
+                        'trend' => $trend,
+                    ];
+                });
+        }
+
+        // Fill in missing products with zero stats
+        $result = collect();
+        foreach ($productIds as $productId) {
+            $result[$productId] = $stats[$productId] ?? [
+                'total_sales_12m' => 0.0,
+                'avg_monthly_sales' => 0.0,
+                'this_month_sales' => 0.0,
+                'last_month_sales' => 0.0,
+                'trend' => 'stable',
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get weekly sales for multiple products in bulk.
+     *
+     * @param  array  $productIds  Array of product IDs
+     * @param  int  $weeksBack  Number of weeks to retrieve
+     * @return \Illuminate\Support\Collection Keyed by product_id, each containing array of weekly data
+     */
+    public function getBulkProductWeeklySales(array $productIds, int $weeksBack = 8): \Illuminate\Support\Collection
+    {
+        if (empty($productIds)) {
+            return collect();
+        }
+
+        $weeksBack = max(1, $weeksBack);
+        $endOfCurrentWeek = Carbon::now()->endOfWeek();
+        $startRange = $endOfCurrentWeek->copy()->subWeeks($weeksBack - 1)->startOfWeek();
+
+        // Build week buckets template
+        $weekBuckets = [];
+        $cursor = $startRange->copy();
+        for ($i = 0; $i < $weeksBack; $i++) {
+            $weekStart = $cursor->copy()->startOfWeek();
+            $weekEnd = $cursor->copy()->endOfWeek();
+            $key = $weekStart->format('Y-m-d');
+            $weekBuckets[$key] = [
+                'week_start' => $weekStart->format('Y-m-d'),
+                'week_end' => $weekEnd->format('Y-m-d'),
+                'label' => $weekStart->format('d M'),
+                'units' => 0.0,
+            ];
+            $cursor->addWeek();
+        }
+
+        // Try to use imported daily summaries first (fast path)
+        $t1 = microtime(true);
+        $summaryData = SalesDailySummary::whereIn('product_id', $productIds)
+            ->whereBetween('sale_date', [$startRange, $endOfCurrentWeek])
+            ->selectRaw('product_id')
+            ->selectRaw("DATE_FORMAT(DATE_SUB(sale_date, INTERVAL WEEKDAY(sale_date) DAY), '%Y-%m-%d') as week_start")
+            ->selectRaw('SUM(total_units) as total_units')
+            ->groupBy('product_id', 'week_start')
+            ->get();
+
+        $usesSummary = $summaryData->isNotEmpty();
+        \Log::debug('getBulkProductWeeklySales: SalesDailySummary query took '.round((microtime(true) - $t1) * 1000).'ms, found '.$summaryData->count().' rows, usesSummary='.$usesSummary);
+
+        if (! $usesSummary) {
+            // Fallback to live POS data
+            $t2 = microtime(true);
+            $summaryData = StockDiary::whereIn('PRODUCT', $productIds)
+                ->sales()
+                ->where('DATENEW', '>=', $startRange)
+                ->selectRaw('PRODUCT as product_id')
+                ->selectRaw("DATE_FORMAT(DATE_SUB(DATENEW, INTERVAL WEEKDAY(DATENEW) DAY), '%Y-%m-%d') as week_start")
+                ->selectRaw('SUM(ABS(UNITS)) as total_units')
+                ->groupBy('PRODUCT', 'week_start')
+                ->get();
+            \Log::debug('getBulkProductWeeklySales: STOCKDIARY fallback took '.round((microtime(true) - $t2) * 1000).'ms');
+        }
+
+        // Build result structure
+        $result = collect();
+        foreach ($productIds as $productId) {
+            $productWeeks = $weekBuckets;
+
+            $productData = $summaryData->where('product_id', $productId);
+            foreach ($productData as $weekData) {
+                if (isset($productWeeks[$weekData->week_start])) {
+                    $productWeeks[$weekData->week_start]['units'] = (float) $weekData->total_units;
+                }
+            }
+
+            $result[$productId] = array_values($productWeeks);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get Christmas window comparison for multiple products in bulk.
+     *
+     * @param  array  $productIds  Array of product IDs
+     * @param  array  $years  Years to compare (e.g., [2024, 2023])
+     * @param  Carbon  $startDate  Christmas period start (e.g., Dec 10)
+     * @param  Carbon  $endDate  Christmas period end (e.g., Dec 26)
+     * @return \Illuminate\Support\Collection Keyed by product_id
+     */
+    public function getBulkChristmasWindowComparison(array $productIds, array $years, Carbon $startDate, Carbon $endDate): \Illuminate\Support\Collection
+    {
+        if (empty($productIds) || empty($years)) {
+            return collect();
+        }
+
+        $result = collect();
+        $days = $startDate->diffInDays($endDate) + 1;
+        $weeksEquivalent = $days / 7;
+
+        // Fetch all data for all years in bulk
+        $allData = collect();
+        foreach ($years as $year) {
+            $periodStart = $startDate->copy()->setYear($year);
+            $periodEnd = $endDate->copy()->setYear($year);
+
+            // Try sales_daily_summary first
+            $yearData = SalesDailySummary::whereIn('product_id', $productIds)
+                ->whereBetween('sale_date', [$periodStart, $periodEnd])
+                ->selectRaw('product_id')
+                ->selectRaw('SUM(total_units) as total_units')
+                ->groupBy('product_id')
+                ->get()
+                ->keyBy('product_id');
+
+            // Fallback to STOCKDIARY if needed
+            if ($yearData->isEmpty()) {
+                $yearData = StockDiary::whereIn('PRODUCT', $productIds)
+                    ->sales()
+                    ->whereBetween('DATENEW', [$periodStart, $periodEnd])
+                    ->selectRaw('PRODUCT as product_id')
+                    ->selectRaw('SUM(ABS(UNITS)) as total_units')
+                    ->groupBy('PRODUCT')
+                    ->get()
+                    ->keyBy('product_id');
+            }
+
+            $allData[$year] = $yearData;
+        }
+
+        // Build result for each product
+        foreach ($productIds as $productId) {
+            $windows = [];
+            foreach ($years as $year) {
+                $periodStart = $startDate->copy()->setYear($year);
+                $periodEnd = $endDate->copy()->setYear($year);
+                $yearData = $allData[$year][$productId] ?? null;
+                $totalUnits = (float) ($yearData->total_units ?? 0);
+
+                $windows[] = [
+                    'year' => $year,
+                    'date_range' => $periodStart->format('M d').' - '.$periodEnd->format('M d'),
+                    'weekly_breakdown' => [], // Simplified for bulk - full breakdown not needed
+                    'total_units' => $totalUnits,
+                    'weekly_average' => $weeksEquivalent > 0 ? $totalUnits / $weeksEquivalent : 0,
+                    'days' => $days,
+                ];
+            }
+            $result[$productId] = $windows;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get recent purchase prices for multiple products in bulk.
+     * Uses a derived table approach for better performance.
+     *
+     * @param  array  $productIds  Array of product IDs
+     * @return \Illuminate\Support\Collection Keyed by product_id, value is float price or null
+     */
+    public function getBulkRecentPurchasePrices(array $productIds): \Illuminate\Support\Collection
+    {
+        if (empty($productIds)) {
+            return collect();
+        }
+
+        // First get the max date per product (fast GROUP BY)
+        $maxDates = DB::connection('pos')
+            ->table('STOCKDIARY')
+            ->whereIn('PRODUCT', $productIds)
+            ->where('REASON', '>', 0)
+            ->where('PRICE', '>', 0)
+            ->selectRaw('PRODUCT, MAX(DATENEW) as max_date')
+            ->groupBy('PRODUCT')
+            ->get()
+            ->keyBy('PRODUCT');
+
+        if ($maxDates->isEmpty()) {
+            $result = collect();
+            foreach ($productIds as $productId) {
+                $result[$productId] = null;
+            }
+
+            return $result;
+        }
+
+        // Build conditions for fetching the actual prices
+        $conditions = [];
+        foreach ($maxDates as $productId => $row) {
+            $conditions[] = "(PRODUCT = '{$productId}' AND DATENEW = '{$row->max_date}')";
+        }
+
+        // Fetch the prices for those specific records
+        $latestPrices = DB::connection('pos')
+            ->table('STOCKDIARY')
+            ->where('REASON', '>', 0)
+            ->where('PRICE', '>', 0)
+            ->whereRaw('('.implode(' OR ', $conditions).')')
+            ->select('PRODUCT as product_id', 'PRICE as price')
+            ->get()
+            ->keyBy('product_id');
+
+        // Build result with null for products without purchase history
+        $result = collect();
+        foreach ($productIds as $productId) {
+            $result[$productId] = isset($latestPrices[$productId])
+                ? (float) $latestPrices[$productId]->price
+                : null;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get sales history for multiple products in bulk.
+     *
+     * @param  array  $productIds  Array of product IDs
+     * @param  int  $monthsBack  Number of months to retrieve
+     * @return \Illuminate\Support\Collection Keyed by product_id, each containing array of monthly data
+     */
+    public function getBulkProductSalesHistory(array $productIds, int $monthsBack = 6): \Illuminate\Support\Collection
+    {
+        if (empty($productIds)) {
+            return collect();
+        }
+
+        $currentDate = Carbon::now();
+        $startDate = $currentDate->copy()->subMonths($monthsBack)->startOfMonth();
+
+        // Build month template
+        $monthTemplate = [];
+        for ($i = 0; $i < $monthsBack; $i++) {
+            $monthDate = $currentDate->copy()->subMonths($i);
+            $monthKey = $monthDate->format('Y-m');
+            $monthTemplate[$monthKey] = [
+                'month' => $monthDate->format('F Y'),
+                'units' => 0,
+                'month_short' => $monthDate->format('M'),
+                'year' => $monthDate->format('Y'),
+            ];
+        }
+
+        // Get sales data from STOCKDIARY in bulk
+        $salesData = StockDiary::whereIn('PRODUCT', $productIds)
+            ->sales()
+            ->where('DATENEW', '>=', $startDate)
+            ->selectRaw('PRODUCT as product_id')
+            ->selectRaw("DATE_FORMAT(DATENEW, '%Y-%m') as month_key")
+            ->selectRaw('SUM(ABS(UNITS)) as total_units')
+            ->groupBy('PRODUCT', 'month_key')
+            ->get();
+
+        // Build result for each product
+        $result = collect();
+        foreach ($productIds as $productId) {
+            $productMonths = $monthTemplate;
+
+            $productData = $salesData->where('product_id', $productId);
+            foreach ($productData as $monthData) {
+                if (isset($productMonths[$monthData->month_key])) {
+                    $productMonths[$monthData->month_key]['units'] = (float) $monthData->total_units;
+                }
+            }
+
+            // Return in chronological order (oldest first)
+            $result[$productId] = array_reverse($productMonths);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get last sale date for multiple products in bulk.
+     * Optimized to use GROUP BY instead of correlated subquery.
+     *
+     * @param  array  $productIds  Array of product IDs
+     * @return \Illuminate\Support\Collection Keyed by product_id, value is string date or null
+     */
+    public function getBulkLastSaleDates(array $productIds): \Illuminate\Support\Collection
+    {
+        if (empty($productIds)) {
+            return collect();
+        }
+
+        // Use GROUP BY with MAX instead of correlated subquery - MUCH faster
+        $lastSales = DB::connection('pos')
+            ->table('STOCKDIARY')
+            ->whereIn('PRODUCT', $productIds)
+            ->where('REASON', -1)
+            ->selectRaw('PRODUCT as product_id, MAX(DATENEW) as last_sale')
+            ->groupBy('PRODUCT')
+            ->get()
+            ->keyBy('product_id');
+
+        $result = collect();
+        foreach ($productIds as $productId) {
+            $result[$productId] = isset($lastSales[$productId])
+                ? Carbon::parse($lastSales[$productId]->last_sale)->format('Y-m-d')
+                : null;
+        }
+
+        return $result;
     }
 }

@@ -68,8 +68,12 @@ class OrderController extends Controller
             'christmas_start_date' => 'nullable|required_if:christmas_comparison_enabled,true|date',
             'christmas_end_date' => 'nullable|required_if:christmas_comparison_enabled,true|date|after_or_equal:christmas_start_date',
             'comparison_years' => 'nullable|array',
-            'comparison_years.*' => 'integer|min:2020|max:' . date('Y'),
+            'comparison_years.*' => 'integer|min:2020|max:'.date('Y'),
         ]);
+
+        // Extend timeout for large order generation (300-500 products with Christmas data)
+        // This is a temporary fix while we implement bulk pre-fetching optimization
+        set_time_limit(300);
 
         $orderDate = Carbon::parse($request->order_date);
         $coverageEndDate = Carbon::parse($request->coverage_end_date);
@@ -196,7 +200,7 @@ class OrderController extends Controller
     public function showChristmasReview(OrderSession $order): View|RedirectResponse
     {
         // If Christmas mode is not enabled, redirect to normal review
-        if (!$order->christmas_comparison_enabled) {
+        if (! $order->christmas_comparison_enabled) {
             return redirect()->route('orders.show', $order);
         }
 
