@@ -303,6 +303,42 @@ class ProductController extends Controller
     }
 
     /**
+     * Get weekly sales data for a product (used by sales chart popup).
+     */
+    public function weeklySalesData(Request $request, string $id)
+    {
+        $product = $this->productRepository->findById($id);
+
+        if (! $product) {
+            return response()->json(['error' => 'Product not found'], 404);
+        }
+
+        $weeks = (int) $request->get('weeks', 8);
+        $weeks = max(4, min(104, $weeks)); // Clamp between 4 and 104 weeks (2 years)
+
+        $weeklySales = $this->salesRepository->getProductWeeklySales($id, $weeks, forceLiveData: true);
+
+        // Calculate statistics
+        $salesValues = array_map(fn ($w) => (float) ($w['units'] ?? 0), $weeklySales);
+        $nonZeroSales = array_filter($salesValues, fn ($v) => $v > 0);
+        $totalSales = array_sum($salesValues);
+        $peakSales = ! empty($salesValues) ? max($salesValues) : 0;
+        $avgSales = count($nonZeroSales) > 0 ? $totalSales / count($nonZeroSales) : 0;
+
+        return response()->json([
+            'weeks' => $weeks,
+            'weeklySales' => $weeklySales,
+            'productName' => $product->NAME,
+            'stats' => [
+                'total' => round($totalSales, 1),
+                'peak' => round($peakSales, 1),
+                'average' => round($avgSales, 1),
+                'weeksWithSales' => count($nonZeroSales),
+            ],
+        ]);
+    }
+
+    /**
      * Update the price for a product.
      */
     public function updatePrice(Request $request, string $id): RedirectResponse

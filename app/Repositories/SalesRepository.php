@@ -62,9 +62,10 @@ class SalesRepository
      * Get weekly sales for a product for the last N weeks (oldest first).
      *
      * @param  int  $weeksBack  Number of weeks to retrieve (default 8)
+     * @param  bool  $forceLiveData  Force using live POS data instead of summaries
      * @return array<int, array<string, mixed>>
      */
-    public function getProductWeeklySales(string $productId, int $weeksBack = 8): array
+    public function getProductWeeklySales(string $productId, int $weeksBack = 8, bool $forceLiveData = false): array
     {
         $weeksBack = max(1, $weeksBack);
 
@@ -90,14 +91,17 @@ class SalesRepository
             $cursor->addWeek();
         }
 
-        // Try to use imported daily summaries first (fast path)
-        $summaryWeekly = SalesDailySummary::where('product_id', $productId)
-            ->whereBetween('sale_date', [$startRange, $endOfCurrentWeek])
-            ->selectRaw("DATE_FORMAT(DATE_SUB(sale_date, INTERVAL WEEKDAY(sale_date) DAY), '%Y-%m-%d') as week_start")
-            ->selectRaw('SUM(total_units) as total_units')
-            ->groupBy('week_start')
-            ->pluck('total_units', 'week_start')
-            ->toArray();
+        // Try to use imported daily summaries first (fast path) unless forced to use live data
+        $summaryWeekly = [];
+        if (! $forceLiveData) {
+            $summaryWeekly = SalesDailySummary::where('product_id', $productId)
+                ->whereBetween('sale_date', [$startRange, $endOfCurrentWeek])
+                ->selectRaw("DATE_FORMAT(DATE_SUB(sale_date, INTERVAL WEEKDAY(sale_date) DAY), '%Y-%m-%d') as week_start")
+                ->selectRaw('SUM(total_units) as total_units')
+                ->groupBy('week_start')
+                ->pluck('total_units', 'week_start')
+                ->toArray();
+        }
 
         if (! empty($summaryWeekly)) {
             foreach ($summaryWeekly as $weekStart => $units) {
@@ -106,7 +110,7 @@ class SalesRepository
                 }
             }
         } else {
-            // Fallback to live POS data if summaries are missing
+            // Fallback to live POS data if summaries are missing or forced
             $weeklySales = StockDiary::where('PRODUCT', $productId)
                 ->sales()
                 ->where('DATENEW', '>=', $startRange)

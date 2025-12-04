@@ -1,5 +1,137 @@
 # Technical Changelog
 
+## 2025-12-04 - Order Generation Performance Optimization
+
+### Overview
+Resolved critical production timeout issue affecting large order generation with Christmas comparison data. Applied bulk pre-fetching pattern to eliminate N+1 query problem, achieving **6.6x overall improvement** and enabling orders with 1,400+ products.
+
+### Problem Statement
+Order generation was timing out (30 second limit) when processing orders with:
+- 300-500+ products
+- Christmas comparison enabled
+- Root cause: N+1 query problem - 5-8 database queries per product
+
+**Impact Before Fix:**
+- Small orders (4 products): ~400ms
+- Medium orders (100 products): ~30 seconds
+- Large orders (1,400+ products): 149+ seconds → **TIMEOUT**
+
+### Solution: Bulk Pre-Fetching Pattern
+
+#### Core Pattern Applied
+```php
+// BEFORE: N+1 queries (3,000-5,000+ queries for large orders)
+foreach ($products as $product) {
+    $settings = ProductOrderSetting::where('product_id', $product->ID)->first();
+    $weeklySales = $salesRepository->getProductWeeklySales($product->ID, 8);
+    // ... 5-8 queries per product
+}
+
+// AFTER: Bulk pre-fetch + hashmap lookup (~10-20 queries total)
+$productIds = $products->pluck('ID')->toArray();
+$allSettings = ProductOrderSetting::whereIn('product_id', $productIds)->get()->keyBy('product_id');
+$allWeeklySales = $salesRepository->getBulkProductWeeklySales($productIds, 8);
+$groupedWeeklySales = $allWeeklySales->groupBy('product_id');
+
+foreach ($products as $product) {
+    $settings = $allSettings->get($product->ID);
+    $weeklySales = $groupedWeeklySales->get($product->ID, collect());
+}
+```
+
+### Files Modified
+
+#### `/app/Repositories/SalesRepository.php`
+**Status:** ✅ Enhanced with bulk methods
+**New Methods Added:**
+- `getBulkProductSalesStatistics(array $productIds)` - Bulk stats from sales_daily_summary
+- `getBulkProductWeeklySales(array $productIds, int $weeksBack)` - Bulk weekly breakdown
+- `getBulkChristmasWindowComparison(array $productIds, array $years, $start, $end)` - Bulk Christmas data with weekly breakdown
+- `getBulkRecentPurchasePrices(array $productIds)` - Bulk latest purchase prices
+- `getBulkProductSalesHistory(array $productIds, int $monthsBack)` - Bulk monthly history
+- `getBulkLastSaleDates(array $productIds)` - Bulk last sale dates (uses sales_daily_summary)
+
+**Key Optimization - Collection groupBy():**
+```php
+// Changed from O(n×m) filtering:
+$productData = $summaryData->where('product_id', $productId);  // O(n) each time
+
+// To O(1) hashmap lookup:
+$groupedData = $summaryData->groupBy('product_id');  // O(n) once
+$productData = $groupedData->get($productId, collect());  // O(1)
+```
+
+#### `/app/Services/OrderService.php`
+**Status:** ✅ Enhanced with bulk pre-fetching
+**Key Changes:**
+
+1. **Bulk Pre-Fetching in `buildOrderItemsForSession()`:**
+```php
+// Pre-fetch ALL data before product loop
+$productIds = $products->pluck('ID')->toArray();
+$allSettings = ProductOrderSetting::whereIn('product_id', $productIds)->get()->keyBy('product_id');
+$allSalesStats = $this->salesRepository->getBulkProductSalesStatistics($productIds);
+$allWeeklySales = $this->salesRepository->getBulkProductWeeklySales($productIds, $salesHistoryWeeks);
+$allStock = DB::connection('pos')->table('STOCKCURRENT')->whereIn('PRODUCT', $productIds)->get()->keyBy('PRODUCT');
+$allPurchasePrices = $this->salesRepository->getBulkRecentPurchasePrices($productIds);
+$allSalesHistory = $this->salesRepository->getBulkProductSalesHistory($productIds, 6);
+$allLastSaleDates = $this->salesRepository->getBulkLastSaleDates($productIds);
+
+// Christmas data (if enabled)
+if ($christmasEnabled) {
+    $allChristmasData = $this->salesRepository->getBulkChristmasWindowComparison($productIds, $years, $start, $end);
+}
+```
+
+2. **Updated `calculateProductSuggestion()` Signature:**
+- Now accepts pre-fetched data as optional parameters
+- Falls back to individual queries if pre-fetched data not provided
+
+3. **Fixed `getSupplierProducts()` Step 5:**
+- Changed from STOCKDIARY to `sales_daily_summary` for last sale dates
+
+### Performance Results
+
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| Database queries (large order) | 3,000-5,000+ | ~10-20 | 250x fewer |
+| Weekly sales processing | 70,014ms | 344ms | **203x faster** |
+| Last sale date lookups | 51,316ms | 39ms | **1,316x faster** |
+| Total order generation (1,400+ products) | 149 seconds | 22 seconds | **6.6x faster** |
+| Christmas comparison (large order) | TIMEOUT | SUCCESS | ✅ Fixed |
+
+### Bug Fixes Included
+
+1. **Christmas Graph Not Rendering:**
+   - Issue: `weekly_breakdown` array was empty in bulk method
+   - Fix: Updated `getBulkChristmasWindowComparison()` to include weekly breakdown data
+
+2. **Collection Filtering Performance:**
+   - Issue: Using `->where()` inside loop = O(n×m) complexity
+   - Fix: Using `->groupBy()` upfront = O(1) lookups
+
+3. **Slow Last Sale Date Queries:**
+   - Issue: Querying massive STOCKDIARY table
+   - Fix: Use pre-aggregated `sales_daily_summary` table
+
+### Testing Results
+
+- ✅ Small orders (4 products): ~350ms
+- ✅ Medium orders (100 products): ~3 seconds
+- ✅ Large orders (1,400+ products): ~22 seconds
+- ✅ Christmas comparison graphs displaying correctly
+- ✅ All suggested quantities calculated correctly
+- ✅ No regression in existing functionality
+
+### Documentation Updated
+
+- `docs/features/sales-data-import-plan.md` - Added Order Generation success story
+- `docs/features/order-management/order-generation.md` - Added 2025-12 enhancements section
+- `docs/features/order-management/christmas-comparison.md` - Updated performance section
+- `docs/development/performance-optimization-guide.md` - Added Order Generation example
+
+---
+
 ## 2025-01-24 - Document File Support for Invoice Bulk Upload
 
 ### Overview

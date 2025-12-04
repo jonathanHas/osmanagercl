@@ -10,9 +10,13 @@ This guide demonstrates how to apply the proven **100x+ performance improvement 
 - **Sales Analytics**: 30+ seconds → **<20ms** (1000x+ faster)
 - **F&V Dashboard**: 60+ seconds → **30ms** (2000x+ faster)
 - **Data Validation**: Hours → **seconds** (10,000x+ faster)
+- **Order Generation (1,400+ products)**: 149 seconds → **22 seconds** (6.6x faster)
 
-### Core Principle
-**Replace slow cross-database queries with blazing-fast pre-aggregated data**
+### Core Principles
+
+1. **Replace slow cross-database queries with pre-aggregated data**
+2. **Eliminate N+1 queries with bulk pre-fetching**
+3. **Use `groupBy()` for O(1) lookups instead of O(n) filtering**
 
 ## 📋 Step-by-Step Implementation
 
@@ -325,6 +329,44 @@ protected function schedule(Schedule $schedule)
 ```
 
 ## 🎯 Module-Specific Examples
+
+### Order Generation Module (Implemented December 2025)
+```php
+// BEFORE: N+1 query problem - 5-8 queries per product
+foreach ($products as $product) {
+    $settings = ProductOrderSetting::where('product_id', $product->ID)->first();
+    $salesStats = $salesRepository->getProductSalesStatistics($product->ID);
+    $weeklySales = $salesRepository->getProductWeeklySales($product->ID, 8);
+    $stock = $this->getCurrentStock($product->ID);
+    // Each product = 5-8 queries → 500 products = 3,000-5,000 queries = TIMEOUT
+}
+
+// AFTER: Bulk pre-fetching with hashmap lookups
+$productIds = $products->pluck('ID')->toArray();
+
+// Single bulk queries
+$allSettings = ProductOrderSetting::whereIn('product_id', $productIds)->get()->keyBy('product_id');
+$allSalesStats = $salesRepository->getBulkProductSalesStatistics($productIds);
+$allWeeklySales = $salesRepository->getBulkProductWeeklySales($productIds, 8);
+$allStock = StockCurrent::whereIn('PRODUCT', $productIds)->get()->keyBy('PRODUCT');
+
+// Group collections upfront for O(1) lookups
+$groupedWeeklySales = $allWeeklySales->groupBy('product_id');
+
+foreach ($products as $product) {
+    // O(1) hashmap lookups instead of database queries
+    $settings = $allSettings->get($product->ID);
+    $weeklySales = $groupedWeeklySales->get($product->ID, collect());
+    $stock = $allStock->get($product->ID);
+}
+// Result: ~10-20 queries total regardless of product count
+```
+
+**Performance Results:**
+- Weekly sales processing: 70,014ms → 344ms (203x faster)
+- Last sale date lookups: 51,316ms → 39ms (1,316x faster)
+- Total order generation: 149 seconds → 22 seconds (6.6x faster)
+- Large orders (1,400+ products): Timeout → Success
 
 ### Financial Reports Module
 ```php

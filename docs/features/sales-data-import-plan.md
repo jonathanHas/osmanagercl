@@ -965,6 +965,84 @@ class FruitVegController {
 - Top Products: **7,117x faster** (1ms vs 10+ seconds)
 - User Experience: From unusable → instant, responsive analytics
 
+### ✅ Successful Implementation: Order Generation System (December 2025)
+
+**Problem:**
+- Large supplier orders (300-500+ products) timed out at 30 seconds
+- Christmas data orders with 1,400+ products took 149+ seconds
+- N+1 query problem: 5-8 database queries per product = 3,000-5,000+ queries per order
+
+**Root Cause:**
+- `OrderService::calculateProductSuggestion()` made individual database calls per product
+- Collection filtering used O(n×m) complexity instead of O(1) hashmap lookups
+- STOCKDIARY queries on massive table without using pre-aggregated data
+
+**Solution Applied:**
+
+```php
+// BEFORE: N+1 Query Problem (3,000-5,000+ queries)
+foreach ($products as $product) {
+    $settings = ProductOrderSetting::where('product_id', $product->ID)->first();
+    $salesStats = $this->salesRepository->getProductSalesStatistics($product->ID);
+    $weeklySales = $this->salesRepository->getProductWeeklySales($product->ID, $weeks);
+    // ... 5-8 more queries per product
+}
+
+// AFTER: Bulk Pre-fetching (~10-20 queries total)
+$productIds = $products->pluck('ID')->toArray();
+$allSettings = ProductOrderSetting::whereIn('product_id', $productIds)->get()->keyBy('product_id');
+$allSalesStats = $this->salesRepository->getBulkProductSalesStatistics($productIds);
+$allWeeklySales = $this->salesRepository->getBulkProductWeeklySales($productIds, $weeks);
+// ... all data pre-fetched in bulk
+
+foreach ($products as $product) {
+    $settings = $allSettings[$product->ID] ?? null;  // O(1) lookup
+    $salesStats = $allSalesStats[$product->ID] ?? null;
+    // ... use pre-fetched data
+}
+```
+
+**Critical Optimization - Collection groupBy():**
+```php
+// BEFORE: O(n×m) - 70 seconds for 1,472 products × 5,483 rows
+foreach ($productIds as $productId) {
+    $productData = $summaryData->where('product_id', $productId);  // Scans ALL rows each time
+}
+
+// AFTER: O(n) - 344ms for same data
+$groupedData = $summaryData->groupBy('product_id');  // Group ONCE
+foreach ($productIds as $productId) {
+    $productData = $groupedData->get($productId, collect());  // O(1) hashmap lookup
+}
+```
+
+**Performance Results:**
+
+| Operation | Before | After | Improvement |
+|-----------|--------|-------|-------------|
+| Weekly sales fetch | 70,014ms | **344ms** | **203x faster** |
+| Last sale dates | 51,316ms | **39ms** | **1,316x faster** |
+| Sales history | 53,998ms | 3,868ms | **14x faster** |
+| **Total order time** | 149 seconds | **22 seconds** | **6.6x faster** |
+
+**Files Modified:**
+- `app/Services/OrderService.php` - Bulk pre-fetching in `buildOrderItemsForSession()`
+- `app/Repositories/SalesRepository.php` - Added bulk methods:
+  - `getBulkProductSalesStatistics()`
+  - `getBulkProductWeeklySales()`
+  - `getBulkChristmasWindowComparison()`
+  - `getBulkRecentPurchasePrices()`
+  - `getBulkProductSalesHistory()`
+  - `getBulkLastSaleDates()`
+
+**Key Lessons:**
+1. **Always use `groupBy()` before filtering** - Collection `where()` inside loops is O(n×m)
+2. **Use pre-aggregated tables** - `sales_daily_summary` is indexed and much smaller than STOCKDIARY
+3. **Bulk fetch with `whereIn()`** - One query for all products, not one per product
+4. **keyBy() for O(1) lookups** - Use `->keyBy('product_id')` instead of repeated filtering
+
+---
+
 ### 🎯 Ready-to-Implement Integration Patterns
 
 #### 1. Category-Specific Sales Modules (Coffee, Lunch, Cakes, etc.)

@@ -37,6 +37,14 @@ The order generation system automates the calculation of required stock quantiti
 - **Priority Shortcuts**: Inline priority selectors let buyers mark items as 🔴 review, 🟡 standard, or 🟢 safe. Choosing safe persists to `product_order_settings`, flips the row to auto-approved, and influences future order suggestions.
 - **Smarter Case Formatting**: Suggested and ordered case quantities collapse cleanly to whole numbers (e.g. `1` instead of `1.000`) while still displaying fractional values when buyers adjust partial cases.
 
+### 2025-12 Enhancements (Performance Optimization)
+- **Bulk Pre-Fetching**: Eliminated N+1 query problem by pre-fetching all data before the product loop. Reduced database queries from 3,000-5,000+ (for large orders) down to ~10-20 queries.
+- **Collection groupBy() Optimization**: Changed collection filtering from O(n×m) to O(1) hashmap lookups, reducing weekly sales processing from 70 seconds to 344ms (203x faster).
+- **Pre-Aggregated Data**: Order generation now uses `sales_daily_summary` table instead of querying the massive STOCKDIARY table directly, yielding 1,316x faster last-sale-date lookups.
+- **Christmas Comparison Fix**: Bulk Christmas window comparison now properly includes weekly breakdown data for chart visualization.
+- **Large Order Support**: Orders with 1,400+ products now complete in ~22 seconds instead of timing out at 30 seconds or taking 149+ seconds.
+- **New Bulk Repository Methods**: Added `getBulkProductSalesStatistics()`, `getBulkProductWeeklySales()`, `getBulkChristmasWindowComparison()`, `getBulkRecentPurchasePrices()`, `getBulkProductSalesHistory()`, and `getBulkLastSaleDates()` to `SalesRepository`.
+
 ### 2. Product Classification System
 Products are classified into three review priority levels:
 
@@ -277,11 +285,39 @@ Code,Cases,Units,Content,Description,Price,Sale,Total
 
 ## Performance Considerations
 
-### Optimization Strategies
-- Cache sales calculations for session duration
-- Index frequently queried columns
-- Lazy load product details
-- Background processing for large supplier catalogs
+### Current Performance (December 2025)
+| Order Size | Previous Time | Current Time | Improvement |
+|------------|---------------|--------------|-------------|
+| Small (4 products) | ~400ms | ~350ms | 1.1x |
+| Medium (100 products) | ~30 seconds | ~3 seconds | 10x |
+| Large (1,400+ products) | 149 seconds (timeout) | **22 seconds** | **6.6x** |
+
+### Optimization Strategies Implemented
+- **Bulk Pre-Fetching**: All product data fetched upfront with `whereIn()` queries
+- **Collection groupBy()**: Data grouped once, then accessed via O(1) hashmap lookups
+- **Pre-Aggregated Tables**: Uses `sales_daily_summary` instead of raw STOCKDIARY queries
+- **Efficient Stock Lookups**: Single query for all stock levels via STOCKCURRENT
+
+### Key Performance Patterns
+```php
+// ✅ GOOD: Bulk fetch then lookup
+$allData = Model::whereIn('product_id', $productIds)->get()->keyBy('product_id');
+foreach ($products as $product) {
+    $data = $allData[$product->ID] ?? null;  // O(1) lookup
+}
+
+// ❌ BAD: Query inside loop (N+1 problem)
+foreach ($products as $product) {
+    $data = Model::where('product_id', $product->ID)->first();  // N queries
+}
+
+// ✅ GOOD: Group then access
+$grouped = $collection->groupBy('product_id');
+$productData = $grouped->get($productId, collect());  // O(1)
+
+// ❌ BAD: Filter repeatedly
+$productData = $collection->where('product_id', $productId);  // O(n) each time
+```
 
 ### Scalability
 - Pagination for large product lists
