@@ -154,17 +154,29 @@ class Product extends Model
     }
 
     /**
-     * Search products by name, code, or reference.
+     * Search products by name, code, reference, or supplier code.
      *
      * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeSearch($query, string $search)
     {
-        return $query->where(function ($q) use ($search) {
+        // Two-phase supplier code search: first get barcodes, then use WHERE IN
+        // This avoids the slow correlated subquery (6.8s -> <100ms)
+        $matchingBarcodes = \DB::connection('pos')
+            ->table('supplier_link')
+            ->where('SupplierCode', 'like', '%'.$search.'%')
+            ->pluck('Barcode')
+            ->toArray();
+
+        return $query->where(function ($q) use ($search, $matchingBarcodes) {
             $q->where('NAME', 'like', '%'.$search.'%')
                 ->orWhere('CODE', 'like', '%'.$search.'%')
                 ->orWhere('REFERENCE', 'like', '%'.$search.'%');
+
+            if (! empty($matchingBarcodes)) {
+                $q->orWhereIn('CODE', $matchingBarcodes);
+            }
         });
     }
 
