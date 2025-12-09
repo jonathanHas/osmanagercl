@@ -7,6 +7,8 @@ use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\Financials\BankStatementController;
 use App\Http\Controllers\FruitVegController;
 use App\Http\Controllers\KdsController;
+use App\Http\Controllers\KitchenController;
+use App\Http\Controllers\KitchenIngredientProfileController;
 use App\Http\Controllers\LabelAreaController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
@@ -62,6 +64,9 @@ Route::middleware('auth')->group(function () {
     Route::put('/products/{id}', [ProductController::class, 'update'])->name('products.update');
     Route::get('/products/{id}/sales-data', [ProductController::class, 'salesData'])->name('products.sales-data');
     Route::get('/products/{id}/weekly-sales', [ProductController::class, 'weeklySalesData'])->name('products.weekly-sales');
+    Route::get('/products/{id}/daily-sales', [ProductController::class, 'dailySalesData'])->name('products.daily-sales');
+    Route::get('/products/{id}/transaction-details', [ProductController::class, 'transactionDetailsData'])->name('products.transaction-details');
+    Route::get('/products/{id}/image', [ProductController::class, 'image'])->name('products.image');
     Route::get('/products/{id}/refresh-udea-pricing', [ProductController::class, 'refreshUdeaPricing'])->name('products.refresh-udea-pricing');
     Route::get('/products/udea-pricing', [ProductController::class, 'getUdeaPricing'])->name('products.udea-pricing');
     Route::patch('/products/{id}/name', [ProductController::class, 'updateName'])->name('products.update-name');
@@ -231,6 +236,44 @@ Route::middleware('auth')->group(function () {
         Route::get('/sales/data', [CoffeeController::class, 'getSalesData'])->name('sales.data');
         Route::get('/sales/product/{code}/daily', [CoffeeController::class, 'getProductDailySales'])->name('sales.product.daily');
         Route::get('/product-image/{code}', [CoffeeController::class, 'productImage'])->name('product-image');
+    });
+
+    // Kitchen/Recipe Management routes
+    Route::prefix('kitchen')->name('kitchen.')->group(function () {
+        // Static routes first
+        Route::get('/', [KitchenController::class, 'index'])->name('index');
+        Route::get('/create', [KitchenController::class, 'create'])->name('create');
+        Route::post('/', [KitchenController::class, 'store'])->name('store');
+
+        // Ingredient Profiles (must be before {recipe} wildcard)
+        Route::prefix('profiles')->name('profiles.')->group(function () {
+            Route::get('/', [KitchenIngredientProfileController::class, 'index'])->name('index');
+            Route::get('/create', [KitchenIngredientProfileController::class, 'create'])->name('create');
+            Route::post('/', [KitchenIngredientProfileController::class, 'store'])->name('store');
+            Route::get('/{profile}/edit', [KitchenIngredientProfileController::class, 'edit'])->name('edit');
+            Route::put('/{profile}', [KitchenIngredientProfileController::class, 'update'])->name('update');
+            Route::delete('/{profile}', [KitchenIngredientProfileController::class, 'destroy'])->name('destroy');
+            Route::post('/{profile}/recalculate', [KitchenIngredientProfileController::class, 'recalculate'])->name('recalculate');
+        });
+
+        // AJAX API endpoints (must be before {recipe} wildcard)
+        Route::get('/api/products/search', [KitchenController::class, 'searchProducts'])->name('api.products.search');
+        Route::get('/api/recipes/{recipe}/costs', [KitchenController::class, 'getRecipeCosts'])->name('api.costs');
+        Route::post('/api/recipes/{recipe}/recalculate', [KitchenController::class, 'recalculateCosts'])->name('api.recalculate');
+        Route::get('/api/profiles/search', [KitchenIngredientProfileController::class, 'search'])->name('api.profiles.search');
+        Route::get('/api/profiles/products/search', [KitchenIngredientProfileController::class, 'searchProducts'])->name('api.profiles.products.search');
+
+        // Ingredient management
+        Route::put('/ingredients/{ingredient}', [KitchenController::class, 'updateIngredient'])->name('ingredients.update');
+        Route::delete('/ingredients/{ingredient}', [KitchenController::class, 'removeIngredient'])->name('ingredients.remove');
+
+        // Recipe wildcard routes (must be last)
+        Route::get('/{recipe}', [KitchenController::class, 'show'])->name('show');
+        Route::get('/{recipe}/edit', [KitchenController::class, 'edit'])->name('edit');
+        Route::put('/{recipe}', [KitchenController::class, 'update'])->name('update');
+        Route::delete('/{recipe}', [KitchenController::class, 'destroy'])->name('destroy');
+        Route::post('/{recipe}/ingredients', [KitchenController::class, 'addIngredient'])->name('ingredients.add');
+        Route::post('/{recipe}/scale', [KitchenController::class, 'saveScaledRecipe'])->name('scale');
     });
 
     // Categories management routes

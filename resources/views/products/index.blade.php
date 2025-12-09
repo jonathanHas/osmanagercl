@@ -156,6 +156,9 @@
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                         Code
                                     </th>
+                                    <th class="px-2 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-12">
+
+                                    </th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                         Name
                                     </th>
@@ -186,6 +189,27 @@
                                     <tr>
                                         <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                                             {{ $product->CODE }}
+                                        </td>
+                                        <td class="px-2 py-2 whitespace-nowrap">
+                                            @php
+                                                $imageUrl = null;
+                                                // Priority 1: Database image
+                                                if ($product->has_image) {
+                                                    $imageUrl = route('products.image', $product->ID);
+                                                }
+                                                // Priority 2: Supplier image (if suppliers shown and has external integration)
+                                                elseif ($showSuppliers && $product->supplier && $supplierService->hasExternalIntegration($product->supplier->SupplierID)) {
+                                                    $imageUrl = $supplierService->getExternalImageUrl($product);
+                                                }
+                                            @endphp
+
+                                            @if($imageUrl)
+                                                <img src="{{ $imageUrl }}"
+                                                     alt="{{ $product->NAME }}"
+                                                     class="w-10 h-10 object-cover rounded border border-gray-200 dark:border-gray-700"
+                                                     loading="lazy"
+                                                     onerror="this.style.display='none'">
+                                            @endif
                                         </td>
                                         <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                                             {{ $product->NAME }}
@@ -296,7 +320,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="{{ $showSuppliers ? '7' : '6' }}" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                                        <td colspan="{{ $showSuppliers ? '8' : '7' }}" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                                             No products found.
                                         </td>
                                     </tr>

@@ -4,6 +4,7 @@ This document provides a comprehensive overview of all features in the OSManager
 
 **Quick Navigation:**
 - [Product Management](#product-management)
+- [Kitchen Management](#kitchen-management)
 - [Supplier Management](#supplier-management)
 - [Order Management](#order-management)
 - [Financial Systems](#financial-systems)
@@ -100,6 +101,35 @@ Cross-database price synchronization management with web-based interface.
 **Critical Fix**: Resolved cross-database transaction issue where Laravel `DB::transaction()` only applied to default connection, causing POS updates to not commit properly. Now uses separate transaction management for each database connection.
 
 📖 [F&V System Documentation](./features/fruit-veg-system.md#price-sync-management-system)
+
+---
+
+## Kitchen Management
+
+### Kitchen Recipe Costing System (NEW! 2025-12-08)
+Comprehensive recipe costing system with ingredient profiles, overhead calculations, and margin analysis.
+- **Recipe Management**: Create, edit, and manage recipes with ingredients linked to POS products
+- **Ingredient Profiles**: Define ingredient costing with purchase units, recipe units, and density conversions
+- **Labour Cost Calculation**: Automatic labour cost from `(prep_time + cook_time)` × hourly rate
+- **Electricity Cost Calculation**: Automatic electricity cost from `cook_time` × power (kW) × rate (€/kWh)
+- **Per-Recipe Overrides**: Override global labour rate, electricity rate, and cooking power per recipe
+- **Cost Breakdown Display**: Detailed breakdown showing ingredients, labour, electricity, and total costs
+- **Margin Analysis**: Profit margin calculation with color-coded status indicators:
+  - Excellent (40%+) - Green
+  - Good (20-40%) - Yellow
+  - Low (10-20%) - Orange
+  - Critical (<10%) - Red
+- **Cost History Tracking**: Record cost snapshots over time for trend analysis
+- **Delivery Markup Support**: Apply delivery markup percentage to imported products (Udea, Dynamis suppliers)
+- **Unit Conversions**: Smart weight↔volume conversions using density factors (e.g., flour density 0.593)
+- **Linked Products**: Connect recipes to POS products for automatic sell price and margin calculation
+
+**Configuration** (`config/kitchen.php`):
+- `KITCHEN_LABOUR_RATE` - Default labour rate per hour (€15.00)
+- `KITCHEN_ELECTRICITY_RATE` - Electricity cost per kWh (€0.25)
+- `KITCHEN_AVG_COOKING_POWER` - Average cooking power in kW (2.0)
+
+📖 [Kitchen Recipe Costing Documentation](./features/kitchen-recipe-costing.md)
 
 ---
 

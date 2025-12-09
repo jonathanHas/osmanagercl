@@ -466,6 +466,15 @@
                                         title="Copy supplier code">
                                     Copy
                                 </button>
+                                @if(isset($supplierService) && ($link = $supplierService->getSupplierWebsiteLink($product)))
+                                    <a href="{{ $link }}"
+                                       target="_blank"
+                                       rel="noopener noreferrer"
+                                       class="text-[11px] font-medium text-blue-600 hover:text-blue-800"
+                                       title="View on supplier website">
+                                        View →
+                                    </a>
+                                @endif
                             </div>
                         @endif
                         <div class="mt-2 flex items-center gap-2 text-xs">
@@ -487,6 +496,16 @@
                             <span class="hidden text-[11px] text-green-600" data-priority-feedback="{{ $item->id }}">
                                 Saved
                             </span>
+                        </div>
+                        <div class="mt-2 flex items-center gap-2 text-xs">
+                            <button type="button"
+                                    class="stock-toggle-btn text-[11px] font-medium border rounded px-2 py-0.5 transition-colors {{ $product->stocking ? 'text-red-600 hover:text-red-800 border-red-300 hover:border-red-400' : 'text-green-600 hover:text-green-800 border-green-300 hover:border-green-400' }}"
+                                    data-product-id="{{ $product->ID }}"
+                                    data-product-name="{{ $safeProductName }}"
+                                    data-is-stocked="{{ $product->stocking ? 'true' : 'false' }}"
+                                    title="{{ $product->stocking ? 'Remove from stock management' : 'Add to stock management' }}">
+                                {{ $product->stocking ? 'Destock' : 'Restock' }}
+                            </button>
                         </div>
                         <div class="mt-2 text-xs text-slate-500 leading-tight">
                             <span class="uppercase tracking-wide text-[10px] text-slate-400">Safety stock floor</span>
@@ -895,6 +914,15 @@
                                         title="Copy supplier code">
                                     Copy
                                 </button>
+                                @if(isset($supplierService) && ($link = $supplierService->getSupplierWebsiteLink($product)))
+                                    <a href="{{ $link }}"
+                                       target="_blank"
+                                       rel="noopener noreferrer"
+                                       class="text-[11px] font-medium text-blue-600 hover:text-blue-800"
+                                       title="View on supplier website">
+                                        View →
+                                    </a>
+                                @endif
                             </div>
                         @endif
                         <div class="mt-2 flex items-center gap-2 text-xs">
@@ -916,6 +944,16 @@
                             <span class="hidden text-[11px] text-green-600" data-priority-feedback="{{ $item->id }}">
                                 Saved
                             </span>
+                        </div>
+                        <div class="mt-2 flex items-center gap-2 text-xs">
+                            <button type="button"
+                                    class="stock-toggle-btn text-[11px] font-medium border rounded px-2 py-0.5 transition-colors {{ $product->stocking ? 'text-red-600 hover:text-red-800 border-red-300 hover:border-red-400' : 'text-green-600 hover:text-green-800 border-green-300 hover:border-green-400' }}"
+                                    data-product-id="{{ $product->ID }}"
+                                    data-product-name="{{ $safeProductName }}"
+                                    data-is-stocked="{{ $product->stocking ? 'true' : 'false' }}"
+                                    title="{{ $product->stocking ? 'Remove from stock management' : 'Add to stock management' }}">
+                                {{ $product->stocking ? 'Destock' : 'Restock' }}
+                            </button>
                         </div>
                         <div class="mt-2 text-xs text-slate-500 leading-tight">
                             <span class="uppercase tracking-wide text-[10px] text-slate-400">Safety stock floor</span>
@@ -1236,6 +1274,15 @@
                                         title="Copy supplier code">
                                     Copy
                                 </button>
+                                @if(isset($supplierService) && ($link = $supplierService->getSupplierWebsiteLink($product)))
+                                    <a href="{{ $link }}"
+                                       target="_blank"
+                                       rel="noopener noreferrer"
+                                       class="text-[11px] font-medium text-blue-600 hover:text-blue-800"
+                                       title="View on supplier website">
+                                        View →
+                                    </a>
+                                @endif
                             </div>
                         @endif
                         <div class="mt-2 flex items-center gap-2 text-xs">
@@ -1257,6 +1304,16 @@
                             <span class="hidden text-[11px] text-green-600" data-priority-feedback="{{ $item->id }}">
                                 Saved
                             </span>
+                        </div>
+                        <div class="mt-2 flex items-center gap-2 text-xs">
+                            <button type="button"
+                                    class="stock-toggle-btn text-[11px] font-medium border rounded px-2 py-0.5 transition-colors {{ $product->stocking ? 'text-red-600 hover:text-red-800 border-red-300 hover:border-red-400' : 'text-green-600 hover:text-green-800 border-green-300 hover:border-green-400' }}"
+                                    data-product-id="{{ $product->ID }}"
+                                    data-product-name="{{ $safeProductName }}"
+                                    data-is-stocked="{{ $product->stocking ? 'true' : 'false' }}"
+                                    title="{{ $product->stocking ? 'Remove from stock management' : 'Add to stock management' }}">
+                                {{ $product->stocking ? 'Destock' : 'Restock' }}
+                            </button>
                         </div>
                         <div class="mt-2 text-xs text-slate-500 leading-tight">
                             <span class="uppercase tracking-wide text-[10px] text-slate-400">Safety stock floor</span>
@@ -1577,6 +1634,15 @@
                                         title="Copy supplier code">
                                     Copy
                                 </button>
+                                @if(isset($supplierService) && ($link = $supplierService->getSupplierWebsiteLink($product)))
+                                    <a href="{{ $link }}"
+                                       target="_blank"
+                                       rel="noopener noreferrer"
+                                       class="text-[11px] font-medium text-blue-600 hover:text-blue-800"
+                                       title="View on supplier website">
+                                        View →
+                                    </a>
+                                @endif
                             </div>
                         @endif
                         <div class="mt-2 flex items-center gap-2 text-xs">
@@ -1598,6 +1664,16 @@
                             <span class="hidden text-[11px] text-green-600" data-priority-feedback="{{ $item->id }}">
                                 Saved
                             </span>
+                        </div>
+                        <div class="mt-2 flex items-center gap-2 text-xs">
+                            <button type="button"
+                                    class="stock-toggle-btn text-[11px] font-medium border rounded px-2 py-0.5 transition-colors {{ $product->stocking ? 'text-red-600 hover:text-red-800 border-red-300 hover:border-red-400' : 'text-green-600 hover:text-green-800 border-green-300 hover:border-green-400' }}"
+                                    data-product-id="{{ $product->ID }}"
+                                    data-product-name="{{ $safeProductName }}"
+                                    data-is-stocked="{{ $product->stocking ? 'true' : 'false' }}"
+                                    title="{{ $product->stocking ? 'Remove from stock management' : 'Add to stock management' }}">
+                                {{ $product->stocking ? 'Destock' : 'Restock' }}
+                            </button>
                         </div>
                         <div class="mt-2 text-xs text-slate-500 leading-tight">
                             <span class="uppercase tracking-wide text-[10px] text-slate-400">Safety stock floor</span>
@@ -3100,5 +3176,75 @@
                 }
             });
         })();
+
+        // Destock/Restock button handler
+        function initStockToggleButtons() {
+            document.querySelectorAll('.stock-toggle-btn').forEach(button => {
+                if (button.dataset.initialized) return;
+                button.dataset.initialized = 'true';
+
+                button.addEventListener('click', async function() {
+                    const productId = this.dataset.productId;
+                    const productName = this.dataset.productName;
+                    const isStocked = this.dataset.isStocked === 'true';
+                    const action = isStocked ? 'destock' : 'restock';
+
+                    // Show confirmation dialog
+                    const message = isStocked
+                        ? `Are you sure you want to remove "${productName}" from stock management?\n\nThis product will no longer be included in future orders.`
+                        : `Are you sure you want to add "${productName}" back to stock management?\n\nThis product will be included in future orders.`;
+
+                    if (!confirm(message)) {
+                        return;
+                    }
+
+                    // Disable button while processing
+                    this.disabled = true;
+                    this.textContent = isStocked ? 'Removing...' : 'Adding...';
+
+                    try {
+                        const response = await fetch(`/products/${productId}/toggle-stocking`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({ include_in_stocking: !isStocked })
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok && data.success) {
+                            // Toggle the button state
+                            this.dataset.isStocked = (!isStocked).toString();
+                            if (isStocked) {
+                                // Was stocked, now destocked
+                                this.textContent = 'Restock';
+                                this.classList.remove('text-red-600', 'hover:text-red-800', 'border-red-300', 'hover:border-red-400');
+                                this.classList.add('text-green-600', 'hover:text-green-800', 'border-green-300', 'hover:border-green-400');
+                            } else {
+                                // Was destocked, now restocked
+                                this.textContent = 'Destock';
+                                this.classList.remove('text-green-600', 'hover:text-green-800', 'border-green-300', 'hover:border-green-400');
+                                this.classList.add('text-red-600', 'hover:text-red-800', 'border-red-300', 'hover:border-red-400');
+                            }
+                            this.disabled = false;
+                        } else {
+                            alert(`Failed to ${action} product: ` + (data.error || 'Unknown error'));
+                            this.disabled = false;
+                            this.textContent = isStocked ? 'Destock' : 'Restock';
+                        }
+                    } catch (error) {
+                        console.error('Stock toggle error:', error);
+                        alert(`Failed to ${action} product. Please try again.`);
+                        this.disabled = false;
+                        this.textContent = isStocked ? 'Destock' : 'Restock';
+                    }
+                });
+            });
+        }
+
+        initStockToggleButtons();
     });
 </script>

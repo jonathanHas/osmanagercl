@@ -18,6 +18,11 @@ class ProductRepository
     {
         $query = Product::query();
 
+        // Select all product columns first, then add has_image computed column
+        // Note: addSelect() alone replaces SELECT *, so we must explicitly select columns first
+        $query->select('PRODUCTS.*')
+            ->addSelect(DB::raw('(CASE WHEN IMAGE IS NOT NULL AND LENGTH(IMAGE) > 0 THEN 1 ELSE 0 END) as has_image'));
+
         if ($withSuppliers) {
             $query->with(['stockCurrent', 'taxCategory', 'tax', 'supplierLink', 'supplier', 'category']);
         } else {
@@ -120,6 +125,11 @@ class ProductRepository
 
         $query = Product::query();
 
+        // Select all product columns first, then add has_image computed column
+        // Note: addSelect() alone replaces SELECT *, so we must explicitly select columns first
+        $query->select('PRODUCTS.*')
+            ->addSelect(DB::raw('(CASE WHEN IMAGE IS NOT NULL AND LENGTH(IMAGE) > 0 THEN 1 ELSE 0 END) as has_image'));
+
         // Apply basic filters first
         if ($categoryId) {
             $query->where('CATEGORY', $categoryId);
@@ -185,6 +195,11 @@ class ProductRepository
             ->pluck('Barcode');
 
         $query = Product::query()->whereIn('CODE', $supplierProducts);
+
+        // Select all product columns first, then add has_image computed column
+        // Note: addSelect() alone replaces SELECT *, so we must explicitly select columns first
+        $query->select('PRODUCTS.*')
+            ->addSelect(DB::raw('(CASE WHEN IMAGE IS NOT NULL AND LENGTH(IMAGE) > 0 THEN 1 ELSE 0 END) as has_image'));
 
         // Apply basic filters
         if ($categoryId) {

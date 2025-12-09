@@ -7,6 +7,7 @@ use App\Models\OrderSession;
 use App\Models\Supplier;
 use App\Services\OrderService;
 use App\Services\SalesDataSyncService;
+use App\Services\SupplierService;
 use App\Support\SpecialOrderCategories;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -22,10 +23,13 @@ class OrderController extends Controller
 
     protected SalesDataSyncService $salesDataSyncService;
 
-    public function __construct(OrderService $orderService, SalesDataSyncService $salesDataSyncService)
+    protected SupplierService $supplierService;
+
+    public function __construct(OrderService $orderService, SalesDataSyncService $salesDataSyncService, SupplierService $supplierService)
     {
         $this->orderService = $orderService;
         $this->salesDataSyncService = $salesDataSyncService;
+        $this->supplierService = $supplierService;
     }
 
     /**
@@ -158,6 +162,7 @@ class OrderController extends Controller
             'order' => $order,
             'statistics' => $context['statistics'],
             'categoryGroups' => $context['categoryGroups'],
+            'supplierService' => $this->supplierService,
         ]);
     }
 
@@ -177,6 +182,7 @@ class OrderController extends Controller
             'order' => $order,
             'statistics' => $context['statistics'],
             'categoryGroups' => $context['categoryGroups'],
+            'supplierService' => $this->supplierService,
         ]);
     }
 
@@ -191,6 +197,7 @@ class OrderController extends Controller
             'order' => $order,
             'statistics' => $context['statistics'],
             'categoryGroups' => $context['categoryGroups'],
+            'supplierService' => $this->supplierService,
         ]);
     }
 
@@ -210,6 +217,7 @@ class OrderController extends Controller
             'order' => $order,
             'statistics' => $context['statistics'],
             'categoryGroups' => $context['categoryGroups'],
+            'supplierService' => $this->supplierService,
         ]);
     }
 
@@ -230,7 +238,7 @@ class OrderController extends Controller
         $statistics = $this->orderService->getOrderStatistics($order);
         $categoryGroups = SpecialOrderCategories::forSupplier((string) $order->supplier_id);
 
-        return view('orders.grid-view', compact('order', 'statistics', 'categoryGroups'));
+        return view('orders.grid-view', compact('order', 'statistics', 'categoryGroups') + ['supplierService' => $this->supplierService]);
     }
 
     /**
@@ -392,6 +400,7 @@ class OrderController extends Controller
     {
         $order->load([
             'items.product.supplierLinks.supplier',
+            'items.product.stocking',
             'items.product.orderSettings',
             'supplier',
             'user',

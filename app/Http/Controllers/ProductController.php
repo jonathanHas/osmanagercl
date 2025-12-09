@@ -339,6 +339,128 @@ class ProductController extends Controller
     }
 
     /**
+     * Get daily sales data for a product within a specific week (used by sales chart popup drill-down).
+     */
+    public function dailySalesData(Request $request, string $id)
+    {
+        $product = $this->productRepository->findById($id);
+
+        if (! $product) {
+            return response()->json(['error' => 'Product not found'], 404);
+        }
+
+        $weekStart = $request->get('week_start');
+        if (! $weekStart) {
+            return response()->json(['error' => 'week_start parameter is required'], 400);
+        }
+
+        // Validate date format
+        try {
+            $startDate = \Carbon\Carbon::parse($weekStart)->startOfWeek();
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Invalid week_start date format'], 400);
+        }
+
+        $endDate = $startDate->copy()->endOfWeek();
+
+        $dailySales = $this->salesRepository->getProductDailySales($id, $weekStart, forceLiveData: true);
+
+        // Calculate statistics
+        $salesValues = array_map(fn ($d) => (float) ($d['units'] ?? 0), $dailySales);
+        $nonZeroSales = array_filter($salesValues, fn ($v) => $v > 0);
+        $totalSales = array_sum($salesValues);
+        $peakSales = ! empty($salesValues) ? max($salesValues) : 0;
+        $avgSales = count($nonZeroSales) > 0 ? $totalSales / count($nonZeroSales) : 0;
+
+        // Find peak day name
+        $peakDay = '-';
+        foreach ($dailySales as $day) {
+            if ((float) $day['units'] === $peakSales && $peakSales > 0) {
+                $peakDay = $day['dayName'];
+                break;
+            }
+        }
+
+        return response()->json([
+            'weekStart' => $startDate->format('Y-m-d'),
+            'weekEnd' => $endDate->format('Y-m-d'),
+            'weekLabel' => 'Week of '.$startDate->format('d M'),
+            'dailySales' => $dailySales,
+            'productName' => $product->NAME,
+            'stats' => [
+                'total' => round($totalSales, 1),
+                'peak' => round($peakSales, 1),
+                'peakDay' => $peakDay,
+                'average' => round($avgSales, 1),
+                'daysWithSales' => count($nonZeroSales),
+            ],
+        ]);
+    }
+
+    /**
+     * Get individual transaction details for a product on a specific date (used by sales chart popup drill-down).
+     */
+    public function transactionDetailsData(Request $request, string $id)
+    {
+        $product = $this->productRepository->findById($id);
+
+        if (! $product) {
+            return response()->json(['error' => 'Product not found'], 404);
+        }
+
+        $date = $request->get('date');
+        if (! $date) {
+            return response()->json(['error' => 'date parameter is required'], 400);
+        }
+
+        // Validate date format
+        try {
+            $parsedDate = \Carbon\Carbon::parse($date);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Invalid date format'], 400);
+        }
+
+        $transactions = $this->salesRepository->getProductTransactionDetails($id, $date);
+
+        // Calculate summary stats
+        $totalUnits = array_sum(array_column($transactions, 'units'));
+        $totalValue = array_sum(array_column($transactions, 'total'));
+        $avgPerTransaction = count($transactions) > 0 ? $totalUnits / count($transactions) : 0;
+
+        return response()->json([
+            'date' => $parsedDate->format('Y-m-d'),
+            'dayName' => $parsedDate->format('l'),
+            'dateLabel' => $parsedDate->format('D d M Y'),
+            'transactions' => $transactions,
+            'productName' => $product->NAME,
+            'stats' => [
+                'transactionCount' => count($transactions),
+                'totalUnits' => round($totalUnits, 2),
+                'totalValue' => round($totalValue, 2),
+                'avgPerTransaction' => round($avgPerTransaction, 2),
+            ],
+        ]);
+    }
+
+    /**
+     * Serve product image from database.
+     * Returns binary image data with caching headers for browser caching.
+     */
+    public function image(string $id)
+    {
+        $product = Product::select('IMAGE')->find($id);
+
+        if (! $product || ! $product->IMAGE) {
+            abort(404);
+        }
+
+        // Return image with proper headers and caching (24 hours)
+        return response($product->IMAGE)
+            ->header('Content-Type', 'image/jpeg')
+            ->header('Cache-Control', 'public, max-age=86400');
+    }
+
+    /**
      * Update the price for a product.
      */
     public function updatePrice(Request $request, string $id): RedirectResponse

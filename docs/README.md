@@ -4,7 +4,39 @@ Welcome to the comprehensive documentation for OSManager CL. This documentation 
 
 📚 **New to the docs?** Start with the [Documentation Usage Guide](./DOCUMENTATION_GUIDE.md) to understand how to navigate and contribute to documentation.
 
-## 🆕 Latest Updates (August-September 2025)
+## 🆕 Latest Updates (December 2025)
+
+### Kitchen Recipe Costing System (2025-12-08)
+Comprehensive recipe costing system with ingredient profiles, overhead calculations, and margin analysis:
+
+- **🍳 Recipe Management**: Create, edit, and manage recipes with ingredients linked to POS products
+- **📊 Ingredient Profiles**: Define ingredient costing with purchase units, recipe units, and density conversions
+- **⏱️ Labour Cost Calculation**: Automatic labour cost from `(prep_time + cook_time)` × hourly rate (default €15/hr)
+- **⚡ Electricity Cost Calculation**: Automatic electricity cost from `cook_time` × power (kW) × rate (€/kWh)
+- **🔧 Per-Recipe Overrides**: Override global labour rate, electricity rate, and cooking power per recipe
+- **💰 Cost Breakdown Display**: Detailed breakdown showing ingredients, labour, electricity, and total costs
+- **📈 Margin Analysis**: Profit margin calculation with color-coded status (excellent/good/low/critical)
+- **📜 Cost History Tracking**: Record cost snapshots over time for trend analysis
+- **🚚 Delivery Markup Support**: Apply delivery markup percentage to imported products (Udea, Dynamis suppliers)
+- **⚖️ Unit Conversions**: Smart weight↔volume conversions using density factors
+
+**Configuration** (`config/kitchen.php` or `.env`):
+```env
+KITCHEN_LABOUR_RATE=15.00      # €/hour
+KITCHEN_ELECTRICITY_RATE=0.25  # €/kWh
+KITCHEN_AVG_COOKING_POWER=2.0  # kW
+```
+
+**Key Benefits**:
+- Complete recipe costing including all overhead costs
+- Per-recipe rate overrides for specialized equipment or labour
+- Real-time margin analysis when linked to POS products
+- Cost history for tracking price changes over time
+- Intelligent unit conversions with density support
+
+See [Kitchen Recipe Costing Documentation](./features/kitchen-recipe-costing.md) for complete details.
+
+## Previous Updates (August-September 2025)
 
 ### Unified Supplier Management System (2025-09-11)
 Complete supplier management with seamless POS integration and intelligent auto-code generation:
@@ -455,6 +487,15 @@ Detailed documentation for each major feature.
   - One-click order completion
   - Real-time system status monitoring
   - Mobile-responsive design for kitchen displays
+
+- **[Kitchen Recipe Costing](./features/kitchen-recipe-costing.md)** - 🆕 Recipe costing with overhead calculations *(New 2025-12-08)*
+  - Recipe management with POS product integration
+  - Ingredient profiles with unit conversions and density factors
+  - Labour cost calculation from prep + cook time
+  - Electricity cost calculation from cook time
+  - Per-recipe rate overrides for specialized requirements
+  - Profit margin analysis with color-coded status indicators
+  - Cost history tracking for trend analysis
 
 ### 🏢 Management Systems
 Administrative and operational management tools.

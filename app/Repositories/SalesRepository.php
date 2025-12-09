@@ -2,6 +2,7 @@
 
 namespace App\Repositories;
 
+use App\Models\POS;
 use App\Models\Product;
 use App\Models\SalesDailySummary;
 use App\Models\StockDiary;
@@ -883,6 +884,105 @@ class SalesRepository
         }
 
         return $result;
+    }
+
+    /**
+     * Get daily sales for a product within a specific week.
+     *
+     * @param  string  $productId  Product ID
+     * @param  string  $weekStart  Monday date in Y-m-d format
+     * @param  bool  $forceLiveData  Force using live POS data instead of summaries
+     * @return array<int, array<string, mixed>>
+     */
+    public function getProductDailySales(string $productId, string $weekStart, bool $forceLiveData = false): array
+    {
+        $startDate = Carbon::parse($weekStart)->startOfWeek()->startOfDay();
+        $endDate = $startDate->copy()->endOfWeek()->endOfDay();
+
+        // Build daily buckets for 7 days (Mon-Sun)
+        $dailyBuckets = [];
+        $cursor = $startDate->copy();
+
+        for ($i = 0; $i < 7; $i++) {
+            $key = $cursor->format('Y-m-d');
+            $dailyBuckets[$key] = [
+                'date' => $key,
+                'label' => $cursor->format('D d'),
+                'dayName' => $cursor->format('l'),
+                'units' => 0.0,
+            ];
+            $cursor->addDay();
+        }
+
+        // Try to use imported daily summaries first (fast path) unless forced to use live data
+        $summaryDaily = [];
+        if (! $forceLiveData) {
+            $summaryDaily = SalesDailySummary::where('product_id', $productId)
+                ->whereBetween('sale_date', [$startDate, $endDate])
+                ->selectRaw("DATE_FORMAT(sale_date, '%Y-%m-%d') as sale_date")
+                ->selectRaw('SUM(total_units) as total_units')
+                ->groupBy('sale_date')
+                ->pluck('total_units', 'sale_date')
+                ->toArray();
+        }
+
+        if (! empty($summaryDaily)) {
+            foreach ($summaryDaily as $saleDate => $units) {
+                if (isset($dailyBuckets[$saleDate])) {
+                    $dailyBuckets[$saleDate]['units'] = (float) $units;
+                }
+            }
+        } else {
+            // Fallback to live POS data if summaries are missing or forced
+            $dailySales = StockDiary::where('PRODUCT', $productId)
+                ->sales()
+                ->whereBetween('DATENEW', [$startDate, $endDate])
+                ->select(
+                    DB::raw("DATE_FORMAT(DATENEW, '%Y-%m-%d') as sale_date"),
+                    DB::raw('SUM(ABS(UNITS)) as total_units')
+                )
+                ->groupBy('sale_date')
+                ->get();
+
+            foreach ($dailySales as $sale) {
+                if (isset($dailyBuckets[$sale->sale_date])) {
+                    $dailyBuckets[$sale->sale_date]['units'] = (float) $sale->total_units;
+                }
+            }
+        }
+
+        return array_values($dailyBuckets);
+    }
+
+    /**
+     * Get individual transaction details for a product on a specific date.
+     *
+     * @param  string  $productId  Product ID
+     * @param  string  $date  Date in Y-m-d format
+     * @return array<int, array<string, mixed>>
+     */
+    public function getProductTransactionDetails(string $productId, string $date): array
+    {
+        $targetDate = Carbon::parse($date);
+
+        return POS\TicketLine::where('PRODUCT', $productId)
+            ->whereHas('ticket.receipt', function ($q) use ($targetDate) {
+                $q->whereDate('DATENEW', $targetDate);
+            })
+            ->with(['ticket.receipt', 'ticket.person'])
+            ->get()
+            ->map(function ($line) {
+                return [
+                    'time' => $line->ticket->receipt->DATENEW->format('H:i'),
+                    'employee' => $line->ticket->person->NAME ?? 'Unknown',
+                    'units' => (float) $line->UNITS,
+                    'price' => (float) $line->PRICE,
+                    'total' => (float) $line->UNITS * (float) $line->PRICE,
+                ];
+            })
+            ->sortBy('time')
+            ->values()
+            ->toArray();
     }
 
     /**

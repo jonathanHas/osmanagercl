@@ -17,10 +17,11 @@
         <!-- Livewire Styles are auto-injected when inject_assets is true in config/livewire.php -->
     </head>
     <body class="font-sans antialiased">
-        <div x-data="{ 
+        <div x-data="{
             sidebarOpen: false,
             operationsOpen: true,
-            ordersOpen: true, 
+            kitchenOpen: true,
+            ordersOpen: true,
             financialOpen: true,
             systemToolsOpen: true,
             adminOpen: true
@@ -129,7 +130,7 @@
                                 Fruit & Veg
                             </a>
                             
-                            <a href="{{ route('coffee.index') }}" 
+                            <a href="{{ route('coffee.index') }}"
                                class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('coffee.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                                 <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
@@ -138,6 +139,37 @@
                             </a>
                         </div>
                         @endunless
+
+                        <!-- KITCHEN SECTION -->
+                        @if(auth()->user()->hasAnyRole(['admin', 'manager']))
+                        <div class="px-2 pt-4">
+                            <button @click="kitchenOpen = !kitchenOpen"
+                                    class="w-full flex items-center justify-between text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-300 py-2">
+                                <span>Kitchen</span>
+                                <svg class="w-4 h-4 transition-transform duration-200" :class="kitchenOpen ? 'rotate-90' : 'rotate-0'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div x-show="kitchenOpen" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-1">
+                            <a href="{{ route('kitchen.index') }}"
+                               class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('kitchen.index') || request()->routeIs('kitchen.create') || request()->routeIs('kitchen.edit') || request()->routeIs('kitchen.show') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                                <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                </svg>
+                                Recipes
+                            </a>
+
+                            <a href="{{ route('kitchen.profiles.index') }}"
+                               class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('kitchen.profiles.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                                <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                </svg>
+                                Ingredient Profiles
+                            </a>
+                        </div>
+                        @endif
 
                         <!-- ORDER MANAGEMENT SECTION -->
                         @unless(auth()->user()->hasRole('barista'))

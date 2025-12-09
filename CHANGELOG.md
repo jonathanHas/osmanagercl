@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **🍳 Kitchen Recipe Costing System** (2025-12-08)
+  - **Recipe Management**: Create, edit, and manage recipes with ingredients linked to POS products
+  - **Ingredient Profiles**: Define ingredient costing with purchase units, recipe units, and density conversions
+  - **Labour Cost Calculation**: Automatic labour cost from prep + cook time with configurable hourly rate
+  - **Electricity Cost Calculation**: Automatic electricity cost from cook time with configurable kW and rate
+  - **Per-Recipe Overrides**: Override global labour rate, electricity rate, and cooking power per recipe
+  - **Cost Breakdown Display**: Detailed cost breakdown showing ingredients, labour, electricity, and total
+  - **Margin Analysis**: Profit margin calculation with color-coded status (excellent/good/low/critical)
+  - **Cost History Tracking**: Record cost snapshots over time for trend analysis
+  - **Delivery Markup Support**: Apply delivery markup to imported products (Udea, Dynamis suppliers)
+  - **Unit Conversions**: Smart weight↔volume conversions using density factors
+  - **Global Config Defaults**: `config/kitchen.php` for system-wide rate defaults via environment variables
+  - **Database Schema**:
+    - `kitchen_recipes` table with override fields for rates
+    - `kitchen_recipe_ingredients` table with unit conversions
+    - `kitchen_ingredient_profiles` table for reusable ingredient costing
+    - `kitchen_recipe_cost_history` table for cost tracking over time
+  - **Files**:
+    - `app/Models/KitchenRecipe.php` - Recipe model with rate helpers
+    - `app/Services/KitchenCostingService.php` - Cost calculation service
+    - `app/Http/Controllers/KitchenController.php` - Recipe management
+    - `resources/views/kitchen/` - Recipe management views
+
 - **🎄 Christmas Comparison Feature** (2025-12-01)
   - **Seasonal Order Planning**: Compare recent sales with historical Christmas period sales when generating orders
     - Flexible date range selection (e.g., Dec 10-26) with custom start/end dates
