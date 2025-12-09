@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **📦 Order Page Enhancements** (2025-12-09)
+  - **Supplier Website Links**: Added "View →" links to Udea and Independent Health Foods product pages directly from order review
+    - Links appear next to supplier code in product rows
+    - Opens supplier website in new tab with product search
+    - Works on both regular and Christmas review pages
+  - **Destock/Restock Toggle**: Quick stock management control from order review pages
+    - Red "Destock" button to remove products from stock management
+    - Green "Restock" button to add products back
+    - Confirmation dialog with clear messaging before action
+    - Visual state toggle without page reload
+    - Prevents products from appearing in future orders when destocked
+  - **Sales Chart Modal for Christmas Review**: Extended sales history popup now available on Christmas review page
+    - Click any chart to open expandable sales history modal
+    - Navigate sales history with +/- 1 month and +/- 2 months controls
+    - Statistics bar showing total sales, peak week, average, and active weeks
+    - Consistent experience with regular order review page
+
 - **🍳 Kitchen Recipe Costing System** (2025-12-08)
   - **Recipe Management**: Create, edit, and manage recipes with ingredients linked to POS products
   - **Ingredient Profiles**: Define ingredient costing with purchase units, recipe units, and density conversions

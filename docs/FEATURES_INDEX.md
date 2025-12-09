@@ -197,6 +197,17 @@ Seasonal order planning with historical Christmas sales comparison.
 ### Order Review & Adjustment
 Interactive review interface with inline editing and approval workflow.
 - **Product-Level Charts**: Chart.js graphs showing sales trends, stock levels, and projections
+- **Sales Chart Modal** (NEW! 2025-12-09): Click any chart to open expandable sales history popup
+  - Navigate with +/- 1 month and +/- 2 months controls (4 weeks to 2 years)
+  - Statistics bar: total sales, peak week, average, and active weeks
+  - Available on both regular and Christmas review pages
+- **Supplier Website Links** (NEW! 2025-12-09): Direct links to view products on supplier websites
+  - "View →" link next to supplier code for Udea and Independent Health Foods products
+  - Opens supplier search page in new tab
+- **Destock/Restock Toggle** (NEW! 2025-12-09): Quick stock management from order review
+  - Red "Destock" button removes product from stock management (won't appear in future orders)
+  - Green "Restock" button adds product back to stock management
+  - Confirmation dialog before action with clear messaging
 - **Inline Quantity Editing**: Adjust suggested quantities with +/- buttons or direct input
 - **Priority Filtering**: Filter by Review/Standard/Safe classification
 - **Approval Workflow**: Complete orders when ready, mark items for adjustment

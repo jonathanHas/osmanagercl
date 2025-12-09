@@ -31,10 +31,13 @@ use App\Support\SpecialOrderCategories;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Intervention\Image\Drivers\Gd\Driver as GdDriver;
+use Intervention\Image\ImageManager;
 
 class ProductController extends Controller
 {
@@ -458,6 +461,104 @@ class ProductController extends Controller
         return response($product->IMAGE)
             ->header('Content-Type', 'image/jpeg')
             ->header('Cache-Control', 'public, max-age=86400');
+    }
+
+    /**
+     * Update product image.
+     */
+    public function updateProductImage(Request $request, string $id)
+    {
+        $request->validate([
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
+
+        $product = Product::findOrFail($id);
+
+        if ($request->hasFile('image')) {
+            $imageFile = $request->file('image');
+
+            $imageManager = new ImageManager(new GdDriver);
+            $image = $imageManager->read($imageFile->getRealPath());
+
+            $image->resize(64, 64, function ($constraint) {
+                $constraint->aspectRatio();
+                $constraint->upsize();
+            });
+
+            $encodedImage = $image->encodeByExtension($this->determineImageExtension($imageFile));
+            $imageData = $encodedImage->toString();
+            $mimeType = $encodedImage->mediaType();
+            $resizedWidth = $image->width();
+            $resizedHeight = $image->height();
+
+            // Start transaction on POS database connection
+            DB::connection('pos')->beginTransaction();
+
+            try {
+                // Update the image in POS database
+                DB::connection('pos')->table('PRODUCTS')
+                    ->where('ID', $product->ID)
+                    ->update(['IMAGE' => $imageData]);
+
+                DB::connection('pos')->commit();
+
+                \Log::info('Product image updated successfully', [
+                    'product_id' => $product->ID,
+                    'product_code' => $product->CODE,
+                    'image_size_bytes' => strlen($imageData),
+                    'mime_type' => $mimeType,
+                    'width' => $resizedWidth,
+                    'height' => $resizedHeight,
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'timestamp' => time(),
+                ]);
+
+            } catch (\Exception $e) {
+                DB::connection('pos')->rollBack();
+
+                \Log::error('Failed to update product image', [
+                    'product_id' => $product->ID,
+                    'product_code' => $product->CODE,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Failed to update image',
+                ], 500);
+            }
+        }
+
+        return response()->json(['success' => false, 'error' => 'No image file provided']);
+    }
+
+    /**
+     * Determine the image extension for encoding.
+     */
+    private function determineImageExtension(UploadedFile $file): string
+    {
+        $extension = strtolower($file->getClientOriginalExtension() ?: '');
+
+        $normalizedExtension = match ($extension) {
+            'jpeg', 'jpg' => 'jpg',
+            'png' => 'png',
+            'gif' => 'gif',
+            default => null,
+        };
+
+        if ($normalizedExtension) {
+            return $normalizedExtension;
+        }
+
+        return match ($file->getMimeType()) {
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            default => 'png',
+        };
     }
 
     /**

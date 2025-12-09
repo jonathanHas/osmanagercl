@@ -446,6 +446,30 @@ If issues arise:
 
 ---
 
+## December 2025 Enhancements
+
+### Sales Chart Modal (2025-12-09)
+The Christmas review page now includes the same expandable sales chart modal as the regular order review:
+- **Click to Expand**: Click any inline chart to open a full-sized sales history modal
+- **Date Range Controls**: Navigate sales history with +/- 1 month and +/- 2 months buttons
+- **Statistics Bar**: Shows total sales, peak week, average weekly sales, and active weeks
+- **Range Limits**: View from 4 weeks to 2 years of sales history
+
+### Supplier Website Links (2025-12-09)
+Direct links to view products on supplier websites:
+- **"View →" Link**: Appears next to supplier code for Udea and Independent Health Foods products
+- **Quick Access**: Opens supplier's product search page in new tab
+- **Both Pages**: Available on regular and Christmas review pages
+
+### Destock/Restock Toggle (2025-12-09)
+Quick stock management controls added to order review:
+- **Destock Button**: Red button to remove product from stock management
+- **Restock Button**: Green button to add product back (after destocking)
+- **Confirmation Dialog**: Warning message before action with explanation
+- **Visual Toggle**: Button changes color and label based on current state
+
+---
+
 ## Support
 
 For questions or issues with the Christmas Comparison feature:

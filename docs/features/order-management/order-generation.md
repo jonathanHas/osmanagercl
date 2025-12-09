@@ -45,6 +45,11 @@ The order generation system automates the calculation of required stock quantiti
 - **Large Order Support**: Orders with 1,400+ products now complete in ~22 seconds instead of timing out at 30 seconds or taking 149+ seconds.
 - **New Bulk Repository Methods**: Added `getBulkProductSalesStatistics()`, `getBulkProductWeeklySales()`, `getBulkChristmasWindowComparison()`, `getBulkRecentPurchasePrices()`, `getBulkProductSalesHistory()`, and `getBulkLastSaleDates()` to `SalesRepository`.
 
+### 2025-12-09 Enhancements (Order Review UI)
+- **Supplier Website Links**: "View →" links next to supplier codes for Udea and Independent Health Foods products, opening supplier's product search page in new tab.
+- **Destock/Restock Toggle**: Quick stock management controls on order review pages. Red "Destock" button removes products from future orders, green "Restock" button adds them back. Includes confirmation dialog with clear messaging.
+- **Sales Chart Modal (Christmas)**: The expandable sales history modal (click chart to view extended history) is now available on Christmas review pages, with date range controls (+/- 1 month, +/- 2 months) and statistics bar.
+
 ### 2. Product Classification System
 Products are classified into three review priority levels:
 
