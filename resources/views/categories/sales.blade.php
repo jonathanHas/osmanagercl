@@ -383,6 +383,11 @@
 
                 async loadSalesData() {
                     this.loading = true;
+
+                    // Clear expanded product data when date range changes
+                    // so they reload with the new date range
+                    this.clearExpandedProductData();
+
                     try {
                         const response = await fetch(`{{ route('categories.sales.data', $category) }}?start_date=${this.startDate}&end_date=${this.endDate}`);
                         const data = await response.json();
@@ -405,6 +410,8 @@
                         // Update chart with new data
                         this.$nextTick(() => {
                             this.updateChart();
+                            // Reload any expanded products with new date range
+                            this.reloadExpandedProducts();
                         });
                     } catch (error) {
                         console.error('Error loading sales data:', error);
@@ -1058,7 +1065,7 @@
                 setQuickPeriod(period) {
                     const today = new Date();
                     let start, end;
-                    
+
                     switch(period) {
                         case 'today':
                             start = end = today;
@@ -1089,10 +1096,46 @@
                         default:
                             return;
                     }
-                    
+
                     this.startDate = start.toISOString().split('T')[0];
                     this.endDate = end.toISOString().split('T')[0];
                     this.loadSalesData();
+                },
+
+                clearExpandedProductData() {
+                    // Destroy all product charts first
+                    for (const productId of this.expandedProducts) {
+                        this.destroyProductChart(productId);
+                    }
+
+                    // Clear cached data so it reloads with new date range
+                    this.dailySalesData = {};
+                    this.dailySalesRawData = {};
+                    this.dailySalesLoading = {};
+                    this.dailySalesError = {};
+
+                    // Reload data for any expanded products
+                    if (this.expandedProducts.length > 0) {
+                        console.log('🔄 Reloading data for expanded products:', this.expandedProducts);
+                        // Store the current expanded products to reload after main data loads
+                        this._pendingExpandedReload = [...this.expandedProducts];
+                    }
+                },
+
+                reloadExpandedProducts() {
+                    if (this._pendingExpandedReload && this._pendingExpandedReload.length > 0) {
+                        console.log('🔄 Reloading expanded product data for new date range');
+
+                        // Find matching product codes from the new sales data
+                        for (const productId of this._pendingExpandedReload) {
+                            const product = this.salesData.find(p => p.product_id === productId);
+                            if (product) {
+                                this.loadDailySales(productId, product.product_code);
+                            }
+                        }
+
+                        this._pendingExpandedReload = [];
+                    }
                 }
             };
         }
