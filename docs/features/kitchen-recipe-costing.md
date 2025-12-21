@@ -1,15 +1,16 @@
 # Kitchen Recipe Costing System
 
-The Kitchen Recipe Costing System provides comprehensive recipe management with ingredient costing, overhead calculations (labour and electricity), and profit margin analysis.
+The Kitchen Recipe Costing System provides comprehensive recipe management with ingredient costing, overhead calculations (labour, electricity, and packaging), profit margin analysis, and batch scaling tools.
 
 ## Overview
 
 This system enables you to:
 - Create and manage recipes with ingredients linked to POS products
 - Define ingredient profiles for accurate unit conversions and costing
-- Calculate total recipe costs including ingredients, labour, and electricity
+- Calculate total recipe costs including ingredients, labour, electricity, and packaging
 - Analyze profit margins when recipes are linked to POS products
 - Track cost history over time for trend analysis
+- **Scale recipes** to see cost efficiencies when producing larger batches
 
 ## Features
 
@@ -59,8 +60,19 @@ Override global defaults for specific recipes:
 - **Labour Rate Override**: Custom hourly rate for this recipe
 - **Electricity Rate Override**: Custom €/kWh for this recipe
 - **Cooking Power Override**: Custom kW for this recipe
+- **Packaging Cost**: Cost per portion for containers, lids, labels, etc.
 
-Use overrides for recipes with special requirements (e.g., commercial equipment, specialized labour).
+Use overrides for recipes with special requirements (e.g., commercial equipment, specialized labour, takeaway packaging).
+
+### Packaging Cost
+
+Some recipes require packaging (containers, lids, labels). Set the packaging cost per portion in the recipe overrides section:
+
+```
+packaging_total = packaging_cost_per_portion × portions_produced
+```
+
+This is automatically included in the total cost and cost-per-portion calculations.
 
 ### Cost Breakdown
 
@@ -68,7 +80,8 @@ The system displays a complete cost breakdown:
 - **Ingredients**: Sum of all ingredient line costs
 - **Labour**: Calculated from prep + cook time
 - **Electricity**: Calculated from cook time
-- **Total Cost**: Ingredients + Labour + Electricity
+- **Packaging**: Per-portion packaging cost × portions (if set)
+- **Total Cost**: Ingredients + Labour + Electricity + Packaging
 - **Cost per Portion**: Total ÷ portions produced
 
 ### Margin Analysis
@@ -85,6 +98,40 @@ When linked to a POS product:
 | Good | 20-40% | Yellow |
 | Low | 10-20% | Orange |
 | Critical | <10% | Red |
+
+### Batch Scaling Calculator
+
+The scaling calculator helps analyze cost efficiencies when producing larger batches. Access it from the recipe edit page sidebar.
+
+**Scaling Factors:**
+- **Recipe Multiplier**: Scale ingredient quantities (2x, 3x, 5x, 10x, or custom)
+- **Labour Factor**: Independent scaling for labour (e.g., 2x batch might only need 1.5x labour)
+- **Electricity Factor**: Independent scaling for electricity (e.g., same oven time for larger batch)
+
+**Smart Defaults:**
+When you change the recipe multiplier, suggested factors are automatically set:
+| Multiplier | Labour Factor | Electricity Factor |
+|------------|---------------|-------------------|
+| 2x | 1.5x | 1.0x |
+| 3-5x | 2.0x | 1.5x |
+| 10x+ | 3.0x | 2.0x |
+
+**Features:**
+- Real-time comparison table showing original vs scaled costs
+- Per-portion cost comparison with savings percentage
+- **Save as New Recipe**: Create a scaled version as a separate recipe
+
+**Scaling Calculation:**
+```
+scaled_ingredients = original_ingredients × recipe_multiplier
+scaled_labour = original_labour × labour_factor
+scaled_electricity = original_electricity × electricity_factor
+scaled_packaging = packaging_per_portion × (portions × recipe_multiplier)
+scaled_total = scaled_ingredients + scaled_labour + scaled_electricity + scaled_packaging
+scaled_portions = original_portions × recipe_multiplier
+scaled_cost_per_portion = scaled_total / scaled_portions
+savings_percent = ((original_cost_per_portion - scaled_cost_per_portion) / original_cost_per_portion) × 100
+```
 
 ## Configuration
 
@@ -128,6 +175,7 @@ return [
 | labour_rate_override | decimal(8,2) | Override labour rate |
 | electricity_rate_override | decimal(8,4) | Override electricity rate |
 | cooking_power_override | decimal(8,2) | Override cooking power |
+| packaging_cost_per_portion | decimal(8,2) | Packaging cost per portion |
 | created_at | timestamp | Created timestamp |
 | updated_at | timestamp | Updated timestamp |
 
@@ -185,6 +233,7 @@ return [
 | GET | `/kitchen/{recipe}/edit` | Show edit form |
 | PUT | `/kitchen/{recipe}` | Update recipe |
 | DELETE | `/kitchen/{recipe}` | Delete recipe |
+| POST | `/kitchen/{recipe}/scale` | Save scaled recipe as new |
 
 ### Ingredients
 
@@ -212,20 +261,37 @@ return [
 - Labour rate: €15/hr (default)
 - Electricity rate: €0.25/kWh
 - Cooking power: 2.0 kW
+- Packaging: €0.50/portion (pie box)
 
 **Calculation:**
 ```
 Labour = (30 + 45) / 60 × €15 = 1.25 × €15 = €18.75
-Electricity = 45 / 60 × 2.0 kW × €0.25 = 0.75 × 2.0 × €0.25 = €0.375
-Overhead = €18.75 + €0.38 = €19.13
-Total = €12.50 + €19.13 = €31.63
-Per portion = €31.63 / 8 = €3.95
+Electricity = 45 / 60 × 2.0 kW × €0.25 = 0.75 × 2.0 × €0.25 = €0.38
+Packaging = €0.50 × 8 = €4.00
+Total = €12.50 + €18.75 + €0.38 + €4.00 = €35.63
+Per portion = €35.63 / 8 = €4.45
 ```
 
 If linked to a product selling at €6.50:
 ```
-Profit = €6.50 - €3.95 = €2.55
-Margin = (€2.55 / €6.50) × 100 = 39.2% (Good)
+Profit = €6.50 - €4.45 = €2.05
+Margin = (€2.05 / €6.50) × 100 = 31.5% (Good)
+```
+
+### Scaling Example
+
+Using the batch scaling calculator with 2x multiplier, 1.5x labour, 1.0x electricity:
+
+```
+Scaled Ingredients = €12.50 × 2 = €25.00
+Scaled Labour = €18.75 × 1.5 = €28.13
+Scaled Electricity = €0.38 × 1.0 = €0.38
+Scaled Packaging = €0.50 × 16 = €8.00
+Scaled Total = €25.00 + €28.13 + €0.38 + €8.00 = €61.51
+Scaled Portions = 8 × 2 = 16
+Scaled Per Portion = €61.51 / 16 = €3.84
+
+Savings = €4.45 - €3.84 = €0.61/portion (13.7% savings)
 ```
 
 ## Files

@@ -107,18 +107,24 @@ Cross-database price synchronization management with web-based interface.
 ## Kitchen Management
 
 ### Kitchen Recipe Costing System (NEW! 2025-12-08)
-Comprehensive recipe costing system with ingredient profiles, overhead calculations, and margin analysis.
+Comprehensive recipe costing system with ingredient profiles, overhead calculations, margin analysis, and batch scaling tools.
 - **Recipe Management**: Create, edit, and manage recipes with ingredients linked to POS products
 - **Ingredient Profiles**: Define ingredient costing with purchase units, recipe units, and density conversions
 - **Labour Cost Calculation**: Automatic labour cost from `(prep_time + cook_time)` × hourly rate
 - **Electricity Cost Calculation**: Automatic electricity cost from `cook_time` × power (kW) × rate (€/kWh)
-- **Per-Recipe Overrides**: Override global labour rate, electricity rate, and cooking power per recipe
-- **Cost Breakdown Display**: Detailed breakdown showing ingredients, labour, electricity, and total costs
+- **Packaging Cost** (NEW! 2025-12-10): Per-portion packaging costs for containers, lids, labels
+- **Per-Recipe Overrides**: Override global labour rate, electricity rate, cooking power, and packaging per recipe
+- **Cost Breakdown Display**: Detailed breakdown showing ingredients, labour, electricity, packaging, and total costs
 - **Margin Analysis**: Profit margin calculation with color-coded status indicators:
   - Excellent (40%+) - Green
   - Good (20-40%) - Yellow
   - Low (10-20%) - Orange
   - Critical (<10%) - Red
+- **Batch Scaling Calculator** (NEW! 2025-12-10): Analyze cost efficiencies when scaling recipes
+  - Independent scaling for ingredients, labour, and electricity
+  - Smart default factors based on batch size
+  - Real-time cost comparison and savings percentage
+  - Save scaled version as new recipe
 - **Cost History Tracking**: Record cost snapshots over time for trend analysis
 - **Delivery Markup Support**: Apply delivery markup percentage to imported products (Udea, Dynamis suppliers)
 - **Unit Conversions**: Smart weight↔volume conversions using density factors (e.g., flour density 0.593)

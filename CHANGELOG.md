@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **🍳 Kitchen Recipe Scaling & Packaging** (2025-12-10)
+  - **Batch Scaling Calculator**: Analyze cost efficiencies when producing larger batches
+    - Recipe multiplier (2x, 3x, 5x, 10x, or custom)
+    - Independent labour factor (e.g., 2x batch might only need 1.5x labour)
+    - Independent electricity factor (e.g., same oven time for larger batch)
+    - Smart default factors based on batch size
+    - Real-time comparison table showing original vs scaled costs
+    - Per-portion savings percentage calculation
+    - Save scaled version as new recipe with one click
+  - **Packaging Cost Support**: Per-portion packaging costs for containers, lids, labels
+    - New field in Rate Overrides section
+    - Automatically included in total cost and cost-per-portion calculations
+    - Packaging costs scale with portions in batch scaling calculator
+    - Preserved when saving scaled recipes
+  - **Database**: Added `packaging_cost_per_portion` column to `kitchen_recipes` table
+  - **API**: New endpoint `POST /kitchen/{recipe}/scale` for saving scaled recipes
+
 - **📦 Order Page Enhancements** (2025-12-09)
   - **Supplier Website Links**: Added "View →" links to Udea and Independent Health Foods product pages directly from order review
     - Links appear next to supplier code in product rows
