@@ -39,6 +39,14 @@ return [
             'description' => 'Fresh vegetable products use sequential numbering in 1000s-2000s range',
         ],
 
+        // Veg Barcoded - Uses 1000s-2000s range (same as Fruit & Veg)
+        'SUB3' => [
+            'name' => 'Veg Barcoded',
+            'ranges' => [[1000, 2999]],
+            'priority' => 'increment', // Always increment from highest
+            'description' => 'Barcoded vegetable products use sequential numbering in 1000s-2000s range',
+        ],
+
         // Bakery - Uses 4000s range, overlaps with Coffee Fresh
         '082' => [
             'name' => 'Bakery',

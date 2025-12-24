@@ -4,9 +4,52 @@
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
                 {{ __('Manage Fruit & Vegetables') }}
             </h2>
-            <a href="{{ route('fruit-veg.index') }}" class="text-blue-600 hover:text-blue-800">
-                ← Back to Dashboard
-            </a>
+            <div class="flex items-center gap-4">
+                <!-- Create Product Dropdown -->
+                <div x-data="{ open: false }" class="relative">
+                    <button @click="open = !open"
+                            @click.outside="open = false"
+                            class="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Create Product
+                        <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <div x-show="open"
+                         x-cloak
+                         x-transition:enter="transition ease-out duration-100"
+                         x-transition:enter-start="opacity-0 scale-95"
+                         x-transition:enter-end="opacity-100 scale-100"
+                         x-transition:leave="transition ease-in duration-75"
+                         x-transition:leave-start="opacity-100 scale-100"
+                         x-transition:leave-end="opacity-0 scale-95"
+                         class="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
+                        <div class="py-1">
+                            <a href="{{ route('products.create') }}?category=SUB1"
+                               class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700">
+                                <span class="w-3 h-3 rounded-full bg-green-500 mr-3"></span>
+                                Fruit
+                            </a>
+                            <a href="{{ route('products.create') }}?category=SUB2"
+                               class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700">
+                                <span class="w-3 h-3 rounded-full bg-orange-500 mr-3"></span>
+                                Vegetables
+                            </a>
+                            <a href="{{ route('products.create') }}?category=SUB3"
+                               class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700">
+                                <span class="w-3 h-3 rounded-full bg-purple-500 mr-3"></span>
+                                Veg Barcoded
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <a href="{{ route('fruit-veg.index') }}" class="text-blue-600 hover:text-blue-800">
+                    ← Back to Dashboard
+                </a>
+            </div>
         </div>
     </x-slot>
 
