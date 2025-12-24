@@ -26,6 +26,12 @@ class Kernel extends ConsoleKernel
             ->onOneServer()
             ->withoutOverlapping(60);
 
+        // Populate POS daily summaries for financial dashboard (runs after sales import)
+        $schedule->command('pos:populate-daily-summaries --last-days=7')
+            ->dailyAt('06:15')
+            ->onOneServer()
+            ->withoutOverlapping(30);
+
         // Monitor for new coffee orders every 10 seconds
         // This ensures orders are detected even when no one has the KDS page open
         $schedule->command('kds:monitor')

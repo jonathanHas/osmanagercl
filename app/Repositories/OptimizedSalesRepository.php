@@ -7,6 +7,7 @@ use App\Models\SalesDailySummary;
 use App\Models\SalesMonthlySummary;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class OptimizedSalesRepository
 {
@@ -843,5 +844,231 @@ class OptimizedSalesRepository
             ->values();
 
         return $productsWithVelocity;
+    }
+
+    // ============================================================================
+    // Financial Dashboard Methods - Using Pre-Aggregated pos_daily_summaries
+    // ============================================================================
+
+    /**
+     * Get daily financial metrics from pre-aggregated data (single query)
+     * Replaces the slow cross-database query in FinancialDashboardController::getDailyMetrics()
+     */
+    public function getDailyFinancialMetrics(Carbon $date): array
+    {
+        $summary = DB::table('pos_daily_summaries')
+            ->where('sale_date', $date->format('Y-m-d'))
+            ->first();
+
+        if (! $summary) {
+            return $this->getEmptyFinancialMetrics();
+        }
+
+        $netCashSales = $summary->cash_sales - $summary->cash_refunds;
+        $netCardSales = $summary->card_sales - $summary->card_refunds;
+        $totalSales = $summary->cash_sales + $summary->card_sales + $summary->debt_sales + $summary->free_sales;
+        $totalRefunds = $summary->cash_refunds + $summary->card_refunds;
+        $netSales = $totalSales - $totalRefunds;
+
+        return [
+            'sales' => $totalSales,
+            'refunds' => $totalRefunds,
+            'net_sales' => $netSales,
+            'transactions' => $summary->total_transactions,
+            'avg_transaction' => $summary->total_transactions > 0 ? $netSales / $summary->total_transactions : 0,
+            'cash_sales' => $netCashSales,
+            'card_sales' => $netCardSales,
+            'debt_sales' => $summary->debt_sales,
+            'free_sales' => $summary->free_sales,
+        ];
+    }
+
+    /**
+     * Get financial metrics for multiple dates in a single batch query
+     * Reduces 7 queries to 1 for the sales trend
+     */
+    public function getFinancialMetricsBatch(Carbon $startDate, Carbon $endDate): Collection
+    {
+        return DB::table('pos_daily_summaries')
+            ->whereBetween('sale_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+            ->orderBy('sale_date')
+            ->get()
+            ->keyBy('sale_date');
+    }
+
+    /**
+     * Get 7-day sales trend data in a single query
+     * Replaces getSalesTrend() loop of 7 individual queries
+     */
+    public function getSalesTrendOptimized(int $days = 7): array
+    {
+        $endDate = Carbon::now();
+        $startDate = Carbon::now()->subDays($days - 1);
+
+        $summaries = DB::table('pos_daily_summaries')
+            ->whereBetween('sale_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+            ->orderBy('sale_date')
+            ->get()
+            ->keyBy('sale_date');
+
+        $trend = [];
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $date = Carbon::now()->subDays($i);
+            $dateKey = $date->format('Y-m-d');
+            $summary = $summaries->get($dateKey);
+
+            if ($summary) {
+                $netSales = ($summary->cash_sales + $summary->card_sales + $summary->debt_sales + $summary->free_sales)
+                          - ($summary->cash_refunds + $summary->card_refunds);
+            } else {
+                $netSales = 0;
+            }
+
+            $trend[] = [
+                'date' => $date->format('M j'),
+                'sales' => $netSales,
+            ];
+        }
+
+        return $trend;
+    }
+
+    /**
+     * Get 7-day cash flow trend data in a single query
+     * Replaces getCashFlowTrend() loop of 7 individual queries
+     */
+    public function getCashFlowTrendOptimized(int $days = 7): array
+    {
+        $endDate = Carbon::now();
+        $startDate = Carbon::now()->subDays($days - 1);
+
+        $summaries = DB::table('pos_daily_summaries')
+            ->whereBetween('sale_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+            ->orderBy('sale_date')
+            ->get()
+            ->keyBy('sale_date');
+
+        // Get cash payments for the period
+        $payments = DB::table('cash_reconciliation_payments')
+            ->whereBetween('created_at', [$startDate, $endDate->endOfDay()])
+            ->selectRaw('DATE(created_at) as payment_date, SUM(amount) as total_out')
+            ->groupBy('payment_date')
+            ->get()
+            ->keyBy('payment_date');
+
+        $trend = [];
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $date = Carbon::now()->subDays($i);
+            $dateKey = $date->format('Y-m-d');
+            $summary = $summaries->get($dateKey);
+            $payment = $payments->get($dateKey);
+
+            $cashIn = $summary ? ($summary->cash_sales - $summary->cash_refunds) : 0;
+            $cashOut = $payment->total_out ?? 0;
+
+            $trend[] = [
+                'date' => $date->format('M j'),
+                'in' => $cashIn,
+                'out' => $cashOut,
+                'net' => $cashIn - $cashOut,
+            ];
+        }
+
+        return $trend;
+    }
+
+    /**
+     * Get week financial metrics in a single query
+     * Replaces getWeekMetrics() cross-database query
+     */
+    public function getWeekFinancialMetrics(Carbon $date): array
+    {
+        $startOfWeek = $date->copy()->startOfWeek();
+        $endOfWeek = $date->copy()->endOfWeek();
+
+        $summary = DB::table('pos_daily_summaries')
+            ->whereBetween('sale_date', [$startOfWeek->format('Y-m-d'), $endOfWeek->format('Y-m-d')])
+            ->selectRaw('
+                SUM(cash_sales + card_sales + debt_sales + free_sales) as total_sales,
+                SUM(cash_refunds + card_refunds) as total_refunds,
+                COUNT(DISTINCT sale_date) as days_traded
+            ')
+            ->first();
+
+        $supplierPayments = DB::table('cash_reconciliation_payments')
+            ->whereBetween('created_at', [$startOfWeek, $endOfWeek->endOfDay()])
+            ->sum('amount');
+
+        $netSales = ($summary->total_sales ?? 0) - ($summary->total_refunds ?? 0);
+        $dayTraded = $summary->days_traded ?? 0;
+
+        return [
+            'net_sales' => $netSales,
+            'days_traded' => $dayTraded,
+            'daily_average' => $dayTraded > 0 ? $netSales / $dayTraded : 0,
+            'supplier_payments' => $supplierPayments,
+        ];
+    }
+
+    /**
+     * Get month financial metrics in a single query (with comparison)
+     * Replaces getMonthMetrics() which made 2 cross-database queries
+     */
+    public function getMonthFinancialMetrics(Carbon $date): array
+    {
+        $startOfMonth = $date->copy()->startOfMonth();
+        $endOfMonth = $date->copy()->endOfMonth();
+        $lastMonthStart = $startOfMonth->copy()->subMonth();
+        $lastMonthEnd = $endOfMonth->copy()->subMonth();
+
+        // Get both months in a single query
+        $summaries = DB::table('pos_daily_summaries')
+            ->whereBetween('sale_date', [$lastMonthStart->format('Y-m-d'), $endOfMonth->format('Y-m-d')])
+            ->selectRaw('
+                CASE
+                    WHEN sale_date >= ? AND sale_date <= ? THEN "current"
+                    ELSE "previous"
+                END as period,
+                SUM(cash_sales + card_sales + debt_sales + free_sales) as total_sales,
+                SUM(cash_refunds + card_refunds) as total_refunds
+            ', [$startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d')])
+            ->groupBy('period')
+            ->get()
+            ->keyBy('period');
+
+        $currentMonth = $summaries->get('current');
+        $previousMonth = $summaries->get('previous');
+
+        $currentNetSales = $currentMonth ? ($currentMonth->total_sales - $currentMonth->total_refunds) : 0;
+        $previousNetSales = $previousMonth ? ($previousMonth->total_sales - $previousMonth->total_refunds) : 0;
+
+        $growth = 0;
+        if ($previousNetSales > 0) {
+            $growth = (($currentNetSales - $previousNetSales) / $previousNetSales) * 100;
+        }
+
+        return [
+            'net_sales' => $currentNetSales,
+            'last_month_sales' => $previousNetSales,
+            'growth' => $growth,
+        ];
+    }
+
+    /**
+     * Get empty financial metrics (for days with no data)
+     */
+    private function getEmptyFinancialMetrics(): array
+    {
+        return [
+            'sales' => 0,
+            'refunds' => 0,
+            'net_sales' => 0,
+            'transactions' => 0,
+            'avg_transaction' => 0,
+            'cash_sales' => 0,
+            'card_sales' => 0,
+            'debt_sales' => 0,
+            'free_sales' => 0,
+        ];
     }
 }
