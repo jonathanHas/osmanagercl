@@ -554,6 +554,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/financial/dashboard', [\App\Http\Controllers\Management\FinancialDashboardController::class, 'index'])
             ->name('financial.dashboard');
 
+        // Sales Review
+        Route::get('/sales-review', [\App\Http\Controllers\Management\SalesReviewController::class, 'index'])
+            ->name('sales-review.index');
+
         // Profit & Loss
         Route::get('/profit-loss', [\App\Http\Controllers\Management\ProfitLossController::class, 'index'])
             ->name('profit-loss.index');

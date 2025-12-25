@@ -68,14 +68,14 @@ class OptimizedSalesRepository
     {
         return SalesDailySummary::forDateRange($startDate, $endDate)
             ->selectRaw('
-                sale_date, 
+                DATE(sale_date) as sale_date,
                 SUM(total_units) as daily_units,
                 SUM(total_revenue) as daily_revenue,
                 COUNT(DISTINCT product_id) as daily_products,
                 SUM(transaction_count) as daily_transactions
             ')
             ->groupByRaw('DATE(sale_date)')
-            ->orderBy('sale_date', 'asc')
+            ->orderByRaw('DATE(sale_date) asc')
             ->get();
     }
 
