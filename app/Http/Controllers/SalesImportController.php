@@ -416,4 +416,33 @@ class SalesImportController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Quick gap finder - find missing days without heavy aggregation
+     * Much faster than full validation for large date ranges
+     */
+    public function findGaps(Request $request)
+    {
+        $request->validate([
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+        ]);
+
+        try {
+            $startDate = Carbon::parse($request->start_date);
+            $endDate = Carbon::parse($request->end_date);
+
+            $result = $this->validationService->findMissingDays($startDate, $endDate);
+
+            return response()->json([
+                'success' => true,
+                'data' => $result,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gap finder failed: '.$e->getMessage(),
+            ], 500);
+        }
+    }
 }

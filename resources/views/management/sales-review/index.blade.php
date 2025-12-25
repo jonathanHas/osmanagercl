@@ -78,18 +78,6 @@
                 <span class="text-sm text-gray-500 ml-2">({{ $periodDays }} days)</span>
             </div>
 
-            {{-- Debug Info (temporary) --}}
-            @if(config('app.debug'))
-            <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-xs">
-                <strong>Debug:</strong>
-                Sales trend records: {{ $salesTrend->count() }} |
-                Stats revenue: &euro;{{ number_format($stats['total_revenue'], 2) }} |
-                Stats units: {{ number_format($stats['total_units']) }} |
-                Top by volume: {{ $topByVolume->count() }} |
-                Top by revenue: {{ $topByRevenue->count() }}
-            </div>
-            @endif
-
             {{-- KPI Cards --}}
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 {{-- Total Revenue --}}

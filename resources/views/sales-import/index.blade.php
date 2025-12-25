@@ -131,6 +131,53 @@
                 </div>
             </div>
 
+            <!-- Quick Gap Finder -->
+            <div class="bg-white shadow rounded-lg mb-8">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">🔍 Quick Gap Finder</h3>
+                    <p class="text-sm text-gray-600 mt-1">Fast scan to find missing days in imported data (no heavy processing)</p>
+                </div>
+                <div class="p-6">
+                    <form id="gap-finder-form" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Start Date</label>
+                                <input type="date" name="start_date"
+                                       value="{{ $dateRange && $dateRange->earliest ? \Carbon\Carbon::parse($dateRange->earliest)->format('Y-m-d') : now()->subYear()->format('Y-m-d') }}"
+                                       class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">End Date</label>
+                                <input type="date" name="end_date"
+                                       value="{{ now()->format('Y-m-d') }}"
+                                       class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div class="flex items-end">
+                                <button type="submit" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    Scan for Missing Days
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Gap Finder Results -->
+                    <div id="gap-finder-results" class="hidden mt-6">
+                        <div id="gap-finder-summary" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                            <!-- Summary cards will be populated here -->
+                        </div>
+                        <div id="gap-finder-status" class="mb-4">
+                            <!-- Status indicator -->
+                        </div>
+                        <div id="gap-finder-missing" class="hidden">
+                            <h4 class="text-md font-medium text-gray-700 mb-3">Missing Days (need import)</h4>
+                            <div id="missing-days-list" class="space-y-2">
+                                <!-- Missing days will be listed here with import buttons -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Action Panels -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
                 
@@ -536,5 +583,218 @@
 
         // Load logs on page load
         document.addEventListener('DOMContentLoaded', loadImportLogs);
+
+        // Gap Finder Form
+        document.getElementById('gap-finder-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const button = e.target.querySelector('button[type="submit"]');
+            const hideLoading = showLoading(button);
+
+            const formData = new FormData(e.target);
+
+            try {
+                const response = await fetch('{{ route('sales-import.find-gaps') }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                    },
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    displayGapFinderResults(result.data);
+                    showNotification(`Scan completed in ${result.data.execution_time_seconds}s - ${result.data.missing_count} missing days found`);
+                } else {
+                    showNotification(result.message, 'error');
+                }
+            } catch (error) {
+                showNotification('Gap finder failed: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        });
+
+        function displayGapFinderResults(data) {
+            const resultsDiv = document.getElementById('gap-finder-results');
+            const summaryDiv = document.getElementById('gap-finder-summary');
+            const statusDiv = document.getElementById('gap-finder-status');
+            const missingDiv = document.getElementById('gap-finder-missing');
+            const missingList = document.getElementById('missing-days-list');
+
+            // Show results container
+            resultsDiv.classList.remove('hidden');
+
+            // Summary cards
+            summaryDiv.innerHTML = `
+                <div class="bg-blue-50 rounded-lg p-4 text-center">
+                    <div class="text-2xl font-bold text-blue-600">${data.pos_count}</div>
+                    <div class="text-sm text-blue-700">Days in POS</div>
+                </div>
+                <div class="bg-green-50 rounded-lg p-4 text-center">
+                    <div class="text-2xl font-bold text-green-600">${data.imported_count}</div>
+                    <div class="text-sm text-green-700">Days Imported</div>
+                </div>
+                <div class="bg-${data.missing_count > 0 ? 'red' : 'green'}-50 rounded-lg p-4 text-center">
+                    <div class="text-2xl font-bold text-${data.missing_count > 0 ? 'red' : 'green'}-600">${data.missing_count}</div>
+                    <div class="text-sm text-${data.missing_count > 0 ? 'red' : 'green'}-700">Missing Days</div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4 text-center">
+                    <div class="text-2xl font-bold text-gray-600">${data.execution_time_seconds}s</div>
+                    <div class="text-sm text-gray-700">Scan Time</div>
+                </div>
+            `;
+
+            // Status indicator
+            if (data.status === 'complete') {
+                statusDiv.innerHTML = `
+                    <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4">
+                        <p class="font-medium">✅ All Clear! No missing days found.</p>
+                        <p class="text-sm mt-1">All sales data from POS has been imported for the selected period.</p>
+                    </div>
+                `;
+                missingDiv.classList.add('hidden');
+            } else {
+                statusDiv.innerHTML = `
+                    <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4">
+                        <p class="font-medium">⚠️ Gaps Found! ${data.missing_count} day(s) need to be imported.</p>
+                        <p class="text-sm mt-1">Click "Import" next to each missing day to import the data.</p>
+                    </div>
+                `;
+
+                // Show missing days with import buttons
+                missingDiv.classList.remove('hidden');
+                missingList.innerHTML = '';
+
+                data.missing_days.forEach(date => {
+                    const dayDiv = document.createElement('div');
+                    dayDiv.className = 'flex items-center justify-between bg-red-50 rounded-lg p-3';
+                    dayDiv.innerHTML = `
+                        <div>
+                            <span class="font-medium text-red-700">${date}</span>
+                            <span class="text-sm text-red-600 ml-2">(${new Date(date).toLocaleDateString('en-IE', { weekday: 'long' })})</span>
+                        </div>
+                        <button onclick="importSingleDay('${date}')" class="bg-blue-600 text-white px-3 py-1 text-sm rounded hover:bg-blue-700">
+                            Import
+                        </button>
+                    `;
+                    missingList.appendChild(dayDiv);
+                });
+
+                // Add "Import All" button if there are multiple missing days
+                if (data.missing_days.length > 1) {
+                    const importAllDiv = document.createElement('div');
+                    importAllDiv.className = 'mt-4 pt-4 border-t border-gray-200';
+                    importAllDiv.innerHTML = `
+                        <button onclick="importAllMissingDays()" class="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
+                            Import All ${data.missing_days.length} Missing Days
+                        </button>
+                    `;
+                    missingList.appendChild(importAllDiv);
+                }
+            }
+        }
+
+        // Store missing days for bulk import
+        let currentMissingDays = [];
+
+        async function importSingleDay(date) {
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = 'Importing...';
+            button.disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('start_date', date);
+                formData.append('end_date', date);
+
+                const response = await fetch('{{ route('sales-import.run-daily') }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                    },
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showNotification(`Imported ${date}: ${data.data.records_processed} records`);
+                    // Update button to show success
+                    button.textContent = '✓ Done';
+                    button.className = 'bg-green-600 text-white px-3 py-1 text-sm rounded cursor-default';
+                    button.onclick = null;
+
+                    // Refresh logs
+                    loadImportLogs();
+                } else {
+                    showNotification(`Failed to import ${date}: ${data.message}`, 'error');
+                    button.textContent = originalText;
+                    button.disabled = false;
+                }
+            } catch (error) {
+                showNotification(`Failed to import ${date}: ${error.message}`, 'error');
+                button.textContent = originalText;
+                button.disabled = false;
+            }
+        }
+
+        async function importAllMissingDays() {
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = 'Importing...';
+            button.disabled = true;
+
+            // Get all missing days from the list
+            const missingDays = Array.from(document.querySelectorAll('#missing-days-list > div:not(.border-t) .font-medium'))
+                .map(el => el.textContent);
+
+            let imported = 0;
+            let failed = 0;
+
+            for (const date of missingDays) {
+                try {
+                    const formData = new FormData();
+                    formData.append('start_date', date);
+                    formData.append('end_date', date);
+
+                    const response = await fetch('{{ route('sales-import.run-daily') }}', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'Accept': 'application/json',
+                        },
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        imported++;
+                        button.textContent = `Importing... (${imported}/${missingDays.length})`;
+                    } else {
+                        failed++;
+                    }
+                } catch (error) {
+                    failed++;
+                }
+            }
+
+            showNotification(`Import complete: ${imported} succeeded, ${failed} failed`);
+            button.textContent = '✓ All Done';
+            button.className = 'w-full bg-green-600 text-white px-4 py-2 rounded-md cursor-default';
+            button.onclick = null;
+
+            // Refresh the gap finder to show updated results
+            setTimeout(() => {
+                document.getElementById('gap-finder-form').dispatchEvent(new Event('submit'));
+            }, 1000);
+
+            loadImportLogs();
+        }
     </script>
 </x-admin-layout>

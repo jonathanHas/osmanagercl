@@ -507,4 +507,56 @@ class SalesValidationService
             'transactions' => $imported->total_transactions - $pos->total_transactions,
         ];
     }
+
+    /**
+     * Fast gap finder - only compares dates (no heavy aggregation)
+     * Use this for quick scans on production to find missing import days
+     */
+    public function findMissingDays(Carbon $startDate, Carbon $endDate): array
+    {
+        $startTime = microtime(true);
+
+        // Get dates from imported data (fast - indexed local query)
+        $importedDates = DB::table('sales_daily_summary')
+            ->whereBetween('sale_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+            ->selectRaw('DISTINCT DATE(sale_date) as sale_date')
+            ->pluck('sale_date')
+            ->map(fn ($d) => Carbon::parse($d)->format('Y-m-d'))
+            ->toArray();
+
+        // Get dates from POS (fast - just dates, no aggregation)
+        $posDates = DB::connection('pos')
+            ->table('STOCKDIARY')
+            ->whereBetween('DATENEW', [$startDate->startOfDay(), $endDate->endOfDay()])
+            ->where('REASON', -1) // Sales only
+            ->selectRaw('DISTINCT DATE(DATENEW) as sale_date')
+            ->pluck('sale_date')
+            ->map(fn ($d) => Carbon::parse($d)->format('Y-m-d'))
+            ->toArray();
+
+        // Find gaps
+        $missingInImported = array_values(array_diff($posDates, $importedDates));
+        $extraInImported = array_values(array_diff($importedDates, $posDates));
+
+        // Sort dates
+        sort($missingInImported);
+        sort($extraInImported);
+
+        $executionTime = microtime(true) - $startTime;
+
+        return [
+            'missing_days' => $missingInImported,
+            'extra_days' => $extraInImported,
+            'imported_count' => count(array_unique($importedDates)),
+            'pos_count' => count(array_unique($posDates)),
+            'missing_count' => count($missingInImported),
+            'extra_count' => count($extraInImported),
+            'status' => empty($missingInImported) ? 'complete' : 'gaps_found',
+            'execution_time_seconds' => round($executionTime, 3),
+            'date_range' => [
+                'start' => $startDate->format('Y-m-d'),
+                'end' => $endDate->format('Y-m-d'),
+            ],
+        ];
+    }
 }
