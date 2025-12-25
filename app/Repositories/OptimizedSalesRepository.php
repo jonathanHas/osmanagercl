@@ -899,11 +899,14 @@ class OptimizedSalesRepository
     /**
      * Get 7-day sales trend data in a single query
      * Replaces getSalesTrend() loop of 7 individual queries
+     *
+     * @param  int  $days  Number of days to include in trend
+     * @param  Carbon|null  $endDate  End date for the trend (defaults to today)
      */
-    public function getSalesTrendOptimized(int $days = 7): array
+    public function getSalesTrendOptimized(int $days = 7, ?Carbon $endDate = null): array
     {
-        $endDate = Carbon::now();
-        $startDate = Carbon::now()->subDays($days - 1);
+        $endDate = $endDate ?? Carbon::now();
+        $startDate = $endDate->copy()->subDays($days - 1);
 
         $summaries = DB::table('pos_daily_summaries')
             ->whereBetween('sale_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
@@ -913,7 +916,7 @@ class OptimizedSalesRepository
 
         $trend = [];
         for ($i = $days - 1; $i >= 0; $i--) {
-            $date = Carbon::now()->subDays($i);
+            $date = $endDate->copy()->subDays($i);
             $dateKey = $date->format('Y-m-d');
             $summary = $summaries->get($dateKey);
 
@@ -936,11 +939,14 @@ class OptimizedSalesRepository
     /**
      * Get 7-day cash flow trend data in a single query
      * Replaces getCashFlowTrend() loop of 7 individual queries
+     *
+     * @param  int  $days  Number of days to include in trend
+     * @param  Carbon|null  $endDate  End date for the trend (defaults to today)
      */
-    public function getCashFlowTrendOptimized(int $days = 7): array
+    public function getCashFlowTrendOptimized(int $days = 7, ?Carbon $endDate = null): array
     {
-        $endDate = Carbon::now();
-        $startDate = Carbon::now()->subDays($days - 1);
+        $endDate = $endDate ?? Carbon::now();
+        $startDate = $endDate->copy()->subDays($days - 1);
 
         $summaries = DB::table('pos_daily_summaries')
             ->whereBetween('sale_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
@@ -950,7 +956,7 @@ class OptimizedSalesRepository
 
         // Get cash payments for the period
         $payments = DB::table('cash_reconciliation_payments')
-            ->whereBetween('created_at', [$startDate, $endDate->endOfDay()])
+            ->whereBetween('created_at', [$startDate, $endDate->copy()->endOfDay()])
             ->selectRaw('DATE(created_at) as payment_date, SUM(amount) as total_out')
             ->groupBy('payment_date')
             ->get()
@@ -958,7 +964,7 @@ class OptimizedSalesRepository
 
         $trend = [];
         for ($i = $days - 1; $i >= 0; $i--) {
-            $date = Carbon::now()->subDays($i);
+            $date = $endDate->copy()->subDays($i);
             $dateKey = $date->format('Y-m-d');
             $summary = $summaries->get($dateKey);
             $payment = $payments->get($dateKey);

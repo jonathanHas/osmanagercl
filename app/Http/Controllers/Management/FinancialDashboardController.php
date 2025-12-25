@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Management;
 
 use App\Http\Controllers\Controller;
+use App\Models\Invoice;
 use App\Repositories\OptimizedSalesRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -35,11 +36,15 @@ class FinancialDashboardController extends Controller
         $pendingReconciliations = $this->getPendingReconciliations();
 
         // Get trends - using pre-aggregated data (2 queries vs 14 cross-DB queries!)
-        $salesTrend = $this->optimizedSalesRepository->getSalesTrendOptimized();
-        $cashFlowTrend = $this->optimizedSalesRepository->getCashFlowTrendOptimized();
+        // Trend is relative to the selected date, not today
+        $salesTrend = $this->optimizedSalesRepository->getSalesTrendOptimized(7, $carbonDate);
+        $cashFlowTrend = $this->optimizedSalesRepository->getCashFlowTrendOptimized(7, $carbonDate);
 
-        // Get alerts
-        $alerts = $this->getFinancialAlerts($carbonDate, $todayMetrics);
+        // Get alerts (including overdue invoices)
+        $alerts = $this->getFinancialAlerts($carbonDate, $todayMetrics, $outstandingInvoices);
+
+        // Last updated timestamp
+        $lastUpdated = now();
 
         return view('management.financial.dashboard', compact(
             'date',
@@ -52,7 +57,8 @@ class FinancialDashboardController extends Controller
             'pendingReconciliations',
             'salesTrend',
             'cashFlowTrend',
-            'alerts'
+            'alerts',
+            'lastUpdated'
         ));
     }
 
@@ -139,12 +145,28 @@ class FinancialDashboardController extends Controller
 
     private function getOutstandingInvoices()
     {
-        // This would come from invoices table when fully implemented
-        // For now, return mock data
+        // Get unpaid invoices (pending, overdue, or partial payment)
+        $unpaidStatuses = ['pending', 'overdue', 'partial'];
+
+        $count = Invoice::whereIn('payment_status', $unpaidStatuses)->count();
+        $totalAmount = Invoice::whereIn('payment_status', $unpaidStatuses)->sum('total_amount');
+        $overdueCount = Invoice::where('payment_status', 'overdue')->count();
+
+        // Get the oldest unpaid invoice to calculate days outstanding
+        $oldestUnpaid = Invoice::whereIn('payment_status', $unpaidStatuses)
+            ->whereNotNull('due_date')
+            ->orderBy('due_date', 'asc')
+            ->first();
+
+        $oldestDays = $oldestUnpaid
+            ? Carbon::parse($oldestUnpaid->due_date)->diffInDays(now(), false)
+            : 0;
+
         return [
-            'count' => 0,
-            'total_amount' => 0,
-            'oldest_days' => 0,
+            'count' => $count,
+            'total_amount' => $totalAmount,
+            'overdue_count' => $overdueCount,
+            'oldest_days' => max(0, $oldestDays), // Only show positive days overdue
         ];
     }
 
@@ -169,9 +191,18 @@ class FinancialDashboardController extends Controller
         return count($missing);
     }
 
-    private function getFinancialAlerts($date, array $todayMetrics)
+    private function getFinancialAlerts($date, array $todayMetrics, array $outstandingInvoices)
     {
         $alerts = [];
+
+        // Check for overdue invoices
+        if ($outstandingInvoices['overdue_count'] > 0) {
+            $alerts[] = [
+                'type' => 'danger',
+                'message' => $outstandingInvoices['overdue_count'].' overdue invoice(s) - €'.number_format($outstandingInvoices['total_amount'], 2).' outstanding',
+                'action' => route('invoices.index', ['payment_status' => 'overdue']),
+            ];
+        }
 
         // Check for unreconciled days
         $lastReconciliation = DB::table('cash_reconciliations')

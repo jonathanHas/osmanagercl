@@ -1,18 +1,56 @@
 <x-admin-layout>
     <div class="p-6">
         <!-- Header with Date Selector -->
-        <div class="mb-6 flex justify-between items-center">
-            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Financial Dashboard</h1>
-            <div class="flex items-center gap-4">
-                <input type="date" 
-                       value="{{ $date }}" 
-                       max="{{ date('Y-m-d') }}"
-                       onchange="window.location.href='{{ route('management.financial.dashboard') }}?date=' + this.value"
-                       class="rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
-                <button onclick="window.location.href='{{ route('management.financial.dashboard') }}'"
-                        class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+        <div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Financial Dashboard</h1>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    Last updated: {{ $lastUpdated->format('H:i:s') }}
+                </p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <!-- Date Range Presets -->
+                <a href="{{ route('management.financial.dashboard') }}"
+                   class="px-3 py-1.5 text-sm font-medium rounded-md {{ $date === now()->format('Y-m-d') ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600' }}">
                     Today
-                </button>
+                </a>
+                <a href="{{ route('management.financial.dashboard', ['date' => now()->subDay()->format('Y-m-d')]) }}"
+                   class="px-3 py-1.5 text-sm font-medium rounded-md {{ $date === now()->subDay()->format('Y-m-d') ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600' }}">
+                    Yesterday
+                </a>
+                <span class="text-gray-300 dark:text-gray-600">|</span>
+
+                <!-- Date Navigation -->
+                <div class="flex items-center gap-1">
+                    <a href="{{ route('management.financial.dashboard', ['date' => \Carbon\Carbon::parse($date)->subDay()->format('Y-m-d')]) }}"
+                       class="p-1.5 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                       title="Previous day">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                        </svg>
+                    </a>
+                    <input type="date"
+                           value="{{ $date }}"
+                           max="{{ date('Y-m-d') }}"
+                           onchange="window.location.href='{{ route('management.financial.dashboard') }}?date=' + this.value"
+                           class="rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm">
+                    @if($date < now()->format('Y-m-d'))
+                    <a href="{{ route('management.financial.dashboard', ['date' => \Carbon\Carbon::parse($date)->addDay()->format('Y-m-d')]) }}"
+                       class="p-1.5 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                       title="Next day">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </a>
+                    @else
+                    <span class="p-1.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed"
+                          title="Cannot go to future dates">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </span>
+                    @endif
+                </div>
             </div>
         </div>
 
@@ -35,7 +73,7 @@
         <!-- Primary KPI Cards -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <!-- Today's Sales -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <a href="{{ route('till-review.index', ['date' => $date]) }}" class="block bg-white dark:bg-gray-800 rounded-lg shadow p-6 hover:shadow-lg hover:ring-2 hover:ring-blue-500 transition-all">
                 <div class="flex items-center justify-between mb-2">
                     <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Today's Sales</h3>
                     <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -54,12 +92,12 @@
                     @endif
                 </div>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {{ $todayMetrics['transactions'] }} transactions
+                    {{ $todayMetrics['transactions'] }} transactions · <span class="underline">View details →</span>
                 </p>
-            </div>
+            </a>
 
             <!-- Cash Position -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <a href="{{ route('cash-reconciliation.index') }}" class="block bg-white dark:bg-gray-800 rounded-lg shadow p-6 hover:shadow-lg hover:ring-2 hover:ring-blue-500 transition-all">
                 <div class="flex items-center justify-between mb-2">
                     <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Cash Position</h3>
                     <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -77,9 +115,9 @@
                     @endif
                 </div>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Float: €{{ number_format($cashPosition['current_float'], 2) }}
+                    Float: €{{ number_format($cashPosition['current_float'], 2) }} · <span class="underline">Reconcile →</span>
                 </p>
-            </div>
+            </a>
 
             <!-- Week Performance -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
@@ -218,15 +256,23 @@
             <!-- Sales Trend -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">7-Day Sales Trend</h3>
+                @php
+                    $maxSales = max(array_column($salesTrend, 'sales'));
+                    $maxSales = $maxSales > 0 ? $maxSales : 1; // Prevent division by zero
+                @endphp
                 <div class="h-48 flex items-end justify-between gap-2">
                     @foreach($salesTrend as $day)
                     <div class="flex-1 flex flex-col items-center">
-                        <div class="w-full bg-blue-500 rounded-t" 
-                             style="height: {{ $day['sales'] > 0 ? ($day['sales'] / max(array_column($salesTrend, 'sales')) * 100) : 2 }}%"
+                        <div class="w-full bg-blue-500 rounded-t transition-all"
+                             style="height: {{ $day['sales'] > 0 ? max(4, ($day['sales'] / $maxSales) * 160) : 4 }}px"
                              title="€{{ number_format($day['sales'], 2) }}"></div>
                         <span class="text-xs text-gray-500 dark:text-gray-400 mt-2">{{ $day['date'] }}</span>
                     </div>
                     @endforeach
+                </div>
+                <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2 pt-2 border-t dark:border-gray-700">
+                    <span>Total: €{{ number_format(array_sum(array_column($salesTrend, 'sales')), 2) }}</span>
+                    <span>Avg: €{{ number_format(array_sum(array_column($salesTrend, 'sales')) / 7, 2) }}/day</span>
                 </div>
             </div>
 
@@ -298,32 +344,44 @@
             </div>
 
             <!-- Outstanding Invoices -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <a href="{{ route('invoices.index', ['payment_status' => 'unpaid']) }}" class="block bg-white dark:bg-gray-800 rounded-lg shadow p-6 hover:shadow-lg hover:ring-2 hover:ring-blue-500 transition-all">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Outstanding</h3>
-                    <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 rounded-full">
-                        {{ $outstandingInvoices['count'] }}
-                    </span>
+                    <div class="flex gap-2">
+                        @if(($outstandingInvoices['overdue_count'] ?? 0) > 0)
+                        <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded-full">
+                            {{ $outstandingInvoices['overdue_count'] }} overdue
+                        </span>
+                        @endif
+                        <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 rounded-full">
+                            {{ $outstandingInvoices['count'] }} total
+                        </span>
+                    </div>
                 </div>
                 <div class="space-y-2">
                     @if($outstandingInvoices['count'] > 0)
-                    <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                        <p class="text-sm font-medium text-gray-800 dark:text-gray-200">
+                    <div class="p-3 {{ ($outstandingInvoices['overdue_count'] ?? 0) > 0 ? 'bg-red-50 dark:bg-red-900/20' : 'bg-gray-50 dark:bg-gray-700' }} rounded-lg">
+                        <p class="text-sm font-medium {{ ($outstandingInvoices['overdue_count'] ?? 0) > 0 ? 'text-red-800 dark:text-red-300' : 'text-gray-800 dark:text-gray-200' }}">
                             €{{ number_format($outstandingInvoices['total_amount'], 2) }} outstanding
                         </p>
-                        <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                            Oldest: {{ $outstandingInvoices['oldest_days'] }} days
+                        <p class="text-xs {{ ($outstandingInvoices['overdue_count'] ?? 0) > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400' }} mt-1">
+                            @if($outstandingInvoices['oldest_days'] > 0)
+                            Oldest: {{ $outstandingInvoices['oldest_days'] }} days overdue
+                            @else
+                            All invoices within terms
+                            @endif
+                            · <span class="underline">View invoices →</span>
                         </p>
                     </div>
                     @else
-                    <div class="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                    <div class="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                        <p class="text-sm text-green-800 dark:text-green-300 font-medium">
                             No outstanding invoices
                         </p>
                     </div>
                     @endif
                 </div>
-            </div>
+            </a>
 
             <!-- Quick Actions -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
