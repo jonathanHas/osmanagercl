@@ -509,6 +509,105 @@ class SalesValidationService
     }
 
     /**
+     * Quick daily totals comparison - faster than full validation
+     * Compares daily revenue/units totals to find days with discrepancies
+     */
+    public function findDailyDiscrepancies(Carbon $startDate, Carbon $endDate, float $tolerance = 1.00): array
+    {
+        $startTime = microtime(true);
+
+        // Get daily totals from imported data (fast - pre-aggregated)
+        $importedDaily = DB::table('sales_daily_summary')
+            ->whereBetween('sale_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+            ->selectRaw('DATE(sale_date) as sale_date')
+            ->selectRaw('SUM(total_revenue) as total_revenue')
+            ->selectRaw('SUM(total_units) as total_units')
+            ->selectRaw('SUM(transaction_count) as total_transactions')
+            ->groupByRaw('DATE(sale_date)')
+            ->get()
+            ->keyBy('sale_date');
+
+        // Get daily totals from POS (aggregated at daily level - much faster than product level)
+        $posDaily = DB::connection('pos')
+            ->table('STOCKDIARY as s')
+            ->whereBetween('s.DATENEW', [$startDate->startOfDay(), $endDate->endOfDay()])
+            ->where('s.REASON', -1)
+            ->selectRaw('DATE(s.DATENEW) as sale_date')
+            ->selectRaw('SUM(ABS(s.UNITS) * s.PRICE) as total_revenue')
+            ->selectRaw('SUM(ABS(s.UNITS)) as total_units')
+            ->selectRaw('COUNT(*) as total_transactions')
+            ->groupByRaw('DATE(s.DATENEW)')
+            ->get()
+            ->keyBy('sale_date');
+
+        $discrepancies = [];
+        $matches = [];
+        $missingDays = [];
+
+        // Check all POS days
+        foreach ($posDaily as $date => $posData) {
+            $importedData = $importedDaily->get($date);
+
+            if (! $importedData) {
+                $missingDays[] = [
+                    'date' => $date,
+                    'pos_revenue' => round($posData->total_revenue, 2),
+                    'pos_units' => round($posData->total_units, 2),
+                ];
+
+                continue;
+            }
+
+            $revenueDiff = abs($importedData->total_revenue - $posData->total_revenue);
+            $unitsDiff = abs($importedData->total_units - $posData->total_units);
+
+            if ($revenueDiff > $tolerance || $unitsDiff > 0.1) {
+                $discrepancies[] = [
+                    'date' => $date,
+                    'imported_revenue' => round($importedData->total_revenue, 2),
+                    'pos_revenue' => round($posData->total_revenue, 2),
+                    'revenue_diff' => round($importedData->total_revenue - $posData->total_revenue, 2),
+                    'imported_units' => round($importedData->total_units, 2),
+                    'pos_units' => round($posData->total_units, 2),
+                    'units_diff' => round($importedData->total_units - $posData->total_units, 2),
+                ];
+            } else {
+                $matches[] = $date;
+            }
+        }
+
+        // Sort by date
+        usort($discrepancies, fn ($a, $b) => $a['date'] <=> $b['date']);
+        usort($missingDays, fn ($a, $b) => $a['date'] <=> $b['date']);
+
+        $executionTime = microtime(true) - $startTime;
+
+        $totalDays = $posDaily->count();
+        $matchCount = count($matches);
+        $discrepancyCount = count($discrepancies);
+        $missingCount = count($missingDays);
+
+        return [
+            'discrepancies' => $discrepancies,
+            'missing_days' => $missingDays,
+            'summary' => [
+                'total_days' => $totalDays,
+                'matches' => $matchCount,
+                'discrepancies' => $discrepancyCount,
+                'missing' => $missingCount,
+                'accuracy_percentage' => $totalDays > 0 ? round(($matchCount / $totalDays) * 100, 1) : 100,
+            ],
+            'status' => $discrepancyCount === 0 && $missingCount === 0 ? 'complete' : 'issues_found',
+            'execution_time_seconds' => round($executionTime, 3),
+            'date_range' => [
+                'start' => $startDate->format('Y-m-d'),
+                'end' => $endDate->format('Y-m-d'),
+            ],
+            'tolerance_used' => $tolerance,
+        ];
+    }
+
+    /**
      * Fast gap finder - only compares dates (no heavy aggregation)
      * Use this for quick scans on production to find missing import days
      */

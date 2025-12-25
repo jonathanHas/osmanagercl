@@ -445,4 +445,34 @@ class SalesImportController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Quick daily totals comparison - find days with value discrepancies
+     * Faster than full validation but catches mismatched totals
+     */
+    public function findDailyDiscrepancies(Request $request)
+    {
+        $request->validate([
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+        ]);
+
+        try {
+            $startDate = Carbon::parse($request->start_date);
+            $endDate = Carbon::parse($request->end_date);
+            $tolerance = (float) $request->get('tolerance', 1.00);
+
+            $result = $this->validationService->findDailyDiscrepancies($startDate, $endDate, $tolerance);
+
+            return response()->json([
+                'success' => true,
+                'data' => $result,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Daily discrepancy check failed: '.$e->getMessage(),
+            ], 500);
+        }
+    }
 }

@@ -131,47 +131,118 @@
                 </div>
             </div>
 
-            <!-- Quick Gap Finder -->
+            <!-- Quick Validation Tools -->
             <div class="bg-white shadow rounded-lg mb-8">
                 <div class="px-6 py-4 border-b border-gray-200">
-                    <h3 class="text-lg font-medium text-gray-900">🔍 Quick Gap Finder</h3>
-                    <p class="text-sm text-gray-600 mt-1">Fast scan to find missing days in imported data (no heavy processing)</p>
+                    <h3 class="text-lg font-medium text-gray-900">🔍 Quick Validation Tools</h3>
+                    <p class="text-sm text-gray-600 mt-1">Fast checks that work on production (unlike full validation)</p>
                 </div>
-                <div class="p-6">
-                    <form id="gap-finder-form" class="space-y-4">
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">Start Date</label>
-                                <input type="date" name="start_date"
-                                       value="{{ $dateRange && $dateRange->earliest ? \Carbon\Carbon::parse($dateRange->earliest)->format('Y-m-d') : now()->subYear()->format('Y-m-d') }}"
-                                       class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700">End Date</label>
-                                <input type="date" name="end_date"
-                                       value="{{ now()->format('Y-m-d') }}"
-                                       class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                            </div>
-                            <div class="flex items-end">
-                                <button type="submit" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                    Scan for Missing Days
-                                </button>
-                            </div>
-                        </div>
-                    </form>
 
-                    <!-- Gap Finder Results -->
-                    <div id="gap-finder-results" class="hidden mt-6">
-                        <div id="gap-finder-summary" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                            <!-- Summary cards will be populated here -->
+                <!-- Tabs -->
+                <div class="border-b border-gray-200">
+                    <nav class="-mb-px flex" aria-label="Tabs">
+                        <button class="quick-val-tab active w-1/2 py-4 px-1 text-center border-b-2 border-blue-500 font-medium text-sm text-blue-600" data-tab="gap-finder">
+                            Gap Finder
+                            <span class="block text-xs text-gray-500 font-normal">Find missing days</span>
+                        </button>
+                        <button class="quick-val-tab w-1/2 py-4 px-1 text-center border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300" data-tab="daily-totals">
+                            Daily Totals Check
+                            <span class="block text-xs text-gray-500 font-normal">Find value discrepancies</span>
+                        </button>
+                    </nav>
+                </div>
+
+                <div class="p-6">
+                    <!-- Gap Finder Tab -->
+                    <div id="tab-gap-finder" class="quick-val-content">
+                        <form id="gap-finder-form" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Start Date</label>
+                                    <input type="date" name="start_date"
+                                           value="{{ $dateRange && $dateRange->earliest ? \Carbon\Carbon::parse($dateRange->earliest)->format('Y-m-d') : now()->subYear()->format('Y-m-d') }}"
+                                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">End Date</label>
+                                    <input type="date" name="end_date"
+                                           value="{{ now()->format('Y-m-d') }}"
+                                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+                                <div class="flex items-end">
+                                    <button type="submit" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        Find Missing Days
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+
+                        <!-- Gap Finder Results -->
+                        <div id="gap-finder-results" class="hidden mt-6">
+                            <div id="gap-finder-summary" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                            </div>
+                            <div id="gap-finder-status" class="mb-4">
+                            </div>
+                            <div id="gap-finder-missing" class="hidden">
+                                <h4 class="text-md font-medium text-red-700 mb-3">Missing Days (POS has data, not imported)</h4>
+                                <div id="missing-days-list" class="space-y-2 max-h-64 overflow-y-auto">
+                                </div>
+                            </div>
                         </div>
-                        <div id="gap-finder-status" class="mb-4">
-                            <!-- Status indicator -->
-                        </div>
-                        <div id="gap-finder-missing" class="hidden">
-                            <h4 class="text-md font-medium text-gray-700 mb-3">Missing Days (need import)</h4>
-                            <div id="missing-days-list" class="space-y-2">
-                                <!-- Missing days will be listed here with import buttons -->
+                    </div>
+
+                    <!-- Daily Totals Tab -->
+                    <div id="tab-daily-totals" class="quick-val-content hidden">
+                        <form id="daily-totals-form" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Start Date</label>
+                                    <input type="date" name="start_date"
+                                           value="{{ $dateRange && $dateRange->earliest ? \Carbon\Carbon::parse($dateRange->earliest)->format('Y-m-d') : now()->subYear()->format('Y-m-d') }}"
+                                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">End Date</label>
+                                    <input type="date" name="end_date"
+                                           value="{{ now()->format('Y-m-d') }}"
+                                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+                                <div class="flex items-end">
+                                    <button type="submit" class="w-full bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                        Check Daily Totals
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+
+                        <!-- Daily Totals Results -->
+                        <div id="daily-totals-results" class="hidden mt-6">
+                            <div id="daily-totals-summary" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                            </div>
+                            <div id="daily-totals-status" class="mb-4">
+                            </div>
+                            <div id="daily-totals-discrepancies" class="hidden">
+                                <h4 class="text-md font-medium text-red-700 mb-3">Days with Discrepancies</h4>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-gray-200">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Imported</th>
+                                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">POS</th>
+                                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Diff</th>
+                                                <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="discrepancies-tbody" class="bg-white divide-y divide-gray-200">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div id="daily-totals-missing" class="hidden mt-4">
+                                <h4 class="text-md font-medium text-orange-700 mb-3">Missing Days (not imported)</h4>
+                                <div id="daily-missing-list" class="space-y-2 max-h-48 overflow-y-auto">
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -584,6 +655,25 @@
         // Load logs on page load
         document.addEventListener('DOMContentLoaded', loadImportLogs);
 
+        // Quick Validation Tabs
+        document.querySelectorAll('.quick-val-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Update active tab
+                document.querySelectorAll('.quick-val-tab').forEach(t => {
+                    t.classList.remove('active', 'border-blue-500', 'text-blue-600');
+                    t.classList.add('border-transparent', 'text-gray-500');
+                });
+                tab.classList.add('active', 'border-blue-500', 'text-blue-600');
+                tab.classList.remove('border-transparent', 'text-gray-500');
+
+                // Show/hide content
+                document.querySelectorAll('.quick-val-content').forEach(content => {
+                    content.classList.add('hidden');
+                });
+                document.getElementById('tab-' + tab.dataset.tab).classList.remove('hidden');
+            });
+        });
+
         // Gap Finder Form
         document.getElementById('gap-finder-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -795,6 +885,179 @@
             }, 1000);
 
             loadImportLogs();
+        }
+
+        // Daily Totals Form
+        document.getElementById('daily-totals-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const button = e.target.querySelector('button[type="submit"]');
+            const hideLoading = showLoading(button);
+
+            const formData = new FormData(e.target);
+
+            try {
+                const response = await fetch('{{ route('sales-import.find-daily-discrepancies') }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                    },
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    displayDailyTotalsResults(result.data);
+                    const issueCount = result.data.summary.discrepancies + result.data.summary.missing;
+                    showNotification(`Check completed in ${result.data.execution_time_seconds}s - ${issueCount} issue(s) found`);
+                } else {
+                    showNotification(result.message, 'error');
+                }
+            } catch (error) {
+                showNotification('Daily totals check failed: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        });
+
+        function displayDailyTotalsResults(data) {
+            const resultsDiv = document.getElementById('daily-totals-results');
+            const summaryDiv = document.getElementById('daily-totals-summary');
+            const statusDiv = document.getElementById('daily-totals-status');
+            const discrepanciesDiv = document.getElementById('daily-totals-discrepancies');
+            const missingDiv = document.getElementById('daily-totals-missing');
+
+            resultsDiv.classList.remove('hidden');
+
+            // Summary cards
+            summaryDiv.innerHTML = `
+                <div class="bg-blue-50 rounded-lg p-4 text-center">
+                    <div class="text-2xl font-bold text-blue-600">${data.summary.total_days}</div>
+                    <div class="text-sm text-blue-700">Days Checked</div>
+                </div>
+                <div class="bg-green-50 rounded-lg p-4 text-center">
+                    <div class="text-2xl font-bold text-green-600">${data.summary.matches}</div>
+                    <div class="text-sm text-green-700">Matches</div>
+                </div>
+                <div class="bg-${data.summary.discrepancies > 0 ? 'red' : 'green'}-50 rounded-lg p-4 text-center">
+                    <div class="text-2xl font-bold text-${data.summary.discrepancies > 0 ? 'red' : 'green'}-600">${data.summary.discrepancies}</div>
+                    <div class="text-sm text-${data.summary.discrepancies > 0 ? 'red' : 'green'}-700">Discrepancies</div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4 text-center">
+                    <div class="text-2xl font-bold text-gray-600">${data.summary.accuracy_percentage}%</div>
+                    <div class="text-sm text-gray-700">Accuracy</div>
+                </div>
+            `;
+
+            // Status indicator
+            if (data.status === 'complete') {
+                statusDiv.innerHTML = `
+                    <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4">
+                        <p class="font-medium">✅ All Clear! Daily totals match between POS and imported data.</p>
+                        <p class="text-sm mt-1">Tolerance: €${data.tolerance_used} per day</p>
+                    </div>
+                `;
+                discrepanciesDiv.classList.add('hidden');
+                missingDiv.classList.add('hidden');
+            } else {
+                statusDiv.innerHTML = `
+                    <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4">
+                        <p class="font-medium">⚠️ Issues Found! ${data.summary.discrepancies} day(s) with value discrepancies, ${data.summary.missing} missing.</p>
+                        <p class="text-sm mt-1">Re-import the affected days to fix. Tolerance: €${data.tolerance_used}</p>
+                    </div>
+                `;
+
+                // Show discrepancies table
+                if (data.discrepancies.length > 0) {
+                    discrepanciesDiv.classList.remove('hidden');
+                    const tbody = document.getElementById('discrepancies-tbody');
+                    tbody.innerHTML = '';
+
+                    data.discrepancies.forEach(d => {
+                        const row = document.createElement('tr');
+                        const diffClass = d.revenue_diff > 0 ? 'text-green-600' : 'text-red-600';
+                        row.innerHTML = `
+                            <td class="px-4 py-2 text-sm font-medium text-gray-900">${d.date}</td>
+                            <td class="px-4 py-2 text-sm text-gray-600 text-right">€${d.imported_revenue.toFixed(2)}</td>
+                            <td class="px-4 py-2 text-sm text-gray-600 text-right">€${d.pos_revenue.toFixed(2)}</td>
+                            <td class="px-4 py-2 text-sm font-medium ${diffClass} text-right">${d.revenue_diff > 0 ? '+' : ''}€${d.revenue_diff.toFixed(2)}</td>
+                            <td class="px-4 py-2 text-center">
+                                <button onclick="reimportDay('${d.date}')" class="bg-blue-600 text-white px-2 py-1 text-xs rounded hover:bg-blue-700">
+                                    Re-import
+                                </button>
+                            </td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                } else {
+                    discrepanciesDiv.classList.add('hidden');
+                }
+
+                // Show missing days
+                if (data.missing_days.length > 0) {
+                    missingDiv.classList.remove('hidden');
+                    const list = document.getElementById('daily-missing-list');
+                    list.innerHTML = '';
+
+                    data.missing_days.forEach(d => {
+                        const div = document.createElement('div');
+                        div.className = 'flex items-center justify-between bg-orange-50 rounded-lg p-3';
+                        div.innerHTML = `
+                            <div>
+                                <span class="font-medium text-orange-700">${d.date}</span>
+                                <span class="text-sm text-orange-600 ml-2">(€${d.pos_revenue.toFixed(2)} in POS)</span>
+                            </div>
+                            <button onclick="importSingleDay('${d.date}')" class="bg-blue-600 text-white px-2 py-1 text-xs rounded hover:bg-blue-700">
+                                Import
+                            </button>
+                        `;
+                        list.appendChild(div);
+                    });
+                } else {
+                    missingDiv.classList.add('hidden');
+                }
+            }
+        }
+
+        async function reimportDay(date) {
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = '...';
+            button.disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('start_date', date);
+                formData.append('end_date', date);
+
+                const response = await fetch('{{ route('sales-import.run-daily') }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                    },
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showNotification(`Re-imported ${date}: ${data.data.records_processed} records`);
+                    button.textContent = '✓';
+                    button.className = 'bg-green-600 text-white px-2 py-1 text-xs rounded cursor-default';
+                    button.onclick = null;
+                    loadImportLogs();
+                } else {
+                    showNotification(`Failed to re-import ${date}: ${data.message}`, 'error');
+                    button.textContent = originalText;
+                    button.disabled = false;
+                }
+            } catch (error) {
+                showNotification(`Failed to re-import ${date}: ${error.message}`, 'error');
+                button.textContent = originalText;
+                button.disabled = false;
+            }
         }
     </script>
 </x-admin-layout>

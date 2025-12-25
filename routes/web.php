@@ -395,6 +395,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/daily-summary', [SalesImportController::class, 'getDailySummary'])->name('daily-summary');
         Route::post('/category-validation', [SalesImportController::class, 'getCategoryValidation'])->name('category-validation');
         Route::post('/find-gaps', [SalesImportController::class, 'findGaps'])->name('find-gaps');
+        Route::post('/find-daily-discrepancies', [SalesImportController::class, 'findDailyDiscrepancies'])->name('find-daily-discrepancies');
     });
 
     // Udea scraping test routes
