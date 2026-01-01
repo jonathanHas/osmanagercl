@@ -407,6 +407,22 @@ class DeliveryController extends Controller
     }
 
     /**
+     * Toggle whether delivery quantities are included in order stock calculations
+     */
+    public function toggleOrderStock(Delivery $delivery): RedirectResponse
+    {
+        $delivery->update([
+            'include_in_order_stock' => ! $delivery->include_in_order_stock,
+        ]);
+
+        $message = $delivery->include_in_order_stock
+            ? 'Delivery will be included in order stock calculations.'
+            : 'Delivery removed from order stock calculations.';
+
+        return back()->with('success', $message);
+    }
+
+    /**
      * Remove the specified delivery from storage
      */
     public function destroy(Delivery $delivery): RedirectResponse

@@ -351,6 +351,7 @@
 
                     $safeProductName = strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product'));
                     $currentStock = $contextData['current_stock'] ?? 0;
+                    $pendingDeliveryQty = $contextData['pending_delivery_qty'] ?? 0;
                     $avgWeeklySales = (float) ($contextData['avg_weekly_sales'] ?? 0);
                     $safetyFactorWeeks = isset($contextData['safety_factor'])
                         ? (float) $contextData['safety_factor']
@@ -584,6 +585,9 @@
                                                 {{ $currentStockCaseText }} cases
                                             @else
                                                 {{ number_format($currentStock, 0) }} units
+                                            @endif
+                                            @if($pendingDeliveryQty > 0)
+                                                <span class="text-blue-600 font-medium">(+{{ number_format($pendingDeliveryQty, 0) }} incoming)</span>
                                             @endif
                                         </div>
                                     </div>
@@ -799,6 +803,7 @@
 
                     $safeProductName = strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product'));
                     $currentStock = $contextData['current_stock'] ?? 0;
+                    $pendingDeliveryQty = $contextData['pending_delivery_qty'] ?? 0;
                     $avgWeeklySales = (float) ($contextData['avg_weekly_sales'] ?? 0);
                     $safetyFactorWeeks = isset($contextData['safety_factor'])
                         ? (float) $contextData['safety_factor']
@@ -1032,6 +1037,9 @@
                                                 {{ $currentStockCaseText }} cases
                                             @else
                                                 {{ number_format($currentStock, 0) }} units
+                                            @endif
+                                            @if($pendingDeliveryQty > 0)
+                                                <span class="text-blue-600 font-medium">(+{{ number_format($pendingDeliveryQty, 0) }} incoming)</span>
                                             @endif
                                         </div>
                                     </div>
@@ -1159,6 +1167,7 @@
 
                     $safeProductName = strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product'));
                     $currentStock = $contextData['current_stock'] ?? 0;
+                    $pendingDeliveryQty = $contextData['pending_delivery_qty'] ?? 0;
                     $avgWeeklySales = (float) ($contextData['avg_weekly_sales'] ?? 0);
                     $safetyFactorWeeks = isset($contextData['safety_factor'])
                         ? (float) $contextData['safety_factor']
@@ -1392,6 +1401,9 @@
                                                 {{ $currentStockCaseText }} cases
                                             @else
                                                 {{ number_format($currentStock, 0) }} units
+                                            @endif
+                                            @if($pendingDeliveryQty > 0)
+                                                <span class="text-blue-600 font-medium">(+{{ number_format($pendingDeliveryQty, 0) }} incoming)</span>
                                             @endif
                                         </div>
                                     </div>
@@ -1519,6 +1531,7 @@
 
                     $safeProductName = strip_tags(html_entity_decode($product->NAME ?? 'Unknown Product'));
                     $currentStock = $contextData['current_stock'] ?? 0;
+                    $pendingDeliveryQty = $contextData['pending_delivery_qty'] ?? 0;
                     $avgWeeklySales = (float) ($contextData['avg_weekly_sales'] ?? 0);
                     $safetyFactorWeeks = isset($contextData['safety_factor'])
                         ? (float) $contextData['safety_factor']
@@ -1752,6 +1765,9 @@
                                                 {{ $currentStockCaseText }} cases
                                             @else
                                                 {{ number_format($currentStock, 0) }} units
+                                            @endif
+                                            @if($pendingDeliveryQty > 0)
+                                                <span class="text-blue-600 font-medium">(+{{ number_format($pendingDeliveryQty, 0) }} incoming)</span>
                                             @endif
                                         </div>
                                     </div>

@@ -16,6 +16,7 @@ class Delivery extends Model
         'supplier_id',
         'delivery_date',
         'status',
+        'include_in_order_stock',
         'total_expected',
         'total_received',
         'import_data',
@@ -27,6 +28,7 @@ class Delivery extends Model
         'total_expected' => 'decimal:2',
         'total_received' => 'decimal:2',
         'import_data' => 'array',
+        'include_in_order_stock' => 'boolean',
     ];
 
     public function supplier(): BelongsTo
@@ -74,5 +76,10 @@ class Delivery extends Model
     public function scopeForSupplier($query, int $supplierId)
     {
         return $query->where('supplier_id', $supplierId);
+    }
+
+    public function scopeIncludedInOrderStock($query)
+    {
+        return $query->where('include_in_order_stock', true);
     }
 }

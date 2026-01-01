@@ -77,6 +77,22 @@
                     ];
                 }
                 
+                // Add toggle for including delivery in order stock calculations (non-completed only)
+                if (!in_array($delivery->status, ['completed', 'cancelled'])) {
+                    $deliveryActions[] = [
+                        'type' => 'form',
+                        'method' => 'POST',
+                        'route' => 'deliveries.toggle-order-stock',
+                        'params' => $delivery,
+                        'label' => $delivery->include_in_order_stock ? 'Included in Orders ✓' : 'Include in Orders',
+                        'color' => $delivery->include_in_order_stock ? 'green' : 'gray',
+                        'class' => $delivery->include_in_order_stock
+                            ? 'inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-md transition-colors duration-200'
+                            : 'inline-flex items-center px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-md transition-colors duration-200',
+                        'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'
+                    ];
+                }
+
                 // Add delete action for non-completed deliveries
                 if (in_array($delivery->status, ['draft', 'cancelled'])) {
                     $deliveryActions[] = [

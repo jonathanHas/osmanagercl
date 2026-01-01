@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\DeliveryItem;
 use App\Models\OrderAdjustment;
 use App\Models\OrderItem;
 use App\Models\OrderSession;
@@ -242,6 +243,11 @@ class OrderService
             ->keyBy('PRODUCT');
         \Log::info('Order generation: Stock levels fetched in '.round((microtime(true) - $t3) * 1000).'ms');
 
+        // Pre-fetch pending delivery quantities (from flagged deliveries only)
+        $tPending = microtime(true);
+        $allPendingDeliveries = $this->getBulkPendingDeliveryQuantities($productIds, $orderSession->supplier_id);
+        \Log::info('Order generation: Pending delivery quantities fetched in '.round((microtime(true) - $tPending) * 1000).'ms for '.count($allPendingDeliveries).' products');
+
         // Pre-fetch Christmas comparison data if enabled
         $allChristmasData = collect();
         $christmasEnabled = $options['christmas_comparison_enabled'] ?? false;
@@ -317,6 +323,7 @@ class OrderService
                     'current_stock' => isset($allStock[$product->ID])
                         ? (float) ($allStock[$product->ID]->UNITS ?? 0)
                         : null,
+                    'pending_delivery_qty' => $allPendingDeliveries[$product->ID] ?? 0,
                     'christmas_data' => $allChristmasData[$product->ID] ?? null,
                     'recent_purchase_price' => $allRecentPrices[$product->ID] ?? null,
                     'sales_history' => $allSalesHistory[$product->ID] ?? [],
@@ -450,7 +457,9 @@ class OrderService
 
         // Use pre-fetched stock if available, otherwise query
         $currentStock = $prefetchedData['current_stock'] ?? $this->getCurrentStock($product->ID);
-        $usableStock = max($currentStock, 0);
+        $pendingDeliveryQty = (float) ($prefetchedData['pending_delivery_qty'] ?? 0);
+        $effectiveStock = $currentStock + $pendingDeliveryQty;
+        $usableStock = max($effectiveStock, 0);
 
         // Base calculation: (Weekly Average × Target Weeks) - Current Stock
         $calculatedMin = $avgWeeklySales * $targetWeeks;
@@ -590,6 +599,7 @@ class OrderService
             'context_data' => [
                 'avg_weekly_sales' => round($avgWeeklySales, 2),
                 'current_stock' => $currentStock,
+                'pending_delivery_qty' => $pendingDeliveryQty,
                 'effective_stock' => $usableStock,
                 'safety_factor' => $safetyFactor,
                 'coverage_days' => $coverageDays,
@@ -696,6 +706,41 @@ class OrderService
         $stockRecord = StockCurrent::where('PRODUCT', $productId)->first();
 
         return $stockRecord?->UNITS ?? 0;
+    }
+
+    /**
+     * Get pending delivery quantities for products from FLAGGED deliveries only.
+     * Only includes deliveries where include_in_order_stock is true.
+     *
+     * @param  array<string>  $productIds  Product IDs to look up
+     * @param  string|null  $supplierId  Optional supplier filter
+     * @return array<string, float> Keyed by product_id => pending units
+     */
+    protected function getBulkPendingDeliveryQuantities(array $productIds, ?string $supplierId = null): array
+    {
+        if (empty($productIds)) {
+            return [];
+        }
+
+        $query = DeliveryItem::query()
+            ->select('delivery_items.product_id', DB::raw('SUM(
+                (COALESCE(delivery_items.case_ordered_quantity, 0) * COALESCE(delivery_items.supplier_case_units, delivery_items.units_per_case, 1) + COALESCE(delivery_items.unit_ordered_quantity, 0))
+                - (COALESCE(delivery_items.case_received_quantity, 0) * COALESCE(delivery_items.supplier_case_units, delivery_items.units_per_case, 1) + COALESCE(delivery_items.unit_received_quantity, 0))
+            ) as pending_units'))
+            ->join('deliveries', 'delivery_items.delivery_id', '=', 'deliveries.id')
+            ->where('deliveries.include_in_order_stock', true)
+            ->whereIn('deliveries.status', ['draft', 'receiving'])
+            ->whereIn('delivery_items.product_id', $productIds)
+            ->whereNotNull('delivery_items.product_id')
+            ->groupBy('delivery_items.product_id');
+
+        if ($supplierId) {
+            $query->where('deliveries.supplier_id', $supplierId);
+        }
+
+        return $query->pluck('pending_units', 'product_id')
+            ->map(fn ($value) => max(0, (float) $value))
+            ->toArray();
     }
 
     /**
