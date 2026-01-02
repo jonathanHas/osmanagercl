@@ -614,6 +614,22 @@ Route::middleware('auth')->group(function () {
             Route::get('/{lodgement}', [\App\Http\Controllers\Management\CashLodgementController::class, 'show'])->name('show');
             Route::get('/export/csv', [\App\Http\Controllers\Management\CashLodgementController::class, 'export'])->name('export');
         });
+
+        // Stock Valuation Management
+        Route::prefix('stock-valuation')->name('stock-valuation.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Management\StockValuationController::class, 'index'])->name('index');
+            Route::get('/live', [\App\Http\Controllers\Management\StockValuationController::class, 'live'])->name('live');
+            Route::get('/live/category/{category}', [\App\Http\Controllers\Management\StockValuationController::class, 'liveCategory'])->name('live.category');
+            Route::get('/create', [\App\Http\Controllers\Management\StockValuationController::class, 'create'])->name('create');
+            Route::post('/', [\App\Http\Controllers\Management\StockValuationController::class, 'store'])->name('store');
+            Route::get('/{snapshot}', [\App\Http\Controllers\Management\StockValuationController::class, 'show'])->name('show');
+            Route::get('/{snapshot}/category/{category}', [\App\Http\Controllers\Management\StockValuationController::class, 'category'])->name('category');
+            Route::post('/{snapshot}/override', [\App\Http\Controllers\Management\StockValuationController::class, 'override'])->name('override');
+            Route::post('/{snapshot}/refresh', [\App\Http\Controllers\Management\StockValuationController::class, 'refresh'])->name('refresh');
+            Route::post('/{snapshot}/finalize', [\App\Http\Controllers\Management\StockValuationController::class, 'finalize'])->name('finalize');
+            Route::get('/{snapshot}/export', [\App\Http\Controllers\Management\StockValuationController::class, 'export'])->name('export');
+            Route::delete('/{snapshot}', [\App\Http\Controllers\Management\StockValuationController::class, 'destroy'])->name('destroy');
+        });
     });
 });
 
