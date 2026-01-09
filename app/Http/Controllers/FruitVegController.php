@@ -1904,11 +1904,7 @@ class FruitVegController extends Controller
         }
 
         // Sort by sales (descending) by default
-        $sortMode = $request->input('sort', 'sales');
-        $sortFn = match ($sortMode) {
-            'name' => fn ($a, $b) => strcasecmp($a['product']->NAME ?? '', $b['product']->NAME ?? ''),
-            default => fn ($a, $b) => $b['sales_data']['total_units'] <=> $a['sales_data']['total_units'],
-        };
+        $sortFn = fn ($a, $b) => $b['sales_data']['total_units'] <=> $a['sales_data']['total_units'];
 
         $fruitProducts = $fruitProducts->sort($sortFn)->values();
         $vegetableProducts = $vegetableProducts->sort($sortFn)->values();
@@ -1930,8 +1926,7 @@ class FruitVegController extends Controller
             'barcodedProducts',
             'statistics',
             'salesPeriod',
-            'coverageDays',
-            'sortMode'
+            'coverageDays'
         ));
     }
 }

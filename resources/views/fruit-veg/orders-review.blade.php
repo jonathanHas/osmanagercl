@@ -49,16 +49,13 @@
                     </span>
                 </div>
                 <div class="flex items-center space-x-3">
-                    <form method="GET" class="flex items-center space-x-2 text-sm text-gray-600">
-                        <input type="hidden" name="start_date" value="{{ $salesPeriod['start']->format('Y-m-d') }}">
-                        <input type="hidden" name="end_date" value="{{ $salesPeriod['end']->format('Y-m-d') }}">
-                        <input type="hidden" name="coverage_days" value="{{ $coverageDays }}">
+                    <div class="flex items-center space-x-2 text-sm text-gray-600">
                         <label for="order-sort" class="font-medium text-gray-500">Sort</label>
-                        <select id="order-sort" name="sort" class="border-gray-300 rounded-md text-sm focus:ring-green-500 focus:border-green-500" onchange="this.form.submit()">
-                            <option value="sales" {{ ($sortMode ?? 'sales') === 'sales' ? 'selected' : '' }}>Sales ↓</option>
-                            <option value="name" {{ ($sortMode ?? 'sales') === 'name' ? 'selected' : '' }}>Name A-Z</option>
+                        <select id="order-sort" class="border-gray-300 rounded-md text-sm focus:ring-green-500 focus:border-green-500">
+                            <option value="sales">Sales ↓</option>
+                            <option value="name">Name A-Z</option>
                         </select>
-                    </form>
+                    </div>
                 </div>
             </div>
 
@@ -122,6 +119,35 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Client-side sorting
+            const sortSelect = document.getElementById('order-sort');
+            if (sortSelect) {
+                sortSelect.addEventListener('change', function() {
+                    const sortBy = this.value;
+
+                    // Sort each category table
+                    document.querySelectorAll('table tbody').forEach(tbody => {
+                        const rows = Array.from(tbody.querySelectorAll('tr'));
+
+                        rows.sort((a, b) => {
+                            if (sortBy === 'name') {
+                                const nameA = a.querySelector('td:nth-child(2) a')?.textContent?.trim() || '';
+                                const nameB = b.querySelector('td:nth-child(2) a')?.textContent?.trim() || '';
+                                return nameA.localeCompare(nameB);
+                            } else {
+                                // Sort by sales (descending)
+                                const salesA = parseInt(a.querySelector('td:nth-child(3) .text-2xl')?.textContent?.replace(/,/g, '') || '0');
+                                const salesB = parseInt(b.querySelector('td:nth-child(3) .text-2xl')?.textContent?.replace(/,/g, '') || '0');
+                                return salesB - salesA;
+                            }
+                        });
+
+                        // Re-append rows in sorted order
+                        rows.forEach(row => tbody.appendChild(row));
+                    });
+                });
+            }
+
             // Initialize mini charts - matching order system style
             document.querySelectorAll('canvas[id^="chart_"]').forEach(canvas => {
                 const weekLabels = JSON.parse(canvas.dataset.weekLabels || '[]');
