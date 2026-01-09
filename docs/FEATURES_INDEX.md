@@ -286,6 +286,24 @@ Comprehensive bank transaction reconciliation with AI-powered bulk auto-reconcil
 
 📖 [Bank Reconciliation System Documentation](./features/bank-reconciliation-system.md)
 
+### Card Transaction Reconciliation System (NEW! 2026-01-07)
+Comprehensive card transaction reconciliation with myPOS integration and intelligent matching.
+- **myPOS XLS Import**: Upload card transaction exports for reconciliation against POS records
+- **Intelligent Matching**: Confidence-based matching using amount, time, and card type scoring
+- **Discrepancy Detection**: Automatically identifies declined, mismatched, and orphan transactions
+- **Auto-Match Orphans**: Batch matching with configurable criteria and preview mode
+  - Adjustable time window (15 min to 2 hours)
+  - Minimum confidence threshold (70-90%)
+  - Exact amount only option
+  - Card/cash payment filtering
+- **Preview Before Matching**: Review all proposed matches with payment method details before confirming
+- **Manual Matching**: Find nearby POS payments for unmatched transactions
+- **Configurable Settings**: User-defined time windows and auto-match thresholds
+- **Batch Management**: Upload history, reprocess, delete, and export batches
+- **CSV Export**: Download reconciliation results with full transaction details
+
+📖 [Card Transaction Reconciliation Documentation](./features/card-reconciliation.md)
+
 ### VAT Returns Management System
 Complete Irish Revenue Online Service (ROS) VAT returns with automated calculations.
 - **ROS Compliance**: All required fields (T1, T2, T3, T4, E1, E2) automatically calculated

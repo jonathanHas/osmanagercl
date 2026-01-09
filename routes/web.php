@@ -5,6 +5,7 @@ use App\Http\Controllers\CoffeeController;
 use App\Http\Controllers\CoffeeMetadataController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\Financials\BankStatementController;
+use App\Http\Controllers\Financials\CardReconciliationController;
 use App\Http\Controllers\FruitVegController;
 use App\Http\Controllers\KdsController;
 use App\Http\Controllers\KitchenController;
@@ -219,6 +220,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/price-sync', [FruitVegController::class, 'priceSync'])->name('price-sync');
         Route::post('/price-sync/sync', [FruitVegController::class, 'syncPrice'])->name('price-sync.sync');
         Route::post('/price-sync/bulk-sync', [FruitVegController::class, 'bulkSyncPrices'])->name('price-sync.bulk-sync');
+
+        // F&V Order Generation
+        Route::get('/orders', [FruitVegController::class, 'orders'])->name('orders');
+        Route::post('/orders', [FruitVegController::class, 'generateOrder'])->name('orders.generate');
     });
 
     // Coffee routes
@@ -551,6 +556,28 @@ Route::middleware('auth')->group(function () {
             Route::post('/analysis/refresh-pos', [\App\Http\Controllers\Financials\BankStatementAnalysisController::class, 'refreshPOSData'])->name('analysis.refresh-pos');
             Route::get('/analysis/export', [\App\Http\Controllers\Financials\BankStatementAnalysisController::class, 'export'])->name('analysis.export');
             Route::post('/analysis/suggest', [\App\Http\Controllers\Financials\BankStatementAnalysisController::class, 'suggestMatches'])->name('analysis.suggest');
+        });
+
+        // Card Transaction Reconciliation
+        Route::prefix('card-reconciliation')->name('card-reconciliation.')->group(function () {
+            Route::get('/', [CardReconciliationController::class, 'index'])->name('index');
+            Route::post('/', [CardReconciliationController::class, 'store'])->name('store');
+            Route::get('/status/{batchId}', [CardReconciliationController::class, 'status'])->name('status');
+            Route::get('/transactions', [CardReconciliationController::class, 'transactions'])->name('transactions');
+            Route::post('/match', [CardReconciliationController::class, 'match'])->name('match');
+            Route::post('/unmatch', [CardReconciliationController::class, 'unmatch'])->name('unmatch');
+            Route::get('/nearby-payments', [CardReconciliationController::class, 'nearbyPayments'])->name('nearby-payments');
+            Route::get('/export', [CardReconciliationController::class, 'export'])->name('export');
+            Route::match(['get', 'post'], '/settings', [CardReconciliationController::class, 'settings'])->name('settings');
+            Route::delete('/delete', [CardReconciliationController::class, 'deleteBatch'])->name('delete');
+            Route::post('/reprocess', [CardReconciliationController::class, 'reprocess'])->name('reprocess');
+            Route::get('/preview-auto-match', [CardReconciliationController::class, 'previewAutoMatch'])->name('preview-auto-match');
+            Route::post('/auto-match', [CardReconciliationController::class, 'autoMatchBatch'])->name('auto-match');
+
+            // Terminal-Till Mappings
+            Route::get('/terminal-mappings', [CardReconciliationController::class, 'terminalMappings'])->name('terminal-mappings');
+            Route::post('/terminal-mappings', [CardReconciliationController::class, 'saveTerminalMapping'])->name('save-terminal-mapping');
+            Route::delete('/terminal-mappings/{mapping}', [CardReconciliationController::class, 'deleteTerminalMapping'])->name('delete-terminal-mapping');
         });
 
         // Financial Dashboard

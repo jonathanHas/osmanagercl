@@ -1779,4 +1779,159 @@ class FruitVegController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Display the F&V order generation form.
+     */
+    public function orders()
+    {
+        return view('fruit-veg.orders', [
+            'defaultStartDate' => now()->subDays(7)->format('Y-m-d'),
+            'defaultEndDate' => now()->format('Y-m-d'),
+        ]);
+    }
+
+    /**
+     * Generate F&V order suggestions based on sales data.
+     */
+    public function generateOrder(Request $request)
+    {
+        $validated = $request->validate([
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+            'coverage_days' => 'required|integer|min:1|max:30',
+        ]);
+
+        $startDate = Carbon::parse($validated['start_date']);
+        $endDate = Carbon::parse($validated['end_date']);
+        $coverageDays = (int) $validated['coverage_days'];
+        $periodDays = $startDate->diffInDays($endDate) + 1;
+
+        // Get sales data grouped by product
+        $salesData = DB::table('sales_daily_summary')
+            ->whereIn('category_id', ['SUB1', 'SUB2', 'SUB3'])
+            ->whereBetween('sale_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+            ->selectRaw('
+                product_id,
+                product_code,
+                product_name,
+                category_id,
+                SUM(total_units) as total_units,
+                SUM(total_revenue) as total_revenue
+            ')
+            ->groupBy('product_id', 'product_code', 'product_name', 'category_id')
+            ->orderByDesc('total_units')
+            ->get();
+
+        // Get weekly breakdown for charts
+        $weeklySales = DB::table('sales_daily_summary')
+            ->whereIn('category_id', ['SUB1', 'SUB2', 'SUB3'])
+            ->whereBetween('sale_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+            ->selectRaw('
+                product_code,
+                YEARWEEK(sale_date, 1) as year_week,
+                SUM(total_units) as week_units
+            ')
+            ->groupBy('product_code', 'year_week')
+            ->orderBy('year_week')
+            ->get()
+            ->groupBy('product_code');
+
+        // Build week labels for the period
+        $weekLabels = [];
+        $currentWeek = $startDate->copy()->startOfWeek();
+        while ($currentWeek <= $endDate) {
+            $weekLabels[$currentWeek->format('oW')] = $currentWeek->format('M j');
+            $currentWeek->addWeek();
+        }
+
+        // Process products and calculate suggestions
+        $fruitProducts = collect();
+        $vegetableProducts = collect();
+        $barcodedProducts = collect();
+
+        foreach ($salesData as $sale) {
+            // Get product details
+            $product = Product::with('vegDetails.country')
+                ->where('CODE', $sale->product_code)
+                ->first();
+
+            if (! $product) {
+                continue;
+            }
+
+            // Calculate suggested quantity
+            $totalUnits = (float) $sale->total_units;
+            $periodWeeks = max($periodDays / 7, 1);
+            $avgWeekly = $totalUnits / $periodWeeks;
+            $coverageWeeks = $coverageDays / 7;
+            $suggestedQty = ceil($avgWeekly * $coverageWeeks);
+
+            // Build weekly chart data
+            $productWeekly = $weeklySales->get($sale->product_code, collect());
+            $weekUnits = [];
+            $weekLabelsForProduct = [];
+
+            foreach ($weekLabels as $yearWeek => $label) {
+                $weekData = $productWeekly->firstWhere('year_week', $yearWeek);
+                $weekUnits[] = $weekData ? (float) $weekData->week_units : 0;
+                $weekLabelsForProduct[] = $label;
+            }
+
+            // Calculate peak weekly sales
+            $peakWeekly = count($weekUnits) > 0 ? max($weekUnits) : $avgWeekly;
+
+            $item = [
+                'product' => $product,
+                'sales_data' => [
+                    'total_units' => $totalUnits,
+                    'total_revenue' => (float) $sale->total_revenue,
+                    'avg_weekly' => round($avgWeekly, 1),
+                    'peak_weekly' => round($peakWeekly, 1),
+                    'suggested_qty' => $suggestedQty,
+                    'week_labels' => $weekLabelsForProduct,
+                    'week_units' => $weekUnits,
+                ],
+            ];
+
+            // Group by category
+            match ($sale->category_id) {
+                'SUB1' => $fruitProducts->push($item),
+                'SUB2' => $vegetableProducts->push($item),
+                'SUB3' => $barcodedProducts->push($item),
+                default => null,
+            };
+        }
+
+        // Sort by sales (descending) by default
+        $sortMode = $request->input('sort', 'sales');
+        $sortFn = match ($sortMode) {
+            'name' => fn ($a, $b) => strcasecmp($a['product']->NAME ?? '', $b['product']->NAME ?? ''),
+            default => fn ($a, $b) => $b['sales_data']['total_units'] <=> $a['sales_data']['total_units'],
+        };
+
+        $fruitProducts = $fruitProducts->sort($sortFn)->values();
+        $vegetableProducts = $vegetableProducts->sort($sortFn)->values();
+        $barcodedProducts = $barcodedProducts->sort($sortFn)->values();
+
+        $statistics = [
+            'total_products' => $fruitProducts->count() + $vegetableProducts->count() + $barcodedProducts->count(),
+        ];
+
+        $salesPeriod = [
+            'start' => $startDate,
+            'end' => $endDate,
+            'days' => $periodDays,
+        ];
+
+        return view('fruit-veg.orders-review', compact(
+            'fruitProducts',
+            'vegetableProducts',
+            'barcodedProducts',
+            'statistics',
+            'salesPeriod',
+            'coverageDays',
+            'sortMode'
+        ));
+    }
 }

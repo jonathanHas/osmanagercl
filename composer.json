@@ -12,6 +12,7 @@
         "laravel/tinker": "^2.10.1",
         "league/csv": "^9.24",
         "livewire/livewire": "^3.6",
+        "phpoffice/phpspreadsheet": "^5.3",
         "picqer/php-barcode-generator": "^3.2"
     },
     "require-dev": {

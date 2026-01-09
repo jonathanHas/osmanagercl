@@ -4,7 +4,34 @@ Welcome to the comprehensive documentation for OSManager CL. This documentation 
 
 📚 **New to the docs?** Start with the [Documentation Usage Guide](./DOCUMENTATION_GUIDE.md) to understand how to navigate and contribute to documentation.
 
-## 🆕 Latest Updates (December 2025)
+## 🆕 Latest Updates (January 2026)
+
+### Card Transaction Reconciliation System (2026-01-07)
+Comprehensive card transaction reconciliation with myPOS integration and intelligent matching:
+
+- **💳 myPOS XLS Import**: Upload card transaction exports for reconciliation against POS records
+- **🎯 Intelligent Matching**: Confidence-based matching using amount (0-50 pts), time (0-40 pts), and card type (0-10 pts)
+- **⚠️ Discrepancy Detection**: Automatically identifies declined, mismatched, and orphan transactions
+- **🔄 Auto-Match Orphans**: Batch matching with configurable criteria and preview mode
+  - Adjustable time window (15 min to 2 hours)
+  - Minimum confidence threshold (70-90%)
+  - Exact amount only option
+  - Card/cash payment filtering
+- **👁️ Preview Before Matching**: Review all proposed matches with payment method details (Card/Cash)
+- **🔗 Manual Matching**: Find nearby POS payments for unmatched transactions
+- **⚙️ Configurable Settings**: User-defined time windows and auto-match thresholds
+- **📦 Batch Management**: Upload history, reprocess, delete, and export batches
+
+**Key Benefits**:
+- Identify declined card transactions that may need follow-up
+- Find amount mismatches between card terminal and POS
+- Detect orphan transactions missing from either system
+- Intelligent matching with preview before confirming
+- Full audit trail of all matching decisions
+
+See [Card Transaction Reconciliation Documentation](./features/card-reconciliation.md) for complete details.
+
+## Previous Updates (December 2025)
 
 ### Kitchen Recipe Costing System (2025-12-08)
 Comprehensive recipe costing system with ingredient profiles, overhead calculations, and margin analysis:

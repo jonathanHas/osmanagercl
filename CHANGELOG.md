@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **💳 Card Transaction Reconciliation System** (2026-01-07)
+  - **myPOS XLS Import**: Upload card transaction exports for reconciliation against POS records
+  - **Intelligent Matching Algorithm**: Confidence-based matching using amount (0-50 pts), time (0-40 pts), and card type (0-10 pts)
+  - **Discrepancy Detection**: Automatically identifies declined, mismatched, and orphan transactions
+  - **Auto-Match Orphans**: Batch matching with configurable criteria and preview mode
+    - Adjustable time window (15 min to 2 hours)
+    - Minimum confidence threshold (70-90%)
+    - Exact amount only option
+    - Card/cash payment filtering
+  - **Preview Before Matching**: Review all proposed matches with payment method details (Card/Cash) before confirming
+  - **Manual Matching**: Find nearby POS payments for unmatched transactions
+  - **Configurable Settings**: User-defined time windows and auto-match thresholds
+  - **Batch Management**: Upload history, reprocess, delete, and export batches
+  - **CSV Export**: Download reconciliation results with full transaction details
+  - **Database Schema**: Two new tables (`card_transactions`, `card_reconciliation_settings`)
+  - **Files Created**:
+    - `app/Services/MyPosXlsParserService.php` - myPOS XLS parser
+    - `app/Services/CardReconciliationService.php` - Matching logic
+    - `app/Models/CardTransaction.php` - Card transaction model
+    - `app/Models/CardReconciliationSetting.php` - User settings model
+    - `app/Jobs/ProcessCardTransactions.php` - File processing job
+    - `app/Http/Controllers/Financials/CardReconciliationController.php`
+    - `resources/views/financials/card-reconciliation/` - Views
+  - **Documentation**: See [Card Transaction Reconciliation Guide](./docs/features/card-reconciliation.md)
+
 - **🍳 Kitchen Recipe Scaling & Packaging** (2025-12-10)
   - **Batch Scaling Calculator**: Analyze cost efficiencies when producing larger batches
     - Recipe multiplier (2x, 3x, 5x, 10x, or custom)
