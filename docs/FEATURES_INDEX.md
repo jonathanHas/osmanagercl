@@ -102,6 +102,18 @@ Cross-database price synchronization management with web-based interface.
 
 📖 [F&V System Documentation](./features/fruit-veg-system.md#price-sync-management-system)
 
+### F&V Order Generation System (NEW! 2026-01-09)
+Supplier-agnostic order generation based on historical sales data for all F&V products.
+- **Sales-Based Ordering**: Generate order suggestions from sales history analysis
+- **Configurable Period**: Select any date range for sales analysis and coverage days
+- **Category Groupings**: Products organized by Fruits, Vegetables, and Barcoded
+- **Weekly Analytics**: Average and peak weekly sales with visual trend charts
+- **Interactive Review**: Editable quantities with same layout as main order system
+- **Client-Side Sorting**: Sort by sales volume or product name without page reload
+- **Quick Access**: Available at `/fruit-veg/orders` from F&V dashboard
+
+📖 [F&V System Documentation](./features/fruit-veg-system.md#order-generation-system)
+
 ---
 
 ## Kitchen Management

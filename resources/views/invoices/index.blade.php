@@ -4,22 +4,13 @@
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-2xl font-bold text-gray-100">Invoices</h2>
             <div class="flex space-x-2">
-                @php
-                    // Count Amazon pending invoices from unified bulk-upload system
-                    $pendingCount = \App\Models\InvoiceUploadFile::where('status', 'amazon_pending')
-                        ->orWhere(function ($query) {
-                            $query->where('supplier_detected', 'Amazon')
-                                  ->whereIn('status', ['review', 'parsed']);
-                        })
-                        ->count();
-                @endphp
-                @if($pendingCount > 0)
+                @if($amazonPendingCount > 0)
                 <a href="{{ route('invoices.bulk-upload.amazon-pending') }}" 
                    class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
                     <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
                     </svg>
-                    Amazon Pending ({{ $pendingCount }})
+                    Amazon Pending ({{ $amazonPendingCount }})
                 </a>
                 @endif
                 
@@ -75,13 +66,13 @@
             <div class="bg-gray-800 rounded-lg p-4">
                 <div class="text-gray-400 text-sm font-medium">This Month</div>
                 <div class="text-2xl font-bold text-green-400">
-                    €{{ number_format(\App\Models\Invoice::whereMonth('invoice_date', now()->month)->whereYear('invoice_date', now()->year)->sum('total_amount'), 2) }}
+                    €{{ number_format($monthlyTotals['this_month'], 2) }}
                 </div>
             </div>
             <div class="bg-gray-800 rounded-lg p-4">
                 <div class="text-gray-400 text-sm font-medium">Last Month</div>
                 <div class="text-2xl font-bold text-gray-300">
-                    €{{ number_format(\App\Models\Invoice::whereMonth('invoice_date', now()->subMonth()->month)->whereYear('invoice_date', now()->subMonth()->year)->sum('total_amount'), 2) }}
+                    €{{ number_format($monthlyTotals['last_month'], 2) }}
                 </div>
             </div>
         </div>
@@ -114,7 +105,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-400 mb-1">From Date</label>
-                    <input type="date" name="from_date" value="{{ request('from_date', '2025-01-01') }}" 
+                    <input type="date" name="from_date" value="{{ request('from_date', now()->subMonths(3)->format('Y-m-d')) }}"
                            class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md">
                 </div>
                 <div>

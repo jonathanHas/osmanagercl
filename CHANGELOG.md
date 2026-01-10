@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **🥬 F&V Order Generation System** (2026-01-09)
+  - **Supplier-Agnostic Ordering**: Generate orders for all F&V products regardless of supplier
+  - **Sales-Based Suggestions**: Order quantities calculated from historical sales data
+  - **Category Groupings**: Products organized by Fruits (SUB1), Vegetables (SUB2), and Barcoded (SUB3)
+  - **Configurable Parameters**:
+    - Sales period selection (start/end date)
+    - Coverage days (how many days the order should cover)
+  - **Weekly Sales Analytics**:
+    - Weekly average calculation
+    - Peak weekly sales tracking
+    - Mini line charts with average line indicator (dashed)
+  - **Interactive Review Interface**:
+    - Matches existing order system layout
+    - Editable suggested quantities with +/- buttons
+    - Client-side sorting by sales or name
+    - Product images and origin country display
+  - **Routes**: `/fruit-veg/orders` (form) and POST for results
+  - **Quick Access**: "Generate Order" button added to F&V dashboard
+  - **Files Created**:
+    - `resources/views/fruit-veg/orders.blade.php` - Order generation form
+    - `resources/views/fruit-veg/orders-review.blade.php` - Results display
+    - `resources/views/fruit-veg/partials/order-table.blade.php` - Category table partial
+
 - **💳 Card Transaction Reconciliation System** (2026-01-07)
   - **myPOS XLS Import**: Upload card transaction exports for reconciliation against POS records
   - **Intelligent Matching Algorithm**: Confidence-based matching using amount (0-50 pts), time (0-40 pts), and card type (0-10 pts)

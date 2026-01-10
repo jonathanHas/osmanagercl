@@ -87,7 +87,45 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 - **Transaction Safety**: Proper error handling ensures database integrity
 - **Access**: Available at `/fruit-veg/price-sync` from the F&V dashboard
 
-### 8. Sales Analytics & Performance (Enhanced 2025! 🚀)
+### 8. Order Generation System (NEW! 2026-01-09 🥬)
+Supplier-agnostic order generation based on historical sales data for all F&V products.
+
+**Key Features:**
+- **Supplier-Agnostic**: Generates orders for ALL F&V products regardless of which supplier provides them
+- **Sales-Based Suggestions**: Order quantities calculated from historical sales within a configurable date range
+- **Category Organization**: Products grouped by Fruits (SUB1), Vegetables (SUB2), and Veg Barcoded (SUB3)
+
+**Configuration Options:**
+- **Sales Period**: Select start and end dates for sales analysis
+- **Coverage Days**: Specify how many days the order should cover (1-30 days)
+- **Calculation**: `suggested_qty = (total_sales / period_weeks) × coverage_weeks`
+
+**Review Interface:**
+- **Matching Layout**: Same visual style as the main `/orders` review system
+- **Product Information**: Name, code, image, and country of origin
+- **Sales Metrics**: Total sales, weekly average, and peak weekly sales
+- **Visual Charts**: Mini line charts showing weekly sales trends with average line indicator (dashed)
+- **Editable Quantities**: +/- buttons and input field to adjust suggested quantities
+- **Client-Side Sorting**: Sort by sales volume or product name without page reload
+
+**Weekly Analytics:**
+- Weekly average calculation displayed as `/wk`
+- Peak weekly sales tracking
+- Mini Chart.js line charts with:
+  - Blue line showing weekly sales
+  - Dashed grey horizontal line indicating the weekly average
+  - Grey points for zero-sales weeks, blue for actual sales
+
+**Access:**
+- Dashboard: "Generate Order" button on F&V dashboard
+- Direct URL: `/fruit-veg/orders`
+
+**Technical Implementation:**
+- Controller: `FruitVegController::orders()` and `generateOrder()`
+- Views: `fruit-veg/orders.blade.php`, `fruit-veg/orders-review.blade.php`
+- Data Source: `sales_daily_summary` table (pre-aggregated for performance)
+
+### 9. Sales Analytics & Performance (Enhanced 2025! 🚀)
 - **Blazing-Fast Sales Dashboard**: Revolutionary performance improvement with 100x+ speed increase
 - **Sub-Second Queries**: Complete F&V sales analytics in under 20ms (previously 30+ seconds)
 - **Real-time Statistics**: Instant F&V sales summaries with category breakdowns
@@ -134,7 +172,7 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
   - Instant results from optimized indexes
   - Smart filtering with real-time updates
 
-### 8. Daily Sales Overview Chart (Enhanced 2025)
+### 10. Daily Sales Overview Chart (Enhanced 2025)
 - **Responsive Date Range Selection**: Chart updates correctly when date ranges change
 - **Data-Aware Quick Buttons**: "7 Days", "14 Days", "30 Days" buttons use available data periods
 - **Smart Fallback System**: Automatic fallback to live POS queries when aggregated data missing

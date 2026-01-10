@@ -7,6 +7,7 @@ use App\Models\CostCategory;
 use App\Models\Invoice;
 use App\Models\InvoiceVatLine;
 use App\Models\VatRate;
+use App\Repositories\InvoiceRepository;
 use App\Rules\RepairablePdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -16,6 +17,10 @@ use Illuminate\Support\Facades\Storage;
 
 class InvoiceController extends Controller
 {
+    public function __construct(
+        protected InvoiceRepository $invoiceRepository
+    ) {}
+
     /**
      * Display a listing of invoices.
      */
@@ -23,8 +28,8 @@ class InvoiceController extends Controller
     {
         $query = Invoice::with(['supplier', 'vatLines']);
 
-        // Default to current year (2025) if no date filters provided
-        $fromDate = $request->filled('from_date') ? $request->from_date : '2025-01-01';
+        // Default to last 3 months if no date filters provided
+        $fromDate = $request->filled('from_date') ? $request->from_date : now()->subMonths(3)->format('Y-m-d');
         $toDate = $request->filled('to_date') ? $request->to_date : null;
 
         // Apply filters
@@ -82,9 +87,6 @@ class InvoiceController extends Controller
             $sortDirection = 'desc';
         }
 
-        // Clone query for statistics before pagination
-        $statsQuery = clone $query;
-
         // Handle payment_date sorting with special logic for NULL values
         if ($sortField === 'payment_date') {
             if ($sortDirection === 'desc') {
@@ -109,37 +111,47 @@ class InvoiceController extends Controller
             ->orderBy('name')
             ->pluck('name', 'id');
 
-        // Calculate summary statistics for filtered results (always calculate for consistency)
-        $filteredStats = [
-            'total_count' => $statsQuery->count(),
-            'total_amount' => $statsQuery->sum('total_amount'),
-            'total_subtotal' => $statsQuery->sum('subtotal'),
-            'total_vat' => $statsQuery->sum('vat_amount'),
-            'standard_net' => $statsQuery->sum('standard_net'),
-            'standard_vat' => $statsQuery->sum('standard_vat'),
-            'reduced_net' => $statsQuery->sum('reduced_net'),
-            'reduced_vat' => $statsQuery->sum('reduced_vat'),
-            'second_reduced_net' => $statsQuery->sum('second_reduced_net'),
-            'second_reduced_vat' => $statsQuery->sum('second_reduced_vat'),
-            'zero_net' => $statsQuery->sum('zero_net'),
-            'paid_count' => (clone $statsQuery)->where('payment_status', 'paid')->count(),
-            'unpaid_count' => (clone $statsQuery)->whereIn('payment_status', ['pending', 'overdue', 'partial'])->count(),
-            'unpaid_total' => (clone $statsQuery)->whereIn('payment_status', ['pending', 'overdue', 'partial'])->sum('total_amount'),
-        ];
+        // Build stats query with same filters as main query (but without eager loading)
+        $statsQuery = Invoice::query();
+        if ($request->filled('supplier_id')) {
+            $statsQuery->where('supplier_id', $request->supplier_id);
+        }
+        if ($request->filled('payment_status')) {
+            if ($request->payment_status === 'unpaid') {
+                $statsQuery->whereIn('payment_status', ['pending', 'overdue', 'partial']);
+            } else {
+                $statsQuery->where('payment_status', $request->payment_status);
+            }
+        }
+        $statsQuery->where('invoice_date', '>=', $fromDate);
+        if ($toDate) {
+            $statsQuery->where('invoice_date', '<=', $toDate);
+        }
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $statsQuery->where(function ($q) use ($search) {
+                $q->where('invoice_number', 'like', "%{$search}%")
+                    ->orWhere('supplier_name', 'like', "%{$search}%")
+                    ->orWhere('notes', 'like', "%{$search}%");
+            });
+        }
 
-        // Calculate overall statistics (unfiltered)
-        $stats = [
-            'total_unpaid' => Invoice::unpaid()->sum('total_amount'),
-            'total_overdue' => Invoice::unpaid()
-                ->where('due_date', '<', now())
-                ->sum('total_amount'),
-            'count_unpaid' => Invoice::unpaid()->count(),
-            'count_overdue' => Invoice::unpaid()
-                ->where('due_date', '<', now())
-                ->count(),
-        ];
+        // Get all statistics in optimized single queries (replaces 14+ queries with 3)
+        $filteredStats = $this->invoiceRepository->getFilteredStatistics($statsQuery);
+        $stats = $this->invoiceRepository->getOverallStatistics();
+        $monthlyTotals = $this->invoiceRepository->getMonthlyTotals();
+        $amazonPendingCount = $this->invoiceRepository->getAmazonPendingCount();
 
-        return view('invoices.index', compact('invoices', 'suppliers', 'stats', 'filteredStats', 'sortField', 'sortDirection'));
+        return view('invoices.index', compact(
+            'invoices',
+            'suppliers',
+            'stats',
+            'filteredStats',
+            'monthlyTotals',
+            'amazonPendingCount',
+            'sortField',
+            'sortDirection'
+        ));
     }
 
     /**
@@ -667,8 +679,8 @@ class InvoiceController extends Controller
         // Use the same filtering logic as index method
         $query = Invoice::with(['supplier', 'vatLines']);
 
-        // Default to current year if no date filters provided
-        $fromDate = $request->filled('from_date') ? $request->from_date : '2025-01-01';
+        // Default to last 3 months if no date filters provided
+        $fromDate = $request->filled('from_date') ? $request->from_date : now()->subMonths(3)->format('Y-m-d');
         $toDate = $request->filled('to_date') ? $request->to_date : null;
 
         // Apply filters (same logic as index)
@@ -715,9 +727,6 @@ class InvoiceController extends Controller
             $sortDirection = 'desc';
         }
 
-        // Clone query for statistics
-        $statsQuery = clone $query;
-
         // Apply sorting
         if ($sortField === 'payment_date') {
             if ($sortDirection === 'desc') {
@@ -735,23 +744,35 @@ class InvoiceController extends Controller
                 ->get();
         }
 
-        // Calculate statistics (same as index method)
-        $filteredStats = [
-            'total_count' => $statsQuery->count(),
-            'total_amount' => $statsQuery->sum('total_amount'),
-            'total_subtotal' => $statsQuery->sum('subtotal'),
-            'total_vat' => $statsQuery->sum('vat_amount'),
-            'paid_count' => (clone $statsQuery)->where('payment_status', 'paid')->count(),
-            'unpaid_count' => (clone $statsQuery)->whereIn('payment_status', ['pending', 'overdue', 'partial'])->count(),
-            'unpaid_total' => (clone $statsQuery)->whereIn('payment_status', ['pending', 'overdue', 'partial'])->sum('total_amount'),
-        ];
+        // Build stats query with same filters (but without eager loading)
+        $statsQuery = Invoice::query();
+        if ($request->filled('supplier_id')) {
+            $statsQuery->where('supplier_id', $request->supplier_id);
+        }
+        if ($request->filled('payment_status')) {
+            if ($request->payment_status === 'unpaid') {
+                $statsQuery->whereIn('payment_status', ['pending', 'overdue', 'partial']);
+            } else {
+                $statsQuery->where('payment_status', $request->payment_status);
+            }
+        }
+        $statsQuery->where('invoice_date', '>=', $fromDate);
+        if ($toDate) {
+            $statsQuery->where('invoice_date', '<=', $toDate);
+        }
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $statsQuery->where(function ($q) use ($search) {
+                $q->where('invoice_number', 'like', "%{$search}%")
+                    ->orWhere('supplier_name', 'like', "%{$search}%")
+                    ->orWhere('notes', 'like', "%{$search}%");
+            });
+        }
 
-        $stats = [
-            'total_unpaid' => Invoice::unpaid()->sum('total_amount'),
-            'total_overdue' => Invoice::unpaid()->where('due_date', '<', now())->sum('total_amount'),
-            'count_unpaid' => Invoice::unpaid()->count(),
-            'count_overdue' => Invoice::unpaid()->where('due_date', '<', now())->count(),
-        ];
+        // Calculate statistics using optimized repository
+        $filteredStats = $this->invoiceRepository->getFilteredStatistics($statsQuery);
+        $stats = $this->invoiceRepository->getOverallStatistics();
+        $monthlyTotals = $this->invoiceRepository->getMonthlyTotals();
 
         // Generate filename with current date
         $filename = 'invoices_'.now()->format('Y-m-d').'.csv';
@@ -761,7 +782,7 @@ class InvoiceController extends Controller
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ];
 
-        $callback = function () use ($invoices, $stats, $filteredStats, $request, $fromDate, $toDate) {
+        $callback = function () use ($invoices, $stats, $filteredStats, $monthlyTotals, $request, $fromDate, $toDate) {
             $file = fopen('php://output', 'w');
 
             // Header section
@@ -799,8 +820,8 @@ class InvoiceController extends Controller
             fputcsv($file, ['OVERALL STATISTICS']);
             fputcsv($file, ['Total Unpaid:', '€'.number_format($stats['total_unpaid'], 2), '('.$stats['count_unpaid'].' invoices)']);
             fputcsv($file, ['Overdue:', '€'.number_format($stats['total_overdue'], 2), '('.$stats['count_overdue'].' invoices)']);
-            fputcsv($file, ['This Month:', '€'.number_format(Invoice::whereMonth('invoice_date', now()->month)->whereYear('invoice_date', now()->year)->sum('total_amount'), 2)]);
-            fputcsv($file, ['Last Month:', '€'.number_format(Invoice::whereMonth('invoice_date', now()->subMonth()->month)->whereYear('invoice_date', now()->subMonth()->year)->sum('total_amount'), 2)]);
+            fputcsv($file, ['This Month:', '€'.number_format($monthlyTotals['this_month'], 2)]);
+            fputcsv($file, ['Last Month:', '€'.number_format($monthlyTotals['last_month'], 2)]);
             fputcsv($file, []); // Empty row
 
             // Filtered results section (if filters are active)
