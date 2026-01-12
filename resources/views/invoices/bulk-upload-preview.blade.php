@@ -77,12 +77,18 @@
             {{-- Progress Bar --}}
             @if($batch->status === 'processing')
             <div class="mt-6">
-                <div class="flex justify-between text-sm text-gray-400 mb-2">
+                <div class="flex justify-between items-center text-sm text-gray-400 mb-2">
                     <span>Processing Progress</span>
-                    <span>{{ $batch->processed_files }}/{{ $batch->total_files }} files</span>
+                    <div class="flex items-center space-x-4">
+                        <span>{{ $batch->processed_files }}/{{ $batch->total_files }} files</span>
+                        <button onclick="cancelBatch()"
+                                class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1 px-3 rounded">
+                            Cancel Processing
+                        </button>
+                    </div>
                 </div>
                 <div class="bg-gray-700 rounded-full h-3">
-                    <div class="bg-blue-500 h-3 rounded-full transition-all duration-500" 
+                    <div class="bg-blue-500 h-3 rounded-full transition-all duration-500"
                          style="width: {{ $batch->progress_percentage }}%"></div>
                 </div>
             </div>
