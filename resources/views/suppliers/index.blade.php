@@ -11,9 +11,13 @@
                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm">
                     <i class="fas fa-plus mr-2"></i>Add Supplier
                 </a>
-                <a href="{{ route('suppliers.outstanding-report') }}" 
+                <a href="{{ route('suppliers.outstanding-report') }}"
                    class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded text-sm">
                     <i class="fas fa-calendar-check mr-2"></i>Outstanding Report
+                </a>
+                <a href="{{ route('suppliers.payments') }}"
+                   class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm">
+                    <i class="fas fa-money-bill-wave mr-2"></i>Payments
                 </a>
                 <a href="{{ route('invoices.index') }}" 
                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded text-sm">

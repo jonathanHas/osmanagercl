@@ -227,7 +227,7 @@ def process_invoice(file_path):
             # For XLS files, use loughboora parser with full file path
             parsed_data = loughboora.parse_xls(text, file_path)
         else:
-            parsed_data = parser.parse_invoice(text, filename)
+            parsed_data = parser.parse_invoice(text, file_path)
         
         # Ensure it's a list
         if not isinstance(parsed_data, list):

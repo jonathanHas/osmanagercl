@@ -1,14 +1,16 @@
 import re
 import sys
+import os
 from utils import extract_text
 from pdf2image import convert_from_path
 import pytesseract
 
-def parse_invoice(text, filename):
+def parse_invoice(text, file_path):
+    filename = os.path.basename(file_path)
     print(f"[DEBUG] Parsing Coolnagrower invoice: {filename}", file=sys.stderr)
 
     # Force OCR again and get per-page text
-    pages = convert_from_path(filename, dpi=400)
+    pages = convert_from_path(file_path, dpi=200)
     results = []
 
     for i, page in enumerate(pages):

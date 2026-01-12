@@ -163,6 +163,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/suppliers/{supplier}/toggle-status', [\App\Http\Controllers\AccountingSuppliersController::class, 'toggleStatus'])->name('suppliers.toggle-status');
     Route::get('/suppliers/outstanding-report', [\App\Http\Controllers\SupplierOutstandingController::class, 'index'])->name('suppliers.outstanding-report');
     Route::get('/suppliers/outstanding-report/export', [\App\Http\Controllers\SupplierOutstandingController::class, 'exportCsv'])->name('suppliers.outstanding-report.export');
+    Route::get('/suppliers/payments', [\App\Http\Controllers\SupplierPaymentsController::class, 'index'])->name('suppliers.payments');
+    Route::get('/suppliers/payments/export', [\App\Http\Controllers\SupplierPaymentsController::class, 'exportCsv'])->name('suppliers.payments.export');
     Route::resource('suppliers', \App\Http\Controllers\AccountingSuppliersController::class);
 
     // Label area routes
