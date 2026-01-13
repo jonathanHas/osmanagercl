@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **💰 Supplier Payments Report** (2026-01-12)
+  - **Payments Listing**: View all supplier invoice payments within a date range
+  - **Sorting Options**: Sort by date (newest/oldest) or supplier name (A-Z/Z-A)
+  - **Group by Supplier**: Collapsible sections with Expand All/Collapse All toggle
+  - **Summary Statistics**: Total payments, count, and breakdown by payment method
+  - **Date Format**: UK format (dd/mm/yyyy) for payment and invoice dates
+  - **Invoice Date Column**: Shows invoice date alongside payment date for reference
+  - **CSV Export**: Download filtered payments with current sort order
+  - **Navigation**: Green "Payments" button added to suppliers index
+  - **Routes**: `/suppliers/payments` and `/suppliers/payments/export`
+  - **Files Created/Modified**:
+    - `app/Http/Controllers/SupplierPaymentsController.php` - New controller
+    - `resources/views/suppliers/payments.blade.php` - New view with grouped/flat modes
+    - `resources/views/suppliers/index.blade.php` - Added navigation link
+
 - **🥬 F&V Order Generation System** (2026-01-09)
   - **Supplier-Agnostic Ordering**: Generate orders for all F&V products regardless of supplier
   - **Sales-Based Suggestions**: Order quantities calculated from historical sales data

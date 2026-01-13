@@ -43,7 +43,7 @@ def parse_invoice(text, filename):
 
 
         # === VAT Detection ===
-        vat_match = re.search(r'VAT at\s*([0-9]+)%\s*on\s*€?([0-9.,]+)', text)
+        vat_match = re.search(r'VAT at\s*([0-9]+)%\s*on\s*[€¤]?([0-9.,]+)', text)
         if vat_match:
             vat_rate = vat_match.group(1)
             net_vat_amount = vat_match.group(2).replace(',', '')

@@ -480,7 +480,7 @@ class ProductController extends Controller
             $imageManager = new ImageManager(new GdDriver);
             $image = $imageManager->read($imageFile->getRealPath());
 
-            $image->resize(64, 64, function ($constraint) {
+            $image->resize(128, 128, function ($constraint) {
                 $constraint->aspectRatio();
                 $constraint->upsize();
             });

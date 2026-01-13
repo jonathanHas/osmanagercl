@@ -38,7 +38,7 @@ class FruitVegProductImageTest extends TestCase
         });
     }
 
-    public function test_upload_resizes_image_to_maximum_64_pixels(): void
+    public function test_upload_resizes_image_to_maximum_128_pixels(): void
     {
         $user = User::factory()->create();
 
@@ -70,8 +70,8 @@ class FruitVegProductImageTest extends TestCase
 
         [$width, $height] = $details;
 
-        $this->assertLessThanOrEqual(64, $width);
-        $this->assertLessThanOrEqual(64, $height);
-        $this->assertSame(64, max($width, $height));
+        $this->assertLessThanOrEqual(128, $width);
+        $this->assertLessThanOrEqual(128, $height);
+        $this->assertSame(128, max($width, $height));
     }
 }

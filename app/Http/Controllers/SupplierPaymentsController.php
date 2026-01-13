@@ -2,8 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\BankTransactionAllocation;
-use App\Models\CashReconciliationPayment;
+use App\Models\Invoice;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -14,119 +13,135 @@ class SupplierPaymentsController extends Controller
         // Default to current month
         $startDate = $request->get('start_date', now()->startOfMonth()->format('Y-m-d'));
         $endDate = $request->get('end_date', now()->format('Y-m-d'));
+        $sort = $request->get('sort', 'date_desc');
+        $groupBy = $request->get('group_by', 'none');
 
         // If no dates provided, show form only
         if (! $request->filled('start_date')) {
-            return view('suppliers.payments', compact('startDate', 'endDate'));
+            return view('suppliers.payments', compact('startDate', 'endDate', 'sort', 'groupBy'));
         }
 
         $startDateTime = Carbon::parse($startDate)->startOfDay();
         $endDateTime = Carbon::parse($endDate)->endOfDay();
 
-        // Get bank payments (allocations to invoices)
-        $bankPayments = BankTransactionAllocation::with(['bankTransaction', 'invoice.supplier'])
-            ->whereHas('bankTransaction', function ($query) use ($startDateTime, $endDateTime) {
-                $query->whereBetween('transaction_date', [$startDateTime, $endDateTime]);
-            })
-            ->get()
-            ->map(function ($allocation) {
-                return [
-                    'date' => $allocation->bankTransaction->transaction_date,
-                    'supplier_name' => $allocation->invoice->supplier->name ?? $allocation->invoice->supplier_name ?? 'Unknown',
-                    'amount' => (float) $allocation->allocated_amount,
-                    'type' => 'Bank',
-                    'reference' => $allocation->bankTransaction->description,
-                    'invoice_number' => $allocation->invoice->invoice_number ?? null,
-                    'allocation_type' => $allocation->formatted_type,
-                ];
-            });
+        // Get paid invoices within the date range
+        $paidInvoices = Invoice::with('supplier')
+            ->where('payment_status', 'paid')
+            ->whereNotNull('payment_date')
+            ->whereBetween('payment_date', [$startDateTime, $endDateTime])
+            ->get();
 
-        // Get cash payments
-        $cashPayments = CashReconciliationPayment::with(['reconciliation', 'supplier'])
-            ->whereHas('reconciliation', function ($query) use ($startDateTime, $endDateTime) {
-                $query->whereBetween('date', [$startDateTime, $endDateTime]);
-            })
-            ->get()
-            ->map(function ($payment) {
-                return [
-                    'date' => $payment->reconciliation->date,
-                    'supplier_name' => $payment->payee_display_name,
-                    'amount' => (float) $payment->amount,
-                    'type' => 'Cash',
-                    'reference' => $payment->description,
-                    'invoice_number' => null,
-                    'allocation_type' => null,
-                ];
-            });
+        // Map to payment records
+        $payments = $paidInvoices->map(function ($invoice) {
+            return [
+                'date' => $invoice->payment_date,
+                'invoice_date' => $invoice->invoice_date,
+                'supplier_name' => $invoice->supplier->name ?? $invoice->supplier_name ?? 'Unknown',
+                'supplier_id' => $invoice->supplier_id,
+                'amount' => (float) $invoice->total_amount,
+                'type' => $this->formatPaymentMethod($invoice->payment_method),
+                'reference' => $invoice->payment_reference,
+                'invoice_number' => $invoice->invoice_number,
+                'payment_method' => $invoice->payment_method,
+            ];
+        });
 
-        // Merge and sort by date descending
-        $payments = $bankPayments->concat($cashPayments)
-            ->sortByDesc('date')
-            ->values();
+        // Apply sorting
+        $payments = match ($sort) {
+            'date_asc' => $payments->sortBy('date'),
+            'supplier_asc' => $payments->sortBy('supplier_name')->values(),
+            'supplier_desc' => $payments->sortByDesc('supplier_name')->values(),
+            default => $payments->sortByDesc('date'),
+        };
 
         // Calculate summary stats
         $totalPayments = $payments->sum('amount');
         $paymentCount = $payments->count();
-        $bankTotal = $bankPayments->sum('amount');
-        $cashTotal = $cashPayments->sum('amount');
+
+        // Group by payment method for breakdown
+        $methodTotals = $payments->groupBy('payment_method')->map(fn ($group) => $group->sum('amount'));
+
+        // Group by supplier if requested
+        $groupedPayments = null;
+        if ($groupBy === 'supplier') {
+            $groupedPayments = $payments->groupBy('supplier_name')->map(function ($group) {
+                return [
+                    'payments' => $group->values(),
+                    'total' => $group->sum('amount'),
+                    'count' => $group->count(),
+                ];
+            })->sortKeys();
+        }
 
         return view('suppliers.payments', compact(
             'startDate',
             'endDate',
+            'sort',
+            'groupBy',
             'payments',
+            'groupedPayments',
             'totalPayments',
             'paymentCount',
-            'bankTotal',
-            'cashTotal'
+            'methodTotals'
         ));
+    }
+
+    private function formatPaymentMethod(?string $method): string
+    {
+        if (! $method) {
+            return 'Unknown';
+        }
+
+        $methods = [
+            'bank_transfer' => 'Bank Transfer',
+            'bacs' => 'BACS',
+            'cash' => 'Cash',
+            'cheque' => 'Cheque',
+            'card' => 'Card',
+            'credit_card' => 'Credit Card',
+            'other' => 'Other',
+        ];
+
+        return $methods[$method] ?? ucfirst(str_replace('_', ' ', $method));
     }
 
     public function exportCsv(Request $request)
     {
         $startDate = $request->get('start_date', now()->startOfMonth()->format('Y-m-d'));
         $endDate = $request->get('end_date', now()->format('Y-m-d'));
+        $sort = $request->get('sort', 'date_desc');
+        $groupBy = $request->get('group_by', 'none');
 
         $startDateTime = Carbon::parse($startDate)->startOfDay();
         $endDateTime = Carbon::parse($endDate)->endOfDay();
 
-        // Get bank payments
-        $bankPayments = BankTransactionAllocation::with(['bankTransaction', 'invoice.supplier'])
-            ->whereHas('bankTransaction', function ($query) use ($startDateTime, $endDateTime) {
-                $query->whereBetween('transaction_date', [$startDateTime, $endDateTime]);
-            })
-            ->get()
-            ->map(function ($allocation) {
-                return [
-                    'date' => $allocation->bankTransaction->transaction_date,
-                    'supplier_name' => $allocation->invoice->supplier->name ?? $allocation->invoice->supplier_name ?? 'Unknown',
-                    'amount' => (float) $allocation->allocated_amount,
-                    'type' => 'Bank',
-                    'reference' => $allocation->bankTransaction->description,
-                    'invoice_number' => $allocation->invoice->invoice_number ?? null,
-                ];
-            });
+        // Get paid invoices within the date range
+        $paidInvoices = Invoice::with('supplier')
+            ->where('payment_status', 'paid')
+            ->whereNotNull('payment_date')
+            ->whereBetween('payment_date', [$startDateTime, $endDateTime])
+            ->get();
 
-        // Get cash payments
-        $cashPayments = CashReconciliationPayment::with(['reconciliation', 'supplier'])
-            ->whereHas('reconciliation', function ($query) use ($startDateTime, $endDateTime) {
-                $query->whereBetween('date', [$startDateTime, $endDateTime]);
-            })
-            ->get()
-            ->map(function ($payment) {
-                return [
-                    'date' => $payment->reconciliation->date,
-                    'supplier_name' => $payment->payee_display_name,
-                    'amount' => (float) $payment->amount,
-                    'type' => 'Cash',
-                    'reference' => $payment->description,
-                    'invoice_number' => null,
-                ];
-            });
+        // Map to payment records
+        $payments = $paidInvoices->map(function ($invoice) {
+            return [
+                'date' => $invoice->payment_date,
+                'invoice_date' => $invoice->invoice_date,
+                'supplier_name' => $invoice->supplier->name ?? $invoice->supplier_name ?? 'Unknown',
+                'amount' => (float) $invoice->total_amount,
+                'type' => $this->formatPaymentMethod($invoice->payment_method),
+                'reference' => $invoice->payment_reference,
+                'invoice_number' => $invoice->invoice_number,
+            ];
+        });
 
-        // Merge and sort by date descending
-        $payments = $bankPayments->concat($cashPayments)
-            ->sortByDesc('date')
-            ->values();
+        // Apply sorting
+        $payments = match ($sort) {
+            'date_asc' => $payments->sortBy('date'),
+            'supplier_asc' => $payments->sortBy('supplier_name')->values(),
+            'supplier_desc' => $payments->sortByDesc('supplier_name')->values(),
+            default => $payments->sortByDesc('date'),
+        };
 
         $filename = 'supplier-payments-'.$startDate.'-to-'.$endDate.'.csv';
 
@@ -144,35 +159,27 @@ class SupplierPaymentsController extends Controller
             fputcsv($file, []); // Empty row
 
             // Column headers
-            fputcsv($file, ['Date', 'Supplier', 'Amount', 'Type', 'Reference', 'Invoice #']);
+            fputcsv($file, ['Payment Date', 'Supplier', 'Amount', 'Payment Method', 'Reference', 'Invoice #', 'Invoice Date']);
 
             $totalAmount = 0;
-            $bankTotal = 0;
-            $cashTotal = 0;
 
             foreach ($payments as $payment) {
                 fputcsv($file, [
-                    $payment['date']->format('Y-m-d'),
+                    $payment['date']->format('d/m/Y'),
                     $payment['supplier_name'],
                     number_format($payment['amount'], 2),
                     $payment['type'],
                     $payment['reference'] ?? '',
                     $payment['invoice_number'] ?? '',
+                    $payment['invoice_date'] ? $payment['invoice_date']->format('d/m/Y') : '',
                 ]);
 
                 $totalAmount += $payment['amount'];
-                if ($payment['type'] === 'Bank') {
-                    $bankTotal += $payment['amount'];
-                } else {
-                    $cashTotal += $payment['amount'];
-                }
             }
 
             fputcsv($file, []); // Empty row
             fputcsv($file, ['Summary']);
             fputcsv($file, ['Total Payments:', '€'.number_format($totalAmount, 2)]);
-            fputcsv($file, ['Bank Payments:', '€'.number_format($bankTotal, 2)]);
-            fputcsv($file, ['Cash Payments:', '€'.number_format($cashTotal, 2)]);
             fputcsv($file, ['Payment Count:', $payments->count()]);
 
             fclose($file);

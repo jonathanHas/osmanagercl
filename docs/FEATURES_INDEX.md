@@ -176,6 +176,20 @@ Complete supplier management with seamless POS integration and auto-code generat
 
 📖 [Supplier Management Documentation](./features/supplier-management.md)
 
+### Supplier Payments Report (NEW! 2026-01-12)
+Comprehensive payment history report with flexible sorting and grouping options.
+- **Date Range Selection**: View payments within any selected date range
+- **Sort Options**: Sort by date (newest/oldest) or supplier name (A-Z/Z-A)
+- **Group by Supplier**: Toggle grouped view with collapsible supplier sections
+- **Expand/Collapse All**: Quick toggle to show or hide all supplier details
+- **Summary Statistics**: Total payments, count, and breakdown by payment method
+- **Invoice Date Display**: Shows both payment date and invoice date (dd/mm/yyyy format)
+- **Payment Method Tags**: Color-coded badges for Bank Transfer, Cash, Cheque, Card
+- **CSV Export**: Download filtered data respecting current sort order
+- **Navigation**: Accessible via green "Payments" button on suppliers index
+
+📖 [Supplier Management Documentation](./features/supplier-management.md#supplier-payments-report)
+
 ---
 
 ## Order Management

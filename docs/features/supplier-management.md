@@ -265,6 +265,96 @@ php artisan tinker
 - XSS protection via Blade templating
 - CSRF protection on all forms
 
+## Supplier Payments Report
+
+### Overview
+The Supplier Payments Report (`/suppliers/payments`) provides a comprehensive view of all supplier invoice payments within a selected date range. Added on 2026-01-12.
+
+### Features
+
+#### Date Range Selection
+- Start and end date pickers with sensible defaults (current month)
+- Maximum date limited to today
+
+#### Sorting Options
+- **Date (Newest)**: Most recent payments first (default)
+- **Date (Oldest)**: Oldest payments first
+- **Supplier (A-Z)**: Alphabetical by supplier name
+- **Supplier (Z-A)**: Reverse alphabetical
+
+#### Group by Supplier
+- Toggle checkbox to enable grouped view
+- Collapsible sections per supplier showing:
+  - Supplier name
+  - Payment count
+  - Total amount paid
+- **Expand All / Collapse All** toggle for quick navigation
+- Individual sections expand to show payment details table
+
+#### Payment Details Table
+| Column | Description |
+|--------|-------------|
+| Payment Date | Date payment was made (dd/mm/yyyy) |
+| Supplier | Supplier name (flat view only) |
+| Amount | Payment amount in euros |
+| Payment Method | Color-coded badge (Bank Transfer, Cash, Cheque, Card) |
+| Invoice # | Related invoice number |
+| Invoice Date | Original invoice date (dd/mm/yyyy) |
+| Reference | Payment reference if provided |
+
+#### Summary Statistics
+- **Total Payments**: Count of payments in range
+- **Total Amount**: Sum of all payments
+- **By Payment Method**: Breakdown showing totals per method
+
+#### CSV Export
+- Downloads all filtered payments
+- Respects current sort order
+- Includes headers: Payment Date, Supplier, Amount, Payment Method, Reference, Invoice #, Invoice Date
+
+### User Interface
+
+#### Navigation
+Access via the green **"Payments"** button in the suppliers index page header (between Outstanding Report and View Invoices).
+
+#### URL Parameters
+```
+/suppliers/payments?start_date=2026-01-01&end_date=2026-01-12&sort=supplier_asc&group_by=supplier
+```
+
+### Controller Implementation
+
+```php
+// SupplierPaymentsController.php
+public function index(Request $request)
+{
+    $startDate = $request->get('start_date', now()->startOfMonth()->format('Y-m-d'));
+    $endDate = $request->get('end_date', now()->format('Y-m-d'));
+    $sort = $request->get('sort', 'date_desc');
+    $groupBy = $request->get('group_by', 'none');
+
+    // Query paid invoices
+    $paidInvoices = Invoice::with('supplier')
+        ->where('payment_status', 'paid')
+        ->whereNotNull('payment_date')
+        ->whereBetween('payment_date', [$startDate, $endDate])
+        ->get();
+
+    // Apply sorting and optional grouping
+    // ...
+}
+```
+
+### Routes
+```php
+Route::get('/suppliers/payments', [SupplierPaymentsController::class, 'index'])
+    ->name('suppliers.payments');
+Route::get('/suppliers/payments/export', [SupplierPaymentsController::class, 'exportCsv'])
+    ->name('suppliers.payments.export');
+```
+
+---
+
 ## Future Enhancements
 
 1. **Bulk Import**: CSV/Excel import for multiple suppliers

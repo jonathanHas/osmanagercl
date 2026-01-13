@@ -353,6 +353,18 @@ Standard payment methods available in dropdowns:
 - Clear error messages for user guidance
 - Graceful degradation for JavaScript failures
 
+## Related Features
+
+### Supplier Payments Report (NEW! 2026-01-12)
+View comprehensive payment history across all suppliers with sorting and grouping options.
+- **Access**: Suppliers → Payments button
+- **Features**: Date range filtering, sort by date/supplier, group by supplier with collapsible sections
+- **Export**: CSV download with current sort order
+
+📖 [Supplier Payments Report Documentation](./supplier-management.md#supplier-payments-report)
+
+---
+
 ## Future Enhancements
 
 ### Potential Features
