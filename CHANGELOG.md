@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **🖼️ Product Image Quality Improvement** (2026-01-13)
+  - **Increased Resolution**: Product image uploads now resize to 128x128 pixels (was 64x64)
+  - **Sharper Display**: Images now match the UI display size exactly, eliminating blurriness
+  - **Files Modified**:
+    - `app/Http/Controllers/ProductController.php` - Updated resize dimensions
+    - `tests/Feature/FruitVegProductImageTest.php` - Updated test assertions
+
 ### Added
 
 - **💰 Supplier Payments Report** (2026-01-12)

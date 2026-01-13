@@ -490,4 +490,27 @@ class CategoriesController extends Controller
 
         return $ids;
     }
+
+    /**
+     * Toggle category visibility (CATSHOWNAME).
+     */
+    public function toggleCategoryVisibility(Request $request)
+    {
+        $request->validate([
+            'category_id' => 'required|string',
+            'visible' => 'required|boolean',
+        ]);
+
+        $category = Category::findOrFail($request->category_id);
+        $category->CATSHOWNAME = $request->visible;
+        $category->save();
+
+        return response()->json([
+            'success' => true,
+            'visible' => $category->CATSHOWNAME,
+            'message' => $category->CATSHOWNAME
+                ? 'Category is now visible'
+                : 'Category is now hidden',
+        ]);
+    }
 }

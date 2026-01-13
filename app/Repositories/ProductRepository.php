@@ -347,7 +347,8 @@ class ProductRepository
     public function getAllCategoriesWithProducts(
         ?bool $activeOnly = null,
         ?bool $stockedOnly = null,
-        ?bool $inStockOnly = null
+        ?bool $inStockOnly = null,
+        ?bool $showHidden = null
     ): SupportCollection {
         $query = DB::connection('pos')
             ->table('CATEGORIES')
@@ -376,10 +377,14 @@ class ProductRepository
                             ->where('STOCKCURRENT.UNITS', '>', 0);
                     });
                 }
-            })
-            ->where('CATSHOWNAME', 1);
+            });
 
-        return $query->select('CATEGORIES.ID', 'CATEGORIES.NAME', 'CATEGORIES.PARENTID')
+        // Only filter by CATSHOWNAME if not showing hidden categories
+        if ($showHidden !== true) {
+            $query->where('CATSHOWNAME', 1);
+        }
+
+        return $query->select('CATEGORIES.ID', 'CATEGORIES.NAME', 'CATEGORIES.PARENTID', 'CATEGORIES.CATSHOWNAME')
             ->orderBy('CATEGORIES.NAME')
             ->get();
     }

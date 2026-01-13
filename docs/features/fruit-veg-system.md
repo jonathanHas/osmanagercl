@@ -653,9 +653,11 @@ Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
   - AJAX-powered data loading without page refresh
 - Real-time AJAX form submissions without page refresh
 
-#### Enhanced Image Management (Updated September 2025)
+#### Enhanced Image Management (Updated January 2026)
 - Direct image upload to POS database IMAGE field with transaction-safe operations
 - Real-time image preview before upload with drag-and-drop support
+- **Image Resize**: Automatically resized to 128x128 pixels (maintains aspect ratio, no upscaling)
+- **Supported Formats**: JPEG, PNG, GIF (max 2MB)
 - **Intelligent Cache Management**: 24-hour cache normally, 5-minute cache with cache-busting for immediate updates
 - **Automatic Content-Type Detection**: Serves images with correct MIME types (PNG, JPEG, GIF, WebP) detected from binary data
 - **Cache-Busting Integration**: Server-returned timestamps ensure immediate visibility of uploaded images

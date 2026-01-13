@@ -110,6 +110,7 @@ class ProductController extends Controller
         $supplierId = $request->get('supplier_id');
         $categoryId = $request->get('category_id');
         $showSuppliers = $request->boolean('show_suppliers');
+        $showHiddenCategories = $request->boolean('show_hidden_categories');
         $perPage = $request->get('per_page', 20);
 
         // Get suppliers for dropdown (always load for immediate availability when checkbox is toggled)
@@ -123,7 +124,8 @@ class ProductController extends Controller
         $categories = $this->productRepository->getAllCategoriesWithProducts(
             activeOnly: $activeOnly,
             stockedOnly: $stockedOnly,
-            inStockOnly: $inStockOnly
+            inStockOnly: $inStockOnly,
+            showHidden: $showHiddenCategories
         );
 
         if ($search || $activeOnly || $stockedOnly || $inStockOnly || $supplierId || $categoryId) {
@@ -155,6 +157,7 @@ class ProductController extends Controller
             'supplierId' => $supplierId,
             'categoryId' => $categoryId,
             'showSuppliers' => $showSuppliers,
+            'showHiddenCategories' => $showHiddenCategories,
             'suppliers' => $suppliers,
             'categories' => $categories,
             'supplierService' => $this->supplierService,

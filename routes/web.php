@@ -294,6 +294,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/{category}/sales/product/{code}/daily', [CategoriesController::class, 'getProductDailySales'])->name('sales.product.daily');
         Route::get('/{category}/dashboard-data', [CategoriesController::class, 'getDashboardData'])->name('dashboard.data');
         Route::post('/visibility/toggle', [CategoriesController::class, 'toggleVisibility'])->name('visibility.toggle');
+        Route::post('/category-visibility/toggle', [CategoriesController::class, 'toggleCategoryVisibility'])->name('category-visibility.toggle');
         Route::get('/product-image/{code}', [CategoriesController::class, 'productImage'])->name('product-image');
     });
 

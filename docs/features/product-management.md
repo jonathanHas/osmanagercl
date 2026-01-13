@@ -1074,11 +1074,33 @@ Added quick cost update functionality to delivery pages.
 - **Confirmation Dialog**: Prevents accidental updates
 - **Batch Processing**: Handle multiple updates efficiently
 
+### Product Image Management (2026-01-13)
+
+Product images are stored as binary data in the POS database `PRODUCTS.IMAGE` field.
+
+#### Image Upload Specifications
+- **Maximum File Size**: 2MB
+- **Supported Formats**: JPEG, PNG, GIF
+- **Resize Dimensions**: 128x128 pixels (maintains aspect ratio)
+- **Storage**: Binary blob in POS database
+- **Display Size**: 128x128 pixels in product edit page
+
+#### Image Processing
+- Images are automatically resized to fit within 128x128 pixels while maintaining aspect ratio
+- Uses Intervention Image library with GD driver
+- Upscaling is prevented (small images stay small)
+- Content-type is preserved from original file
+
+#### Image Serving
+- Route: `GET /products/{id}/image`
+- Cache headers: 24-hour public cache
+- Fallback: Transparent placeholder for products without images
+
 ## Future Enhancements
 
 - Bulk product import/export functionality
 - Advanced pricing rules and discount management
-- Product image management and optimization
+- Higher resolution image support (256x256 or 400x400)
 - Inventory tracking and low-stock alerts
 - Product variant support (size, color, etc.)
 - Enhanced reporting and analytics

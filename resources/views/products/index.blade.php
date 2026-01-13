@@ -103,6 +103,12 @@
                         'label' => 'Show suppliers',
                         'type' => 'checkbox',
                         'checked' => $showSuppliers
+                    ],
+                    [
+                        'name' => 'show_hidden_categories',
+                        'label' => 'Show hidden categories',
+                        'type' => 'checkbox',
+                        'checked' => $showHiddenCategories
                     ]
                 ]">
                 
@@ -128,8 +134,8 @@
                         <select name="category_id" id="category_id" class="rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600">
                             <option value="">All Categories</option>
                             @foreach($categories as $category)
-                                <option value="{{ $category->ID }}" {{ $categoryId == $category->ID ? 'selected' : '' }}>
-                                    {{ $category->NAME }}
+                                <option value="{{ $category->ID }}" {{ $categoryId == $category->ID ? 'selected' : '' }} class="{{ !$category->CATSHOWNAME ? 'text-gray-400' : '' }}">
+                                    {{ $category->NAME }}{{ !$category->CATSHOWNAME ? ' (hidden)' : '' }}
                                 </option>
                             @endforeach
                         </select>
