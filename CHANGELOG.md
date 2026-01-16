@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **👁️ Category Visibility Management** (2026-01-14)
+  - **Products Page Toggle**: New "Show hidden categories" checkbox to include all categories in the dropdown filter
+  - **Hidden Category Indicator**: Categories marked as hidden show "(hidden)" suffix in the dropdown
+  - **Categories Page Visibility Stats**: Header now displays visible/hidden category counts
+  - **Visual Visibility Toggle**: Eye icon button on each category card to toggle visibility
+  - **Instant AJAX Updates**: Toggle visibility without page reload using Alpine.js
+  - **POS Integration**: Changes `CATSHOWNAME` field in POS database to control dropdown visibility
+  - **Files Modified**:
+    - `app/Repositories/ProductRepository.php` - Added `showHidden` parameter to `getAllCategoriesWithProducts()`
+    - `app/Http/Controllers/ProductController.php` - Added `showHiddenCategories` handling
+    - `app/Http/Controllers/CategoriesController.php` - Added `toggleCategoryVisibility()` method
+    - `resources/views/products/index.blade.php` - Added checkbox filter and hidden indicator
+    - `resources/views/categories/index.blade.php` - Added visibility stats and toggle buttons
+    - `routes/web.php` - Added `categories.category-visibility.toggle` route
+
 ### Fixed
 
 - **🖼️ Product Image Quality Improvement** (2026-01-13)

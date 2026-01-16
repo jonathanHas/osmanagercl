@@ -42,6 +42,10 @@ Universal category management interface for all product categories.
 - **Universal Interface**: Manage any category with consistent tools
 - **Sales Analytics**: Pre-aggregated data for instant performance metrics
 - **Till Visibility Control**: Toggle products on/off POS per category
+- **Category Visibility Management** (NEW! 2026-01-14): Toggle which categories appear in dropdown filters
+  - Eye icon toggle on category cards for instant visibility changes
+  - "Show hidden categories" checkbox on Products page
+  - Visible/hidden count stats in Categories header
 - **Product Management**: Inline editing of prices and display names
 - **Subcategory Support**: Navigate category hierarchies
 - **Search & Filter**: Find products and categories quickly

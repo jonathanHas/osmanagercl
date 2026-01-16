@@ -30,7 +30,8 @@ The Categories Management System provides a universal interface for managing all
 ### Category Index Page
 - **Grid Layout**: Visual category cards with key metrics
 - **Product Counts**: Total products per category
-- **Visibility Stats**: Till visibility percentage with progress bars
+- **Visibility Stats**: Header shows visible/hidden category counts (e.g., "20 visible • 74 hidden")
+- **Category Visibility Toggle**: Eye icon button on each card to toggle dropdown visibility
 - **Search & Filter**: Find categories quickly
 - **Empty Category Toggle**: Show/hide categories without products
 - **Quick Insights**: Top categories by products, visibility, and attention needed
@@ -130,6 +131,57 @@ The Product Health Dashboard provides instant insights into product performance 
 - **Loading States**: Smooth loading animations per tab
 - **Empty States**: Positive feedback when no issues found
 
+## Category Visibility Management (NEW! 2026-01-14)
+
+### Overview
+Categories can be hidden from dropdown filters using the `CATSHOWNAME` field in the POS database. This feature allows managing which categories appear in product filter dropdowns.
+
+### Features
+
+#### Categories Page (`/categories`)
+- **Visibility Stats in Header**: Shows count of visible and hidden categories
+- **Visual Toggle Button**: Eye icon on each category card
+  - Green eye = Visible in dropdowns
+  - Gray eye-slash = Hidden from dropdowns
+- **Instant AJAX Updates**: Toggle without page reload
+- **Loading State**: Spinner animation during update
+
+#### Products Page (`/products`)
+- **Show Hidden Categories Checkbox**: Filter option to include hidden categories
+- **Hidden Category Indicator**: Categories marked with "(hidden)" suffix in dropdown
+- **Persistent Filter**: Setting maintained across searches
+
+### Technical Details
+
+```php
+// Toggle category visibility
+public function toggleCategoryVisibility(Request $request)
+{
+    $category = Category::findOrFail($request->category_id);
+    $category->CATSHOWNAME = $request->visible;
+    $category->save();
+
+    return response()->json([
+        'success' => true,
+        'visible' => $category->CATSHOWNAME,
+        'message' => $category->CATSHOWNAME ? 'Category is now visible' : 'Category is now hidden',
+    ]);
+}
+
+// Get categories with optional hidden inclusion
+public function getAllCategoriesWithProducts(
+    ?bool $activeOnly = null,
+    ?bool $stockedOnly = null,
+    ?bool $inStockOnly = null,
+    ?bool $showHidden = null  // NEW parameter
+): SupportCollection
+```
+
+### Database Field
+- **Table**: `CATEGORIES` (POS Database)
+- **Field**: `CATSHOWNAME`
+- **Type**: Boolean (1 = visible, 0 = hidden)
+
 ## Routes
 
 ```php
@@ -143,6 +195,7 @@ Route::prefix('categories')->name('categories.')->group(function () {
     Route::get('/{category}/sales/product/{code}/daily', [CategoriesController::class, 'getProductDailySales'])->name('sales.product.daily');
     Route::get('/{category}/dashboard-data', [CategoriesController::class, 'getDashboardData'])->name('dashboard.data');
     Route::post('/visibility/toggle', [CategoriesController::class, 'toggleVisibility'])->name('visibility.toggle');
+    Route::post('/category-visibility/toggle', [CategoriesController::class, 'toggleCategoryVisibility'])->name('category-visibility.toggle');
     Route::get('/product-image/{code}', [CategoriesController::class, 'productImage'])->name('product-image');
 });
 ```

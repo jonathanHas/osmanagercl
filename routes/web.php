@@ -4,6 +4,7 @@ use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\CoffeeController;
 use App\Http\Controllers\CoffeeMetadataController;
 use App\Http\Controllers\DeliveryController;
+use App\Http\Controllers\DeliveryLegacyController;
 use App\Http\Controllers\Financials\BankStatementController;
 use App\Http\Controllers\Financials\CardReconciliationController;
 use App\Http\Controllers\FruitVegController;
@@ -312,6 +313,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/deliveries/{delivery}/export-discrepancies', [DeliveryController::class, 'exportDiscrepancies'])->name('deliveries.export-discrepancies');
     Route::post('/deliveries/{delivery}/update-costs', [DeliveryController::class, 'updateCosts'])->name('deliveries.update-costs');
     Route::post('/delivery-items/{item}/refresh-barcode', [DeliveryController::class, 'refreshBarcode'])->name('delivery-items.refresh-barcode');
+
+    // Delivery Legacy (Invoice Match) - replicates legacy PHP workflow
+    Route::prefix('delivery-legacy')->name('delivery-legacy.')->group(function () {
+        Route::get('/', [DeliveryLegacyController::class, 'index'])->name('index');
+        Route::get('/match', [DeliveryLegacyController::class, 'match'])->name('match');
+    });
 
     // Order Management mockup routes (for UI testing)
     Route::get('/orders/mockups', fn () => view('orders.mockup-index'))->name('orders.mockups');
