@@ -19,16 +19,24 @@
     <body class="font-sans antialiased">
         <div x-data="{
             sidebarOpen: false,
+            sidebarCollapsed: localStorage.getItem('sidebarCollapsed') === 'true',
             operationsOpen: true,
             kitchenOpen: true,
             ordersOpen: true,
             financialOpen: true,
             systemToolsOpen: true,
             adminOpen: true
-        }" class="flex h-screen bg-gray-100">
+        }"
+        x-init="$watch('sidebarCollapsed', val => localStorage.setItem('sidebarCollapsed', val))"
+        class="flex h-screen bg-gray-100">
             <!-- Sidebar -->
-            <div :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" 
-                 class="fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:block lg:flex-shrink-0">
+            <div :class="{
+                    'translate-x-0': sidebarOpen,
+                    '-translate-x-full': !sidebarOpen,
+                    'lg:translate-x-0': !sidebarCollapsed,
+                    'lg:-translate-x-full lg:w-0 lg:overflow-hidden': sidebarCollapsed
+                 }"
+                 class="fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 transition-all duration-300 ease-in-out lg:static lg:block lg:flex-shrink-0">
                 <div class="flex h-full min-h-full flex-col bg-gray-900">
                     <!-- Logo -->
                     <div class="flex h-16 items-center justify-between px-4 bg-gray-800">
@@ -512,7 +520,18 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                             </svg>
                         </button>
-                        
+
+                        <!-- Desktop sidebar toggle -->
+                        <button @click="sidebarCollapsed = !sidebarCollapsed"
+                                class="hidden lg:block text-gray-400 hover:text-gray-600 p-1 rounded transition-colors"
+                                :title="sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'">
+                            <svg class="h-5 w-5 transition-transform duration-200"
+                                 :class="sidebarCollapsed ? 'rotate-180' : ''"
+                                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
+                            </svg>
+                        </button>
+
                         <!-- Page Header -->
                         @isset($header)
                             {{ $header }}

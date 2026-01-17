@@ -507,6 +507,52 @@
                     </div>
                 </div>
             </form>
+
+            <!-- Alternate Barcode Section -->
+            <div x-data="{ open: false }" class="mt-6 bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
+                <button type="button"
+                        @click="open = !open"
+                        class="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
+                    <div class="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                        <svg class="w-4 h-4 mr-2 transition-transform duration-200" :class="{ 'rotate-90': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                        <span class="font-medium">Add alternate barcode for this product</span>
+                    </div>
+                    <span class="text-xs text-gray-400 dark:text-gray-500">Product changed packaging?</span>
+                </button>
+
+                <div x-show="open"
+                     x-collapse
+                     class="px-6 pb-6 border-t border-gray-200 dark:border-gray-700">
+                    <form action="{{ route('products.create-alternate', $product->ID) }}" method="POST" class="pt-4">
+                        @csrf
+                        <div class="max-w-md">
+                            <label for="new_barcode" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                New Barcode
+                            </label>
+                            <input type="text"
+                                   id="new_barcode"
+                                   name="new_barcode"
+                                   required
+                                   class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:border-indigo-500 focus:ring-indigo-500"
+                                   placeholder="Scan or enter new barcode">
+                            @error('new_barcode')
+                                <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                            @enderror
+                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                This creates a copy of this product with the new barcode, preserving all pricing, supplier, and category details.
+                            </p>
+                        </div>
+                        <div class="mt-4">
+                            <button type="submit"
+                                    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-md transition-colors duration-200">
+                                Create Linked Product
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 

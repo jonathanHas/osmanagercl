@@ -80,6 +80,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/products/{id}/min-stock-override', [ProductController::class, 'updateMinStockOverride'])->name('products.update-min-stock-override');
     Route::patch('/products/{id}/short-dated-settings', [ProductController::class, 'updateShortDatedSettings'])->name('products.update-short-dated-settings');
     Route::patch('/products/{id}/barcode', [ProductController::class, 'updateBarcode'])->name('products.update-barcode');
+    Route::post('/products/{id}/create-alternate', [ProductController::class, 'createAlternateBarcode'])->name('products.create-alternate');
     Route::patch('/products/{id}/display', [ProductController::class, 'updateDisplay'])->name('products.update-display');
     Route::post('/products/{id}/update-stock', [ProductController::class, 'updateStock'])->name('products.update-stock');
     Route::post('/products/{id}/toggle-stocking', [ProductController::class, 'toggleStocking'])->name('products.toggle-stocking');

@@ -37,6 +37,15 @@ Safe barcode modification for correcting scanner errors.
 
 📖 [Product Management Documentation](./features/product-management.md#barcode-editing-feature-2025-08-07)
 
+### Alternate Barcode (NEW! 2026-01)
+Create linked product copies when suppliers change packaging barcodes.
+- **Supplier Link Transfer**: Moves (not copies) supplier connection to new product
+- **Complete Data Copy**: All product details, stocking, till visibility inherited
+- **Name Uniqueness**: Auto-appends `[alt]` suffix (editable after creation)
+- **Expandable UI**: Minimal footprint panel at bottom of edit page
+
+📖 [Product Management Documentation](./features/product-management.md#alternate-barcode-feature-2026-01)
+
 ### Categories Management System
 Universal category management interface for all product categories.
 - **Universal Interface**: Manage any category with consistent tools

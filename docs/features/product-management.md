@@ -445,6 +445,102 @@ DB::transaction(function () use ($product, $oldBarcode, $newBarcode) {
 3. **Validation**: Ensures new barcode is unique
 4. **Audit Trail**: Changes are logged for accountability
 
+### Alternate Barcode Feature (2026-01)
+
+#### Overview
+When a supplier changes product packaging (new barcode for same product), users can create a linked copy that inherits all product data and **transfers** the supplier relationship.
+
+#### Key Features
+
+1. **Expandable Panel Interface**
+   - Subtle collapsible panel at bottom of product edit page
+   - Alpine.js animation for smooth expand/collapse
+   - Minimal UI footprint when collapsed
+
+2. **Product Copying**
+   - Creates new product with unique UUID
+   - Copies all product fields (name, category, pricing, tax, etc.)
+   - Appends `[alt]` to name (since NAME has unique index)
+   - If `[alt]` exists, appends `[barcode]` instead
+
+3. **Supplier Link Transfer** (Not Copy)
+   - **Moves** supplier link from original to new product
+   - Original product loses supplier connection
+   - Supplier code stays the same (only barcode reference changes)
+   - Avoids duplicate supplier code conflicts
+
+4. **Additional Data Handling**
+   - Initializes STOCKCURRENT with 0 units
+   - Copies stocking table entry if original was stocked
+   - Copies till visibility (PRODUCTS_CAT) setting
+   - Creates product_metadata with source tracking
+   - Logs new product in label_logs
+
+#### Technical Implementation
+
+**Route:**
+```php
+Route::post('/products/{id}/create-alternate', [ProductController::class, 'createAlternateBarcode'])
+    ->name('products.create-alternate');
+```
+
+**Controller Method:**
+```php
+public function createAlternateBarcode(Request $request, string $id)
+{
+    $validated = $request->validate([
+        'new_barcode' => ['required', 'string', 'unique:pos.PRODUCTS,CODE'],
+    ]);
+
+    // Move supplier link (not copy)
+    if ($originalProduct->supplierLink) {
+        $originalProduct->supplierLink->update([
+            'Barcode' => $newBarcode,
+        ]);
+    }
+
+    // Redirect to new product
+    return redirect()->route('products.edit', $newProductId)
+        ->with('success', $message);
+}
+```
+
+**View Component:**
+```html
+<div x-data="{ open: false }" class="mt-6 border-t pt-4">
+    <button type="button" @click="open = !open">
+        <span x-show="!open">[+]</span>
+        <span x-show="open">[-]</span>
+        Add alternate barcode for this product
+    </button>
+
+    <div x-show="open" x-collapse class="mt-4">
+        <form action="{{ route('products.create-alternate', $product) }}" method="POST">
+            @csrf
+            <input type="text" name="new_barcode" />
+            <button type="submit">Create Linked Product</button>
+        </form>
+    </div>
+</div>
+```
+
+#### Usage
+
+1. Navigate to `/products/{uuid}/edit` for existing product
+2. Scroll to bottom, click "Add alternate barcode for this product"
+3. Enter new unique barcode and click "Create Linked Product"
+4. Redirected to new product's edit page with success message
+5. Rename product (remove `[alt]` suffix) as needed
+6. Original product retains all data except supplier link
+
+#### Why Transfer Instead of Copy?
+
+When a supplier sends the same product with a new barcode:
+- The **new barcode** is what the supplier now uses
+- The **supplier code** stays the same (it's how the supplier identifies the product)
+- The **old product** should no longer be linked to that supplier
+- This is a "replacement" not a "variant"
+
 ### Display Name Management (2025)
 
 The product management system now supports inline editing of display names for all products, providing consistent functionality across the entire application.

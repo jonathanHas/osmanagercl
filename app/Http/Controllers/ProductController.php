@@ -771,6 +771,131 @@ class ProductController extends Controller
     }
 
     /**
+     * Create a copy of a product with a new barcode.
+     * Used when a product comes in with a new barcode (e.g., supplier changed packaging).
+     */
+    public function createAlternateBarcode(Request $request, string $id): RedirectResponse
+    {
+        $request->validate([
+            'new_barcode' => ['required', 'string', 'max:255', 'unique:pos.PRODUCTS,CODE'],
+        ]);
+
+        $originalProduct = $this->productRepository->findById($id);
+
+        if (! $originalProduct) {
+            abort(404, 'Product not found');
+        }
+
+        $newBarcode = $request->new_barcode;
+
+        try {
+            $newProductId = (string) Str::uuid();
+            $hadSupplierLink = (bool) $originalProduct->supplierLink;
+
+            DB::connection('pos')->transaction(function () use ($originalProduct, $newBarcode, $newProductId) {
+                // Generate unique name - append [alt] suffix since NAME has unique index
+                // User can rename the product after creation
+                $newName = $originalProduct->NAME.' [alt]';
+
+                // If that name also exists, append barcode to make it truly unique
+                if (Product::where('NAME', $newName)->exists()) {
+                    $newName = $originalProduct->NAME.' ['.$newBarcode.']';
+                }
+
+                // Create the new product as a copy with the new barcode
+                Product::create([
+                    'ID' => $newProductId,
+                    'NAME' => $newName,
+                    'CODE' => $newBarcode,
+                    'REFERENCE' => $newBarcode,
+                    'CATEGORY' => $originalProduct->CATEGORY,
+                    'PRICEBUY' => $originalProduct->PRICEBUY,
+                    'PRICESELL' => $originalProduct->PRICESELL,
+                    'TAXCAT' => $originalProduct->TAXCAT,
+                    'DISPLAY' => $originalProduct->DISPLAY,
+                ]);
+
+                // MOVE supplier link from original product to new product
+                // The supplier code stays the same - only the barcode reference changes
+                if ($originalProduct->supplierLink) {
+                    $originalProduct->supplierLink->update([
+                        'Barcode' => $newBarcode,
+                    ]);
+                }
+
+                // Initialize STOCKCURRENT entry
+                try {
+                    \App\Models\StockCurrent::create([
+                        'LOCATION' => '0',
+                        'PRODUCT' => $newProductId,
+                        'ATTRIBUTESETINSTANCE_ID' => null,
+                        'UNITS' => 0.0,
+                    ]);
+                } catch (\Exception $e) {
+                    \Log::warning('Failed to initialize STOCKCURRENT for alternate barcode product', [
+                        'product_id' => $newProductId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+
+                // Add to stocking table if original was stocked
+                $originalStocking = Stocking::find($originalProduct->CODE);
+                if ($originalStocking) {
+                    try {
+                        Stocking::create(['Barcode' => $newBarcode]);
+                    } catch (\Exception $e) {
+                        \Log::warning('Failed to add alternate barcode product to stocking', [
+                            'barcode' => $newBarcode,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+
+                // Copy till visibility from original
+                $originalVisibility = $this->tillVisibilityService->isVisibleOnTill($originalProduct->ID);
+                if ($originalVisibility) {
+                    $this->tillVisibilityService->setVisibility($newProductId, true, 'category');
+                }
+
+                // Create product metadata
+                ProductMetadata::createForProduct(
+                    $newProductId,
+                    $newBarcode,
+                    Auth::id(),
+                    [
+                        'source' => 'alternate_barcode',
+                        'original_product_id' => $originalProduct->ID,
+                        'original_barcode' => $originalProduct->CODE,
+                    ]
+                );
+
+                // Log the new product event
+                LabelLog::logNewProduct($newBarcode);
+            });
+
+            $message = "Product created with barcode {$newBarcode}. The name has '[alt]' appended - you may want to rename it.";
+            if ($hadSupplierLink) {
+                $message .= ' Supplier link has been transferred from the original product.';
+            }
+
+            return redirect()
+                ->route('products.edit', $newProductId)
+                ->with('success', $message);
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to create alternate barcode product', [
+                'original_product_id' => $id,
+                'new_barcode' => $newBarcode,
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()
+                ->route('products.edit', $id)
+                ->with('error', 'Failed to create product with alternate barcode: '.$e->getMessage());
+        }
+    }
+
+    /**
      * Refresh Udea pricing for a specific product via AJAX.
      */
     public function refreshUdeaPricing(string $id)
