@@ -131,30 +131,38 @@ The Product Health Dashboard provides instant insights into product performance 
 - **Loading States**: Smooth loading animations per tab
 - **Empty States**: Positive feedback when no issues found
 
-## Category Visibility Management (NEW! 2026-01-14)
+## Category Visibility Management
 
 ### Overview
-Categories can be hidden from dropdown filters using the `CATSHOWNAME` field in the POS database. This feature allows managing which categories appear in product filter dropdowns.
+The `CATSHOWNAME` field in the POS database controls which categories appear **on the POS till** for cashiers. This is separate from product management, where all categories are always visible.
+
+### Key Distinction
+
+| Context | Behavior |
+|---------|----------|
+| **POS Till** | Only categories with `CATSHOWNAME = 1` appear |
+| **Products Page (`/products`)** | ALL categories shown regardless of `CATSHOWNAME` |
+| **Categories Page (`/categories`)** | All categories shown with visibility toggle for till |
 
 ### Features
 
 #### Categories Page (`/categories`)
-- **Visibility Stats in Header**: Shows count of visible and hidden categories
+- **Visibility Stats in Header**: Shows count of visible and hidden categories (for till)
 - **Visual Toggle Button**: Eye icon on each category card
-  - Green eye = Visible in dropdowns
-  - Gray eye-slash = Hidden from dropdowns
+  - Green eye = Visible on POS till
+  - Gray eye-slash = Hidden from POS till
 - **Instant AJAX Updates**: Toggle without page reload
 - **Loading State**: Spinner animation during update
 
 #### Products Page (`/products`)
-- **Show Hidden Categories Checkbox**: Filter option to include hidden categories
-- **Hidden Category Indicator**: Categories marked with "(hidden)" suffix in dropdown
-- **Persistent Filter**: Setting maintained across searches
+- **All Categories Shown**: The category dropdown shows ALL categories that have products
+- **No Filtering by Till Visibility**: Product management is separate from till display concerns
+- **Clean Display**: Category names shown without visibility indicators
 
 ### Technical Details
 
 ```php
-// Toggle category visibility
+// Toggle category visibility (for POS till)
 public function toggleCategoryVisibility(Request $request)
 {
     $category = Category::findOrFail($request->category_id);
@@ -164,23 +172,24 @@ public function toggleCategoryVisibility(Request $request)
     return response()->json([
         'success' => true,
         'visible' => $category->CATSHOWNAME,
-        'message' => $category->CATSHOWNAME ? 'Category is now visible' : 'Category is now hidden',
+        'message' => $category->CATSHOWNAME ? 'Category visible on till' : 'Category hidden from till',
     ]);
 }
 
-// Get categories with optional hidden inclusion
+// Get categories for product management dropdown (shows ALL categories)
 public function getAllCategoriesWithProducts(
     ?bool $activeOnly = null,
     ?bool $stockedOnly = null,
-    ?bool $inStockOnly = null,
-    ?bool $showHidden = null  // NEW parameter
+    ?bool $inStockOnly = null
 ): SupportCollection
+// Note: No visibility filtering - all categories with products are returned
 ```
 
 ### Database Field
 - **Table**: `CATEGORIES` (POS Database)
 - **Field**: `CATSHOWNAME`
-- **Type**: Boolean (1 = visible, 0 = hidden)
+- **Type**: Boolean (1 = visible on till, 0 = hidden from till)
+- **Purpose**: Controls POS till display only, not product management
 
 ## Routes
 

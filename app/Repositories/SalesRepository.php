@@ -688,6 +688,80 @@ class SalesRepository
     }
 
     /**
+     * Get weekly sales TO the Coffee customer for multiple products in bulk.
+     * This tracks products sold/transferred to the coffee department (internal usage).
+     *
+     * @param  array  $productIds  Array of product IDs
+     * @param  int  $weeksBack  Number of weeks to retrieve
+     * @return \Illuminate\Support\Collection Keyed by product_id, each containing array of weekly data
+     */
+    public function getBulkCoffeeCustomerWeeklySales(array $productIds, int $weeksBack = 8): \Illuminate\Support\Collection
+    {
+        if (empty($productIds)) {
+            return collect();
+        }
+
+        $weeksBack = max(1, $weeksBack);
+        $endOfCurrentWeek = Carbon::now()->endOfWeek();
+        $startRange = $endOfCurrentWeek->copy()->subWeeks($weeksBack - 1)->startOfWeek();
+
+        // Build week buckets template (same structure as getBulkProductWeeklySales)
+        $weekBuckets = [];
+        $cursor = $startRange->copy();
+        for ($i = 0; $i < $weeksBack; $i++) {
+            $weekStart = $cursor->copy()->startOfWeek();
+            $weekEnd = $cursor->copy()->endOfWeek();
+            $key = $weekStart->format('Y-m-d');
+            $weekBuckets[$key] = [
+                'week_start' => $weekStart->format('Y-m-d'),
+                'week_end' => $weekEnd->format('Y-m-d'),
+                'label' => $weekStart->format('d M'),
+                'units' => 0.0,
+            ];
+            $cursor->addWeek();
+        }
+
+        // Query TICKETLINES joined with TICKETS and CUSTOMERS where NAME = 'Coffee'
+        $t1 = microtime(true);
+        $coffeeData = DB::connection('pos')
+            ->table('TICKETLINES')
+            ->join('TICKETS', 'TICKETLINES.TICKET', '=', 'TICKETS.ID')
+            ->join('RECEIPTS', 'TICKETS.ID', '=', 'RECEIPTS.ID')
+            ->join('CUSTOMERS', 'TICKETS.CUSTOMER', '=', 'CUSTOMERS.ID')
+            ->whereIn('TICKETLINES.PRODUCT', $productIds)
+            ->where('CUSTOMERS.NAME', '=', 'Coffee')
+            ->where('RECEIPTS.DATENEW', '>=', $startRange)
+            ->where('RECEIPTS.DATENEW', '<=', $endOfCurrentWeek)
+            ->selectRaw('TICKETLINES.PRODUCT as product_id')
+            ->selectRaw("DATE_FORMAT(DATE_SUB(RECEIPTS.DATENEW, INTERVAL WEEKDAY(RECEIPTS.DATENEW) DAY), '%Y-%m-%d') as week_start")
+            ->selectRaw('SUM(ABS(TICKETLINES.UNITS)) as total_units')
+            ->groupBy('TICKETLINES.PRODUCT', 'week_start')
+            ->get();
+
+        \Log::debug('getBulkCoffeeCustomerWeeklySales: Query took '.round((microtime(true) - $t1) * 1000).'ms, found '.$coffeeData->count().' rows');
+
+        // Group data by product_id
+        $groupedData = $coffeeData->groupBy('product_id');
+
+        // Build result structure
+        $result = collect();
+        foreach ($productIds as $productId) {
+            $productWeeks = $weekBuckets;
+
+            $productData = $groupedData->get($productId, collect());
+            foreach ($productData as $weekData) {
+                if (isset($productWeeks[$weekData->week_start])) {
+                    $productWeeks[$weekData->week_start]['units'] = (float) $weekData->total_units;
+                }
+            }
+
+            $result[$productId] = array_values($productWeeks);
+        }
+
+        return $result;
+    }
+
+    /**
      * Get Christmas window comparison for multiple products in bulk.
      * Includes weekly breakdown data needed for chart visualization.
      *

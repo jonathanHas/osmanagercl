@@ -475,7 +475,7 @@ Quick stock management controls added to order review:
 For questions or issues with the Christmas Comparison feature:
 
 1. Check [Known Issues](../../development/known-issues.md)
-2. Review [Troubleshooting Guide](../../development/troubleshooting.md)
+2. Review [Troubleshooting Guide](../../troubleshooting/index.md)
 3. See [Order Generation Docs](./order-generation.md) for general order system
 4. Contact system administrator
 

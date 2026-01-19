@@ -77,6 +77,9 @@ class DeliveryLegacyController extends Controller
         $udeaIds = config('suppliers.external_links.udea.supplier_ids', [5, 44, 85]);
         $isUdea = in_array((int) $supplierId, $udeaIds) || in_array($supplierId, array_map('strval', $udeaIds));
 
+        // Calculate financial summaries for dashboard
+        $financials = $this->calculateFinancials($matchedItems, $scannedNotOnInvoice, $onInvoiceNotScanned, $isUdea);
+
         return view('delivery-legacy.match', compact(
             'matchedItems',
             'scannedNotOnInvoice',
@@ -84,7 +87,8 @@ class DeliveryLegacyController extends Controller
             'supplier',
             'deliveryId',
             'supplierId',
-            'isUdea'
+            'isUdea',
+            'financials'
         ));
     }
 
@@ -110,7 +114,8 @@ class DeliveryLegacyController extends Controller
                     supplier_link.CaseUnits,
                     delivery.caseUnits as invoiceCaseUnits,
                     b.barcode as scannedBarcode,
-                    b.scanned
+                    b.scanned,
+                    PRODUCTS.ID as productID
                 FROM delivery
                 LEFT JOIN supplier_link ON delivery.supCode = supplier_link.SupplierCode
                     AND supplier_link.SupplierID = ?
@@ -125,7 +130,7 @@ class DeliveryLegacyController extends Controller
                 ) b ON b.barcode = supplier_link.Barcode
                 WHERE supplier_link.SupplierID = ?
                 GROUP BY prodName, supCode, supplier_link.Barcode, rrPrice, PRICEBUY, PRICESELL,
-                         RATE, delivery.caseUnits, supplier_link.CaseUnits, b.barcode, b.scanned, UNITS
+                         RATE, delivery.caseUnits, supplier_link.CaseUnits, b.barcode, b.scanned, UNITS, PRODUCTS.ID
                 ORDER BY scanned DESC, margin ASC';
 
         $results = DB::connection('pos')->select($sql, [$supplierId, $deliveryId, $supplierId]);
@@ -146,7 +151,8 @@ class DeliveryLegacyController extends Controller
                     PRODUCTS.NAME,
                     PRODUCTS.PRICESELL,
                     TAXES.RATE,
-                    sl.SupplierCode
+                    sl.SupplierCode,
+                    PRODUCTS.ID as productID
                 FROM deliveriesScanItems
                 LEFT JOIN PRODUCTS ON PRODUCTS.CODE = deliveriesScanItems.barcode
                 LEFT JOIN TAXES ON PRODUCTS.TAXCAT = TAXES.ID
@@ -162,7 +168,7 @@ class DeliveryLegacyController extends Controller
                     AND supplier_link.Barcode IS NOT NULL
                     GROUP BY supplier_link.Barcode
                 )
-                GROUP BY deliveriesScanItems.barcode, PRODUCTS.NAME, PRODUCTS.PRICESELL, TAXES.RATE, sl.SupplierCode
+                GROUP BY deliveriesScanItems.barcode, PRODUCTS.NAME, PRODUCTS.PRICESELL, TAXES.RATE, sl.SupplierCode, PRODUCTS.ID
                 ORDER BY PRODUCTS.NAME';
 
         $results = DB::connection('pos')->select($sql, [$supplierId, $deliveryId, $supplierId, $supplierId]);
@@ -199,5 +205,67 @@ class DeliveryLegacyController extends Controller
         $results = DB::connection('pos')->select($sql, [$supplierId, $deliveryId]);
 
         return $results;
+    }
+
+    /**
+     * Calculate financial summaries for the dashboard.
+     */
+    private function calculateFinancials(array $matchedItems, array $scannedNotOnInvoice, array $onInvoiceNotScanned, bool $isUdea): array
+    {
+        $invoiceTotal = 0;
+        $scannedTotal = 0;
+        $verifiedCount = 0;
+        $mismatchCount = 0;
+        $marginAlerts = 0;
+        $missingValue = 0;
+        $extraValue = 0;
+
+        foreach ($matchedItems as $item) {
+            $cost = $item->cost ?? 0;
+            $caseUnits = $item->invoiceCaseUnits ?? 1;
+            $myOrder = $item->myOrder ?? 0;
+            $unitsDelivered = (fmod($myOrder, 1) == 0.0) ? $caseUnits * $myOrder : round($caseUnits * $myOrder);
+
+            $invoiceTotal += $cost * $unitsDelivered;
+
+            if ($item->scanned !== null) {
+                $scannedTotal += $cost * $item->scanned;
+                if (floatval($item->scanned) == $unitsDelivered) {
+                    $verifiedCount++;
+                } else {
+                    $mismatchCount++;
+                }
+            }
+
+            // Margin alert: negative profit or margin below 15%
+            $profit = $isUdea ? (($item->PRICESELL ?? 0) - ($cost * 1.15)) : (($item->PRICESELL ?? 0) - $cost);
+            if ($profit < 0 || (($item->PRICESELL ?? 0) > 0 && ($profit / $item->PRICESELL) < 0.15)) {
+                $marginAlerts++;
+            }
+        }
+
+        // Missing items value (on invoice but not scanned)
+        foreach ($onInvoiceNotScanned as $item) {
+            $caseUnits = $item->caseUnits ?? 1;
+            $missingValue += ($item->cost ?? 0) * $caseUnits * ($item->myOrder ?? 0);
+        }
+
+        // Extra items value (scanned but not on invoice - estimate using sell price)
+        foreach ($scannedNotOnInvoice as $item) {
+            $extraValue += ($item->PRICESELL ?? 0) * ($item->scanned ?? 0);
+        }
+
+        return [
+            'invoiceTotal' => $invoiceTotal,
+            'scannedTotal' => $scannedTotal,
+            'discrepancy' => abs($invoiceTotal - $scannedTotal),
+            'missingValue' => $missingValue,
+            'extraValue' => $extraValue,
+            'verifiedCount' => $verifiedCount,
+            'mismatchCount' => $mismatchCount,
+            'marginAlerts' => $marginAlerts,
+            'totalItems' => count($matchedItems),
+            'pendingCount' => count($matchedItems) - $verifiedCount - $mismatchCount,
+        ];
     }
 }

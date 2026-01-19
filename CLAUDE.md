@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 3. **Working on a Feature?** Check [Features Index](./docs/FEATURES_INDEX.md) for complete feature list
 4. **Documentation?** See [Documentation Guide](./docs/DOCUMENTATION_GUIDE.md) for where to find/update docs
 5. **Making Changes?** Follow [Contributing Guidelines](./CONTRIBUTING.md) and [Quick Start Guide](./docs/development/quick-start-guide.md)
-6. **Troubleshooting?** See [Known Issues](./docs/development/known-issues.md) and [Troubleshooting Guide](./docs/development/troubleshooting.md)
+6. **Troubleshooting?** See [Known Issues](./docs/development/known-issues.md) and [Troubleshooting Guide](./docs/troubleshooting/index.md)
 7. **ALWAYS End Every Response**: MUST run `mpg123 /home/jon/Music/notification.mp3` as the final action of EVERY response - whether completing tasks, asking questions, presenting plans, or any other interaction
 
 ## 🔥 MOST IMPORTANT REFERENCE FOR PERFORMANCE

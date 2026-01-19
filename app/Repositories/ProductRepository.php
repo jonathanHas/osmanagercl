@@ -343,12 +343,15 @@ class ProductRepository
 
     /**
      * Get all categories that have products for dropdown filter.
+     *
+     * Note: This returns ALL categories regardless of CATSHOWNAME (till visibility).
+     * CATSHOWNAME controls what appears on the POS till, not what should appear
+     * in product management dropdowns.
      */
     public function getAllCategoriesWithProducts(
         ?bool $activeOnly = null,
         ?bool $stockedOnly = null,
-        ?bool $inStockOnly = null,
-        ?bool $showHidden = null
+        ?bool $inStockOnly = null
     ): SupportCollection {
         $query = DB::connection('pos')
             ->table('CATEGORIES')
@@ -379,10 +382,8 @@ class ProductRepository
                 }
             });
 
-        // Only filter by CATSHOWNAME if not showing hidden categories
-        if ($showHidden !== true) {
-            $query->where('CATSHOWNAME', 1);
-        }
+        // No longer filter by CATSHOWNAME - show all categories for product management
+        // CATSHOWNAME only controls POS till visibility, not product management dropdowns
 
         return $query->select('CATEGORIES.ID', 'CATEGORIES.NAME', 'CATEGORIES.PARENTID', 'CATEGORIES.CATSHOWNAME')
             ->orderBy('CATEGORIES.NAME')

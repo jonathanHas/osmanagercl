@@ -112,7 +112,7 @@ All deployment scripts are now organized in `scripts/deployment/` with comprehen
 
 - **[Feature Documentation](../features/)** - Individual feature setup guides
 - **[Performance Optimization](../development/performance-optimization-guide.md)** - Speed improvements
-- **[Troubleshooting Guide](../development/troubleshooting.md)** - General issue resolution
+- **[Troubleshooting Guide](../troubleshooting/index.md)** - General issue resolution
 - **[Sales Data Import Plan](../features/sales-data-import-plan.md)** - Performance optimization patterns
 
 ---

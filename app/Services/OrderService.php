@@ -236,6 +236,11 @@ class OrderService
         $allWeeklySales = $this->salesRepository->getBulkProductWeeklySales($productIds, $salesHistoryWeeks);
         \Log::info('Order generation: Weekly sales fetched in '.round((microtime(true) - $t2) * 1000).'ms');
 
+        // Pre-fetch Coffee customer weekly sales in bulk (sales TO the coffee department)
+        $tCoffee = microtime(true);
+        $allCoffeeWeeklySales = $this->salesRepository->getBulkCoffeeCustomerWeeklySales($productIds, $salesHistoryWeeks);
+        \Log::info('Order generation: Coffee customer weekly sales fetched in '.round((microtime(true) - $tCoffee) * 1000).'ms');
+
         // Pre-fetch all stock levels in bulk (already eager loaded, but this ensures consistency)
         $t3 = microtime(true);
         $allStock = StockCurrent::whereIn('PRODUCT', $productIds)
@@ -320,6 +325,7 @@ class OrderService
                     'settings' => $allSettings[$product->ID] ?? null,
                     'sales_stats' => $allSalesStats[$product->ID] ?? null,
                     'weekly_sales' => $allWeeklySales[$product->ID] ?? [],
+                    'coffee_weekly_sales' => $allCoffeeWeeklySales[$product->ID] ?? [],
                     'current_stock' => isset($allStock[$product->ID])
                         ? (float) ($allStock[$product->ID]->UNITS ?? 0)
                         : null,
@@ -454,6 +460,9 @@ class OrderService
         if ($peakWeeklySales <= 0 && $avgWeeklySales > 0) {
             $peakWeeklySales = $avgWeeklySales;
         }
+
+        // Coffee customer weekly sales (products sold/transferred to coffee department)
+        $coffeeWeeklySales = $prefetchedData['coffee_weekly_sales'] ?? [];
 
         // Use pre-fetched stock if available, otherwise query
         $currentStock = $prefetchedData['current_stock'] ?? $this->getCurrentStock($product->ID);
@@ -615,6 +624,7 @@ class OrderService
                 'total_sales_6m' => $totalSales6m,
                 'sales_history' => $salesHistory,
                 'weekly_sales' => $weeklySales,
+                'coffee_weekly_sales' => $coffeeWeeklySales,
                 'peak_weekly_sales' => round($peakWeeklySales, 2),
                 'weekly_sales_total' => round($weeklySalesTotal, 2),
                 'weekly_sales_window_weeks' => $weeksWindow,

@@ -395,4 +395,4 @@ if ($lastMonitorCheck->diffInSeconds(now()) >= 3) {
 ## Related Documentation
 - [POS Integration](./pos-integration.md)
 - [Performance Optimization Guide](../development/performance-optimization-guide.md)
-- [Troubleshooting Guide](../development/troubleshooting.md)
+- [Troubleshooting Guide](../troubleshooting/index.md)

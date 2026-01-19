@@ -836,9 +836,138 @@ async function updateProductCost(productId, newCost, productName) {
 
 ---
 
-**Last Updated**: 2025-08-08  
-**System Status**: ✅ Fully Operational  
-**Test Coverage**: Manual testing completed  
-**Performance**: Tested with 292-item deliveries  
-**Recent Enhancement**: Cost update improvements, modal enhancements  
+---
+
+### 2026-01-18 - Delivery Legacy Invoice Match Page Redesign
+
+#### Complete UX Overhaul for Invoice Verification Interface
+
+**Enhancement**: Full redesign of the `/delivery-legacy/match` page to transform raw data tables into an actionable verification interface.
+
+**New Features Implemented**:
+
+1. **Financial Dashboard** (6 cards):
+   - **Invoice Total**: Sum of all expected delivery costs
+   - **Scanned Total**: Value of items actually scanned
+   - **Discrepancy**: Absolute difference between invoice and scanned values
+   - **Missing Value**: Cost of items on invoice but not scanned
+   - **Extra Value**: Estimated value of scanned items not on invoice
+   - **Margin Alerts**: Count of items with concerning profit margins (<15%)
+
+2. **Progress Bar**:
+   - Visual verification progress indicator
+   - Shows verified/total items count
+   - Green fill proportional to verification completion
+
+3. **Quick Filter Buttons** (Alpine.js):
+   - **All Items**: Show all data across all sections
+   - **Problems Only**: Filter to show only Critical Issues and Warnings
+   - **Verified Only**: Show only successfully verified items
+   - Real-time filtering without page reload
+
+4. **Issues-First Collapsible Sections**:
+   - **Critical Issues** (Red): Quantity mismatches between invoice and scanned amounts
+   - **Warnings** (Yellow): Margin alerts and case unit discrepancies
+   - **Verified Items** (Green): Perfect matches - collapsed by default
+   - **Pending Items** (Gray): Items not yet scanned
+   - **Extra Items** (Orange): Scanned items not on invoice
+   - **Missing Items** (Red): Invoice items not scanned
+   - Each section has expand/collapse toggle with item counts
+
+5. **Simplified Table View** (default):
+   - **Product Name**: Description of item
+   - **Expected**: Quantity on invoice
+   - **Scanned**: Quantity scanned
+   - **Diff**: Difference between expected and scanned
+   - **Stock**: Current stock level (always visible for verification)
+
+6. **Detailed Table View** (via "Show Details" toggle):
+   - Adds additional columns: VAT, Barcode, Cost, Sell, Margin
+   - Provides full data when needed for investigation
+
+7. **Action Buttons** (UI only - future functionality):
+   - Verify button for confirming items
+   - Flag button for marking items for review
+
+**Technical Implementation**:
+
+**Controller Enhancements** (`DeliveryLegacyController.php`):
+```php
+private function calculateFinancials(array $matchedItems, array $scannedNotOnInvoice, array $onInvoiceNotScanned, bool $isUdea): array
+{
+    // Calculates: invoiceTotal, scannedTotal, discrepancy, missingValue,
+    // extraValue, verifiedCount, mismatchCount, marginAlerts, totalItems, pendingCount
+    // Handles UDEA 15% delivery charge adjustment for margin calculations
+}
+```
+
+**View Structure** (`match.blade.php`):
+- Uses Alpine.js `x-data` wrapper for reactive filtering and toggle states
+- Collapsible sections using `x-collapse` directive
+- Conditional display using `x-show` and `x-if` directives
+- Stock column moved out of `showDetails` conditional for constant visibility
+
+**Layout Change**:
+- Changed from `<x-app-layout>` to `<x-admin-layout>` for sidebar navigation
+- Both `index.blade.php` and `match.blade.php` now use admin layout
+
+#### Impact & Benefits
+- ✅ **Prioritized Issues**: Problems surface first, verified items hidden by default
+- ✅ **Financial Visibility**: Instant view of cost discrepancies and margin concerns
+- ✅ **Faster Verification**: Quick filters and collapsible sections speed up workflow
+- ✅ **Simplified Default View**: Focus on essential data, expand for details when needed
+- ✅ **Stock Visibility**: Stock column always visible to help verify scan status
+- ✅ **Consistent Navigation**: Sidebar navigation matches rest of application
+
+---
+
+---
+
+### 2026-01-19 - Product Link Improvements
+
+#### Fixed Product Navigation in Delivery Legacy Match Page
+
+**Problem Resolved**: Product links were broken because they used the barcode (EAN) instead of the product UUID.
+
+**Root Cause**:
+- SQL queries selected `supplier_link.Barcode` but the `products.show`/`products.edit` routes expect the product's UUID (`PRODUCTS.ID`)
+- Links generated URLs like `/products/5060184240000` (barcode) instead of `/products/3f783168-2bbd-4d6a-8bc5-2e8aa01979ae` (UUID)
+
+**Solution Implemented**:
+
+1. **SQL Query Updates** (`DeliveryLegacyController.php`):
+   - Added `PRODUCTS.ID as productID` to `getMatchedItems()` SELECT and GROUP BY
+   - Added `PRODUCTS.ID as productID` to `getScannedNotOnInvoice()` SELECT and GROUP BY
+
+2. **View Updates** (`match.blade.php`):
+   - Changed route from `products.show` to `products.edit` for direct editing
+   - Changed link parameter from `$item->Barcode` to `$item->productID`
+   - Added `target="_blank"` to all product links for new tab opening
+   - Updated conditions from `@if($item->Barcode)` to `@if($item->productID)`
+
+**Code Changes**:
+```php
+// Controller - Added to SQL SELECT clauses
+PRODUCTS.ID as productID
+
+// View - Updated product links
+<a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="...">
+```
+
+**Additional Enhancement**:
+- Case unit mismatch badge now shows actual values: `Case: 6 → 5` instead of just `Case units changed`
+
+#### Impact & Benefits
+- ✅ **Working Links**: Product links now correctly navigate to product edit pages
+- ✅ **Direct Editing**: Goes straight to edit page instead of show page
+- ✅ **Easy Return**: New tab opening allows users to stay on delivery page
+- ✅ **Better Diagnostics**: Case unit changes show actual invoice vs system values
+
+---
+
+**Last Updated**: 2026-01-19
+**System Status**: ✅ Fully Operational
+**Test Coverage**: Manual testing completed
+**Performance**: Tested with 292-item deliveries
+**Recent Enhancement**: Product link fixes with UUID support and new tab navigation
 **New Features**: Price comparison matrix, bulk cost updates, quick price editing, professional table sorting, enhanced product navigation, inline cost editing

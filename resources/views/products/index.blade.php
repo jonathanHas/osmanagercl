@@ -103,12 +103,6 @@
                         'label' => 'Show suppliers',
                         'type' => 'checkbox',
                         'checked' => $showSuppliers
-                    ],
-                    [
-                        'name' => 'show_hidden_categories',
-                        'label' => 'Show hidden categories',
-                        'type' => 'checkbox',
-                        'checked' => $showHiddenCategories
                     ]
                 ]">
                 
@@ -134,8 +128,8 @@
                         <select name="category_id" id="category_id" class="rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600">
                             <option value="">All Categories</option>
                             @foreach($categories as $category)
-                                <option value="{{ $category->ID }}" {{ $categoryId == $category->ID ? 'selected' : '' }} class="{{ !$category->CATSHOWNAME ? 'text-gray-400' : '' }}">
-                                    {{ $category->NAME }}{{ !$category->CATSHOWNAME ? ' (hidden)' : '' }}
+                                <option value="{{ $category->ID }}" {{ $categoryId == $category->ID ? 'selected' : '' }}>
+                                    {{ $category->NAME }}
                                 </option>
                             @endforeach
                         </select>
@@ -313,9 +307,21 @@
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                                                     </svg>
                                                 </button>
-                                                <x-action-buttons :actions="[
-                                                    ['type' => 'link', 'route' => 'products.show', 'params' => $product->ID, 'label' => 'View', 'color' => 'primary']
-                                                ]" />
+                                                <a href="{{ route('products.show', $product->ID) }}"
+                                                   class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                                                   title="View Product">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                                    </svg>
+                                                </a>
+                                                <a href="{{ route('products.edit', $product->ID) }}"
+                                                   class="text-amber-600 hover:text-amber-900 dark:text-amber-400 dark:hover:text-amber-300"
+                                                   title="Edit Product">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                                    </svg>
+                                                </a>
                                             </div>
                                         </td>
                                     </tr>

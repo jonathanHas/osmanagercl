@@ -110,7 +110,6 @@ class ProductController extends Controller
         $supplierId = $request->get('supplier_id');
         $categoryId = $request->get('category_id');
         $showSuppliers = $request->boolean('show_suppliers');
-        $showHiddenCategories = $request->boolean('show_hidden_categories');
         $perPage = $request->get('per_page', 20);
 
         // Get suppliers for dropdown (always load for immediate availability when checkbox is toggled)
@@ -120,12 +119,12 @@ class ProductController extends Controller
             activeOnly: $activeOnly
         );
 
-        // Get categories for dropdown, filtered by current search criteria
+        // Get categories for dropdown - shows ALL categories regardless of till visibility
+        // CATSHOWNAME controls POS till display, not product management
         $categories = $this->productRepository->getAllCategoriesWithProducts(
             activeOnly: $activeOnly,
             stockedOnly: $stockedOnly,
-            inStockOnly: $inStockOnly,
-            showHidden: $showHiddenCategories
+            inStockOnly: $inStockOnly
         );
 
         if ($search || $activeOnly || $stockedOnly || $inStockOnly || $supplierId || $categoryId) {
@@ -157,7 +156,6 @@ class ProductController extends Controller
             'supplierId' => $supplierId,
             'categoryId' => $categoryId,
             'showSuppliers' => $showSuppliers,
-            'showHiddenCategories' => $showHiddenCategories,
             'suppliers' => $suppliers,
             'categories' => $categories,
             'supplierService' => $this->supplierService,
@@ -324,6 +322,10 @@ class ProductController extends Controller
 
         $weeklySales = $this->salesRepository->getProductWeeklySales($id, $weeks, forceLiveData: true);
 
+        // Get coffee customer sales (products sold/transferred to coffee department)
+        $coffeeSalesData = $this->salesRepository->getBulkCoffeeCustomerWeeklySales([$id], $weeks);
+        $coffeeWeeklySales = $coffeeSalesData[$id] ?? [];
+
         // Calculate statistics
         $salesValues = array_map(fn ($w) => (float) ($w['units'] ?? 0), $weeklySales);
         $nonZeroSales = array_filter($salesValues, fn ($v) => $v > 0);
@@ -331,15 +333,21 @@ class ProductController extends Controller
         $peakSales = ! empty($salesValues) ? max($salesValues) : 0;
         $avgSales = count($nonZeroSales) > 0 ? $totalSales / count($nonZeroSales) : 0;
 
+        // Calculate coffee statistics
+        $coffeeValues = array_map(fn ($w) => (float) ($w['units'] ?? 0), $coffeeWeeklySales);
+        $totalCoffeeSales = array_sum($coffeeValues);
+
         return response()->json([
             'weeks' => $weeks,
             'weeklySales' => $weeklySales,
+            'coffeeWeeklySales' => $coffeeWeeklySales,
             'productName' => $product->NAME,
             'stats' => [
                 'total' => round($totalSales, 1),
                 'peak' => round($peakSales, 1),
                 'average' => round($avgSales, 1),
                 'weeksWithSales' => count($nonZeroSales),
+                'totalCoffeeSales' => round($totalCoffeeSales, 1),
             ],
         ]);
     }

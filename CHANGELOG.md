@@ -7,7 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **🔗 Delivery Legacy Match Page - Product Link Fixes** (2026-01-19)
+  - **Correct Product URLs**: Product links now use UUID (`productID`) instead of barcode, fixing broken links
+  - **Edit Page Navigation**: Links now go to `/products/{uuid}/edit` instead of show page for direct editing
+  - **New Tab Opening**: All product links open in new tabs (`target="_blank"`) so users can easily return to delivery
+  - **Case Unit Values Display**: "Case units changed" badge now shows actual values (e.g., "Case: 6 → 5")
+  - **Files Modified**:
+    - `app/Http/Controllers/DeliveryLegacyController.php` - Added `PRODUCTS.ID as productID` to SQL queries
+    - `resources/views/delivery-legacy/match.blade.php` - Updated links to use productID with target="_blank"
+
 ### Added
+
+- **📦 Delivery Legacy Page Redesign** (2026-01-18)
+  - **Financial Dashboard**: 6-card overview showing Invoice Total, Scanned Total, Discrepancy, Missing Value, Extra Value, and Margin Alerts
+  - **Progress Bar**: Visual verification progress with verified/total item counts
+  - **Quick Filters**: Alpine.js-powered buttons for All Items, Problems Only, and Verified Only views
+  - **Issues-First Layout**: Collapsible sections prioritized by severity (Critical, Warnings, Verified, Pending, Extra, Missing)
+  - **Simplified Tables**: Default view shows Product, Expected, Scanned, Diff, Stock columns
+  - **Detailed View Toggle**: "Show Details" checkbox reveals VAT, Barcode, Cost, Sell, Margin columns
+  - **Stock Column Always Visible**: Moved from details toggle to always-on for easier verification
+  - **Admin Layout Integration**: Added sidebar navigation matching rest of application
+  - **Files Modified**:
+    - `app/Http/Controllers/DeliveryLegacyController.php` - Added `calculateFinancials()` method
+    - `resources/views/delivery-legacy/match.blade.php` - Complete redesign with Alpine.js interactivity
+    - `resources/views/delivery-legacy/index.blade.php` - Changed to admin layout
 
 - **👁️ Category Visibility Management** (2026-01-14)
   - **Products Page Toggle**: New "Show hidden categories" checkbox to include all categories in the dropdown filter

@@ -2029,6 +2029,14 @@
                     $weekUnitsRaw = array_pad($weekUnitsRaw, count($weekLabels), 0.0);
                 }
                 $weekUnits = array_map(static fn ($value) => round($value, 2), $weekUnitsRaw);
+                // Coffee customer weekly sales (products sold/transferred to coffee department)
+                $coffeeWeeklySales = $contextData['coffee_weekly_sales'] ?? [];
+                $coffeeWeekUnitsRaw = array_map(static fn ($week) => (float) ($week['units'] ?? 0), $coffeeWeeklySales);
+                if (count($coffeeWeekUnitsRaw) !== count($weekLabels)) {
+                    $coffeeWeekUnitsRaw = array_pad($coffeeWeekUnitsRaw, count($weekLabels), 0.0);
+                }
+                $coffeeWeekUnits = array_map(static fn ($value) => round($value, 2), $coffeeWeekUnitsRaw);
+                $hasCoffeeSales = array_sum($coffeeWeekUnits) > 0;
                 $currentStockValue = (float) ($contextData['current_stock'] ?? 0);
                 $caseUnitsValue = (float) ($contextData['case_units'] ?? 1);
                 $isCaseProductValue = (bool) ($contextData['is_case_product'] ?? ($caseUnitsValue > 1));
@@ -2053,6 +2061,8 @@
 
                 const labels = @json($weekLabels);
                 const dataPoints = @json($weekUnits);
+                const coffeeDataPoints = @json($coffeeWeekUnits);
+                const hasCoffeeSales = {{ $hasCoffeeSales ? 'true' : 'false' }};
                 const averageUnits = {{ $avgWeeklySalesValue }};
                 const currentStock = {{ $currentStockValue }};
                 const afterStock = {{ $afterStockValue }};
@@ -2065,6 +2075,7 @@
 
                 const extendedLabels = labels.concat(['Current stock', 'After order']);
                 const salesData = dataPoints.concat([null, null]);
+                const coffeeData = coffeeDataPoints.concat([null, null]);
                 const averageLineData = labels.map(() => averageUnits).concat([null, null]);
                 const minStockLineData = minStockOverride !== null ? labels.map(() => minStockOverride).concat([null, null]) : null;
 
@@ -2085,7 +2096,8 @@
                 afterStockData[extendedLabels.length - 1] = afterStock;
 
                 const salesMax = dataPoints.length ? Math.max(...dataPoints) : 0;
-                const chartMax = Math.max(salesMax, currentStock, afterStock, peakWeeklySales, averageUnits, minStockOverride || 0, 1);
+                const coffeeMax = coffeeDataPoints.length ? Math.max(...coffeeDataPoints) : 0;
+                const chartMax = Math.max(salesMax, coffeeMax, currentStock, afterStock, peakWeeklySales, averageUnits, minStockOverride || 0, 1);
                 const chartMin = Math.min(0, currentStock, afterStock);
 
                 // Build datasets array
@@ -2117,6 +2129,38 @@
                         tension: 0,
                         spanGaps: true,
                         order: 0
+                    });
+                }
+
+                // Add Coffee department sales line if there are any coffee sales
+                if (hasCoffeeSales) {
+                    const coffeeColor = 'rgb(168, 85, 247)'; // Purple
+                    const coffeePointColors = coffeeDataPoints.map(value => value === 0 ? greyColor : coffeeColor);
+                    coffeePointColors.push('transparent', 'transparent');
+                    datasets.push({
+                        label: 'Coffee dept',
+                        data: coffeeData,
+                        borderColor: coffeeColor,
+                        backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                        pointBackgroundColor: coffeePointColors,
+                        pointBorderColor: coffeePointColors,
+                        pointRadius: coffeeDataPoints.map(value => value === 0 ? 2 : 3).concat([0, 0]),
+                        pointHoverRadius: coffeeDataPoints.map(value => value === 0 ? 3 : 5).concat([0, 0]),
+                        segment: {
+                            borderColor: ctx => {
+                                const prevValue = ctx.p0.parsed.y;
+                                const currValue = ctx.p1.parsed.y;
+                                if (prevValue === 0 || currValue === 0) {
+                                    return greyColor;
+                                }
+                                return coffeeColor;
+                            }
+                        },
+                        tension: 0.4,
+                        fill: false,
+                        borderWidth: 1.5,
+                        spanGaps: false,
+                        order: 1
                     });
                 }
 
@@ -2221,6 +2265,16 @@
                                                 return '⚠️ 0 units sold (no sales)';
                                             }
                                             return value + ' units sold';
+                                        }
+                                        if (context.dataset.label === 'Coffee dept') {
+                                            const value = Math.round(context.parsed.y);
+                                            if (Number.isNaN(value)) {
+                                                return null;
+                                            }
+                                            if (value === 0) {
+                                                return null; // Don't show coffee line if 0
+                                            }
+                                            return '☕ ' + value + ' to coffee';
                                         }
 
                                         if (context.dataset.label === 'Current stock') {
@@ -3030,7 +3084,7 @@
                     }
 
                     const data = await response.json();
-                    renderChart(data.weeklySales);
+                    renderChart(data.weeklySales, data.coffeeWeeklySales || []);
                     updateStats(data.stats);
                     currentWeeks = data.weeks;
                     updateWeeksDisplay();
@@ -3042,34 +3096,58 @@
                 }
             }
 
-            function renderChart(weeklySales) {
+            function renderChart(weeklySales, coffeeWeeklySales = []) {
                 const labels = weeklySales.map(w => w.label);
                 const dataPoints = weeklySales.map(w => parseFloat(w.units) || 0);
-                const maxSales = Math.max(...dataPoints, 1);
+                const coffeeDataPoints = coffeeWeeklySales.map(w => parseFloat(w.units) || 0);
+                const hasCoffeeSales = coffeeDataPoints.some(v => v > 0);
+                const maxSales = Math.max(...dataPoints, ...(hasCoffeeSales ? coffeeDataPoints : []), 1);
 
                 if (modalChart) {
                     modalChart.destroy();
                 }
 
                 const ctx = chartCanvas.getContext('2d');
+
+                // Build datasets array
+                const datasets = [{
+                    label: 'Weekly Sales',
+                    data: dataPoints,
+                    borderColor: 'rgb(79, 70, 229)',
+                    backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: true,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: 'rgb(79, 70, 229)',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                }];
+
+                // Add coffee department sales if there are any
+                if (hasCoffeeSales) {
+                    datasets.push({
+                        label: 'Coffee dept',
+                        data: coffeeDataPoints,
+                        borderColor: 'rgb(168, 85, 247)',
+                        backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: false,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: 'rgb(168, 85, 247)',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                    });
+                }
+
                 modalChart = new Chart(ctx, {
                     type: 'line',
                     data: {
                         labels: labels,
-                        datasets: [{
-                            label: 'Weekly Sales',
-                            data: dataPoints,
-                            borderColor: 'rgb(79, 70, 229)',
-                            backgroundColor: 'rgba(79, 70, 229, 0.1)',
-                            borderWidth: 2,
-                            tension: 0.3,
-                            fill: true,
-                            pointRadius: 4,
-                            pointHoverRadius: 6,
-                            pointBackgroundColor: 'rgb(79, 70, 229)',
-                            pointBorderColor: '#fff',
-                            pointBorderWidth: 2,
-                        }]
+                        datasets: datasets
                     },
                     options: {
                         responsive: true,
@@ -3080,7 +3158,13 @@
                         },
                         plugins: {
                             legend: {
-                                display: false
+                                display: hasCoffeeSales, // Show legend when there are multiple datasets
+                                position: 'top',
+                                labels: {
+                                    usePointStyle: true,
+                                    padding: 15,
+                                    font: { size: 12 }
+                                }
                             },
                             tooltip: {
                                 backgroundColor: 'rgba(15, 23, 42, 0.9)',
@@ -3089,7 +3173,8 @@
                                 padding: 12,
                                 callbacks: {
                                     label: function(context) {
-                                        return `Sales: ${context.parsed.y.toFixed(1)} units`;
+                                        const label = context.dataset.label || 'Sales';
+                                        return `${label}: ${context.parsed.y.toFixed(1)} units`;
                                     }
                                 }
                             }
