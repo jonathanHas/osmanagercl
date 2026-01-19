@@ -322,9 +322,10 @@ class ProductController extends Controller
 
         $weeklySales = $this->salesRepository->getProductWeeklySales($id, $weeks, forceLiveData: true);
 
-        // Get coffee customer sales (products sold/transferred to coffee department)
-        $coffeeSalesData = $this->salesRepository->getBulkCoffeeCustomerWeeklySales([$id], $weeks);
-        $coffeeWeeklySales = $coffeeSalesData[$id] ?? [];
+        // Get coffee and kitchen customer sales in ONE query
+        $internalSales = $this->salesRepository->getBulkInternalCustomerWeeklySales([$id], $weeks);
+        $coffeeWeeklySales = $internalSales['coffee'][$id] ?? [];
+        $kitchenWeeklySales = $internalSales['kitchen'][$id] ?? [];
 
         // Calculate statistics
         $salesValues = array_map(fn ($w) => (float) ($w['units'] ?? 0), $weeklySales);
@@ -333,14 +334,17 @@ class ProductController extends Controller
         $peakSales = ! empty($salesValues) ? max($salesValues) : 0;
         $avgSales = count($nonZeroSales) > 0 ? $totalSales / count($nonZeroSales) : 0;
 
-        // Calculate coffee statistics
+        // Calculate coffee and kitchen statistics
         $coffeeValues = array_map(fn ($w) => (float) ($w['units'] ?? 0), $coffeeWeeklySales);
         $totalCoffeeSales = array_sum($coffeeValues);
+        $kitchenValues = array_map(fn ($w) => (float) ($w['units'] ?? 0), $kitchenWeeklySales);
+        $totalKitchenSales = array_sum($kitchenValues);
 
         return response()->json([
             'weeks' => $weeks,
             'weeklySales' => $weeklySales,
             'coffeeWeeklySales' => $coffeeWeeklySales,
+            'kitchenWeeklySales' => $kitchenWeeklySales,
             'productName' => $product->NAME,
             'stats' => [
                 'total' => round($totalSales, 1),
@@ -348,6 +352,7 @@ class ProductController extends Controller
                 'average' => round($avgSales, 1),
                 'weeksWithSales' => count($nonZeroSales),
                 'totalCoffeeSales' => round($totalCoffeeSales, 1),
+                'totalKitchenSales' => round($totalKitchenSales, 1),
             ],
         ]);
     }

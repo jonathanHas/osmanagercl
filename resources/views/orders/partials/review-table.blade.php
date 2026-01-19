@@ -2037,6 +2037,14 @@
                 }
                 $coffeeWeekUnits = array_map(static fn ($value) => round($value, 2), $coffeeWeekUnitsRaw);
                 $hasCoffeeSales = array_sum($coffeeWeekUnits) > 0;
+                // Kitchen customer weekly sales (products sold/transferred to kitchen)
+                $kitchenWeeklySales = $contextData['kitchen_weekly_sales'] ?? [];
+                $kitchenWeekUnitsRaw = array_map(static fn ($week) => (float) ($week['units'] ?? 0), $kitchenWeeklySales);
+                if (count($kitchenWeekUnitsRaw) !== count($weekLabels)) {
+                    $kitchenWeekUnitsRaw = array_pad($kitchenWeekUnitsRaw, count($weekLabels), 0.0);
+                }
+                $kitchenWeekUnits = array_map(static fn ($value) => round($value, 2), $kitchenWeekUnitsRaw);
+                $hasKitchenSales = array_sum($kitchenWeekUnits) > 0;
                 $currentStockValue = (float) ($contextData['current_stock'] ?? 0);
                 $caseUnitsValue = (float) ($contextData['case_units'] ?? 1);
                 $isCaseProductValue = (bool) ($contextData['is_case_product'] ?? ($caseUnitsValue > 1));
@@ -2063,6 +2071,8 @@
                 const dataPoints = @json($weekUnits);
                 const coffeeDataPoints = @json($coffeeWeekUnits);
                 const hasCoffeeSales = {{ $hasCoffeeSales ? 'true' : 'false' }};
+                const kitchenDataPoints = @json($kitchenWeekUnits);
+                const hasKitchenSales = {{ $hasKitchenSales ? 'true' : 'false' }};
                 const averageUnits = {{ $avgWeeklySalesValue }};
                 const currentStock = {{ $currentStockValue }};
                 const afterStock = {{ $afterStockValue }};
@@ -2076,6 +2086,7 @@
                 const extendedLabels = labels.concat(['Current stock', 'After order']);
                 const salesData = dataPoints.concat([null, null]);
                 const coffeeData = coffeeDataPoints.concat([null, null]);
+                const kitchenData = kitchenDataPoints.concat([null, null]);
                 const averageLineData = labels.map(() => averageUnits).concat([null, null]);
                 const minStockLineData = minStockOverride !== null ? labels.map(() => minStockOverride).concat([null, null]) : null;
 
@@ -2097,7 +2108,8 @@
 
                 const salesMax = dataPoints.length ? Math.max(...dataPoints) : 0;
                 const coffeeMax = coffeeDataPoints.length ? Math.max(...coffeeDataPoints) : 0;
-                const chartMax = Math.max(salesMax, coffeeMax, currentStock, afterStock, peakWeeklySales, averageUnits, minStockOverride || 0, 1);
+                const kitchenMax = kitchenDataPoints.length ? Math.max(...kitchenDataPoints) : 0;
+                const chartMax = Math.max(salesMax, coffeeMax, kitchenMax, currentStock, afterStock, peakWeeklySales, averageUnits, minStockOverride || 0, 1);
                 const chartMin = Math.min(0, currentStock, afterStock);
 
                 // Build datasets array
@@ -2159,6 +2171,39 @@
                         tension: 0.4,
                         fill: false,
                         borderWidth: 1.5,
+                        spanGaps: false,
+                        order: 1
+                    });
+                }
+
+                // Add Kitchen department sales line if there are any kitchen sales
+                if (hasKitchenSales) {
+                    const kitchenColor = 'rgb(249, 115, 22)'; // Orange (distinct from Coffee purple and Sales colors)
+                    const kitchenPointColors = kitchenDataPoints.map(value => value === 0 ? greyColor : kitchenColor);
+                    kitchenPointColors.push('transparent', 'transparent');
+                    datasets.push({
+                        label: 'Kitchen',
+                        data: kitchenData,
+                        borderColor: kitchenColor,
+                        backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                        pointBackgroundColor: kitchenPointColors,
+                        pointBorderColor: kitchenPointColors,
+                        pointRadius: kitchenDataPoints.map(value => value === 0 ? 2 : 3).concat([0, 0]),
+                        pointHoverRadius: kitchenDataPoints.map(value => value === 0 ? 3 : 5).concat([0, 0]),
+                        segment: {
+                            borderColor: ctx => {
+                                const prevValue = ctx.p0.parsed.y;
+                                const currValue = ctx.p1.parsed.y;
+                                if (prevValue === 0 || currValue === 0) {
+                                    return greyColor;
+                                }
+                                return kitchenColor;
+                            }
+                        },
+                        tension: 0.4,
+                        fill: false,
+                        borderWidth: 1.5,
+                        borderDash: [4, 2], // Dashed line to distinguish from Coffee
                         spanGaps: false,
                         order: 1
                     });
@@ -2275,6 +2320,16 @@
                                                 return null; // Don't show coffee line if 0
                                             }
                                             return '☕ ' + value + ' to coffee';
+                                        }
+                                        if (context.dataset.label === 'Kitchen') {
+                                            const value = Math.round(context.parsed.y);
+                                            if (Number.isNaN(value)) {
+                                                return null;
+                                            }
+                                            if (value === 0) {
+                                                return null; // Don't show kitchen line if 0
+                                            }
+                                            return '🍳 ' + value + ' to kitchen';
                                         }
 
                                         if (context.dataset.label === 'Current stock') {
@@ -3084,7 +3139,7 @@
                     }
 
                     const data = await response.json();
-                    renderChart(data.weeklySales, data.coffeeWeeklySales || []);
+                    renderChart(data.weeklySales, data.coffeeWeeklySales || [], data.kitchenWeeklySales || []);
                     updateStats(data.stats);
                     currentWeeks = data.weeks;
                     updateWeeksDisplay();
@@ -3096,12 +3151,15 @@
                 }
             }
 
-            function renderChart(weeklySales, coffeeWeeklySales = []) {
+            function renderChart(weeklySales, coffeeWeeklySales = [], kitchenWeeklySales = []) {
                 const labels = weeklySales.map(w => w.label);
                 const dataPoints = weeklySales.map(w => parseFloat(w.units) || 0);
                 const coffeeDataPoints = coffeeWeeklySales.map(w => parseFloat(w.units) || 0);
+                const kitchenDataPoints = kitchenWeeklySales.map(w => parseFloat(w.units) || 0);
                 const hasCoffeeSales = coffeeDataPoints.some(v => v > 0);
-                const maxSales = Math.max(...dataPoints, ...(hasCoffeeSales ? coffeeDataPoints : []), 1);
+                const hasKitchenSales = kitchenDataPoints.some(v => v > 0);
+                const hasInternalSales = hasCoffeeSales || hasKitchenSales;
+                const maxSales = Math.max(...dataPoints, ...(hasCoffeeSales ? coffeeDataPoints : []), ...(hasKitchenSales ? kitchenDataPoints : []), 1);
 
                 if (modalChart) {
                     modalChart.destroy();
@@ -3143,6 +3201,25 @@
                     });
                 }
 
+                // Add kitchen department sales if there are any
+                if (hasKitchenSales) {
+                    datasets.push({
+                        label: 'Kitchen',
+                        data: kitchenDataPoints,
+                        borderColor: 'rgb(249, 115, 22)',
+                        backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: false,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: 'rgb(249, 115, 22)',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        borderDash: [4, 2], // Dashed line to distinguish from Coffee
+                    });
+                }
+
                 modalChart = new Chart(ctx, {
                     type: 'line',
                     data: {
@@ -3158,7 +3235,7 @@
                         },
                         plugins: {
                             legend: {
-                                display: hasCoffeeSales, // Show legend when there are multiple datasets
+                                display: hasInternalSales, // Show legend when there are Coffee or Kitchen datasets
                                 position: 'top',
                                 labels: {
                                     usePointStyle: true,

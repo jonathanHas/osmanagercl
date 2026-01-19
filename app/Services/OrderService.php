@@ -236,10 +236,12 @@ class OrderService
         $allWeeklySales = $this->salesRepository->getBulkProductWeeklySales($productIds, $salesHistoryWeeks);
         \Log::info('Order generation: Weekly sales fetched in '.round((microtime(true) - $t2) * 1000).'ms');
 
-        // Pre-fetch Coffee customer weekly sales in bulk (sales TO the coffee department)
-        $tCoffee = microtime(true);
-        $allCoffeeWeeklySales = $this->salesRepository->getBulkCoffeeCustomerWeeklySales($productIds, $salesHistoryWeeks);
-        \Log::info('Order generation: Coffee customer weekly sales fetched in '.round((microtime(true) - $tCoffee) * 1000).'ms');
+        // Pre-fetch Coffee AND Kitchen customer weekly sales in ONE bulk query
+        $tInternal = microtime(true);
+        $internalSales = $this->salesRepository->getBulkInternalCustomerWeeklySales($productIds, $salesHistoryWeeks);
+        $allCoffeeWeeklySales = $internalSales['coffee'];
+        $allKitchenWeeklySales = $internalSales['kitchen'];
+        \Log::info('Order generation: Internal customer weekly sales (Coffee+Kitchen) fetched in '.round((microtime(true) - $tInternal) * 1000).'ms');
 
         // Pre-fetch all stock levels in bulk (already eager loaded, but this ensures consistency)
         $t3 = microtime(true);
@@ -326,6 +328,7 @@ class OrderService
                     'sales_stats' => $allSalesStats[$product->ID] ?? null,
                     'weekly_sales' => $allWeeklySales[$product->ID] ?? [],
                     'coffee_weekly_sales' => $allCoffeeWeeklySales[$product->ID] ?? [],
+                    'kitchen_weekly_sales' => $allKitchenWeeklySales[$product->ID] ?? [],
                     'current_stock' => isset($allStock[$product->ID])
                         ? (float) ($allStock[$product->ID]->UNITS ?? 0)
                         : null,
@@ -461,8 +464,9 @@ class OrderService
             $peakWeeklySales = $avgWeeklySales;
         }
 
-        // Coffee customer weekly sales (products sold/transferred to coffee department)
+        // Internal customer weekly sales (products sold/transferred to Coffee and Kitchen)
         $coffeeWeeklySales = $prefetchedData['coffee_weekly_sales'] ?? [];
+        $kitchenWeeklySales = $prefetchedData['kitchen_weekly_sales'] ?? [];
 
         // Use pre-fetched stock if available, otherwise query
         $currentStock = $prefetchedData['current_stock'] ?? $this->getCurrentStock($product->ID);
@@ -625,6 +629,7 @@ class OrderService
                 'sales_history' => $salesHistory,
                 'weekly_sales' => $weeklySales,
                 'coffee_weekly_sales' => $coffeeWeeklySales,
+                'kitchen_weekly_sales' => $kitchenWeeklySales,
                 'peak_weekly_sales' => round($peakWeeklySales, 2),
                 'weekly_sales_total' => round($weeklySalesTotal, 2),
                 'weekly_sales_window_weeks' => $weeksWindow,

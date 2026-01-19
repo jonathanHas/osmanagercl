@@ -688,17 +688,20 @@ class SalesRepository
     }
 
     /**
-     * Get weekly sales TO the Coffee customer for multiple products in bulk.
-     * This tracks products sold/transferred to the coffee department (internal usage).
+     * Get weekly sales TO internal customers (Coffee and Kitchen) for multiple products in bulk.
+     * This tracks products sold/transferred to internal departments.
+     * Fetches BOTH Coffee and Kitchen in a single query for efficiency.
      *
      * @param  array  $productIds  Array of product IDs
      * @param  int  $weeksBack  Number of weeks to retrieve
-     * @return \Illuminate\Support\Collection Keyed by product_id, each containing array of weekly data
+     * @return array{coffee: \Illuminate\Support\Collection, kitchen: \Illuminate\Support\Collection}
      */
-    public function getBulkCoffeeCustomerWeeklySales(array $productIds, int $weeksBack = 8): \Illuminate\Support\Collection
+    public function getBulkInternalCustomerWeeklySales(array $productIds, int $weeksBack = 8): array
     {
+        $emptyResult = ['coffee' => collect(), 'kitchen' => collect()];
+
         if (empty($productIds)) {
-            return collect();
+            return $emptyResult;
         }
 
         $weeksBack = max(1, $weeksBack);
@@ -721,44 +724,64 @@ class SalesRepository
             $cursor->addWeek();
         }
 
-        // Query TICKETLINES joined with TICKETS and CUSTOMERS where NAME = 'Coffee'
+        // Query TICKETLINES for BOTH Coffee AND Kitchen in ONE query
         $t1 = microtime(true);
-        $coffeeData = DB::connection('pos')
+        $internalData = DB::connection('pos')
             ->table('TICKETLINES')
             ->join('TICKETS', 'TICKETLINES.TICKET', '=', 'TICKETS.ID')
             ->join('RECEIPTS', 'TICKETS.ID', '=', 'RECEIPTS.ID')
             ->join('CUSTOMERS', 'TICKETS.CUSTOMER', '=', 'CUSTOMERS.ID')
             ->whereIn('TICKETLINES.PRODUCT', $productIds)
-            ->where('CUSTOMERS.NAME', '=', 'Coffee')
+            ->whereIn('CUSTOMERS.NAME', ['Coffee', 'Kitchen'])
             ->where('RECEIPTS.DATENEW', '>=', $startRange)
             ->where('RECEIPTS.DATENEW', '<=', $endOfCurrentWeek)
             ->selectRaw('TICKETLINES.PRODUCT as product_id')
+            ->selectRaw('CUSTOMERS.NAME as customer_name')
             ->selectRaw("DATE_FORMAT(DATE_SUB(RECEIPTS.DATENEW, INTERVAL WEEKDAY(RECEIPTS.DATENEW) DAY), '%Y-%m-%d') as week_start")
             ->selectRaw('SUM(ABS(TICKETLINES.UNITS)) as total_units')
-            ->groupBy('TICKETLINES.PRODUCT', 'week_start')
+            ->groupBy('TICKETLINES.PRODUCT', 'CUSTOMERS.NAME', 'week_start')
             ->get();
 
-        \Log::debug('getBulkCoffeeCustomerWeeklySales: Query took '.round((microtime(true) - $t1) * 1000).'ms, found '.$coffeeData->count().' rows');
+        \Log::debug('getBulkInternalCustomerWeeklySales: Query took '.round((microtime(true) - $t1) * 1000).'ms, found '.$internalData->count().' rows');
+
+        // Separate Coffee and Kitchen data
+        $coffeeData = $internalData->where('customer_name', 'Coffee');
+        $kitchenData = $internalData->where('customer_name', 'Kitchen');
 
         // Group data by product_id
-        $groupedData = $coffeeData->groupBy('product_id');
+        $coffeeGrouped = $coffeeData->groupBy('product_id');
+        $kitchenGrouped = $kitchenData->groupBy('product_id');
 
-        // Build result structure
-        $result = collect();
+        // Build result structures
+        $coffeeResult = collect();
+        $kitchenResult = collect();
+
         foreach ($productIds as $productId) {
-            $productWeeks = $weekBuckets;
-
-            $productData = $groupedData->get($productId, collect());
-            foreach ($productData as $weekData) {
-                if (isset($productWeeks[$weekData->week_start])) {
-                    $productWeeks[$weekData->week_start]['units'] = (float) $weekData->total_units;
+            // Coffee
+            $coffeeWeeks = $weekBuckets;
+            $productCoffeeData = $coffeeGrouped->get($productId, collect());
+            foreach ($productCoffeeData as $weekData) {
+                if (isset($coffeeWeeks[$weekData->week_start])) {
+                    $coffeeWeeks[$weekData->week_start]['units'] = (float) $weekData->total_units;
                 }
             }
+            $coffeeResult[$productId] = array_values($coffeeWeeks);
 
-            $result[$productId] = array_values($productWeeks);
+            // Kitchen
+            $kitchenWeeks = $weekBuckets;
+            $productKitchenData = $kitchenGrouped->get($productId, collect());
+            foreach ($productKitchenData as $weekData) {
+                if (isset($kitchenWeeks[$weekData->week_start])) {
+                    $kitchenWeeks[$weekData->week_start]['units'] = (float) $weekData->total_units;
+                }
+            }
+            $kitchenResult[$productId] = array_values($kitchenWeeks);
         }
 
-        return $result;
+        return [
+            'coffee' => $coffeeResult,
+            'kitchen' => $kitchenResult,
+        ];
     }
 
     /**
