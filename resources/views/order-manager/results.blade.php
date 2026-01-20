@@ -1,5 +1,12 @@
 <x-admin-layout>
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6" x-data="{ expandedSuppliers: {}, allExpanded: true }" x-init="
+        {{-- Initialize all suppliers as expanded by default --}}
+        @if(!empty($results))
+            @foreach(collect($results)->filter(fn($r) => $r['low_stock_count'] > 0) as $index => $result)
+                expandedSuppliers['{{ $result['supplier']->id }}'] = true;
+            @endforeach
+        @endif
+    ">
         {{-- Header Section --}}
         <div class="flex justify-between items-center mb-6">
             <div>
@@ -54,21 +61,37 @@
             {{-- Suppliers Needing Attention --}}
             @if($suppliersNeedingAttention->isNotEmpty())
                 <div class="mb-8">
-                    <h3 class="text-lg font-semibold text-red-400 mb-4 flex items-center">
-                        <i class="fas fa-exclamation-circle mr-2"></i>
-                        Suppliers Needing Attention ({{ $suppliersNeedingAttention->count() }})
-                    </h3>
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold text-red-400 flex items-center">
+                            <i class="fas fa-exclamation-circle mr-2"></i>
+                            Suppliers Needing Attention ({{ $suppliersNeedingAttention->count() }})
+                        </h3>
+                        <button @click="
+                            allExpanded = !allExpanded;
+                            @foreach($suppliersNeedingAttention as $result)
+                                expandedSuppliers['{{ $result['supplier']->id }}'] = allExpanded;
+                            @endforeach
+                        " class="text-sm text-blue-400 hover:text-blue-300 flex items-center">
+                            <i class="fas mr-1" :class="allExpanded ? 'fa-compress-alt' : 'fa-expand-alt'"></i>
+                            <span x-text="allExpanded ? 'Collapse All' : 'Expand All'"></span>
+                        </button>
+                    </div>
 
                     @foreach($suppliersNeedingAttention as $result)
                         <div class="bg-gray-800 rounded-lg mb-4 overflow-hidden border-l-4 border-yellow-500">
-                            {{-- Supplier Header --}}
-                            <div class="px-4 py-3 bg-gray-900 flex justify-between items-center">
-                                <div>
-                                    <h4 class="text-lg font-semibold text-gray-100">{{ $result['supplier']->name }}</h4>
-                                    <div class="text-sm text-gray-400">
-                                        <span class="text-purple-400 font-mono">POS: {{ $result['supplier']->external_pos_id }}</span>
-                                        <span class="mx-2">|</span>
-                                        Threshold: {{ $result['threshold'] }} units
+                            {{-- Supplier Header (Clickable) --}}
+                            <button @click="expandedSuppliers['{{ $result['supplier']->id }}'] = !expandedSuppliers['{{ $result['supplier']->id }}']"
+                                    class="w-full px-4 py-3 bg-gray-900 flex justify-between items-center cursor-pointer hover:bg-gray-800/50 transition-colors">
+                                <div class="flex items-center">
+                                    <i class="fas fa-chevron-right mr-3 text-gray-400 transition-transform duration-200"
+                                       :class="{ 'rotate-90': expandedSuppliers['{{ $result['supplier']->id }}'] }"></i>
+                                    <div class="text-left">
+                                        <h4 class="text-lg font-semibold text-gray-100">{{ $result['supplier']->name }}</h4>
+                                        <div class="text-sm text-gray-400">
+                                            <span class="text-purple-400 font-mono">POS: {{ $result['supplier']->external_pos_id }}</span>
+                                            <span class="mx-2">|</span>
+                                            Threshold: {{ $result['threshold'] }} units
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="text-right">
@@ -81,9 +104,12 @@
                                         </span>
                                     @endif
                                 </div>
-                            </div>
+                            </button>
 
-                            {{-- Products Table --}}
+                            {{-- Products Table (Collapsible) --}}
+                            <div x-show="expandedSuppliers['{{ $result['supplier']->id }}']"
+                                 x-collapse
+                                 x-cloak>
                             <table class="min-w-full divide-y divide-gray-700">
                                 <thead class="bg-gray-800">
                                     <tr>
@@ -130,6 +156,7 @@
                                     @endforeach
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     @endforeach
                 </div>

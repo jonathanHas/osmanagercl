@@ -64,11 +64,15 @@ AccountingSupplier (Laravel DB)
     ↓ external_pos_id
 SupplierLink (POS DB)
     ↓ SupplierID → Barcode
+stocking (POS DB)
+    ↓ Barcode must exist (filters out discontinued products)
 Product (POS DB)
     ↓ CODE matches Barcode
 StockCurrent (POS DB)
     → UNITS (current stock level)
 ```
+
+**Important**: Only products that exist in the `stocking` table (actively stocked in store) are included. This matches the filtering used by the main order generation system and excludes discontinued products.
 
 ### Key Service Methods
 
@@ -236,12 +240,29 @@ php artisan tinker
 
 ### Issue: Products not showing when expanded
 
-**Cause**: No products in `supplier_link` table for that supplier, or `stocked` flag is false.
+**Cause**: No products in `supplier_link` table for that supplier, `stocked` flag is false, OR products are not in the `stocking` table.
 
-**Solution**: Verify the supplier has products in the POS database:
+**Solution**: Verify the supplier has products in the POS database that are also actively stocked:
 ```sql
-SELECT * FROM supplier_link WHERE SupplierID = 'SUP001234' AND stocked = 1;
+-- Check supplier_link entries
+SELECT sl.Barcode, p.NAME, sl.stocked
+FROM supplier_link sl
+JOIN PRODUCTS p ON sl.Barcode = p.CODE
+WHERE sl.SupplierID = 'SUP001234';
+
+-- Check which are in the stocking table (actively stocked)
+SELECT sl.Barcode, p.NAME
+FROM supplier_link sl
+JOIN stocking s ON sl.Barcode = s.Barcode
+JOIN PRODUCTS p ON sl.Barcode = p.CODE
+WHERE sl.SupplierID = 'SUP001234' AND sl.stocked = 1;
 ```
+
+### Issue: Discontinued products appearing
+
+**Cause**: Products in `supplier_link` with `stocked=true` but not in the `stocking` table.
+
+**Solution**: This was fixed in January 2026 by adding a join to the `stocking` table. Discontinued products (not in `stocking` table) are now automatically excluded.
 
 ### Issue: Stock levels not updating
 

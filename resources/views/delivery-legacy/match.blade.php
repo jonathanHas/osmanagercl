@@ -163,6 +163,7 @@
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Scanned</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Diff</th>
                                         <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Impact</th>
+                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Issue</th>
                                         <template x-if="showDetails">
                                             <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">VAT</th>
                                         </template>
@@ -195,6 +196,7 @@
                                             $unitsDelivered = (fmod($myOrder, 1) == 0.0) ? $caseUnits * $myOrder : round($caseUnits * $myOrder);
                                             $diff = ($item->scanned ?? 0) - $unitsDelivered;
                                             $impact = $diff * $cost;
+                                            $hasCaseUnitChange = $item->invoiceCaseUnits != $item->CaseUnits;
                                         @endphp
                                         <tr class="bg-red-50">
                                             <td class="px-3 py-2">
@@ -209,7 +211,37 @@
                                             </td>
                                             <td class="px-3 py-2 text-center font-medium">{{ $unitsDelivered }}</td>
                                             <td class="px-3 py-2 text-center text-gray-600">{{ $item->invoiceCaseUnits ?? '-' }}</td>
-                                            <td class="px-3 py-2 text-center {{ ($item->invoiceCaseUnits ?? null) != ($item->CaseUnits ?? null) ? 'text-orange-600 font-bold' : 'text-gray-600' }}">{{ $item->CaseUnits ?? '-' }}</td>
+                                            <td class="px-3 py-2 text-center"
+                                                x-data="{ editing: false, caseQty: {{ $item->CaseUnits ?? 1 }}, originalCaseQty: {{ $item->CaseUnits ?? 1 }}, saving: false }">
+                                                <template x-if="!editing">
+                                                    <span @click="editing = true; $nextTick(() => $refs.caseInput.select())"
+                                                          class="cursor-pointer hover:bg-blue-100 px-2 py-1 rounded inline-flex items-center gap-1 {{ $hasCaseUnitChange ? 'text-orange-600 font-bold' : 'text-gray-600' }}"
+                                                          title="Click to edit DB case units">
+                                                        <span x-text="caseQty"></span>
+                                                        <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                                        </svg>
+                                                    </span>
+                                                </template>
+                                                <template x-if="editing">
+                                                    <form @submit.prevent="saving = true; window.deliveryMatchInstance.saveCaseUnits('{{ $item->Barcode }}', caseQty, (newQty) => { originalCaseQty = newQty; editing = false; saving = false; }).catch(() => saving = false)"
+                                                          class="flex items-center justify-center gap-1">
+                                                        <input type="number" x-model="caseQty" x-ref="caseInput" min="1" step="1"
+                                                               @keydown.escape="caseQty = originalCaseQty; editing = false"
+                                                               class="w-16 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-blue-500 focus:border-blue-500">
+                                                        <button type="submit" :disabled="saving" class="text-green-600 hover:text-green-800 disabled:opacity-50">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                                            </svg>
+                                                        </button>
+                                                        <button type="button" @click="caseQty = originalCaseQty; editing = false" class="text-gray-400 hover:text-gray-600">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                            </svg>
+                                                        </button>
+                                                    </form>
+                                                </template>
+                                            </td>
                                             <td class="px-3 py-2 text-center font-medium text-blue-600"
                                                 x-data="{ editing: false, qty: {{ $item->scanned ?? 0 }}, originalQty: {{ $item->scanned ?? 0 }}, saving: false }">
                                                 <template x-if="!editing">
@@ -246,6 +278,13 @@
                                             </td>
                                             <td class="px-3 py-2 text-right font-medium {{ $impact > 0 ? 'text-green-600' : 'text-red-600' }}">
                                                 {{ $impact > 0 ? '+' : '' }}&euro;{{ number_format($impact, 2) }}
+                                            </td>
+                                            <td class="px-3 py-2 text-center">
+                                                @if($hasCaseUnitChange)
+                                                    <span class="inline-block text-xs px-2 py-0.5 bg-orange-200 text-orange-800 rounded">
+                                                        Case: {{ $item->invoiceCaseUnits ?? 1 }} &rarr; {{ $item->CaseUnits ?? '?' }}
+                                                    </span>
+                                                @endif
                                             </td>
                                             <template x-if="showDetails">
                                                 <td class="px-3 py-2 text-center text-gray-500">{{ number_format($vat, 0) }}%</td>
@@ -355,7 +394,37 @@
                                             </td>
                                             <td class="px-3 py-2 text-center font-medium">{{ $unitsDelivered }}</td>
                                             <td class="px-3 py-2 text-center text-gray-600">{{ $item->invoiceCaseUnits ?? '-' }}</td>
-                                            <td class="px-3 py-2 text-center {{ ($item->invoiceCaseUnits ?? null) != ($item->CaseUnits ?? null) ? 'text-orange-600 font-bold' : 'text-gray-600' }}">{{ $item->CaseUnits ?? '-' }}</td>
+                                            <td class="px-3 py-2 text-center"
+                                                x-data="{ editing: false, caseQty: {{ $item->CaseUnits ?? 1 }}, originalCaseQty: {{ $item->CaseUnits ?? 1 }}, saving: false }">
+                                                <template x-if="!editing">
+                                                    <span @click="editing = true; $nextTick(() => $refs.caseInput.select())"
+                                                          class="cursor-pointer hover:bg-blue-100 px-2 py-1 rounded inline-flex items-center gap-1 {{ $hasCaseUnitChange ? 'text-orange-600 font-bold' : 'text-gray-600' }}"
+                                                          title="Click to edit DB case units">
+                                                        <span x-text="caseQty"></span>
+                                                        <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                                        </svg>
+                                                    </span>
+                                                </template>
+                                                <template x-if="editing">
+                                                    <form @submit.prevent="saving = true; window.deliveryMatchInstance.saveCaseUnits('{{ $item->Barcode }}', caseQty, (newQty) => { originalCaseQty = newQty; editing = false; saving = false; }).catch(() => saving = false)"
+                                                          class="flex items-center justify-center gap-1">
+                                                        <input type="number" x-model="caseQty" x-ref="caseInput" min="1" step="1"
+                                                               @keydown.escape="caseQty = originalCaseQty; editing = false"
+                                                               class="w-16 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-blue-500 focus:border-blue-500">
+                                                        <button type="submit" :disabled="saving" class="text-green-600 hover:text-green-800 disabled:opacity-50">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                                            </svg>
+                                                        </button>
+                                                        <button type="button" @click="caseQty = originalCaseQty; editing = false" class="text-gray-400 hover:text-gray-600">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                            </svg>
+                                                        </button>
+                                                    </form>
+                                                </template>
+                                            </td>
                                             <td class="px-3 py-2 text-center font-medium"
                                                 :class="qty !== null ? 'text-blue-600' : 'text-gray-400'"
                                                 x-data="{ editing: false, qty: {{ $item->scanned !== null ? $item->scanned : 'null' }}, originalQty: {{ $item->scanned !== null ? $item->scanned : 'null' }}, saving: false }">
@@ -484,6 +553,7 @@
                                             $myOrder = $item->myOrder ?? 0;
                                             $unitsDelivered = (fmod($myOrder, 1) == 0.0) ? $caseUnits * $myOrder : round($caseUnits * $myOrder);
                                             $value = $cost * $unitsDelivered;
+                                            $hasCaseUnitChange = $item->invoiceCaseUnits != $item->CaseUnits;
                                         @endphp
                                         <tr class="hover:bg-green-50">
                                             <td class="px-3 py-2">
@@ -498,7 +568,37 @@
                                             </td>
                                             <td class="px-3 py-2 text-center font-medium text-green-600">{{ $unitsDelivered }}</td>
                                             <td class="px-3 py-2 text-center text-gray-600">{{ $item->invoiceCaseUnits ?? '-' }}</td>
-                                            <td class="px-3 py-2 text-center {{ ($item->invoiceCaseUnits ?? null) != ($item->CaseUnits ?? null) ? 'text-orange-600 font-bold' : 'text-gray-600' }}">{{ $item->CaseUnits ?? '-' }}</td>
+                                            <td class="px-3 py-2 text-center"
+                                                x-data="{ editing: false, caseQty: {{ $item->CaseUnits ?? 1 }}, originalCaseQty: {{ $item->CaseUnits ?? 1 }}, saving: false }">
+                                                <template x-if="!editing">
+                                                    <span @click="editing = true; $nextTick(() => $refs.caseInput.select())"
+                                                          class="cursor-pointer hover:bg-blue-100 px-2 py-1 rounded inline-flex items-center gap-1 {{ $hasCaseUnitChange ? 'text-orange-600 font-bold' : 'text-gray-600' }}"
+                                                          title="Click to edit DB case units">
+                                                        <span x-text="caseQty"></span>
+                                                        <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                                        </svg>
+                                                    </span>
+                                                </template>
+                                                <template x-if="editing">
+                                                    <form @submit.prevent="saving = true; window.deliveryMatchInstance.saveCaseUnits('{{ $item->Barcode }}', caseQty, (newQty) => { originalCaseQty = newQty; editing = false; saving = false; }).catch(() => saving = false)"
+                                                          class="flex items-center justify-center gap-1">
+                                                        <input type="number" x-model="caseQty" x-ref="caseInput" min="1" step="1"
+                                                               @keydown.escape="caseQty = originalCaseQty; editing = false"
+                                                               class="w-16 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-blue-500 focus:border-blue-500">
+                                                        <button type="submit" :disabled="saving" class="text-green-600 hover:text-green-800 disabled:opacity-50">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                                            </svg>
+                                                        </button>
+                                                        <button type="button" @click="caseQty = originalCaseQty; editing = false" class="text-gray-400 hover:text-gray-600">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                            </svg>
+                                                        </button>
+                                                    </form>
+                                                </template>
+                                            </td>
                                             <td class="px-3 py-2 text-center font-medium text-green-600"
                                                 x-data="{ editing: false, qty: {{ $item->scanned ?? 0 }}, originalQty: {{ $item->scanned ?? 0 }}, saving: false }">
                                                 <template x-if="!editing">
@@ -896,6 +996,33 @@
                         return data;
                     } catch (error) {
                         console.error('Error saving scanned qty:', error);
+                        return { success: false };
+                    }
+                },
+                async saveCaseUnits(barcode, newCaseUnits, onSuccess) {
+                    try {
+                        const response = await fetch('{{ route('delivery-legacy.update-case-units') }}', {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                barcode: barcode,
+                                caseUnits: newCaseUnits,
+                                supplierID: this.supplierID
+                            })
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            if (onSuccess) onSuccess(data.caseUnits);
+                            // Reload page to recalculate expected quantities
+                            location.reload();
+                        }
+                        return data;
+                    } catch (error) {
+                        console.error('Error saving case units:', error);
                         return { success: false };
                     }
                 }

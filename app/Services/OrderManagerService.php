@@ -45,6 +45,7 @@ class OrderManagerService
     {
         return DB::connection('pos')
             ->table('supplier_link')
+            ->join('stocking', 'supplier_link.Barcode', '=', 'stocking.Barcode')
             ->join('PRODUCTS', 'supplier_link.Barcode', '=', 'PRODUCTS.CODE')
             ->leftJoin('STOCKCURRENT', 'PRODUCTS.ID', '=', 'STOCKCURRENT.PRODUCT')
             ->where('supplier_link.SupplierID', $posSupplierID)
@@ -126,6 +127,7 @@ class OrderManagerService
     {
         return DB::connection('pos')
             ->table('supplier_link')
+            ->join('stocking', 'supplier_link.Barcode', '=', 'stocking.Barcode')
             ->join('PRODUCTS', 'supplier_link.Barcode', '=', 'PRODUCTS.CODE')
             ->leftJoin('STOCKCURRENT', 'PRODUCTS.ID', '=', 'STOCKCURRENT.PRODUCT')
             ->where('supplier_link.SupplierID', $posSupplierID)

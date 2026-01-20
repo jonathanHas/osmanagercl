@@ -339,6 +339,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [DeliveryLegacyController::class, 'index'])->name('index');
         Route::get('/match', [DeliveryLegacyController::class, 'match'])->name('match');
         Route::patch('/scan-item', [DeliveryLegacyController::class, 'updateScannedQuantity'])->name('update-quantity');
+        Route::patch('/update-case-units', [DeliveryLegacyController::class, 'updateCaseUnits'])->name('update-case-units');
     });
 
     // Order Management mockup routes (for UI testing)

@@ -317,4 +317,26 @@ class DeliveryLegacyController extends Controller
             'financials' => $financials,
         ]);
     }
+
+    /**
+     * Update the case units for a supplier link record.
+     */
+    public function updateCaseUnits(Request $request)
+    {
+        $validated = $request->validate([
+            'barcode' => 'required|string',
+            'supplierID' => 'required|string',
+            'caseUnits' => 'required|numeric|min:1',
+        ]);
+
+        DB::connection('pos')->table('supplier_link')
+            ->where('Barcode', $validated['barcode'])
+            ->where('SupplierID', $validated['supplierID'])
+            ->update(['CaseUnits' => $validated['caseUnits']]);
+
+        return response()->json([
+            'success' => true,
+            'caseUnits' => $validated['caseUnits'],
+        ]);
+    }
 }
