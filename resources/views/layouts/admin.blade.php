@@ -23,6 +23,7 @@
             operationsOpen: true,
             kitchenOpen: true,
             ordersOpen: true,
+            stockMonitoringOpen: true,
             financialOpen: true,
             systemToolsOpen: true,
             adminOpen: true
@@ -225,6 +226,29 @@
                             </a>
                         </div>
                         @endunless
+
+                        <!-- STOCK MONITORING SECTION -->
+                        @if(auth()->user()->hasRole('admin'))
+                        <div class="px-2 pt-4">
+                            <button @click="stockMonitoringOpen = !stockMonitoringOpen"
+                                    class="w-full flex items-center justify-between text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-300 py-2">
+                                <span>Stock Monitoring</span>
+                                <svg class="w-4 h-4 transition-transform duration-200" :class="stockMonitoringOpen ? 'rotate-90' : 'rotate-0'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div x-show="stockMonitoringOpen" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-1">
+                            <a href="{{ route('order-manager.index') }}"
+                               class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('order-manager.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                                <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                                </svg>
+                                Order Manager
+                            </a>
+                        </div>
+                        @endif
 
                         <!-- FINANCIAL MANAGEMENT SECTION -->
                         @if(auth()->user()->hasAnyRole(['admin', 'manager']))

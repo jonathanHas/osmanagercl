@@ -219,6 +219,42 @@
                         }
                     };
                 }
+
+                function copyToClipboard(text, button) {
+                    // Store original content
+                    const originalHtml = button.innerHTML;
+
+                    // Try modern clipboard API first, fallback to execCommand
+                    const copyText = function() {
+                        if (navigator.clipboard && window.isSecureContext) {
+                            return navigator.clipboard.writeText(text);
+                        } else {
+                            // Fallback for non-HTTPS
+                            const textArea = document.createElement('textarea');
+                            textArea.value = text;
+                            textArea.style.position = 'fixed';
+                            textArea.style.left = '-9999px';
+                            document.body.appendChild(textArea);
+                            textArea.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(textArea);
+                            return Promise.resolve();
+                        }
+                    };
+
+                    copyText().then(function() {
+                        // Show copied feedback
+                        button.innerHTML = '<span class="flex items-center gap-1.5 text-green-600"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span class="text-xs font-medium">Copied!</span></span>';
+
+                        // Restore original after 1 second
+                        setTimeout(function() {
+                            button.innerHTML = originalHtml;
+                        }, 1000);
+                    }).catch(function(err) {
+                        console.error('Failed to copy:', err);
+                        alert('Failed to copy: ' + text);
+                    });
+                }
             </script>
 
             <!-- Filters -->
@@ -303,8 +339,9 @@
                                         <tr>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
-                                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Kitchen Sales (avg/wk)</th>
-                                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Total (6mo)</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier Code</th>
+                                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Shop Stock</th>
+                                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Kitchen Stock</th>
                                             <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Profile</th>
                                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                         </tr>
@@ -313,7 +350,6 @@
                                         @foreach($products as $kitchenProduct)
                                             @include('kitchen.products.partials.product-row', [
                                                 'kitchenProduct' => $kitchenProduct,
-                                                'kitchenSales' => $kitchenSales,
                                                 'supplierInfo' => $supplierInfo,
                                                 'profiledProductIds' => $profiledProductIds,
                                             ])
@@ -329,8 +365,9 @@
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
-                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Kitchen Sales (avg/wk)</th>
-                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Total (6mo)</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier Code</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Shop Stock</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Kitchen Stock</th>
                                     <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Profile</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                 </tr>
@@ -339,7 +376,6 @@
                                 @foreach($kitchenProducts as $kitchenProduct)
                                     @include('kitchen.products.partials.product-row', [
                                         'kitchenProduct' => $kitchenProduct,
-                                        'kitchenSales' => $kitchenSales,
                                         'supplierInfo' => $supplierInfo,
                                         'profiledProductIds' => $profiledProductIds,
                                     ])

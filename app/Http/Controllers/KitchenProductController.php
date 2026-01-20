@@ -20,9 +20,9 @@ class KitchenProductController extends Controller
         $supplierFilter = $request->input('supplier');
         $groupByCategory = $request->boolean('group_by_category', false);
 
-        // Get all kitchen products with their POS product data
+        // Get all kitchen products with their POS product data and stock
         $kitchenProductsQuery = KitchenProduct::query()
-            ->with('product')
+            ->with(['product.stockCurrent'])
             ->orderBy('created_at', 'desc');
 
         // Get all kitchen products first
@@ -46,12 +46,6 @@ class KitchenProductController extends Controller
             $productIds = $matchingProductIds;
         }
 
-        // Get kitchen sales data (last 8 weeks)
-        $kitchenSales = [];
-        if (! empty($productIds)) {
-            $kitchenSales = $this->getKitchenSalesData($productIds);
-        }
-
         // Get ingredient profile status for each product
         $profiledProductIds = KitchenIngredientProfile::whereIn('pos_product_id', $productIds)
             ->pluck('pos_product_id', 'id')
@@ -65,7 +59,12 @@ class KitchenProductController extends Controller
         }
 
         // Get unique suppliers for dropdown (before filtering)
-        $availableSuppliers = collect($supplierInfo)->filter()->unique()->sort()->values();
+        $availableSuppliers = collect($supplierInfo)
+            ->pluck('name')
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
 
         // Get category info for each product
         $categoryInfo = [];
@@ -76,7 +75,7 @@ class KitchenProductController extends Controller
         // Filter by supplier if selected
         if ($supplierFilter) {
             $kitchenProducts = $kitchenProducts->filter(function ($kp) use ($supplierInfo, $supplierFilter) {
-                return ($supplierInfo[$kp->product_id] ?? null) === $supplierFilter;
+                return ($supplierInfo[$kp->product_id]['name'] ?? null) === $supplierFilter;
             });
         }
 
@@ -87,7 +86,6 @@ class KitchenProductController extends Controller
 
         return view('kitchen.products.index', [
             'kitchenProducts' => $kitchenProducts,
-            'kitchenSales' => $kitchenSales,
             'profiledProductIds' => $profiledProductIds,
             'supplierInfo' => $supplierInfo,
             'search' => $search,
@@ -272,7 +270,7 @@ class KitchenProductController extends Controller
     }
 
     /**
-     * Get supplier info for products.
+     * Get supplier info for products (name and code).
      */
     private function getSupplierInfo(array $productIds): array
     {
@@ -299,7 +297,11 @@ class KitchenProductController extends Controller
         foreach ($productIds as $productId) {
             $product = $products->get($productId);
             $supplierId = $product?->supplierLink?->SupplierID;
-            $result[$productId] = $supplierId ? ($suppliers[$supplierId] ?? null) : null;
+            $supplierCode = $product?->supplierLink?->SupplierCode;
+            $result[$productId] = [
+                'name' => $supplierId ? ($suppliers[$supplierId] ?? null) : null,
+                'code' => $supplierCode,
+            ];
         }
 
         return $result;
