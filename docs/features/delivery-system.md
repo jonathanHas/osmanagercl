@@ -232,6 +232,7 @@ Route::get('/deliveries/{delivery}/export-discrepancies', [DeliveryController::c
 Route::post('/delivery-items/{item}/refresh-barcode', [DeliveryController::class, 'refreshBarcode']);
 Route::patch('/deliveries/{delivery}/items/{item}/price', [DeliveryController::class, 'updateItemPrice']);
 Route::post('/deliveries/{delivery}/update-costs', [DeliveryController::class, 'updateCosts']);
+Route::post('/deliveries/{delivery}/sync-legacy', [DeliveryController::class, 'syncToLegacy']);
 ```
 
 **Note**: The `Route::resource('deliveries', DeliveryController::class)` includes the `destroy` method for delivery deletion, accessible via `DELETE /deliveries/{delivery}` with safety restrictions.
@@ -965,9 +966,70 @@ PRODUCTS.ID as productID
 
 ---
 
+### 2026-01-19 - Sync to Legacy Feature
+
+#### One-Click Integration with Legacy Invoice Match System
+
+**Enhancement**: Added "Sync to Legacy" button to transfer delivery data from Laravel system to POS `delivery` table for comparison with scanned items.
+
+**New Features Implemented**:
+
+1. **Sync to Legacy Button**:
+   - Purple "Sync to Legacy" button on delivery detail pages (`/deliveries/{id}`)
+   - Confirmation dialog warning that existing legacy data will be replaced
+   - Transaction-safe data transfer to POS database
+
+2. **LegacyDelivery Model** (`app/Models/LegacyDelivery.php`):
+   - Eloquent model for POS `delivery` table
+   - Connection: `pos` (POS database)
+   - Fields: `prodName`, `supCode`, `cost`, `caseUnits`, `myOrder`, `rrPrice`
+
+3. **Data Mapping**:
+   | Laravel `delivery_items` | POS `delivery` |
+   |--------------------------|----------------|
+   | `description` | `prodName` |
+   | `supplier_code` | `supCode` |
+   | `unit_cost` | `cost` |
+   | `units_per_case` | `caseUnits` |
+   | `ordered_quantity` | `myOrder` |
+   | `sale_price` | `rrPrice` |
+
+4. **Workflow**:
+   ```
+   /deliveries/create (upload CSV)
+         ↓
+   /deliveries/{id} (view delivery details)
+         ↓
+   Click "Sync to Legacy" button
+         ↓
+   POS delivery table cleared and populated
+         ↓
+   Redirect to /delivery-legacy (select scan session)
+         ↓
+   /delivery-legacy/match (compare invoice vs scanned)
+   ```
+
+**Route**: `POST /deliveries/{delivery}/sync-legacy`
+
+**Files Created**:
+- `app/Models/LegacyDelivery.php`
+
+**Files Modified**:
+- `app/Http/Controllers/DeliveryController.php` - Added `syncToLegacy()` method
+- `routes/web.php` - Added `deliveries.sync-legacy` route
+- `resources/views/deliveries/show.blade.php` - Added sync button
+
+#### Impact & Benefits
+- ✅ **Unified Workflow**: Use existing `/deliveries` CSV upload, then sync to legacy for comparison
+- ✅ **No Duplicate Code**: Reuses existing CSV parsing from `DeliveryService`
+- ✅ **Transaction Safety**: Database transaction ensures data integrity
+- ✅ **Clear User Flow**: Confirmation dialog and redirect to legacy match interface
+
+---
+
 **Last Updated**: 2026-01-19
 **System Status**: ✅ Fully Operational
 **Test Coverage**: Manual testing completed
 **Performance**: Tested with 292-item deliveries
-**Recent Enhancement**: Product link fixes with UUID support and new tab navigation
-**New Features**: Price comparison matrix, bulk cost updates, quick price editing, professional table sorting, enhanced product navigation, inline cost editing
+**Recent Enhancement**: Sync to Legacy feature for invoice matching workflow
+**New Features**: Price comparison matrix, bulk cost updates, quick price editing, professional table sorting, enhanced product navigation, inline cost editing, sync to legacy

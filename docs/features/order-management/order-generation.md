@@ -43,12 +43,23 @@ The order generation system automates the calculation of required stock quantiti
 - **Pre-Aggregated Data**: Order generation now uses `sales_daily_summary` table instead of querying the massive STOCKDIARY table directly, yielding 1,316x faster last-sale-date lookups.
 - **Christmas Comparison Fix**: Bulk Christmas window comparison now properly includes weekly breakdown data for chart visualization.
 - **Large Order Support**: Orders with 1,400+ products now complete in ~22 seconds instead of timing out at 30 seconds or taking 149+ seconds.
-- **New Bulk Repository Methods**: Added `getBulkProductSalesStatistics()`, `getBulkProductWeeklySales()`, `getBulkChristmasWindowComparison()`, `getBulkRecentPurchasePrices()`, `getBulkProductSalesHistory()`, and `getBulkLastSaleDates()` to `SalesRepository`.
+- **New Bulk Repository Methods**: Added `getBulkProductSalesStatistics()`, `getBulkProductWeeklySales()`, `getBulkChristmasWindowComparison()`, `getBulkRecentPurchasePrices()`, `getBulkProductSalesHistory()`, `getBulkLastSaleDates()`, and `getBulkInternalCustomerWeeklySales()` to `SalesRepository`.
 
 ### 2025-12-09 Enhancements (Order Review UI)
 - **Supplier Website Links**: "View →" links next to supplier codes for Udea and Independent Health Foods products, opening supplier's product search page in new tab.
 - **Destock/Restock Toggle**: Quick stock management controls on order review pages. Red "Destock" button removes products from future orders, green "Restock" button adds them back. Includes confirmation dialog with clear messaging.
 - **Sales Chart Modal (Christmas)**: The expandable sales history modal (click chart to view extended history) is now available on Christmas review pages, with date range controls (+/- 1 month, +/- 2 months) and statistics bar.
+
+### 2025-01 Enhancements (Internal Customer Sales Tracking)
+- **Coffee & Kitchen Department Tracking**: Order review charts now display internal customer transfers alongside regular sales. This helps buyers distinguish between retail sales and internal department usage (e.g., products sent to the coffee bar or kitchen).
+- **Visual Distinction**:
+  - Purple solid line (☕): Coffee department transfers
+  - Orange dashed line (🍳): Kitchen department transfers
+  - Blue line: Total sales (as before)
+- **Optimized Performance**: Both Coffee and Kitchen data are fetched in a single database query using `getBulkInternalCustomerWeeklySales()`, ensuring no additional performance impact for large suppliers like Udea and Independent.
+- **Interactive Tooltips**: Hovering over chart points shows contextual information with emoji indicators (☕ for coffee transfers, 🍳 for kitchen transfers).
+- **Modal Chart Support**: The expanded sales history modal (click any chart) also displays Coffee and Kitchen lines when data exists.
+- **Universal Availability**: Feature works for all suppliers, not just specific ones.
 
 ### 2. Product Classification System
 Products are classified into three review priority levels:

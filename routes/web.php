@@ -313,12 +313,14 @@ Route::middleware('auth')->group(function () {
     Route::post('/deliveries/{delivery}/toggle-order-stock', [DeliveryController::class, 'toggleOrderStock'])->name('deliveries.toggle-order-stock');
     Route::get('/deliveries/{delivery}/export-discrepancies', [DeliveryController::class, 'exportDiscrepancies'])->name('deliveries.export-discrepancies');
     Route::post('/deliveries/{delivery}/update-costs', [DeliveryController::class, 'updateCosts'])->name('deliveries.update-costs');
+    Route::post('/deliveries/{delivery}/sync-legacy', [DeliveryController::class, 'syncToLegacy'])->name('deliveries.sync-legacy');
     Route::post('/delivery-items/{item}/refresh-barcode', [DeliveryController::class, 'refreshBarcode'])->name('delivery-items.refresh-barcode');
 
     // Delivery Legacy (Invoice Match) - replicates legacy PHP workflow
     Route::prefix('delivery-legacy')->name('delivery-legacy.')->group(function () {
         Route::get('/', [DeliveryLegacyController::class, 'index'])->name('index');
         Route::get('/match', [DeliveryLegacyController::class, 'match'])->name('match');
+        Route::patch('/scan-item', [DeliveryLegacyController::class, 'updateScannedQuantity'])->name('update-quantity');
     });
 
     // Order Management mockup routes (for UI testing)

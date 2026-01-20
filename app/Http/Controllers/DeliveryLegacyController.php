@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DeliveryScanItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -267,5 +268,52 @@ class DeliveryLegacyController extends Controller
             'totalItems' => count($matchedItems),
             'pendingCount' => count($matchedItems) - $verifiedCount - $mismatchCount,
         ];
+    }
+
+    /**
+     * Update the scanned quantity for a specific barcode in a delivery scan session.
+     */
+    public function updateScannedQuantity(Request $request)
+    {
+        $validated = $request->validate([
+            'delID' => 'required|string',
+            'barcode' => 'required|string',
+            'quantity' => 'required|numeric|min:0',
+            'supplierID' => 'required|string',
+        ]);
+
+        $delID = $validated['delID'];
+        $barcode = $validated['barcode'];
+        $quantity = $validated['quantity'];
+        $supplierID = $validated['supplierID'];
+
+        // Delete existing scan records for this barcode+delID and insert consolidated record
+        DeliveryScanItem::where('delID', $delID)
+            ->where('barcode', $barcode)
+            ->delete();
+
+        if ($quantity > 0) {
+            DeliveryScanItem::create([
+                'delID' => $delID,
+                'barcode' => $barcode,
+                'quantity' => $quantity,
+            ]);
+        }
+
+        // Recalculate financials
+        $matchedItems = $this->getMatchedItems($delID, $supplierID);
+        $scannedNotOnInvoice = $this->getScannedNotOnInvoice($delID, $supplierID);
+        $onInvoiceNotScanned = $this->getOnInvoiceNotScanned($delID, $supplierID);
+
+        $udeaIds = config('suppliers.external_links.udea.supplier_ids', [5, 44, 85]);
+        $isUdea = in_array((int) $supplierID, $udeaIds) || in_array($supplierID, array_map('strval', $udeaIds));
+
+        $financials = $this->calculateFinancials($matchedItems, $scannedNotOnInvoice, $onInvoiceNotScanned, $isUdea);
+
+        return response()->json([
+            'success' => true,
+            'quantity' => $quantity,
+            'financials' => $financials,
+        ]);
     }
 }

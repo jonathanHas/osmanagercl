@@ -173,6 +173,7 @@ External supplier connectivity for images, pricing, and product data.
 
 ### Delivery Verification
 Comprehensive delivery processing with barcode scanning.
+- **Sync to Legacy** (NEW! 2026-01-19): One-click sync from `/deliveries` to POS `delivery` table for invoice matching with scanned items
 - **Delivery Legacy Page** (NEW! 2026-01-18): Redesigned invoice match interface with financial dashboard, issues-first layout, collapsible sections, and quick filters for faster verification
 
 📖 [Delivery System Documentation](./features/delivery-system.md)
@@ -218,6 +219,7 @@ Intelligent order suggestion system with sales history analysis and coverage pla
 - **Case Product Support**: Smart rounding for case-based ordering (6-packs, 12-packs, etc.)
 - **Priority Classification**: Products flagged as "Review", "Standard", or "Safe" based on analysis
 - **Min Stock Override**: User-defined minimum stock levels with absolute unit control
+- **Internal Customer Tracking**: Charts display Coffee (☕ purple) and Kitchen (🍳 orange) department transfers alongside regular sales
 
 📖 [Order Generation Documentation](./features/order-management/order-generation.md)
 

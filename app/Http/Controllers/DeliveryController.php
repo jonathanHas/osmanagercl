@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Delivery;
 use App\Models\DeliveryItem;
 use App\Models\LabelLog;
+use App\Models\LegacyDelivery;
 use App\Models\Supplier;
 use App\Services\DeliveryService;
 use App\Services\SupplierService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
@@ -820,6 +822,43 @@ class DeliveryController extends Controller
                 'success' => false,
                 'message' => 'Cost update failed: '.$e->getMessage(),
             ], 500);
+        }
+    }
+
+    /**
+     * Sync delivery items to the legacy POS delivery table.
+     * This clears existing data and populates with current delivery items.
+     */
+    public function syncToLegacy(Delivery $delivery): RedirectResponse
+    {
+        try {
+            $itemCount = $delivery->items->count();
+
+            if ($itemCount === 0) {
+                return back()->withErrors(['sync' => 'Cannot sync empty delivery to legacy system.']);
+            }
+
+            DB::connection('pos')->transaction(function () use ($delivery) {
+                // Clear existing legacy delivery data
+                LegacyDelivery::truncate();
+
+                // Map delivery_items to legacy format and insert
+                foreach ($delivery->items as $item) {
+                    LegacyDelivery::create([
+                        'prodName' => $item->description,
+                        'supCode' => $item->supplier_code,
+                        'cost' => $item->unit_cost,
+                        'caseUnits' => $item->units_per_case ?? 1,
+                        'myOrder' => $item->ordered_quantity,
+                        'rrPrice' => $item->sale_price ?? 0,
+                    ]);
+                }
+            });
+
+            return redirect()->route('delivery-legacy.index')
+                ->with('success', "Synced {$itemCount} items to legacy. Select a scan session to compare.");
+        } catch (\Exception $e) {
+            return back()->withErrors(['sync' => 'Failed to sync to legacy: '.$e->getMessage()]);
         }
     }
 }

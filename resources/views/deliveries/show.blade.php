@@ -93,6 +93,19 @@
                     ];
                 }
 
+                // Add sync to legacy action for comparing with scanned items
+                $deliveryActions[] = [
+                    'type' => 'form',
+                    'method' => 'POST',
+                    'route' => 'deliveries.sync-legacy',
+                    'params' => $delivery,
+                    'label' => 'Sync to Legacy',
+                    'color' => 'purple',
+                    'class' => 'inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-md transition-colors duration-200',
+                    'icon' => 'M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4',
+                    'onclick' => "return confirm('This will replace all data in the legacy delivery table. Continue?')"
+                ];
+
                 // Add delete action for non-completed deliveries
                 if (in_array($delivery->status, ['draft', 'cancelled'])) {
                     $deliveryActions[] = [

@@ -20,6 +20,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **🔄 Delivery Sync to Legacy Feature** (2026-01-19)
+  - **Sync Button**: New "Sync to Legacy" button on delivery detail pages
+  - **One-Click Sync**: Copies delivery items from Laravel to POS `delivery` table for legacy comparison
+  - **Invoice Matching**: Enables comparison with scanned items via `/delivery-legacy/match`
+  - **Confirmation Dialog**: Warns user that existing legacy data will be replaced
+  - **Transaction Safety**: Uses database transaction for safe data transfer
+  - **Files Created**:
+    - `app/Models/LegacyDelivery.php` - Eloquent model for POS delivery table
+  - **Files Modified**:
+    - `app/Http/Controllers/DeliveryController.php` - Added `syncToLegacy()` method
+    - `routes/web.php` - Added `deliveries.sync-legacy` route
+    - `resources/views/deliveries/show.blade.php` - Added sync button
+
+- **☕ Internal Customer Sales Tracking on Order Charts** (2026-01-19)
+  - **Coffee & Kitchen Tracking**: Order review charts now display internal department transfers (Coffee, Kitchen) alongside regular sales
+  - **Visual Distinction**: Purple solid line for Coffee (☕), orange dashed line for Kitchen (🍳), blue for total sales
+  - **Interactive Tooltips**: Hover shows contextual info with emoji indicators
+  - **Optimized Performance**: Single database query fetches both Coffee and Kitchen data via `getBulkInternalCustomerWeeklySales()`
+  - **Modal Support**: Expanded sales history modal also shows Coffee/Kitchen lines
+  - **Universal**: Works for all suppliers (Udea, Independent, Mossfield, etc.)
+  - **Files Modified**:
+    - `app/Repositories/SalesRepository.php` - Added `getBulkInternalCustomerWeeklySales()` method
+    - `app/Services/OrderService.php` - Pre-fetches coffee/kitchen data, adds to context_data
+    - `app/Http/Controllers/ProductController.php` - Updated API to include coffee/kitchen
+    - `resources/views/orders/partials/review-table.blade.php` - Added chart datasets and tooltips
+
 - **📦 Delivery Legacy Page Redesign** (2026-01-18)
   - **Financial Dashboard**: 6-card overview showing Invoice Total, Scanned Total, Discrepancy, Missing Value, Extra Value, and Margin Alerts
   - **Progress Bar**: Visual verification progress with verified/total item counts

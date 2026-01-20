@@ -350,6 +350,63 @@ GET /deliveries/{delivery}/export-discrepancies
 }
 ```
 
+### Sync to Legacy
+
+Sync delivery items to the POS `delivery` table for invoice comparison with scanned items.
+
+```http
+POST /deliveries/{delivery}/sync-legacy
+```
+
+**Description:**
+Clears the POS `delivery` table and populates it with items from the specified Laravel delivery. This enables comparison with scanned items via the legacy `/delivery-legacy/match` interface.
+
+**Request:** No body required (uses CSRF token from session)
+
+**Success Response:**
+```
+HTTP/1.1 302 Found
+Location: /delivery-legacy
+```
+
+With session flash message:
+```
+"Synced 45 items to legacy. Select a scan session to compare."
+```
+
+**Error Response:**
+```json
+{
+  "errors": {
+    "sync": ["Cannot sync empty delivery to legacy system."]
+  }
+}
+```
+
+Or:
+```json
+{
+  "errors": {
+    "sync": ["Failed to sync to legacy: Database connection error"]
+  }
+}
+```
+
+**Data Mapping:**
+| Laravel `delivery_items` | POS `delivery` |
+|--------------------------|----------------|
+| `description` | `prodName` |
+| `supplier_code` | `supCode` |
+| `unit_cost` | `cost` |
+| `units_per_case` | `caseUnits` |
+| `ordered_quantity` | `myOrder` |
+| `sale_price` | `rrPrice` |
+
+**Notes:**
+- Existing data in POS `delivery` table is cleared before sync
+- Operation is wrapped in a database transaction
+- Redirects to `/delivery-legacy` for scan session selection
+
 ## Format-Specific Features
 
 ### Independent Irish Health Foods
@@ -456,6 +513,6 @@ php artisan queue:work --verbose
 
 ---
 
-**Last Updated**: 2025-08-04  
-**API Version**: v1.0  
+**Last Updated**: 2026-01-19
+**API Version**: v1.1
 **Framework**: Laravel 12

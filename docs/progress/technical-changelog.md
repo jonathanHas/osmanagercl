@@ -1,5 +1,59 @@
 # Technical Changelog
 
+## 2026-01-19 - Internal Customer Sales Tracking (Coffee & Kitchen)
+
+### Overview
+Added ability to track internal department transfers (Coffee and Kitchen customers) on order review charts. This helps buyers distinguish between retail sales and internal usage when planning orders.
+
+### Implementation Details
+
+#### Single Query Optimization
+Combined Coffee and Kitchen data fetching into a single database query to avoid doubling query time for large suppliers.
+
+```php
+// Single query fetches BOTH Coffee AND Kitchen
+$internalData = DB::connection('pos')
+    ->table('TICKETLINES')
+    ->join('TICKETS', 'TICKETLINES.TICKET', '=', 'TICKETS.ID')
+    ->join('RECEIPTS', 'TICKETS.ID', '=', 'RECEIPTS.ID')
+    ->join('CUSTOMERS', 'TICKETS.CUSTOMER', '=', 'CUSTOMERS.ID')
+    ->whereIn('TICKETLINES.PRODUCT', $productIds)
+    ->whereIn('CUSTOMERS.NAME', ['Coffee', 'Kitchen'])  // Both in one query
+    ->selectRaw('CUSTOMERS.NAME as customer_name')
+    ->groupBy('TICKETLINES.PRODUCT', 'week_start', 'CUSTOMERS.NAME')
+    // Returns ['coffee' => Collection, 'kitchen' => Collection]
+```
+
+### Files Modified
+
+#### `/app/Repositories/SalesRepository.php`
+**New Method Added:**
+- `getBulkInternalCustomerWeeklySales(array $productIds, int $weeksBack)` - Returns both Coffee and Kitchen weekly sales in a single query
+
+#### `/app/Services/OrderService.php`
+**Changes:**
+- Pre-fetches internal customer sales using the new bulk method
+- Extracts `coffee_weekly_sales` and `kitchen_weekly_sales` from result
+- Adds both to `context_data` JSON for each order item
+
+#### `/app/Http/Controllers/ProductController.php`
+**Changes:**
+- Updated `weeklySalesData()` API method to include coffee and kitchen data in response
+
+#### `/resources/views/orders/partials/review-table.blade.php`
+**Changes:**
+- Added Coffee dataset (purple solid line) to Chart.js configuration
+- Added Kitchen dataset (orange dashed line) to Chart.js configuration
+- Updated tooltip callbacks with emoji indicators (☕ for Coffee, 🍳 for Kitchen)
+- Added same functionality to modal chart
+
+### Performance Impact
+- **Net impact: ~0ms additional query time** for large suppliers (Udea, Independent)
+- Single query fetches both Coffee and Kitchen vs. two separate queries
+- Follows existing bulk pre-fetch pattern established in December optimization
+
+---
+
 ## 2025-12-04 - Order Generation Performance Optimization
 
 ### Overview

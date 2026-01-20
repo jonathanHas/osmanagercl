@@ -17,18 +17,7 @@
         </div>
     </x-slot>
 
-    <div class="py-6" x-data="{
-        filter: 'all',
-        showDetails: false,
-        sectionsOpen: {
-            critical: true,
-            warnings: true,
-            verified: false,
-            pending: true,
-            extra: true,
-            missing: true
-        }
-    }">
+    <div class="py-6" x-data="deliveryMatch()" x-ref="deliveryMatchRoot">
         <div class="max-w-full mx-auto sm:px-6 lg:px-8">
             @if($isUdea)
                 <div class="mb-4 bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded">
@@ -40,27 +29,27 @@
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
                 <div class="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
                     <div class="text-xs text-gray-500 uppercase tracking-wide">Invoice Total</div>
-                    <div class="text-xl font-bold text-gray-900">&euro;{{ number_format($financials['invoiceTotal'], 2) }}</div>
+                    <div class="text-xl font-bold text-gray-900">&euro;<span x-text="financials.invoiceTotal.toFixed(2)"></span></div>
                 </div>
                 <div class="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
                     <div class="text-xs text-gray-500 uppercase tracking-wide">Scanned Total</div>
-                    <div class="text-xl font-bold text-gray-900">&euro;{{ number_format($financials['scannedTotal'], 2) }}</div>
+                    <div class="text-xl font-bold text-gray-900">&euro;<span x-text="financials.scannedTotal.toFixed(2)"></span></div>
                 </div>
-                <div class="bg-white rounded-lg shadow p-4 border-l-4 {{ $financials['discrepancy'] > 0 ? 'border-red-500' : 'border-gray-300' }}">
+                <div class="bg-white rounded-lg shadow p-4 border-l-4" :class="financials.discrepancy > 0 ? 'border-red-500' : 'border-gray-300'">
                     <div class="text-xs text-gray-500 uppercase tracking-wide">Discrepancy</div>
-                    <div class="text-xl font-bold {{ $financials['discrepancy'] > 0 ? 'text-red-600' : 'text-gray-900' }}">&euro;{{ number_format($financials['discrepancy'], 2) }}</div>
+                    <div class="text-xl font-bold" :class="financials.discrepancy > 0 ? 'text-red-600' : 'text-gray-900'">&euro;<span x-text="financials.discrepancy.toFixed(2)"></span></div>
                 </div>
-                <div class="bg-white rounded-lg shadow p-4 border-l-4 {{ $financials['missingValue'] > 0 ? 'border-red-500' : 'border-gray-300' }}">
+                <div class="bg-white rounded-lg shadow p-4 border-l-4" :class="financials.missingValue > 0 ? 'border-red-500' : 'border-gray-300'">
                     <div class="text-xs text-gray-500 uppercase tracking-wide">Missing Value</div>
-                    <div class="text-xl font-bold {{ $financials['missingValue'] > 0 ? 'text-red-600' : 'text-gray-900' }}">&euro;{{ number_format($financials['missingValue'], 2) }}</div>
+                    <div class="text-xl font-bold" :class="financials.missingValue > 0 ? 'text-red-600' : 'text-gray-900'">&euro;<span x-text="financials.missingValue.toFixed(2)"></span></div>
                 </div>
-                <div class="bg-white rounded-lg shadow p-4 border-l-4 {{ $financials['extraValue'] > 0 ? 'border-orange-500' : 'border-gray-300' }}">
+                <div class="bg-white rounded-lg shadow p-4 border-l-4" :class="financials.extraValue > 0 ? 'border-orange-500' : 'border-gray-300'">
                     <div class="text-xs text-gray-500 uppercase tracking-wide">Extra Items Value</div>
-                    <div class="text-xl font-bold {{ $financials['extraValue'] > 0 ? 'text-orange-600' : 'text-gray-900' }}">&euro;{{ number_format($financials['extraValue'], 2) }}</div>
+                    <div class="text-xl font-bold" :class="financials.extraValue > 0 ? 'text-orange-600' : 'text-gray-900'">&euro;<span x-text="financials.extraValue.toFixed(2)"></span></div>
                 </div>
-                <div class="bg-white rounded-lg shadow p-4 border-l-4 {{ $financials['marginAlerts'] > 0 ? 'border-yellow-500' : 'border-gray-300' }}">
+                <div class="bg-white rounded-lg shadow p-4 border-l-4" :class="financials.marginAlerts > 0 ? 'border-yellow-500' : 'border-gray-300'">
                     <div class="text-xs text-gray-500 uppercase tracking-wide">Margin Alerts</div>
-                    <div class="text-xl font-bold {{ $financials['marginAlerts'] > 0 ? 'text-yellow-600' : 'text-gray-900' }}">{{ $financials['marginAlerts'] }}</div>
+                    <div class="text-xl font-bold" :class="financials.marginAlerts > 0 ? 'text-yellow-600' : 'text-gray-900'" x-text="financials.marginAlerts"></div>
                 </div>
             </div>
 
@@ -69,23 +58,19 @@
                 <div class="flex justify-between text-sm mb-2">
                     <span class="font-medium text-gray-700">Verification Progress</span>
                     <span class="text-gray-600">
-                        <span class="text-green-600 font-medium">{{ $financials['verifiedCount'] }}</span> verified
+                        <span class="text-green-600 font-medium" x-text="financials.verifiedCount"></span> verified
                         <span class="text-gray-400 mx-1">|</span>
-                        <span class="text-red-600 font-medium">{{ $financials['mismatchCount'] }}</span> mismatched
+                        <span class="text-red-600 font-medium" x-text="financials.mismatchCount"></span> mismatched
                         <span class="text-gray-400 mx-1">|</span>
-                        <span class="text-gray-500 font-medium">{{ $financials['pendingCount'] }}</span> pending
+                        <span class="text-gray-500 font-medium" x-text="financials.pendingCount"></span> pending
                         <span class="text-gray-400 mx-1">|</span>
-                        {{ $financials['totalItems'] }} total
+                        <span x-text="financials.totalItems"></span> total
                     </span>
                 </div>
                 <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                    @php
-                        $verifiedPct = $financials['totalItems'] > 0 ? ($financials['verifiedCount'] / $financials['totalItems']) * 100 : 0;
-                        $mismatchPct = $financials['totalItems'] > 0 ? ($financials['mismatchCount'] / $financials['totalItems']) * 100 : 0;
-                    @endphp
                     <div class="h-3 flex">
-                        <div class="bg-green-500 h-3" style="width: {{ $verifiedPct }}%"></div>
-                        <div class="bg-red-500 h-3" style="width: {{ $mismatchPct }}%"></div>
+                        <div class="bg-green-500 h-3 transition-all duration-300" :style="'width: ' + (financials.totalItems > 0 ? (financials.verifiedCount / financials.totalItems) * 100 : 0) + '%'"></div>
+                        <div class="bg-red-500 h-3 transition-all duration-300" :style="'width: ' + (financials.totalItems > 0 ? (financials.mismatchCount / financials.totalItems) * 100 : 0) + '%'"></div>
                     </div>
                 </div>
             </div>
@@ -221,7 +206,37 @@
                                                 <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
                                             </td>
                                             <td class="px-3 py-2 text-center font-medium">{{ $unitsDelivered }}</td>
-                                            <td class="px-3 py-2 text-center font-medium text-blue-600">{{ $item->scanned }}</td>
+                                            <td class="px-3 py-2 text-center font-medium text-blue-600"
+                                                x-data="{ editing: false, qty: {{ $item->scanned ?? 0 }}, originalQty: {{ $item->scanned ?? 0 }}, saving: false }">
+                                                <template x-if="!editing">
+                                                    <span @click="editing = true; $nextTick(() => $refs.qtyInput.select())"
+                                                          class="cursor-pointer hover:bg-blue-100 px-2 py-1 rounded inline-flex items-center gap-1"
+                                                          title="Click to edit">
+                                                        <span x-text="qty"></span>
+                                                        <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                                        </svg>
+                                                    </span>
+                                                </template>
+                                                <template x-if="editing">
+                                                    <form @submit.prevent="saving = true; window.deliveryMatchInstance.saveScannedQty('{{ $item->Barcode }}', qty, (newQty) => { originalQty = newQty; editing = false; saving = false; }).catch(() => saving = false)"
+                                                          class="flex items-center justify-center gap-1">
+                                                        <input type="number" x-model="qty" x-ref="qtyInput" min="0" step="1"
+                                                               @keydown.escape="qty = originalQty; editing = false"
+                                                               class="w-16 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-blue-500 focus:border-blue-500">
+                                                        <button type="submit" :disabled="saving" class="text-green-600 hover:text-green-800 disabled:opacity-50">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                                            </svg>
+                                                        </button>
+                                                        <button type="button" @click="qty = originalQty; editing = false" class="text-gray-400 hover:text-gray-600">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                            </svg>
+                                                        </button>
+                                                    </form>
+                                                </template>
+                                            </td>
                                             <td class="px-3 py-2 text-center font-bold {{ $diff > 0 ? 'text-green-600' : 'text-red-600' }}">
                                                 {{ $diff > 0 ? '+' : '' }}{{ $diff }}
                                             </td>
@@ -333,8 +348,37 @@
                                                 <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
                                             </td>
                                             <td class="px-3 py-2 text-center font-medium">{{ $unitsDelivered }}</td>
-                                            <td class="px-3 py-2 text-center font-medium {{ $item->scanned !== null ? 'text-blue-600' : 'text-gray-400' }}">
-                                                {{ $item->scanned ?? '-' }}
+                                            <td class="px-3 py-2 text-center font-medium"
+                                                :class="qty !== null ? 'text-blue-600' : 'text-gray-400'"
+                                                x-data="{ editing: false, qty: {{ $item->scanned !== null ? $item->scanned : 'null' }}, originalQty: {{ $item->scanned !== null ? $item->scanned : 'null' }}, saving: false }">
+                                                <template x-if="!editing">
+                                                    <span @click="editing = true; $nextTick(() => $refs.qtyInput.select())"
+                                                          class="cursor-pointer hover:bg-blue-100 px-2 py-1 rounded inline-flex items-center gap-1"
+                                                          title="Click to edit">
+                                                        <span x-text="qty !== null ? qty : '-'"></span>
+                                                        <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                                        </svg>
+                                                    </span>
+                                                </template>
+                                                <template x-if="editing">
+                                                    <form @submit.prevent="saving = true; window.deliveryMatchInstance.saveScannedQty('{{ $item->Barcode }}', qty || 0, (newQty) => { qty = newQty; originalQty = newQty; editing = false; saving = false; }).catch(() => saving = false)"
+                                                          class="flex items-center justify-center gap-1">
+                                                        <input type="number" x-model="qty" x-ref="qtyInput" min="0" step="1"
+                                                               @keydown.escape="qty = originalQty; editing = false"
+                                                               class="w-16 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-blue-500 focus:border-blue-500">
+                                                        <button type="submit" :disabled="saving" class="text-green-600 hover:text-green-800 disabled:opacity-50">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                                            </svg>
+                                                        </button>
+                                                        <button type="button" @click="qty = originalQty; editing = false" class="text-gray-400 hover:text-gray-600">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                            </svg>
+                                                        </button>
+                                                    </form>
+                                                </template>
                                             </td>
                                             <td class="px-3 py-2 text-center">
                                                 @foreach($issues as $issue)
@@ -443,7 +487,37 @@
                                                 <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
                                             </td>
                                             <td class="px-3 py-2 text-center font-medium text-green-600">{{ $unitsDelivered }}</td>
-                                            <td class="px-3 py-2 text-center font-medium text-green-600">{{ $item->scanned }}</td>
+                                            <td class="px-3 py-2 text-center font-medium text-green-600"
+                                                x-data="{ editing: false, qty: {{ $item->scanned ?? 0 }}, originalQty: {{ $item->scanned ?? 0 }}, saving: false }">
+                                                <template x-if="!editing">
+                                                    <span @click="editing = true; $nextTick(() => $refs.qtyInput.select())"
+                                                          class="cursor-pointer hover:bg-green-100 px-2 py-1 rounded inline-flex items-center gap-1"
+                                                          title="Click to edit">
+                                                        <span x-text="qty"></span>
+                                                        <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                                        </svg>
+                                                    </span>
+                                                </template>
+                                                <template x-if="editing">
+                                                    <form @submit.prevent="saving = true; window.deliveryMatchInstance.saveScannedQty('{{ $item->Barcode }}', qty, (newQty) => { originalQty = newQty; editing = false; saving = false; }).catch(() => saving = false)"
+                                                          class="flex items-center justify-center gap-1">
+                                                        <input type="number" x-model="qty" x-ref="qtyInput" min="0" step="1"
+                                                               @keydown.escape="qty = originalQty; editing = false"
+                                                               class="w-16 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-blue-500 focus:border-blue-500">
+                                                        <button type="submit" :disabled="saving" class="text-green-600 hover:text-green-800 disabled:opacity-50">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                                            </svg>
+                                                        </button>
+                                                        <button type="button" @click="qty = originalQty; editing = false" class="text-gray-400 hover:text-gray-600">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                            </svg>
+                                                        </button>
+                                                    </form>
+                                                </template>
+                                            </td>
                                             <td class="px-3 py-2 text-right text-gray-500">&euro;{{ number_format($value, 2) }}</td>
                                             <template x-if="showDetails">
                                                 <td class="px-3 py-2 text-center text-gray-500">{{ number_format($vat, 0) }}%</td>
@@ -614,7 +688,37 @@
                                                     <span class="text-gray-500">-</span>
                                                 @endif
                                             </td>
-                                            <td class="px-3 py-2 text-center font-medium text-orange-600">{{ $item->scanned }}</td>
+                                            <td class="px-3 py-2 text-center font-medium text-orange-600"
+                                                x-data="{ editing: false, qty: {{ $item->scanned ?? 0 }}, originalQty: {{ $item->scanned ?? 0 }}, saving: false }">
+                                                <template x-if="!editing">
+                                                    <span @click="editing = true; $nextTick(() => $refs.qtyInput.select())"
+                                                          class="cursor-pointer hover:bg-orange-100 px-2 py-1 rounded inline-flex items-center gap-1"
+                                                          title="Click to edit">
+                                                        <span x-text="qty"></span>
+                                                        <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                                        </svg>
+                                                    </span>
+                                                </template>
+                                                <template x-if="editing">
+                                                    <form @submit.prevent="saving = true; window.deliveryMatchInstance.saveScannedQty('{{ $item->Barcode }}', qty, (newQty) => { originalQty = newQty; editing = false; saving = false; }).catch(() => saving = false)"
+                                                          class="flex items-center justify-center gap-1">
+                                                        <input type="number" x-model="qty" x-ref="qtyInput" min="0" step="1"
+                                                               @keydown.escape="qty = originalQty; editing = false"
+                                                               class="w-16 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-blue-500 focus:border-blue-500">
+                                                        <button type="submit" :disabled="saving" class="text-green-600 hover:text-green-800 disabled:opacity-50">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                                            </svg>
+                                                        </button>
+                                                        <button type="button" @click="qty = originalQty; editing = false" class="text-gray-400 hover:text-gray-600">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                            </svg>
+                                                        </button>
+                                                    </form>
+                                                </template>
+                                            </td>
                                             <td class="px-3 py-2 text-right text-gray-500">
                                                 @if($item->PRICESELL)
                                                     &euro;{{ number_format($item->PRICESELL * (1 + ($item->RATE ?? 0)), 2) }}
@@ -730,4 +834,58 @@
             </div>
         </div>
     </div>
+
+    <script>
+        // Global reference to store the Alpine component instance
+        window.deliveryMatchInstance = null;
+
+        function deliveryMatch() {
+            return {
+                filter: 'all',
+                showDetails: false,
+                sectionsOpen: {
+                    critical: true,
+                    warnings: true,
+                    verified: false,
+                    pending: true,
+                    extra: true,
+                    missing: true
+                },
+                financials: @js($financials),
+                deliveryId: '{{ $deliveryId }}',
+                supplierID: '{{ $supplierId }}',
+                init() {
+                    // Store reference to this instance for child components
+                    window.deliveryMatchInstance = this;
+                },
+                async saveScannedQty(barcode, newQty, onSuccess) {
+                    try {
+                        const response = await fetch('{{ route('delivery-legacy.update-quantity') }}', {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                delID: this.deliveryId,
+                                barcode: barcode,
+                                quantity: newQty,
+                                supplierID: this.supplierID
+                            })
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            this.financials = data.financials;
+                            if (onSuccess) onSuccess(data.quantity);
+                        }
+                        return data;
+                    } catch (error) {
+                        console.error('Error saving scanned qty:', error);
+                        return { success: false };
+                    }
+                }
+            };
+        }
+    </script>
 </x-admin-layout>
