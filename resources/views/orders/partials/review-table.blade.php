@@ -100,6 +100,12 @@
         ->whereNotNull('min_stock_override')
         ->pluck('min_stock_override', 'product_id')
         ->toArray();
+
+    // Load kitchen product IDs to show kitchen toggle state
+    $kitchenProductIds = \App\Models\KitchenProduct::whereIn('product_id', $productIds)
+        ->pluck('product_id')
+        ->toArray();
+
     $globalCoverageDateRaw = optional($orderSession->coverage_ends_on)?->toDateString();
     $globalCoverageDateFormatted = $globalCoverageDateRaw
         ? \Carbon\Carbon::parse($globalCoverageDateRaw)->format('D j M Y')
@@ -498,6 +504,9 @@
                                 Saved
                             </span>
                         </div>
+                        @php
+                            $isKitchenProduct = in_array($product->ID, $kitchenProductIds);
+                        @endphp
                         <div class="mt-2 flex items-center gap-2 text-xs">
                             <button type="button"
                                     class="stock-toggle-btn text-[11px] font-medium border rounded px-2 py-0.5 transition-colors {{ $product->stocking ? 'text-red-600 hover:text-red-800 border-red-300 hover:border-red-400' : 'text-green-600 hover:text-green-800 border-green-300 hover:border-green-400' }}"
@@ -506,6 +515,14 @@
                                     data-is-stocked="{{ $product->stocking ? 'true' : 'false' }}"
                                     title="{{ $product->stocking ? 'Remove from stock management' : 'Add to stock management' }}">
                                 {{ $product->stocking ? 'Destock' : 'Restock' }}
+                            </button>
+                            <button type="button"
+                                    class="kitchen-toggle-btn text-[11px] font-medium border rounded px-2 py-0.5 transition-colors {{ $isKitchenProduct ? 'text-orange-600 border-orange-300 bg-orange-50 hover:bg-orange-100' : 'text-gray-500 border-gray-300 hover:border-orange-300 hover:text-orange-600' }}"
+                                    data-product-id="{{ $product->ID }}"
+                                    data-product-name="{{ $safeProductName }}"
+                                    data-is-kitchen="{{ $isKitchenProduct ? 'true' : 'false' }}"
+                                    title="{{ $isKitchenProduct ? 'Remove from kitchen products' : 'Add to kitchen products' }}">
+                                Kitchen
                             </button>
                         </div>
                         <div class="mt-2 text-xs text-slate-500 leading-tight">
@@ -950,6 +967,9 @@
                                 Saved
                             </span>
                         </div>
+                        @php
+                            $isKitchenProduct = in_array($product->ID, $kitchenProductIds);
+                        @endphp
                         <div class="mt-2 flex items-center gap-2 text-xs">
                             <button type="button"
                                     class="stock-toggle-btn text-[11px] font-medium border rounded px-2 py-0.5 transition-colors {{ $product->stocking ? 'text-red-600 hover:text-red-800 border-red-300 hover:border-red-400' : 'text-green-600 hover:text-green-800 border-green-300 hover:border-green-400' }}"
@@ -958,6 +978,14 @@
                                     data-is-stocked="{{ $product->stocking ? 'true' : 'false' }}"
                                     title="{{ $product->stocking ? 'Remove from stock management' : 'Add to stock management' }}">
                                 {{ $product->stocking ? 'Destock' : 'Restock' }}
+                            </button>
+                            <button type="button"
+                                    class="kitchen-toggle-btn text-[11px] font-medium border rounded px-2 py-0.5 transition-colors {{ $isKitchenProduct ? 'text-orange-600 border-orange-300 bg-orange-50 hover:bg-orange-100' : 'text-gray-500 border-gray-300 hover:border-orange-300 hover:text-orange-600' }}"
+                                    data-product-id="{{ $product->ID }}"
+                                    data-product-name="{{ $safeProductName }}"
+                                    data-is-kitchen="{{ $isKitchenProduct ? 'true' : 'false' }}"
+                                    title="{{ $isKitchenProduct ? 'Remove from kitchen products' : 'Add to kitchen products' }}">
+                                Kitchen
                             </button>
                         </div>
                         <div class="mt-2 text-xs text-slate-500 leading-tight">
@@ -1314,6 +1342,9 @@
                                 Saved
                             </span>
                         </div>
+                        @php
+                            $isKitchenProduct = in_array($product->ID, $kitchenProductIds);
+                        @endphp
                         <div class="mt-2 flex items-center gap-2 text-xs">
                             <button type="button"
                                     class="stock-toggle-btn text-[11px] font-medium border rounded px-2 py-0.5 transition-colors {{ $product->stocking ? 'text-red-600 hover:text-red-800 border-red-300 hover:border-red-400' : 'text-green-600 hover:text-green-800 border-green-300 hover:border-green-400' }}"
@@ -1322,6 +1353,14 @@
                                     data-is-stocked="{{ $product->stocking ? 'true' : 'false' }}"
                                     title="{{ $product->stocking ? 'Remove from stock management' : 'Add to stock management' }}">
                                 {{ $product->stocking ? 'Destock' : 'Restock' }}
+                            </button>
+                            <button type="button"
+                                    class="kitchen-toggle-btn text-[11px] font-medium border rounded px-2 py-0.5 transition-colors {{ $isKitchenProduct ? 'text-orange-600 border-orange-300 bg-orange-50 hover:bg-orange-100' : 'text-gray-500 border-gray-300 hover:border-orange-300 hover:text-orange-600' }}"
+                                    data-product-id="{{ $product->ID }}"
+                                    data-product-name="{{ $safeProductName }}"
+                                    data-is-kitchen="{{ $isKitchenProduct ? 'true' : 'false' }}"
+                                    title="{{ $isKitchenProduct ? 'Remove from kitchen products' : 'Add to kitchen products' }}">
+                                Kitchen
                             </button>
                         </div>
                         <div class="mt-2 text-xs text-slate-500 leading-tight">
@@ -1678,6 +1717,9 @@
                                 Saved
                             </span>
                         </div>
+                        @php
+                            $isKitchenProduct = in_array($product->ID, $kitchenProductIds);
+                        @endphp
                         <div class="mt-2 flex items-center gap-2 text-xs">
                             <button type="button"
                                     class="stock-toggle-btn text-[11px] font-medium border rounded px-2 py-0.5 transition-colors {{ $product->stocking ? 'text-red-600 hover:text-red-800 border-red-300 hover:border-red-400' : 'text-green-600 hover:text-green-800 border-green-300 hover:border-green-400' }}"
@@ -1686,6 +1728,14 @@
                                     data-is-stocked="{{ $product->stocking ? 'true' : 'false' }}"
                                     title="{{ $product->stocking ? 'Remove from stock management' : 'Add to stock management' }}">
                                 {{ $product->stocking ? 'Destock' : 'Restock' }}
+                            </button>
+                            <button type="button"
+                                    class="kitchen-toggle-btn text-[11px] font-medium border rounded px-2 py-0.5 transition-colors {{ $isKitchenProduct ? 'text-orange-600 border-orange-300 bg-orange-50 hover:bg-orange-100' : 'text-gray-500 border-gray-300 hover:border-orange-300 hover:text-orange-600' }}"
+                                    data-product-id="{{ $product->ID }}"
+                                    data-product-name="{{ $safeProductName }}"
+                                    data-is-kitchen="{{ $isKitchenProduct ? 'true' : 'false' }}"
+                                    title="{{ $isKitchenProduct ? 'Remove from kitchen products' : 'Add to kitchen products' }}">
+                                Kitchen
                             </button>
                         </div>
                         <div class="mt-2 text-xs text-slate-500 leading-tight">
@@ -3424,5 +3474,67 @@
         }
 
         initStockToggleButtons();
+
+        // Kitchen toggle button handler
+        function initKitchenToggleButtons() {
+            document.querySelectorAll('.kitchen-toggle-btn').forEach(button => {
+                if (button.dataset.kitchenInitialized) return;
+                button.dataset.kitchenInitialized = 'true';
+
+                button.addEventListener('click', async function() {
+                    const productId = this.dataset.productId;
+                    const productName = this.dataset.productName;
+                    const isKitchen = this.dataset.isKitchen === 'true';
+
+                    // Disable button while processing
+                    this.disabled = true;
+                    const originalText = this.textContent;
+                    this.textContent = isKitchen ? 'Removing...' : 'Adding...';
+
+                    try {
+                        const response = await fetch('/kitchen/products/toggle', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({ product_id: productId })
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok && data.success) {
+                            // Toggle the button state
+                            this.dataset.isKitchen = data.is_kitchen.toString();
+                            if (data.is_kitchen) {
+                                // Now is kitchen product
+                                this.classList.remove('text-gray-500', 'border-gray-300');
+                                this.classList.add('text-orange-600', 'border-orange-300', 'bg-orange-50');
+                                this.title = 'Remove from kitchen products';
+                            } else {
+                                // No longer kitchen product
+                                this.classList.remove('text-orange-600', 'border-orange-300', 'bg-orange-50');
+                                this.classList.add('text-gray-500', 'border-gray-300');
+                                this.title = 'Add to kitchen products';
+                            }
+                            this.textContent = 'Kitchen';
+                            this.disabled = false;
+                        } else {
+                            alert('Failed to update kitchen status: ' + (data.error || 'Unknown error'));
+                            this.disabled = false;
+                            this.textContent = originalText;
+                        }
+                    } catch (error) {
+                        console.error('Kitchen toggle error:', error);
+                        alert('Failed to update kitchen status. Please try again.');
+                        this.disabled = false;
+                        this.textContent = originalText;
+                    }
+                });
+            });
+        }
+
+        initKitchenToggleButtons();
     });
 </script>

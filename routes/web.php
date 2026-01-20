@@ -11,6 +11,7 @@ use App\Http\Controllers\FruitVegController;
 use App\Http\Controllers\KdsController;
 use App\Http\Controllers\KitchenController;
 use App\Http\Controllers\KitchenIngredientProfileController;
+use App\Http\Controllers\KitchenProductController;
 use App\Http\Controllers\LabelAreaController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
@@ -254,6 +255,13 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [KitchenController::class, 'index'])->name('index');
         Route::get('/create', [KitchenController::class, 'create'])->name('create');
         Route::post('/', [KitchenController::class, 'store'])->name('store');
+
+        // Kitchen Products (must be before {recipe} wildcard)
+        Route::prefix('products')->name('products.')->group(function () {
+            Route::get('/', [KitchenProductController::class, 'index'])->name('index');
+            Route::post('/toggle', [KitchenProductController::class, 'toggle'])->name('toggle');
+            Route::delete('/{kitchenProduct}', [KitchenProductController::class, 'destroy'])->name('destroy');
+        });
 
         // Ingredient Profiles (must be before {recipe} wildcard)
         Route::prefix('profiles')->name('profiles.')->group(function () {

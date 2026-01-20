@@ -35,11 +35,17 @@ class KitchenIngredientProfileController extends Controller
     /**
      * Show create profile form.
      */
-    public function create(): View
+    public function create(Request $request): View
     {
+        $prefillProduct = null;
+        if ($productId = $request->get('product_id')) {
+            $prefillProduct = Product::find($productId);
+        }
+
         return view('kitchen.profiles.create', [
             'unitTypes' => KitchenIngredientProfile::UNIT_CONVERSIONS,
             'unitCategories' => KitchenIngredientProfile::UNIT_CATEGORIES,
+            'prefillProduct' => $prefillProduct,
         ]);
     }
 
