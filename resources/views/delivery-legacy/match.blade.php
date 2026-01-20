@@ -681,6 +681,8 @@
                                     <tr>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Expected</th>
+                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase w-8"></th>
+                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Delivered</th>
                                         <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Value</th>
                                         <template x-if="showDetails">
                                             <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">VAT</th>
@@ -713,7 +715,8 @@
                                             $unitsDelivered = (fmod($myOrder, 1) == 0.0) ? $caseUnits * $myOrder : round($caseUnits * $myOrder);
                                             $value = $cost * $unitsDelivered;
                                         @endphp
-                                        <tr class="hover:bg-gray-50">
+                                        <tr class="hover:bg-gray-50"
+                                            x-data="{ editing: false, qty: null, originalQty: null, saving: false }">
                                             <td class="px-3 py-2">
                                                 @if($item->productID)
                                                     <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium">
@@ -725,6 +728,45 @@
                                                 <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
                                             </td>
                                             <td class="px-3 py-2 text-center font-medium">{{ $unitsDelivered }}</td>
+                                            <td class="px-3 py-2 text-center">
+                                                <button @click="qty = {{ $unitsDelivered }}; editing = true; $nextTick(() => $refs.qtyInput?.focus())"
+                                                        class="text-gray-400 hover:text-blue-600 transition-colors"
+                                                        title="Copy expected to delivered">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                                                    </svg>
+                                                </button>
+                                            </td>
+                                            <td class="px-3 py-2 text-center">
+                                                <template x-if="!editing">
+                                                    <span @click="editing = true; $nextTick(() => $refs.qtyInput?.select())"
+                                                          class="cursor-pointer hover:bg-blue-100 px-2 py-1 rounded inline-flex items-center gap-1 text-gray-400"
+                                                          title="Click to enter delivered quantity">
+                                                        <span x-text="qty !== null ? qty : '-'"></span>
+                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                                        </svg>
+                                                    </span>
+                                                </template>
+                                                <template x-if="editing">
+                                                    <form @submit.prevent="saving = true; window.deliveryMatchInstance.saveScannedQty('{{ $item->Barcode }}', qty || 0, (newQty) => { qty = newQty; originalQty = newQty; editing = false; saving = false; location.reload(); }).catch(() => saving = false)"
+                                                          class="flex items-center justify-center gap-1">
+                                                        <input type="number" x-model="qty" x-ref="qtyInput" min="0" step="1"
+                                                               @keydown.escape="qty = originalQty; editing = false"
+                                                               class="w-16 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-blue-500 focus:border-blue-500">
+                                                        <button type="submit" :disabled="saving" class="text-green-600 hover:text-green-800 disabled:opacity-50">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                                            </svg>
+                                                        </button>
+                                                        <button type="button" @click="qty = originalQty; editing = false" class="text-gray-400 hover:text-gray-600">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                            </svg>
+                                                        </button>
+                                                    </form>
+                                                </template>
+                                            </td>
                                             <td class="px-3 py-2 text-right text-gray-500">&euro;{{ number_format($value, 2) }}</td>
                                             <template x-if="showDetails">
                                                 <td class="px-3 py-2 text-center text-gray-500">{{ number_format($vat, 0) }}%</td>
