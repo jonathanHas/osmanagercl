@@ -170,6 +170,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/suppliers/payments/export', [\App\Http\Controllers\SupplierPaymentsController::class, 'exportCsv'])->name('suppliers.payments.export');
     Route::resource('suppliers', \App\Http\Controllers\AccountingSuppliersController::class);
 
+    // Order Manager routes
+    Route::prefix('order-manager')->name('order-manager.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\OrderManagerController::class, 'index'])->name('index');
+        Route::get('/check', [\App\Http\Controllers\OrderManagerController::class, 'check'])->name('check');
+        Route::post('/{supplier}/toggle', [\App\Http\Controllers\OrderManagerController::class, 'toggleManaged'])->name('toggle');
+        Route::patch('/{supplier}/threshold', [\App\Http\Controllers\OrderManagerController::class, 'updateThreshold'])->name('threshold');
+        Route::get('/{supplier}/products', [\App\Http\Controllers\OrderManagerController::class, 'products'])->name('products');
+    });
+
     // Label area routes
     Route::get('/labels', [LabelAreaController::class, 'index'])->name('labels.index');
     Route::post('/labels/print-a4', [LabelAreaController::class, 'printA4'])->name('labels.print-a4');
@@ -259,6 +268,7 @@ Route::middleware('auth')->group(function () {
         // Kitchen Products (must be before {recipe} wildcard)
         Route::prefix('products')->name('products.')->group(function () {
             Route::get('/', [KitchenProductController::class, 'index'])->name('index');
+            Route::get('/search', [KitchenProductController::class, 'search'])->name('search');
             Route::post('/toggle', [KitchenProductController::class, 'toggle'])->name('toggle');
             Route::delete('/{kitchenProduct}', [KitchenProductController::class, 'destroy'])->name('destroy');
         });

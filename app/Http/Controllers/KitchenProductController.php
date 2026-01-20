@@ -17,6 +17,8 @@ class KitchenProductController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
+        $supplierFilter = $request->input('supplier');
+        $groupByCategory = $request->boolean('group_by_category', false);
 
         // Get all kitchen products with their POS product data
         $kitchenProductsQuery = KitchenProduct::query()
@@ -62,9 +64,26 @@ class KitchenProductController extends Controller
             $supplierInfo = $this->getSupplierInfo($productIds);
         }
 
-        // Calculate totals
+        // Get unique suppliers for dropdown (before filtering)
+        $availableSuppliers = collect($supplierInfo)->filter()->unique()->sort()->values();
+
+        // Get category info for each product
+        $categoryInfo = [];
+        if (! empty($productIds)) {
+            $categoryInfo = $this->getCategoryInfo($productIds);
+        }
+
+        // Filter by supplier if selected
+        if ($supplierFilter) {
+            $kitchenProducts = $kitchenProducts->filter(function ($kp) use ($supplierInfo, $supplierFilter) {
+                return ($supplierInfo[$kp->product_id] ?? null) === $supplierFilter;
+            });
+        }
+
+        // Calculate totals (after all filters)
+        $filteredProductIds = $kitchenProducts->pluck('product_id')->toArray();
         $totalKitchenProducts = $kitchenProducts->count();
-        $totalWithProfiles = count(array_intersect($productIds, array_keys($profiledProductIds)));
+        $totalWithProfiles = count(array_intersect($filteredProductIds, array_keys($profiledProductIds)));
 
         return view('kitchen.products.index', [
             'kitchenProducts' => $kitchenProducts,
@@ -74,6 +93,10 @@ class KitchenProductController extends Controller
             'search' => $search,
             'totalKitchenProducts' => $totalKitchenProducts,
             'totalWithProfiles' => $totalWithProfiles,
+            'availableSuppliers' => $availableSuppliers,
+            'selectedSupplier' => $supplierFilter,
+            'categoryInfo' => $categoryInfo,
+            'groupByCategory' => $groupByCategory,
         ]);
     }
 
@@ -123,6 +146,69 @@ class KitchenProductController extends Controller
 
         return redirect()->route('kitchen.products.index')
             ->with('success', 'Product removed from kitchen list.');
+    }
+
+    /**
+     * Search for products to add to kitchen list.
+     */
+    public function search(Request $request)
+    {
+        $query = $request->input('q', '');
+
+        if (strlen($query) < 2) {
+            return response()->json([]);
+        }
+
+        // Get existing kitchen product IDs to exclude
+        $existingIds = KitchenProduct::pluck('product_id')->toArray();
+
+        // Search by supplier code first (from supplier_link table)
+        $supplierCodeMatches = DB::connection('pos')
+            ->table('supplier_link')
+            ->where('SupplierCode', 'like', "%{$query}%")
+            ->pluck('Barcode')
+            ->toArray();
+
+        // Search products by name, code (barcode), or matching supplier codes
+        $products = Product::where(function ($q) use ($query, $supplierCodeMatches) {
+            $q->where('NAME', 'like', "%{$query}%")
+                ->orWhere('CODE', 'like', "%{$query}%")
+                ->orWhere('REFERENCE', 'like', "%{$query}%");
+
+            if (! empty($supplierCodeMatches)) {
+                $q->orWhereIn('CODE', $supplierCodeMatches);
+            }
+        })
+            ->whereNotIn('ID', $existingIds)
+            ->with('supplierLink')
+            ->limit(15)
+            ->get();
+
+        // Get supplier names
+        $supplierIds = $products->map(fn ($p) => $p->supplierLink?->SupplierID)->filter()->unique()->values()->toArray();
+        $suppliers = [];
+        if (! empty($supplierIds)) {
+            $suppliers = DB::connection('pos')
+                ->table('suppliers')
+                ->whereIn('SupplierID', $supplierIds)
+                ->pluck('Supplier', 'SupplierID')
+                ->toArray();
+        }
+
+        $results = $products->map(function ($product) use ($suppliers) {
+            $supplierId = $product->supplierLink?->SupplierID;
+            $supplierCode = $product->supplierLink?->SupplierCode;
+
+            return [
+                'id' => $product->ID,
+                'name' => $product->NAME,
+                'code' => $product->CODE,
+                'supplier_code' => $supplierCode,
+                'supplier' => $supplierId ? ($suppliers[$supplierId] ?? null) : null,
+            ];
+        });
+
+        return response()->json($results);
     }
 
     /**
@@ -192,14 +278,50 @@ class KitchenProductController extends Controller
     {
         // Get products with their supplier links
         $products = Product::whereIn('ID', $productIds)
-            ->with('supplierLink.supplier')
+            ->with('supplierLink')
+            ->get()
+            ->keyBy('ID');
+
+        // Get all supplier IDs
+        $supplierIds = $products->map(fn ($p) => $p->supplierLink?->SupplierID)->filter()->unique()->values()->toArray();
+
+        // Fetch supplier names in one query (column is 'Supplier', not 'NAME')
+        $suppliers = [];
+        if (! empty($supplierIds)) {
+            $suppliers = DB::connection('pos')
+                ->table('suppliers')
+                ->whereIn('SupplierID', $supplierIds)
+                ->pluck('Supplier', 'SupplierID')
+                ->toArray();
+        }
+
+        $result = [];
+        foreach ($productIds as $productId) {
+            $product = $products->get($productId);
+            $supplierId = $product?->supplierLink?->SupplierID;
+            $result[$productId] = $supplierId ? ($suppliers[$supplierId] ?? null) : null;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get category info for products.
+     */
+    private function getCategoryInfo(array $productIds): array
+    {
+        $products = Product::whereIn('ID', $productIds)
+            ->with('category')
             ->get()
             ->keyBy('ID');
 
         $result = [];
         foreach ($productIds as $productId) {
             $product = $products->get($productId);
-            $result[$productId] = $product?->supplierLink?->supplier?->NAME ?? null;
+            $result[$productId] = [
+                'id' => $product?->CATEGORY,
+                'name' => $product?->category?->NAME ?? 'Uncategorized',
+            ];
         }
 
         return $result;

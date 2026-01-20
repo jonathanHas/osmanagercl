@@ -54,10 +54,17 @@ The Categories Management System provides a universal interface for managing all
 - **Alphabetical Ordering**: Products on till are automatically sorted alphabetically by name
   - New products added to till have NULL CATORDER for consistent alphabetical sorting
   - Manual ordering capability preserved for future implementation
-- **Inline Editing**: 
+- **Inline Editing**:
   - Price adjustments with click-to-edit
   - Display name management
+  - Stock level editing (NEW! 2026-01-20)
   - Real-time updates without page reload
+- **Stock Display & Editing** (NEW! 2026-01-20):
+  - "Show Stock" checkbox toggle in filters section
+  - Click-to-edit stock values directly from products table
+  - Adaptive decimal display: shows decimals for liquids (e.g., 12.5), whole numbers for regular items (e.g., 12)
+  - Color-coded values: green for in-stock (>0), gray for out-of-stock (0)
+  - Uses existing `/products/{id}/update-stock` endpoint
 - **Search & Filter**:
   - Text search by name or code
   - Filter by till visibility status

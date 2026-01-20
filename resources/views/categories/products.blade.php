@@ -24,7 +24,7 @@
             
             <!-- Search and Filters -->
             <div class="bg-white rounded-lg shadow mb-6 p-6">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <!-- Search Box -->
                     <div class="md:col-span-2">
                         <label for="search" class="block text-sm font-medium text-gray-700 mb-2">Search Products</label>
@@ -48,8 +48,18 @@
                             <option value="unavailable">Not on Till</option>
                         </select>
                     </div>
+
+                    <!-- Show Stock Toggle -->
+                    <div class="flex items-end">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox"
+                                   x-model="showStock"
+                                   class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500">
+                            <span class="ml-2 text-sm text-gray-700">Show Stock</span>
+                        </label>
+                    </div>
                 </div>
-                
+
                 <!-- Results Info -->
                 <div class="mt-4 flex items-center justify-between">
                     <div class="text-sm text-gray-600">
@@ -85,6 +95,9 @@
                                 </th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Price
+                                </th>
+                                <th x-show="showStock" class="w-20 px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Stock
                                 </th>
                                 <th class="w-20 px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Till Status
@@ -175,7 +188,38 @@
                                             </div>
                                         </div>
                                     </td>
-                                    
+
+                                    <!-- Stock (Editable) -->
+                                    <td x-show="showStock" class="px-4 py-4 text-right">
+                                        <div x-data="{
+                                            editing: false,
+                                            newStock: parseFloat(product.current_stock || 0),
+                                            get hasDecimals() { return (product.current_stock || 0) % 1 !== 0; }
+                                        }">
+                                            <!-- Display mode -->
+                                            <div x-show="!editing"
+                                                 @click="editing = true; $nextTick(() => $refs.stockInput.focus())"
+                                                 class="cursor-pointer hover:bg-yellow-50 px-2 py-1 rounded inline-block">
+                                                <span class="text-sm font-medium"
+                                                      :class="(product.current_stock || 0) > 0 ? 'text-green-600' : 'text-gray-400'"
+                                                      x-text="hasDecimals ? parseFloat(product.current_stock || 0).toFixed(1) : parseInt(product.current_stock || 0)"></span>
+                                            </div>
+                                            <!-- Edit mode -->
+                                            <div x-show="editing" x-cloak>
+                                                <input type="number"
+                                                       x-ref="stockInput"
+                                                       x-model="newStock"
+                                                       :step="hasDecimals ? '0.1' : '1'"
+                                                       min="0"
+                                                       max="9999"
+                                                       @keyup.enter.prevent="window.categoryManagementInstance.updateStock(product.ID, newStock); editing = false"
+                                                       @keyup.escape="editing = false; newStock = parseFloat(product.current_stock || 0)"
+                                                       @blur="window.categoryManagementInstance.updateStock(product.ID, newStock); editing = false"
+                                                       class="w-16 text-sm text-right border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500">
+                                            </div>
+                                        </div>
+                                    </td>
+
                                     <!-- Availability Toggle -->
                                     <td class="px-4 py-4 text-center">
                                         <button @click="toggleProductAvailability(product.CODE, !product.is_available)"
@@ -216,16 +260,26 @@
 
     @push('scripts')
     <script>
+        // Global reference for nested component access
+        window.categoryManagementInstance = null;
+
         function categoryManagementSystem() {
             return {
                 products: {!! json_encode($products->map(function($product) {
                     $product->is_available = $product->is_visible;
                     $product->current_price = $product->PRICESELL * (1 + $product->getVatRate());
+                    $product->current_stock = $product->getCurrentStock();
                     return $product;
                 }) ?? []) !!},
                 searchTerm: '{{ $search ?? '' }}',
                 availabilityFilter: '{{ $availability ?? 'all' }}',
                 searching: false,
+                showStock: false,
+
+                init() {
+                    // Store global reference for nested components
+                    window.categoryManagementInstance = this;
+                },
                 
                 async performSearch() {
                     this.searching = true;
@@ -334,7 +388,39 @@
                         this.showNotification('An error occurred', 'error');
                     }
                 },
-                
+
+                async updateStock(productId, newStock) {
+                    try {
+                        const response = await fetch('/products/' + productId + '/update-stock', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify({ stock_units: parseFloat(newStock) })
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok && data.success) {
+                            this.showNotification('Stock updated', 'success');
+                            // Update the product in the local array
+                            const product = this.products.find(p => p.ID === productId);
+                            if (product) {
+                                product.current_stock = parseFloat(newStock);
+                            }
+                            return true;
+                        } else {
+                            this.showNotification(data.error || 'Failed to update stock', 'error');
+                            return false;
+                        }
+                    } catch (error) {
+                        console.error('Error updating stock:', error);
+                        this.showNotification('An error occurred', 'error');
+                        return false;
+                    }
+                },
+
                 showNotification(message, type = 'info') {
                     // Simple notification - you can enhance this with a toast library
                     const alertType = type === 'error' ? 'alert' : 'log';

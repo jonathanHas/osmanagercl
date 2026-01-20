@@ -84,19 +84,177 @@
                 </p>
             </div>
 
-            <!-- Search -->
+            <!-- Add Product Search -->
+            <div class="mb-6 bg-white overflow-visible shadow-sm sm:rounded-lg" x-data="productSearch()">
+                <div class="p-6">
+                    <h3 class="text-sm font-medium text-gray-700 mb-3">Add Product to Kitchen List</h3>
+                    <div class="relative">
+                        <div class="flex gap-2">
+                            <div class="flex-1 relative">
+                                <input type="text"
+                                       x-model="query"
+                                       @input.debounce.300ms="search()"
+                                       @focus="showResults = results.length > 0"
+                                       @keydown.escape="showResults = false"
+                                       placeholder="Search by product name, barcode, or supplier code..."
+                                       class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <div x-show="loading" class="absolute right-3 top-2.5">
+                                    <svg class="animate-spin h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Search Results Dropdown -->
+                        <div x-show="showResults && results.length > 0"
+                             x-cloak
+                             @click.outside="showResults = false"
+                             class="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-80 overflow-y-auto">
+                            <template x-for="product in results" :key="product.id">
+                                <div class="px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 flex items-center justify-between">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="font-medium text-gray-900 truncate" x-text="product.name"></div>
+                                        <div class="text-xs text-gray-500 flex flex-wrap gap-x-3">
+                                            <span x-show="product.code">Barcode: <span x-text="product.code" class="font-mono"></span></span>
+                                            <span x-show="product.supplier_code">Supplier Code: <span x-text="product.supplier_code" class="font-mono"></span></span>
+                                            <span x-show="product.supplier" class="text-indigo-600" x-text="product.supplier"></span>
+                                        </div>
+                                    </div>
+                                    <button type="button"
+                                            @click="addProduct(product)"
+                                            :disabled="adding === product.id"
+                                            class="ml-3 px-3 py-1.5 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-md disabled:opacity-50 disabled:cursor-wait">
+                                        <span x-show="adding !== product.id">Add</span>
+                                        <span x-show="adding === product.id">Adding...</span>
+                                    </button>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- No Results Message -->
+                        <div x-show="showResults && results.length === 0 && query.length >= 2 && !loading"
+                             x-cloak
+                             class="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg p-4 text-center text-gray-500">
+                            No products found matching "<span x-text="query"></span>"
+                        </div>
+
+                        <!-- Success Message -->
+                        <div x-show="successMessage"
+                             x-transition:enter="transition ease-out duration-200"
+                             x-transition:leave="transition ease-in duration-150"
+                             class="mt-2 p-2 bg-green-100 border border-green-300 text-green-700 rounded-md text-sm">
+                            <span x-text="successMessage"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                function productSearch() {
+                    return {
+                        query: '',
+                        results: [],
+                        showResults: false,
+                        loading: false,
+                        adding: null,
+                        successMessage: '',
+
+                        async search() {
+                            if (this.query.length < 2) {
+                                this.results = [];
+                                this.showResults = false;
+                                return;
+                            }
+
+                            this.loading = true;
+                            try {
+                                const response = await fetch(`{{ route('kitchen.products.search') }}?q=${encodeURIComponent(this.query)}`);
+                                this.results = await response.json();
+                                this.showResults = true;
+                            } catch (error) {
+                                console.error('Search failed:', error);
+                            } finally {
+                                this.loading = false;
+                            }
+                        },
+
+                        async addProduct(product) {
+                            this.adding = product.id;
+                            try {
+                                const response = await fetch('{{ route('kitchen.products.toggle') }}', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                        'Accept': 'application/json'
+                                    },
+                                    body: JSON.stringify({ product_id: product.id })
+                                });
+
+                                const data = await response.json();
+
+                                if (data.success && data.is_kitchen) {
+                                    // Remove from results
+                                    this.results = this.results.filter(p => p.id !== product.id);
+                                    this.successMessage = `"${product.name}" added to kitchen products`;
+
+                                    // Clear success message after 3 seconds
+                                    setTimeout(() => {
+                                        this.successMessage = '';
+                                    }, 3000);
+
+                                    // Reload page to show the new product
+                                    setTimeout(() => {
+                                        window.location.reload();
+                                    }, 1000);
+                                }
+                            } catch (error) {
+                                console.error('Add failed:', error);
+                                alert('Failed to add product. Please try again.');
+                            } finally {
+                                this.adding = null;
+                            }
+                        }
+                    };
+                }
+            </script>
+
+            <!-- Filters -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
                 <div class="p-6">
-                    <form method="GET" action="{{ route('kitchen.products.index') }}" class="flex gap-4">
-                        <div class="flex-1">
+                    <form method="GET" action="{{ route('kitchen.products.index') }}" class="flex flex-wrap items-center gap-4">
+                        <div class="flex-1 min-w-[200px]">
                             <input type="text" name="search" value="{{ $search }}"
                                    placeholder="Search by product name or code..."
                                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                         </div>
+
+                        <!-- Supplier dropdown -->
+                        <div class="w-48">
+                            <select name="supplier" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="">All Suppliers</option>
+                                @foreach($availableSuppliers as $supplier)
+                                    <option value="{{ $supplier }}" {{ $selectedSupplier === $supplier ? 'selected' : '' }}>
+                                        {{ $supplier }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <!-- Group by Category checkbox -->
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input type="checkbox" name="group_by_category" value="1"
+                                   {{ $groupByCategory ? 'checked' : '' }}
+                                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <span class="ml-2 text-sm text-gray-700">Group by Category</span>
+                        </label>
+
                         <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
-                            Search
+                            Filter
                         </button>
-                        @if($search)
+                        @if($search || $selectedSupplier || $groupByCategory)
                             <a href="{{ route('kitchen.products.index') }}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">
                                 Clear
                             </a>
@@ -126,7 +284,46 @@
                                 </a>
                             </div>
                         </div>
+                    @elseif($groupByCategory)
+                        {{-- Grouped by Category View --}}
+                        @php
+                            $groupedProducts = $kitchenProducts->groupBy(function($kp) use ($categoryInfo) {
+                                return $categoryInfo[$kp->product_id]['name'] ?? 'Uncategorized';
+                            })->sortKeys();
+                        @endphp
+
+                        @foreach($groupedProducts as $categoryName => $products)
+                            <div class="mb-8 last:mb-0">
+                                <h3 class="text-lg font-semibold text-gray-800 mb-3 pb-2 border-b border-gray-200">
+                                    {{ $categoryName }}
+                                    <span class="text-sm font-normal text-gray-500">({{ $products->count() }} products)</span>
+                                </h3>
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
+                                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Kitchen Sales (avg/wk)</th>
+                                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Total (6mo)</th>
+                                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Profile</th>
+                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        @foreach($products as $kitchenProduct)
+                                            @include('kitchen.products.partials.product-row', [
+                                                'kitchenProduct' => $kitchenProduct,
+                                                'kitchenSales' => $kitchenSales,
+                                                'supplierInfo' => $supplierInfo,
+                                                'profiledProductIds' => $profiledProductIds,
+                                            ])
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endforeach
                     @else
+                        {{-- Standard Table View --}}
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
@@ -140,62 +337,12 @@
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                                 @foreach($kitchenProducts as $kitchenProduct)
-                                    @php
-                                        $product = $kitchenProduct->product;
-                                        $sales = $kitchenSales[$kitchenProduct->product_id] ?? ['avg_weekly' => 0, 'total_6_months' => 0];
-                                        $supplier = $supplierInfo[$kitchenProduct->product_id] ?? null;
-                                        $profileId = $profiledProductIds[$kitchenProduct->product_id] ?? null;
-                                    @endphp
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="font-medium text-gray-900">{{ $product?->NAME ?? 'Unknown Product' }}</div>
-                                            <div class="text-xs text-gray-500">{{ $product?->CODE ?? $kitchenProduct->product_id }}</div>
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {{ $supplier ?? '-' }}
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-center">
-                                            @if($sales['avg_weekly'] > 0)
-                                                <span class="text-sm font-medium text-orange-600">{{ number_format($sales['avg_weekly'], 1) }}</span>
-                                            @else
-                                                <span class="text-sm text-gray-400">-</span>
-                                            @endif
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-center">
-                                            @if($sales['total_6_months'] > 0)
-                                                <span class="text-sm font-medium text-gray-700">{{ number_format($sales['total_6_months'], 0) }}</span>
-                                            @else
-                                                <span class="text-sm text-gray-400">-</span>
-                                            @endif
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-center">
-                                            @if($profileId)
-                                                <a href="{{ route('kitchen.profiles.edit', $profileId) }}"
-                                                   class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200">
-                                                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                                    </svg>
-                                                    Has Profile
-                                                </a>
-                                            @else
-                                                <a href="{{ route('kitchen.profiles.create', ['product_id' => $kitchenProduct->product_id]) }}"
-                                                   class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200">
-                                                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                                                    </svg>
-                                                    Create Profile
-                                                </a>
-                                            @endif
-                                        </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <form action="{{ route('kitchen.products.destroy', $kitchenProduct) }}" method="POST" class="inline"
-                                                  onsubmit="return confirm('Remove this product from the kitchen list?');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="text-red-600 hover:text-red-900">Remove</button>
-                                            </form>
-                                        </td>
-                                    </tr>
+                                    @include('kitchen.products.partials.product-row', [
+                                        'kitchenProduct' => $kitchenProduct,
+                                        'kitchenSales' => $kitchenSales,
+                                        'supplierInfo' => $supplierInfo,
+                                        'profiledProductIds' => $profiledProductIds,
+                                    ])
                                 @endforeach
                             </tbody>
                         </table>

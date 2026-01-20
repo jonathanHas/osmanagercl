@@ -177,7 +177,7 @@ class CategoriesController extends Controller
         $search = $request->get('search', '');
         $availability = $request->get('availability', 'all');
 
-        $query = $category->products()->with(['category']);
+        $query = $category->products()->with(['category', 'stockCurrent']);
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -210,6 +210,7 @@ class CategoriesController extends Controller
                 'products' => $products->map(function ($product) {
                     $product->is_available = $product->is_visible;
                     $product->current_price = $product->PRICESELL * (1 + $product->getVatRate());
+                    $product->current_stock = $product->getCurrentStock();
 
                     return $product;
                 }),

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **📦 Category Products Stock Display & Editing** (2026-01-20)
+  - **Show Stock Toggle**: New checkbox in filters to display/hide stock column
+  - **Editable Stock Values**: Click-to-edit inline stock editing on category products page
+  - **Adaptive Decimal Display**: Smart formatting shows decimals for liquid products, whole numbers for regular items
+  - **Real-time Updates**: Uses existing `/products/{id}/update-stock` endpoint for instant saves
+  - **Color-Coded Display**: Green for in-stock (>0), gray for out-of-stock (0)
+  - **Global Component Reference**: Follows delivery-legacy pattern for reliable nested component access
+  - **Files Modified**:
+    - `app/Http/Controllers/CategoriesController.php` - Added `stockCurrent` eager loading and `current_stock` to responses
+    - `resources/views/categories/products.blade.php` - Added stock toggle, editable column, and `updateStock()` method
+
 ### Fixed
 
 - **🔗 Delivery Legacy Match Page - Product Link Fixes** (2026-01-19)

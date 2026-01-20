@@ -368,6 +368,7 @@ Route::get('/suppliers/payments/export', [SupplierPaymentsController::class, 'ex
 
 ## Related Documentation
 
+- [Order Manager](./order-manager.md) - Stock monitoring for managed suppliers
 - [POS Integration](./pos-integration.md)
 - [Invoice Management](./invoice-management.md)
 - [OSAccounts Integration](./osaccounts-integration.md)

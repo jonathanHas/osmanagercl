@@ -29,6 +29,8 @@ class AccountingSupplier extends Model
         // Enhanced fields from migration
         'external_pos_id',
         'is_pos_linked',
+        'is_order_managed',
+        'order_manager_threshold',
         'external_osaccounts_id',
         'is_osaccounts_linked',
         'osaccounts_last_sync',
@@ -61,6 +63,8 @@ class AccountingSupplier extends Model
         'payment_terms_days' => 'integer',
         // Enhanced field casts
         'is_pos_linked' => 'boolean',
+        'is_order_managed' => 'boolean',
+        'order_manager_threshold' => 'integer',
         'total_spent' => 'decimal:2',
         'invoice_count' => 'integer',
         'average_invoice_value' => 'decimal:2',
@@ -167,6 +171,15 @@ class AccountingSupplier extends Model
     public function scopePosLinked($query)
     {
         return $query->where('is_pos_linked', true);
+    }
+
+    /**
+     * Scope for order-managed suppliers (must also be POS-linked).
+     */
+    public function scopeOrderManaged($query)
+    {
+        return $query->where('is_order_managed', true)
+            ->where('is_pos_linked', true);
     }
 
     /**

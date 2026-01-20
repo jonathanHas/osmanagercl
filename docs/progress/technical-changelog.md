@@ -1,5 +1,82 @@
 # Technical Changelog
 
+## 2026-01-20 - Category Products Stock Display & Editing
+
+### Overview
+Added the ability to view and edit stock levels directly from the category products page (`/categories/{id}/products`). Stock values are displayed with adaptive decimal formatting and can be edited inline.
+
+### Implementation Details
+
+#### Global Component Reference Pattern
+Adopted the same pattern used in delivery-legacy for reliable nested Alpine.js component access:
+
+```javascript
+// Global reference for nested component access
+window.categoryManagementInstance = null;
+
+function categoryManagementSystem() {
+    return {
+        init() {
+            window.categoryManagementInstance = this;
+        },
+        // ...
+    };
+}
+```
+
+#### Adaptive Decimal Display
+Stock values are displayed based on whether they contain decimal components:
+- `12.5` → displays as `12.5` with `step="0.1"` (liquids, refills)
+- `12.0` → displays as `12` with `step="1"` (regular items)
+
+```javascript
+get hasDecimals() { return (product.current_stock || 0) % 1 !== 0; }
+```
+
+### Files Modified
+
+#### `/app/Http/Controllers/CategoriesController.php`
+**Changes:**
+- Added `stockCurrent` to eager loading in `products()` method
+- Added `current_stock` to JSON response for AJAX requests
+
+```php
+$query = $category->products()->with(['category', 'stockCurrent']);
+// ...
+$product->current_stock = $product->getCurrentStock();
+```
+
+#### `/resources/views/categories/products.blade.php`
+**Changes:**
+- Added "Show Stock" checkbox toggle in filters section
+- Changed grid from 3 to 4 columns to accommodate toggle
+- Added `showStock: false` to Alpine.js state
+- Added `init()` method with global reference storage
+- Added stock column header with `x-show="showStock"`
+- Added editable stock cell with click-to-edit pattern
+- Added `updateStock()` async method to Alpine.js component
+
+### Technical Notes
+
+#### Why Global Reference Instead of $root
+The `$root` context in nested Alpine.js components can be unreliable when:
+- Components are deeply nested
+- Components are inside template loops
+- The component hierarchy changes dynamically
+
+The global reference pattern (`window.categoryManagementInstance`) provides:
+- Guaranteed access to parent component methods
+- Reliable function calls from nested `x-data` scopes
+- Consistency with the working delivery-legacy implementation
+
+#### Existing Endpoint Reuse
+No backend changes were needed - the existing endpoint is reused:
+- Route: `POST /products/{id}/update-stock`
+- Controller: `ProductController@updateStock`
+- Validation: `numeric|min:0|max:9999.99`
+
+---
+
 ## 2026-01-19 - Internal Customer Sales Tracking (Coffee & Kitchen)
 
 ### Overview

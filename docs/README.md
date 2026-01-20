@@ -30,6 +30,7 @@ Detailed documentation for each major feature. See **[Features Index](./FEATURES
 - [Delivery System](./features/delivery-system.md) - Multi-format delivery verification
 - [Supplier Integration](./features/supplier-integration.md) - Multi-supplier connectivity
 - [Supplier Management](./features/supplier-management.md) - Unified supplier management
+- [Order Manager](./features/order-manager.md) - Stock monitoring for managed suppliers
 
 **Financial Systems**
 - [Bank Reconciliation System](./features/bank-reconciliation-system.md) - AI-powered reconciliation

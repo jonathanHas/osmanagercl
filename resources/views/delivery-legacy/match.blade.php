@@ -158,6 +158,8 @@
                                     <tr>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Expected</th>
+                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Inv Case</th>
+                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">DB Case</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Scanned</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Diff</th>
                                         <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Impact</th>
@@ -206,6 +208,8 @@
                                                 <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
                                             </td>
                                             <td class="px-3 py-2 text-center font-medium">{{ $unitsDelivered }}</td>
+                                            <td class="px-3 py-2 text-center text-gray-600">{{ $item->invoiceCaseUnits ?? '-' }}</td>
+                                            <td class="px-3 py-2 text-center {{ ($item->invoiceCaseUnits ?? null) != ($item->CaseUnits ?? null) ? 'text-orange-600 font-bold' : 'text-gray-600' }}">{{ $item->CaseUnits ?? '-' }}</td>
                                             <td class="px-3 py-2 text-center font-medium text-blue-600"
                                                 x-data="{ editing: false, qty: {{ $item->scanned ?? 0 }}, originalQty: {{ $item->scanned ?? 0 }}, saving: false }">
                                                 <template x-if="!editing">
@@ -297,6 +301,8 @@
                                     <tr>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Expected</th>
+                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Inv Case</th>
+                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">DB Case</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Scanned</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Issue</th>
                                         <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Impact</th>
@@ -348,6 +354,8 @@
                                                 <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
                                             </td>
                                             <td class="px-3 py-2 text-center font-medium">{{ $unitsDelivered }}</td>
+                                            <td class="px-3 py-2 text-center text-gray-600">{{ $item->invoiceCaseUnits ?? '-' }}</td>
+                                            <td class="px-3 py-2 text-center {{ ($item->invoiceCaseUnits ?? null) != ($item->CaseUnits ?? null) ? 'text-orange-600 font-bold' : 'text-gray-600' }}">{{ $item->CaseUnits ?? '-' }}</td>
                                             <td class="px-3 py-2 text-center font-medium"
                                                 :class="qty !== null ? 'text-blue-600' : 'text-gray-400'"
                                                 x-data="{ editing: false, qty: {{ $item->scanned !== null ? $item->scanned : 'null' }}, originalQty: {{ $item->scanned !== null ? $item->scanned : 'null' }}, saving: false }">
@@ -442,6 +450,8 @@
                                     <tr>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Expected</th>
+                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Inv Case</th>
+                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">DB Case</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Scanned</th>
                                         <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Value</th>
                                         <template x-if="showDetails">
@@ -487,6 +497,8 @@
                                                 <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
                                             </td>
                                             <td class="px-3 py-2 text-center font-medium text-green-600">{{ $unitsDelivered }}</td>
+                                            <td class="px-3 py-2 text-center text-gray-600">{{ $item->invoiceCaseUnits ?? '-' }}</td>
+                                            <td class="px-3 py-2 text-center {{ ($item->invoiceCaseUnits ?? null) != ($item->CaseUnits ?? null) ? 'text-orange-600 font-bold' : 'text-gray-600' }}">{{ $item->CaseUnits ?? '-' }}</td>
                                             <td class="px-3 py-2 text-center font-medium text-green-600"
                                                 x-data="{ editing: false, qty: {{ $item->scanned ?? 0 }}, originalQty: {{ $item->scanned ?? 0 }}, saving: false }">
                                                 <template x-if="!editing">
@@ -664,6 +676,7 @@
                                     <tr>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Barcode</th>
+                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Case Units</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Scanned Qty</th>
                                         <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Sell Price</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">VAT</th>
@@ -688,6 +701,7 @@
                                                     <span class="text-gray-500">-</span>
                                                 @endif
                                             </td>
+                                            <td class="px-3 py-2 text-center text-gray-600">{{ $item->CaseUnits ?? '-' }}</td>
                                             <td class="px-3 py-2 text-center font-medium text-orange-600"
                                                 x-data="{ editing: false, qty: {{ $item->scanned ?? 0 }}, originalQty: {{ $item->scanned ?? 0 }}, saving: false }">
                                                 <template x-if="!editing">

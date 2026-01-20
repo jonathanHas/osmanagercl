@@ -56,6 +56,10 @@ Universal category management interface for all product categories.
   - "Show hidden categories" checkbox on Products page
   - Visible/hidden count stats in Categories header
 - **Product Management**: Inline editing of prices and display names
+- **Stock Display & Editing** (NEW! 2026-01-20): View and edit stock levels directly from category products page
+  - "Show Stock" toggle to display stock column
+  - Click-to-edit inline stock values with adaptive decimal display
+  - Automatic formatting: decimals for liquids, whole numbers for regular items
 - **Subcategory Support**: Navigate category hierarchies
 - **Search & Filter**: Find products and categories quickly
 
@@ -204,6 +208,18 @@ Comprehensive payment history report with flexible sorting and grouping options.
 - **Navigation**: Accessible via green "Payments" button on suppliers index
 
 📖 [Supplier Management Documentation](./features/supplier-management.md#supplier-payments-report)
+
+### Order Manager (NEW! 2026-01-20)
+Decision-support tool for monitoring stock levels of smaller, non-routine suppliers.
+- **Managed Supplier Selection**: Mark specific POS-linked suppliers for stock monitoring
+- **Per-Supplier Thresholds**: Set custom stock threshold for each managed supplier (default: 10 units)
+- **Expandable Product View**: Click to expand and see all products with current stock levels
+- **Stock Status Indicators**: Color-coded badges (Out of Stock, Low Stock, OK)
+- **Stock Check Report**: User-initiated check showing suppliers and products needing attention
+- **Real-time Updates**: Threshold changes immediately refresh the expanded view
+- **Support Tool Only**: Highlights ordering needs—does not place orders automatically
+
+📖 [Order Manager Documentation](./features/order-manager.md)
 
 ---
 
