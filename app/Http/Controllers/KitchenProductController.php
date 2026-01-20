@@ -190,28 +190,16 @@ class KitchenProductController extends Controller
      */
     private function getSupplierInfo(array $productIds): array
     {
-        // Get supplier from products table
+        // Get products with their supplier links
         $products = Product::whereIn('ID', $productIds)
-            ->select('ID', 'SUPPLIER')
+            ->with('supplierLink.supplier')
             ->get()
             ->keyBy('ID');
-
-        // Get supplier names
-        $supplierIds = $products->pluck('SUPPLIER')->filter()->unique()->toArray();
-        $suppliers = [];
-        if (! empty($supplierIds)) {
-            $suppliers = DB::connection('pos')
-                ->table('SUPPLIERS')
-                ->whereIn('ID', $supplierIds)
-                ->pluck('NAME', 'ID')
-                ->toArray();
-        }
 
         $result = [];
         foreach ($productIds as $productId) {
             $product = $products->get($productId);
-            $supplierId = $product?->SUPPLIER;
-            $result[$productId] = $supplierId ? ($suppliers[$supplierId] ?? 'Unknown') : null;
+            $result[$productId] = $product?->supplierLink?->supplier?->NAME ?? null;
         }
 
         return $result;
