@@ -81,6 +81,15 @@ class DeliveryLegacyController extends Controller
         // Calculate financial summaries for dashboard
         $financials = $this->calculateFinancials($matchedItems, $scannedNotOnInvoice, $onInvoiceNotScanned, $isUdea);
 
+        // Calculate stock preview for update confirmation
+        $stockPreview = $this->calculateStockPreview($matchedItems, $scannedNotOnInvoice);
+
+        // Check if delivery is completed
+        $scanSession = DB::connection('pos')->table('deliveriesScan')
+            ->where('ID', $deliveryId)
+            ->first();
+        $isCompleted = $scanSession && $scanSession->status == 1;
+
         return view('delivery-legacy.match', compact(
             'matchedItems',
             'scannedNotOnInvoice',
@@ -89,7 +98,9 @@ class DeliveryLegacyController extends Controller
             'deliveryId',
             'supplierId',
             'isUdea',
-            'financials'
+            'financials',
+            'stockPreview',
+            'isCompleted'
         ));
     }
 
@@ -154,10 +165,12 @@ class DeliveryLegacyController extends Controller
                     TAXES.RATE,
                     sl.SupplierCode,
                     sl.CaseUnits,
-                    PRODUCTS.ID as productID
+                    PRODUCTS.ID as productID,
+                    STOCKCURRENT.UNITS
                 FROM deliveriesScanItems
                 LEFT JOIN PRODUCTS ON PRODUCTS.CODE = deliveriesScanItems.barcode
                 LEFT JOIN TAXES ON PRODUCTS.TAXCAT = TAXES.ID
+                LEFT JOIN STOCKCURRENT ON PRODUCTS.ID = STOCKCURRENT.PRODUCT
                 LEFT JOIN supplier_link sl ON sl.Barcode = deliveriesScanItems.barcode
                     AND sl.SupplierID = ?
                 WHERE deliveriesScanItems.delID = ?
@@ -170,7 +183,7 @@ class DeliveryLegacyController extends Controller
                     AND supplier_link.Barcode IS NOT NULL
                     GROUP BY supplier_link.Barcode
                 )
-                GROUP BY deliveriesScanItems.barcode, PRODUCTS.NAME, PRODUCTS.PRICESELL, TAXES.RATE, sl.SupplierCode, sl.CaseUnits, PRODUCTS.ID
+                GROUP BY deliveriesScanItems.barcode, PRODUCTS.NAME, PRODUCTS.PRICESELL, TAXES.RATE, sl.SupplierCode, sl.CaseUnits, PRODUCTS.ID, STOCKCURRENT.UNITS
                 ORDER BY PRODUCTS.NAME';
 
         $results = DB::connection('pos')->select($sql, [$supplierId, $deliveryId, $supplierId, $supplierId]);
@@ -272,6 +285,39 @@ class DeliveryLegacyController extends Controller
     }
 
     /**
+     * Calculate stock preview data for the update confirmation.
+     */
+    private function calculateStockPreview(array $matchedItems, array $extraItems): array
+    {
+        $productsToUpdate = 0;
+        $totalUnitsToAdd = 0;
+        $productIds = [];
+
+        foreach (array_merge($matchedItems, $extraItems) as $item) {
+            if ($item->scanned !== null && $item->scanned > 0 && $item->productID) {
+                $productsToUpdate++;
+                $totalUnitsToAdd += $item->scanned;
+                $productIds[] = $item->productID;
+            }
+        }
+
+        // Get current stock total for these products
+        $currentStockTotal = 0;
+        if (! empty($productIds)) {
+            $currentStockTotal = DB::connection('pos')->table('STOCKCURRENT')
+                ->whereIn('PRODUCT', $productIds)
+                ->sum('UNITS') ?? 0;
+        }
+
+        return [
+            'productsToUpdate' => $productsToUpdate,
+            'totalUnitsToAdd' => $totalUnitsToAdd,
+            'currentStockTotal' => $currentStockTotal,
+            'expectedStockTotal' => $currentStockTotal + $totalUnitsToAdd,
+        ];
+    }
+
+    /**
      * Update the scanned quantity for a specific barcode in a delivery scan session.
      */
     public function updateScannedQuantity(Request $request)
@@ -338,5 +384,75 @@ class DeliveryLegacyController extends Controller
             'success' => true,
             'caseUnits' => $validated['caseUnits'],
         ]);
+    }
+
+    /**
+     * Complete the delivery by updating stock levels and marking as completed.
+     */
+    public function completeDelivery(Request $request)
+    {
+        $validated = $request->validate([
+            'delID' => 'required|string',
+            'supplierID' => 'required|string',
+        ]);
+
+        $delID = $validated['delID'];
+        $supplierID = $validated['supplierID'];
+
+        // Get matched items with scanned quantities
+        $matchedItems = $this->getMatchedItems($delID, $supplierID);
+        // Get extra items (scanned but NOT on invoice)
+        $extraItems = $this->getScannedNotOnInvoice($delID, $supplierID);
+
+        // Track update results
+        $updateResults = [
+            'productsUpdated' => 0,
+            'productsSkipped' => 0,
+            'unitsAdded' => 0,
+        ];
+
+        DB::connection('pos')->transaction(function () use ($matchedItems, $extraItems, $delID, &$updateResults) {
+            // Update stock for matched items (on invoice AND scanned)
+            foreach ($matchedItems as $item) {
+                if ($item->scanned !== null && $item->scanned > 0 && $item->productID) {
+                    $affected = DB::connection('pos')->table('STOCKCURRENT')
+                        ->where('PRODUCT', $item->productID)
+                        ->increment('UNITS', $item->scanned);
+
+                    if ($affected > 0) {
+                        $updateResults['productsUpdated']++;
+                        $updateResults['unitsAdded'] += $item->scanned;
+                    } else {
+                        $updateResults['productsSkipped']++;
+                    }
+                }
+            }
+
+            // Update stock for extra items (scanned but NOT on invoice)
+            foreach ($extraItems as $item) {
+                if ($item->scanned !== null && $item->scanned > 0 && $item->productID) {
+                    $affected = DB::connection('pos')->table('STOCKCURRENT')
+                        ->where('PRODUCT', $item->productID)
+                        ->increment('UNITS', $item->scanned);
+
+                    if ($affected > 0) {
+                        $updateResults['productsUpdated']++;
+                        $updateResults['unitsAdded'] += $item->scanned;
+                    } else {
+                        $updateResults['productsSkipped']++;
+                    }
+                }
+            }
+
+            // Mark delivery scan session as completed
+            DB::connection('pos')->table('deliveriesScan')
+                ->where('ID', $delID)
+                ->update(['status' => 1]);
+        });
+
+        return redirect()
+            ->route('delivery-legacy.match', ['delID' => $delID, 'supplierID' => $supplierID])
+            ->with('success', 'Stock updated successfully. Delivery marked as complete.')
+            ->with('updateResults', $updateResults);
     }
 }

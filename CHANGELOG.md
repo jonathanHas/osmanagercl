@@ -9,6 +9,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **📊 Delivery Legacy - Stock Update Verification System** (2026-01-21)
+  - **Stock Update Preview**: Blue card shows what will happen before clicking complete:
+    - Products to update count
+    - Total units to add
+    - Current stock total (for affected products only)
+    - Expected stock after update
+  - **Update Results Banner**: Enhanced completion banner shows actual results:
+    - Products actually updated
+    - Units actually added
+    - Products skipped (no STOCKCURRENT record)
+  - **Extra Items Stock Column**: Added Stock column to Extra Items section showing current stock
+  - **Extra Items Processing**: Fixed bug where Extra section items weren't included in stock updates
+  - **Files Modified**:
+    - `app/Http/Controllers/DeliveryLegacyController.php` - Added `calculateStockPreview()`, result tracking, STOCKCURRENT join for Extra Items
+    - `resources/views/delivery-legacy/match.blade.php` - Added preview card, enhanced completion banner, Stock column in Extra Items
+
+- **✅ Delivery Legacy - Update Stock & Completion** (2026-01-20)
+  - **Update Stock Button**: "Update Stock & Complete" button in header to finalize delivery verification
+  - **Stock Updates**: Increments `STOCKCURRENT.UNITS` for all products with scanned quantities
+  - **Completion Status**: Sets `deliveriesScan.status` to 1 (integer) to mark delivery as finalized
+  - **Read-Only Mode**: After completion, all edit functionality is disabled to preserve record
+  - **Completion Banner**: Green banner shows "Delivery Complete - Stock has been updated"
+  - **Visual Indicators**: Pencil icons and arrow buttons hidden when completed
+  - **Transaction Safety**: Stock updates and status change wrapped in database transaction
+  - **Confirmation Dialog**: Warns user before completing (action cannot be undone)
+  - **Files Modified**:
+    - `routes/web.php` - Added `delivery-legacy.complete` route
+    - `app/Http/Controllers/DeliveryLegacyController.php` - Added `completeDelivery()`, `isCompleted` check
+    - `resources/views/delivery-legacy/match.blade.php` - Added button, banner, `canEdit` pattern for read-only
+
+- **📝 Delivery Legacy - Delivered Column for Pending Items** (2026-01-20)
+  - **Delivered Column**: New column in "Pending - Not Yet Scanned" section for entering quantities
+  - **Arrow Auto-Fill**: Click → button to copy expected quantity to delivered field instantly
+  - **Manual Entry**: Click delivered field directly for custom quantity entry
+  - **Decimal Support**: Accepts up to 3 decimal places for weight-based items (step="0.001")
+  - **Workflow Integration**: Saved items move to Verified or Critical sections automatically
+  - **Use Case**: Allows quantity entry for non-scannable items (no barcode, bulk items, etc.)
+  - **Files Modified**:
+    - `resources/views/delivery-legacy/match.blade.php` - Added Delivered column with arrow button and editable input
+
+- **🔧 Delivery Legacy - Case Quantity Mismatch Improvements** (2026-01-20)
+  - **Issue Column in Critical Issues**: Now shows "Case: X → Y" badge when case units mismatch alongside quantity issues
+  - **Inline-Editable DB Case**: Click DB Case column to edit `supplier_link.CaseUnits` directly
+  - **Consistent Editing Pattern**: Same UX as scanned quantity editing (click, edit, save/cancel)
+  - **Auto Recalculation**: Page reloads after case update to reflect new expected quantities
+  - **Available Everywhere**: Case editing works in Critical Issues, Warnings, and Verified sections
+  - **Files Created/Modified**:
+    - `routes/web.php` - Added `delivery-legacy.update-case-units` route
+    - `app/Http/Controllers/DeliveryLegacyController.php` - Added `updateCaseUnits()` method
+    - `resources/views/delivery-legacy/match.blade.php` - Added Issue column, editable DB Case, JS handler
+
 - **📦 Category Products Stock Display & Editing** (2026-01-20)
   - **Show Stock Toggle**: New checkbox in filters to display/hide stock column
   - **Editable Stock Values**: Click-to-edit inline stock editing on category products page

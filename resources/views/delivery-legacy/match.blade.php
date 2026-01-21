@@ -10,18 +10,86 @@
                     | Scan Session: <span class="font-medium">#{{ $deliveryId }}</span>
                 </p>
             </div>
-            <a href="{{ route('delivery-legacy.index') }}"
-               class="inline-flex items-center px-4 py-2 bg-gray-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700">
-                Back to Selection
-            </a>
+            <div class="flex items-center gap-3">
+                @if(!$isCompleted)
+                    <form method="POST" action="{{ route('delivery-legacy.complete') }}"
+                          onsubmit="return confirm('This will update stock levels for all scanned items and mark this delivery as complete. This action cannot be undone. Continue?')">
+                        @csrf
+                        <input type="hidden" name="delID" value="{{ $deliveryId }}">
+                        <input type="hidden" name="supplierID" value="{{ $supplierId }}">
+                        <button type="submit"
+                                class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700 gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            Update Stock & Complete
+                        </button>
+                    </form>
+                @endif
+                <a href="{{ route('delivery-legacy.index') }}"
+                   class="inline-flex items-center px-4 py-2 bg-gray-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700">
+                    Back to Selection
+                </a>
+            </div>
         </div>
     </x-slot>
 
     <div class="py-6" x-data="deliveryMatch()" x-ref="deliveryMatchRoot">
         <div class="max-w-full mx-auto sm:px-6 lg:px-8">
+            @if(session('success'))
+                <div class="mb-4 p-4 bg-green-100 border border-green-300 rounded-lg text-green-800">
+                    {{ session('success') }}
+                </div>
+            @endif
+
+            @if($isCompleted)
+                <div class="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div class="flex items-center gap-2 mb-2">
+                        <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span class="font-medium text-green-800">Delivery Complete - Stock Updated</span>
+                    </div>
+                    @if(session('updateResults'))
+                        @php $results = session('updateResults'); @endphp
+                        <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm max-w-xs ml-7">
+                            <div class="text-gray-600">Products updated:</div>
+                            <div class="font-medium text-gray-800">{{ $results['productsUpdated'] }}</div>
+                            <div class="text-gray-600">Units added:</div>
+                            <div class="font-medium text-gray-800">{{ number_format($results['unitsAdded'], 2) }}</div>
+                            @if($results['productsSkipped'] > 0)
+                                <div class="text-orange-600">Products skipped:</div>
+                                <div class="font-medium text-orange-600">{{ $results['productsSkipped'] }} (no stock record)</div>
+                            @endif
+                        </div>
+                    @endif
+                </div>
+            @endif
+
             @if($isUdea)
                 <div class="mb-4 bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded">
                     <strong>Note:</strong> Profit and Margin adjusted for UDEA delivery charge (15%)
+                </div>
+            @endif
+
+            @if(!$isCompleted && $stockPreview['productsToUpdate'] > 0)
+                <div class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h4 class="font-medium text-blue-800 mb-2 flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                        </svg>
+                        Stock Update Preview
+                    </h4>
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm max-w-xs">
+                        <div class="text-gray-600">Products to update:</div>
+                        <div class="font-medium text-gray-800">{{ $stockPreview['productsToUpdate'] }}</div>
+                        <div class="text-gray-600">Total units to add:</div>
+                        <div class="font-medium text-gray-800">{{ number_format($stockPreview['totalUnitsToAdd'], 2) }}</div>
+                        <div class="text-gray-600">Current stock total:</div>
+                        <div class="font-medium text-gray-800">{{ number_format($stockPreview['currentStockTotal'], 2) }}</div>
+                        <div class="text-gray-600">Expected after update:</div>
+                        <div class="font-medium text-green-600">{{ number_format($stockPreview['expectedStockTotal'], 2) }}</div>
+                    </div>
                 </div>
             @endif
 
@@ -212,13 +280,14 @@
                                             <td class="px-3 py-2 text-center font-medium">{{ $unitsDelivered }}</td>
                                             <td class="px-3 py-2 text-center text-gray-600">{{ $item->invoiceCaseUnits ?? '-' }}</td>
                                             <td class="px-3 py-2 text-center"
-                                                x-data="{ editing: false, caseQty: {{ $item->CaseUnits ?? 1 }}, originalCaseQty: {{ $item->CaseUnits ?? 1 }}, saving: false }">
+                                                x-data="{ editing: false, caseQty: {{ $item->CaseUnits ?? 1 }}, originalCaseQty: {{ $item->CaseUnits ?? 1 }}, saving: false, canEdit: {{ $isCompleted ? 'false' : 'true' }} }">
                                                 <template x-if="!editing">
-                                                    <span @click="editing = true; $nextTick(() => $refs.caseInput.select())"
-                                                          class="cursor-pointer hover:bg-blue-100 px-2 py-1 rounded inline-flex items-center gap-1 {{ $hasCaseUnitChange ? 'text-orange-600 font-bold' : 'text-gray-600' }}"
-                                                          title="Click to edit DB case units">
+                                                    <span @click="canEdit && (editing = true, $nextTick(() => $refs.caseInput.select()))"
+                                                          :class="canEdit ? 'cursor-pointer hover:bg-blue-100' : ''"
+                                                          class="px-2 py-1 rounded inline-flex items-center gap-1 {{ $hasCaseUnitChange ? 'text-orange-600 font-bold' : 'text-gray-600' }}"
+                                                          :title="canEdit ? 'Click to edit DB case units' : ''">
                                                         <span x-text="caseQty"></span>
-                                                        <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <svg x-show="canEdit" class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
                                                         </svg>
                                                     </span>
@@ -243,13 +312,14 @@
                                                 </template>
                                             </td>
                                             <td class="px-3 py-2 text-center font-medium text-blue-600"
-                                                x-data="{ editing: false, qty: {{ $item->scanned ?? 0 }}, originalQty: {{ $item->scanned ?? 0 }}, saving: false }">
+                                                x-data="{ editing: false, qty: {{ $item->scanned ?? 0 }}, originalQty: {{ $item->scanned ?? 0 }}, saving: false, canEdit: {{ $isCompleted ? 'false' : 'true' }} }">
                                                 <template x-if="!editing">
-                                                    <span @click="editing = true; $nextTick(() => $refs.qtyInput.select())"
-                                                          class="cursor-pointer hover:bg-blue-100 px-2 py-1 rounded inline-flex items-center gap-1"
-                                                          title="Click to edit">
+                                                    <span @click="canEdit && (editing = true, $nextTick(() => $refs.qtyInput.select()))"
+                                                          :class="canEdit ? 'cursor-pointer hover:bg-blue-100' : ''"
+                                                          class="px-2 py-1 rounded inline-flex items-center gap-1"
+                                                          :title="canEdit ? 'Click to edit' : ''">
                                                         <span x-text="qty"></span>
-                                                        <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <svg x-show="canEdit" class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
                                                         </svg>
                                                     </span>
@@ -395,13 +465,14 @@
                                             <td class="px-3 py-2 text-center font-medium">{{ $unitsDelivered }}</td>
                                             <td class="px-3 py-2 text-center text-gray-600">{{ $item->invoiceCaseUnits ?? '-' }}</td>
                                             <td class="px-3 py-2 text-center"
-                                                x-data="{ editing: false, caseQty: {{ $item->CaseUnits ?? 1 }}, originalCaseQty: {{ $item->CaseUnits ?? 1 }}, saving: false }">
+                                                x-data="{ editing: false, caseQty: {{ $item->CaseUnits ?? 1 }}, originalCaseQty: {{ $item->CaseUnits ?? 1 }}, saving: false, canEdit: {{ $isCompleted ? 'false' : 'true' }} }">
                                                 <template x-if="!editing">
-                                                    <span @click="editing = true; $nextTick(() => $refs.caseInput.select())"
-                                                          class="cursor-pointer hover:bg-blue-100 px-2 py-1 rounded inline-flex items-center gap-1 {{ $hasCaseUnitChange ? 'text-orange-600 font-bold' : 'text-gray-600' }}"
-                                                          title="Click to edit DB case units">
+                                                    <span @click="canEdit && (editing = true, $nextTick(() => $refs.caseInput.select()))"
+                                                          :class="canEdit ? 'cursor-pointer hover:bg-blue-100' : ''"
+                                                          class="px-2 py-1 rounded inline-flex items-center gap-1 {{ $hasCaseUnitChange ? 'text-orange-600 font-bold' : 'text-gray-600' }}"
+                                                          :title="canEdit ? 'Click to edit DB case units' : ''">
                                                         <span x-text="caseQty"></span>
-                                                        <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <svg x-show="canEdit" class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
                                                         </svg>
                                                     </span>
@@ -427,13 +498,14 @@
                                             </td>
                                             <td class="px-3 py-2 text-center font-medium"
                                                 :class="qty !== null ? 'text-blue-600' : 'text-gray-400'"
-                                                x-data="{ editing: false, qty: {{ $item->scanned !== null ? $item->scanned : 'null' }}, originalQty: {{ $item->scanned !== null ? $item->scanned : 'null' }}, saving: false }">
+                                                x-data="{ editing: false, qty: {{ $item->scanned !== null ? $item->scanned : 'null' }}, originalQty: {{ $item->scanned !== null ? $item->scanned : 'null' }}, saving: false, canEdit: {{ $isCompleted ? 'false' : 'true' }} }">
                                                 <template x-if="!editing">
-                                                    <span @click="editing = true; $nextTick(() => $refs.qtyInput.select())"
-                                                          class="cursor-pointer hover:bg-blue-100 px-2 py-1 rounded inline-flex items-center gap-1"
-                                                          title="Click to edit">
+                                                    <span @click="canEdit && (editing = true, $nextTick(() => $refs.qtyInput.select()))"
+                                                          :class="canEdit ? 'cursor-pointer hover:bg-blue-100' : ''"
+                                                          class="px-2 py-1 rounded inline-flex items-center gap-1"
+                                                          :title="canEdit ? 'Click to edit' : ''">
                                                         <span x-text="qty !== null ? qty : '-'"></span>
-                                                        <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <svg x-show="canEdit" class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
                                                         </svg>
                                                     </span>
@@ -569,13 +641,14 @@
                                             <td class="px-3 py-2 text-center font-medium text-green-600">{{ $unitsDelivered }}</td>
                                             <td class="px-3 py-2 text-center text-gray-600">{{ $item->invoiceCaseUnits ?? '-' }}</td>
                                             <td class="px-3 py-2 text-center"
-                                                x-data="{ editing: false, caseQty: {{ $item->CaseUnits ?? 1 }}, originalCaseQty: {{ $item->CaseUnits ?? 1 }}, saving: false }">
+                                                x-data="{ editing: false, caseQty: {{ $item->CaseUnits ?? 1 }}, originalCaseQty: {{ $item->CaseUnits ?? 1 }}, saving: false, canEdit: {{ $isCompleted ? 'false' : 'true' }} }">
                                                 <template x-if="!editing">
-                                                    <span @click="editing = true; $nextTick(() => $refs.caseInput.select())"
-                                                          class="cursor-pointer hover:bg-blue-100 px-2 py-1 rounded inline-flex items-center gap-1 {{ $hasCaseUnitChange ? 'text-orange-600 font-bold' : 'text-gray-600' }}"
-                                                          title="Click to edit DB case units">
+                                                    <span @click="canEdit && (editing = true, $nextTick(() => $refs.caseInput.select()))"
+                                                          :class="canEdit ? 'cursor-pointer hover:bg-blue-100' : ''"
+                                                          class="px-2 py-1 rounded inline-flex items-center gap-1 {{ $hasCaseUnitChange ? 'text-orange-600 font-bold' : 'text-gray-600' }}"
+                                                          :title="canEdit ? 'Click to edit DB case units' : ''">
                                                         <span x-text="caseQty"></span>
-                                                        <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <svg x-show="canEdit" class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
                                                         </svg>
                                                     </span>
@@ -600,13 +673,14 @@
                                                 </template>
                                             </td>
                                             <td class="px-3 py-2 text-center font-medium text-green-600"
-                                                x-data="{ editing: false, qty: {{ $item->scanned ?? 0 }}, originalQty: {{ $item->scanned ?? 0 }}, saving: false }">
+                                                x-data="{ editing: false, qty: {{ $item->scanned ?? 0 }}, originalQty: {{ $item->scanned ?? 0 }}, saving: false, canEdit: {{ $isCompleted ? 'false' : 'true' }} }">
                                                 <template x-if="!editing">
-                                                    <span @click="editing = true; $nextTick(() => $refs.qtyInput.select())"
-                                                          class="cursor-pointer hover:bg-green-100 px-2 py-1 rounded inline-flex items-center gap-1"
-                                                          title="Click to edit">
+                                                    <span @click="canEdit && (editing = true, $nextTick(() => $refs.qtyInput.select()))"
+                                                          :class="canEdit ? 'cursor-pointer hover:bg-green-100' : ''"
+                                                          class="px-2 py-1 rounded inline-flex items-center gap-1"
+                                                          :title="canEdit ? 'Click to edit' : ''">
                                                         <span x-text="qty"></span>
-                                                        <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <svg x-show="canEdit" class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
                                                         </svg>
                                                     </span>
@@ -716,7 +790,7 @@
                                             $value = $cost * $unitsDelivered;
                                         @endphp
                                         <tr class="hover:bg-gray-50"
-                                            x-data="{ editing: false, qty: null, originalQty: null, saving: false }">
+                                            x-data="{ editing: false, qty: null, originalQty: null, saving: false, canEdit: {{ $isCompleted ? 'false' : 'true' }} }">
                                             <td class="px-3 py-2">
                                                 @if($item->productID)
                                                     <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium">
@@ -729,7 +803,8 @@
                                             </td>
                                             <td class="px-3 py-2 text-center font-medium">{{ $unitsDelivered }}</td>
                                             <td class="px-3 py-2 text-center">
-                                                <button @click="qty = {{ $unitsDelivered }}; editing = true; $nextTick(() => $refs.qtyInput?.focus())"
+                                                <button x-show="canEdit"
+                                                        @click="qty = {{ $unitsDelivered }}; editing = true; $nextTick(() => $refs.qtyInput?.focus())"
                                                         class="text-gray-400 hover:text-blue-600 transition-colors"
                                                         title="Copy expected to delivered">
                                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -739,11 +814,12 @@
                                             </td>
                                             <td class="px-3 py-2 text-center">
                                                 <template x-if="!editing">
-                                                    <span @click="editing = true; $nextTick(() => $refs.qtyInput?.select())"
-                                                          class="cursor-pointer hover:bg-blue-100 px-2 py-1 rounded inline-flex items-center gap-1 text-gray-400"
-                                                          title="Click to enter delivered quantity">
+                                                    <span @click="canEdit && (editing = true, $nextTick(() => $refs.qtyInput?.select()))"
+                                                          :class="canEdit ? 'cursor-pointer hover:bg-blue-100' : ''"
+                                                          class="px-2 py-1 rounded inline-flex items-center gap-1 text-gray-400"
+                                                          :title="canEdit ? 'Click to enter delivered quantity' : ''">
                                                         <span x-text="qty !== null ? qty : '-'"></span>
-                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <svg x-show="canEdit" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
                                                         </svg>
                                                     </span>
@@ -820,6 +896,7 @@
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Barcode</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Case Units</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Scanned Qty</th>
+                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Stock</th>
                                         <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Sell Price</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">VAT</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -845,13 +922,14 @@
                                             </td>
                                             <td class="px-3 py-2 text-center text-gray-600">{{ $item->CaseUnits ?? '-' }}</td>
                                             <td class="px-3 py-2 text-center font-medium text-orange-600"
-                                                x-data="{ editing: false, qty: {{ $item->scanned ?? 0 }}, originalQty: {{ $item->scanned ?? 0 }}, saving: false }">
+                                                x-data="{ editing: false, qty: {{ $item->scanned ?? 0 }}, originalQty: {{ $item->scanned ?? 0 }}, saving: false, canEdit: {{ $isCompleted ? 'false' : 'true' }} }">
                                                 <template x-if="!editing">
-                                                    <span @click="editing = true; $nextTick(() => $refs.qtyInput.select())"
-                                                          class="cursor-pointer hover:bg-orange-100 px-2 py-1 rounded inline-flex items-center gap-1"
-                                                          title="Click to edit">
+                                                    <span @click="canEdit && (editing = true, $nextTick(() => $refs.qtyInput.select()))"
+                                                          :class="canEdit ? 'cursor-pointer hover:bg-orange-100' : ''"
+                                                          class="px-2 py-1 rounded inline-flex items-center gap-1"
+                                                          :title="canEdit ? 'Click to edit' : ''">
                                                         <span x-text="qty"></span>
-                                                        <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <svg x-show="canEdit" class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
                                                         </svg>
                                                     </span>
@@ -875,6 +953,7 @@
                                                     </form>
                                                 </template>
                                             </td>
+                                            <td class="px-3 py-2 text-center text-gray-500">{{ floatval($item->UNITS ?? 0) }}</td>
                                             <td class="px-3 py-2 text-right text-gray-500">
                                                 @if($item->PRICESELL)
                                                     &euro;{{ number_format($item->PRICESELL * (1 + ($item->RATE ?? 0)), 2) }}
@@ -999,6 +1078,7 @@
             return {
                 filter: 'all',
                 showDetails: false,
+                isCompleted: {{ $isCompleted ? 'true' : 'false' }},
                 sectionsOpen: {
                     critical: true,
                     warnings: true,

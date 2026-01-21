@@ -1027,9 +1027,295 @@ PRODUCTS.ID as productID
 
 ---
 
-**Last Updated**: 2026-01-19
+### 2026-01-20 - Case Quantity Mismatch Improvements
+
+#### Enhanced Critical Issues Detection and Case Unit Editing
+
+**Enhancement**: Improved handling of case quantity mismatches in the delivery-legacy match page, ensuring all issues are visible and easily correctable.
+
+**Problems Resolved**:
+1. **Missing Case Mismatch Indicator**: When a product had both a quantity mismatch (expected vs scanned) AND a case quantity mismatch (invoice case ≠ DB case), only the quantity mismatch was flagged. The case mismatch information was lost in the Critical Issues section.
+2. **No Way to Correct Case Units**: Users could edit scanned quantities but had no way to correct case unit mismatches without navigating away to the product page.
+
+**New Features Implemented**:
+
+1. **Issue Column in Critical Issues Section**:
+   - Added "Issue" column after the "Impact" column in Critical Issues table
+   - Displays orange "Case: X → Y" badge when invoice case units differ from DB case units
+   - Shows both the invoice value and database value for easy comparison
+   - Consistent with the existing Issue column in Warnings section
+
+2. **Inline-Editable DB Case Column**:
+   - DB Case column is now clickable to edit (same pattern as scanned quantity)
+   - Click to enter edit mode with number input
+   - Save/cancel buttons for confirmation
+   - Updates `supplier_link.CaseUnits` in POS database via AJAX
+   - Page reloads after save to recalculate expected quantities
+   - Available in all sections: Critical Issues, Warnings, and Verified
+
+**Technical Implementation**:
+
+```php
+// New route added
+Route::patch('/update-case-units', [DeliveryLegacyController::class, 'updateCaseUnits'])
+    ->name('update-case-units');
+
+// Controller method
+public function updateCaseUnits(Request $request)
+{
+    $validated = $request->validate([
+        'barcode' => 'required|string',
+        'supplierID' => 'required|string',
+        'caseUnits' => 'required|numeric|min:1',
+    ]);
+
+    DB::connection('pos')->table('supplier_link')
+        ->where('Barcode', $validated['barcode'])
+        ->where('SupplierID', $validated['supplierID'])
+        ->update(['CaseUnits' => $validated['caseUnits']]);
+
+    return response()->json(['success' => true, 'caseUnits' => $validated['caseUnits']]);
+}
+```
+
+**Files Modified**:
+- `routes/web.php` - Added `update-case-units` route
+- `app/Http/Controllers/DeliveryLegacyController.php` - Added `updateCaseUnits()` method
+- `resources/views/delivery-legacy/match.blade.php` - Added Issue column, inline-editable DB Case, `saveCaseUnits()` JS handler
+
+#### Impact & Benefits
+- ✅ **Complete Issue Visibility**: Case mismatches now visible in Critical Issues alongside quantity mismatches
+- ✅ **Quick Corrections**: Edit DB case units directly without leaving the page
+- ✅ **Consistent UX**: Same inline-editing pattern as scanned quantity fields
+- ✅ **Automatic Recalculation**: Page reloads to show updated expected quantities
+
+---
+
+### 2026-01-20 - Delivered Column for Pending Items
+
+#### Manual Quantity Entry for Non-Scannable Items
+
+**Enhancement**: Added ability to enter delivered quantities for items in the "Pending - Not Yet Scanned" section, addressing cases where items cannot be scanned (no barcode, bulk items, etc.).
+
+**Problem Resolved**: Some invoice items cannot be physically scanned but their quantities still need to be recorded in the system. Previously, there was no way to enter these quantities without scanning.
+
+**New Features Implemented**:
+
+1. **Delivered Column**:
+   - New "Delivered" column added to Pending Items table
+   - Shows "-" when no quantity entered, displays value when set
+   - Inline-editable field matching the pattern used elsewhere
+
+2. **Arrow Auto-Fill Button**:
+   - Arrow button (→) between Expected and Delivered columns
+   - One-click to copy expected quantity to delivered field
+   - Opens edit mode automatically for immediate confirmation or adjustment
+   - Perfect for quickly confirming full deliveries
+
+3. **Manual Entry**:
+   - Click the delivered field directly for manual entry
+   - Supports decimal values up to 3 decimal places (step="0.001")
+   - Wider input field (w-20) to accommodate decimal values
+   - Uses existing `saveScannedQty` endpoint - creates scan record
+
+4. **Workflow**:
+   - Enter delivered quantity (via arrow or manual)
+   - Save triggers page reload
+   - Item moves to Verified (if matches expected) or Critical (if different)
+   - Financial summaries update automatically
+
+**Technical Implementation**:
+
+```php
+// Table row with x-data for shared state between arrow and input
+<tr class="hover:bg-gray-50"
+    x-data="{ editing: false, qty: null, originalQty: null, saving: false }">
+
+    <!-- Expected column -->
+    <td>{{ $unitsDelivered }}</td>
+
+    <!-- Arrow button - auto-fills and opens edit mode -->
+    <td>
+        <button @click="qty = {{ $unitsDelivered }}; editing = true; $nextTick(() => $refs.qtyInput?.focus())">
+            → (arrow icon)
+        </button>
+    </td>
+
+    <!-- Delivered column - inline editable -->
+    <td>
+        <template x-if="!editing">
+            <span @click="editing = true">{{ qty ?? '-' }}</span>
+        </template>
+        <template x-if="editing">
+            <form @submit.prevent="saveScannedQty(...)">
+                <input type="number" x-model="qty" step="0.001" min="0">
+            </form>
+        </template>
+    </td>
+</tr>
+```
+
+**Files Modified**:
+- `resources/views/delivery-legacy/match.blade.php` - Added Delivered column headers and editable cells to Pending section
+
+#### Impact & Benefits
+- ✅ **Non-Scannable Items**: Can now record quantities for items without barcodes
+- ✅ **Quick Confirmation**: Arrow button provides one-click acceptance of expected quantities
+- ✅ **Flexible Entry**: Manual entry allows for partial deliveries or corrections
+- ✅ **Decimal Support**: Handles items sold by weight (up to 3 decimal places)
+- ✅ **Consistent Workflow**: Items flow to appropriate sections after quantity entry
+
+### Update Stock & Completion Feature
+
+**Enhancement**: Added ability to finalize delivery verification by updating POS stock levels and marking the delivery as complete.
+
+#### Feature Overview
+
+After verifying all delivery items (confirming scanned quantities, correcting case mismatches, and entering quantities for pending items), users can click "Update Stock & Complete" to:
+1. Update `STOCKCURRENT.UNITS` in the POS database with all scanned quantities
+2. Mark the delivery scan session as `completed`
+3. Lock the delivery to prevent further modifications
+
+#### User Interface
+
+**Before Completion**:
+- Green "Update Stock & Complete" button in header
+- All editable cells (scanned qty, DB case, delivered) remain active
+- Arrow buttons visible in Pending section
+
+**After Completion**:
+- Green completion banner: "Delivery Complete - Stock has been updated"
+- All edit functionality disabled (pencil icons hidden)
+- Arrow buttons hidden
+- Update Stock button hidden
+- Data remains visible for reference
+
+#### Implementation Details
+
+**Route**: `POST /delivery-legacy/complete`
+
+**Controller Method**: `DeliveryLegacyController::completeDelivery()`
+- Validates delID and supplierID parameters
+- Retrieves matched items with scanned quantities
+- Uses database transaction for atomicity:
+  - Increments `STOCKCURRENT.UNITS` for each product with scanned quantity
+  - Updates `deliveriesScan.status` to 'completed'
+- Redirects back with success message
+
+**View Changes**:
+- `$isCompleted` variable passed from controller
+- All editable cells check `canEdit` flag (opposite of `isCompleted`)
+- Completion banner displayed when `isCompleted` is true
+- Button visibility controlled by `@if(!$isCompleted)`
+
+**JavaScript Pattern**:
+```javascript
+// Each editable cell includes canEdit flag:
+x-data="{ editing: false, qty: ..., saving: false, canEdit: {{ $isCompleted ? 'false' : 'true' }} }"
+
+// Click handlers check canEdit:
+@click="canEdit && (editing = true, ...)"
+
+// Pencil icons conditionally shown:
+<svg x-show="canEdit" ...>
+```
+
+**Files Modified**:
+- `routes/web.php` - Added `complete` route
+- `app/Http/Controllers/DeliveryLegacyController.php` - Added `completeDelivery()`, `isCompleted` check
+- `resources/views/delivery-legacy/match.blade.php` - Added button, banner, read-only behavior
+
+#### Impact & Benefits
+- ✅ **Stock Updates**: Automatically updates POS stock levels from verified deliveries
+- ✅ **Data Integrity**: Transaction ensures all-or-nothing stock updates
+- ✅ **Audit Trail**: Completed deliveries are locked to preserve verification record
+- ✅ **Clear Status**: Visual indicators show when delivery is finalized
+- ✅ **Error Prevention**: Read-only mode prevents accidental modifications
+
+### Stock Update Verification System
+
+**Enhancement**: Added pre/post verification to give confidence that stock updates are working correctly.
+
+#### Stock Update Preview (Before Completion)
+
+A blue preview card shows what will happen when clicking "Update Stock & Complete":
+
+```
+┌─────────────────────────────────────────────┐
+│ 📦 Stock Update Preview                     │
+│                                             │
+│ Products to update: 47                      │
+│ Total units to add: 156.50                  │
+│ Current stock total: 1,234.00               │
+│ Expected after update: 1,390.50             │
+└─────────────────────────────────────────────┘
+```
+
+- **Products to update**: Count of products with scanned quantities > 0
+- **Total units to add**: Sum of all scanned quantities
+- **Current stock total**: Sum of current STOCKCURRENT.UNITS for affected products only
+- **Expected after update**: Current + units to add
+
+#### Update Results (After Completion)
+
+Enhanced completion banner shows what actually happened:
+
+```
+┌─────────────────────────────────────────────┐
+│ ✅ Delivery Complete - Stock Updated        │
+│                                             │
+│ Products updated: 45                        │
+│ Units added: 154.50                         │
+│ Products skipped: 2 (no stock record)       │
+└─────────────────────────────────────────────┘
+```
+
+- **Products updated**: Actual count of STOCKCURRENT rows incremented
+- **Units added**: Actual sum of units added
+- **Products skipped**: Products where no STOCKCURRENT row exists (increment affected 0 rows)
+
+#### Implementation Details
+
+**Controller Method**: `calculateStockPreview()`
+- Iterates through matched items and extra items
+- Counts products with scanned > 0 and valid productID
+- Queries STOCKCURRENT for current totals of affected products only
+
+**Stock Update Tracking**:
+```php
+$affected = DB::connection('pos')->table('STOCKCURRENT')
+    ->where('PRODUCT', $item->productID)
+    ->increment('UNITS', $item->scanned);
+
+if ($affected > 0) {
+    $updateResults['productsUpdated']++;
+    $updateResults['unitsAdded'] += $item->scanned;
+} else {
+    $updateResults['productsSkipped']++;
+}
+```
+
+**Files Modified**:
+- `app/Http/Controllers/DeliveryLegacyController.php` - Added `calculateStockPreview()`, result tracking
+- `resources/views/delivery-legacy/match.blade.php` - Added preview card and enhanced completion banner
+
+### Extra Items Stock Column
+
+**Enhancement**: Added Stock column to the Extra Items section (scanned but NOT on invoice).
+
+Previously, users couldn't see current stock levels for extra scanned items. Now the Stock column shows `STOCKCURRENT.UNITS` for each product, allowing verification before completing the delivery.
+
+**SQL Change**: Added `LEFT JOIN STOCKCURRENT ON PRODUCTS.ID = STOCKCURRENT.PRODUCT` to `getScannedNotOnInvoice()` query.
+
+**Files Modified**:
+- `app/Http/Controllers/DeliveryLegacyController.php` - Added STOCKCURRENT join to Extra Items query
+- `resources/views/delivery-legacy/match.blade.php` - Added Stock column header and data cell
+
+---
+
+**Last Updated**: 2026-01-21
 **System Status**: ✅ Fully Operational
 **Test Coverage**: Manual testing completed
 **Performance**: Tested with 292-item deliveries
-**Recent Enhancement**: Sync to Legacy feature for invoice matching workflow
-**New Features**: Price comparison matrix, bulk cost updates, quick price editing, professional table sorting, enhanced product navigation, inline cost editing, sync to legacy
+**Recent Enhancement**: Stock update verification system with preview and results
+**New Features**: Price comparison matrix, bulk cost updates, quick price editing, professional table sorting, enhanced product navigation, inline cost editing, sync to legacy, case unit editing, pending item quantity entry, stock update & completion, stock verification preview, extra items stock column
