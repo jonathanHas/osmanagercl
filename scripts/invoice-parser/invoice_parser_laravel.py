@@ -22,7 +22,8 @@ from parsers import (
     dynamis, three, digitalocean, imbibe, openai, linode, jetbrains, independent,
     mossfield, slievebloom, garryhinch, oxigen, kellys, udea, breadelicious,
     kleepaper, ardu, vico, loughboora, coolnagrower, merrymill, flogas,
-    oldyard_organics, amazon, ecobike, dunany_flour, beechlawn, mentons, default_parser
+    oldyard_organics, amazon, ecobike, dunany_flour, beechlawn, mentons, kilbeggan,
+    default_parser
 )
 
 # Configure logging
@@ -88,6 +89,8 @@ def detect_supplier(text):
         return beechlawn, "Beechlawn"
     elif "MENTON" in upper_text or "MENTONS" in upper_text:
         return mentons, "Menton's Organic Farm"
+    elif "KILBEGGAN ORGANIC FOODS" in upper_text or "KILBEGGAN" in upper_text:
+        return kilbeggan, "Kilbeggan"
     else:
         return default_parser, "Unknown"
 
