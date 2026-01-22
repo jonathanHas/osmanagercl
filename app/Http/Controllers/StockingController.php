@@ -116,4 +116,39 @@ class StockingController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Display stock adjustment logs (admin only).
+     */
+    public function logs(Request $request)
+    {
+        $query = StockAdjustment::with('user')
+            ->orderBy('created_at', 'desc');
+
+        // Filter by barcode/product
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where('barcode', 'like', "%{$search}%");
+        }
+
+        // Filter by user
+        if ($request->filled('user_id')) {
+            $query->where('user_id', $request->user_id);
+        }
+
+        // Filter by date range
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
+        $adjustments = $query->paginate(50)->withQueryString();
+
+        // Get users for filter dropdown
+        $users = \App\Models\User::orderBy('name')->get();
+
+        return view('stocking.logs', compact('adjustments', 'users'));
+    }
 }

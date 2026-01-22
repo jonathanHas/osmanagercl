@@ -9,13 +9,24 @@
         <div class="max-w-2xl mx-auto px-2 sm:px-4 lg:px-6">
             <!-- Barcode Input -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-3 mb-3">
-                <input type="text"
-                       x-model="barcode"
-                       x-ref="barcodeInput"
-                       @keydown.enter="processBarcode"
-                       placeholder="Scan barcode..."
-                       class="w-full text-lg py-3 px-3 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:ring-blue-500 touch-manipulation"
-                       autofocus>
+                <div class="flex gap-2">
+                    <input type="text"
+                           x-model="barcode"
+                           x-ref="barcodeInput"
+                           @keydown.enter="processBarcode"
+                           placeholder="Scan barcode..."
+                           :inputmode="keyboardEnabled ? 'text' : 'none'"
+                           class="flex-1 text-lg py-3 px-3 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:ring-blue-500 touch-manipulation"
+                           autofocus>
+                    <button @click="keyboardEnabled = !keyboardEnabled; $nextTick(() => $refs.barcodeInput.focus())"
+                            class="px-3 py-2 rounded-lg border-2 touch-manipulation"
+                            :class="keyboardEnabled ? 'bg-blue-100 border-blue-500 text-blue-700' : 'bg-gray-100 border-gray-300 text-gray-500'"
+                            :title="keyboardEnabled ? 'Hide keyboard' : 'Show keyboard'">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h18a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V6a1 1 0 011-1zm3 4h2m2 0h2m2 0h2m2 0h2M6 12h2m2 0h2m2 0h2m2 0h2M8 16h8"/>
+                        </svg>
+                    </button>
+                </div>
                 <p class="text-sm text-gray-500 mt-2">Scan a product to see its stock level</p>
             </div>
 
@@ -121,6 +132,7 @@
                 newStock: null,
                 updating: false,
                 addingLabel: false,
+                keyboardEnabled: false,
                 feedback: null,
                 feedbackSuccess: true,
 
