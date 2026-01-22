@@ -1069,8 +1069,15 @@
                                 ]
                             ];
                         @endphp
-                        <div class="mb-6" id="timePeriodButtons">
+                        <div class="mb-6 flex flex-wrap items-center gap-4" id="timePeriodButtons">
                             <x-action-buttons :buttons="$timePeriodButtons" spacing="compact" />
+                            <button onclick="showSalesChartModal('{{ $product->ID }}', '{{ addslashes($product->NAME) }}')"
+                                    class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                                </svg>
+                                Detailed Sales History
+                            </button>
                         </div>
 
                         <!-- Chart Container -->
@@ -1089,90 +1096,107 @@
                             </div>
                         </div>
 
-                        @if(isset($salesHistory) && count($salesHistory) > 0)
-                            <!-- Sales Statistics Cards -->
-                            @if(isset($salesStats))
-                                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                                    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                                        <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Sales (12m)</div>
-                                        <div class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100" data-stat="total_sales_12m">{{ number_format($salesStats['total_sales_12m'], 0) }}</div>
+                        <!-- Sales History Section - Lazy Loaded -->
+                        <div x-data="{
+                            loading: true,
+                            error: null,
+                            salesHistory: [],
+                            salesStats: {},
+                            salesUrl: '{{ route("products.sales-data", $product->ID) }}'
+                        }" x-init="
+                            fetch(salesUrl)
+                                .then(r => r.ok ? r.json() : Promise.reject('HTTP ' + r.status))
+                                .then(data => { salesHistory = data.salesHistory || []; salesStats = data.salesStats || {}; })
+                                .catch(e => { console.error(e); error = String(e); })
+                                .finally(() => { loading = false; })
+                        ">
+                            <!-- Loading skeleton -->
+                            <template x-if="loading">
+                                <div class="animate-pulse">
+                                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                                        <div class="bg-gray-200 dark:bg-gray-700 h-20 rounded-lg"></div>
+                                        <div class="bg-gray-200 dark:bg-gray-700 h-20 rounded-lg"></div>
+                                        <div class="bg-gray-200 dark:bg-gray-700 h-20 rounded-lg"></div>
+                                        <div class="bg-gray-200 dark:bg-gray-700 h-20 rounded-lg"></div>
                                     </div>
-                                    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                                        <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Avg Monthly</div>
-                                        <div class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100" data-stat="avg_monthly_sales">{{ number_format($salesStats['avg_monthly_sales'], 1) }}</div>
-                                    </div>
-                                    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                                        <div class="text-sm font-medium text-gray-500 dark:text-gray-400">This Month</div>
-                                        <div class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100" data-stat="this_month_sales">{{ number_format($salesStats['this_month_sales'], 0) }}</div>
-                                    </div>
-                                    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                                        <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Trend</div>
-                                        <div class="mt-1 text-2xl font-semibold" data-stat="trend">
-                                            @if($salesStats['trend'] === 'up')
-                                                <span class="text-green-600 dark:text-green-400">↑ Up</span>
-                                            @elseif($salesStats['trend'] === 'down')
-                                                <span class="text-red-600 dark:text-red-400">↓ Down</span>
-                                            @else
-                                                <span class="text-gray-600 dark:text-gray-400">→ Stable</span>
-                                            @endif
+                                    <div class="bg-gray-200 dark:bg-gray-700 h-6 w-32 rounded mb-4"></div>
+                                    <div class="bg-gray-200 dark:bg-gray-700 h-48 rounded-lg"></div>
+                                </div>
+                            </template>
+
+                            <!-- Loaded content with sales data -->
+                            <template x-if="!loading && !error && salesHistory.length > 0">
+                                <div>
+                                    <!-- Sales Statistics Cards -->
+                                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                                        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                                            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Sales (12m)</div>
+                                            <div class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100" x-text="Math.round(salesStats.total_sales_12m || 0).toLocaleString()"></div>
+                                        </div>
+                                        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                                            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Avg Monthly</div>
+                                            <div class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100" x-text="(salesStats.avg_monthly_sales || 0).toFixed(1)"></div>
+                                        </div>
+                                        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                                            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">This Month</div>
+                                            <div class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100" x-text="Math.round(salesStats.this_month_sales || 0).toLocaleString()"></div>
+                                        </div>
+                                        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                                            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Trend</div>
+                                            <div class="mt-1 text-2xl font-semibold">
+                                                <span x-show="salesStats.trend === 'up'" class="text-green-600 dark:text-green-400">↑ Up</span>
+                                                <span x-show="salesStats.trend === 'down'" class="text-red-600 dark:text-red-400">↓ Down</span>
+                                                <span x-show="salesStats.trend === 'stable'" class="text-gray-600 dark:text-gray-400">→ Stable</span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            @endif
 
-                            <!-- Sales by Month Table -->
-                            <h3 class="text-lg font-semibold mb-4">Sales by Month</h3>
-                            <div class="overflow-x-auto">
-                                <table id="salesTable" class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                    <thead class="bg-gray-50 dark:bg-gray-700">
-                                        <tr>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Month</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Units Sold</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Trend</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                        @php
-                                            $previousUnits = null;
-                                        @endphp
-                                        @foreach($salesHistory as $monthData)
-                                            <tr>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                                                    {{ $monthData['month'] }}
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                                                    {{ number_format($monthData['units'], 1) }}
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                                    @if($previousUnits !== null)
-                                                        @if($monthData['units'] > $previousUnits)
-                                                            <span class="text-green-600 dark:text-green-400">↑ {{ number_format((($monthData['units'] - $previousUnits) / max($previousUnits, 1)) * 100, 1) }}%</span>
-                                                        @elseif($monthData['units'] < $previousUnits)
-                                                            <span class="text-red-600 dark:text-red-400">↓ {{ number_format((($previousUnits - $monthData['units']) / max($previousUnits, 1)) * 100, 1) }}%</span>
-                                                        @else
-                                                            <span class="text-gray-600 dark:text-gray-400">→ 0%</span>
-                                                        @endif
-                                                    @else
-                                                        <span class="text-gray-400 dark:text-gray-500">-</span>
-                                                    @endif
-                                                </td>
-                                            </tr>
-                                            @php
-                                                $previousUnits = $monthData['units'];
-                                            @endphp
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        @else
-                            <div class="text-center py-12">
-                                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                                </svg>
-                                <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">No sales data</h3>
-                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">This product has no sales history.</p>
-                            </div>
-                        @endif
+                                    <!-- Sales by Month Table -->
+                                    <h3 class="text-lg font-semibold mb-4">Sales by Month</h3>
+                                    <div class="overflow-x-auto">
+                                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                            <thead class="bg-gray-50 dark:bg-gray-700">
+                                                <tr>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Month</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Units Sold</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                                <template x-for="(monthData, index) in salesHistory" :key="index">
+                                                    <tr>
+                                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100" x-text="monthData.month"></td>
+                                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100" x-text="parseFloat(monthData.units || 0).toFixed(1)"></td>
+                                                    </tr>
+                                                </template>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- Error state -->
+                            <template x-if="!loading && error">
+                                <div class="text-center py-12">
+                                    <svg class="mx-auto h-12 w-12 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">Failed to load sales data</h3>
+                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400" x-text="error"></p>
+                                    <button @click="location.reload()" class="mt-3 text-sm text-indigo-600 hover:text-indigo-500">Try again</button>
+                                </div>
+                            </template>
+
+                            <!-- No data state -->
+                            <template x-if="!loading && !error && salesHistory.length === 0">
+                                <div class="text-center py-12">
+                                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                    </svg>
+                                    <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">No sales data</h3>
+                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">This product has no sales history.</p>
+                                </div>
+                            </template>
+                        </div>
                     </div>
                 </x-slot>
                 
@@ -1191,11 +1215,14 @@
         </div>
     </div>
 
+    <!-- Sales Chart Modal (same as products listing) -->
+    <x-sales-chart-modal />
+
     @push('scripts')
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         const vatRate = {{ $product->getVatRate() }};
-        
+
         function togglePriceEdit() {
             console.log('togglePriceEdit called');
             
@@ -1267,13 +1294,33 @@
         const productId = '{{ $product->ID }}';
         const minStockOverride = {{ $orderSettings?->min_stock_override ?? 'null' }};
 
-        // Initialize chart with existing data
+        // Initialize chart by loading data via AJAX
         document.addEventListener('DOMContentLoaded', function() {
-            @if(isset($salesHistory) && count($salesHistory) > 0)
-                const initialData = @json(array_values($salesHistory));
-                createChart(initialData);
-            @endif
+            // Load initial chart data
+            loadInitialSalesData();
         });
+
+        function loadInitialSalesData() {
+            document.getElementById('chartLoading').classList.remove('hidden');
+
+            fetch(`/products/${productId}/sales-data?period=4`, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.salesHistory && data.salesHistory.length > 0) {
+                    createChart(data.salesHistory);
+                }
+                document.getElementById('chartLoading').classList.add('hidden');
+            })
+            .catch(error => {
+                console.error('Error loading initial sales data:', error);
+                document.getElementById('chartLoading').classList.add('hidden');
+            });
+        }
 
         function createChart(salesData) {
             const ctx = document.getElementById('salesChart').getContext('2d');

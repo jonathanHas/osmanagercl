@@ -181,9 +181,8 @@ class ProductController extends Controller
 
         $taxCategories = $this->productRepository->getAllTaxCategories();
 
-        // Load sales data for the product
-        $salesHistory = $this->salesRepository->getProductSalesHistory($id, 4); // Last 4 months
-        $salesStats = $this->salesRepository->getProductSalesStatistics($id);
+        // Sales data is now loaded via AJAX for better page performance
+        // See: /products/{id}/sales-data endpoint
 
         // Fetch Udea pricing if product has supplier code and is Udea supplier
         $udeaPricing = null;
@@ -215,8 +214,6 @@ class ProductController extends Controller
         return view('products.show', [
             'product' => $product,
             'taxCategories' => $taxCategories,
-            'salesHistory' => $salesHistory,
-            'salesStats' => $salesStats,
             'supplierService' => $this->supplierService,
             'udeaPricing' => $udeaPricing,
             'fromDelivery' => $fromDelivery,

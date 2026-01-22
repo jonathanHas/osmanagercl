@@ -141,69 +141,52 @@ class SalesRepository
     {
         $currentDate = Carbon::now();
         $lastYear = $currentDate->copy()->subYear();
+        $lastMonth = $currentDate->copy()->subMonth();
 
-        $summaryQuery = SalesDailySummary::where('product_id', $productId);
-        $hasSummaryData = $summaryQuery->exists();
+        // Try pre-aggregated data first - single query for all stats
+        $stats = SalesDailySummary::where('product_id', $productId)
+            ->whereBetween('sale_date', [$lastYear, $currentDate])
+            ->selectRaw('
+                SUM(total_units) as total_sales_12m,
+                SUM(CASE WHEN YEAR(sale_date) = ? AND MONTH(sale_date) = ? THEN total_units ELSE 0 END) as this_month_sales,
+                SUM(CASE WHEN YEAR(sale_date) = ? AND MONTH(sale_date) = ? THEN total_units ELSE 0 END) as last_month_sales
+            ', [$currentDate->year, $currentDate->month, $lastMonth->year, $lastMonth->month])
+            ->first();
 
-        if ($hasSummaryData) {
-            // Total sales last 12 months
-            $totalSales = (float) SalesDailySummary::where('product_id', $productId)
-                ->whereBetween('sale_date', [$lastYear, $currentDate])
-                ->sum('total_units');
-
-            $avgMonthlySales = $totalSales / 12;
-
-            // Sales this month
-            $thisMonthSales = (float) SalesDailySummary::where('product_id', $productId)
-                ->whereYear('sale_date', $currentDate->year)
-                ->whereMonth('sale_date', $currentDate->month)
-                ->sum('total_units');
-
-            // Sales last month
-            $lastMonth = $currentDate->copy()->subMonth();
-            $lastMonthSales = (float) SalesDailySummary::where('product_id', $productId)
-                ->whereYear('sale_date', $lastMonth->year)
-                ->whereMonth('sale_date', $lastMonth->month)
-                ->sum('total_units');
+        // Check if we got data from pre-aggregated table
+        if ($stats && $stats->total_sales_12m > 0) {
+            $totalSales = (float) $stats->total_sales_12m;
+            $thisMonthSales = (float) $stats->this_month_sales;
+            $lastMonthSales = (float) $stats->last_month_sales;
         } else {
-            // Fallback to live POS queries
-            $totalSales = StockDiary::where('PRODUCT', $productId)
+            // Fallback to STOCKDIARY - also combined into single query
+            $stats = StockDiary::where('PRODUCT', $productId)
                 ->sales()
                 ->where('DATENEW', '>=', $lastYear)
-                ->sum(DB::raw('ABS(UNITS)'));
+                ->selectRaw('
+                    SUM(ABS(UNITS)) as total_sales_12m,
+                    SUM(CASE WHEN YEAR(DATENEW) = ? AND MONTH(DATENEW) = ? THEN ABS(UNITS) ELSE 0 END) as this_month_sales,
+                    SUM(CASE WHEN YEAR(DATENEW) = ? AND MONTH(DATENEW) = ? THEN ABS(UNITS) ELSE 0 END) as last_month_sales
+                ', [$currentDate->year, $currentDate->month, $lastMonth->year, $lastMonth->month])
+                ->first();
 
-            $avgMonthlySales = $totalSales / 12;
-
-            $thisMonthSales = StockDiary::where('PRODUCT', $productId)
-                ->sales()
-                ->whereYear('DATENEW', $currentDate->year)
-                ->whereMonth('DATENEW', $currentDate->month)
-                ->sum(DB::raw('ABS(UNITS)'));
-
-            $lastMonth = $currentDate->copy()->subMonth();
-            $lastMonthSales = StockDiary::where('PRODUCT', $productId)
-                ->sales()
-                ->whereYear('DATENEW', $lastMonth->year)
-                ->whereMonth('DATENEW', $lastMonth->month)
-                ->sum(DB::raw('ABS(UNITS)'));
+            $totalSales = (float) ($stats->total_sales_12m ?? 0);
+            $thisMonthSales = (float) ($stats->this_month_sales ?? 0);
+            $lastMonthSales = (float) ($stats->last_month_sales ?? 0);
         }
 
         // Calculate trend
         $trend = 'stable';
         if ($lastMonthSales > 0) {
             $percentChange = (($thisMonthSales - $lastMonthSales) / $lastMonthSales) * 100;
-            if ($percentChange > 10) {
-                $trend = 'up';
-            } elseif ($percentChange < -10) {
-                $trend = 'down';
-            }
+            $trend = $percentChange > 10 ? 'up' : ($percentChange < -10 ? 'down' : 'stable');
         }
 
         return [
-            'total_sales_12m' => (float) $totalSales,
-            'avg_monthly_sales' => round($avgMonthlySales, 1),
-            'this_month_sales' => (float) $thisMonthSales,
-            'last_month_sales' => (float) $lastMonthSales,
+            'total_sales_12m' => $totalSales,
+            'avg_monthly_sales' => round($totalSales / 12, 1),
+            'this_month_sales' => $thisMonthSales,
+            'last_month_sales' => $lastMonthSales,
             'trend' => $trend,
         ];
     }

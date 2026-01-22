@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **📦 Stocking Scanner** (2026-01-22)
+  - **Mobile-First Store Room Scanner**: Dedicated page at `/stocking` for checking stock levels in the store room
+  - **Stock Level Display**: Scan product barcode to see current stock count prominently displayed
+  - **Stock Adjustment**: Adjust stock levels directly from the scanner with +/- buttons
+  - **Add to Label Queue**: Quick button to add scanned products to the label print queue
+  - **Audit Trail**: All stock adjustments logged with user, timestamp, old/new values
+  - **Keyboard Toggle**: Button to show/hide mobile keyboard (scanner mode vs manual entry)
+  - **Scan History**: Recent scans stored in localStorage for quick reference
+  - **Admin Stock Logs Page**: View all stock adjustments at `/stocking/logs` (admin only)
+    - Filter by barcode, user, and date range
+    - Color-coded changes (green for increases, red for decreases)
+    - Links to product detail pages
+  - **Sidebar Navigation**: Links under "Stock" section (Stocking, Labels & Printing)
+  - **Database Schema**: New `stock_adjustments` table for audit trail
+  - **Files Created**:
+    - `app/Http/Controllers/StockingController.php`
+    - `app/Models/StockAdjustment.php`
+    - `database/migrations/2026_01_22_105722_create_stock_adjustments_table.php`
+    - `resources/views/stocking/index.blade.php`
+    - `resources/views/stocking/logs.blade.php`
+  - **Files Modified**:
+    - `routes/web.php` - Added stocking routes
+    - `resources/views/layouts/admin.blade.php` - Added Stock section and Stock Logs link
+  - **Documentation**: See [Stocking Documentation](./docs/features/stocking.md)
+
 - **🍳 Kitchen Products Management System** (2026-01-21)
   - **Kitchen Products List**: Dedicated page at `/kitchen/products` for managing products that regularly go to the kitchen
   - **Quick Flag from Orders**: "Kitchen" toggle button on Orders review page (`/orders/`) to quickly add/remove products from kitchen list

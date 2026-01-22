@@ -4,6 +4,7 @@ This document provides a comprehensive overview of all features in the OSManager
 
 **Quick Navigation:**
 - [Product Management](#product-management)
+- [Stock Management](#stock-management)
 - [Kitchen Management](#kitchen-management)
 - [Supplier Management](#supplier-management)
 - [Order Management](#order-management)
@@ -130,6 +131,32 @@ Supplier-agnostic order generation based on historical sales data for all F&V pr
 - **Quick Access**: Available at `/fruit-veg/orders` from F&V dashboard
 
 📖 [F&V System Documentation](./features/fruit-veg-system.md#order-generation-system)
+
+---
+
+## Stock Management
+
+### Stocking Scanner (NEW! 2026-01-22)
+Mobile-first store room scanner for checking stock levels and managing inventory.
+- **Stock Level Display**: Scan product barcodes to see current stock count prominently displayed
+- **Stock Adjustment**: Adjust stock levels directly with +/- buttons and number input
+- **Add to Label Queue**: Quick button to add scanned products to the label print queue
+- **Audit Trail**: All adjustments logged with user, timestamp, and old/new values
+- **Keyboard Toggle**: Button to show/hide mobile keyboard (scanner mode vs manual entry)
+- **Scan History**: Recent scans stored locally for quick reference
+- **Mobile-Optimized**: Large touch targets, minimal UI, designed for handheld scanners
+
+📖 [Stocking Documentation](./features/stocking.md)
+
+### Stock Adjustment Logs (NEW! 2026-01-22)
+Admin-only page to view and audit all stock adjustments.
+- **Comprehensive Logging**: View all stock changes with user attribution
+- **Filtering**: Filter by barcode, user, and date range
+- **Visual Indicators**: Green for increases, red for decreases
+- **Product Links**: Direct links to product detail pages
+- **Pagination**: Handle large volumes of adjustment records
+
+📖 [Stocking Documentation](./features/stocking.md#stock-adjustment-logs)
 
 ---
 
