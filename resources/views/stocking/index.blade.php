@@ -1,32 +1,32 @@
-<x-app-layout>
+<x-admin-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+        <h2 class="font-semibold text-lg text-gray-800 leading-tight py-1">
             Stocking
         </h2>
     </x-slot>
 
-    <div class="py-4" x-data="stockingScanner()">
-        <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="py-2" x-data="stockingScanner()">
+        <div class="max-w-2xl mx-auto px-2 sm:px-4 lg:px-6">
             <!-- Barcode Input -->
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4 mb-4">
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-3 mb-3">
                 <input type="text"
                        x-model="barcode"
                        x-ref="barcodeInput"
                        @keydown.enter="processBarcode"
                        placeholder="Scan barcode..."
-                       class="w-full text-xl py-4 px-4 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:ring-blue-500 touch-manipulation"
+                       class="w-full text-lg py-3 px-3 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:ring-blue-500 touch-manipulation"
                        autofocus>
                 <p class="text-sm text-gray-500 mt-2">Scan a product to see its stock level</p>
             </div>
 
             <!-- Loading State -->
-            <div x-show="loading" class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-8 mb-4 text-center">
+            <div x-show="loading" class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4 mb-3 text-center">
                 <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
                 <p class="text-gray-500 mt-2">Looking up product...</p>
             </div>
 
             <!-- Current Product Display -->
-            <div x-show="currentProduct && !loading" x-transition class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6 mb-4">
+            <div x-show="currentProduct && !loading" x-transition class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4 mb-3">
                 <div class="text-center">
                     <!-- Product Name -->
                     <h3 class="text-lg sm:text-xl font-semibold text-gray-900 mb-1" x-text="currentProduct?.product?.name"></h3>
@@ -35,8 +35,8 @@
                     <p class="text-sm text-gray-500 mb-4" x-text="currentProduct?.product?.code"></p>
 
                     <!-- Stock Count - Very Prominent -->
-                    <div class="py-6">
-                        <span class="text-6xl sm:text-7xl font-bold text-gray-900" x-text="Math.floor(currentProduct?.stock || 0)"></span>
+                    <div class="py-3">
+                        <span class="text-5xl sm:text-6xl font-bold text-gray-900" x-text="Math.floor(currentProduct?.stock || 0)"></span>
                     </div>
                     <p class="text-lg text-gray-600">in stock</p>
 
@@ -46,7 +46,7 @@
             </div>
 
             <!-- Not Found Message -->
-            <div x-show="notFound && !loading" x-transition class="bg-red-50 border border-red-200 overflow-hidden shadow-sm sm:rounded-lg p-6 mb-4">
+            <div x-show="notFound && !loading" x-transition class="bg-red-50 border border-red-200 overflow-hidden shadow-sm sm:rounded-lg p-4 mb-3">
                 <div class="text-center">
                     <p class="text-red-600 font-medium">Product not found</p>
                     <p class="text-sm text-red-500 mt-1">Barcode: <span x-text="lastSearchedBarcode"></span></p>
@@ -54,7 +54,7 @@
             </div>
 
             <!-- Scan History -->
-            <div x-show="scanHistory.length > 0" class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4">
+            <div x-show="scanHistory.length > 0" class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-3">
                 <div class="flex justify-between items-center mb-3">
                     <h4 class="text-sm font-medium text-gray-700">Recent Scans</h4>
                     <button @click="clearHistory" class="text-xs text-gray-400 hover:text-gray-600">Clear</button>
@@ -147,4 +147,4 @@
             };
         }
     </script>
-</x-app-layout>
+</x-admin-layout>
