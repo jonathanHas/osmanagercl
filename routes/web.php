@@ -97,6 +97,7 @@ Route::middleware('auth')->group(function () {
     // Stocking scanner routes
     Route::get('/stocking', [StockingController::class, 'index'])->name('stocking.index');
     Route::post('/stocking/lookup', [StockingController::class, 'lookup'])->name('stocking.lookup');
+    Route::post('/stocking/update-stock', [StockingController::class, 'updateStock'])->name('stocking.update-stock');
 
     // Invoice Management routes - specific routes BEFORE resource routes
     Route::get('/invoices/create-simple', [\App\Http\Controllers\InvoiceController::class, 'createSimple'])->name('invoices.create-simple');

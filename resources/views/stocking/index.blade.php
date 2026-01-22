@@ -32,17 +32,55 @@
                     <h3 class="text-lg sm:text-xl font-semibold text-gray-900 mb-1" x-text="currentProduct?.product?.name"></h3>
 
                     <!-- Barcode -->
-                    <p class="text-sm text-gray-500 mb-4" x-text="currentProduct?.product?.code"></p>
+                    <p class="text-sm text-gray-500 mb-2" x-text="currentProduct?.product?.code"></p>
 
                     <!-- Stock Count - Very Prominent -->
-                    <div class="py-3">
+                    <div class="py-2">
                         <span class="text-5xl sm:text-6xl font-bold text-gray-900" x-text="Math.floor(currentProduct?.stock || 0)"></span>
                     </div>
-                    <p class="text-lg text-gray-600">in stock</p>
+                    <p class="text-base text-gray-600 mb-4">in stock</p>
+
+                    <!-- Stock Adjustment -->
+                    <div class="border-t pt-4">
+                        <p class="text-sm text-gray-500 mb-2">Adjust stock:</p>
+                        <div class="flex items-center justify-center gap-2 mb-3">
+                            <button @click="newStock = Math.max(0, (newStock ?? currentProduct?.stock ?? 0) - 1)"
+                                    class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-xl font-bold touch-manipulation">-</button>
+                            <input type="number"
+                                   x-model="newStock"
+                                   min="0"
+                                   step="1"
+                                   class="w-24 text-center text-xl py-2 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                            <button @click="newStock = (newStock ?? currentProduct?.stock ?? 0) + 1"
+                                    class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-xl font-bold touch-manipulation">+</button>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="flex gap-2 justify-center">
+                            <button @click="updateStock"
+                                    :disabled="updating || newStock === null || newStock == currentProduct?.stock"
+                                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-medium touch-manipulation">
+                                <span x-show="!updating">Update Stock</span>
+                                <span x-show="updating">Updating...</span>
+                            </button>
+                            <button @click="addToLabelQueue"
+                                    :disabled="addingLabel"
+                                    class="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg font-medium touch-manipulation">
+                                <span x-show="!addingLabel">Add to Labels</span>
+                                <span x-show="addingLabel">Adding...</span>
+                            </button>
+                        </div>
+                    </div>
 
                     <!-- Category (subtle) -->
-                    <p class="text-sm text-gray-400 mt-4" x-text="currentProduct?.product?.category"></p>
+                    <p class="text-sm text-gray-400 mt-3" x-text="currentProduct?.product?.category"></p>
                 </div>
+            </div>
+
+            <!-- Success/Error Feedback -->
+            <div x-show="feedback" x-transition class="mb-3 p-3 rounded-lg text-center"
+                 :class="feedbackSuccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
+                <span x-text="feedback"></span>
             </div>
 
             <!-- Not Found Message -->
@@ -80,12 +118,18 @@
                 notFound: false,
                 lastSearchedBarcode: '',
                 scanHistory: JSON.parse(localStorage.getItem('stockingScanHistory') || '[]'),
+                newStock: null,
+                updating: false,
+                addingLabel: false,
+                feedback: null,
+                feedbackSuccess: true,
 
                 async processBarcode() {
                     if (!this.barcode.trim()) return;
 
                     this.loading = true;
                     this.notFound = false;
+                    this.feedback = null;
                     this.lastSearchedBarcode = this.barcode.trim();
 
                     try {
@@ -102,20 +146,105 @@
 
                         if (data.found) {
                             this.currentProduct = data;
+                            this.newStock = Math.floor(data.stock);
                             this.notFound = false;
                             this.addToHistory(data);
                         } else {
                             this.currentProduct = null;
+                            this.newStock = null;
                             this.notFound = true;
                         }
                     } catch (error) {
                         console.error('Lookup error:', error);
                         this.currentProduct = null;
+                        this.newStock = null;
                         this.notFound = true;
                     } finally {
                         this.loading = false;
                         this.barcode = '';
                         this.$refs.barcodeInput.focus();
+                    }
+                },
+
+                async updateStock() {
+                    if (!this.currentProduct || this.newStock === null) return;
+
+                    this.updating = true;
+                    this.feedback = null;
+
+                    try {
+                        const response = await fetch('{{ route("stocking.update-stock") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            },
+                            body: JSON.stringify({
+                                barcode: this.currentProduct.product.code,
+                                new_stock: this.newStock,
+                            }),
+                        });
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            this.currentProduct.stock = data.stock;
+                            this.feedback = 'Stock updated successfully';
+                            this.feedbackSuccess = true;
+                            // Update history entry
+                            this.updateHistoryStock(this.currentProduct.product.code, data.stock);
+                        } else {
+                            this.feedback = data.message || 'Failed to update stock';
+                            this.feedbackSuccess = false;
+                        }
+                    } catch (error) {
+                        console.error('Update error:', error);
+                        this.feedback = 'Failed to update stock';
+                        this.feedbackSuccess = false;
+                    } finally {
+                        this.updating = false;
+                        this.$refs.barcodeInput.focus();
+                        // Clear feedback after 3 seconds
+                        setTimeout(() => { this.feedback = null; }, 3000);
+                    }
+                },
+
+                async addToLabelQueue() {
+                    if (!this.currentProduct) return;
+
+                    this.addingLabel = true;
+                    this.feedback = null;
+
+                    try {
+                        const response = await fetch('{{ route("labels.scan") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            },
+                            body: JSON.stringify({
+                                barcode: this.currentProduct.product.code,
+                            }),
+                        });
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            this.feedback = 'Added to label queue';
+                            this.feedbackSuccess = true;
+                        } else {
+                            this.feedback = data.message || 'Failed to add to labels';
+                            this.feedbackSuccess = false;
+                        }
+                    } catch (error) {
+                        console.error('Label queue error:', error);
+                        this.feedback = 'Failed to add to labels';
+                        this.feedbackSuccess = false;
+                    } finally {
+                        this.addingLabel = false;
+                        this.$refs.barcodeInput.focus();
+                        // Clear feedback after 3 seconds
+                        setTimeout(() => { this.feedback = null; }, 3000);
                     }
                 },
 
@@ -134,6 +263,14 @@
                     }
 
                     this.saveHistory();
+                },
+
+                updateHistoryStock(code, newStock) {
+                    const item = this.scanHistory.find(h => h.code === code);
+                    if (item) {
+                        item.stock = newStock;
+                        this.saveHistory();
+                    }
                 },
 
                 saveHistory() {
