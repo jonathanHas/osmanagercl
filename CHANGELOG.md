@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **🍳 Kitchen Products Management System** (2026-01-21)
+  - **Kitchen Products List**: Dedicated page at `/kitchen/products` for managing products that regularly go to the kitchen
+  - **Quick Flag from Orders**: "Kitchen" toggle button on Orders review page (`/orders/`) to quickly add/remove products from kitchen list
+  - **Product Search & Add**: Search and add products directly from kitchen products page
+    - Search by product name, barcode (CODE), or supplier code
+    - Results show product name, barcode, supplier code, and supplier name
+    - One-click add with success feedback and page reload
+  - **Supplier Code Quick Copy**: Click supplier code to copy to clipboard with visual feedback
+    - Fallback method for non-HTTPS environments using execCommand
+    - "Copied!" confirmation with checkmark icon
+  - **Shop Stock Display**: Real-time stock levels from POS `STOCKCURRENT` table
+    - Color-coded: green for in-stock, red for negative stock
+  - **Kitchen Stock Placeholder**: Column ready for future kitchen inventory tracking
+  - **Ingredient Profile Integration**: Direct links to create or edit ingredient profiles for costing
+  - **Filtering Options**:
+    - Supplier dropdown filter
+    - Group by category toggle with collapsible category sections
+    - Text search for product name/code
+  - **Statistics Dashboard**: Cards showing total kitchen products and profile coverage
+  - **Sidebar Navigation**: Quick access link in admin sidebar
+  - **Database Schema**: New `kitchen_products` table with `product_id` (UUID) and notes field
+  - **Files Created**:
+    - `database/migrations/2026_01_20_114028_create_kitchen_products_table.php`
+    - `app/Models/KitchenProduct.php`
+    - `app/Http/Controllers/KitchenProductController.php`
+    - `resources/views/kitchen/products/index.blade.php`
+    - `resources/views/kitchen/products/partials/product-row.blade.php`
+  - **Files Modified**:
+    - `routes/web.php` - Added kitchen products routes
+    - `resources/views/orders/partials/review-table.blade.php` - Added Kitchen toggle button
+    - `resources/views/layouts/admin.blade.php` - Added sidebar link
+  - **Documentation**: See [Kitchen Products Documentation](./docs/features/kitchen-products.md)
+
 - **📊 Delivery Legacy - Stock Update Verification System** (2026-01-21)
   - **Stock Update Preview**: Blue card shows what will happen before clicking complete:
     - Products to update count

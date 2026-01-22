@@ -18,6 +18,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SalesImportController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\StockingController;
 use App\Http\Controllers\TestScraperController;
 use App\Http\Controllers\UdeaDiagnosticsController;
 use App\Http\Controllers\UserManagementController;
@@ -92,6 +93,10 @@ Route::middleware('auth')->group(function () {
     // Product AJAX API routes (for real-time validation)
     Route::post('/api/products/check-barcode-duplicate', [ProductController::class, 'checkBarcodeDuplicate'])->name('api.products.check-barcode-duplicate');
     Route::post('/api/products/check-supplier-link-duplicate', [ProductController::class, 'checkSupplierLinkDuplicate'])->name('api.products.check-supplier-link-duplicate');
+
+    // Stocking scanner routes
+    Route::get('/stocking', [StockingController::class, 'index'])->name('stocking.index');
+    Route::post('/stocking/lookup', [StockingController::class, 'lookup'])->name('stocking.lookup');
 
     // Invoice Management routes - specific routes BEFORE resource routes
     Route::get('/invoices/create-simple', [\App\Http\Controllers\InvoiceController::class, 'createSimple'])->name('invoices.create-simple');

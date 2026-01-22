@@ -135,6 +135,20 @@ Supplier-agnostic order generation based on historical sales data for all F&V pr
 
 ## Kitchen Management
 
+### Kitchen Products Management (NEW! 2026-01-21)
+Manage products that regularly go to the kitchen with quick flagging and ingredient profile creation.
+- **Kitchen Products List**: Dedicated page at `/kitchen/products` showing all flagged kitchen products
+- **Quick Flag from Orders**: "Kitchen" toggle button on Orders page to quickly flag products
+- **Product Search & Add**: Search and add products by name, barcode, or supplier code directly from kitchen products page
+- **Supplier Code Quick Copy**: Click-to-copy supplier codes for easy ordering
+- **Shop Stock Display**: Real-time stock levels from POS STOCKCURRENT table
+- **Kitchen Stock Placeholder**: Column ready for future kitchen inventory tracking
+- **Ingredient Profile Integration**: Direct links to create/edit ingredient profiles for each product
+- **Filtering Options**: Filter by supplier, group by category, text search
+- **Statistics Dashboard**: Overview cards showing total products and profile coverage
+
+📖 [Kitchen Products Documentation](./features/kitchen-products.md)
+
 ### Kitchen Recipe Costing System (NEW! 2025-12-08)
 Comprehensive recipe costing system with ingredient profiles, overhead calculations, margin analysis, and batch scaling tools.
 - **Recipe Management**: Create, edit, and manage recipes with ingredients linked to POS products

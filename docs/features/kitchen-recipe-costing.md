@@ -320,6 +320,7 @@ Savings = €4.45 - €3.84 = €0.61/portion (13.7% savings)
 
 ## Related Documentation
 
+- [Kitchen Products Management](./kitchen-products.md) - Track products for kitchen and speed up profile creation
 - [Coffee KDS System](./kds-coffee-system.md) - Kitchen Display System for orders
 - [Product Management](./product-management.md) - POS product integration
 - [Supplier Integration](./supplier-integration.md) - Delivery markup for suppliers
