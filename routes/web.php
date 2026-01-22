@@ -98,6 +98,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/stocking', [StockingController::class, 'index'])->name('stocking.index');
     Route::post('/stocking/lookup', [StockingController::class, 'lookup'])->name('stocking.lookup');
     Route::post('/stocking/update-stock', [StockingController::class, 'updateStock'])->name('stocking.update-stock');
+    Route::get('/stocking/logs', [StockingController::class, 'logs'])->name('stocking.logs')->middleware('role:admin');
 
     // Invoice Management routes - specific routes BEFORE resource routes
     Route::get('/invoices/create-simple', [\App\Http\Controllers\InvoiceController::class, 'createSimple'])->name('invoices.create-simple');
