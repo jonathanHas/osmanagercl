@@ -844,19 +844,20 @@ class DeliveryController extends Controller
 
                 // Map delivery_items to legacy format and insert
                 foreach ($delivery->items as $item) {
-                    // Calculate total units from total_cost to ensure legacy calculation is correct
+                    // Derive number of cases from total_cost (format-agnostic approach)
                     // Legacy formula: invoiceTotal = cost × caseUnits × myOrder
-                    // By setting caseUnits=1 and myOrder=totalUnits, we get: cost × 1 × totalUnits = correct total
-                    $totalUnits = $item->unit_cost > 0
-                        ? round($item->total_cost / $item->unit_cost)
+                    // This works for both Independent (ordered_qty=units) and UDEA (ordered_qty=cases)
+                    $unitsPerCase = $item->units_per_case ?? 1;
+                    $numCases = ($item->unit_cost > 0 && $unitsPerCase > 0)
+                        ? round($item->total_cost / ($item->unit_cost * $unitsPerCase))
                         : $item->ordered_quantity;
 
                     LegacyDelivery::create([
                         'prodName' => $item->description,
                         'supCode' => $item->supplier_code,
                         'cost' => $item->unit_cost,
-                        'caseUnits' => 1,  // Neutralize the multiplier
-                        'myOrder' => $totalUnits,  // Total units derived from total_cost
+                        'caseUnits' => $unitsPerCase,  // Keep actual case size for display
+                        'myOrder' => $numCases,  // Number of cases derived from total_cost
                         'rrPrice' => $item->sale_price ?? 0,
                     ]);
                 }
