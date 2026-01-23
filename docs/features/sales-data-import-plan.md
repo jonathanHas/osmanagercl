@@ -965,6 +965,59 @@ class FruitVegController {
 - Top Products: **7,117x faster** (1ms vs 10+ seconds)
 - User Experience: From unusable → instant, responsive analytics
 
+### ✅ Successful Implementation: Product Detail Page (January 2026)
+
+**Problem:**
+- Product detail page (`/products/{uuid}`) was slow to load
+- Sales history section blocked page rendering
+- `getProductSalesStatistics()` method ran 4 separate database queries
+
+**Root Cause:**
+- Synchronous sales data loading in `ProductController::show()` blocked page render
+- Repository method ran: 1 EXISTS check + 3 separate SUM queries = 4 round trips
+- Fallback to STOCKDIARY table was 100x+ slower when summary data was missing
+
+**Solution:**
+```php
+// BEFORE: 4 queries in SalesRepository::getProductSalesStatistics()
+$hasSummaryData = $summaryQuery->exists();           // Query 1
+$totalSales = SalesDailySummary::...->sum();         // Query 2
+$thisMonthSales = SalesDailySummary::...->sum();     // Query 3
+$lastMonthSales = SalesDailySummary::...->sum();     // Query 4
+
+// AFTER: Single query with CASE statements
+$stats = SalesDailySummary::where('product_id', $productId)
+    ->whereBetween('sale_date', [$lastYear, $currentDate])
+    ->selectRaw('
+        SUM(total_units) as total_sales_12m,
+        SUM(CASE WHEN YEAR(sale_date) = ? AND MONTH(sale_date) = ?
+            THEN total_units ELSE 0 END) as this_month_sales,
+        SUM(CASE WHEN YEAR(sale_date) = ? AND MONTH(sale_date) = ?
+            THEN total_units ELSE 0 END) as last_month_sales
+    ', [$currentYear, $currentMonth, $lastMonthYear, $lastMonthMonth])
+    ->first();
+```
+
+**Additional Optimizations:**
+- Lazy loading via AJAX - Page renders instantly, sales data loads asynchronously
+- Added "Detailed Sales History" button linking to full drill-down modal
+- Reused existing `<x-sales-chart-modal />` component for consistency
+
+**Performance Results:**
+
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| Page load queries | 4+ for sales | 0 (deferred) | **Instant render** |
+| Sales statistics | 4 queries | 1 query | **75% reduction** |
+| User experience | Slow page load | Instant page, async sales | **Much faster** |
+
+**Files Modified:**
+- `app/Repositories/SalesRepository.php` - Optimized `getProductSalesStatistics()`
+- `app/Http/Controllers/ProductController.php` - Removed sync loading from `show()`
+- `resources/views/products/show.blade.php` - Added lazy loading and modal
+
+---
+
 ### ✅ Successful Implementation: Order Generation System (December 2025)
 
 **Problem:**

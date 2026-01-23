@@ -844,12 +844,19 @@ class DeliveryController extends Controller
 
                 // Map delivery_items to legacy format and insert
                 foreach ($delivery->items as $item) {
+                    // Calculate total units from total_cost to ensure legacy calculation is correct
+                    // Legacy formula: invoiceTotal = cost × caseUnits × myOrder
+                    // By setting caseUnits=1 and myOrder=totalUnits, we get: cost × 1 × totalUnits = correct total
+                    $totalUnits = $item->unit_cost > 0
+                        ? round($item->total_cost / $item->unit_cost)
+                        : $item->ordered_quantity;
+
                     LegacyDelivery::create([
                         'prodName' => $item->description,
                         'supCode' => $item->supplier_code,
                         'cost' => $item->unit_cost,
-                        'caseUnits' => $item->units_per_case ?? 1,
-                        'myOrder' => $item->ordered_quantity,
+                        'caseUnits' => 1,  // Neutralize the multiplier
+                        'myOrder' => $totalUnits,  // Total units derived from total_cost
                         'rrPrice' => $item->sale_price ?? 0,
                     ]);
                 }

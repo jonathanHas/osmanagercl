@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **⚡ Product Detail Page Performance Optimization** (2026-01-22)
+  - **Lazy-Loaded Sales Data**: Sales history section now loads via AJAX after page render
+  - **Optimized Database Queries**: Combined 4 separate queries into 1 using SQL CASE statements
+    - Before: 1 EXISTS check + 3 SUM queries = 4 database round trips
+    - After: Single query with CASE statements = 1 database round trip (75% reduction)
+  - **Detailed Sales History Modal**: Added "Detailed Sales History" button that opens the full interactive sales chart modal (same as products listing)
+    - Weekly view with expand/contract date range
+    - Click on week to drill down to daily view
+    - Click on day to see individual transactions
+  - **Instant Page Load**: Product detail pages now render immediately without waiting for sales data
+  - **Files Modified**:
+    - `app/Repositories/SalesRepository.php` - Optimized `getProductSalesStatistics()` method
+    - `app/Http/Controllers/ProductController.php` - Removed synchronous sales loading from `show()`
+    - `resources/views/products/show.blade.php` - Added lazy loading and sales chart modal
+  - **Performance Pattern**: Follows the proven optimization pattern from [Sales Data Import Plan](./docs/features/sales-data-import-plan.md)
+
 - **📦 Stocking Scanner** (2026-01-22)
   - **Mobile-First Store Room Scanner**: Dedicated page at `/stocking` for checking stock levels in the store room
   - **Stock Level Display**: Scan product barcode to see current stock count prominently displayed

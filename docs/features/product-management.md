@@ -1025,6 +1025,11 @@ A: Products in the `stocking` table are included in automated ordering calculati
 - Eager loading of relationships to prevent N+1 queries
 - Caching of tax category and supplier dropdowns
 - Optimized search queries with database indexes
+- **Product Detail Page Optimization (2026-01-22)**:
+  - Sales data now loads via AJAX for instant page rendering
+  - Combined 4 database queries into 1 using SQL CASE statements (75% reduction)
+  - Lazy-loaded sales section with skeleton loading states
+  - Added interactive drill-down modal for detailed sales history
 
 ## Recent Updates
 
@@ -1191,6 +1196,54 @@ Product images are stored as binary data in the POS database `PRODUCTS.IMAGE` fi
 - Route: `GET /products/{id}/image`
 - Cache headers: 24-hour public cache
 - Fallback: Transparent placeholder for products without images
+
+### Product Detail Page Performance Optimization (2026-01-22)
+
+Implemented lazy loading and query optimization for the product detail page sales history section.
+
+#### Problem
+- Product detail pages (`/products/{uuid}`) loaded slowly
+- Sales data queries blocked page rendering
+- `SalesRepository::getProductSalesStatistics()` ran 4 separate database queries
+
+#### Solution
+1. **Query Optimization**: Combined 4 queries into 1 using SQL CASE statements
+   ```php
+   // Before: 4 separate queries
+   $hasSummaryData = $query->exists();     // Query 1
+   $totalSales = $query->sum('total_units');  // Query 2
+   $thisMonth = $query->sum('total_units');   // Query 3
+   $lastMonth = $query->sum('total_units');   // Query 4
+
+   // After: Single query with CASE statements
+   $stats = SalesDailySummary::selectRaw('
+       SUM(total_units) as total_sales_12m,
+       SUM(CASE WHEN ... THEN total_units ELSE 0 END) as this_month_sales,
+       SUM(CASE WHEN ... THEN total_units ELSE 0 END) as last_month_sales
+   ')->first();
+   ```
+
+2. **Lazy Loading**: Sales section loads via AJAX after page render
+   - Skeleton loading states while data loads
+   - Alpine.js for reactive data binding
+   - Non-blocking page initialization
+
+3. **Detailed Sales History Modal**: "Detailed Sales History" button opens interactive modal
+   - Same component used on products listing page (`<x-sales-chart-modal />`)
+   - Weekly → Daily → Transaction drill-down
+   - Date range expansion/contraction controls
+
+#### Files Modified
+- `app/Repositories/SalesRepository.php` - Optimized `getProductSalesStatistics()`
+- `app/Http/Controllers/ProductController.php` - Removed sync loading from `show()`
+- `resources/views/products/show.blade.php` - Added lazy loading and modal
+
+#### Performance Results
+| Metric | Before | After |
+|--------|--------|-------|
+| Page load queries | 4+ for sales | 0 (deferred) |
+| Sales stat queries | 4 separate | 1 combined |
+| User experience | Slow load | Instant render |
 
 ## Future Enhancements
 

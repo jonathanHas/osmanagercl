@@ -75,6 +75,8 @@ Comprehensive product catalog management with inline editing capabilities and re
 - **Delivery Integration**: Create products directly from delivery items with pre-populated data
 - **Smart Navigation**: Context-aware navigation maintaining delivery workflow state
 - **Validation & Error Handling**: Robust form validation with user-friendly error messages
+- **Lazy-Loaded Sales Data** (NEW! 2026-01-22): Product detail page sales history loads asynchronously for instant page rendering
+- **Detailed Sales History Modal** (NEW! 2026-01-22): Interactive drill-down from weekly → daily → transaction level views
 
 📖 [Product Management Documentation](./features/product-management.md)
 
