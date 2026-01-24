@@ -83,6 +83,19 @@ class DeliveryService
                 $tax = (float) ($record['Tax'] ?? 0);
                 $rsp = (float) ($record['RSP'] ?? 0);
 
+                // Calculate tax rate from tax amount and line value
+                $taxRate = null;
+                $normalizedTaxRate = null;
+                if ($lineTotal > 0) {
+                    if ($tax > 0) {
+                        $taxRate = ($tax / $lineTotal) * 100;
+                        $taxRate = round($taxRate, 2);
+                    } else {
+                        $taxRate = 0.0;  // Explicitly set to 0% for zero tax
+                    }
+                    $normalizedTaxRate = $this->normalizeIrishVatRate($taxRate);
+                }
+
                 // Check if product exists in our system
                 $product = $this->findProductBySupplierCode($productCode, $supplierId);
                 $supplierLink = SupplierLink::where('SupplierID', $supplierId)
@@ -128,6 +141,8 @@ class DeliveryService
                     // Additional fields
                     'sale_price' => $rsp,
                     'tax_amount' => $tax,
+                    'tax_rate' => $taxRate,
+                    'normalized_tax_rate' => $normalizedTaxRate,
                     'sku' => $caseSize,
                 ]);
 
