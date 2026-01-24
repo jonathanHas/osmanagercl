@@ -327,6 +327,7 @@ Route::middleware('auth')->group(function () {
 
     // Delivery management routes
     Route::resource('deliveries', DeliveryController::class);
+    Route::post('/deliveries/detect-supplier', [DeliveryController::class, 'detectSupplier'])->name('deliveries.detect-supplier');
     Route::post('/deliveries/parse-pdf', [DeliveryController::class, 'parsePdf'])->name('deliveries.parse-pdf');
     Route::post('/deliveries/store-pdf', [DeliveryController::class, 'storePdf'])->name('deliveries.store-pdf');
     Route::get('/deliveries/{delivery}/scan', [DeliveryController::class, 'scan'])->name('deliveries.scan');

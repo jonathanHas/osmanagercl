@@ -156,6 +156,102 @@ class DeliveryController extends Controller
     }
 
     /**
+     * Detect supplier from uploaded PDF without requiring supplier selection first.
+     */
+    public function detectSupplier(Request $request): JsonResponse
+    {
+        $storedPath = null;
+
+        try {
+            $uploadedFile = $request->file('pdf_file');
+
+            if (! $uploadedFile || ! $uploadedFile->isValid()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No valid PDF file uploaded',
+                ], 422);
+            }
+
+            if ($uploadedFile->getMimeType() !== 'application/pdf' && ! str_ends_with(strtolower($uploadedFile->getClientOriginalName()), '.pdf')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'File is not a PDF',
+                ], 422);
+            }
+
+            // Store temporarily
+            $pdfPath = $uploadedFile->store('temp');
+            $storedPath = Storage::disk('local')->path($pdfPath);
+
+            // Parse PDF without supplier hint to detect supplier
+            $result = $this->deliveryParsingService->parseDeliveryPdf($storedPath);
+
+            // Clean up temp file
+            if (file_exists($storedPath)) {
+                unlink($storedPath);
+            }
+
+            $detectedName = $result['metadata']['supplier_detected'] ?? null;
+            $supplierId = $this->mapSupplierNameToId($detectedName);
+
+            return response()->json([
+                'success' => true,
+                'detected_name' => $detectedName,
+                'supplier_id' => $supplierId,
+                'confidence' => $result['metadata']['confidence'] ?? null,
+            ]);
+
+        } catch (\Exception $e) {
+            // Clean up temp file if it exists
+            if ($storedPath && file_exists($storedPath)) {
+                unlink($storedPath);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to detect supplier: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Map detected supplier name to database supplier ID.
+     */
+    private function mapSupplierNameToId(?string $detectedName): ?int
+    {
+        if (! $detectedName) {
+            return null;
+        }
+
+        // Normalize the detected name for matching
+        $normalized = strtolower(trim($detectedName));
+
+        $mapping = [
+            'independent' => 37,
+            'independent health food distributors' => 37,
+            'independent health foods' => 37,
+            'udea' => 5,
+            'natural medicine' => 65,
+            'natural medicine company' => 65,
+            'the natural medicine company' => 65,
+        ];
+
+        // Try exact match first
+        if (isset($mapping[$normalized])) {
+            return $mapping[$normalized];
+        }
+
+        // Try partial match
+        foreach ($mapping as $key => $id) {
+            if (str_contains($normalized, $key) || str_contains($key, $normalized)) {
+                return $id;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Parse delivery PDF(s) and show preview before import.
      * Supports both single file and multiple file uploads.
      */

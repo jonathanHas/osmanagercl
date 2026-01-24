@@ -215,6 +215,7 @@ class DeliveryLegacyController extends Controller
                     WHERE delID = ?
                 )
                 GROUP BY delivery.supCode, delivery.prodName, delivery.caseUnits
+                HAVING SUM(delivery.myOrder) > 0
                 ORDER BY delivery.prodName ASC';
 
         $results = DB::connection('pos')->select($sql, [$supplierId, $deliveryId]);
