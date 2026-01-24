@@ -348,9 +348,165 @@ Code,Product,Ordered,Qty,RSP,Price,Tax,Value
 
 ### File Uploads
 - **Maximum Size**: 10MB
-- **Accepted Types**: .csv, .txt
+- **Accepted Types**: .csv, .txt, .pdf
 - **Storage**: Temporary storage with automatic cleanup
 - **Validation**: Required supplier selection and delivery date
+
+## PDF Delivery Parsing System
+
+### Overview
+The system supports direct parsing of supplier delivery invoice PDFs, eliminating the need for manual CSV creation. This feature uses Python-based parsers to extract product data directly from PDF invoices.
+
+### Supported Suppliers
+
+#### Independent Irish Health Foods
+- **Detection**: Automatically detected via "INDEPENDENT IRISH HEALTH FOODS" or "IIHF" text in PDF
+- **Parser**: `scripts/invoice-parser/parsers/delivery_independent.py`
+- **Output Format**: JSON with cases/units breakdown
+- **Features**:
+  - Case and unit quantity parsing (e.g., "6/5" = 6 cases, 5 units)
+  - Case price to unit cost conversion
+  - RSP (Recommended Selling Price) extraction
+  - VAT rate calculation from Tax/Value fields
+  - Price validation (Qty × Price × SKU verification)
+
+#### UDEA B.V.
+- **Detection**: Automatically detected via "UDEA B.V.", "WWW.UDEA.NL", or "UDEA" text in PDF
+- **Parser**: `scripts/invoice-parser/parsers/delivery_udea.py`
+- **Output Format**: JSON with total units and prices
+- **Features**:
+  - European number formatting (1.234,56 → 1234.56)
+  - Three-tier regex matching (NORMAL → QUANTITY_SKU → FALLBACK)
+  - Weight-based product handling (kilogram, gram)
+  - SKU-based quantity conversion
+  - Qty × Price × SKU price validation
+  - High confidence scoring (typically 99-100%)
+
+### Technical Implementation
+
+#### Service Layer
+**File**: `app/Services/DeliveryParsingService.php`
+
+Key methods:
+- `parseDeliveryPdf($pdfPath, $supplierHint)` - Parse single PDF
+- `parseMultipleDeliveryPdfs($pdfPaths, $supplierHint)` - Parse and merge multiple PDFs
+- `convertToDeliveryItems($parsedData)` - Convert parsed data to delivery format
+- `checkConfiguration()` - Verify Python parser setup
+
+#### Python Parser
+**File**: `scripts/invoice-parser/delivery_parser_laravel.py`
+
+Command-line interface:
+```bash
+python delivery_parser_laravel.py --file /path/to/invoice.pdf --output json
+python delivery_parser_laravel.py --file /path/to/invoice.pdf --supplier udea --output json
+```
+
+#### Data Flow
+```
+User uploads PDF(s) → Controller handles upload
+         ↓
+DeliveryParsingService calls Python parser
+         ↓
+Python extracts text, detects supplier, parses items
+         ↓
+JSON returned with items, totals, confidence score
+         ↓
+Preview displayed to user for review
+         ↓
+User clicks Import → Delivery created with items
+```
+
+### Multi-PDF Upload Support
+
+The system supports uploading multiple PDF files to create a single combined delivery. This is useful when suppliers send multiple order confirmations that should be combined.
+
+#### Features
+- **Multiple File Selection**: File input accepts multiple PDFs
+- **Per-File Status**: Preview shows success/failure for each file
+- **Item Merging**: All items combined into single delivery
+- **Total Aggregation**: Values summed across all files
+- **Confidence Scoring**: Weighted average confidence
+
+#### Preview Interface
+When multiple PDFs are uploaded, the preview shows:
+```
+┌─────────────────────────────────────────────┐
+│ Files Processed (3)                         │
+├─────────────────────────────────────────────┤
+│ ✓ Order_4294419.pdf - 17 items              │
+│ ✓ Order_4294423.pdf - 145 items             │
+│ ✓ Order_4295657.pdf - 95 items              │
+└─────────────────────────────────────────────┘
+│ Total: 257 items, €3,938.47                 │
+```
+
+#### Controller Methods
+**File**: `app/Http/Controllers/DeliveryController.php`
+
+- `parsePdf()` - Handles both single and multiple file uploads for preview
+- `storePdf()` - Creates delivery from parsed PDF data
+
+#### API Endpoints
+```php
+POST /deliveries/parse-pdf    // Preview PDF(s) - accepts pdf_file[] array
+POST /deliveries/store-pdf    // Create delivery from PDF(s)
+```
+
+### Configuration
+
+#### Python Environment
+The parser requires a Python virtual environment with dependencies:
+```bash
+cd scripts/invoice-parser
+python -m venv venv
+source venv/bin/activate
+pip install pdfplumber
+```
+
+#### Laravel Configuration
+In `config/invoices.php`:
+```php
+'parsing' => [
+    'python_executable' => '/usr/bin/python3',
+    'python_venv_path' => base_path('scripts/invoice-parser/venv'),
+    'max_parse_time' => 120, // seconds
+],
+```
+
+### Troubleshooting
+
+#### Parser Not Found
+```
+Error: Delivery parser script not found
+```
+**Solution**: Ensure `scripts/invoice-parser/delivery_parser_laravel.py` exists
+
+#### Virtual Environment Issues
+```
+Error: Virtual environment not found
+```
+**Solution**: Create venv at `scripts/invoice-parser/venv` with pdfplumber installed
+
+#### Unsupported Supplier
+```
+Error: No delivery parser available for supplier: Unknown
+```
+**Solution**: The PDF supplier was not detected. Use `--supplier` hint or add detection pattern
+
+#### Low Confidence Score
+If confidence is below 90%, review parsed items carefully. May indicate:
+- Poor PDF quality or scanned document
+- Non-standard invoice format
+- Missing or incorrect line item data
+
+### Testing Results
+
+UDEA multi-PDF test (3 files):
+- Order_4294419.pdf: 17 items, €311.44, 100% confidence
+- Order_4294423.pdf: 145 items, €2,353.58, 99.3% confidence
+- Order_4295657.pdf: 95 items, €1,273.45, 100% confidence
+- **Combined**: 257 items, €3,938.47
 
 ## Troubleshooting Guide
 
@@ -1313,9 +1469,9 @@ Previously, users couldn't see current stock levels for extra scanned items. Now
 
 ---
 
-**Last Updated**: 2026-01-21
+**Last Updated**: 2026-01-23
 **System Status**: ✅ Fully Operational
 **Test Coverage**: Manual testing completed
 **Performance**: Tested with 292-item deliveries
-**Recent Enhancement**: Stock update verification system with preview and results
-**New Features**: Price comparison matrix, bulk cost updates, quick price editing, professional table sorting, enhanced product navigation, inline cost editing, sync to legacy, case unit editing, pending item quantity entry, stock update & completion, stock verification preview, extra items stock column
+**Recent Enhancement**: UDEA PDF parsing and multi-PDF upload support
+**New Features**: PDF delivery parsing (Independent & UDEA), multi-PDF upload, price comparison matrix, bulk cost updates, quick price editing, professional table sorting, enhanced product navigation, inline cost editing, sync to legacy, case unit editing, pending item quantity entry, stock update & completion, stock verification preview, extra items stock column

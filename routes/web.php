@@ -327,6 +327,8 @@ Route::middleware('auth')->group(function () {
 
     // Delivery management routes
     Route::resource('deliveries', DeliveryController::class);
+    Route::post('/deliveries/parse-pdf', [DeliveryController::class, 'parsePdf'])->name('deliveries.parse-pdf');
+    Route::post('/deliveries/store-pdf', [DeliveryController::class, 'storePdf'])->name('deliveries.store-pdf');
     Route::get('/deliveries/{delivery}/scan', [DeliveryController::class, 'scan'])->name('deliveries.scan');
     Route::post('/deliveries/{delivery}/scan', [DeliveryController::class, 'processScan'])->name('deliveries.process-scan');
     Route::patch('/deliveries/{delivery}/items/{item}/quantity', [DeliveryController::class, 'adjustQuantity'])->name('deliveries.adjust-quantity');

@@ -219,7 +219,16 @@ External supplier connectivity for images, pricing, and product data.
 📖 [Supplier Integration Documentation](./features/supplier-integration.md)
 
 ### Delivery Verification
-Comprehensive delivery processing with barcode scanning.
+Comprehensive delivery processing with barcode scanning and PDF invoice parsing.
+- **PDF Delivery Parsing** (NEW! 2026-01-23): Parse supplier PDF invoices directly
+  - Independent Irish Health Foods: Case/unit breakdown, RSP extraction, VAT calculation
+  - UDEA B.V.: European number formatting, weight-based products, three-tier regex matching
+  - Automatic supplier detection from PDF text
+  - Python-based parsing with pdfplumber
+- **Multi-PDF Upload** (NEW! 2026-01-23): Combine multiple PDFs into single delivery
+  - Per-file status reporting in preview
+  - Item merging with aggregated totals
+  - Confidence scoring across files
 - **Sync to Legacy** (NEW! 2026-01-19): One-click sync from `/deliveries` to POS `delivery` table for invoice matching with scanned items
 - **Delivery Legacy Page** (NEW! 2026-01-18): Redesigned invoice match interface with financial dashboard, issues-first layout, collapsible sections, and quick filters for faster verification
 

@@ -7,6 +7,7 @@ use App\Models\DeliveryItem;
 use App\Models\LabelLog;
 use App\Models\LegacyDelivery;
 use App\Models\Supplier;
+use App\Services\DeliveryParsingService;
 use App\Services\DeliveryService;
 use App\Services\SupplierService;
 use Illuminate\Http\JsonResponse;
@@ -22,10 +23,16 @@ class DeliveryController extends Controller
 
     private SupplierService $supplierService;
 
-    public function __construct(DeliveryService $deliveryService, SupplierService $supplierService)
-    {
+    private DeliveryParsingService $deliveryParsingService;
+
+    public function __construct(
+        DeliveryService $deliveryService,
+        SupplierService $supplierService,
+        DeliveryParsingService $deliveryParsingService
+    ) {
         $this->deliveryService = $deliveryService;
         $this->supplierService = $supplierService;
+        $this->deliveryParsingService = $deliveryParsingService;
     }
 
     /**
@@ -146,6 +153,281 @@ class DeliveryController extends Controller
                 ->withInput()
                 ->withErrors(['csv_file' => 'Failed to import CSV: '.$e->getMessage()]);
         }
+    }
+
+    /**
+     * Parse delivery PDF(s) and show preview before import.
+     * Supports both single file and multiple file uploads.
+     */
+    public function parsePdf(Request $request): JsonResponse
+    {
+        $request->validate([
+            'supplier_id' => 'required|exists:App\Models\Supplier,SupplierID',
+        ]);
+
+        $storedPaths = [];
+
+        try {
+            // Handle both single file and multiple files
+            $uploadedFiles = $request->file('pdf_file');
+
+            // Normalize to array
+            if (! is_array($uploadedFiles)) {
+                $uploadedFiles = [$uploadedFiles];
+            }
+
+            // Filter out null values and validate each file
+            $uploadedFiles = array_filter($uploadedFiles, fn ($f) => $f !== null);
+
+            if (empty($uploadedFiles)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No PDF files uploaded',
+                ], 422);
+            }
+
+            // Validate and store each file
+            foreach ($uploadedFiles as $index => $file) {
+                if (! $file->isValid()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'File upload failed for file '.($index + 1),
+                    ], 422);
+                }
+
+                if ($file->getMimeType() !== 'application/pdf' && ! str_ends_with(strtolower($file->getClientOriginalName()), '.pdf')) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "File {$file->getClientOriginalName()} is not a PDF",
+                    ], 422);
+                }
+
+                if ($file->getSize() > 20 * 1024 * 1024) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "File {$file->getClientOriginalName()} exceeds 20MB limit",
+                    ], 422);
+                }
+
+                $pdfPath = $file->store('temp');
+                $storedPaths[] = Storage::disk('local')->path($pdfPath);
+            }
+
+            // Get supplier hint based on supplier ID
+            $supplierHint = $this->getSupplierHint($request->supplier_id);
+
+            // Parse PDF(s)
+            if (count($storedPaths) === 1) {
+                $result = $this->deliveryParsingService->parseDeliveryPdf($storedPaths[0], $supplierHint);
+            } else {
+                $result = $this->deliveryParsingService->parseMultipleDeliveryPdfs($storedPaths, $supplierHint);
+            }
+
+            // Clean up temp files
+            foreach ($storedPaths as $path) {
+                if (file_exists($path)) {
+                    unlink($path);
+                }
+            }
+
+            if (! $this->deliveryParsingService->wasSuccessful($result)) {
+                $errors = $this->deliveryParsingService->getErrors($result);
+                $errorMsg = ! empty($errors)
+                    ? (is_array($errors[0]) ? $errors[0]['message'] : $errors[0])
+                    : 'Failed to parse PDF';
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $errorMsg,
+                    'errors' => $errors,
+                ], 422);
+            }
+
+            // Convert to delivery items format
+            $items = $this->deliveryParsingService->convertToDeliveryItems($result);
+            $totals = $this->deliveryParsingService->getTotals($result);
+            $warnings = $this->deliveryParsingService->getWarnings($result);
+            $confidence = $this->deliveryParsingService->getConfidence($result);
+
+            $response = [
+                'success' => true,
+                'items' => $items,
+                'totals' => $totals,
+                'warnings' => $warnings,
+                'confidence' => $confidence,
+                'supplier_detected' => $result['metadata']['supplier_detected'] ?? 'Unknown',
+            ];
+
+            // Include file results for multi-file uploads
+            if (isset($result['file_results'])) {
+                $response['file_results'] = $result['file_results'];
+            }
+
+            return response()->json($response);
+
+        } catch (\Exception $e) {
+            // Clean up temp files if they exist
+            foreach ($storedPaths as $path) {
+                if (file_exists($path)) {
+                    unlink($path);
+                }
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to parse PDF: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Store a newly created delivery from PDF upload.
+     * Supports both single file and multiple file uploads.
+     */
+    public function storePdf(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'supplier_id' => 'required|exists:App\Models\Supplier,SupplierID',
+            'delivery_date' => 'required|date',
+        ]);
+
+        $storedPaths = [];
+        $originalFilenames = [];
+
+        try {
+            // Handle both single file and multiple files
+            $uploadedFiles = $request->file('pdf_file');
+
+            // Normalize to array
+            if (! is_array($uploadedFiles)) {
+                $uploadedFiles = [$uploadedFiles];
+            }
+
+            // Filter out null values
+            $uploadedFiles = array_filter($uploadedFiles, fn ($f) => $f !== null);
+
+            if (empty($uploadedFiles)) {
+                throw new \Exception('No PDF files uploaded');
+            }
+
+            // Validate and store each file
+            foreach ($uploadedFiles as $index => $file) {
+                if (! $file->isValid()) {
+                    throw new \Exception('File upload failed for file '.($index + 1));
+                }
+
+                if ($file->getMimeType() !== 'application/pdf' && ! str_ends_with(strtolower($file->getClientOriginalName()), '.pdf')) {
+                    throw new \Exception("File {$file->getClientOriginalName()} is not a PDF");
+                }
+
+                if ($file->getSize() > 20 * 1024 * 1024) {
+                    throw new \Exception("File {$file->getClientOriginalName()} exceeds 20MB limit");
+                }
+
+                $pdfPath = $file->store('temp');
+                $storedPaths[] = Storage::disk('local')->path($pdfPath);
+                $originalFilenames[] = $file->getClientOriginalName();
+            }
+
+            // Get supplier hint based on supplier ID
+            $supplierHint = $this->getSupplierHint($request->supplier_id);
+
+            // Parse PDF(s)
+            if (count($storedPaths) === 1) {
+                $result = $this->deliveryParsingService->parseDeliveryPdf($storedPaths[0], $supplierHint);
+            } else {
+                $result = $this->deliveryParsingService->parseMultipleDeliveryPdfs($storedPaths, $supplierHint);
+            }
+
+            if (! $this->deliveryParsingService->wasSuccessful($result)) {
+                $errors = $this->deliveryParsingService->getErrors($result);
+                $errorMsg = ! empty($errors)
+                    ? (is_array($errors[0]) ? $errors[0]['message'] : $errors[0])
+                    : 'Failed to parse PDF';
+                throw new \Exception($errorMsg);
+            }
+
+            // Convert to delivery items format
+            $items = $this->deliveryParsingService->convertToDeliveryItems($result);
+
+            if (empty($items)) {
+                throw new \Exception('No products found in PDF(s)');
+            }
+
+            // Build filename for delivery record
+            $filenameForRecord = count($originalFilenames) > 1
+                ? implode(', ', array_slice($originalFilenames, 0, 3)).(count($originalFilenames) > 3 ? '...' : '')
+                : $originalFilenames[0];
+
+            // Create delivery using the parsed data
+            $delivery = $this->deliveryService->importFromPdfData(
+                $items,
+                $request->supplier_id,
+                $request->delivery_date,
+                $filenameForRecord
+            );
+
+            // Clean up temp files
+            foreach ($storedPaths as $path) {
+                if (file_exists($path)) {
+                    unlink($path);
+                }
+            }
+
+            $totals = $this->deliveryParsingService->getTotals($result);
+            $warnings = $this->deliveryParsingService->getWarnings($result);
+
+            $fileCount = count($originalFilenames);
+            $successMsg = 'Delivery imported successfully from '.($fileCount > 1 ? "{$fileCount} PDFs" : 'PDF').'. '.
+                          count($items).' items loaded. '.
+                          'Total value: '.number_format($totals['total_value'], 2);
+
+            if (! empty($warnings)) {
+                $successMsg .= ' ('.count($warnings).' warnings - check items)';
+            }
+
+            return redirect()
+                ->route('deliveries.show', $delivery)
+                ->with('success', $successMsg);
+
+        } catch (\Exception $e) {
+            // Clean up temp files if they exist
+            foreach ($storedPaths as $path) {
+                if (file_exists($path)) {
+                    unlink($path);
+                }
+            }
+
+            return back()
+                ->withInput()
+                ->withErrors(['pdf_file' => 'Failed to import PDF: '.$e->getMessage()]);
+        }
+    }
+
+    /**
+     * Get supplier hint for PDF parsing based on supplier ID.
+     */
+    private function getSupplierHint(int $supplierId): ?string
+    {
+        // Get Independent supplier configuration
+        $independentConfig = config('suppliers.external_links.independent');
+        if ($independentConfig && in_array($supplierId, $independentConfig['supplier_ids'] ?? [])) {
+            return 'independent';
+        }
+
+        // Get UDEA supplier configuration
+        $udeaConfig = config('suppliers.external_links.udea');
+        if ($udeaConfig && in_array($supplierId, $udeaConfig['supplier_ids'] ?? [])) {
+            return 'udea';
+        }
+
+        // Get Natural Medicine supplier configuration
+        $naturalMedicineConfig = config('suppliers.external_links.natural_medicine');
+        if ($naturalMedicineConfig && in_array($supplierId, $naturalMedicineConfig['supplier_ids'] ?? [])) {
+            return 'natural_medicine';
+        }
+
+        return null;
     }
 
     /**
@@ -844,20 +1126,30 @@ class DeliveryController extends Controller
 
                 // Map delivery_items to legacy format and insert
                 foreach ($delivery->items as $item) {
-                    // Derive number of cases from total_cost (format-agnostic approach)
                     // Legacy formula: invoiceTotal = cost × caseUnits × myOrder
-                    // This works for both Independent (ordered_qty=units) and UDEA (ordered_qty=cases)
+                    // Handle both full-case orders AND individual unit orders
                     $unitsPerCase = $item->units_per_case ?? 1;
-                    $numCases = ($item->unit_cost > 0 && $unitsPerCase > 0)
-                        ? round($item->total_cost / ($item->unit_cost * $unitsPerCase))
+                    $totalUnits = $item->unit_cost > 0
+                        ? (int) round($item->total_cost / $item->unit_cost)
                         : $item->ordered_quantity;
+
+                    // Check if this is a full-case order (totalUnits divisible by case size)
+                    if ($unitsPerCase > 1 && $totalUnits >= $unitsPerCase && $totalUnits % $unitsPerCase === 0) {
+                        // Full case order - use actual case units for display
+                        $syncCaseUnits = $unitsPerCase;
+                        $syncMyOrder = $totalUnits / $unitsPerCase;
+                    } else {
+                        // Individual units or partial case - treat as units
+                        $syncCaseUnits = 1;
+                        $syncMyOrder = $totalUnits;
+                    }
 
                     LegacyDelivery::create([
                         'prodName' => $item->description,
                         'supCode' => $item->supplier_code,
                         'cost' => $item->unit_cost,
-                        'caseUnits' => $unitsPerCase,  // Keep actual case size for display
-                        'myOrder' => $numCases,  // Number of cases derived from total_cost
+                        'caseUnits' => $syncCaseUnits,
+                        'myOrder' => $syncMyOrder,
                         'rrPrice' => $item->sale_price ?? 0,
                     ]);
                 }

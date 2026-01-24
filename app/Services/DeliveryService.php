@@ -25,6 +25,126 @@ class DeliveryService
     }
 
     /**
+     * Import delivery from parsed PDF data.
+     *
+     * This method creates a delivery from the structured data returned by
+     * the DeliveryParsingService. The PDF parser provides pre-calculated
+     * unit quantities which are more reliable than CSV interpretation.
+     *
+     * @param  array  $items  Array of parsed items from PDF
+     * @param  int  $supplierId  Supplier ID
+     * @param  string|null  $deliveryDate  Delivery date
+     * @param  string|null  $filename  Original filename for reference
+     */
+    public function importFromPdfData(
+        array $items,
+        int $supplierId,
+        ?string $deliveryDate = null,
+        ?string $filename = null
+    ): Delivery {
+        return DB::transaction(function () use ($items, $supplierId, $deliveryDate, $filename) {
+            // Create delivery header
+            $delivery = Delivery::create([
+                'delivery_number' => 'DEL-'.date('Ymd-His'),
+                'supplier_id' => $supplierId,
+                'delivery_date' => $deliveryDate ? \Carbon\Carbon::parse($deliveryDate) : now(),
+                'status' => 'draft',
+                'import_data' => [
+                    'filename' => $filename ?? 'pdf_import',
+                    'imported_at' => now(),
+                    'format' => 'pdf_direct',
+                    'source' => 'delivery_parsing_service',
+                ],
+            ]);
+
+            $totalExpected = 0;
+
+            foreach ($items as $record) {
+                // The PDF parser provides clearly named fields
+                $productCode = $record['Code'];
+                $productName = $record['Product'];
+
+                // These are already calculated total units from the PDF parser
+                $totalOrderedUnits = (int) ($record['Total_Ordered_Units'] ?? 0);
+                $totalDeliveredUnits = (int) ($record['Total_Delivered_Units'] ?? 0);
+
+                // Case size from product description
+                $caseSize = (int) ($record['Case_Size'] ?? 1);
+                if ($caseSize == 0) {
+                    $caseSize = 1;
+                }
+
+                // Unit cost is already per-unit from the PDF parser
+                $unitCost = (float) ($record['Unit_Cost'] ?? 0);
+                $casePrice = (float) ($record['Price'] ?? 0);
+                $lineTotal = (float) ($record['Value'] ?? 0);
+
+                // Tax and RSP if available
+                $tax = (float) ($record['Tax'] ?? 0);
+                $rsp = (float) ($record['RSP'] ?? 0);
+
+                // Check if product exists in our system
+                $product = $this->findProductBySupplierCode($productCode, $supplierId);
+                $supplierLink = SupplierLink::where('SupplierID', $supplierId)
+                    ->where('SupplierCode', $productCode)
+                    ->first();
+
+                // Calculate case quantities for display (how many full cases + remaining units)
+                $orderedCases = $caseSize > 1 ? intval($totalOrderedUnits / $caseSize) : 0;
+                $orderedUnits = $caseSize > 1 ? $totalOrderedUnits % $caseSize : $totalOrderedUnits;
+
+                $deliveredCases = $caseSize > 1 ? intval($totalDeliveredUnits / $caseSize) : 0;
+                $deliveredUnits = $caseSize > 1 ? $totalDeliveredUnits % $caseSize : $totalDeliveredUnits;
+
+                // Create delivery item with correct quantity interpretation
+                $deliveryItem = DeliveryItem::create([
+                    'delivery_id' => $delivery->id,
+                    'supplier_code' => $productCode,
+                    'description' => $productName,
+                    'units_per_case' => $caseSize,
+                    'supplier_case_units' => $supplierLink?->CaseUnits,
+
+                    // Unit cost is per individual unit
+                    'unit_cost' => $unitCost,
+
+                    // Legacy ordered_quantity field - now stores TOTAL UNITS (not cases)
+                    'ordered_quantity' => $totalOrderedUnits,
+
+                    // New quantity fields for clarity
+                    'case_ordered_quantity' => $orderedCases,
+                    'unit_ordered_quantity' => $orderedUnits,
+                    'quantity_type' => 'unit', // We're tracking in units
+
+                    // Total cost is the line value
+                    'total_cost' => $lineTotal,
+
+                    // Product linking
+                    'product_id' => $product?->ID,
+                    'is_new_product' => ! $product,
+                    'barcode' => $product?->CODE,
+                    'outer_code' => $supplierLink?->OuterCode,
+
+                    // Additional fields
+                    'sale_price' => $rsp,
+                    'tax_amount' => $tax,
+                    'sku' => $caseSize,
+                ]);
+
+                $totalExpected += $lineTotal;
+
+                // If new product, queue barcode retrieval
+                if (! $product) {
+                    $this->queueBarcodeRetrieval($deliveryItem, true);
+                }
+            }
+
+            $delivery->update(['total_expected' => $totalExpected]);
+
+            return $delivery;
+        });
+    }
+
+    /**
      * Import delivery from CSV file
      */
     public function importFromCsv(string $filePath, int $supplierId, ?string $deliveryDate = null): Delivery
@@ -73,17 +193,36 @@ class DeliveryService
                     ->where('SupplierCode', $item['code'])
                     ->first();
 
-                // Determine quantity type based on supplier format
-                $quantityType = $isIndependentFormat ? 'case' : 'case'; // Most suppliers use case quantities
-
-                // Calculate case and unit quantities
+                // Get case/unit info
                 $unitsPerCase = $item['units_per_case'];
-                $orderedCases = $item['ordered_quantity']; // CSV typically contains case quantities
-                $orderedUnits = $orderedCases * $unitsPerCase;
+                $supplierCaseUnits = $supplierLink?->CaseUnits;
+
+                // CRITICAL FIX: Independent format already provides quantities in UNITS, not cases
+                // The parseIndependentCsv method calculates total units from the cases/units notation
+                // Other formats (Udea, legacy) provide quantities in CASES
+                if ($isIndependentFormat || $isNaturalMedicineFormat) {
+                    // Independent/Natural Medicine: ordered_quantity IS total units
+                    $totalOrderedUnits = (int) $item['ordered_quantity'];
+                    $quantityType = 'unit';
+
+                    // Calculate how many full cases + remaining units this represents
+                    if ($unitsPerCase > 1) {
+                        $orderedCases = intval($totalOrderedUnits / $unitsPerCase);
+                        $orderedIndividualUnits = $totalOrderedUnits % $unitsPerCase;
+                    } else {
+                        $orderedCases = 0;
+                        $orderedIndividualUnits = $totalOrderedUnits;
+                    }
+                } else {
+                    // Udea/legacy format: ordered_quantity IS number of cases
+                    $orderedCases = (int) $item['ordered_quantity'];
+                    $orderedIndividualUnits = 0;
+                    $totalOrderedUnits = $orderedCases * $unitsPerCase;
+                    $quantityType = 'case';
+                }
 
                 // Validate against SupplierLink if available
-                $supplierCaseUnits = $supplierLink?->CaseUnits;
-                if ($supplierCaseUnits && $supplierCaseUnits !== $unitsPerCase) {
+                if ($supplierCaseUnits && $supplierCaseUnits !== $unitsPerCase && $unitsPerCase > 1) {
                     Log::warning('Case units mismatch for delivery import', [
                         'supplier_code' => $item['code'],
                         'csv_units_per_case' => $unitsPerCase,
@@ -93,6 +232,7 @@ class DeliveryService
                 }
 
                 // Create delivery item with enhanced quantity fields
+                // ordered_quantity now stores TOTAL UNITS for consistency with PDF import
                 $deliveryItemData = [
                     'delivery_id' => $delivery->id,
                     'supplier_code' => $item['code'],
@@ -101,9 +241,9 @@ class DeliveryService
                     'units_per_case' => $unitsPerCase,
                     'supplier_case_units' => $supplierCaseUnits,
                     'unit_cost' => $item['unit_cost'],
-                    'ordered_quantity' => $orderedCases, // Legacy field
+                    'ordered_quantity' => $totalOrderedUnits, // Now stores TOTAL UNITS (not cases)
                     'case_ordered_quantity' => $orderedCases,
-                    'unit_ordered_quantity' => 0, // Pure case orders don't have individual unit orders
+                    'unit_ordered_quantity' => $orderedIndividualUnits,
                     'quantity_type' => $quantityType,
                     'total_cost' => $item['total_cost'],
                     'product_id' => $product?->ID,

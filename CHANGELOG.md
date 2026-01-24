@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **📄 UDEA PDF Delivery Parsing** (2026-01-23)
+  - **Automatic Supplier Detection**: Parses "UDEA B.V." or "WWW.UDEA.NL" from PDF text
+  - **European Number Formatting**: Converts 1.234,56 → 1234.56 automatically
+  - **Three-Tier Regex Matching**: NORMAL → QUANTITY_SKU → FALLBACK patterns for robust parsing
+  - **Weight-Based Products**: Handles kilogram, gram, and SKU-based quantities
+  - **Price Validation**: Qty × Price × SKU verification with configurable tolerance
+  - **High Confidence**: Achieves 99-100% confidence on standard UDEA invoices
+  - **Files Created**:
+    - `scripts/invoice-parser/parsers/delivery_udea.py` - UDEA-specific parser
+  - **Files Modified**:
+    - `scripts/invoice-parser/delivery_parser_laravel.py` - Added UDEA detection and import
+    - `resources/views/deliveries/create.blade.php` - Added UDEA to supported suppliers list
+  - **Test Results**: 3 UDEA PDFs with 257 combined items, €3,938.47 total
+
+- **📦 Multi-PDF Delivery Upload** (2026-01-23)
+  - **Multiple File Selection**: Upload multiple PDFs at once to create single delivery
+  - **Per-File Status**: Preview shows success/failure and item count for each file
+  - **Item Merging**: All items from all PDFs combined into single delivery
+  - **Total Aggregation**: Values summed across all files with combined statistics
+  - **Confidence Scoring**: Weighted average confidence across parsed files
+  - **Files Processed Summary**: Visual breakdown of each file's contribution
+  - **Backward Compatible**: Single file uploads continue to work as before
+  - **Files Modified**:
+    - `app/Services/DeliveryParsingService.php` - Added `parseMultipleDeliveryPdfs()` method
+    - `app/Http/Controllers/DeliveryController.php` - Updated `parsePdf()` and `storePdf()` for multi-file
+    - `resources/views/deliveries/create.blade.php` - Multi-file UI with `multiple` attribute
+  - **Documentation**: See [Delivery System Documentation](./docs/features/delivery-system.md#multi-pdf-upload-support)
+
 - **⚡ Product Detail Page Performance Optimization** (2026-01-22)
   - **Lazy-Loaded Sales Data**: Sales history section now loads via AJAX after page render
   - **Optimized Database Queries**: Combined 4 separate queries into 1 using SQL CASE statements
