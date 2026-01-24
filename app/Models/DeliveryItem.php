@@ -29,6 +29,7 @@ class DeliveryItem extends Model
         'line_value_ex_vat',
         'unit_cost_including_tax',
         'ordered_quantity',
+        'invoice_delivered_quantity',
         'received_quantity',
         'case_ordered_quantity',
         'case_received_quantity',
@@ -397,5 +398,13 @@ class DeliveryItem extends Model
         } else {
             return '0';
         }
+    }
+
+    /**
+     * Check if this item was ordered but not delivered by supplier (supplier out of stock)
+     */
+    public function isSupplierOutOfStock(): bool
+    {
+        return $this->ordered_quantity > 0 && $this->invoice_delivered_quantity == 0;
     }
 }

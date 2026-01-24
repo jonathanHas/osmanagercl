@@ -1124,24 +1124,32 @@ class DeliveryController extends Controller
                 // Clear existing legacy delivery data
                 LegacyDelivery::truncate();
 
-                // Map delivery_items to legacy format and insert
-                foreach ($delivery->items as $item) {
-                    // Legacy formula: invoiceTotal = cost × caseUnits × myOrder
-                    // Handle both full-case orders AND individual unit orders
+                // Helper function to sync a single item to legacy
+                $syncItemToLegacy = function ($item, $isOOS = false) {
                     $unitsPerCase = $item->units_per_case ?? 1;
-                    $totalUnits = $item->unit_cost > 0
-                        ? (int) round($item->total_cost / $item->unit_cost)
-                        : $item->ordered_quantity;
+                    $cases = $item->case_ordered_quantity ?? 0;
+                    $looseUnits = $item->unit_ordered_quantity ?? 0;
 
-                    // Check if this is a full-case order (totalUnits divisible by case size)
-                    if ($unitsPerCase > 1 && $totalUnits >= $unitsPerCase && $totalUnits % $unitsPerCase === 0) {
-                        // Full case order - use actual case units for display
-                        $syncCaseUnits = $unitsPerCase;
-                        $syncMyOrder = $totalUnits / $unitsPerCase;
+                    // Calculate case units (same logic for OOS and delivered items)
+                    if ($unitsPerCase > 1 && $cases > 0) {
+                        if ($looseUnits > 0) {
+                            // Mixed order (cases + loose units) - treat as units for legacy
+                            $syncCaseUnits = 1;
+                            $syncMyOrder = ($cases * $unitsPerCase) + $looseUnits;
+                        } else {
+                            // Full case order - use actual case units
+                            $syncCaseUnits = $unitsPerCase;
+                            $syncMyOrder = $cases;
+                        }
                     } else {
-                        // Individual units or partial case - treat as units
+                        // Unit-based order or no case info
                         $syncCaseUnits = 1;
-                        $syncMyOrder = $totalUnits;
+                        $syncMyOrder = $item->ordered_quantity;
+                    }
+
+                    // For OOS items, set myOrder to 0 (but keep correct caseUnits)
+                    if ($isOOS) {
+                        $syncMyOrder = 0;
                     }
 
                     LegacyDelivery::create([
@@ -1152,6 +1160,24 @@ class DeliveryController extends Controller
                         'myOrder' => $syncMyOrder,
                         'rrPrice' => $item->sale_price ?? 0,
                     ]);
+                };
+
+                // First pass: Sync items that were delivered (non-OOS)
+                foreach ($delivery->items as $item) {
+                    // Skip OOS items in first pass (ordered but not delivered by supplier)
+                    if ($item->ordered_quantity > 0 && $item->invoice_delivered_quantity == 0) {
+                        continue;
+                    }
+                    $syncItemToLegacy($item);
+                }
+
+                // Second pass: Sync OOS items (grouped at bottom) with myOrder=0
+                foreach ($delivery->items as $item) {
+                    // Only process OOS items in second pass
+                    if (! ($item->ordered_quantity > 0 && $item->invoice_delivered_quantity == 0)) {
+                        continue;
+                    }
+                    $syncItemToLegacy($item, true);
                 }
             });
 

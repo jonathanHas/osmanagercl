@@ -109,6 +109,7 @@ class DeliveryService
 
                     // Legacy ordered_quantity field - now stores TOTAL UNITS (not cases)
                     'ordered_quantity' => $totalOrderedUnits,
+                    'invoice_delivered_quantity' => $totalDeliveredUnits,
 
                     // New quantity fields for clarity
                     'case_ordered_quantity' => $orderedCases,

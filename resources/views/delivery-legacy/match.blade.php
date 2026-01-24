@@ -121,6 +121,11 @@
                 </div>
             </div>
 
+            @php
+                // Calculate OOS count early for progress bar display
+                $oosCount = collect($matchedItems)->filter(fn($item) => ($item->myOrder ?? 0) == 0)->count();
+            @endphp
+
             <!-- Progress Bar -->
             <div class="bg-white rounded-lg shadow p-4 mb-6">
                 <div class="flex justify-between text-sm mb-2">
@@ -131,6 +136,10 @@
                         <span class="text-red-600 font-medium" x-text="financials.mismatchCount"></span> mismatched
                         <span class="text-gray-400 mx-1">|</span>
                         <span class="text-gray-500 font-medium" x-text="financials.pendingCount"></span> pending
+                        @if($oosCount > 0)
+                        <span class="text-gray-400 mx-1">|</span>
+                        <span class="text-orange-600 font-medium">{{ $oosCount }}</span> OOS
+                        @endif
                         <span class="text-gray-400 mx-1">|</span>
                         <span x-text="financials.totalItems"></span> total
                     </span>
@@ -193,14 +202,20 @@
                     return $isNotCritical && ($hasMarginIssue || $hasCaseUnitChange);
                 });
 
+                // OOS items (myOrder = 0 means supplier didn't deliver)
+                $oosItems = collect($matchedItems)->filter(function($item) {
+                    return ($item->myOrder ?? 0) == 0;
+                });
+
                 $verifiedItems = collect($matchedItems)->filter(function($item) {
                     $caseUnits = $item->invoiceCaseUnits ?? 1;
                     $myOrder = $item->myOrder ?? 0;
+                    if ($myOrder == 0) return false; // Exclude OOS items
                     $unitsDelivered = (fmod($myOrder, 1) == 0.0) ? $caseUnits * $myOrder : round($caseUnits * $myOrder);
                     return $item->scanned !== null && floatval($item->scanned) == $unitsDelivered;
                 });
 
-                $pendingItems = collect($matchedItems)->filter(fn($item) => $item->scanned === null);
+                $pendingItems = collect($matchedItems)->filter(fn($item) => $item->scanned === null && ($item->myOrder ?? 0) > 0);
             @endphp
 
             <!-- Critical Issues Section -->
@@ -732,6 +747,65 @@
                 </div>
             </div>
 
+            <!-- Out of Stock Section -->
+            @if($oosItems->count() > 0)
+            <div class="mb-4" x-show="filter === 'all'">
+                <button @click="sectionsOpen.oos = !sectionsOpen.oos"
+                        class="w-full flex justify-between items-center p-4 bg-orange-100 hover:bg-orange-200 rounded-t-lg transition-colors"
+                        :class="sectionsOpen.oos ? 'rounded-t-lg' : 'rounded-lg'">
+                    <span class="font-medium text-orange-800">
+                        <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                        </svg>
+                        Out of Stock - Supplier Did Not Deliver ({{ $oosItems->count() }})
+                    </span>
+                    <svg :class="sectionsOpen.oos ? 'rotate-180' : ''" class="w-5 h-5 text-orange-600 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div x-show="sectionsOpen.oos" x-collapse class="bg-white border border-orange-200 border-t-0 rounded-b-lg overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead class="bg-orange-50">
+                                <tr>
+                                    <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                                    <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Inv Case</th>
+                                    <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">DB Case</th>
+                                    <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Stock</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                @foreach($oosItems as $item)
+                                    @php
+                                        $hasCaseUnitChange = $item->invoiceCaseUnits != $item->CaseUnits;
+                                    @endphp
+                                    <tr class="hover:bg-orange-50">
+                                        <td class="px-3 py-2">
+                                            @if($item->productID)
+                                                <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium">
+                                                    {{ $item->prodName }}
+                                                </a>
+                                            @else
+                                                <span class="font-medium text-gray-900">{{ $item->prodName }}</span>
+                                            @endif
+                                            <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                        </td>
+                                        <td class="px-3 py-2 text-center {{ $hasCaseUnitChange ? 'bg-orange-100' : '' }}">
+                                            {{ $item->invoiceCaseUnits ?? 1 }}
+                                        </td>
+                                        <td class="px-3 py-2 text-center {{ $hasCaseUnitChange ? 'bg-orange-100' : '' }}">
+                                            {{ $item->CaseUnits ?? '-' }}
+                                        </td>
+                                        <td class="px-3 py-2 text-center text-gray-500">{{ floatval($item->UNITS ?? 0) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            @endif
+
             <!-- Pending Section -->
             <div class="mb-4" x-show="filter === 'all'">
                 <button @click="sectionsOpen.pending = !sectionsOpen.pending"
@@ -1085,7 +1159,8 @@
                     verified: false,
                     pending: true,
                     extra: true,
-                    missing: true
+                    missing: true,
+                    oos: true
                 },
                 financials: @js($financials),
                 deliveryId: '{{ $deliveryId }}',

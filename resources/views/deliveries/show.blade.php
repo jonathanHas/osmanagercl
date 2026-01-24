@@ -264,7 +264,7 @@
                             <!-- Sort Dropdown -->
                             <div class="flex items-center gap-2">
                                 <span class="text-sm text-gray-600 dark:text-gray-400">Sort by:</span>
-                                <select id="sortSelect" onchange="sortDeliveryItems()" 
+                                <select id="sortSelect" onchange="sortDeliveryItems()"
                                         class="text-sm border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md">
                                     <option value="new_first">New Products First</option>
                                     <option value="product">Product Name</option>
@@ -274,6 +274,13 @@
                                     <option value="margin">Margin</option>
                                 </select>
                             </div>
+
+                            <!-- Supplier OOS Filter -->
+                            <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
+                                <input type="checkbox" id="hideOosFilter" onchange="toggleOosFilter()"
+                                       class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
+                                Hide Supplier OOS
+                            </label>
                         </div>
                         <div class="flex gap-2">
                             <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded">
@@ -288,6 +295,14 @@
                             <span class="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded">
                                 {{ $delivery->items->where('status', 'excess')->count() }} Excess
                             </span>
+                            @php
+                                $oosCount = $delivery->items->filter(fn($i) => $i->ordered_quantity > 0 && $i->invoice_delivered_quantity == 0)->count();
+                            @endphp
+                            @if($oosCount > 0)
+                                <span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded">
+                                    {{ $oosCount }} Supplier OOS
+                                </span>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -369,9 +384,13 @@
                                 @php
                                     // Check if this item wasn't on the delivery (0 invoiced quantity)
                                     $notOnDelivery = $item->ordered_quantity == 0;
-                                    
+                                    // Check if supplier couldn't fulfill (ordered but not delivered)
+                                    $supplierOos = $item->ordered_quantity > 0 && $item->invoice_delivered_quantity == 0;
+
                                     // Determine row background class based on status
-                                    if ($item->is_new_product) {
+                                    if ($supplierOos) {
+                                        $rowClass = 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30';
+                                    } elseif ($item->is_new_product) {
                                         $rowClass = 'bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30';
                                     } elseif ($notOnDelivery) {
                                         $rowClass = 'bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30';
@@ -379,7 +398,7 @@
                                         $rowClass = 'hover:bg-gray-50 dark:hover:bg-gray-700';
                                     }
                                 @endphp
-                                <tr class="{{ $rowClass }}" data-item-id="{{ $item->id }}">
+                                <tr class="{{ $rowClass }}" data-item-id="{{ $item->id }}" data-supplier-oos="{{ $supplierOos ? 'true' : 'false' }}">
                                     <td class="px-6 py-4 text-center">
                                         <div id="image-cell-{{ $item->id }}" class="mx-auto">
                                             @if($item->product)
@@ -459,6 +478,18 @@
                                         {{ $item->ordered_quantity }}
                                         @if($item->ordered_quantity == 0)
                                             <span class="block text-xs text-amber-600 dark:text-amber-500">Not invoiced</span>
+                                        @elseif($item->units_per_case > 1)
+                                            @php
+                                                $cases = $item->case_ordered_quantity ?? 0;
+                                                $looseUnits = $item->unit_ordered_quantity ?? 0;
+                                            @endphp
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">
+                                                @if($cases > 0 && $looseUnits > 0)
+                                                    {{ $cases }} × {{ $item->units_per_case }} + {{ $looseUnits }}
+                                                @elseif($cases > 0)
+                                                    {{ $cases }} × {{ $item->units_per_case }}
+                                                @endif
+                                            </span>
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 text-center text-sm text-gray-900 dark:text-gray-100">
@@ -981,6 +1012,14 @@
             setTimeout(() => {
                 toast.remove();
             }, 3000);
+        }
+
+        // Toggle supplier OOS filter
+        function toggleOosFilter() {
+            const hideOos = document.getElementById('hideOosFilter').checked;
+            document.querySelectorAll('tr[data-supplier-oos="true"]').forEach(row => {
+                row.style.display = hideOos ? 'none' : '';
+            });
         }
 
         // Sort delivery items function
