@@ -71,44 +71,97 @@
 @endphp
 
 @if($hasImage)
-    <div class="relative {{ $sizeClass }} {{ $hover ? 'group' : '' }}">
-        <img 
-            src="{{ $imageUrl }}" 
-            alt="{{ $productName }}"
-            class="{{ $imageClasses }} {{ $hover ? 'cursor-pointer' : '' }}"
-            @if($lazy) 
-                loading="lazy"
-                onload="this.classList.remove('animate-pulse')"
-            @endif
-            onerror="this.style.display='none'; this.parentElement.style.display='{{ $fallback ? 'block' : 'none' }}'; @if($fallback) this.parentElement.querySelector('.fallback-icon').style.display='flex'; @endif"
-            {{ $attributes->except(['product', 'supplierService', 'size', 'fallback', 'lazy', 'rounded', 'border', 'hover', 'hoverSize']) }}
+    @if($hover)
+        {{-- Hover-enabled version with Alpine.js for fixed positioning --}}
+        <div
+            class="relative {{ $sizeClass }}"
+            x-data="{ show: false, pos: { x: 0, y: 0 } }"
+            @mouseenter="
+                const rect = $el.getBoundingClientRect();
+                const spaceBelow = window.innerHeight - rect.bottom;
+                const spaceAbove = rect.top;
+                const previewHeight = 320;
+
+                pos.x = rect.left;
+                if (spaceBelow >= previewHeight || spaceBelow > spaceAbove) {
+                    pos.y = rect.bottom + 8;
+                } else {
+                    pos.y = rect.top - previewHeight - 8;
+                }
+                show = true;
+            "
+            @mouseleave="show = false"
         >
-        
-        @if($hover)
-            <!-- Hover preview -->
-            <div class="absolute left-0 bottom-full mb-2 z-[9999] opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none w-64">
-                <img
-                    src="{{ $imageUrl }}"
-                    alt="{{ $productName }}"
-                    class="w-64 h-auto max-h-80 object-contain rounded-lg border-2 border-white dark:border-gray-600 shadow-xl bg-white"
+            <img
+                src="{{ $imageUrl }}"
+                alt="{{ $productName }}"
+                class="{{ $imageClasses }} cursor-pointer"
+                @if($lazy)
                     loading="lazy"
-                >
-                @if($productName)
-                    <div class="bg-black bg-opacity-75 text-white text-xs p-2 rounded-b-lg truncate">
-                        {{ $productName }}
-                    </div>
+                    onload="this.classList.remove('animate-pulse')"
                 @endif
-            </div>
-        @endif
-        
-        @if($fallback)
-            <div class="fallback-icon absolute inset-0 bg-gray-100 dark:bg-gray-700 {{ $rounded ? 'rounded' : '' }} {{ $border ? 'border border-gray-200 dark:border-gray-700' : '' }} flex items-center justify-center" style="display: none;">
-                <svg class="w-1/2 h-1/2 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                </svg>
-            </div>
-        @endif
-    </div>
+                onerror="this.style.display='none'; this.parentElement.style.display='{{ $fallback ? 'block' : 'none' }}'; @if($fallback) this.parentElement.querySelector('.fallback-icon')?.style.display='flex'; @endif"
+                {{ $attributes->except(['product', 'supplierService', 'size', 'fallback', 'lazy', 'rounded', 'border', 'hover', 'hoverSize']) }}
+            >
+
+            {{-- Fixed position hover preview - renders over everything --}}
+            <template x-teleport="body">
+                <div
+                    x-show="show"
+                    x-transition:enter="transition ease-out duration-150"
+                    x-transition:enter-start="opacity-0"
+                    x-transition:enter-end="opacity-100"
+                    x-transition:leave="transition ease-in duration-100"
+                    x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0"
+                    class="fixed z-[99999] pointer-events-none w-64"
+                    :style="'left: ' + pos.x + 'px; top: ' + pos.y + 'px;'"
+                >
+                    <img
+                        src="{{ $imageUrl }}"
+                        alt="{{ $productName }}"
+                        class="w-64 h-auto max-h-80 object-contain rounded-lg border-2 border-white dark:border-gray-600 shadow-2xl bg-white"
+                    >
+                    @if($productName)
+                        <div class="bg-black bg-opacity-75 text-white text-xs p-2 rounded-b-lg truncate max-w-64">
+                            {{ $productName }}
+                        </div>
+                    @endif
+                </div>
+            </template>
+
+            @if($fallback)
+                <div class="fallback-icon absolute inset-0 bg-gray-100 dark:bg-gray-700 {{ $rounded ? 'rounded' : '' }} {{ $border ? 'border border-gray-200 dark:border-gray-700' : '' }} flex items-center justify-center" style="display: none;">
+                    <svg class="w-1/2 h-1/2 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+            @endif
+        </div>
+    @else
+        {{-- Non-hover version --}}
+        <div class="relative {{ $sizeClass }}">
+            <img
+                src="{{ $imageUrl }}"
+                alt="{{ $productName }}"
+                class="{{ $imageClasses }}"
+                @if($lazy)
+                    loading="lazy"
+                    onload="this.classList.remove('animate-pulse')"
+                @endif
+                onerror="this.style.display='none'; this.parentElement.style.display='{{ $fallback ? 'block' : 'none' }}'; @if($fallback) this.parentElement.querySelector('.fallback-icon')?.style.display='flex'; @endif"
+                {{ $attributes->except(['product', 'supplierService', 'size', 'fallback', 'lazy', 'rounded', 'border', 'hover', 'hoverSize']) }}
+            >
+
+            @if($fallback)
+                <div class="fallback-icon absolute inset-0 bg-gray-100 dark:bg-gray-700 {{ $rounded ? 'rounded' : '' }} {{ $border ? 'border border-gray-200 dark:border-gray-700' : '' }} flex items-center justify-center" style="display: none;">
+                    <svg class="w-1/2 h-1/2 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+            @endif
+        </div>
+    @endif
 @elseif($fallback)
     <!-- No image available - show fallback icon -->
     <div class="{{ $sizeClass }} bg-gray-100 dark:bg-gray-700 {{ $rounded ? 'rounded' : '' }} {{ $border ? 'border border-gray-200 dark:border-gray-700' : '' }} flex items-center justify-center">
