@@ -9,6 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **✅ Barcode Exists Highlighting in Deliveries** (2026-01-26)
+  - **Auto-Detection**: When refreshing a barcode from supplier website, system checks if barcode already exists in POS products
+  - **Green Highlighting**: Existing barcodes display with green background, checkmark icon in separate circle
+  - **Product Link**: Clickable link opens existing product page in new tab for verification
+  - **Persistent Display**: Highlighting persists through auto-refresh polling (every 10 seconds)
+  - **Tooltip**: Hover shows product name for quick identification
+  - **Files Modified**:
+    - `app/Http/Controllers/DeliveryController.php` - Added Product lookup in `refreshBarcode()` and AJAX response
+    - `resources/views/deliveries/show.blade.php` - Updated `refreshBarcode()` and `updateBarcodeCell()` JS functions
+
+- **📦 Barrel Deposit Tracking System** (2026-01-26)
+  - **Automatic Extraction**: Barrel deposits (crates, bottles, pallets) parsed from Udea delivery PDFs
+  - **Reference Database**: `barrel_codes` table auto-populated from imports with supplier linkage
+  - **Per-Delivery Tracking**: `delivery_barrels` table records each barrel item per delivery
+  - **Custom Naming**: Add your own names to barrel codes for easier identification
+  - **Image Support**: Upload photos (100x100 resized) for visual identification
+  - **Collapsible Display**: Barrel section on delivery show page collapsed by default with Show/Hide toggle
+  - **Management Page**: `/barrel-codes` - browse, filter by supplier/status, search, and edit barrel codes
+  - **Parser Boundary Fix**: Barrels section correctly stops at "Costs" to exclude freight charges
+  - **Files Created**:
+    - `app/Models/BarrelCode.php` - Barrel code reference model
+    - `app/Models/DeliveryBarrel.php` - Delivery barrel line item model
+    - `app/Http/Controllers/BarrelCodeController.php` - CRUD with image handling
+    - `resources/views/barrel-codes/index.blade.php` - List page with filters
+    - `resources/views/barrel-codes/edit.blade.php` - Edit form with image upload
+    - `docs/features/barrel-deposit-tracking.md` - Feature documentation
+  - **Files Modified**:
+    - `scripts/invoice-parser/parsers/delivery_udea.py` - Barrel section extraction
+    - `scripts/invoice-parser/delivery_parser_laravel.py` - Include barrels in response
+    - `app/Services/DeliveryService.php` - storeBarrelItems() method
+    - `app/Http/Controllers/DeliveryController.php` - storePdf() integration
+    - `resources/views/deliveries/show.blade.php` - Collapsible barrel display
+    - `resources/views/deliveries/index.blade.php` - Barrel Codes button
+
 - **📦 Delivery Legacy - Out of Stock (OOS) Handling** (2026-01-24)
   - **OOS Items at Bottom**: OOS items (ordered but not delivered) now sync to legacy at the bottom of the list
   - **Expected: 0 for OOS**: OOS items display "Expected: 0" instead of their ordered quantity for clearer verification

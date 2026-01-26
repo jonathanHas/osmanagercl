@@ -86,15 +86,15 @@
         
         @if($hover)
             <!-- Hover preview -->
-            <div class="absolute left-0 bottom-full mb-2 z-[9999] opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-                <img 
-                    src="{{ $imageUrl }}" 
+            <div class="absolute left-0 bottom-full mb-2 z-[9999] opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none w-64">
+                <img
+                    src="{{ $imageUrl }}"
                     alt="{{ $productName }}"
-                    class="{{ $hoverSize }} object-cover rounded-lg border-2 border-white dark:border-gray-600 shadow-xl"
+                    class="w-64 h-auto max-h-80 object-contain rounded-lg border-2 border-white dark:border-gray-600 shadow-xl bg-white"
                     loading="lazy"
                 >
                 @if($productName)
-                    <div class="absolute inset-x-0 bottom-0 bg-black bg-opacity-75 text-white text-xs p-2 rounded-b-lg">
+                    <div class="bg-black bg-opacity-75 text-white text-xs p-2 rounded-b-lg truncate">
                         {{ $productName }}
                     </div>
                 @endif

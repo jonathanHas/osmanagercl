@@ -221,6 +221,11 @@ External supplier connectivity for images, pricing, and product data.
 
 ### Delivery Verification
 Comprehensive delivery processing with barcode scanning and PDF invoice parsing.
+- **Barcode Exists Highlighting** (NEW! 2026-01-26): Visual indicator when refreshed barcode already exists in POS
+  - Green highlighting with checkmark icon for existing barcodes
+  - Clickable link opens product page in new tab for verification
+  - Prevents accidental duplicate product creation
+  - Persists through auto-refresh polling
 - **PDF Delivery Parsing** (NEW! 2026-01-23): Parse supplier PDF invoices directly
   - Independent Irish Health Foods: Case/unit breakdown, RSP extraction, VAT calculation
   - UDEA B.V.: European number formatting, weight-based products, three-tier regex matching
@@ -234,6 +239,18 @@ Comprehensive delivery processing with barcode scanning and PDF invoice parsing.
 - **Delivery Legacy Page** (NEW! 2026-01-18): Redesigned invoice match interface with financial dashboard, issues-first layout, collapsible sections, and quick filters for faster verification
 
 📖 [Delivery System Documentation](./features/delivery-system.md)
+
+### Barrel Deposit Tracking (NEW! 2026-01-26)
+Track returnable deposit items (crates, bottles, pallets) from supplier deliveries.
+- **Automatic Extraction**: Barrel data parsed automatically from Udea delivery PDFs
+- **Reference Database**: Barrel codes auto-populated from imports with supplier linkage
+- **Per-Delivery Tracking**: Each delivery records barrel line items with quantities and values
+- **Custom Naming**: Add your own names to barrel codes for easier identification
+- **Image Support**: Upload photos for visual identification of barrel types
+- **Collapsible Display**: Barrel section on delivery pages collapsed by default to save space
+- **Management Page**: Browse, filter, and edit all barrel codes at `/barrel-codes`
+
+📖 [Barrel Deposit Tracking Documentation](./features/barrel-deposit-tracking.md)
 
 ### Unified Supplier Management System (NEW! 2025-09-11)
 Complete supplier management with seamless POS integration and auto-code generation.

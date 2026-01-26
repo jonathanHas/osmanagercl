@@ -239,6 +239,7 @@
                             <table class="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead class="bg-red-50">
                                     <tr>
+                                        <th class="px-2 py-2 w-12"></th>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Expected</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Inv Case</th>
@@ -282,6 +283,19 @@
                                             $hasCaseUnitChange = $item->invoiceCaseUnits != $item->CaseUnits;
                                         @endphp
                                         <tr class="bg-red-50">
+                                            <td class="px-2 py-2">
+                                                @php
+                                                    $tempProduct = (object)[
+                                                        'barcode' => $item->Barcode,
+                                                        'supplier' => (object)['SupplierID' => $supplierId],
+                                                    ];
+                                                @endphp
+                                                <x-product-image
+                                                    :product="$tempProduct"
+                                                    :supplier-service="$supplierService"
+                                                    size="sm"
+                                                    :hover="true" />
+                                            </td>
                                             <td class="px-3 py-2">
                                                 @if($item->productID)
                                                     <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium">
@@ -426,6 +440,7 @@
                             <table class="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead class="bg-yellow-50">
                                     <tr>
+                                        <th class="px-2 py-2 w-12"></th>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Expected</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Inv Case</th>
@@ -469,6 +484,19 @@
                                             if ($hasMarginIssue) $issues[] = 'Low margin';
                                         @endphp
                                         <tr class="bg-yellow-50">
+                                            <td class="px-2 py-2">
+                                                @php
+                                                    $tempProduct = (object)[
+                                                        'barcode' => $item->Barcode,
+                                                        'supplier' => (object)['SupplierID' => $supplierId],
+                                                    ];
+                                                @endphp
+                                                <x-product-image
+                                                    :product="$tempProduct"
+                                                    :supplier-service="$supplierService"
+                                                    size="sm"
+                                                    :hover="true" />
+                                            </td>
                                             <td class="px-3 py-2">
                                                 @if($item->productID)
                                                     <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium">
@@ -614,6 +642,7 @@
                             <table class="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead class="bg-green-50">
                                     <tr>
+                                        <th class="px-2 py-2 w-12"></th>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Expected</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Inv Case</th>
@@ -653,6 +682,19 @@
                                             $hasCaseUnitChange = $item->invoiceCaseUnits != $item->CaseUnits;
                                         @endphp
                                         <tr class="hover:bg-green-50">
+                                            <td class="px-2 py-2">
+                                                @php
+                                                    $tempProduct = (object)[
+                                                        'barcode' => $item->Barcode,
+                                                        'supplier' => (object)['SupplierID' => $supplierId],
+                                                    ];
+                                                @endphp
+                                                <x-product-image
+                                                    :product="$tempProduct"
+                                                    :supplier-service="$supplierService"
+                                                    size="sm"
+                                                    :hover="true" />
+                                            </td>
                                             <td class="px-3 py-2">
                                                 @if($item->productID)
                                                     <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium">
@@ -778,6 +820,7 @@
                         <table class="min-w-full divide-y divide-gray-200 text-sm">
                             <thead class="bg-orange-50">
                                 <tr>
+                                    <th class="px-2 py-2 w-12"></th>
                                     <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                                     <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Inv Case</th>
                                     <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">DB Case</th>
@@ -790,6 +833,19 @@
                                         $hasCaseUnitChange = $item->invoiceCaseUnits != $item->CaseUnits;
                                     @endphp
                                     <tr class="hover:bg-orange-50">
+                                        <td class="px-2 py-2">
+                                            @php
+                                                $tempProduct = (object)[
+                                                    'barcode' => $item->Barcode,
+                                                    'supplier' => (object)['SupplierID' => $supplierId],
+                                                ];
+                                            @endphp
+                                            <x-product-image
+                                                :product="$tempProduct"
+                                                :supplier-service="$supplierService"
+                                                size="sm"
+                                                :hover="true" />
+                                        </td>
                                         <td class="px-3 py-2">
                                             @if($item->productID)
                                                 <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium">
@@ -837,6 +893,7 @@
                             <table class="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead class="bg-gray-50">
                                     <tr>
+                                        <th class="px-2 py-2 w-12"></th>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Expected</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase w-8"></th>
@@ -875,6 +932,19 @@
                                         @endphp
                                         <tr class="hover:bg-gray-50"
                                             x-data="{ editing: false, qty: null, originalQty: null, saving: false, canEdit: {{ $isCompleted ? 'false' : 'true' }} }">
+                                            <td class="px-2 py-2">
+                                                @php
+                                                    $tempProduct = (object)[
+                                                        'barcode' => $item->Barcode,
+                                                        'supplier' => (object)['SupplierID' => $supplierId],
+                                                    ];
+                                                @endphp
+                                                <x-product-image
+                                                    :product="$tempProduct"
+                                                    :supplier-service="$supplierService"
+                                                    size="sm"
+                                                    :hover="true" />
+                                            </td>
                                             <td class="px-3 py-2">
                                                 @if($item->productID)
                                                     <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium">
@@ -976,6 +1046,7 @@
                             <table class="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead class="bg-orange-50">
                                     <tr>
+                                        <th class="px-2 py-2 w-12"></th>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Barcode</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Case Units</th>
@@ -989,6 +1060,19 @@
                                 <tbody class="bg-white divide-y divide-gray-200">
                                     @foreach($scannedNotOnInvoice as $item)
                                         <tr class="bg-orange-50">
+                                            <td class="px-2 py-2">
+                                                @php
+                                                    $tempProduct = (object)[
+                                                        'barcode' => $item->Barcode,
+                                                        'supplier' => (object)['SupplierID' => $supplierId],
+                                                    ];
+                                                @endphp
+                                                <x-product-image
+                                                    :product="$tempProduct"
+                                                    :supplier-service="$supplierService"
+                                                    size="sm"
+                                                    :hover="true" />
+                                            </td>
                                             <td class="px-3 py-2">
                                                 <span class="font-medium text-gray-900">{{ $item->NAME ?? 'Unknown Product' }}</span>
                                                 @if($item->SupplierCode)
@@ -1084,6 +1168,7 @@
                             <table class="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead class="bg-red-50">
                                     <tr>
+                                        <th class="px-2 py-2 w-12"></th>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Supplier Code</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Cases</th>
@@ -1102,6 +1187,12 @@
                                             $value = ($item->cost ?? 0) * $totalUnits;
                                         @endphp
                                         <tr class="bg-red-50">
+                                            <td class="px-2 py-2">
+                                                {{-- Missing items only have supplier code, no barcode - show fallback --}}
+                                                <x-product-image
+                                                    :product="null"
+                                                    size="sm" />
+                                            </td>
                                             <td class="px-3 py-2 font-medium text-gray-900">{{ $item->prodName }}</td>
                                             <td class="px-3 py-2 text-gray-500">{{ $item->supCode }}</td>
                                             <td class="px-3 py-2 text-center">{{ $myOrder }}</td>

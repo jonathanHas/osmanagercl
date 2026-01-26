@@ -3,11 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Models\DeliveryScanItem;
+use App\Services\SupplierService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class DeliveryLegacyController extends Controller
 {
+    private SupplierService $supplierService;
+
+    public function __construct(SupplierService $supplierService)
+    {
+        $this->supplierService = $supplierService;
+    }
+
     /**
      * Display the delivery/supplier selection page.
      */
@@ -101,7 +109,7 @@ class DeliveryLegacyController extends Controller
             'financials',
             'stockPreview',
             'isCompleted'
-        ));
+        ))->with('supplierService', $this->supplierService);
     }
 
     /**

@@ -982,11 +982,12 @@
                             // Highlight with green background - product already exists in database
                             barcodeCell.innerHTML = `
                                 <a href="/products/${data.existing_product.id}" target="_blank"
-                                   class="inline-block hover:opacity-80 transition-opacity"
+                                   class="inline-flex items-center gap-1 hover:opacity-80 transition-opacity"
                                    title="Product exists: ${data.existing_product.name} - Click to view">
                                     <code class="px-2 py-1 bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 rounded text-xs border border-green-300 dark:border-green-600">
-                                        ${data.barcode} ✓
+                                        ${data.barcode}
                                     </code>
+                                    <span class="w-4 h-4 bg-green-500 text-white rounded-full inline-flex items-center justify-center text-xs flex-shrink-0">✓</span>
                                 </a>
                             `;
                             showMessage(`Barcode found - Product already exists: ${data.existing_product.name}`, 'success');
@@ -1047,11 +1048,12 @@
                     // Highlight with green background - product already exists in database
                     barcodeCell.innerHTML = `
                         <a href="/products/${item.existing_product.id}" target="_blank"
-                           class="inline-block hover:opacity-80 transition-opacity"
+                           class="inline-flex items-center gap-1 hover:opacity-80 transition-opacity"
                            title="Product exists: ${item.existing_product.name} - Click to view">
                             <code class="px-2 py-1 bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 rounded text-xs border border-green-300 dark:border-green-600">
-                                ${item.barcode} ✓
+                                ${item.barcode}
                             </code>
+                            <span class="w-4 h-4 bg-green-500 text-white rounded-full inline-flex items-center justify-center text-xs flex-shrink-0">✓</span>
                         </a>
                     `;
                 } else {

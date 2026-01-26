@@ -20,6 +20,8 @@ The delivery verification system provides a complete workflow for handling suppl
    - `Delivery` - Main delivery tracking
    - `DeliveryItem` - Individual product items
    - `DeliveryScan` - Scan history and matching
+   - `DeliveryBarrel` - Barrel deposit line items (see [Barrel Deposit Tracking](./barrel-deposit-tracking.md))
+   - `BarrelCode` - Barrel type reference data
 
 3. **Controllers** (`app/Http/Controllers/DeliveryController.php`)
    - RESTful delivery management
@@ -1613,9 +1615,84 @@ if ($lineTotal > 0) {
 
 ---
 
-**Last Updated**: 2026-01-24
+### 2026-01-26 - Barcode Exists Highlighting
+
+#### Visual Indication When Refreshed Barcode Already Exists in POS
+
+**Enhancement**: When using "Refresh Barcode" on new products, the system now checks if the retrieved barcode already exists in the POS products database and highlights it for the user.
+
+**Problem Solved**: Users could accidentally create duplicate products when a barcode already existed in the system under a different supplier code or product name.
+
+**New Features Implemented**:
+
+1. **Auto-Detection**:
+   - After retrieving barcode from supplier website, queries `PRODUCTS.CODE` for match
+   - Works for both manual refresh button and background job retrieval
+   - Included in auto-refresh polling (every 10 seconds)
+
+2. **Visual Highlighting**:
+   - **Green Background**: `bg-green-100` (light) / `bg-green-800` (dark mode)
+   - **Green Border**: Distinct from standard gray barcode styling
+   - **Checkmark Icon**: Separate green circle with white checkmark
+   - **Tooltip**: Shows "Product exists: {product name} - Click to view"
+
+3. **Product Link**:
+   - Entire barcode display is clickable
+   - Opens `/products/{id}` in new tab (`target="_blank"`)
+   - Allows user to verify existing product before deciding to create new one
+
+4. **Persistent Display**:
+   - `updateBarcodeCell()` function updated to use same green styling
+   - Prevents auto-refresh from reverting to gray styling
+   - AJAX response includes `exists_in_database` and `existing_product` data
+
+**Technical Implementation**:
+
+```php
+// Controller - refreshBarcode() and show() AJAX response
+$existingProduct = Product::where('CODE', $barcode)->first();
+
+return response()->json([
+    // ... existing fields ...
+    'exists_in_database' => $existingProduct !== null,
+    'existing_product' => $existingProduct ? [
+        'id' => $existingProduct->ID,
+        'name' => $existingProduct->NAME,
+    ] : null,
+]);
+```
+
+```javascript
+// JavaScript - Both refreshBarcode() and updateBarcodeCell()
+if (data.exists_in_database && data.existing_product) {
+    barcodeCell.innerHTML = `
+        <a href="/products/${data.existing_product.id}" target="_blank"
+           class="inline-flex items-center gap-1 hover:opacity-80">
+            <code class="... bg-green-100 dark:bg-green-800 ...">
+                ${data.barcode}
+            </code>
+            <span class="w-4 h-4 bg-green-500 text-white rounded-full ...">✓</span>
+        </a>
+    `;
+}
+```
+
+**Files Modified**:
+- `app/Http/Controllers/DeliveryController.php` - Added Product lookup in `refreshBarcode()` and AJAX response
+- `resources/views/deliveries/show.blade.php` - Updated both JS functions with green styling and product link
+
+#### Impact & Benefits
+- ✅ **Duplicate Prevention**: Visual warning before creating duplicate products
+- ✅ **Quick Verification**: One-click access to existing product page
+- ✅ **Persistent Indicator**: Green highlighting survives page auto-refresh
+- ✅ **Dark Mode Support**: Proper styling for both light and dark themes
+- ✅ **Non-Intrusive**: Standard gray styling for new barcodes unchanged
+
+---
+
+**Last Updated**: 2026-01-26
 **System Status**: ✅ Fully Operational
 **Test Coverage**: Manual testing completed
 **Performance**: Tested with 292-item deliveries
-**Recent Enhancement**: OOS handling, auto supplier detection, clickable case badges
-**New Features**: PDF delivery parsing (Independent & UDEA), multi-PDF upload, price comparison matrix, bulk cost updates, quick price editing, professional table sorting, enhanced product navigation, inline cost editing, sync to legacy, case unit editing, pending item quantity entry, stock update & completion, stock verification preview, extra items stock column, OOS section, auto supplier detection, clickable case badges
+**Recent Enhancement**: Barcode exists highlighting, OOS handling, auto supplier detection, clickable case badges
+**New Features**: Barcode exists highlighting, PDF delivery parsing (Independent & UDEA), multi-PDF upload, price comparison matrix, bulk cost updates, quick price editing, professional table sorting, enhanced product navigation, inline cost editing, sync to legacy, case unit editing, pending item quantity entry, stock update & completion, stock verification preview, extra items stock column, OOS section, auto supplier detection, clickable case badges
