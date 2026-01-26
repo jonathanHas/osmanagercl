@@ -560,6 +560,18 @@
             if (data.warnings && data.warnings.length > 0) {
                 warningsList.innerHTML = data.warnings.map(w => '<li>' + w + '</li>').join('');
                 warningsDiv.classList.remove('hidden');
+
+                // Show unparsed line details if available
+                if (data.unmatched_lines && data.unmatched_lines.length > 0) {
+                    let unmatchedHtml = '<li class="mt-2"><strong>Unparsed lines for review:</strong>';
+                    unmatchedHtml += '<ul class="ml-4 mt-1 text-xs opacity-75 font-mono max-h-32 overflow-y-auto">';
+                    data.unmatched_lines.forEach(line => {
+                        const prefix = line.filename ? '[' + line.filename + '] ' : '';
+                        unmatchedHtml += '<li class="truncate" title="' + line.content + '">' + prefix + 'L' + line.line_num + ': ' + line.content + '</li>';
+                    });
+                    unmatchedHtml += '</ul></li>';
+                    warningsList.innerHTML += unmatchedHtml;
+                }
             } else {
                 warningsDiv.classList.add('hidden');
             }

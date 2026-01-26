@@ -1469,9 +1469,153 @@ Previously, users couldn't see current stock levels for extra scanned items. Now
 
 ---
 
-**Last Updated**: 2026-01-23
+### 2026-01-24 - Out of Stock (OOS) Handling & Auto Supplier Detection
+
+#### OOS Items in Legacy Sync
+
+**Enhancement**: Improved handling of Out of Stock items when syncing deliveries to the legacy verification system.
+
+**Problems Resolved**:
+1. OOS items were being skipped entirely during sync
+2. OOS items showed their ordered quantity as "Expected" instead of 0
+3. OOS items appeared in "Verified Items" (Expected: 0, Scanned: 0 = match)
+4. OOS items appeared in "Missing Items" (on invoice, not scanned)
+
+**New Features Implemented**:
+
+1. **Two-Pass Sync**:
+   - First pass syncs all non-OOS items
+   - Second pass syncs OOS items at the bottom with `myOrder = 0`
+   - OOS detection: `ordered_quantity > 0 && invoice_delivered_quantity == 0`
+
+2. **Separate OOS Section**:
+   - New "Out of Stock" collapsible section with orange styling
+   - Shows items that were ordered but not delivered by supplier
+   - Displays order quantity, invoice case units, cost, and value
+   - Excluded from Verified Items filter
+   - Excluded from Pending Items filter
+
+3. **OOS Excluded from Missing Items**:
+   - Added `HAVING SUM(delivery.myOrder) > 0` to query
+   - Prevents OOS items from appearing in both OOS and Missing sections
+
+**Technical Implementation**:
+
+```php
+// OOS detection in sync
+$isOOS = ($item->ordered_quantity > 0 && $item->invoice_delivered_quantity == 0);
+
+// Sync with myOrder = 0 for OOS items
+if ($isOOS) {
+    $syncMyOrder = 0;  // Shows "Expected: 0" in legacy view
+}
+
+// Case units calculated normally for all items (not hardcoded to 1)
+$syncCaseUnits = $unitsPerCase;  // Correct for both OOS and non-OOS
+```
+
+**View Updates** (`match.blade.php`):
+```php
+// OOS filter
+$oosItems = collect($matchedItems)->filter(fn($item) => $item->myOrder == 0);
+
+// Exclude OOS from verified and pending
+$verifiedItems = collect($matchedItems)->filter(fn($item) =>
+    $item->myOrder > 0 && abs($item->scanned - $item->expected) < 0.01
+);
+```
+
+#### Auto Supplier Detection on PDF Upload
+
+**Enhancement**: Automatic supplier identification when uploading delivery PDFs, eliminating manual supplier selection.
+
+**New Features Implemented**:
+
+1. **Detection Endpoint**:
+   - Route: `POST /deliveries/detect-supplier`
+   - Parses first few pages of PDF to identify supplier
+   - Returns matched supplier ID or null if unrecognized
+
+2. **Supplier Name Mapping**:
+   ```php
+   private function mapSupplierNameToId(?string $supplierName): ?int
+   {
+       $mapping = [
+           'Independent Irish Health Foods' => 1,
+           'IIHF' => 1,
+           'UDEA' => 5,
+           'Mossfield' => 3,
+       ];
+       // Case-insensitive partial matching
+   }
+   ```
+
+3. **Frontend Integration**:
+   - Shows "🔍 Detecting supplier..." while parsing
+   - Auto-selects supplier dropdown on success
+   - Shows "✓ Supplier detected" confirmation
+   - Falls back to manual selection if detection fails
+
+**Files Modified**:
+- `app/Http/Controllers/DeliveryController.php` - Added `detectSupplier()` and `mapSupplierNameToId()`
+- `resources/views/deliveries/create.blade.php` - Added detection status and JavaScript
+- `routes/web.php` - Added `deliveries.detect-supplier` route
+
+#### Clickable Case Unit Mismatch Badges
+
+**Enhancement**: Made case unit mismatch indicators clickable for quick database updates.
+
+**Before**: Static badge showing "Case: 1 → 12" required manual editing via DB Case cell.
+
+**After**: Clickable button that instantly updates DB case units to match invoice.
+
+**Implementation**:
+```blade
+@if($hasCaseUnitChange)
+    <button type="button"
+            onclick="window.deliveryMatchInstance.saveCaseUnits('{{ $item->Barcode }}', {{ $item->invoiceCaseUnits ?? 1 }}, () => location.reload())"
+            class="inline-block text-xs px-2 py-0.5 bg-orange-200 text-orange-800 rounded hover:bg-orange-300 cursor-pointer transition-colors"
+            title="Click to update DB case units to {{ $item->invoiceCaseUnits ?? 1 }}">
+        Case: {{ $item->invoiceCaseUnits ?? 1 }} &rarr; {{ $item->CaseUnits ?? '?' }}
+    </button>
+@endif
+```
+
+**Benefits**:
+- ✅ One-click case unit correction
+- ✅ Page reloads to show updated expected quantities
+- ✅ Hover tooltip shows target value
+- ✅ Visual feedback with hover state change
+
+#### Tax Rate Fix for PDF Imports
+
+**Bug Fix**: Tax rates were NULL for items imported via PDF parsing.
+
+**Root Cause**: `importFromPdfData()` saved `tax_amount` but didn't calculate `tax_rate` or `normalized_tax_rate`.
+
+**Solution**:
+```php
+$taxRate = null;
+$normalizedTaxRate = null;
+if ($lineTotal > 0) {
+    if ($tax > 0) {
+        $taxRate = ($tax / $lineTotal) * 100;
+        $taxRate = round($taxRate, 2);
+    } else {
+        $taxRate = 0.0;
+    }
+    $normalizedTaxRate = $this->normalizeIrishVatRate($taxRate);
+}
+```
+
+**Files Modified**:
+- `app/Services/DeliveryService.php` - Added tax rate calculation in `importFromPdfData()`
+
+---
+
+**Last Updated**: 2026-01-24
 **System Status**: ✅ Fully Operational
 **Test Coverage**: Manual testing completed
 **Performance**: Tested with 292-item deliveries
-**Recent Enhancement**: UDEA PDF parsing and multi-PDF upload support
-**New Features**: PDF delivery parsing (Independent & UDEA), multi-PDF upload, price comparison matrix, bulk cost updates, quick price editing, professional table sorting, enhanced product navigation, inline cost editing, sync to legacy, case unit editing, pending item quantity entry, stock update & completion, stock verification preview, extra items stock column
+**Recent Enhancement**: OOS handling, auto supplier detection, clickable case badges
+**New Features**: PDF delivery parsing (Independent & UDEA), multi-PDF upload, price comparison matrix, bulk cost updates, quick price editing, professional table sorting, enhanced product navigation, inline cost editing, sync to legacy, case unit editing, pending item quantity entry, stock update & completion, stock verification preview, extra items stock column, OOS section, auto supplier detection, clickable case badges

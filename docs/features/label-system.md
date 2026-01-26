@@ -69,9 +69,10 @@ The label system provides automated label generation and printing capabilities w
 
 ### 📱 Scan to Label Feature
 - **Barcode Scanner Integration**: Quick barcode scanning modal for instant product addition to label queue
-- **Scanner-Optimized Interface**: 
+- **Scanner-Optimized Interface**:
   - Prominent "Scan to Label" button in page header (always accessible without scrolling)
   - Auto-focus input field with virtual keyboard suppression (`inputmode="none"`)
+  - **Keyboard Toggle Button**: Toggle virtual keyboard on/off for manual entry when needed (matches stocking page pattern)
   - Real-time product lookup and visual feedback
   - Queue counter showing current items in labels queue
 - **Streamlined Workflow**:
@@ -332,5 +333,5 @@ Templates are stored in the database and can be managed through:
 
 ---
 
-**Last Updated**: August 2025  
-**Version**: 1.3.0 - Added filtering by label add method with visual indicators and persistent filter state
+**Last Updated**: January 2026
+**Version**: 1.4.0 - Added keyboard toggle button to scan-to-label modal for manual barcode entry

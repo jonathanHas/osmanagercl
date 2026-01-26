@@ -366,9 +366,12 @@
                                             </td>
                                             <td class="px-3 py-2 text-center">
                                                 @if($hasCaseUnitChange)
-                                                    <span class="inline-block text-xs px-2 py-0.5 bg-orange-200 text-orange-800 rounded">
+                                                    <button type="button"
+                                                            onclick="window.deliveryMatchInstance.saveCaseUnits('{{ $item->Barcode }}', {{ $item->invoiceCaseUnits ?? 1 }}, () => location.reload())"
+                                                            class="inline-block text-xs px-2 py-0.5 bg-orange-200 text-orange-800 rounded hover:bg-orange-300 cursor-pointer transition-colors"
+                                                            title="Click to update DB case units to {{ $item->invoiceCaseUnits ?? 1 }}">
                                                         Case: {{ $item->invoiceCaseUnits ?? 1 }} &rarr; {{ $item->CaseUnits ?? '?' }}
-                                                    </span>
+                                                    </button>
                                                 @endif
                                             </td>
                                             <template x-if="showDetails">
@@ -464,7 +467,6 @@
                                             $hasCaseUnitChange = $item->invoiceCaseUnits != $item->CaseUnits;
                                             $issues = [];
                                             if ($hasMarginIssue) $issues[] = 'Low margin';
-                                            if ($hasCaseUnitChange) $issues[] = 'Case: ' . ($item->invoiceCaseUnits ?? 1) . ' → ' . ($item->CaseUnits ?? '?');
                                         @endphp
                                         <tr class="bg-yellow-50">
                                             <td class="px-3 py-2">
@@ -548,6 +550,14 @@
                                                 @foreach($issues as $issue)
                                                     <span class="inline-block text-xs px-2 py-0.5 bg-yellow-200 text-yellow-800 rounded mb-0.5">{{ $issue }}</span>
                                                 @endforeach
+                                                @if($hasCaseUnitChange)
+                                                    <button type="button"
+                                                            onclick="window.deliveryMatchInstance.saveCaseUnits('{{ $item->Barcode }}', {{ $item->invoiceCaseUnits ?? 1 }}, () => location.reload())"
+                                                            class="inline-block text-xs px-2 py-0.5 bg-orange-200 text-orange-800 rounded hover:bg-orange-300 cursor-pointer transition-colors mb-0.5"
+                                                            title="Click to update DB case units to {{ $item->invoiceCaseUnits ?? 1 }}">
+                                                        Case: {{ $item->invoiceCaseUnits ?? 1 }} &rarr; {{ $item->CaseUnits ?? '?' }}
+                                                    </button>
+                                                @endif
                                             </td>
                                             <td class="px-3 py-2 text-right font-medium {{ $margin < 15 ? 'text-red-600' : 'text-gray-500' }}">
                                                 {{ number_format($margin, 0) }}% margin

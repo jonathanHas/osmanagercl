@@ -86,6 +86,7 @@ Complete label printing system with integrated barcode scanning for quick produc
 - **Scanner-Optimized Layout**: Prominent scan button in page header, compact stats, streamlined interface
 - **Queue Management**: Live counter showing products in labels queue with session tracking
 - **Touch-Free Workflow**: Virtual keyboard suppression and automatic focus management for continuous scanning
+- **Keyboard Toggle** (NEW! 2026-01-24): Toggle button to show/hide virtual keyboard for manual barcode entry when needed
 - **Filter by Add Method**: Select labels by how they were added (New Products, Price Updates, Scanned/Re-queued) with visual indicators and real-time counts
 
 📖 [Label System Documentation](./features/label-system.md)

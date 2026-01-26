@@ -431,14 +431,24 @@
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 Scan Barcode
                             </label>
-                            <input type="text" 
-                                   x-model="barcode"
-                                   x-ref="barcodeInput"
-                                   @keydown.enter="processBarcode()"
-                                   placeholder="Ready for barcode scan..."
-                                   inputmode="none"
-                                   autocomplete="off"
-                                   class="w-full text-lg py-3 px-4 rounded-lg border-2 border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                            <div class="flex gap-2">
+                                <input type="text"
+                                       x-model="barcode"
+                                       x-ref="barcodeInput"
+                                       @keydown.enter="processBarcode()"
+                                       placeholder="Ready for barcode scan..."
+                                       :inputmode="keyboardEnabled ? 'text' : 'none'"
+                                       autocomplete="off"
+                                       class="flex-1 text-lg py-3 px-4 rounded-lg border-2 border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                                <button @click="keyboardEnabled = !keyboardEnabled; $nextTick(() => $refs.barcodeInput.focus())"
+                                        class="px-3 py-2 rounded-lg border-2 touch-manipulation"
+                                        :class="keyboardEnabled ? 'bg-blue-100 border-blue-500 text-blue-700 dark:bg-blue-900/30 dark:border-blue-500 dark:text-blue-400' : 'bg-gray-100 border-gray-300 text-gray-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-400'"
+                                        :title="keyboardEnabled ? 'Hide keyboard' : 'Show keyboard'">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h18a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V6a1 1 0 011-1zm3 4h2m2 0h2m2 0h2m2 0h2M6 12h2m2 0h2m2 0h2m2 0h2M8 16h8"/>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Product Preview -->
@@ -975,6 +985,7 @@
                 processing: false,
                 scansCount: 0,
                 currentQueueCount: {{ count($productsNeedingLabels) }},
+                keyboardEnabled: false,
 
                 init() {
                     // Check if we should open immediately

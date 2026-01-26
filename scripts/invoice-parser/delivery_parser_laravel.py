@@ -161,6 +161,11 @@ def process_delivery_pdf(file_path: str, supplier_hint: str = None, verbose: boo
 
             response['warnings'] = result.get('warnings', [])
 
+            # Pass through unmatched lines for user review
+            unmatched_lines = result.get('metadata', {}).get('unmatched_lines', [])
+            if unmatched_lines:
+                response['metadata']['unmatched_lines'] = unmatched_lines
+
         else:
             response['errors'] = result.get('errors', [])
             response['warnings'] = result.get('warnings', [])

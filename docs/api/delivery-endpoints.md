@@ -350,6 +350,62 @@ GET /deliveries/{delivery}/export-discrepancies
 }
 ```
 
+### Detect Supplier from PDF
+
+Automatically detect the supplier from uploaded PDF content.
+
+```http
+POST /deliveries/detect-supplier
+Content-Type: multipart/form-data
+```
+
+**Request Body:**
+```
+pdf_file: file (required) - PDF file to analyze
+```
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "supplier_id": 1,
+  "supplier_name": "Independent Irish Health Foods",
+  "detected_name": "INDEPENDENT IRISH HEALTH FOODS"
+}
+```
+
+**No Match Response:**
+```json
+{
+  "success": true,
+  "supplier_id": null,
+  "supplier_name": null,
+  "detected_name": "Unknown Supplier Name"
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "error": "Failed to parse PDF"
+}
+```
+
+**Supported Suppliers:**
+| Detected Text | Supplier ID | Supplier Name |
+|---------------|-------------|---------------|
+| `INDEPENDENT IRISH HEALTH FOODS`, `IIHF` | 1 | Independent Irish Health Foods |
+| `UDEA B.V.`, `WWW.UDEA.NL`, `UDEA` | 5 | UDEA |
+| `MOSSFIELD` | 3 | Mossfield |
+
+**Notes:**
+- Detection uses case-insensitive partial matching
+- Parses first few pages of PDF for supplier identification
+- Returns null supplier_id if no match found (user selects manually)
+
+---
+
 ### Sync to Legacy
 
 Sync delivery items to the POS `delivery` table for invoice comparison with scanned items.
@@ -513,6 +569,6 @@ php artisan queue:work --verbose
 
 ---
 
-**Last Updated**: 2026-01-19
-**API Version**: v1.1
+**Last Updated**: 2026-01-24
+**API Version**: v1.2
 **Framework**: Laravel 12

@@ -111,15 +111,72 @@ class DeliveryUdeaParser:
             print(f"[{level}] {message}", file=sys.stderr)
 
     def _clean_number_string(self, num_str: str) -> str:
-        """Convert European-style numbers (e.g., '1.234,56') to standard float format ('1234.56')."""
+        """Convert European-style numbers to standard float format.
+
+        Handles:
+        - Thousands notation: '1,200' -> '1200', '2,500' -> '2500' (comma + 3 digits, no decimal part)
+        - European decimals: '1,20' -> '1.20', '2,88' -> '2.88' (comma as decimal)
+        - Mixed European: '1.234,56' -> '1234.56' (dot thousands, comma decimal)
+        - Standard notation: '4.560' -> '4.560' (no comma = preserve as-is)
+        """
         if num_str is None:
             return ""
+
+        # If no comma, preserve as-is (standard notation with dots as decimals)
+        if ',' not in num_str:
+            return num_str
+
+        # Check specifically for comma-separated thousands notation: X,XXX or X,XXX,XXX
+        # Pattern: 1-3 digits, then one or more groups of comma+3 digits, nothing after
+        # Examples: "1,200" -> 1200, "1,200,000" -> 1200000
+        # NOT: "1,200,00" (would need comma decimal ending)
+        comma_thousands_match = re.match(r'^(\d{1,3})(,\d{3})+$', num_str)
+        if comma_thousands_match:
+            # This is thousands notation, remove all commas
+            return num_str.replace(",", "")
+
+        # European format: dots are thousands separators, comma is decimal
+        # Remove dots (thousands), replace comma (decimal) with dot
         return num_str.replace(".", "").replace(",", ".")
 
     def _preprocess_line(self, line: str) -> str:
         """Pre-process lines to fix common PDF extraction issues."""
         # Fix merged unit names like "1kilogram" -> "1 kilogram"
         line = re.sub(r'(\d)([a-z])', r'\1 \2', line)
+
+        # Fix merged SKU+Content pattern like "41,200 millilitre" -> "4 1,200 millilitre"
+        # Pattern: single digit (SKU) merged with comma-thousands number (Content) before a unit
+        # Examples: "41,200 millilitre" -> "4 1,200 millilitre"
+        #           "61,000 pc" -> "6 1,000 pc"
+        merged_sku_content_pattern = re.compile(
+            r'(\d)(\d,\d{3})\s+(millilitre|litre|liter|pc|stuks|gram|kilogram|builtjes)'
+        )
+        line = merged_sku_content_pattern.sub(r'\1 \2 \3', line)
+
+        # Fix merged Qty+ActualWeight for variable weight products (cheese wheels, meat packets)
+        # Pattern: "Code Ordered XY,ZZZ A,BBunit" where XY,ZZZ is qty+weight merged
+        # Examples: "32350 1 12,500 2,50kilogram" -> "32350 1 1 2,500 2,50kilogram"
+        #           "45006 12 120,207 200gram" -> "45006 12 12 0,207 200gram"
+        variable_weight_merge_pattern = re.compile(
+            r'^(\d+\s+\d+\s+)(\d{1,2})(\d,\d{3})\s+(\d+,?\d*\s*(?:kilogram|gram))'
+        )
+        line = variable_weight_merge_pattern.sub(r'\1\2 \3 \4', line)
+
+        # For variable weight products, convert actual weight from European (X,XXX) to standard (X.XXX)
+        # This ensures "2,960" is treated as 2.96 kg, not 2960
+        # Pattern: after "Code Ordered Qty", weight in X,XXX format followed by content+unit
+        # Examples: "32358 1 1 2,960 2,70kilogram" -> "32358 1 1 2.960 2,70kilogram"
+        variable_weight_decimal_pattern = re.compile(
+            r'^(\d+\s+\d+\s+\d+\s+)(\d),(\d{3})\s+(\d+,?\d*\s*(?:kilogram|gram))'
+        )
+        line = variable_weight_decimal_pattern.sub(r'\1\2.\3 \4', line)
+
+        # Separate unit names from description text (e.g., "kilogramGruyere" -> "kilogram Gruyere")
+        # This is needed for weight-based product detection to work correctly
+        unit_description_pattern = re.compile(
+            r'(kilogram|gram|millilitre|litre|liter|stuks|pc|builtjes)([A-Z][a-z])'
+        )
+        line = unit_description_pattern.sub(r'\1 \2', line)
 
         # Fix weight/qty corruption patterns
         weight_corruption_pattern = re.compile(
@@ -207,6 +264,28 @@ class DeliveryUdeaParser:
             elif has_decimal_group4 and not has_decimal_group5:
                 final_csv_sku_value = cleaned_group4
                 quantity_for_content_display = cleaned_group5
+            elif not has_decimal_group4 and not has_decimal_group5:
+                # Both are integers - use heuristics to determine SKU vs content
+                # SKU (case size) is typically small (1-24), content qty can be large (1200 ml, 1000 pc)
+                try:
+                    g4_int = int(cleaned_group4)
+                    g5_int = int(cleaned_group5)
+                    if g4_int <= 24 and g5_int > 50:
+                        # Group4 is likely SKU (small case size), Group5 is content quantity
+                        final_csv_sku_value = cleaned_group4
+                        quantity_for_content_display = cleaned_group5
+                    elif g5_int <= 24 and g4_int > 50:
+                        # Group5 is likely SKU, Group4 is content quantity
+                        final_csv_sku_value = cleaned_group5
+                        quantity_for_content_display = cleaned_group4
+                    else:
+                        # Default: assume group5 is SKU
+                        final_csv_sku_value = cleaned_group5
+                        quantity_for_content_display = cleaned_group4
+                except ValueError:
+                    # Non-numeric values, use default
+                    final_csv_sku_value = cleaned_group5
+                    quantity_for_content_display = cleaned_group4
             else:
                 final_csv_sku_value = cleaned_group5
                 quantity_for_content_display = cleaned_group4
@@ -422,6 +501,8 @@ class DeliveryUdeaParser:
                 result["warnings"].append(
                     f"Found {len(unmatched_product_lines)} likely product lines that couldn't be parsed"
                 )
+                # Include the actual line content for user review
+                result["metadata"]["unmatched_lines"] = unmatched_product_lines
 
             # Set results
             result["items"] = items

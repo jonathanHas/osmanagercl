@@ -352,6 +352,7 @@ class DeliveryController extends Controller
                 'warnings' => $warnings,
                 'confidence' => $confidence,
                 'supplier_detected' => $result['metadata']['supplier_detected'] ?? 'Unknown',
+                'unmatched_lines' => $result['metadata']['unmatched_lines'] ?? [],
             ];
 
             // Include file results for multi-file uploads

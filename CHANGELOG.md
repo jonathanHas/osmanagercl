@@ -9,6 +9,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **📦 Delivery Legacy - Out of Stock (OOS) Handling** (2026-01-24)
+  - **OOS Items at Bottom**: OOS items (ordered but not delivered) now sync to legacy at the bottom of the list
+  - **Expected: 0 for OOS**: OOS items display "Expected: 0" instead of their ordered quantity for clearer verification
+  - **Correct Case Units**: OOS items retain correct invoice case units (not hardcoded to 1)
+  - **Separate OOS Section**: New "Out of Stock" section on delivery-legacy match page with orange styling
+  - **OOS Excluded from Missing**: OOS items no longer appear in "Missing Items" section (HAVING clause filter)
+  - **OOS Excluded from Verified**: OOS items no longer incorrectly appear in "Verified Items"
+  - **Visual Progress**: OOS count displayed in progress bar area
+  - **Files Modified**:
+    - `app/Http/Controllers/DeliveryController.php` - Two-pass sync with OOS detection
+    - `app/Http/Controllers/DeliveryLegacyController.php` - HAVING clause to exclude OOS from Missing Items
+    - `resources/views/delivery-legacy/match.blade.php` - OOS section and filter updates
+
+- **🔍 Auto Supplier Detection on PDF Upload** (2026-01-24)
+  - **Automatic Detection**: System identifies supplier from PDF content when uploading deliveries
+  - **Supported Suppliers**: Independent Irish Health Foods, UDEA, Mossfield
+  - **Visual Feedback**: Shows "Detecting supplier..." status while parsing
+  - **Smart Mapping**: Converts detected supplier name to correct supplier ID
+  - **Graceful Fallback**: If supplier cannot be detected, user can select manually
+  - **Route**: `POST /deliveries/detect-supplier`
+  - **Files Modified**:
+    - `app/Http/Controllers/DeliveryController.php` - Added `detectSupplier()` and `mapSupplierNameToId()`
+    - `resources/views/deliveries/create.blade.php` - Added auto-detection UI and JavaScript
+    - `routes/web.php` - Added `deliveries.detect-supplier` route
+
+- **🔘 Clickable Case Unit Mismatch Badges** (2026-01-24)
+  - **Quick Update**: Case mismatch badges (e.g., "Case: 1 → 12") are now clickable buttons
+  - **One-Click Fix**: Clicking updates DB case units to match invoice case units
+  - **Auto Reload**: Page reloads after update to reflect corrected expected quantities
+  - **Hover Feedback**: Title tooltip shows what value will be applied
+  - **Available In**: Critical Issues and Warnings sections
+  - **Files Modified**:
+    - `resources/views/delivery-legacy/match.blade.php` - Converted case badges to clickable buttons
+
+### Fixed
+
+- **🧾 Tax Rate Calculation for PDF Imports** (2026-01-24)
+  - **Root Cause**: `importFromPdfData()` saved tax_amount but didn't calculate tax_rate or normalized_tax_rate
+  - **Fix**: Added tax rate calculation: `(tax / lineTotal) * 100` with Irish VAT normalization
+  - **Impact**: Delivery items now have correct tax_rate and normalized_tax_rate values
+  - **Files Modified**:
+    - `app/Services/DeliveryService.php` - Added tax rate calculation in `importFromPdfData()`
+
+- **⌨️ Label Scanner Keyboard Toggle** (2026-01-24)
+  - **Keyboard Toggle Button**: Added toggle button beside barcode input in scan-to-label modal
+  - **Mobile Keyboard Control**: Click to show/hide virtual keyboard for manual barcode entry
+  - **Visual State Feedback**: Blue styling when enabled, gray when disabled (matches stocking page pattern)
+  - **Dark Mode Support**: Full dark mode styling for the toggle button
+  - **Focus Preservation**: Automatically refocuses input after toggling keyboard state
+  - **Files Modified**:
+    - `resources/views/labels/index.blade.php` - Added keyboard toggle button and `keyboardEnabled` Alpine state
+
 - **📄 UDEA PDF Delivery Parsing** (2026-01-23)
   - **Automatic Supplier Detection**: Parses "UDEA B.V." or "WWW.UDEA.NL" from PDF text
   - **European Number Formatting**: Converts 1.234,56 → 1234.56 automatically

@@ -113,6 +113,7 @@ class DeliveryParsingService
         $totalValue = 0.0;
         $allWarnings = [];
         $allErrors = [];
+        $allUnmatchedLines = [];
         $fileResults = [];
         $totalValidations = 0;
         $passedValidations = 0;
@@ -150,6 +151,16 @@ class DeliveryParsingService
                     // Merge warnings with file context
                     foreach ($result['warnings'] ?? [] as $warning) {
                         $allWarnings[] = "[{$filename}] {$warning}";
+                    }
+
+                    // Collect unmatched lines with file context
+                    $unmatchedLines = $result['metadata']['unmatched_lines'] ?? $result['data']['metadata']['unmatched_lines'] ?? [];
+                    foreach ($unmatchedLines as $line) {
+                        $allUnmatchedLines[] = [
+                            'filename' => $filename,
+                            'line_num' => $line['line_num'],
+                            'content' => $line['content'],
+                        ];
                     }
                 } else {
                     // Add errors with file context
@@ -198,6 +209,7 @@ class DeliveryParsingService
                 'supplier_detected' => $detectedSupplier,
                 'files_processed' => count($pdfPaths),
                 'files_successful' => count(array_filter($fileResults, fn ($f) => $f['success'])),
+                'unmatched_lines' => $allUnmatchedLines,
             ],
         ];
     }
