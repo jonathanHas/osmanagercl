@@ -153,15 +153,45 @@
                                     </div>
 
                                     <!-- Summary -->
-                                    <div class="grid grid-cols-2 gap-4 mb-3 text-sm">
+                                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3 text-sm">
                                         <div class="bg-white dark:bg-gray-800 rounded p-2">
                                             <span class="text-gray-500 dark:text-gray-400">Items:</span>
                                             <span id="pdf-item-count" class="font-medium text-gray-900 dark:text-gray-100 ml-1">0</span>
                                         </div>
                                         <div class="bg-white dark:bg-gray-800 rounded p-2">
-                                            <span class="text-gray-500 dark:text-gray-400">Total:</span>
-                                            <span id="pdf-total-value" class="font-medium text-gray-900 dark:text-gray-100 ml-1">0.00</span>
+                                            <span class="text-gray-500 dark:text-gray-400">Products:</span>
+                                            <span id="pdf-products-total" class="font-medium text-gray-900 dark:text-gray-100 ml-1">€0.00</span>
                                         </div>
+                                        <div id="pdf-barrels-summary" class="bg-amber-50 dark:bg-amber-900/30 rounded p-2 hidden">
+                                            <span class="text-amber-700 dark:text-amber-400">Barrels:</span>
+                                            <span id="pdf-barrels-total" class="font-medium text-amber-800 dark:text-amber-300 ml-1">€0.00</span>
+                                        </div>
+                                        <div class="bg-white dark:bg-gray-800 rounded p-2">
+                                            <span class="text-gray-500 dark:text-gray-400">Grand Total:</span>
+                                            <span id="pdf-total-value" class="font-bold text-gray-900 dark:text-gray-100 ml-1">€0.00</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Barrels Section (collapsible) -->
+                                    <div id="pdf-barrels-section" class="hidden mb-3">
+                                        <details class="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded">
+                                            <summary class="px-3 py-2 cursor-pointer text-sm font-medium text-amber-800 dark:text-amber-200">
+                                                Barrel Deposits (<span id="pdf-barrels-count">0</span> items)
+                                            </summary>
+                                            <div class="px-3 pb-3">
+                                                <table class="min-w-full text-xs mt-2">
+                                                    <thead>
+                                                        <tr class="text-left text-amber-700 dark:text-amber-400">
+                                                            <th class="py-1">Qty</th>
+                                                            <th class="py-1">Description</th>
+                                                            <th class="py-1 text-right">Total</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="pdf-barrels-body" class="text-amber-900 dark:text-amber-100">
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </details>
                                     </div>
 
                                     <!-- Items Table -->
@@ -519,6 +549,9 @@
         function displayPreview(data) {
             const preview = document.getElementById('pdf-preview');
             const itemCount = document.getElementById('pdf-item-count');
+            const productsTotal = document.getElementById('pdf-products-total');
+            const barrelsTotal = document.getElementById('pdf-barrels-total');
+            const barrelsSummary = document.getElementById('pdf-barrels-summary');
             const totalValue = document.getElementById('pdf-total-value');
             const confidenceBadge = document.getElementById('pdf-confidence');
             const filesProcessedDiv = document.getElementById('pdf-files-processed');
@@ -526,10 +559,41 @@
             const warningsDiv = document.getElementById('pdf-warnings');
             const warningsList = document.getElementById('pdf-warnings-list');
             const itemsBody = document.getElementById('pdf-items-body');
+            const barrelsSection = document.getElementById('pdf-barrels-section');
+            const barrelsCount = document.getElementById('pdf-barrels-count');
+            const barrelsBody = document.getElementById('pdf-barrels-body');
 
-            // Update summary
+            // Update summary with products/barrels breakdown
             itemCount.textContent = data.totals.line_count;
-            totalValue.textContent = '\u20AC' + data.totals.total_value.toFixed(2);
+            const productsValue = data.totals.products_total || data.totals.total_value;
+            const barrelsValue = data.totals.barrels_total || 0;
+            const grandTotal = data.totals.total_value;
+
+            productsTotal.textContent = '\u20AC' + productsValue.toFixed(2);
+            totalValue.textContent = '\u20AC' + grandTotal.toFixed(2);
+
+            // Show barrels summary if there are barrels
+            if (barrelsValue > 0) {
+                barrelsTotal.textContent = '\u20AC' + barrelsValue.toFixed(2);
+                barrelsSummary.classList.remove('hidden');
+            } else {
+                barrelsSummary.classList.add('hidden');
+            }
+
+            // Display barrels section if there are barrel items
+            if (data.barrels && data.barrels.items && data.barrels.items.length > 0) {
+                barrelsCount.textContent = data.barrels.items.length;
+                barrelsBody.innerHTML = data.barrels.items.map(item => `
+                    <tr>
+                        <td class="py-1">${item.qty}</td>
+                        <td class="py-1">${item.description}</td>
+                        <td class="py-1 text-right">\u20AC${item.total.toFixed(2)}</td>
+                    </tr>
+                `).join('');
+                barrelsSection.classList.remove('hidden');
+            } else {
+                barrelsSection.classList.add('hidden');
+            }
 
             // Update confidence badge
             const confidence = data.confidence;

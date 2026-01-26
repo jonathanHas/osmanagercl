@@ -6,6 +6,7 @@ use App\Models\Delivery;
 use App\Models\DeliveryItem;
 use App\Models\LabelLog;
 use App\Models\LegacyDelivery;
+use App\Models\Product;
 use App\Models\Supplier;
 use App\Services\DeliveryParsingService;
 use App\Services\DeliveryService;
@@ -349,6 +350,7 @@ class DeliveryController extends Controller
                 'success' => true,
                 'items' => $items,
                 'totals' => $totals,
+                'barrels' => $result['data']['barrels'] ?? ['items' => [], 'total' => 0],
                 'warnings' => $warnings,
                 'confidence' => $confidence,
                 'supplier_detected' => $result['metadata']['supplier_detected'] ?? 'Unknown',
@@ -464,6 +466,16 @@ class DeliveryController extends Controller
                 $filenameForRecord
             );
 
+            // Store barrel items if present (Udea deliveries)
+            $barrels = $result['data']['barrels'] ?? ['items' => [], 'total' => 0];
+            if (! empty($barrels['items'])) {
+                $this->deliveryService->storeBarrelItems(
+                    $delivery,
+                    $barrels['items'],
+                    $request->supplier_id
+                );
+            }
+
             // Clean up temp files
             foreach ($storedPaths as $path) {
                 if (file_exists($path)) {
@@ -473,6 +485,7 @@ class DeliveryController extends Controller
 
             $totals = $this->deliveryParsingService->getTotals($result);
             $warnings = $this->deliveryParsingService->getWarnings($result);
+            $barrels = $result['data']['barrels'] ?? ['items' => [], 'total' => 0];
 
             $fileCount = count($originalFilenames);
             $successMsg = 'Delivery imported successfully from '.($fileCount > 1 ? "{$fileCount} PDFs" : 'PDF').'. '.
@@ -481,6 +494,23 @@ class DeliveryController extends Controller
 
             if (! empty($warnings)) {
                 $successMsg .= ' ('.count($warnings).' warnings - check items)';
+            }
+
+            // Flash import summary with barrels breakdown
+            session()->flash('import_summary', [
+                'products_total' => $totals['products_total'] ?? $totals['total_value'],
+                'barrels_total' => $totals['barrels_total'] ?? 0,
+                'grand_total' => $totals['total_value'],
+                'barrel_items' => $barrels['items'] ?? [],
+            ]);
+
+            // Flash unmatched lines for user review
+            $unmatchedLines = $result['metadata']['unmatched_lines'] ?? [];
+            if (! empty($unmatchedLines)) {
+                session()->flash('import_warnings', [
+                    'unmatched_count' => count($unmatchedLines),
+                    'unmatched_lines' => $unmatchedLines,
+                ]);
             }
 
             return redirect()
@@ -553,6 +583,9 @@ class DeliveryController extends Controller
                         $hasIntegration = true;
                     }
 
+                    // Check if barcode already exists in products database
+                    $existingProduct = $item->barcode ? Product::where('CODE', $item->barcode)->first() : null;
+
                     return [
                         'id' => $item->id,
                         'barcode' => $item->barcode,
@@ -562,6 +595,11 @@ class DeliveryController extends Controller
                         'has_integration' => $hasIntegration,
                         'is_new_product' => $item->is_new_product,
                         'description' => $item->description,
+                        'exists_in_database' => $existingProduct !== null,
+                        'existing_product' => $existingProduct ? [
+                            'id' => $existingProduct->ID,
+                            'name' => $existingProduct->NAME,
+                        ] : null,
                     ];
                 }),
                 'summary' => $summary,
@@ -870,6 +908,9 @@ class DeliveryController extends Controller
             if ($barcode) {
                 $item->update(['barcode' => $barcode]);
 
+                // Check if barcode already exists in products database
+                $existingProduct = Product::where('CODE', $barcode)->first();
+
                 // Check for image URL if supplier has external integration
                 $imageUrl = null;
                 $hasIntegration = false;
@@ -886,6 +927,11 @@ class DeliveryController extends Controller
                     'has_integration' => $hasIntegration,
                     'item_id' => $item->id,
                     'description' => $item->description,
+                    'exists_in_database' => $existingProduct !== null,
+                    'existing_product' => $existingProduct ? [
+                        'id' => $existingProduct->ID,
+                        'name' => $existingProduct->NAME,
+                    ] : null,
                 ]);
             } else {
                 return response()->json([

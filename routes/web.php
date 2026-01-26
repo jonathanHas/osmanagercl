@@ -3,6 +3,7 @@
 use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\CoffeeController;
 use App\Http\Controllers\CoffeeMetadataController;
+use App\Http\Controllers\BarrelCodeController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\DeliveryLegacyController;
 use App\Http\Controllers\Financials\BankStatementController;
@@ -343,6 +344,14 @@ Route::middleware('auth')->group(function () {
     Route::post('/deliveries/{delivery}/update-costs', [DeliveryController::class, 'updateCosts'])->name('deliveries.update-costs');
     Route::post('/deliveries/{delivery}/sync-legacy', [DeliveryController::class, 'syncToLegacy'])->name('deliveries.sync-legacy');
     Route::post('/delivery-items/{item}/refresh-barcode', [DeliveryController::class, 'refreshBarcode'])->name('delivery-items.refresh-barcode');
+
+    // Barrel Codes management (deposit items from deliveries)
+    Route::get('/barrel-codes', [BarrelCodeController::class, 'index'])->name('barrel-codes.index');
+    Route::get('/barrel-codes/{barrelCode}/edit', [BarrelCodeController::class, 'edit'])->name('barrel-codes.edit');
+    Route::put('/barrel-codes/{barrelCode}', [BarrelCodeController::class, 'update'])->name('barrel-codes.update');
+    Route::get('/barrel-codes/{barrelCode}/image', [BarrelCodeController::class, 'image'])->name('barrel-codes.image');
+    Route::post('/barrel-codes/{barrelCode}/image', [BarrelCodeController::class, 'updateImage'])->name('barrel-codes.update-image');
+    Route::delete('/barrel-codes/{barrelCode}/image', [BarrelCodeController::class, 'removeImage'])->name('barrel-codes.remove-image');
 
     // Delivery Legacy (Invoice Match) - replicates legacy PHP workflow
     Route::prefix('delivery-legacy')->name('delivery-legacy.')->group(function () {

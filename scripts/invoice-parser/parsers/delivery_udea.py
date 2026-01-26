@@ -349,6 +349,70 @@ class DeliveryUdeaParser:
             return total / total_units
         return 0.0
 
+    def _parse_barrels_section(self, text: str) -> Dict[str, Any]:
+        """Extract barrel deposits from the invoice.
+
+        Barrels are returnable items (crates, bottles, pallets) that get charged
+        on delivery and should be tracked for reconciliation when returned.
+
+        Returns:
+            {
+                'items': [
+                    {'code': '69', 'qty': 1, 'description': 'Beutelsb klein leeg',
+                     'price': 1.50, 'total': 1.50},
+                    ...
+                ],
+                'total': 44.28
+            }
+        """
+        result: Dict[str, Any] = {'items': [], 'total': 0.0}
+
+        # Find barrels section - header is "Barrels delivered with product"
+        barrels_start = text.find('Barrels delivered with product')
+        if barrels_start == -1:
+            return result
+
+        # Find the end of barrels section - stops at "Costs" or "Cost code" section
+        barrels_text = text[barrels_start:]
+        costs_start = barrels_text.find('Cost code')
+        if costs_start == -1:
+            costs_start = barrels_text.find('Costs')
+
+        if costs_start != -1:
+            barrels_section = barrels_text[:costs_start]
+        else:
+            barrels_section = barrels_text
+
+        # Parse barrel lines: BrlCode Amount Description Price VAT Total
+        # Example: "69 	1	Beutelsb klein leeg - Landpark 	1,50 	1 	1,50"
+        # The pattern needs to handle tabs and spaces, and European number format
+        barrel_pattern = re.compile(
+            r'^(\d+)\s+(\d+)\s+(.+?)\s+(\d+,\d{2})\s+\d+\s+(\d+,\d{2})\s*$',
+            re.MULTILINE
+        )
+
+        for match in barrel_pattern.finditer(barrels_section):
+            code, qty, desc, price, total = match.groups()
+            result['items'].append({
+                'code': code,
+                'qty': int(qty),
+                'description': desc.strip(),
+                'price': float(self._clean_number_string(price)),
+                'total': float(self._clean_number_string(total))
+            })
+
+        # Extract total barrels delivered
+        total_match = re.search(r'Total barrels delivered\s+(\d+,\d{2})', barrels_section)
+        if total_match:
+            result['total'] = float(self._clean_number_string(total_match.group(1)))
+        elif result['items']:
+            # Calculate from items if total line not found
+            result['total'] = sum(item['total'] for item in result['items'])
+
+        self.log(f"Parsed {len(result['items'])} barrel items, total: {result['total']}", "DEBUG")
+
+        return result
+
     def parse_invoice(self, pdf_path: str) -> Dict[str, Any]:
         """
         Parse a delivery invoice PDF and return structured data.
@@ -504,10 +568,16 @@ class DeliveryUdeaParser:
                 # Include the actual line content for user review
                 result["metadata"]["unmatched_lines"] = unmatched_product_lines
 
+            # Parse barrels section (crates, bottles, pallets - returnable deposits)
+            barrels = self._parse_barrels_section(text)
+            result["barrels"] = barrels
+
             # Set results
             result["items"] = items
             result["totals"]["line_count"] = len(items)
-            result["totals"]["total_value"] = round(total_value, 2)
+            result["totals"]["products_total"] = round(total_value, 2)
+            result["totals"]["barrels_total"] = barrels['total']
+            result["totals"]["total_value"] = round(total_value + barrels['total'], 2)
             result["success"] = len(items) > 0
             result["metadata"]["stats"] = self.stats
 

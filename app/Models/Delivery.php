@@ -46,6 +46,16 @@ class Delivery extends Model
         return $this->hasMany(DeliveryScan::class);
     }
 
+    public function barrels(): HasMany
+    {
+        return $this->hasMany(DeliveryBarrel::class);
+    }
+
+    public function getBarrelsTotalAttribute(): float
+    {
+        return $this->barrels->sum('total');
+    }
+
     public function getCompletionPercentageAttribute(): float
     {
         if ($this->items->isEmpty()) {

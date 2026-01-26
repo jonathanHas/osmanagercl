@@ -934,4 +934,48 @@ class DeliveryService
 
         return $deliveryItem;
     }
+
+    /**
+     * Store barrel deposit items for a delivery.
+     *
+     * Creates or updates barrel code references and stores line items
+     * linking barrels to the delivery. Used for Udea deliveries that
+     * include returnable items like crates, bottles, and pallets.
+     *
+     * @param  Delivery  $delivery  The delivery to attach barrels to
+     * @param  array  $barrelItems  Array of barrel items from PDF parser
+     * @param  int  $supplierId  Supplier ID for barrel code reference
+     */
+    public function storeBarrelItems(Delivery $delivery, array $barrelItems, int $supplierId): void
+    {
+        foreach ($barrelItems as $item) {
+            // Find or create barrel code reference
+            $barrelCode = \App\Models\BarrelCode::firstOrCreate(
+                ['supplier_id' => $supplierId, 'supplier_code' => $item['code']],
+                ['description' => $item['description'], 'unit_price' => $item['price']]
+            );
+
+            // Update price if changed
+            if ((float) $barrelCode->unit_price !== (float) $item['price']) {
+                $barrelCode->update(['unit_price' => $item['price']]);
+            }
+
+            // Store barrel line item
+            \App\Models\DeliveryBarrel::create([
+                'delivery_id' => $delivery->id,
+                'barrel_code_id' => $barrelCode->id,
+                'supplier_code' => $item['code'],
+                'description' => $item['description'],
+                'quantity' => $item['qty'],
+                'unit_price' => $item['price'],
+                'total' => $item['total'],
+            ]);
+        }
+
+        Log::info('Stored barrel items for delivery', [
+            'delivery_id' => $delivery->id,
+            'barrel_count' => count($barrelItems),
+            'total_value' => array_sum(array_column($barrelItems, 'total')),
+        ]);
+    }
 }

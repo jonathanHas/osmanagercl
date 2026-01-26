@@ -132,6 +132,105 @@
             <x-alert type="success" :message="session('success')" />
             <x-alert type="error" :message="session('error')" />
 
+            {{-- Import Summary (shown after PDF import) --}}
+            @if(session('import_summary'))
+                @php $summary = session('import_summary'); @endphp
+                <div class="mb-4 p-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <h4 class="font-semibold text-blue-800 dark:text-blue-200 mb-3">Import Summary</h4>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div>
+                            <span class="text-sm text-gray-600 dark:text-gray-400">Products</span>
+                            <p class="text-lg font-semibold text-gray-900 dark:text-gray-100">€{{ number_format($summary['products_total'], 2) }}</p>
+                        </div>
+                        @if($summary['barrels_total'] > 0)
+                            <div>
+                                <span class="text-sm text-gray-600 dark:text-gray-400">Barrels/Deposits</span>
+                                <p class="text-lg font-semibold text-amber-600 dark:text-amber-400">€{{ number_format($summary['barrels_total'], 2) }}</p>
+                            </div>
+                        @endif
+                        <div>
+                            <span class="text-sm text-gray-600 dark:text-gray-400">Grand Total</span>
+                            <p class="text-lg font-bold text-gray-900 dark:text-gray-100">€{{ number_format($summary['grand_total'], 2) }}</p>
+                        </div>
+                    </div>
+
+                    @if(!empty($summary['barrel_items']))
+                        <details class="mt-3">
+                            <summary class="cursor-pointer text-sm text-amber-700 dark:text-amber-400 hover:underline">
+                                View barrel details ({{ count($summary['barrel_items']) }} items)
+                            </summary>
+                            <ul class="mt-2 text-xs font-mono bg-white dark:bg-gray-800 p-2 rounded max-h-32 overflow-y-auto">
+                                @foreach($summary['barrel_items'] as $item)
+                                    <li class="py-0.5">{{ $item['qty'] }}x {{ $item['description'] }} - €{{ number_format($item['total'], 2) }}</li>
+                                @endforeach
+                            </ul>
+                        </details>
+                    @endif
+                </div>
+            @endif
+
+            {{-- Parsing Warnings (shown after PDF import with unparsed lines) --}}
+            @if(session('import_warnings'))
+                <div class="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                    <h4 class="font-semibold text-yellow-800 dark:text-yellow-200">Parsing Warnings</h4>
+                    <p class="text-yellow-700 dark:text-yellow-300 text-sm">
+                        {{ session('import_warnings.unmatched_count') }} lines could not be parsed:
+                    </p>
+                    <ul class="mt-2 text-xs font-mono bg-white dark:bg-gray-800 p-2 rounded max-h-32 overflow-y-auto">
+                        @foreach(session('import_warnings.unmatched_lines') as $line)
+                            <li class="py-0.5 truncate" title="{{ $line['content'] }}">
+                                [{{ $line['filename'] }}] L{{ $line['line_num'] }}: {{ Str::limit($line['content'], 80) }}
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            {{-- Permanent Barrel Deposits Section (from database) - Collapsible --}}
+            @if($delivery->barrels->count() > 0)
+                <div class="mb-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-3" x-data="{ expanded: false }">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <span class="font-semibold text-amber-800 dark:text-amber-200">Barrels/Deposits:</span>
+                            <span class="font-bold text-amber-900 dark:text-amber-100">&euro;{{ number_format($delivery->barrels_total, 2) }}</span>
+                            <span class="text-sm text-amber-600 dark:text-amber-400">({{ $delivery->barrels->count() }} items)</span>
+                        </div>
+                        <button @click="expanded = !expanded" class="flex items-center gap-1 text-sm text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 transition-colors">
+                            <span x-text="expanded ? 'Hide' : 'Show'">Show</span>
+                            <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': expanded }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div x-show="expanded" x-collapse class="mt-3 pt-3 border-t border-amber-200 dark:border-amber-700">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="text-amber-700 dark:text-amber-400 text-left">
+                                        <th class="py-1 pr-4">Code</th>
+                                        <th class="py-1 pr-4">Qty</th>
+                                        <th class="py-1 pr-4">Description</th>
+                                        <th class="py-1 text-right">Unit</th>
+                                        <th class="py-1 text-right">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-amber-900 dark:text-amber-100">
+                                    @foreach($delivery->barrels as $barrel)
+                                        <tr class="border-t border-amber-200 dark:border-amber-800">
+                                            <td class="py-1.5 pr-4 font-mono text-xs">{{ $barrel->supplier_code }}</td>
+                                            <td class="py-1.5 pr-4">{{ $barrel->quantity }}</td>
+                                            <td class="py-1.5 pr-4">{{ $barrel->description }}</td>
+                                            <td class="py-1.5 text-right">&euro;{{ number_format($barrel->unit_price, 2) }}</td>
+                                            <td class="py-1.5 text-right">&euro;{{ number_format($barrel->total, 2) }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <!-- Delivery Overview -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
@@ -879,23 +978,36 @@
                     // Update the barcode cell with the new barcode
                     const barcodeCell = document.getElementById(`barcode-cell-${itemId}`);
                     if (barcodeCell) {
-                        barcodeCell.innerHTML = `
-                            <code class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">
-                                ${data.barcode}
-                            </code>
-                        `;
+                        if (data.exists_in_database && data.existing_product) {
+                            // Highlight with green background - product already exists in database
+                            barcodeCell.innerHTML = `
+                                <a href="/products/${data.existing_product.id}" target="_blank"
+                                   class="inline-block hover:opacity-80 transition-opacity"
+                                   title="Product exists: ${data.existing_product.name} - Click to view">
+                                    <code class="px-2 py-1 bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 rounded text-xs border border-green-300 dark:border-green-600">
+                                        ${data.barcode} ✓
+                                    </code>
+                                </a>
+                            `;
+                            showMessage(`Barcode found - Product already exists: ${data.existing_product.name}`, 'success');
+                        } else {
+                            // Standard gray styling - new barcode
+                            barcodeCell.innerHTML = `
+                                <code class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">
+                                    ${data.barcode}
+                                </code>
+                            `;
+                            showMessage(data.message || 'Barcode retrieved successfully!', 'success');
+                        }
                     }
-                    
+
                     // Update image if available
                     if (data.has_integration && data.image_url) {
                         updateImageCell(itemId, data.image_url, data.description, data.barcode);
                     }
-                    
+
                     // Remove the refresh button
                     button.remove();
-                    
-                    // Show success message
-                    showMessage(data.message || 'Barcode retrieved successfully!', 'success');
                 } else {
                     // Show error and re-enable button
                     showMessage(data.message || 'Failed to retrieve barcode', 'error');
@@ -927,21 +1039,34 @@
         function updateBarcodeCell(item) {
             const barcodeCell = document.getElementById(`barcode-cell-${item.id}`);
             const refreshButton = document.getElementById(`refresh-btn-${item.id}`);
-            
+
             if (!barcodeCell) return;
 
             if (item.barcode) {
-                // Update cell with barcode
-                barcodeCell.innerHTML = `
-                    <code class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">
-                        ${item.barcode}
-                    </code>
-                `;
+                if (item.exists_in_database && item.existing_product) {
+                    // Highlight with green background - product already exists in database
+                    barcodeCell.innerHTML = `
+                        <a href="/products/${item.existing_product.id}" target="_blank"
+                           class="inline-block hover:opacity-80 transition-opacity"
+                           title="Product exists: ${item.existing_product.name} - Click to view">
+                            <code class="px-2 py-1 bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 rounded text-xs border border-green-300 dark:border-green-600">
+                                ${item.barcode} ✓
+                            </code>
+                        </a>
+                    `;
+                } else {
+                    // Standard gray styling - new barcode
+                    barcodeCell.innerHTML = `
+                        <code class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">
+                            ${item.barcode}
+                        </code>
+                    `;
+                }
                 // Remove refresh button if it exists
                 if (refreshButton) {
                     refreshButton.remove();
                 }
-                
+
                 // Update image if available
                 if (item.has_integration && item.image_url) {
                     updateImageCell(item.id, item.image_url, item.description, item.barcode);
@@ -951,8 +1076,8 @@
                 barcodeCell.innerHTML = `
                     <div class="flex items-center justify-center space-x-1">
                         <span class="text-red-500 text-xs">❌ Failed</span>
-                        ${item.barcode_retrieval_error ? 
-                            `<span class="text-gray-400 text-xs cursor-help" title="${item.barcode_retrieval_error}">ⓘ</span>` : 
+                        ${item.barcode_retrieval_error ?
+                            `<span class="text-gray-400 text-xs cursor-help" title="${item.barcode_retrieval_error}">ⓘ</span>` :
                             ''
                         }
                     </div>

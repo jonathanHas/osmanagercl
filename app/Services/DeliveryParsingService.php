@@ -118,6 +118,8 @@ class DeliveryParsingService
         $totalValidations = 0;
         $passedValidations = 0;
         $detectedSupplier = null;
+        $allBarrelItems = [];
+        $totalBarrelsValue = 0.0;
 
         foreach ($pdfPaths as $pdfPath) {
             $filename = basename($pdfPath);
@@ -126,11 +128,16 @@ class DeliveryParsingService
                 $result = $this->parseDeliveryPdf($pdfPath, $supplierHint);
 
                 $itemCount = count($result['data']['items'] ?? []);
+                $barrelsTotal = $result['data']['totals']['barrels_total'] ?? 0;
+                $productsTotal = $result['data']['totals']['products_total'] ?? $result['data']['totals']['total_value'] ?? 0;
+
                 $fileResults[] = [
                     'filename' => $filename,
                     'success' => $result['success'],
                     'item_count' => $itemCount,
-                    'total_value' => $result['data']['totals']['total_value'] ?? 0,
+                    'products_total' => $productsTotal,
+                    'barrels_total' => $barrelsTotal,
+                    'total_value' => $productsTotal + $barrelsTotal,
                 ];
 
                 if ($result['success']) {
@@ -141,7 +148,15 @@ class DeliveryParsingService
 
                     // Merge items
                     $allItems = array_merge($allItems, $result['data']['items']);
-                    $totalValue += $result['data']['totals']['total_value'] ?? 0;
+                    $totalValue += $productsTotal;
+
+                    // Merge barrel items (Udea-specific: crates, bottles, pallets)
+                    $barrels = $result['data']['barrels'] ?? ['items' => [], 'total' => 0];
+                    foreach ($barrels['items'] as $barrelItem) {
+                        $barrelItem['filename'] = $filename;
+                        $allBarrelItems[] = $barrelItem;
+                    }
+                    $totalBarrelsValue += $barrels['total'];
 
                     // Track validation stats
                     $stats = $result['metadata']['stats'] ?? [];
@@ -196,9 +211,15 @@ class DeliveryParsingService
             'data' => [
                 'supplier' => $detectedSupplier ?? $supplierHint ?? 'Multiple',
                 'items' => $allItems,
+                'barrels' => [
+                    'items' => $allBarrelItems,
+                    'total' => round($totalBarrelsValue, 2),
+                ],
                 'totals' => [
                     'line_count' => count($allItems),
-                    'total_value' => round($totalValue, 2),
+                    'products_total' => round($totalValue, 2),
+                    'barrels_total' => round($totalBarrelsValue, 2),
+                    'total_value' => round($totalValue + $totalBarrelsValue, 2),
                 ],
             ],
             'file_results' => $fileResults,
