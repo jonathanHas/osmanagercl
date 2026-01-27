@@ -356,7 +356,7 @@
                                                 <template x-if="editing">
                                                     <form @submit.prevent="saving = true; window.deliveryMatchInstance.saveScannedQty('{{ $item->Barcode }}', qty, (newQty) => { originalQty = newQty; editing = false; saving = false; }).catch(() => saving = false)"
                                                           class="flex items-center justify-center gap-1">
-                                                        <input type="number" x-model="qty" x-ref="qtyInput" min="0" step="1"
+                                                        <input type="number" x-model="qty" x-ref="qtyInput" min="0" step="0.001"
                                                                @keydown.escape="qty = originalQty; editing = false"
                                                                class="w-16 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-blue-500 focus:border-blue-500">
                                                         <button type="submit" :disabled="saving" class="text-green-600 hover:text-green-800 disabled:opacity-50">
@@ -558,7 +558,7 @@
                                                 <template x-if="editing">
                                                     <form @submit.prevent="saving = true; window.deliveryMatchInstance.saveScannedQty('{{ $item->Barcode }}', qty || 0, (newQty) => { qty = newQty; originalQty = newQty; editing = false; saving = false; }).catch(() => saving = false)"
                                                           class="flex items-center justify-center gap-1">
-                                                        <input type="number" x-model="qty" x-ref="qtyInput" min="0" step="1"
+                                                        <input type="number" x-model="qty" x-ref="qtyInput" min="0" step="0.001"
                                                                @keydown.escape="qty = originalQty; editing = false"
                                                                class="w-16 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-blue-500 focus:border-blue-500">
                                                         <button type="submit" :disabled="saving" class="text-green-600 hover:text-green-800 disabled:opacity-50">
@@ -755,7 +755,7 @@
                                                 <template x-if="editing">
                                                     <form @submit.prevent="saving = true; window.deliveryMatchInstance.saveScannedQty('{{ $item->Barcode }}', qty, (newQty) => { originalQty = newQty; editing = false; saving = false; }).catch(() => saving = false)"
                                                           class="flex items-center justify-center gap-1">
-                                                        <input type="number" x-model="qty" x-ref="qtyInput" min="0" step="1"
+                                                        <input type="number" x-model="qty" x-ref="qtyInput" min="0" step="0.001"
                                                                @keydown.escape="qty = originalQty; editing = false"
                                                                class="w-16 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-blue-500 focus:border-blue-500">
                                                         <button type="submit" :disabled="saving" class="text-green-600 hover:text-green-800 disabled:opacity-50">
@@ -1110,7 +1110,7 @@
                                                 <template x-if="editing">
                                                     <form @submit.prevent="saving = true; window.deliveryMatchInstance.saveScannedQty('{{ $item->Barcode }}', qty, (newQty) => { originalQty = newQty; editing = false; saving = false; }).catch(() => saving = false)"
                                                           class="flex items-center justify-center gap-1">
-                                                        <input type="number" x-model="qty" x-ref="qtyInput" min="0" step="1"
+                                                        <input type="number" x-model="qty" x-ref="qtyInput" min="0" step="0.001"
                                                                @keydown.escape="qty = originalQty; editing = false"
                                                                class="w-16 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-blue-500 focus:border-blue-500">
                                                         <button type="submit" :disabled="saving" class="text-green-600 hover:text-green-800 disabled:opacity-50">
