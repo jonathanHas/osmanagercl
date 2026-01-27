@@ -71,6 +71,7 @@ Comprehensive product catalog management with inline editing capabilities and re
 - **Real-time Barcode Validation** (NEW! 2025-11-01): Instant duplicate detection when creating products with direct links to edit existing products
 - **Supplier Link Duplicate Prevention** (NEW! 2025-11-01): Real-time warning and override system for duplicate supplier codes with full audit trail
 - **Inline Editing**: Edit product names, tax categories, prices, and costs directly from product detail pages
+- **Stock Editing**: Inline stock editing on products list and detail pages with 2 decimal precision (arrow keys increment by 1)
 - **Stocking Management**: Toggle products in/out of stock management operations with visual indicators
 - **Delivery Integration**: Create products directly from delivery items with pre-populated data
 - **Smart Navigation**: Context-aware navigation maintaining delivery workflow state
@@ -221,6 +222,13 @@ External supplier connectivity for images, pricing, and product data.
 
 ### Delivery Verification
 Comprehensive delivery processing with barcode scanning and PDF invoice parsing.
+- **Weight-Based Product Support** (NEW! 2026-01-27): Full support for products sold by weight (kg/g)
+  - Automatic detection of weight-based products from Udea PDFs
+  - Stores weight_per_unit, weight_unit, total_weight in database
+  - INVOICED column shows total weight instead of quantity
+  - Correct price validation using weight × price
+  - Legacy sync uses total_weight for stock verification
+  - Decimal input enabled for all scanned quantity fields
 - **Barcode Exists Highlighting** (NEW! 2026-01-26): Visual indicator when refreshed barcode already exists in POS
   - Green highlighting with checkmark icon for existing barcodes
   - Clickable link opens product page in new tab for verification

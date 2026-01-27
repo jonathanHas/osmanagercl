@@ -51,6 +51,11 @@ class Delivery extends Model
         return $this->hasMany(DeliveryBarrel::class);
     }
 
+    public function documents(): HasMany
+    {
+        return $this->hasMany(DeliveryDocument::class);
+    }
+
     public function getBarrelsTotalAttribute(): float
     {
         return $this->barrels->sum('total');

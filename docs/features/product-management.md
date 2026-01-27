@@ -206,6 +206,28 @@ POS_DB_PASSWORD=pos_password
 2. Toggle stock management inclusion using **Add/Remove** button
 3. Products included in stocking are considered for automated ordering
 
+#### Editing Stock Levels
+Stock levels can be edited inline on both the products list and product detail pages.
+
+**Products List Page** (`/products`):
+1. Click on a stock value to enter edit mode
+2. Type a new value (supports 2 decimal places, e.g., 12.75)
+3. Use up/down arrow keys to increment/decrement by 1
+4. Press Enter or click away to save
+
+**Product Detail Page** (`/products/{id}`):
+1. Click "Edit" next to the stock display
+2. Enter the new stock value (supports 2 decimal places)
+3. Use up/down arrow keys to increment/decrement by 1
+4. Click "Save" to apply changes
+
+**Technical Details**:
+- Input precision: `step="0.01"` (2 decimal places)
+- Arrow key behavior: Increments by 1 (not 0.01) for quick adjustments
+- Display format: Shows 2 decimal places (e.g., 12.00, 12.75)
+- Database storage: `STOCKCURRENT.UNITS` with decimal precision
+- Validation: min=0, max=9999.99
+
 ### Developer Perspective
 
 #### Key Models and Relationships

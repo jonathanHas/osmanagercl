@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Delivery;
 use App\Models\DeliveryScanItem;
 use App\Services\SupplierService;
 use Illuminate\Http\Request;
@@ -51,7 +52,14 @@ class DeliveryLegacyController extends Controller
             ->pluck('item_count', 'delID')
             ->toArray();
 
-        return view('delivery-legacy.index', compact('suppliers', 'scanSessions', 'scanItemCounts'));
+        // Get synced delivery with documents (if any)
+        $syncedDelivery = null;
+        $syncedDeliveryId = cache('legacy_synced_delivery_id');
+        if ($syncedDeliveryId) {
+            $syncedDelivery = Delivery::with(['documents', 'supplier'])->find($syncedDeliveryId);
+        }
+
+        return view('delivery-legacy.index', compact('suppliers', 'scanSessions', 'scanItemCounts', 'syncedDelivery'));
     }
 
     /**
@@ -98,6 +106,13 @@ class DeliveryLegacyController extends Controller
             ->first();
         $isCompleted = $scanSession && $scanSession->status == 1;
 
+        // Get synced delivery with documents (if any)
+        $syncedDelivery = null;
+        $syncedDeliveryId = cache('legacy_synced_delivery_id');
+        if ($syncedDeliveryId) {
+            $syncedDelivery = Delivery::with(['documents', 'supplier'])->find($syncedDeliveryId);
+        }
+
         return view('delivery-legacy.match', compact(
             'matchedItems',
             'scannedNotOnInvoice',
@@ -108,7 +123,8 @@ class DeliveryLegacyController extends Controller
             'isUdea',
             'financials',
             'stockPreview',
-            'isCompleted'
+            'isCompleted',
+            'syncedDelivery'
         ))->with('supplierService', $this->supplierService);
     }
 
@@ -463,5 +479,38 @@ class DeliveryLegacyController extends Controller
             ->route('delivery-legacy.match', ['delID' => $delID, 'supplierID' => $supplierID])
             ->with('success', 'Stock updated successfully. Delivery marked as complete.')
             ->with('updateResults', $updateResults);
+    }
+
+    /**
+     * Create a new delivery scan session.
+     */
+    public function createSession(Request $request)
+    {
+        $validated = $request->validate([
+            'supplierID' => 'required|string',
+        ]);
+
+        $supplierId = $validated['supplierID'];
+
+        // Generate a UUID for the session ID
+        $sessionId = (string) \Illuminate\Support\Str::uuid();
+
+        // Create the scan session
+        DB::connection('pos')->table('deliveriesScan')->insert([
+            'ID' => $sessionId,
+            'supID' => $supplierId,
+            'dateUpload' => now(),
+            'status' => 0,
+        ]);
+
+        // Get supplier name for message
+        $supplier = DB::connection('pos')
+            ->table('suppliers')
+            ->where('SupplierID', $supplierId)
+            ->first();
+
+        return redirect()
+            ->route('delivery-legacy.match', ['delID' => $sessionId, 'supplierID' => $supplierId])
+            ->with('success', 'New scan session created for '.($supplier->Supplier ?? 'supplier').'.');
     }
 }

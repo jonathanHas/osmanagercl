@@ -15,6 +15,54 @@
                 </div>
             @endif
 
+            @if(session('success'))
+                <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+                    {{ session('success') }}
+                </div>
+            @endif
+
+            {{-- Synced Delivery Documents --}}
+            @if($syncedDelivery && $syncedDelivery->documents->count() > 0)
+                <div class="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-lg font-medium text-blue-900 flex items-center">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            Synced Delivery Documents
+                        </h3>
+                        <span class="text-sm text-blue-600">
+                            From: {{ $syncedDelivery->supplier->Supplier ?? 'Unknown' }} - {{ $syncedDelivery->delivery_date->format('d/m/Y') }}
+                        </span>
+                    </div>
+                    <div class="flex flex-wrap gap-3">
+                        @foreach($syncedDelivery->documents as $document)
+                            <div class="flex items-center bg-white rounded-lg px-3 py-2 shadow-sm border border-blue-100">
+                                @if($document->isPdf())
+                                    <svg class="w-5 h-5 text-red-500 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                                    </svg>
+                                @else
+                                    <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                                    </svg>
+                                @endif
+                                <span class="text-sm text-gray-700 mr-3">{{ $document->original_filename }}</span>
+                                <a href="{{ $document->viewer_minimal_url }}"
+                                   onclick="window.open(this.href, 'documentViewer', 'width=900,height=700,scrollbars=yes,resizable=yes'); return false;"
+                                   class="text-blue-600 hover:text-blue-800 text-sm font-medium mr-2">
+                                    View
+                                </a>
+                                <a href="{{ $document->download_url }}"
+                                   class="text-gray-500 hover:text-gray-700 text-sm">
+                                    Download
+                                </a>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6">
                     <h3 class="text-lg font-medium text-gray-900 mb-4">Select Delivery to Match</h3>
@@ -61,6 +109,31 @@
                             </button>
                         </div>
                     </form>
+
+                    {{-- Create New Scan Session --}}
+                    <div class="mt-6 pt-6 border-t border-gray-200">
+                        <h4 class="text-md font-medium text-gray-900 mb-3">Or Create New Scan Session</h4>
+                        <form action="{{ route('delivery-legacy.create-session') }}" method="POST" class="flex items-end gap-4">
+                            @csrf
+                            <div class="flex-1">
+                                <label for="newSessionSupplier" class="block text-sm font-medium text-gray-700">Supplier</label>
+                                <select name="supplierID" id="newSessionSupplier" required
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500">
+                                    <option value="">-- Select Supplier --</option>
+                                    @foreach($suppliers as $supplier)
+                                        <option value="{{ $supplier->SupplierID }}">{{ $supplier->Supplier }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <button type="submit"
+                                class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700 focus:bg-green-700 active:bg-green-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                </svg>
+                                Create New Session
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
 

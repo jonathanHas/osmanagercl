@@ -7,7 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **📊 Stock Input Precision Enhancement** (2026-01-27)
+  - **2 Decimal Places**: Stock input fields now accept 2 decimal places (was 1)
+  - **Arrow Key Behavior**: Up/down arrow keys increment by 1 (not 0.01) for quick adjustments
+  - **Display Update**: Stock values display with 2 decimal places for consistency
+  - **Pages Updated**: Products index (`/products`) and product detail (`/products/{uuid}`)
+  - **Use Case**: Allows precise stock entries like 12.75 units for weighted/measured items
+  - **Files Modified**:
+    - `resources/views/products/index.blade.php` - Inline stock editing
+    - `resources/views/products/show.blade.php` - Stock edit form
+
 ### Added
+
+- **⚖️ Weight-Based Product Support for Udea Deliveries** (2026-01-27)
+  - **Automatic Detection**: Parser detects weight-based products (e.g., meat sold by kg) from PDF invoices
+  - **Weight Fields**: New database fields `is_weight_based`, `weight_per_unit`, `weight_unit`, `total_weight`
+  - **Correct Price Validation**: Weight-based products validate as `total_weight × price` (not qty × price)
+  - **INVOICED Column**: Shows total weight (e.g., 0.921 kg) instead of quantity for weight-based items
+  - **Delivery Legacy Sync**: Syncs `total_weight` to legacy `myOrder` field for weight-based products
+  - **Visual Indicators**: Purple badges show weight breakdown (e.g., "0.307 kg × 3 = 0.921 kg")
+  - **Decimal Input**: All scanned quantity fields accept decimal values (step="0.001")
+  - **Files Created**:
+    - `database/migrations/2026_01_27_101241_add_weight_fields_to_delivery_items_table.php`
+  - **Files Modified**:
+    - `app/Models/DeliveryItem.php` - Added weight fields to fillable and casts
+    - `scripts/invoice-parser/parsers/delivery_udea.py` - Weight detection and extraction
+    - `app/Services/DeliveryParsingService.php` - Pass weight data through conversion
+    - `app/Services/DeliveryService.php` - Store weight fields on import
+    - `app/Http/Controllers/DeliveryController.php` - Sync weight to legacy
+    - `resources/views/deliveries/show.blade.php` - Display weight badges
+    - `resources/views/delivery-legacy/match.blade.php` - Weight display and decimal inputs
 
 - **🖼️ Product Images in Delivery Legacy Pages** (2026-01-26)
   - **Image Thumbnails**: Product images now display in the left column of all tables on `/delivery-legacy/match`

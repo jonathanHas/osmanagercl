@@ -61,6 +61,10 @@ The delivery verification system provides a complete workflow for handling suppl
 - product_id (foreign key to PRODUCTS, nullable)
 - is_new_product (boolean)
 - barcode (nullable, retrieved from scraping)
+- is_weight_based (boolean, default false) -- Weight-based product flag
+- weight_per_unit (decimal 8,4, nullable) -- Individual item weight (e.g., 0.307 kg)
+- weight_unit (varchar 10, nullable) -- Unit of measurement (kilogram, gram)
+- total_weight (decimal 10,4, nullable) -- Calculated total weight
 - timestamps
 ```
 
@@ -1468,6 +1472,95 @@ Previously, users couldn't see current stock levels for extra scanned items. Now
 **Files Modified**:
 - `app/Http/Controllers/DeliveryLegacyController.php` - Added STOCKCURRENT join to Extra Items query
 - `resources/views/delivery-legacy/match.blade.php` - Added Stock column header and data cell
+
+---
+
+### 2026-01-27 - Weight-Based Product Support for Udea Deliveries
+
+#### Overview
+
+Added support for weight-based products (e.g., meat sold by kilogram) in Udea delivery imports. These products have variable weights that differ from the standard case/unit quantity model.
+
+**Problem Solved**:
+- Udea invoices show weight-based products with a decimal "SKU" value (e.g., 0.307 kg per unit)
+- Previous system interpreted this as case size, losing the weight information
+- Price validation failed because `qty × price` didn't match total (should be `weight × price`)
+
+#### How It Works
+
+**Detection**: The Python parser detects weight-based products when:
+- The SKU/quantity field contains a decimal value (e.g., 0.307)
+- The unit is "kilogram" or "gram"
+
+**Data Flow**:
+```
+PDF: "45010  3  3  0,307  3  kilogram  Chicken-drumsticks  10.02  30.07"
+         ↓
+Parser extracts:
+  - quantity: 3 (number of items)
+  - weight_per_unit: 0.307 kg
+  - total_weight: 0.921 kg (0.307 × 3)
+  - price: 10.02 (per kg)
+  - total: 9.23 (0.921 × 10.02)
+         ↓
+Database stores:
+  - ordered_quantity: 3
+  - is_weight_based: true
+  - weight_per_unit: 0.307
+  - weight_unit: "kilogram"
+  - total_weight: 0.921
+```
+
+**Price Validation**:
+- Regular products: `qty × price × case_size = total`
+- Weight-based products: `total_weight × price = total`
+
+#### Display
+
+**Delivery Show Page** (`/deliveries/{id}`):
+- INVOICED column shows total weight (0.921) instead of quantity (3)
+- Purple badge: "0.307 kilogram × 3 = 0.921 kilogram"
+
+**Delivery Legacy Match** (`/delivery-legacy/match`):
+- EXPECTED column shows weight with "kg" label
+- All sections correctly calculate using weight, not quantity
+- Decimal input enabled for all scanned quantity fields (step="0.001")
+
+#### Legacy Sync
+
+When syncing to legacy (`delivery` table in POS database):
+- Regular products: `myOrder` = quantity or cases
+- Weight-based products: `myOrder` = total_weight (e.g., 0.921)
+
+```php
+// Sync logic
+if ($item->is_weight_based && $item->total_weight) {
+    $syncMyOrder = $item->total_weight;  // 0.921
+} else {
+    $syncMyOrder = $caseUnits * $quantity;  // Regular calculation
+}
+```
+
+#### Database Schema
+
+New fields in `delivery_items` table:
+```sql
+- is_weight_based BOOLEAN DEFAULT FALSE
+- weight_per_unit DECIMAL(8,4) NULLABLE
+- weight_unit VARCHAR(10) NULLABLE  -- 'kilogram', 'gram'
+- total_weight DECIMAL(10,4) NULLABLE
+```
+
+#### Files Modified
+
+- `database/migrations/2026_01_27_101241_add_weight_fields_to_delivery_items_table.php` - New migration
+- `app/Models/DeliveryItem.php` - Added weight fields to fillable and casts
+- `scripts/invoice-parser/parsers/delivery_udea.py` - Weight detection and extraction
+- `app/Services/DeliveryParsingService.php` - Pass weight data through conversion
+- `app/Services/DeliveryService.php` - Store weight fields on import
+- `app/Http/Controllers/DeliveryController.php` - Sync weight to legacy
+- `resources/views/deliveries/show.blade.php` - Display weight badges
+- `resources/views/delivery-legacy/match.blade.php` - Weight display and decimal inputs
 
 ---
 

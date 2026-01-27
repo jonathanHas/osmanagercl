@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Delivery;
+use App\Models\DeliveryDocument;
 use App\Models\DeliveryItem;
 use App\Models\LabelLog;
 use App\Models\LegacyDelivery;
@@ -69,7 +70,7 @@ class DeliveryController extends Controller
             }
         }
 
-        $deliveries = $query->orderBy('delivery_date', 'desc')->paginate(20);
+        $deliveries = $query->orderBy('delivery_date', 'desc')->orderBy('id', 'desc')->paginate(20);
 
         // Preserve search parameter in pagination links
         if ($search) {
@@ -132,6 +133,14 @@ class DeliveryController extends Controller
                 $fullPath,
                 $request->supplier_id,
                 $request->delivery_date
+            );
+
+            // Save the CSV document before deleting temp file
+            $this->saveDeliveryDocument(
+                $delivery,
+                $fullPath,
+                $uploadedFile->getClientOriginalName(),
+                'csv_import'
             );
 
             // Clean up temp file
@@ -476,6 +485,18 @@ class DeliveryController extends Controller
                 );
             }
 
+            // Save PDF documents before deleting temp files
+            foreach ($storedPaths as $index => $path) {
+                if (file_exists($path)) {
+                    $this->saveDeliveryDocument(
+                        $delivery,
+                        $path,
+                        $originalFilenames[$index],
+                        'invoice_pdf'
+                    );
+                }
+            }
+
             // Clean up temp files
             foreach ($storedPaths as $path) {
                 if (file_exists($path)) {
@@ -558,11 +579,57 @@ class DeliveryController extends Controller
     }
 
     /**
+     * Save an uploaded document to permanent storage and create a database record.
+     */
+    protected function saveDeliveryDocument(
+        Delivery $delivery,
+        string $tempFilePath,
+        string $originalFilename,
+        string $documentType = 'invoice_pdf'
+    ): DeliveryDocument {
+        $storedFilename = DeliveryDocument::generateStoredFilename($originalFilename);
+        $filePath = DeliveryDocument::generateFilePath($delivery->id, $storedFilename);
+
+        // Get file info before moving
+        $mimeType = mime_content_type($tempFilePath);
+        $fileSize = filesize($tempFilePath);
+        $fileHash = hash_file('sha256', $tempFilePath);
+
+        // Ensure directory exists
+        $directory = dirname($filePath);
+        if (! Storage::disk('private')->exists($directory)) {
+            Storage::disk('private')->makeDirectory($directory, 0775, true);
+        }
+
+        // Copy file to permanent storage
+        $fileContents = file_get_contents($tempFilePath);
+        Storage::disk('private')->put($filePath, $fileContents);
+
+        // Set proper permissions
+        $fullPath = Storage::disk('private')->path($filePath);
+        @chmod($fullPath, 0644);
+
+        // Create document record
+        return DeliveryDocument::create([
+            'delivery_id' => $delivery->id,
+            'original_filename' => $originalFilename,
+            'stored_filename' => $storedFilename,
+            'file_path' => $filePath,
+            'mime_type' => $mimeType,
+            'file_size' => $fileSize,
+            'file_hash' => $fileHash,
+            'document_type' => $documentType,
+            'is_primary' => $delivery->documents()->count() === 0,
+            'uploaded_by' => auth()->id(),
+        ]);
+    }
+
+    /**
      * Display the specified delivery
      */
     public function show(Delivery $delivery, Request $request)
     {
-        $delivery->load(['supplier', 'items.product.supplier', 'items.product.taxCategory.primaryTax', 'scans']);
+        $delivery->load(['supplier', 'items.product.supplier', 'items.product.taxCategory.primaryTax', 'scans', 'documents']);
 
         $summary = $this->deliveryService->getDeliverySummary($delivery->id);
 
@@ -1330,6 +1397,9 @@ class DeliveryController extends Controller
                     $syncItemToLegacy($item, true);
                 }
             });
+
+            // Store the synced delivery ID so legacy pages can access documents
+            cache()->forever('legacy_synced_delivery_id', $delivery->id);
 
             return redirect()->route('delivery-legacy.index')
                 ->with('success', "Synced {$itemCount} items to legacy. Select a scan session to compare.");

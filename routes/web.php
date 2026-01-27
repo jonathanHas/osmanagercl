@@ -5,6 +5,7 @@ use App\Http\Controllers\CoffeeController;
 use App\Http\Controllers\CoffeeMetadataController;
 use App\Http\Controllers\BarrelCodeController;
 use App\Http\Controllers\DeliveryController;
+use App\Http\Controllers\DeliveryDocumentController;
 use App\Http\Controllers\DeliveryLegacyController;
 use App\Http\Controllers\Financials\BankStatementController;
 use App\Http\Controllers\Financials\CardReconciliationController;
@@ -345,6 +346,14 @@ Route::middleware('auth')->group(function () {
     Route::post('/deliveries/{delivery}/sync-legacy', [DeliveryController::class, 'syncToLegacy'])->name('deliveries.sync-legacy');
     Route::post('/delivery-items/{item}/refresh-barcode', [DeliveryController::class, 'refreshBarcode'])->name('delivery-items.refresh-barcode');
 
+    // Delivery Documents
+    Route::get('/deliveries/{delivery}/documents', [DeliveryDocumentController::class, 'index'])->name('deliveries.documents.index');
+    Route::get('/delivery-documents/{document}/view', [DeliveryDocumentController::class, 'view'])->name('delivery-documents.view');
+    Route::get('/delivery-documents/{document}/viewer', [DeliveryDocumentController::class, 'viewEmbedded'])->name('delivery-documents.viewer');
+    Route::get('/delivery-documents/{document}/viewer-minimal', [DeliveryDocumentController::class, 'viewEmbeddedMinimal'])->name('delivery-documents.viewer-minimal');
+    Route::get('/delivery-documents/{document}/download', [DeliveryDocumentController::class, 'download'])->name('delivery-documents.download');
+    Route::delete('/delivery-documents/{document}', [DeliveryDocumentController::class, 'destroy'])->name('delivery-documents.destroy');
+
     // Barrel Codes management (deposit items from deliveries)
     Route::get('/barrel-codes', [BarrelCodeController::class, 'index'])->name('barrel-codes.index');
     Route::get('/barrel-codes/{barrelCode}/edit', [BarrelCodeController::class, 'edit'])->name('barrel-codes.edit');
@@ -357,6 +366,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('delivery-legacy')->name('delivery-legacy.')->group(function () {
         Route::get('/', [DeliveryLegacyController::class, 'index'])->name('index');
         Route::get('/match', [DeliveryLegacyController::class, 'match'])->name('match');
+        Route::post('/create-session', [DeliveryLegacyController::class, 'createSession'])->name('create-session');
         Route::patch('/scan-item', [DeliveryLegacyController::class, 'updateScannedQuantity'])->name('update-quantity');
         Route::patch('/update-case-units', [DeliveryLegacyController::class, 'updateCaseUnits'])->name('update-case-units');
         Route::post('/complete', [DeliveryLegacyController::class, 'completeDelivery'])->name('complete');

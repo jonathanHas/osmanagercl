@@ -169,6 +169,64 @@
                 </div>
             @endif
 
+            {{-- Delivery Documents - Collapsible --}}
+            @if($delivery->documents->count() > 0)
+                <div class="mb-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-3" x-data="{ expanded: false }">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <svg class="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            <span class="font-semibold text-blue-800 dark:text-blue-200">Delivery Documents</span>
+                            <span class="text-sm text-blue-600 dark:text-blue-400">({{ $delivery->documents->count() }} {{ Str::plural('file', $delivery->documents->count()) }})</span>
+                        </div>
+                        <button @click="expanded = !expanded" class="flex items-center gap-1 text-sm text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 transition-colors">
+                            <span x-text="expanded ? 'Hide' : 'Show'">Show</span>
+                            <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': expanded }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div x-show="expanded" x-collapse class="mt-3 space-y-2">
+                        @foreach($delivery->documents as $document)
+                            <div class="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg">
+                                <div class="flex items-center space-x-3">
+                                    @if($document->isPdf())
+                                        <svg class="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                                        </svg>
+                                    @elseif($document->isCsv())
+                                        <svg class="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                                        </svg>
+                                    @else
+                                        <svg class="w-6 h-6 text-gray-500" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M13,9V3.5L18.5,9M6,2C4.89,2 4,2.89 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2H6Z"/>
+                                        </svg>
+                                    @endif
+                                    <div>
+                                        <span class="text-gray-900 dark:text-gray-100 font-medium">{{ $document->original_filename }}</span>
+                                        <span class="text-sm text-gray-500 dark:text-gray-400 ml-2">({{ $document->formatted_file_size }})</span>
+                                        <span class="text-xs text-gray-400 dark:text-gray-500 ml-2">{{ $document->document_type_label }}</span>
+                                    </div>
+                                </div>
+                                <div class="flex space-x-3">
+                                    <a href="{{ $document->viewer_minimal_url }}"
+                                       onclick="window.open(this.href, 'documentViewer', 'width=900,height=700,scrollbars=yes,resizable=yes'); return false;"
+                                       class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium text-sm">
+                                        View
+                                    </a>
+                                    <a href="{{ $document->download_url }}"
+                                       class="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 font-medium text-sm">
+                                        Download
+                                    </a>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             {{-- Parsing Warnings (shown after PDF import with unparsed lines) --}}
             @if(session('import_warnings'))
                 <div class="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg">
