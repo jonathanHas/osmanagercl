@@ -276,7 +276,7 @@
                                                          @@click="editing = true; $nextTick(() => $refs.stockInput.select())"
                                                          class="cursor-pointer hover:bg-blue-50 dark:hover:bg-gray-700 px-2 py-1 rounded transition-colors">
                                                         <span :class="stockUnits > 0 ? 'text-green-600 dark:text-green-400 font-semibold' : 'text-gray-400 dark:text-gray-500'"
-                                                              x-text="parseFloat(stockUnits).toFixed(1)"></span>
+                                                              x-text="parseFloat(stockUnits).toFixed(2)"></span>
                                                         
                                                         @if($product->stockCurrent && $product->stockCurrent->LOCATION && $product->stockCurrent->LOCATION !== '0')
                                                             <small class="text-gray-400 dark:text-gray-500 block">{{ $product->stockCurrent->LOCATION }}</small>
@@ -287,9 +287,11 @@
                                                         <input type="number"
                                                                x-ref="stockInput"
                                                                x-model="stockUnits"
-                                                               step="0.1"
+                                                               step="0.01"
                                                                min="0"
                                                                max="9999.99"
+                                                               @@keydown.up.prevent="stockUnits = parseFloat((parseFloat(stockUnits) + 1).toFixed(2))"
+                                                               @@keydown.down.prevent="stockUnits = Math.max(0, parseFloat((parseFloat(stockUnits) - 1).toFixed(2)))"
                                                                @@keyup.enter="updateStock('{{ $product->ID }}', stockUnits).then((success) => { if(success) { hasStockRecord = true; editing = false; originalStock = stockUnits; } })"
                                                                @@keyup.escape="editing = false; stockUnits = originalStock"
                                                                @@blur="updateStock('{{ $product->ID }}', stockUnits).then((success) => { if(success) { hasStockRecord = true; editing = false; originalStock = stockUnits; } })"

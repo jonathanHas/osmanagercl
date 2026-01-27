@@ -216,7 +216,7 @@
                             @else
                                 <div id="stockDisplay">
                                     <p class="text-2xl font-bold {{ $product->getCurrentStock() > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
-                                        <span id="currentStockValue">{{ number_format($product->getCurrentStock(), 1) }}</span>
+                                        <span id="currentStockValue">{{ number_format($product->getCurrentStock(), 2) }}</span>
                                     </p>
                                     @if($product->getCurrentStock() > 0 && $product->getCurrentStock() < 10)
                                         <p class="text-xs text-yellow-600 dark:text-yellow-400">Low Stock</p>
@@ -231,9 +231,9 @@
                                                name="stock_units" 
                                                id="stockUnitsInput"
                                                value="{{ $product->getCurrentStock() }}" 
-                                               step="0.1"
+                                               step="0.01"
                                                min="0"
-                                               max="9999"
+                                               max="9999.99"
                                                class="w-20 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                                required>
                                         <button type="submit" 
@@ -1988,7 +1988,7 @@
             const display = document.getElementById('stockDisplay');
             const form = document.getElementById('stockEditForm');
             const input = document.getElementById('stockUnitsInput');
-            
+
             if (form.classList.contains('hidden')) {
                 display.classList.add('hidden');
                 form.classList.remove('hidden');
@@ -1999,6 +1999,17 @@
                 display.classList.remove('hidden');
             }
         }
+
+        // Handle arrow keys to increment/decrement by 1 instead of 0.01
+        document.getElementById('stockUnitsInput').addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                this.value = parseFloat((parseFloat(this.value || 0) + 1).toFixed(2));
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                this.value = Math.max(0, parseFloat((parseFloat(this.value || 0) - 1).toFixed(2)));
+            }
+        });
         
         // Update stock via AJAX
         function updateStock(event) {
@@ -2030,7 +2041,7 @@
                 if (data.success) {
                     // Update the display
                     const currentStockValue = document.getElementById('currentStockValue');
-                    currentStockValue.textContent = Number(stockValue).toLocaleString('en-US', {minimumFractionDigits: 1, maximumFractionDigits: 1});
+                    currentStockValue.textContent = Number(stockValue).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
                     
                     // Update color based on stock level
                     const stockDisplay = currentStockValue.closest('p');
