@@ -83,6 +83,13 @@ class DeliveryService
                 $tax = (float) ($record['Tax'] ?? 0);
                 $rsp = (float) ($record['RSP'] ?? 0);
 
+                // Weight-based product fields
+                $isWeightBased = (bool) ($record['is_weight_based'] ?? false);
+                $weightPerUnit = $isWeightBased ? (float) ($record['weight_per_unit'] ?? 0) : null;
+                $weightUnit = $isWeightBased ? ($record['weight_unit'] ?? null) : null;
+                // Use total_weight from parser if available, otherwise calculate
+                $totalWeight = $isWeightBased ? (float) ($record['total_weight'] ?? ($weightPerUnit * $totalOrderedUnits)) : null;
+
                 // Calculate tax rate from tax amount and line value
                 $taxRate = null;
                 $normalizedTaxRate = null;
@@ -144,6 +151,12 @@ class DeliveryService
                     'tax_rate' => $taxRate,
                     'normalized_tax_rate' => $normalizedTaxRate,
                     'sku' => $caseSize,
+
+                    // Weight-based product fields
+                    'is_weight_based' => $isWeightBased,
+                    'weight_per_unit' => $weightPerUnit,
+                    'weight_unit' => $weightUnit,
+                    'total_weight' => $totalWeight,
                 ]);
 
                 $totalExpected += $lineTotal;

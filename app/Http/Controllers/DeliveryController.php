@@ -1269,25 +1269,32 @@ class DeliveryController extends Controller
 
                 // Helper function to sync a single item to legacy
                 $syncItemToLegacy = function ($item, $isOOS = false) {
-                    $unitsPerCase = $item->units_per_case ?? 1;
-                    $cases = $item->case_ordered_quantity ?? 0;
-                    $looseUnits = $item->unit_ordered_quantity ?? 0;
-
-                    // Calculate case units (same logic for OOS and delivered items)
-                    if ($unitsPerCase > 1 && $cases > 0) {
-                        if ($looseUnits > 0) {
-                            // Mixed order (cases + loose units) - treat as units for legacy
-                            $syncCaseUnits = 1;
-                            $syncMyOrder = ($cases * $unitsPerCase) + $looseUnits;
-                        } else {
-                            // Full case order - use actual case units
-                            $syncCaseUnits = $unitsPerCase;
-                            $syncMyOrder = $cases;
-                        }
-                    } else {
-                        // Unit-based order or no case info
+                    // Weight-based products: use total_weight as myOrder
+                    if ($item->is_weight_based && $item->total_weight) {
                         $syncCaseUnits = 1;
-                        $syncMyOrder = $item->ordered_quantity;
+                        $syncMyOrder = $item->total_weight;
+                    } else {
+                        // Regular products: calculate based on case/unit structure
+                        $unitsPerCase = $item->units_per_case ?? 1;
+                        $cases = $item->case_ordered_quantity ?? 0;
+                        $looseUnits = $item->unit_ordered_quantity ?? 0;
+
+                        // Calculate case units (same logic for OOS and delivered items)
+                        if ($unitsPerCase > 1 && $cases > 0) {
+                            if ($looseUnits > 0) {
+                                // Mixed order (cases + loose units) - treat as units for legacy
+                                $syncCaseUnits = 1;
+                                $syncMyOrder = ($cases * $unitsPerCase) + $looseUnits;
+                            } else {
+                                // Full case order - use actual case units
+                                $syncCaseUnits = $unitsPerCase;
+                                $syncMyOrder = $cases;
+                            }
+                        } else {
+                            // Unit-based order or no case info
+                            $syncCaseUnits = 1;
+                            $syncMyOrder = $item->ordered_quantity;
+                        }
                     }
 
                     // For OOS items, set myOrder to 0 (but keep correct caseUnits)

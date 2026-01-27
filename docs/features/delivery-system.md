@@ -1690,9 +1690,100 @@ if (data.exists_in_database && data.existing_product) {
 
 ---
 
+### 2026-01-26 - Product Images in Delivery Legacy Pages
+
+#### Visual Product Identification Throughout Verification Interface
+
+**Enhancement**: Added product image thumbnails to all table sections in the delivery-legacy match page, matching the visual experience of the main deliveries show page.
+
+**New Features Implemented**:
+
+1. **Image Thumbnails in All Tables**:
+   - Small product images (32x32px) appear in the leftmost column of every table
+   - Tables updated: Critical Issues, Warnings, Verified, OOS, Pending, Extra Items, Missing Items
+   - Uses existing `<x-product-image>` component for consistency
+
+2. **Hover Preview with Fixed Positioning**:
+   - Large image preview (256px wide) appears on hover
+   - Uses `position: fixed` via Alpine.js `x-teleport="body"` to render outside overflow containers
+   - Preview displays over table headers and footers without being clipped
+   - Smart positioning: appears below thumbnail, or above if near viewport bottom
+
+3. **Barcode Column in Pending Section**:
+   - Added always-visible barcode column to "Pending - Not Yet Scanned" table
+   - Helps identify products that need scanning
+   - Monospace font for easy barcode reading
+
+4. **SupplierService Integration**:
+   - `DeliveryLegacyController` now injects `SupplierService`
+   - Creates temporary product objects with barcode and supplier ID
+   - External image URLs fetched from UDEA CDN for UDEA suppliers
+
+**Technical Implementation**:
+
+```php
+// Controller - SupplierService injection
+private SupplierService $supplierService;
+
+public function __construct(SupplierService $supplierService)
+{
+    $this->supplierService = $supplierService;
+}
+
+// Pass to view
+return view('delivery-legacy.match', compact(...))
+    ->with('supplierService', $this->supplierService);
+```
+
+```blade
+<!-- View - Image cell in each table row -->
+<td class="px-2 py-2">
+    @php
+        $tempProduct = (object)[
+            'barcode' => $item->Barcode,
+            'supplier' => (object)['SupplierID' => $supplierId],
+        ];
+    @endphp
+    <x-product-image
+        :product="$tempProduct"
+        :supplier-service="$supplierService"
+        size="sm"
+        :hover="true" />
+</td>
+```
+
+**Enhanced Product Image Component**:
+
+The `<x-product-image>` component was enhanced for better hover preview:
+
+```blade
+<!-- Uses Alpine.js teleport for fixed positioning -->
+<template x-teleport="body">
+    <div x-show="show"
+         class="fixed z-[99999] pointer-events-none w-64"
+         :style="'left: ' + pos.x + 'px; top: ' + pos.y + 'px;'">
+        <img src="{{ $imageUrl }}" class="w-64 h-auto max-h-80 object-contain ...">
+    </div>
+</template>
+```
+
+**Files Modified**:
+- `app/Http/Controllers/DeliveryLegacyController.php` - Added SupplierService injection and view binding
+- `resources/views/delivery-legacy/match.blade.php` - Added image columns to all 7 table sections, added barcode column to Pending
+- `resources/views/components/product-image.blade.php` - Enhanced hover preview with fixed positioning via Alpine.js teleport
+
+#### Impact & Benefits
+- ✅ **Visual Product Identification**: Quickly identify products without reading descriptions
+- ✅ **Consistent Experience**: Matches product image display in main deliveries page
+- ✅ **No Clipping Issues**: Fixed positioning ensures hover preview is always fully visible
+- ✅ **Easy Verification**: See product images when verifying scanned items
+- ✅ **Barcode Visibility**: Pending items now show barcode for easier scanning
+
+---
+
 **Last Updated**: 2026-01-26
 **System Status**: ✅ Fully Operational
 **Test Coverage**: Manual testing completed
 **Performance**: Tested with 292-item deliveries
-**Recent Enhancement**: Barcode exists highlighting, OOS handling, auto supplier detection, clickable case badges
-**New Features**: Barcode exists highlighting, PDF delivery parsing (Independent & UDEA), multi-PDF upload, price comparison matrix, bulk cost updates, quick price editing, professional table sorting, enhanced product navigation, inline cost editing, sync to legacy, case unit editing, pending item quantity entry, stock update & completion, stock verification preview, extra items stock column, OOS section, auto supplier detection, clickable case badges
+**Recent Enhancement**: Product images in delivery-legacy, barcode exists highlighting, OOS handling, auto supplier detection, clickable case badges
+**New Features**: Product images in delivery-legacy, barcode exists highlighting, PDF delivery parsing (Independent & UDEA), multi-PDF upload, price comparison matrix, bulk cost updates, quick price editing, professional table sorting, enhanced product navigation, inline cost editing, sync to legacy, case unit editing, pending item quantity entry, stock update & completion, stock verification preview, extra items stock column, OOS section, auto supplier detection, clickable case badges

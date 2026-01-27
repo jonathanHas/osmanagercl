@@ -547,6 +547,11 @@
                                                     New Product
                                                 </span>
                                             @endif
+                                            @if($item->is_weight_based)
+                                                <span class="ml-2 px-2 py-1 text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300 rounded">
+                                                    {{ $item->weight_per_unit }} {{ $item->weight_unit }} x {{ $item->ordered_quantity }} = {{ number_format($item->total_weight, 3) }} {{ $item->weight_unit }}
+                                                </span>
+                                            @endif
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 text-center text-sm">
@@ -574,21 +579,26 @@
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 text-center text-sm {{ $item->ordered_quantity == 0 ? 'text-amber-700 dark:text-amber-400 font-medium' : 'text-gray-900 dark:text-gray-100' }}">
-                                        {{ $item->ordered_quantity }}
-                                        @if($item->ordered_quantity == 0)
-                                            <span class="block text-xs text-amber-600 dark:text-amber-500">Not invoiced</span>
-                                        @elseif($item->units_per_case > 1)
-                                            @php
-                                                $cases = $item->case_ordered_quantity ?? 0;
-                                                $looseUnits = $item->unit_ordered_quantity ?? 0;
-                                            @endphp
-                                            <span class="block text-xs text-gray-500 dark:text-gray-400">
-                                                @if($cases > 0 && $looseUnits > 0)
-                                                    {{ $cases }} × {{ $item->units_per_case }} + {{ $looseUnits }}
-                                                @elseif($cases > 0)
-                                                    {{ $cases }} × {{ $item->units_per_case }}
-                                                @endif
-                                            </span>
+                                        @if($item->is_weight_based && $item->total_weight)
+                                            {{ number_format($item->total_weight, 3) }}
+                                            <span class="block text-xs text-purple-600 dark:text-purple-400">{{ $item->weight_unit }}</span>
+                                        @else
+                                            {{ $item->ordered_quantity }}
+                                            @if($item->ordered_quantity == 0)
+                                                <span class="block text-xs text-amber-600 dark:text-amber-500">Not invoiced</span>
+                                            @elseif($item->units_per_case > 1)
+                                                @php
+                                                    $cases = $item->case_ordered_quantity ?? 0;
+                                                    $looseUnits = $item->unit_ordered_quantity ?? 0;
+                                                @endphp
+                                                <span class="block text-xs text-gray-500 dark:text-gray-400">
+                                                    @if($cases > 0 && $looseUnits > 0)
+                                                        {{ $cases }} × {{ $item->units_per_case }} + {{ $looseUnits }}
+                                                    @elseif($cases > 0)
+                                                        {{ $cases }} × {{ $item->units_per_case }}
+                                                    @endif
+                                                </span>
+                                            @endif
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 text-center text-sm text-gray-900 dark:text-gray-100">

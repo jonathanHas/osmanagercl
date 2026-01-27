@@ -42,6 +42,10 @@ class DeliveryItem extends Model
         'scan_history',
         'barcode_retrieval_failed',
         'barcode_retrieval_error',
+        'is_weight_based',
+        'weight_per_unit',
+        'weight_unit',
+        'total_weight',
     ];
 
     protected $casts = [
@@ -56,6 +60,9 @@ class DeliveryItem extends Model
         'is_new_product' => 'boolean',
         'barcode_retrieval_failed' => 'boolean',
         'scan_history' => 'array',
+        'is_weight_based' => 'boolean',
+        'weight_per_unit' => 'decimal:4',
+        'total_weight' => 'decimal:4',
     ];
 
     public function delivery(): BelongsTo

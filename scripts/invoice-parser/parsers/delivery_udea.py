@@ -244,6 +244,9 @@ class DeliveryUdeaParser:
                 "Price": self._clean_number_string(price),
                 "Sale": self._clean_number_string(sale),
                 "Total": self._clean_number_string(total),
+                "is_weight_based": False,
+                "weight_per_unit": None,
+                "weight_unit": None,
             }
 
         # 2) QUANTITY_SKU_REGEX - Enhanced logic for weight-based products
@@ -256,6 +259,9 @@ class DeliveryUdeaParser:
 
             has_decimal_group4 = '.' in cleaned_group4
             has_decimal_group5 = '.' in cleaned_group5
+
+            # Detect weight-based products (decimal value + kilogram/gram unit)
+            is_weight_product = has_decimal_group4 and g_unit.lower() in ["kilogram", "gram"]
 
             # For weight-based products
             if has_decimal_group4 and has_decimal_group5 and g_unit.lower() in ["kilogram", "gram"]:
@@ -296,12 +302,15 @@ class DeliveryUdeaParser:
                 "Code": g_code,
                 "Ordered": g_ordered,
                 "Qty": g_qty,
-                "SKU": final_csv_sku_value,
+                "SKU": "1" if is_weight_product else final_csv_sku_value,
                 "Content": content_output_display,
                 "Description": g_desc,
                 "Price": self._clean_number_string(g_price),
                 "Sale": self._clean_number_string(g_sale),
                 "Total": self._clean_number_string(g_total),
+                "is_weight_based": is_weight_product,
+                "weight_per_unit": final_csv_sku_value if is_weight_product else None,
+                "weight_unit": g_unit.lower() if is_weight_product else None,
             }
 
         # 3) FALLBACK_REGEX
@@ -320,6 +329,9 @@ class DeliveryUdeaParser:
                 "Price": self._clean_number_string(price),
                 "Sale": self._clean_number_string(sale),
                 "Total": self._clean_number_string(total),
+                "is_weight_based": False,
+                "weight_per_unit": None,
+                "weight_unit": None,
             }
 
         return None
@@ -494,30 +506,66 @@ class DeliveryUdeaParser:
                         description = parsed.get("Description", "")
                         content = parsed.get("Content", "")
 
+                        # Weight-based product handling
+                        is_weight_based = parsed.get("is_weight_based", False)
+                        weight_per_unit = None
+                        weight_unit = None
+                        total_weight = None
+
+                        if is_weight_based:
+                            weight_per_unit_str = parsed.get("weight_per_unit")
+                            weight_unit = parsed.get("weight_unit")
+                            if weight_per_unit_str:
+                                weight_per_unit = float(weight_per_unit_str)
+                                total_weight = weight_per_unit * qty
+
                         # Build product name
                         product_name = f"{content} {description}".strip()
                         if not product_name:
                             product_name = f"Product {code}"
 
                         # Validate price calculation
-                        is_valid, calculated_total = self._validate_price(qty, price, sku, total)
-
-                        if is_valid:
-                            self.stats['price_validations_passed'] += 1
+                        # For weight-based: total_weight × price = total
+                        # For regular: qty × price × sku = total
+                        if is_weight_based and total_weight:
+                            calculated_total = total_weight * price
+                            is_valid = abs(calculated_total - total) < 0.10
+                            if not is_valid:
+                                self.stats['price_mismatches'] += 1
+                                result["warnings"].append(
+                                    f"Price mismatch for {code}: {total_weight:.3f}kg×{price}={calculated_total:.2f}, actual={total:.2f}"
+                                )
+                            else:
+                                self.stats['price_validations_passed'] += 1
                         else:
-                            self.stats['price_mismatches'] += 1
-                            result["warnings"].append(
-                                f"Price mismatch for {code}: {qty}×{price}×{sku}={calculated_total:.2f}, actual={total:.2f}"
-                            )
+                            is_valid, calculated_total = self._validate_price(qty, price, sku, total)
+                            if is_valid:
+                                self.stats['price_validations_passed'] += 1
+                            else:
+                                self.stats['price_mismatches'] += 1
+                                result["warnings"].append(
+                                    f"Price mismatch for {code}: {qty}×{price}×{sku}={calculated_total:.2f}, actual={total:.2f}"
+                                )
 
                         # Calculate unit cost
-                        unit_cost = self._calculate_unit_cost(qty, sku, total)
+                        # For weight-based: unit_cost = price per kg (already in 'price')
+                        # For regular: unit_cost = total / (qty × sku)
+                        if is_weight_based:
+                            unit_cost = price  # Price per kg
+                        else:
+                            unit_cost = self._calculate_unit_cost(qty, sku, total)
 
                         # Calculate total units
-                        # For UDEA: case_size is the SKU multiplier, total_units = qty * sku
-                        case_size = int(sku) if sku >= 1 else 1
-                        total_delivered_units = int(qty * sku) if sku >= 1 else qty
-                        total_ordered_units = int(ordered * sku) if sku >= 1 else ordered
+                        # For weight-based: units = quantity ordered (not multiplied by weight)
+                        # For regular: case_size is the SKU multiplier, total_units = qty * sku
+                        if is_weight_based:
+                            case_size = 1
+                            total_delivered_units = qty
+                            total_ordered_units = ordered
+                        else:
+                            case_size = int(sku) if sku >= 1 else 1
+                            total_delivered_units = int(qty * sku) if sku >= 1 else qty
+                            total_ordered_units = int(ordered * sku) if sku >= 1 else ordered
 
                         item = {
                             "code": code,
@@ -527,7 +575,11 @@ class DeliveryUdeaParser:
                             "total_delivered_units": total_delivered_units,
                             "unit_cost": round(unit_cost, 4),
                             "line_total": total,
-                            "price_valid": is_valid
+                            "price_valid": is_valid,
+                            "is_weight_based": is_weight_based,
+                            "weight_per_unit": weight_per_unit,
+                            "weight_unit": weight_unit,
+                            "total_weight": total_weight,
                         }
 
                         items.append(item)

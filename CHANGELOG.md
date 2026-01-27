@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **🖼️ Product Images in Delivery Legacy Pages** (2026-01-26)
+  - **Image Thumbnails**: Product images now display in the left column of all tables on `/delivery-legacy/match`
+  - **Hover Preview**: Large image preview on hover using fixed positioning (displays over table headers/footers)
+  - **Smart Positioning**: Preview automatically appears below thumbnail, or above if near viewport bottom
+  - **Alpine.js Teleport**: Uses `x-teleport="body"` to render preview outside overflow containers
+  - **Barcode Column**: Added always-visible barcode column to "Pending - Not Yet Scanned" section
+  - **Supplier Integration**: Uses existing `SupplierService` for external image URLs (UDEA CDN)
+  - **Tables Updated**: Critical Issues, Warnings, Verified, OOS, Pending, Extra Items, Missing Items
+  - **Files Modified**:
+    - `app/Http/Controllers/DeliveryLegacyController.php` - Injected SupplierService
+    - `resources/views/delivery-legacy/match.blade.php` - Added image columns to all tables
+    - `resources/views/components/product-image.blade.php` - Enhanced hover with fixed positioning
+
 - **✅ Barcode Exists Highlighting in Deliveries** (2026-01-26)
   - **Auto-Detection**: When refreshing a barcode from supplier website, system checks if barcode already exists in POS products
   - **Green Highlighting**: Existing barcodes display with green background, checkmark icon in separate circle

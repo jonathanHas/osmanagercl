@@ -185,7 +185,7 @@
                 $criticalItems = collect($matchedItems)->filter(function($item) {
                     $caseUnits = $item->invoiceCaseUnits ?? 1;
                     $myOrder = $item->myOrder ?? 0;
-                    $unitsDelivered = (fmod($myOrder, 1) == 0.0) ? $caseUnits * $myOrder : round($caseUnits * $myOrder);
+                    $unitsDelivered = (fmod($myOrder, 1) != 0.0) ? $myOrder : $caseUnits * $myOrder;
                     return $item->scanned !== null && floatval($item->scanned) != $unitsDelivered;
                 });
 
@@ -197,7 +197,7 @@
                     // Only include if not already in critical
                     $caseUnits = $item->invoiceCaseUnits ?? 1;
                     $myOrder = $item->myOrder ?? 0;
-                    $unitsDelivered = (fmod($myOrder, 1) == 0.0) ? $caseUnits * $myOrder : round($caseUnits * $myOrder);
+                    $unitsDelivered = (fmod($myOrder, 1) != 0.0) ? $myOrder : $caseUnits * $myOrder;
                     $isNotCritical = $item->scanned === null || floatval($item->scanned) == $unitsDelivered;
                     return $isNotCritical && ($hasMarginIssue || $hasCaseUnitChange);
                 });
@@ -211,7 +211,7 @@
                     $caseUnits = $item->invoiceCaseUnits ?? 1;
                     $myOrder = $item->myOrder ?? 0;
                     if ($myOrder == 0) return false; // Exclude OOS items
-                    $unitsDelivered = (fmod($myOrder, 1) == 0.0) ? $caseUnits * $myOrder : round($caseUnits * $myOrder);
+                    $unitsDelivered = (fmod($myOrder, 1) != 0.0) ? $myOrder : $caseUnits * $myOrder;
                     return $item->scanned !== null && floatval($item->scanned) == $unitsDelivered;
                 });
 
@@ -277,7 +277,7 @@
                                             $margin = ($item->PRICESELL ?? 0) > 0 ? ($profit / $item->PRICESELL) * 100 : 0;
                                             $caseUnits = $item->invoiceCaseUnits ?? 1;
                                             $myOrder = $item->myOrder ?? 0;
-                                            $unitsDelivered = (fmod($myOrder, 1) == 0.0) ? $caseUnits * $myOrder : round($caseUnits * $myOrder);
+                                            $unitsDelivered = (fmod($myOrder, 1) != 0.0) ? $myOrder : $caseUnits * $myOrder;
                                             $diff = ($item->scanned ?? 0) - $unitsDelivered;
                                             $impact = $diff * $cost;
                                             $hasCaseUnitChange = $item->invoiceCaseUnits != $item->CaseUnits;
@@ -477,7 +477,7 @@
                                             $margin = ($item->PRICESELL ?? 0) > 0 ? ($profit / $item->PRICESELL) * 100 : 0;
                                             $caseUnits = $item->invoiceCaseUnits ?? 1;
                                             $myOrder = $item->myOrder ?? 0;
-                                            $unitsDelivered = (fmod($myOrder, 1) == 0.0) ? $caseUnits * $myOrder : round($caseUnits * $myOrder);
+                                            $unitsDelivered = (fmod($myOrder, 1) != 0.0) ? $myOrder : $caseUnits * $myOrder;
                                             $hasMarginIssue = $profit < 0 || $margin < 15;
                                             $hasCaseUnitChange = $item->invoiceCaseUnits != $item->CaseUnits;
                                             $issues = [];
@@ -677,7 +677,7 @@
                                             $margin = ($item->PRICESELL ?? 0) > 0 ? ($profit / $item->PRICESELL) * 100 : 0;
                                             $caseUnits = $item->invoiceCaseUnits ?? 1;
                                             $myOrder = $item->myOrder ?? 0;
-                                            $unitsDelivered = (fmod($myOrder, 1) == 0.0) ? $caseUnits * $myOrder : round($caseUnits * $myOrder);
+                                            $unitsDelivered = (fmod($myOrder, 1) != 0.0) ? $myOrder : $caseUnits * $myOrder;
                                             $value = $cost * $unitsDelivered;
                                             $hasCaseUnitChange = $item->invoiceCaseUnits != $item->CaseUnits;
                                         @endphp
@@ -895,15 +895,13 @@
                                     <tr>
                                         <th class="px-2 py-2 w-12"></th>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Barcode</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Expected</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase w-8"></th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Delivered</th>
                                         <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Value</th>
                                         <template x-if="showDetails">
                                             <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">VAT</th>
-                                        </template>
-                                        <template x-if="showDetails">
-                                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Barcode</th>
                                         </template>
                                         <template x-if="showDetails">
                                             <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Cost</th>
@@ -927,7 +925,9 @@
                                             $margin = ($item->PRICESELL ?? 0) > 0 ? ($profit / $item->PRICESELL) * 100 : 0;
                                             $caseUnits = $item->invoiceCaseUnits ?? 1;
                                             $myOrder = $item->myOrder ?? 0;
-                                            $unitsDelivered = (fmod($myOrder, 1) == 0.0) ? $caseUnits * $myOrder : round($caseUnits * $myOrder);
+                                            // If myOrder has decimal, it's weight-based - don't multiply by caseUnits and don't round
+                                            $isWeightBased = fmod($myOrder, 1) != 0.0;
+                                            $unitsDelivered = $isWeightBased ? $myOrder : $caseUnits * $myOrder;
                                             $value = $cost * $unitsDelivered;
                                         @endphp
                                         <tr class="hover:bg-gray-50"
@@ -955,7 +955,15 @@
                                                 @endif
                                                 <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
                                             </td>
-                                            <td class="px-3 py-2 text-center font-medium">{{ $unitsDelivered }}</td>
+                                            <td class="px-3 py-2 text-sm text-gray-600 font-mono">{{ $item->Barcode }}</td>
+                                            <td class="px-3 py-2 text-center font-medium">
+                                                @if($isWeightBased)
+                                                    {{ number_format($unitsDelivered, 3) }}
+                                                    <span class="text-xs text-purple-600 block">kg</span>
+                                                @else
+                                                    {{ $unitsDelivered }}
+                                                @endif
+                                            </td>
                                             <td class="px-3 py-2 text-center">
                                                 <button x-show="canEdit"
                                                         @click="qty = {{ $unitsDelivered }}; editing = true; $nextTick(() => $refs.qtyInput?.focus())"
@@ -1000,9 +1008,6 @@
                                             <td class="px-3 py-2 text-right text-gray-500">&euro;{{ number_format($value, 2) }}</td>
                                             <template x-if="showDetails">
                                                 <td class="px-3 py-2 text-center text-gray-500">{{ number_format($vat, 0) }}%</td>
-                                            </template>
-                                            <template x-if="showDetails">
-                                                <td class="px-3 py-2 text-xs text-gray-500">{{ $item->Barcode }}</td>
                                             </template>
                                             <template x-if="showDetails">
                                                 <td class="px-3 py-2 text-right text-gray-500">&euro;{{ number_format($cost, 2) }}</td>
@@ -1183,7 +1188,9 @@
                                         @php
                                             $caseUnits = $item->caseUnits ?? 1;
                                             $myOrder = $item->myOrder ?? 0;
-                                            $totalUnits = round($caseUnits * $myOrder);
+                                            // If myOrder has decimal, it's weight-based - don't multiply by caseUnits
+                                            $isWeightBased = fmod($myOrder, 1) != 0.0;
+                                            $totalUnits = $isWeightBased ? $myOrder : $caseUnits * $myOrder;
                                             $value = ($item->cost ?? 0) * $totalUnits;
                                         @endphp
                                         <tr class="bg-red-50">
@@ -1195,9 +1202,21 @@
                                             </td>
                                             <td class="px-3 py-2 font-medium text-gray-900">{{ $item->prodName }}</td>
                                             <td class="px-3 py-2 text-gray-500">{{ $item->supCode }}</td>
-                                            <td class="px-3 py-2 text-center">{{ $myOrder }}</td>
-                                            <td class="px-3 py-2 text-center">{{ $caseUnits }}</td>
-                                            <td class="px-3 py-2 text-center font-medium text-red-600">{{ $totalUnits }}</td>
+                                            <td class="px-3 py-2 text-center">
+                                                @if($isWeightBased)
+                                                    {{ number_format($myOrder, 3) }} <span class="text-xs text-purple-600">kg</span>
+                                                @else
+                                                    {{ $myOrder }}
+                                                @endif
+                                            </td>
+                                            <td class="px-3 py-2 text-center">{{ $isWeightBased ? '-' : $caseUnits }}</td>
+                                            <td class="px-3 py-2 text-center font-medium text-red-600">
+                                                @if($isWeightBased)
+                                                    {{ number_format($totalUnits, 3) }} <span class="text-xs text-purple-600">kg</span>
+                                                @else
+                                                    {{ $totalUnits }}
+                                                @endif
+                                            </td>
                                             <td class="px-3 py-2 text-right font-medium text-red-600">&euro;{{ number_format($value, 2) }}</td>
                                             <td class="px-3 py-2 text-center">
                                                 <button class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors">Verify</button>
