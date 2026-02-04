@@ -255,6 +255,43 @@
                                                 </div>
                                             @endif
                                         @endif
+
+                                        {{-- RTD Summary for Udea invoices with line items --}}
+                                        @if($file->supplier_detected === 'Udea' && isset($file->parsed_data['lines']) && count($file->parsed_data['lines']) > 0)
+                                            @php
+                                                $rtdService = app(\App\Services\RtdResolutionService::class);
+                                                $lines = $file->parsed_data['lines'];
+                                                $resolvedCount = 0;
+                                                $unresolvedCount = 0;
+                                                $unresolvedValue = 0;
+
+                                                foreach ($lines as $line) {
+                                                    $lineType = $line['line_type'] ?? 'unknown';
+                                                    if (!in_array($lineType, ['product_for_resale', 'unknown'])) {
+                                                        continue;
+                                                    }
+                                                    $articleCode = $line['article_code'] ?? null;
+                                                    $lineTotal = $rtdService->parseMonetaryValue($line['line_total'] ?? 0);
+                                                    $resolution = $rtdService->resolveArticleCode($articleCode);
+
+                                                    if ($resolution['status'] === 'resolved' && $rtdService->isValidIrishVatRate($resolution['vat_rate'] ?? null)) {
+                                                        $resolvedCount++;
+                                                    } else {
+                                                        $unresolvedCount++;
+                                                        $unresolvedValue += $lineTotal;
+                                                    }
+                                                }
+                                                $totalProductLines = $resolvedCount + $unresolvedCount;
+                                            @endphp
+                                            @if($totalProductLines > 0)
+                                                <div class="mt-1 text-xs {{ $unresolvedCount > 0 ? 'text-yellow-400' : 'text-green-400' }}">
+                                                    RTD: {{ $resolvedCount }}/{{ $totalProductLines }} resolved
+                                                    @if($unresolvedCount > 0)
+                                                        <span class="text-red-400">({{ $unresolvedCount }} unresolved: €{{ number_format($unresolvedValue, 2) }})</span>
+                                                    @endif
+                                                </div>
+                                            @endif
+                                        @endif
                                     </div>
                                 @endif
 
@@ -408,6 +445,13 @@
                                     <button onclick="viewParsedData({{ $file->id }})"
                                             class="text-green-400 hover:text-green-300 text-sm">
                                         View Data
+                                    </button>
+                                    @endif
+                                    @if($file->isPdf())
+                                    <button onclick="parseUdeaInvoice({{ $file->id }})"
+                                            class="text-purple-400 hover:text-purple-300 text-sm ml-2"
+                                            title="Parse this PDF using the Udea invoice parser (debug mode)">
+                                        Parse Udea
                                     </button>
                                     @endif
                                     <button x-data onclick="document.getElementById('edit-form-{{ $file->id }}').classList.toggle('hidden')"
@@ -1039,7 +1083,24 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert(data.message);
+                    let message = data.message;
+
+                    // Add RTD stats if present
+                    if (data.rtd_stats && data.rtd_stats.udea_invoices > 0) {
+                        message += '\n\n--- RTD Summary ---';
+                        message += '\nUdea invoices: ' + data.rtd_stats.udea_invoices;
+                        message += '\nResolved lines: ' + data.rtd_stats.resolved_lines;
+
+                        if (data.rtd_stats.unresolved_lines > 0) {
+                            message += '\nUnresolved lines: ' + data.rtd_stats.unresolved_lines;
+                            message += ' (\u20AC' + data.rtd_stats.unresolved_value.toFixed(2) + ')';
+                            message += '\n\nVisit RTD Fallbacks to assign VAT rates.';
+                        } else {
+                            message += '\n\nAll lines resolved successfully!';
+                        }
+                    }
+
+                    alert(message);
                     window.location.reload();
                 } else {
                     alert(data.error || 'Failed to create invoices');
@@ -1052,7 +1113,8 @@
         }
 
         // Auto-refresh if batch is processing or has files still being parsed
-        @if($batch->status === 'processing' || $batch->status === 'uploaded' || $files->whereIn('status', ['uploaded', 'parsing'])->count() > 0)
+        // Only refresh if there are actually files to process (prevents infinite reload loop on empty batches)
+        @if($files->count() > 0 && ($batch->status === 'processing' || $files->whereIn('status', ['uploaded', 'parsing'])->count() > 0))
         let refreshInterval = setInterval(() => {
             fetch(`/invoices/bulk-upload/status/${batchId}`)
                 .then(response => {
@@ -1396,6 +1458,271 @@
                 submitBtn.disabled = false;
                 submitBtn.textContent = originalText;
             });
+        }
+
+        // Parse Udea Invoice (debug mode)
+        function parseUdeaInvoice(fileId) {
+            // Show loading state
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Parsing...';
+
+            fetch(`/invoices/bulk-upload/${batchId}/file/${fileId}/parse-udea`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.textContent = originalText;
+
+                if (data.success) {
+                    // Show results in a modal
+                    showUdeaParseResults(data);
+                } else {
+                    // Show error in modal for better debugging
+                    let errorContent = '<div class="space-y-4">';
+                    errorContent += '<div class="bg-red-900/30 border border-red-700 p-4 rounded">';
+                    errorContent += '<h4 class="text-red-400 font-semibold mb-2">Parser Error</h4>';
+                    errorContent += `<p class="text-red-300">${data.error || 'Unknown error'}</p>`;
+                    if (data.json_error) {
+                        errorContent += `<p class="text-red-300 text-sm mt-2">JSON Error: ${data.json_error}</p>`;
+                    }
+                    if (data.command) {
+                        errorContent += `<p class="text-gray-400 text-xs mt-2">Command: ${data.command}</p>`;
+                    }
+                    errorContent += '</div>';
+
+                    if (data.raw_output) {
+                        errorContent += '<div class="bg-gray-700 p-4 rounded">';
+                        errorContent += '<h4 class="text-gray-300 font-semibold mb-2">Raw Parser Output</h4>';
+                        errorContent += '<pre class="text-xs text-gray-400 overflow-auto max-h-96 whitespace-pre-wrap">' +
+                            (data.raw_output || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
+                        errorContent += '</div>';
+                        console.log('Raw parser output:', data.raw_output);
+                    }
+
+                    errorContent += '</div>';
+                    document.getElementById('parsedDataContent').innerHTML = errorContent;
+                    document.getElementById('parsedDataModal').classList.remove('hidden');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                btn.disabled = false;
+                btn.textContent = originalText;
+                alert('An error occurred while parsing the invoice');
+            });
+        }
+
+        // Show Udea parse results in a modal
+        function showUdeaParseResults(data) {
+            const result = data.parser_result;
+            let content = '<div class="space-y-4">';
+
+            // Header section
+            content += '<div class="bg-gray-700 p-4 rounded">';
+            content += '<h4 class="text-gray-300 font-semibold mb-2">Invoice Header</h4>';
+            content += `<p class="text-gray-400"><span class="font-medium text-gray-200">Invoice Number:</span> ${result.header?.invoice_number || 'Not found'}</p>`;
+            content += `<p class="text-gray-400"><span class="font-medium text-gray-200">Invoice Date:</span> ${result.header?.invoice_date || 'Not found'}</p>`;
+            content += `<p class="text-gray-400"><span class="font-medium text-gray-200">Total Excl VAT:</span> €${(result.header?.total_excl_vat || 0).toFixed(2)}</p>`;
+            content += `<p class="text-gray-400"><span class="font-medium text-gray-200">VAT Amount:</span> €${(result.header?.vat_amount || 0).toFixed(2)}</p>`;
+            content += `<p class="text-gray-400"><span class="font-medium text-gray-200">Zero VAT:</span> ${result.header?.is_zero_vat ? 'Yes' : 'No'}</p>`;
+            content += '</div>';
+
+            // Validation section
+            if (result.validation) {
+                const v = result.validation;
+                const validClass = v.is_valid ? 'text-green-400' : 'text-red-400';
+                content += '<div class="bg-gray-700 p-4 rounded">';
+                content += '<h4 class="text-gray-300 font-semibold mb-2">Validation</h4>';
+                content += `<p class="${validClass} font-semibold">${v.is_valid ? '✓ Totals Match' : '✗ Totals Mismatch'}</p>`;
+                content += `<p class="text-gray-400">Products: €${v.products_total?.toFixed(2) || '0.00'}</p>`;
+                content += `<p class="text-gray-400">Barrels: €${v.barrels_total?.toFixed(2) || '0.00'}</p>`;
+                content += `<p class="text-gray-400">Costs: €${v.costs_total?.toFixed(2) || '0.00'}</p>`;
+                content += `<p class="text-gray-400">Calculated Total: €${v.calculated_total?.toFixed(2) || '0.00'}</p>`;
+                content += `<p class="text-gray-400">Invoice Total: €${v.invoice_total?.toFixed(2) || '0.00'}</p>`;
+                if (!v.is_valid) {
+                    content += `<p class="text-red-400">Difference: €${v.difference?.toFixed(2) || '0.00'}</p>`;
+                }
+                content += '</div>';
+            }
+
+            // RTD Preview section
+            if (data.rtd_preview) {
+                const rtd = data.rtd_preview;
+                const summary = rtd.summary;
+                const breakdown = rtd.breakdown;
+                const isComplete = summary.is_complete;
+
+                content += '<div class="' + (isComplete ? 'bg-green-900/30 border border-green-700' : 'bg-purple-900/30 border border-purple-700') + ' p-4 rounded">';
+                content += '<div class="flex justify-between items-center mb-3">';
+                content += '<h4 class="text-gray-100 font-semibold">RTD Preview (Goods for Resale)</h4>';
+
+                if (isComplete) {
+                    content += '<span class="px-2 py-1 bg-green-600 text-white text-xs rounded">Ready</span>';
+                } else {
+                    content += `<span class="px-2 py-1 bg-red-600 text-white text-xs rounded">${summary.unresolved_lines} Unresolved</span>`;
+                }
+                content += '</div>';
+
+                // VAT breakdown table
+                content += '<table class="w-full text-sm mb-3">';
+                content += '<thead><tr class="text-gray-400 text-xs border-b border-gray-600">';
+                content += '<th class="text-left py-1">VAT Rate</th>';
+                content += '<th class="text-right py-1">Net Amount</th>';
+                content += '</tr></thead><tbody class="text-gray-300">';
+
+                const gfr = breakdown.goods_for_resale;
+                content += `<tr><td class="py-1">0%</td><td class="text-right">€${(gfr['0'] || 0).toFixed(2)}</td></tr>`;
+                content += `<tr><td class="py-1">9%</td><td class="text-right">€${(gfr['9'] || 0).toFixed(2)}</td></tr>`;
+                content += `<tr><td class="py-1">13.5%</td><td class="text-right">€${(gfr['13.5'] || 0).toFixed(2)}</td></tr>`;
+                content += `<tr><td class="py-1">23%</td><td class="text-right">€${(gfr['23'] || 0).toFixed(2)}</td></tr>`;
+                content += `<tr class="border-t border-gray-600 font-semibold"><td class="py-1">Total RTD</td><td class="text-right text-green-400">€${(summary.total_resolved || 0).toFixed(2)}</td></tr>`;
+                content += '</tbody></table>';
+
+                // Stats
+                content += `<p class="text-xs text-gray-400">${summary.resolved_lines}/${summary.total_lines} lines resolved (${summary.resolved_percentage}%)`;
+                if (summary.excluded_lines > 0) {
+                    content += ` | ${summary.excluded_lines} excluded (barrels/costs)`;
+                }
+                content += '</p>';
+
+                // Unresolved items
+                if (rtd.issues && rtd.issues.length > 0) {
+                    content += '<div class="mt-3 p-3 bg-red-900/30 rounded">';
+                    content += `<p class="text-red-400 text-sm font-medium mb-2">Unresolved Items (€${(summary.total_unresolved || 0).toFixed(2)})</p>`;
+                    content += '<div class="max-h-40 overflow-y-auto space-y-1">';
+
+                    rtd.issues.slice(0, 15).forEach(issue => {
+                        content += '<div class="text-xs flex justify-between items-center py-1 border-b border-gray-700">';
+                        content += `<span class="font-mono text-gray-300">${issue.article_code}</span>`;
+                        content += `<span class="text-gray-400 truncate mx-2 flex-1">${issue.description || ''}</span>`;
+                        content += `<span class="text-red-400">${issue.reason_text || issue.reason}</span>`;
+                        content += `<span class="text-gray-500 ml-2">€${(issue.line_total || 0).toFixed(2)}</span>`;
+                        content += '</div>';
+                    });
+
+                    if (rtd.issues.length > 15) {
+                        content += `<p class="text-gray-500 text-xs text-center mt-2">... and ${rtd.issues.length - 15} more unresolved items</p>`;
+                    }
+
+                    content += '</div>';
+                    content += '<p class="text-xs text-gray-500 mt-2">These items need SupplierLink entries to link article codes to products.</p>';
+                    content += '</div>';
+                }
+
+                content += '</div>';
+            }
+
+            // Lines section
+            if (result.lines && result.lines.length > 0) {
+                content += '<div class="bg-gray-700 p-4 rounded">';
+                content += `<h4 class="text-gray-300 font-semibold mb-2">Product Lines (${result.lines.length})</h4>`;
+                content += '<div class="max-h-60 overflow-y-auto">';
+                content += '<table class="w-full text-sm">';
+                content += '<thead><tr class="text-gray-400 text-xs">';
+                content += '<th class="text-left py-1">Code</th>';
+                content += '<th class="text-left py-1">Description</th>';
+                content += '<th class="text-right py-1">Qty</th>';
+                content += '<th class="text-right py-1">Price</th>';
+                content += '<th class="text-right py-1">Total</th>';
+                content += '<th class="text-left py-1">Type</th>';
+                content += '</tr></thead><tbody>';
+                result.lines.slice(0, 20).forEach(line => {
+                    const typeColor = line.line_type === 'product_for_resale' ? 'text-blue-300' : 'text-orange-300';
+                    content += `<tr class="text-gray-300 border-t border-gray-600">`;
+                    content += `<td class="py-1">${line.article_code}</td>`;
+                    content += `<td class="py-1">${line.description?.substring(0, 30) || ''}...</td>`;
+                    content += `<td class="py-1 text-right">${line.quantity}</td>`;
+                    content += `<td class="py-1 text-right">€${(line.unit_price || 0).toFixed(2)}</td>`;
+                    content += `<td class="py-1 text-right">€${(line.line_total || 0).toFixed(2)}</td>`;
+                    content += `<td class="py-1 ${typeColor} text-xs">${line.line_type?.replace(/_/g, ' ')}</td>`;
+                    content += '</tr>';
+                });
+                if (result.lines.length > 20) {
+                    content += `<tr><td colspan="6" class="text-gray-400 text-center py-2">... and ${result.lines.length - 20} more lines</td></tr>`;
+                }
+                content += '</tbody></table></div></div>';
+            }
+
+            // Barrels section
+            if (result.barrels && result.barrels.items && result.barrels.items.length > 0) {
+                content += '<div class="bg-gray-700 p-4 rounded">';
+                content += `<h4 class="text-orange-300 font-semibold mb-2">Barrels/Deposits (${result.barrels.items.length}) - €${result.barrels.total?.toFixed(2)}</h4>`;
+                content += '<ul class="text-sm text-gray-300 space-y-1">';
+                result.barrels.items.forEach(item => {
+                    content += `<li>${item.quantity}x ${item.description} - €${item.total?.toFixed(2)}</li>`;
+                });
+                content += '</ul></div>';
+            }
+
+            // Costs section
+            if (result.costs && result.costs.items && result.costs.items.length > 0) {
+                content += '<div class="bg-gray-700 p-4 rounded">';
+                content += `<h4 class="text-yellow-300 font-semibold mb-2">Costs/Freight (${result.costs.items.length}) - €${result.costs.total?.toFixed(2)}</h4>`;
+                content += '<ul class="text-sm text-gray-300 space-y-1">';
+                result.costs.items.forEach(item => {
+                    content += `<li>${item.description} - €${item.total?.toFixed(2)}</li>`;
+                });
+                content += '</ul></div>';
+            }
+
+            // Warnings
+            if (result.warnings && result.warnings.length > 0) {
+                content += '<div class="bg-yellow-900/30 border border-yellow-700 p-4 rounded">';
+                content += '<h4 class="text-yellow-400 font-semibold mb-2">⚠ Warnings</h4>';
+                content += '<ul class="list-disc list-inside text-yellow-300 space-y-1">';
+                result.warnings.forEach(warning => {
+                    content += `<li>${warning}</li>`;
+                });
+                content += '</ul></div>';
+            }
+
+            // Errors
+            if (result.errors && result.errors.length > 0) {
+                content += '<div class="bg-red-900/30 border border-red-700 p-4 rounded">';
+                content += '<h4 class="text-red-400 font-semibold mb-2">❌ Errors</h4>';
+                content += '<ul class="list-disc list-inside text-red-300 space-y-1">';
+                result.errors.forEach(error => {
+                    content += `<li>${error.message || error}</li>`;
+                });
+                content += '</ul></div>';
+            }
+
+            // Problem Lines (lines that couldn't be parsed)
+            if (result.problem_lines && result.problem_lines.length > 0) {
+                content += '<div class="bg-orange-900/30 border border-orange-700 p-4 rounded">';
+                content += `<h4 class="text-orange-400 font-semibold mb-2">⚠ Problem Lines (${result.problem_lines.length})</h4>`;
+                content += '<p class="text-orange-300 text-xs mb-2">These lines look like products but couldn\'t be fully parsed:</p>';
+                content += '<div class="max-h-48 overflow-y-auto space-y-2">';
+                result.problem_lines.forEach((item, idx) => {
+                    content += '<div class="bg-gray-800 p-2 rounded text-xs">';
+                    content += `<p class="text-gray-400 font-mono break-all">${(item.original || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`;
+                    content += `<p class="text-orange-400 mt-1">Reason: ${item.reason || 'unknown'}</p>`;
+                    content += '</div>';
+                });
+                content += '</div></div>';
+            }
+
+            // Stats
+            if (result.metadata?.stats) {
+                const s = result.metadata.stats;
+                content += '<div class="bg-gray-700 p-4 rounded text-xs text-gray-400">';
+                content += '<h4 class="text-gray-300 font-semibold mb-1">Parser Stats</h4>';
+                content += `<p>Lines scanned: ${s.total_lines_scanned}, Products: ${s.product_lines_parsed}, Barrels: ${s.barrel_lines_parsed}, Costs: ${s.cost_lines_parsed}</p>`;
+                content += '</div>';
+            }
+
+            content += '</div>';
+
+            // Show in modal (reuse existing parsedDataModal)
+            document.getElementById('parsedDataContent').innerHTML = content;
+            document.getElementById('parsedDataModal').classList.remove('hidden');
         }
     </script>
     @endpush

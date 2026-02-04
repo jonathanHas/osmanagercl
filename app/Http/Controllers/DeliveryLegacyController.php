@@ -256,6 +256,7 @@ class DeliveryLegacyController extends Controller
         $scannedTotal = 0;
         $verifiedCount = 0;
         $mismatchCount = 0;
+        $oosCount = 0;
         $marginAlerts = 0;
         $missingValue = 0;
         $extraValue = 0;
@@ -265,6 +266,11 @@ class DeliveryLegacyController extends Controller
             $caseUnits = $item->invoiceCaseUnits ?? 1;
             $myOrder = $item->myOrder ?? 0;
             $unitsDelivered = (fmod($myOrder, 1) == 0.0) ? $caseUnits * $myOrder : round($caseUnits * $myOrder);
+
+            // Track OOS items (supplier didn't deliver any)
+            if ($myOrder == 0) {
+                $oosCount++;
+            }
 
             $invoiceTotal += $cost * $unitsDelivered;
 
@@ -303,9 +309,10 @@ class DeliveryLegacyController extends Controller
             'extraValue' => $extraValue,
             'verifiedCount' => $verifiedCount,
             'mismatchCount' => $mismatchCount,
+            'oosCount' => $oosCount,
             'marginAlerts' => $marginAlerts,
             'totalItems' => count($matchedItems),
-            'pendingCount' => count($matchedItems) - $verifiedCount - $mismatchCount,
+            'pendingCount' => count($matchedItems) - $verifiedCount - $mismatchCount - $oosCount,
         ];
     }
 

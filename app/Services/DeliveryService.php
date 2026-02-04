@@ -40,9 +40,16 @@ class DeliveryService
         array $items,
         int $supplierId,
         ?string $deliveryDate = null,
-        ?string $filename = null
+        ?string $filename = null,
+        ?array $totals = null
     ): Delivery {
-        return DB::transaction(function () use ($items, $supplierId, $deliveryDate, $filename) {
+        return DB::transaction(function () use ($items, $supplierId, $deliveryDate, $filename, $totals) {
+            // Extract totals verification data
+            $invoiceStatedTotal = $totals['grand_stated'] ?? null;
+            $calculatedTotal = $totals['grand_calculated'] ?? null;
+            $discrepancy = $totals['discrepancy'] ?? null;
+            $hasDiscrepancy = isset($totals['totals_match']) ? ! $totals['totals_match'] : false;
+
             // Create delivery header
             $delivery = Delivery::create([
                 'delivery_number' => 'DEL-'.date('Ymd-His'),
@@ -55,6 +62,11 @@ class DeliveryService
                     'format' => 'pdf_direct',
                     'source' => 'delivery_parsing_service',
                 ],
+                // Totals verification
+                'invoice_stated_total' => $invoiceStatedTotal,
+                'calculated_total' => $calculatedTotal,
+                'total_discrepancy' => $discrepancy,
+                'has_discrepancy' => $hasDiscrepancy,
             ]);
 
             $totalExpected = 0;

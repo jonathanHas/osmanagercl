@@ -7,6 +7,211 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **✅ RTD Force Reparse Mode** (2026-02-04)
+  - **Force Reparse Toggle**: Settings dropdown with toggle to enable force reparse mode
+  - **Reparse Any Invoice**: When enabled, shows "Reparse" button on all invoices with PDFs
+  - **Bypass Checks**: Force reparse bypasses `canReparseForRtd()` validation
+  - **Fresh Parse**: Deletes existing parsed data and re-parses with latest RTD parser
+  - **Visual Indicator**: Orange banner shows when force reparse mode is active
+  - **State Persistence**: Mode setting saved to localStorage across sessions
+  - **Files Modified**:
+    - `app/Http/Controllers/RtdController.php` - Added `forceParse()` method
+    - `routes/web.php` - Added force-parse route
+    - `resources/views/rtd/index.blade.php` - Added settings dropdown, toggle, reparse buttons
+
+- **✅ Independent Irish Health Foods (IIH) RTD Support** (2026-02-04)
+  - **New IIH Parser**: `invoice_iih_rtd.py` extracts VAT summary and DRS totals from IIH invoices
+  - **DRS Exclusion**: Deposit Return Scheme amounts automatically excluded from 0% goods for resale
+  - **VAT Summary Approach**: Uses invoice's built-in VAT categorization (0%, 13.5%, 23%) instead of article code resolution
+  - **Three-Supplier RTD**: Dashboard now supports Udea, Dynamis, and Independent suppliers
+  - **DRS in Excluded Section**: DRS amounts shown alongside Freight and Deposits in reconciliation
+  - **Files Created**:
+    - `scripts/invoice-parser/parsers/invoice_iih_rtd.py` - IIH RTD parser with VAT summary extraction
+  - **Files Modified**:
+    - `app/Models/Invoice.php` - Added `isIndependentSupplier()`, updated `hasRtdParser()`, `canReparseForRtd()`
+    - `app/Services/RtdResolutionService.php` - Added `computeRtdFromVatSummary()` for IIH, DRS support
+    - `app/Http/Controllers/RtdController.php` - Added Independent supplier detection in all queries
+    - `resources/views/rtd/index.blade.php` - Added DRS row in excluded section
+    - `resources/views/rtd/year-report.blade.php` - Added DRS to excluded totals display
+
+- **✅ RTD Detail Row Reconciliation Layout** (2026-02-04)
+  - **4-Column Layout**: Reorganized expandable detail row into Goods for Resale, Excluded, Unresolved, and Reconciliation columns
+  - **Reconciliation Summary**: New column showing how totals add up to match invoice total
+    - Shows `+ Goods`, `+ Excluded`, `+ Unresolved` = `Calculated Total`
+    - Compares against Invoice Total with balance indicator
+  - **Visual Balance Indicator**: Green border when balanced (difference < €0.50), yellow border when discrepancy exists
+  - **Improved Styling**: Each column in a card with colored headers and icons
+  - **Files Modified**:
+    - `app/Http/Controllers/RtdController.php` - Added `invoice_total` to JSON response
+    - `resources/views/rtd/index.blade.php` - New 4-column layout with reconciliation, updated JS
+
+- **✅ RTD Year Report Color Improvements** (2026-02-04)
+  - **Improved Readability**: "Not Frozen" warning section now uses orange theme with better contrast
+  - **Better Text Colors**: Changed from hard-to-read yellow-200 to gray-200/gray-300
+  - **Status Badges**: Proper pill styling with background colors for Computed/Pending status
+  - **Table Styling**: Added row separators and darker background for table area
+  - **Files Modified**:
+    - `resources/views/rtd/year-report.blade.php` - Updated color scheme for warning section
+
+- **✅ RTD Page UX Improvements** (2026-02-04)
+  - **AJAX Actions**: Parse, Compute, Freeze actions now use AJAX instead of page redirects
+  - **Scroll Preservation**: Page scroll position maintained during all RTD operations
+  - **Loading Indicators**: Per-row loading spinners show processing status with action text
+  - **In-Place Updates**: Row status, issues count, and action buttons update without page reload
+  - **Detail Row Updates**: Expandable detail section updates automatically after actions
+  - **PDF View Button**: New "PDF" button opens invoice attachment in popup viewer
+  - **Flash Messages**: Success/error messages appear inline and auto-dismiss after 5 seconds
+  - **Files Modified**:
+    - `app/Http/Controllers/RtdController.php` - Added JSON responses via `rtdResponse()` helper
+    - `resources/views/rtd/index.blade.php` - AJAX buttons, loading states, JS update functions
+
+- **✅ Invoice Missing File Detection & Upload** (2026-02-04)
+  - **Missing File Indicator**: Red badge on `/invoices` list showing count of missing attachments
+  - **Missing Files Modal**: Popup showing missing filenames with upload inputs per file
+  - **Copy Filename Button**: Quick copy-to-clipboard with visual feedback (checkmark confirmation)
+  - **Clipboard Fallback**: Works on non-HTTPS environments using execCommand fallback
+  - **File Upload Validation**: Validates replacement files against invoice data using parser
+    - Compares total_amount, invoice_number, supplier_name, invoice_date
+    - Shows validation mismatches with option to confirm or cancel
+  - **AJAX Upload**: Files upload without page reload, modal updates on success
+  - **Files Modified**:
+    - `app/Models/Invoice.php` - Added `hasMissingAttachments()`, `getMissingAttachmentCountAttribute()`
+    - `app/Http/Controllers/InvoiceController.php` - Eager load attachments
+    - `app/Http/Controllers/InvoiceAttachmentController.php` - Added `getMissing()`, `replace()` methods
+    - `resources/views/invoices/index.blade.php` - Missing badge, modal, JS functions
+    - `routes/web.php` - Added `missing` and `replace` routes
+
+- **✅ RTD Missing PDF Detection** (2026-02-04)
+  - **New Status**: Added `pdf_missing` status for invoices with orphaned attachment records
+  - **Visual Indicator**: Gray "PDF Missing" badge on RTD dashboard for affected invoices
+  - **Smart Detection**: System now checks actual file existence on disk, not just database records
+  - **Stat Card**: Conditional stat card appears when missing PDFs are detected
+  - **Files Modified**:
+    - `app/Models/Invoice.php` - Added `hasPdfOnDisk()` method, updated `canReparseForRtd()`
+    - `app/Http/Controllers/RtdController.php` - Added `pdf_missing` status detection
+    - `resources/views/rtd/index.blade.php` - Added badge, action text, and stat card
+
+- **✅ Dynamis RTD Invoice Parser** (2026-02-04)
+  - **New Parser**: `invoice_dynamis_rtd.py` for line-item extraction from Dynamis invoices
+  - **Two Invoice Types**: Automatically detects F&V (RUNGIS) vs Grocery (MAG) from `Ent:` field
+  - **EAN Barcode Resolution**: Grocery invoices use 13-digit EAN codes for direct product lookup
+  - **Generated Article Codes**: F&V invoices generate `DYN-PRODUCT-COUNTRY` codes for fallback resolution
+  - **Multi-Supplier RTD**: Dashboard now supports both Udea and Dynamis suppliers
+  - **Files Created**:
+    - `scripts/invoice-parser/parsers/invoice_dynamis_rtd.py` - Dynamis RTD parser
+  - **Files Modified**:
+    - `app/Http/Controllers/RtdController.php` - Added Dynamis supplier detection and routing
+    - `app/Services/RtdResolutionService.php` - Added EAN barcode lookup, Dynamis file support
+    - `app/Models/Invoice.php` - Added `isDynamisSupplier()`, `hasRtdParser()` methods
+
+- **✅ Delivery Parsing Totals Verification** (2026-01-29)
+  - **Invoice Total Extraction**: Python parsers now extract stated totals from PDF footers
+    - UDEA: Extracts "Total to deliver", "Total barrels delivered", "Total including/excluding vat"
+    - Independent: Extracts "Gross Total", "Subtotal", "Nett" totals
+  - **Totals Comparison**: Compares calculated sum of parsed items against PDF-stated totals
+    - €0.50 tolerance for rounding differences
+    - Flags mismatches with detailed warnings
+  - **Preview UI Enhancement**: New "Totals Verification" section in delivery upload preview
+    - Shows PDF-stated vs parsed values in comparison table
+    - Green checkmarks for matches, red X for mismatches
+    - Warning message highlighting potential missing items
+  - **Persistent Discrepancy Tracking**: Database storage for audit trail
+    - New fields: `invoice_stated_total`, `calculated_total`, `total_discrepancy`, `has_discrepancy`
+    - `parsing_metadata` JSON field on `delivery_documents` table
+  - **Show Page Warning Banner**: Red warning banner displays on delivery detail page when discrepancy detected
+  - **Files Modified**:
+    - `scripts/invoice-parser/parsers/delivery_udea.py` - Added `_extract_invoice_totals()` method
+    - `scripts/invoice-parser/parsers/delivery_independent.py` - Added `_extract_invoice_totals()` method
+    - `app/Services/DeliveryParsingService.php` - Passes through totals verification data
+    - `app/Services/DeliveryService.php` - Stores discrepancy data in database
+    - `app/Http/Controllers/DeliveryController.php` - Passes totals to service
+    - `app/Models/Delivery.php` - Added discrepancy fields to fillable/casts
+    - `app/Models/DeliveryDocument.php` - Added `parsing_metadata` field
+    - `resources/views/deliveries/create.blade.php` - Totals verification UI section
+    - `resources/views/deliveries/show.blade.php` - Discrepancy warning banner
+  - **Files Created**:
+    - `database/migrations/2026_01_29_160146_add_totals_verification_to_deliveries_table.php`
+
+- **📊 Udea Invoice Parser** (2026-01-28)
+  - **Invoice Header Extraction**: Parses invoice number, date, total excl VAT, VAT amount, zero-VAT confirmation
+  - **Product Line Parsing**: Extracts article codes, descriptions, quantities, unit prices, and line totals
+  - **Line Classification**: Automatic categorization by Gb.rek account code:
+    - 30302 = AGF (Fruit & Vegetables)
+    - 30322 = DKW (Dry goods)
+    - 30342 = Drogmetica
+    - 30362 = Non-food
+    - 30862 = Transport/Freight
+    - 34120 = Barrels/Deposits
+  - **Barrel/Deposit Extraction**: Detects "Barrels delivered" section with codes, quantities, values
+  - **Freight/Costs Detection**: Extracts transport charges from "Costs" section
+  - **Validation**: Reconciles sum of line totals against invoice total (€0.50 tolerance)
+  - **Problem Line Reporting**: Reports unparseable lines with reasons (no Gb.rek, truncated, etc.)
+  - **PDF Corruption Handling**: Fixes common text extraction issues:
+    - `Bio-Dynamis3c0h302` → `Bio-Dynamisch 30302`
+    - `1kilogramOnions` → `1kilogram Onions`
+    - Scrambled Gb.rek codes recovered from corrupted text
+  - **~96% Accuracy**: Captures 248 of ~263 product lines on sample invoices
+  - **Web Interface**: "Parse Udea" button on `/invoices/bulk-upload/preview` page
+  - **Debug Modal**: Shows header, validation, lines, barrels, costs, warnings, and problem lines
+  - **Files Created**:
+    - `scripts/invoice-parser/parsers/invoice_udea.py` - Python parser with pdfplumber
+    - `docs/features/udea-invoice-parser.md` - Feature documentation
+  - **Files Modified**:
+    - `app/Http/Controllers/InvoiceBulkUploadController.php` - Added `parseUdeaInvoice()` method
+    - `routes/web.php` - Added `parse-udea` route
+    - `resources/views/invoices/bulk-upload-preview.blade.php` - Added Parse Udea button and results modal
+
+- **🏷️ Supplier VAT Classification Fields** (2026-01-28)
+  - **New Fields**: `vat_treatment` and `default_purchase_use` enums on AccountingSupplier model
+  - **VAT Treatment Options**: irish_vat, eu_goods_zero_rated, eu_reverse_charge_services, postponed_import, outside_scope_or_exempt
+  - **Purchase Use Options**: resale, overhead, mixed
+  - **Auto-Default Logic**: VAT treatment auto-set based on country_code (IE→irish_vat, EU→eu_goods_zero_rated, etc.)
+  - **Inline Editing**: Update VAT fields directly on `/suppliers` index page via AJAX
+  - **VAT Filter**: Filter suppliers by VAT treatment on index page
+  - **Statistics Display**: Shows counts of suppliers by VAT classification
+  - **Files Created**:
+    - `database/migrations/2026_01_28_135442_add_vat_classification_to_accounting_suppliers_table.php`
+  - **Files Modified**:
+    - `app/Models/AccountingSupplier.php` - Added fields, constants, helper methods, boot() auto-default
+    - `app/Http/Controllers/AccountingSuppliersController.php` - Added updateVatClassification(), validation
+    - `routes/web.php` - Added `suppliers.update-vat-classification` route
+    - `resources/views/suppliers/index.blade.php` - VAT column, inline dropdowns, AJAX, filter, stats
+    - `resources/views/suppliers/edit.blade.php` - VAT Classification section
+    - `resources/views/suppliers/create.blade.php` - VAT Classification section
+
+- **📄 Delivery Document Storage & Viewing** (2026-01-27)
+  - **Permanent Document Storage**: PDF and CSV files uploaded during delivery creation are now stored permanently
+  - **Document Viewer**: View delivery documents at `/delivery-documents/{id}/viewer` with clean minimal interface
+  - **Popup Window**: Documents open in separate popup window (900x700) without navigation elements
+  - **Collapsible Section**: Documents section on delivery detail page is collapsible (collapsed by default)
+  - **Legacy Integration**: Document links synced to legacy delivery pages via cache mechanism
+  - **Multiple Documents**: Support for multiple documents per delivery (PDF invoices, CSV imports)
+  - **File Management**: Automatic cleanup when delivery/document is deleted
+  - **Files Created**:
+    - `database/migrations/2026_01_27_143710_create_delivery_documents_table.php`
+    - `app/Models/DeliveryDocument.php`
+    - `app/Http/Controllers/DeliveryDocumentController.php`
+    - `resources/views/deliveries/document-viewer.blade.php`
+    - `resources/views/deliveries/document-viewer-minimal.blade.php`
+  - **Files Modified**:
+    - `app/Http/Controllers/DeliveryController.php` - Document saving in store/storePdf
+    - `app/Models/Delivery.php` - Added documents() relationship
+    - `resources/views/deliveries/show.blade.php` - Collapsible documents section
+    - `resources/views/delivery-legacy/index.blade.php` - Synced documents display
+    - `resources/views/delivery-legacy/match.blade.php` - Invoice documents section
+
+- **🔄 Create Legacy Scan Session** (2026-01-27)
+  - **New Session Creation**: Create new delivery scan sessions directly from `/delivery-legacy` page
+  - **Supplier Selection**: Select supplier when creating new session
+  - **UUID-Based IDs**: Sessions created with UUID identifiers
+  - **Direct Redirect**: After creation, redirects to match page for the new session
+  - **Files Modified**:
+    - `app/Http/Controllers/DeliveryLegacyController.php` - Added createSession() method
+    - `routes/web.php` - Added `delivery-legacy.create-session` route
+    - `resources/views/delivery-legacy/index.blade.php` - Added create session form
+
 ### Changed
 
 - **📊 Stock Input Precision Enhancement** (2026-01-27)

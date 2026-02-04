@@ -28,7 +28,7 @@
 
         {{-- Filter & Search Section --}}
         <div class="bg-gray-800 rounded-lg p-4 mb-6">
-            <form method="GET" action="{{ route('suppliers.index') }}" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4" id="filter-form">
+            <form method="GET" action="{{ route('suppliers.index') }}" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-7 gap-4" id="filter-form">
                 {{-- Search --}}
                 <div class="lg:col-span-2">
                     <label class="block text-sm font-medium text-gray-400 mb-1">Search</label>
@@ -73,6 +73,16 @@
                     </select>
                 </div>
 
+                {{-- VAT Status Filter --}}
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">VAT Info</label>
+                    <select name="vat_status" class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md text-sm">
+                        <option value="">All</option>
+                        <option value="has_vat" {{ ($vatStatus ?? '') === 'has_vat' ? 'selected' : '' }}>Has VAT</option>
+                        <option value="missing_vat" {{ ($vatStatus ?? '') === 'missing_vat' ? 'selected' : '' }}>Missing VAT</option>
+                    </select>
+                </div>
+
                 {{-- Submit --}}
                 <div class="flex items-end">
                     <button type="submit" 
@@ -83,7 +93,7 @@
             </form>
 
             {{-- Quick Stats --}}
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-700">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4 pt-4 border-t border-gray-700">
                 <div class="text-center">
                     <div class="text-2xl font-bold text-blue-400">{{ $stats['total'] }}</div>
                     <div class="text-xs text-gray-400">Total Results</div>
@@ -95,6 +105,12 @@
                 <div class="text-center">
                     <div class="text-2xl font-bold text-purple-400">{{ $stats['pos_linked'] }}</div>
                     <div class="text-xs text-gray-400">POS Linked</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold {{ $stats['has_vat'] === $stats['total'] ? 'text-green-400' : 'text-orange-400' }}">
+                        {{ $stats['has_vat'] }}/{{ $stats['total'] }}
+                    </div>
+                    <div class="text-xs text-gray-400">VAT Info</div>
                 </div>
                 <div class="text-center">
                     <div class="text-2xl font-bold text-yellow-400">€{{ number_format($stats['total_spent'], 2) }}</div>
@@ -150,6 +166,7 @@
                                         @endif
                                     </a>
                                 </th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">VAT</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Contact</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                                     <a href="{{ request()->fullUrlWithQuery(['sort' => 'total_spent', 'direction' => $sortBy === 'total_spent' && $sortDirection === 'asc' ? 'desc' : 'asc']) }}" 
@@ -189,7 +206,9 @@
                                                 @endif
                                             </div>
                                             <div class="ml-3">
-                                                <div class="text-sm font-medium text-gray-100">{{ $supplier->name }}</div>
+                                                <a href="{{ route('suppliers.edit', $supplier) }}"
+                                                   class="text-sm font-medium text-gray-100 hover:text-blue-400 hover:underline transition-colors"
+                                                   title="Click to edit supplier">{{ $supplier->name }}</a>
                                                 <div class="text-xs text-gray-400">{{ $supplier->code }}</div>
                                                 @if($supplier->is_pos_linked)
                                                     <div class="text-xs text-purple-400">POS ID: {{ $supplier->external_pos_id }}</div>
@@ -206,6 +225,49 @@
                                             @else bg-gray-800 text-gray-100 @endif">
                                             {{ ucfirst($supplier->supplier_type) }}
                                         </span>
+                                    </td>
+                                    {{-- VAT Classification Column --}}
+                                    <td class="px-2 py-2 whitespace-nowrap vat-cell" data-supplier-id="{{ $supplier->id }}">
+                                        <div class="flex flex-col gap-1">
+                                            {{-- Country selector --}}
+                                            <select class="vat-select country-select text-xs bg-gray-700 border-gray-600 text-gray-100 rounded px-1 py-0.5 w-20"
+                                                    data-field="country_code" title="Country">
+                                                <option value="">--</option>
+                                                <option value="IE" {{ $supplier->country_code === 'IE' ? 'selected' : '' }}>IE</option>
+                                                <option value="GB" {{ $supplier->country_code === 'GB' ? 'selected' : '' }}>GB</option>
+                                                <option value="NL" {{ $supplier->country_code === 'NL' ? 'selected' : '' }}>NL</option>
+                                                <option value="FR" {{ $supplier->country_code === 'FR' ? 'selected' : '' }}>FR</option>
+                                                <option value="DE" {{ $supplier->country_code === 'DE' ? 'selected' : '' }}>DE</option>
+                                                <option value="ES" {{ $supplier->country_code === 'ES' ? 'selected' : '' }}>ES</option>
+                                                <option value="IT" {{ $supplier->country_code === 'IT' ? 'selected' : '' }}>IT</option>
+                                                <option value="US" {{ $supplier->country_code === 'US' ? 'selected' : '' }}>US</option>
+                                                @if($supplier->country_code && !in_array($supplier->country_code, ['IE','GB','NL','FR','DE','ES','IT','US']))
+                                                    <option value="{{ $supplier->country_code }}" selected>{{ $supplier->country_code }}</option>
+                                                @endif
+                                            </select>
+                                            {{-- VAT Treatment selector --}}
+                                            <select class="vat-select treatment-select text-xs bg-gray-700 border-gray-600 rounded px-1 py-0.5 w-20
+                                                @if($supplier->vat_treatment === 'irish_vat') text-green-400
+                                                @elseif($supplier->vat_treatment === 'eu_goods_zero_rated') text-blue-400
+                                                @elseif($supplier->vat_treatment === 'eu_reverse_charge_services') text-purple-400
+                                                @elseif($supplier->vat_treatment === 'postponed_import') text-yellow-400
+                                                @else text-gray-400 @endif"
+                                                    data-field="vat_treatment" title="VAT Treatment">
+                                                <option value="">Auto</option>
+                                                <option value="irish_vat" {{ $supplier->vat_treatment === 'irish_vat' ? 'selected' : '' }}>IE VAT</option>
+                                                <option value="eu_goods_zero_rated" {{ $supplier->vat_treatment === 'eu_goods_zero_rated' ? 'selected' : '' }}>EU 0%</option>
+                                                <option value="eu_reverse_charge_services" {{ $supplier->vat_treatment === 'eu_reverse_charge_services' ? 'selected' : '' }}>EU RC</option>
+                                                <option value="postponed_import" {{ $supplier->vat_treatment === 'postponed_import' ? 'selected' : '' }}>Import</option>
+                                                <option value="outside_scope_or_exempt" {{ $supplier->vat_treatment === 'outside_scope_or_exempt' ? 'selected' : '' }}>N/A</option>
+                                            </select>
+                                            {{-- Purchase Use selector --}}
+                                            <select class="vat-select use-select text-xs bg-gray-700 border-gray-600 text-gray-300 rounded px-1 py-0.5 w-20"
+                                                    data-field="default_purchase_use" title="Purchase Use (T1/T2)">
+                                                <option value="resale" {{ ($supplier->default_purchase_use ?? 'resale') === 'resale' ? 'selected' : '' }}>T1</option>
+                                                <option value="overhead" {{ $supplier->default_purchase_use === 'overhead' ? 'selected' : '' }}>T2</option>
+                                                <option value="mixed" {{ $supplier->default_purchase_use === 'mixed' ? 'selected' : '' }}>Mix</option>
+                                            </select>
+                                        </div>
                                     </td>
                                     <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-300">
                                         @if($supplier->contact_person)
@@ -338,6 +400,71 @@
             console.log('  suppliers count:', @json($suppliers->count() ?? 'undefined'));
             console.log('  suppliers total:', @json($suppliers->total() ?? 'undefined'));
             console.log('  stats:', @json($stats ?? 'undefined'));
+
+            // Handle VAT classification inline editing
+            document.querySelectorAll('.vat-select').forEach(select => {
+                select.addEventListener('change', function() {
+                    const cell = this.closest('.vat-cell');
+                    const supplierId = cell.dataset.supplierId;
+                    const field = this.dataset.field;
+                    const value = this.value;
+
+                    // Show loading state
+                    this.classList.add('opacity-50');
+                    this.disabled = true;
+
+                    // Build request data
+                    const data = {};
+                    data[field] = value;
+
+                    // Send AJAX request
+                    fetch(`/suppliers/${supplierId}/update-vat-classification`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                        },
+                        body: JSON.stringify(data)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Update treatment select color based on value
+                            const treatmentSelect = cell.querySelector('.treatment-select');
+                            if (treatmentSelect) {
+                                // Remove all color classes
+                                treatmentSelect.classList.remove('text-green-400', 'text-blue-400', 'text-purple-400', 'text-yellow-400', 'text-gray-400');
+
+                                // Add appropriate color class
+                                const treatment = data.supplier.vat_treatment;
+                                if (treatment === 'irish_vat') treatmentSelect.classList.add('text-green-400');
+                                else if (treatment === 'eu_goods_zero_rated') treatmentSelect.classList.add('text-blue-400');
+                                else if (treatment === 'eu_reverse_charge_services') treatmentSelect.classList.add('text-purple-400');
+                                else if (treatment === 'postponed_import') treatmentSelect.classList.add('text-yellow-400');
+                                else treatmentSelect.classList.add('text-gray-400');
+
+                                // If country changed, update treatment select value (auto-inferred)
+                                if (field === 'country_code' && treatment) {
+                                    treatmentSelect.value = treatment;
+                                }
+                            }
+
+                            showNotification(data.message, 'success');
+                        } else {
+                            throw new Error(data.message || 'Failed to update');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showNotification(error.message || 'Failed to update VAT classification', 'error');
+                    })
+                    .finally(() => {
+                        this.classList.remove('opacity-50');
+                        this.disabled = false;
+                    });
+                });
+            });
 
             // Handle status toggle AJAX
             document.querySelectorAll('.toggle-status-form').forEach(form => {

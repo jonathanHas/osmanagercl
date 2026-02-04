@@ -425,6 +425,50 @@ class DeliveryUdeaParser:
 
         return result
 
+    def _extract_invoice_totals(self, text: str) -> Dict[str, Optional[float]]:
+        """Extract the invoice's stated totals from footer section.
+
+        Udea invoices have these totals at the bottom:
+        - "Total to deliver" - sum of product line items
+        - "Total barrels delivered" - sum of barrel deposits
+        - "Total excluding vat" / "Total including vat" - grand total
+
+        Returns:
+            Dictionary with stated totals:
+            {
+                'products_stated': float or None,   # "Total to deliver"
+                'barrels_stated': float or None,    # "Total barrels delivered"
+                'grand_stated': float or None,      # "Total excluding/including vat"
+            }
+        """
+        totals: Dict[str, Optional[float]] = {
+            'products_stated': None,
+            'barrels_stated': None,
+            'grand_stated': None,
+        }
+
+        # Patterns for Udea format (from sample PDF):
+        # "Total to deliver                949,34"
+        # "Total barrels delivered         40,10"
+        # "Total excluding vat            989,44"
+        # "Total including vat    EUR    989,44"
+        patterns = {
+            'products_stated': r'Total\s+to\s+deliver\s+([\d.,]+)',
+            'barrels_stated': r'Total\s+barrels\s+delivered\s+([\d.,]+)',
+            'grand_stated': r'Total\s+(?:excluding|including)\s+vat\s+(?:EUR\s+)?([\d.,]+)',
+        }
+
+        for key, pattern in patterns.items():
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                try:
+                    totals[key] = float(self._clean_number_string(match.group(1)))
+                    self.log(f"Extracted {key}: {totals[key]}", "DEBUG")
+                except (ValueError, AttributeError) as e:
+                    self.log(f"Failed to parse {key}: {e}", "WARNING")
+
+        return totals
+
     def parse_invoice(self, pdf_path: str) -> Dict[str, Any]:
         """
         Parse a delivery invoice PDF and return structured data.
@@ -630,6 +674,60 @@ class DeliveryUdeaParser:
             result["totals"]["products_total"] = round(total_value, 2)
             result["totals"]["barrels_total"] = barrels['total']
             result["totals"]["total_value"] = round(total_value + barrels['total'], 2)
+
+            # Extract stated totals from PDF footer and compare
+            stated = self._extract_invoice_totals(text)
+            tolerance = 0.50  # Allow for rounding differences
+
+            # Store stated totals
+            result["totals"]["products_stated"] = stated['products_stated']
+            result["totals"]["barrels_stated"] = stated['barrels_stated']
+            result["totals"]["grand_stated"] = stated['grand_stated']
+
+            # Store calculated totals explicitly
+            result["totals"]["products_calculated"] = round(total_value, 2)
+            result["totals"]["barrels_calculated"] = barrels['total']
+            result["totals"]["grand_calculated"] = round(total_value + barrels['total'], 2)
+
+            # Compare calculated vs stated totals
+            products_match = True
+            barrels_match = True
+            grand_match = True
+            discrepancy = None
+
+            if stated['products_stated'] is not None:
+                products_discrepancy = abs(total_value - stated['products_stated'])
+                products_match = products_discrepancy <= tolerance
+                if not products_match:
+                    result["warnings"].append(
+                        f"Products total mismatch: PDF states €{stated['products_stated']:.2f} "
+                        f"but parsed items sum to €{total_value:.2f} (difference: €{products_discrepancy:.2f})"
+                    )
+                    self.log(f"Products total mismatch: stated={stated['products_stated']}, calculated={total_value}", "WARNING")
+
+            if stated['barrels_stated'] is not None:
+                barrels_discrepancy = abs(barrels['total'] - stated['barrels_stated'])
+                barrels_match = barrels_discrepancy <= tolerance
+                if not barrels_match:
+                    result["warnings"].append(
+                        f"Barrels total mismatch: PDF states €{stated['barrels_stated']:.2f} "
+                        f"but parsed items sum to €{barrels['total']:.2f}"
+                    )
+
+            if stated['grand_stated'] is not None:
+                calculated_grand = total_value + barrels['total']
+                discrepancy = abs(calculated_grand - stated['grand_stated'])
+                grand_match = discrepancy <= tolerance
+                if not grand_match:
+                    result["warnings"].append(
+                        f"Grand total mismatch: PDF states €{stated['grand_stated']:.2f} "
+                        f"but parsed items sum to €{calculated_grand:.2f} (difference: €{discrepancy:.2f})"
+                    )
+                    self.log(f"Grand total mismatch: stated={stated['grand_stated']}, calculated={calculated_grand}", "WARNING")
+
+            result["totals"]["totals_match"] = products_match and barrels_match and grand_match
+            result["totals"]["discrepancy"] = round(discrepancy, 2) if discrepancy is not None else None
+
             result["success"] = len(items) > 0
             result["metadata"]["stats"] = self.stats
 

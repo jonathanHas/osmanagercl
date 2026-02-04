@@ -16,6 +16,8 @@ class AccountingSupplier extends Model
         'address',
         'country_code',
         'is_eu_supplier',
+        'vat_treatment',
+        'default_purchase_use',
         'phone',
         'email',
         'website',
@@ -350,6 +352,100 @@ class AccountingSupplier extends Model
             'pos_id' => null,
             'color' => 'gray',
         ];
+    }
+
+    /**
+     * EU country codes (excluding Ireland which gets irish_vat).
+     */
+    public const EU_COUNTRY_CODES = [
+        'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR',
+        'DE', 'GR', 'HU', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL',
+        'PT', 'RO', 'SK', 'SI', 'ES', 'SE',
+    ];
+
+    /**
+     * VAT treatment options with display labels.
+     */
+    public const VAT_TREATMENTS = [
+        'irish_vat' => 'Irish VAT (Domestic)',
+        'eu_goods_zero_rated' => 'EU Goods - Zero Rated',
+        'eu_reverse_charge_services' => 'EU Services - Reverse Charge',
+        'postponed_import' => 'Postponed Import VAT',
+        'outside_scope_or_exempt' => 'Outside Scope / Exempt',
+    ];
+
+    /**
+     * Purchase use options with display labels.
+     */
+    public const PURCHASE_USES = [
+        'resale' => 'Resale (T1)',
+        'overhead' => 'Overhead (T2)',
+        'mixed' => 'Mixed Use',
+    ];
+
+    /**
+     * Infer the appropriate VAT treatment based on country code.
+     * Can be used for auto-defaulting or suggestions.
+     */
+    public static function inferVatTreatment(?string $countryCode): string
+    {
+        if (empty($countryCode)) {
+            return 'irish_vat'; // Default assumption for no country
+        }
+
+        $countryCode = strtoupper($countryCode);
+
+        // Ireland - standard Irish VAT
+        if ($countryCode === 'IE') {
+            return 'irish_vat';
+        }
+
+        // EU countries - zero rated goods (most common for product suppliers)
+        if (in_array($countryCode, self::EU_COUNTRY_CODES)) {
+            return 'eu_goods_zero_rated';
+        }
+
+        // GB (post-Brexit) and all other countries - outside scope
+        return 'outside_scope_or_exempt';
+    }
+
+    /**
+     * Check if the country is in the EU (excluding Ireland).
+     */
+    public static function isEuCountry(?string $countryCode): bool
+    {
+        if (empty($countryCode)) {
+            return false;
+        }
+
+        return in_array(strtoupper($countryCode), self::EU_COUNTRY_CODES);
+    }
+
+    /**
+     * Boot the model - set up auto-defaulting for VAT treatment.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($supplier) {
+            // Auto-default vat_treatment based on country_code if not set
+            if (empty($supplier->vat_treatment) && ! empty($supplier->country_code)) {
+                $supplier->vat_treatment = self::inferVatTreatment($supplier->country_code);
+            }
+
+            // Auto-set is_eu_supplier flag based on country_code
+            if (! empty($supplier->country_code)) {
+                $supplier->is_eu_supplier = self::isEuCountry($supplier->country_code);
+            }
+        });
+
+        static::updating(function ($supplier) {
+            // Update is_eu_supplier flag if country_code changes
+            if ($supplier->isDirty('country_code') && ! empty($supplier->country_code)) {
+                $supplier->is_eu_supplier = self::isEuCountry($supplier->country_code);
+            }
+        });
     }
 
     /**

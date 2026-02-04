@@ -52,6 +52,14 @@ class AccountingSuppliersController extends Controller
             $query->where('is_pos_linked', $posLinked);
         }
 
+        // Filter by VAT status
+        $vatStatus = $request->get('vat_status');
+        if ($vatStatus === 'has_vat') {
+            $query->whereNotNull('vat_treatment');
+        } elseif ($vatStatus === 'missing_vat') {
+            $query->whereNull('vat_treatment');
+        }
+
         // Sort by
         $sortBy = $request->get('sort', 'name');
         $sortDirection = $request->get('direction', 'asc');
@@ -131,12 +139,19 @@ class AccountingSuppliersController extends Controller
             $filteredQuery->where('is_pos_linked', $posLinked);
         }
 
+        if ($vatStatus === 'has_vat') {
+            $filteredQuery->whereNotNull('vat_treatment');
+        } elseif ($vatStatus === 'missing_vat') {
+            $filteredQuery->whereNull('vat_treatment');
+        }
+
         // Get stats based on filtered results
         $stats = [
             'total' => $filteredQuery->count(),
             'active' => (clone $filteredQuery)->where('status', 'active')->count(),
             'pos_linked' => (clone $filteredQuery)->where('is_pos_linked', true)->count(),
             'total_spent' => (clone $filteredQuery)->sum('total_spent'),
+            'has_vat' => (clone $filteredQuery)->whereNotNull('vat_treatment')->count(),
         ];
 
         return view('suppliers.index', compact(
@@ -147,6 +162,7 @@ class AccountingSuppliersController extends Controller
             'search',
             'type',
             'status',
+            'vatStatus',
             'sortBy',
             'sortDirection'
         ));
@@ -160,11 +176,17 @@ class AccountingSuppliersController extends Controller
         $supplierTypes = ['product', 'service', 'utility', 'professional', 'other'];
         $statuses = ['active', 'inactive', 'suspended', 'archived'];
         $paymentMethods = ['bacs', 'cheque', 'card', 'cash', 'other'];
+        $vatTreatments = AccountingSupplier::VAT_TREATMENTS;
+        $purchaseUses = AccountingSupplier::PURCHASE_USES;
+        $countryCodes = $this->getCountryCodes();
 
         return view('suppliers.create', compact(
             'supplierTypes',
             'statuses',
-            'paymentMethods'
+            'paymentMethods',
+            'vatTreatments',
+            'purchaseUses',
+            'countryCodes'
         ));
     }
 
@@ -198,6 +220,10 @@ class AccountingSuppliersController extends Controller
             'status' => 'required|in:active,inactive,suspended,archived',
             'notes' => 'nullable|string|max:2000',
             'tags' => 'nullable|string',
+            // VAT classification fields
+            'country_code' => 'nullable|string|size:2',
+            'vat_treatment' => 'nullable|in:irish_vat,eu_goods_zero_rated,eu_reverse_charge_services,postponed_import,outside_scope_or_exempt',
+            'default_purchase_use' => 'nullable|in:resale,overhead,mixed',
         ]);
 
         // Auto-generate code if not provided
@@ -303,12 +329,18 @@ class AccountingSuppliersController extends Controller
         $supplierTypes = ['product', 'service', 'utility', 'professional', 'other'];
         $statuses = ['active', 'inactive', 'suspended', 'archived'];
         $paymentMethods = ['bacs', 'cheque', 'card', 'cash', 'other'];
+        $vatTreatments = AccountingSupplier::VAT_TREATMENTS;
+        $purchaseUses = AccountingSupplier::PURCHASE_USES;
+        $countryCodes = $this->getCountryCodes();
 
         return view('suppliers.edit', compact(
             'supplier',
             'supplierTypes',
             'statuses',
-            'paymentMethods'
+            'paymentMethods',
+            'vatTreatments',
+            'purchaseUses',
+            'countryCodes'
         ));
     }
 
@@ -342,6 +374,10 @@ class AccountingSuppliersController extends Controller
             'status' => 'required|in:active,inactive,suspended,archived',
             'notes' => 'nullable|string|max:2000',
             'tags' => 'nullable|string',
+            // VAT classification fields
+            'country_code' => 'nullable|string|size:2',
+            'vat_treatment' => 'nullable|in:irish_vat,eu_goods_zero_rated,eu_reverse_charge_services,postponed_import,outside_scope_or_exempt',
+            'default_purchase_use' => 'nullable|in:resale,overhead,mixed',
         ]);
 
         // Process tags
@@ -533,6 +569,60 @@ class AccountingSuppliersController extends Controller
     }
 
     /**
+     * Update VAT classification fields via AJAX.
+     */
+    public function updateVatClassification(Request $request, AccountingSupplier $supplier)
+    {
+        $validated = $request->validate([
+            'country_code' => 'nullable|string|size:2',
+            'vat_treatment' => 'nullable|in:irish_vat,eu_goods_zero_rated,eu_reverse_charge_services,postponed_import,outside_scope_or_exempt',
+            'default_purchase_use' => 'nullable|in:resale,overhead,mixed',
+        ]);
+
+        try {
+            // If country_code changed and vat_treatment not explicitly set, auto-infer it
+            if (isset($validated['country_code']) && ! isset($validated['vat_treatment'])) {
+                $validated['vat_treatment'] = AccountingSupplier::inferVatTreatment($validated['country_code']);
+                $validated['is_eu_supplier'] = AccountingSupplier::isEuCountry($validated['country_code']);
+            }
+
+            $validated['updated_by'] = Auth::id();
+
+            $supplier->update($validated);
+
+            Log::info('Supplier VAT classification updated', [
+                'supplier_id' => $supplier->id,
+                'supplier_name' => $supplier->name,
+                'changes' => $validated,
+                'updated_by' => Auth::id(),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => "VAT classification updated for '{$supplier->name}'.",
+                'supplier' => [
+                    'id' => $supplier->id,
+                    'country_code' => $supplier->country_code,
+                    'vat_treatment' => $supplier->vat_treatment,
+                    'default_purchase_use' => $supplier->default_purchase_use,
+                    'is_eu_supplier' => $supplier->is_eu_supplier,
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to update supplier VAT classification', [
+                'supplier_id' => $supplier->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update VAT classification. Please try again.',
+            ], 422);
+        }
+    }
+
+    /**
      * Generate a unique supplier code.
      */
     private function generateSupplierCode(): string
@@ -596,5 +686,55 @@ class AccountingSuppliersController extends Controller
             ]);
             throw $e;
         }
+    }
+
+    /**
+     * Get list of country codes for dropdown selection.
+     * Returns common countries first (IE, GB, EU), then others alphabetically.
+     */
+    private function getCountryCodes(): array
+    {
+        return [
+            // Ireland first (most common)
+            'IE' => 'Ireland (IE)',
+            // UK
+            'GB' => 'United Kingdom (GB)',
+            // EU countries (alphabetical)
+            'AT' => 'Austria (AT)',
+            'BE' => 'Belgium (BE)',
+            'BG' => 'Bulgaria (BG)',
+            'HR' => 'Croatia (HR)',
+            'CY' => 'Cyprus (CY)',
+            'CZ' => 'Czech Republic (CZ)',
+            'DK' => 'Denmark (DK)',
+            'EE' => 'Estonia (EE)',
+            'FI' => 'Finland (FI)',
+            'FR' => 'France (FR)',
+            'DE' => 'Germany (DE)',
+            'GR' => 'Greece (GR)',
+            'HU' => 'Hungary (HU)',
+            'IT' => 'Italy (IT)',
+            'LV' => 'Latvia (LV)',
+            'LT' => 'Lithuania (LT)',
+            'LU' => 'Luxembourg (LU)',
+            'MT' => 'Malta (MT)',
+            'NL' => 'Netherlands (NL)',
+            'PL' => 'Poland (PL)',
+            'PT' => 'Portugal (PT)',
+            'RO' => 'Romania (RO)',
+            'SK' => 'Slovakia (SK)',
+            'SI' => 'Slovenia (SI)',
+            'ES' => 'Spain (ES)',
+            'SE' => 'Sweden (SE)',
+            // Non-EU common trading partners
+            'US' => 'United States (US)',
+            'CA' => 'Canada (CA)',
+            'CH' => 'Switzerland (CH)',
+            'NO' => 'Norway (NO)',
+            'AU' => 'Australia (AU)',
+            'NZ' => 'New Zealand (NZ)',
+            'CN' => 'China (CN)',
+            'JP' => 'Japan (JP)',
+        ];
     }
 }

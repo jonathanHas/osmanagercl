@@ -468,11 +468,13 @@ class DeliveryController extends Controller
                 : $originalFilenames[0];
 
             // Create delivery using the parsed data
+            $totals = $result['data']['totals'] ?? null;
             $delivery = $this->deliveryService->importFromPdfData(
                 $items,
                 $request->supplier_id,
                 $request->delivery_date,
-                $filenameForRecord
+                $filenameForRecord,
+                $totals
             );
 
             // Store barrel items if present (Udea deliveries)

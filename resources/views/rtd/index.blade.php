@@ -1,0 +1,1050 @@
+<x-admin-layout>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {{-- Header --}}
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-gray-100">RTD Management</h2>
+            <div class="flex space-x-2">
+                <a href="{{ route('rtd.year-report') }}"
+                   class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    Year Report
+                </a>
+                <a href="{{ route('rtd.issues') }}"
+                   class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Issues Queue
+                </a>
+                <a href="{{ route('rtd-fallbacks.index') }}"
+                   class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                    </svg>
+                    Fallbacks
+                </a>
+                <a href="{{ route('rtd-fallbacks.unresolved') }}"
+                   class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    Unresolved
+                </a>
+            </div>
+        </div>
+
+        {{-- Flash Messages --}}
+        @if(session('success'))
+            <div class="bg-green-900/50 border border-green-500 text-green-300 px-4 py-3 rounded mb-4">
+                {{ session('success') }}
+            </div>
+        @endif
+        @if(session('error'))
+            <div class="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded mb-4">
+                {{ session('error') }}
+            </div>
+        @endif
+
+        {{-- Stats Cards --}}
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+            <a href="{{ route('rtd.index', ['filter' => 'all']) }}"
+               class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition {{ $filter === 'all' ? 'ring-2 ring-blue-500' : '' }}">
+                <div class="text-3xl font-bold text-white">{{ $stats['total'] }}</div>
+                <div class="text-sm text-gray-400">Total Invoices</div>
+            </a>
+            <a href="{{ route('rtd.index', ['filter' => 'needs_parsing']) }}"
+               class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition {{ $filter === 'needs_parsing' ? 'ring-2 ring-red-500' : '' }}">
+                <div class="text-3xl font-bold text-red-400">{{ $stats['needs_parsing'] }}</div>
+                <div class="text-sm text-gray-400">Needs Parsing</div>
+            </a>
+            @if(($stats['pdf_missing'] ?? 0) > 0)
+            <a href="{{ route('rtd.index', ['filter' => 'pdf_missing']) }}"
+               class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition {{ $filter === 'pdf_missing' ? 'ring-2 ring-gray-500' : '' }}">
+                <div class="text-3xl font-bold text-gray-400">{{ $stats['pdf_missing'] }}</div>
+                <div class="text-sm text-gray-400">PDF Missing</div>
+            </a>
+            @endif
+            <a href="{{ route('rtd.index', ['filter' => 'needs_computation']) }}"
+               class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition {{ $filter === 'needs_computation' ? 'ring-2 ring-orange-500' : '' }}">
+                <div class="text-3xl font-bold text-orange-400">{{ $stats['needs_computation'] }}</div>
+                <div class="text-sm text-gray-400">Needs Compute</div>
+            </a>
+            <a href="{{ route('rtd.index', ['filter' => 'has_issues']) }}"
+               class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition {{ $filter === 'has_issues' ? 'ring-2 ring-yellow-500' : '' }}">
+                <div class="text-3xl font-bold text-yellow-400">{{ $stats['has_issues'] }}</div>
+                <div class="text-sm text-gray-400">Has Issues</div>
+            </a>
+            <a href="{{ route('rtd.index', ['filter' => 'computed']) }}"
+               class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition {{ $filter === 'computed' ? 'ring-2 ring-blue-500' : '' }}">
+                <div class="text-3xl font-bold text-blue-400">{{ $stats['computed'] }}</div>
+                <div class="text-sm text-gray-400">Computed</div>
+            </a>
+            <a href="{{ route('rtd.index', ['filter' => 'frozen']) }}"
+               class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition {{ $filter === 'frozen' ? 'ring-2 ring-green-500' : '' }}">
+                <div class="text-3xl font-bold text-green-400">{{ $stats['frozen'] }}</div>
+                <div class="text-sm text-gray-400">Frozen</div>
+            </a>
+        </div>
+
+        {{-- Force Reparse Mode Banner --}}
+        <div id="force-reparse-banner" class="hidden bg-orange-900/50 border border-orange-500 text-orange-300 px-4 py-3 rounded mb-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    <span class="font-semibold">Force Reparse Mode Active</span>
+                    <span class="ml-2 text-sm">- Click "Reparse" on any invoice to re-parse with the latest RTD parser</span>
+                </div>
+                <button onclick="toggleForceReparseMode()" class="text-orange-300 hover:text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        {{-- Filters and Actions --}}
+        <div class="bg-gray-800 rounded-lg p-4 mb-4 flex flex-wrap items-center justify-between gap-4">
+            <form action="{{ route('rtd.index') }}" method="GET" class="flex items-center gap-4">
+                <input type="hidden" name="filter" value="{{ $filter }}">
+                <div class="relative">
+                    <input type="text" name="search" value="{{ $search }}" placeholder="Search invoice #..."
+                           class="bg-gray-700 text-white rounded-lg pl-10 pr-4 py-2 w-64 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <svg class="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                    Search
+                </button>
+                @if($search)
+                    <a href="{{ route('rtd.index', ['filter' => $filter]) }}" class="text-gray-400 hover:text-white">
+                        Clear
+                    </a>
+                @endif
+            </form>
+
+            <div class="flex items-center gap-2">
+                {{-- Settings Dropdown --}}
+                <div class="relative" x-data="{ open: false }">
+                    <button @click="open = !open" type="button"
+                            class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg inline-flex items-center"
+                            title="Settings">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                    </button>
+                    <div x-show="open" @click.away="open = false"
+                         x-transition:enter="transition ease-out duration-100"
+                         x-transition:enter-start="transform opacity-0 scale-95"
+                         x-transition:enter-end="transform opacity-100 scale-100"
+                         x-transition:leave="transition ease-in duration-75"
+                         x-transition:leave-start="transform opacity-100 scale-100"
+                         x-transition:leave-end="transform opacity-0 scale-95"
+                         class="absolute right-0 mt-2 w-64 rounded-lg bg-gray-700 shadow-lg ring-1 ring-black ring-opacity-5 z-50">
+                        <div class="p-4">
+                            <label class="flex items-center cursor-pointer">
+                                <input type="checkbox" id="force-reparse-toggle"
+                                       onchange="toggleForceReparseMode()"
+                                       class="form-checkbox h-5 w-5 text-orange-500 rounded border-gray-500 bg-gray-600 focus:ring-orange-500">
+                                <span class="ml-3 text-white text-sm">Force Reparse Mode</span>
+                            </label>
+                            <p class="mt-2 text-xs text-gray-400">
+                                When enabled, shows a "Reparse" button on all invoices to re-parse with the latest RTD parser.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <form action="{{ route('rtd.recompute-all') }}" method="POST">
+                    @csrf
+                    <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg inline-flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        Recompute All with Issues
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        {{-- Invoice Table --}}
+        <div class="bg-gray-800 rounded-lg overflow-hidden">
+            @if($invoices->isEmpty())
+                <div class="p-8 text-center text-gray-400">
+                    <svg class="w-12 h-12 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    <p>No Udea invoices found{{ $filter !== 'all' ? ' matching this filter' : '' }}.</p>
+                </div>
+            @else
+                <table class="min-w-full divide-y divide-gray-700">
+                    <thead class="bg-gray-900">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Invoice</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
+                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Total</th>
+                            <th class="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                            <th class="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">Issues</th>
+                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-700">
+                        @foreach($invoices as $invoice)
+                            <tr class="hover:bg-gray-750 cursor-pointer"
+                                onclick="toggleExpand({{ $invoice->id }})"
+                                id="row-{{ $invoice->id }}">
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center">
+                                        <svg class="w-4 h-4 mr-2 text-gray-500 transition-transform" id="chevron-{{ $invoice->id }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                        </svg>
+                                        <div>
+                                            <div class="text-white font-medium">#{{ $invoice->invoice_number }}</div>
+                                            <div class="text-xs text-gray-400">{{ $invoice->supplier_name }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 text-gray-300">
+                                    {{ $invoice->invoice_date->format('d/m/Y') }}
+                                </td>
+                                <td class="px-4 py-3 text-right text-gray-300">
+                                    {{ number_format($invoice->total_amount, 2) }}
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    @switch($invoice->rtd_display_status)
+                                        @case('frozen')
+                                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-900 text-green-300">Frozen</span>
+                                            @break
+                                        @case('computed')
+                                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-900 text-blue-300">Computed</span>
+                                            @break
+                                        @case('has_issues')
+                                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-900 text-yellow-300">Has Issues</span>
+                                            @break
+                                        @case('needs_computation')
+                                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-orange-900 text-orange-300">Needs Compute</span>
+                                            @break
+                                        @case('needs_parsing')
+                                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-900 text-red-300">Needs Parsing</span>
+                                            @break
+                                        @case('pdf_missing')
+                                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-700 text-gray-300">PDF Missing</span>
+                                            @break
+                                    @endswitch
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    @if($invoice->hasRtdData())
+                                        @php $unresolvedCount = $invoice->rtd_breakdown['unresolved']['count'] ?? 0; @endphp
+                                        @if($unresolvedCount > 0)
+                                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-900 text-red-300">{{ $unresolvedCount }}</span>
+                                        @else
+                                            <span class="text-green-400">0</span>
+                                        @endif
+                                    @else
+                                        <span class="text-gray-500">-</span>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-3 text-right" onclick="event.stopPropagation()">
+                                    <div class="flex justify-end space-x-2 items-center" id="actions-{{ $invoice->id }}" data-has-pdf="{{ $invoice->hasPdfOnDisk() ? 'true' : 'false' }}" data-is-frozen="{{ $invoice->rtd_status === 'frozen' ? 'true' : 'false' }}">
+                                        {{-- Loading indicator --}}
+                                        <span id="loading-{{ $invoice->id }}" class="hidden items-center text-blue-400 text-xs">
+                                            <svg class="animate-spin h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <span id="loading-text-{{ $invoice->id }}">Processing...</span>
+                                        </span>
+                                        {{-- Force Reparse button (hidden by default, shown in force mode) --}}
+                                        @if($invoice->hasPdfOnDisk() && $invoice->rtd_status !== 'frozen')
+                                            <button type="button" onclick="rtdAction({{ $invoice->id }}, 'force-parse', 'Reparsing')"
+                                                    class="force-reparse-btn hidden bg-orange-600 hover:bg-orange-700 text-white text-xs px-3 py-1 rounded"
+                                                    title="Force reparse with latest RTD parser">
+                                                Reparse
+                                            </button>
+                                        @endif
+                                        {{-- Action buttons --}}
+                                        <span id="buttons-{{ $invoice->id }}">
+                                        @if($invoice->rtd_display_status === 'needs_parsing')
+                                            <button type="button" onclick="rtdAction({{ $invoice->id }}, 'parse', 'Parsing')"
+                                                    class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded">
+                                                Parse
+                                            </button>
+                                        @elseif($invoice->rtd_display_status === 'needs_computation')
+                                            <button type="button" onclick="rtdAction({{ $invoice->id }}, 'compute', 'Computing')"
+                                                    class="bg-orange-600 hover:bg-orange-700 text-white text-xs px-3 py-1 rounded">
+                                                Compute
+                                            </button>
+                                        @elseif($invoice->rtd_display_status === 'has_issues')
+                                            <button type="button" onclick="rtdAction({{ $invoice->id }}, 'compute', 'Recomputing')"
+                                                    class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded">
+                                                Recompute
+                                            </button>
+                                        @elseif($invoice->rtd_display_status === 'computed')
+                                            <button type="button" onclick="rtdAction({{ $invoice->id }}, 'compute', 'Recomputing')"
+                                                    class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded">
+                                                Recompute
+                                            </button>
+                                            <button type="button" onclick="rtdAction({{ $invoice->id }}, 'accept', 'Freezing')"
+                                                    class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 rounded">
+                                                Freeze
+                                            </button>
+                                        @elseif($invoice->rtd_display_status === 'pdf_missing')
+                                            <span class="text-gray-400 text-xs">No PDF file</span>
+                                        @endif
+                                        </span>
+                                        @if($invoice->hasPdfOnDisk())
+                                            <button type="button"
+                                                    onclick="viewInvoicePdf({{ $invoice->id }})"
+                                                    class="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-1 rounded inline-flex items-center"
+                                                    title="View PDF">
+                                                <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+                                                </svg>
+                                                PDF
+                                            </button>
+                                        @endif
+                                        <a href="{{ route('invoices.show', $invoice) }}"
+                                           class="bg-gray-600 hover:bg-gray-500 text-white text-xs px-3 py-1 rounded">
+                                            View
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {{-- Expandable Detail Row --}}
+                            <tr id="detail-{{ $invoice->id }}" class="hidden bg-gray-850">
+                                <td colspan="6" class="px-4 py-4">
+                                    <div class="bg-gray-900 rounded-lg p-4">
+                                        @if($invoice->hasRtdData())
+                                            @php
+                                                $gfr = $invoice->rtd_breakdown['goods_for_resale'] ?? [];
+                                                $excluded = $invoice->rtd_breakdown['excluded'] ?? [];
+                                                $unresolved = $invoice->rtd_breakdown['unresolved'] ?? [];
+                                                $rtdTotal = $invoice->getRtdTotal();
+                                                $excludedTotal = ($excluded['freight'] ?? 0) + ($excluded['deposits'] ?? 0) + ($excluded['drs'] ?? 0);
+                                                $unresolvedTotal = $unresolved['net_total'] ?? 0;
+                                                $calculatedTotal = $rtdTotal + $excludedTotal + $unresolvedTotal;
+                                                $invoiceTotal = $invoice->total_amount;
+                                                $difference = abs($calculatedTotal - $invoiceTotal);
+                                                $isBalanced = $difference < 0.50;
+                                            @endphp
+
+                                            <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                                                {{-- Goods for Resale --}}
+                                                <div class="bg-gray-800 rounded-lg p-3">
+                                                    <h4 class="text-sm font-semibold text-green-400 mb-2 flex items-center">
+                                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                        </svg>
+                                                        Goods for Resale
+                                                    </h4>
+                                                    <div class="space-y-1 text-sm">
+                                                        <div class="flex justify-between">
+                                                            <span class="text-gray-400">0% Rate:</span>
+                                                            <span class="text-white font-mono">{{ number_format($gfr['0'] ?? 0, 2) }}</span>
+                                                        </div>
+                                                        <div class="flex justify-between">
+                                                            <span class="text-gray-400">9% Rate:</span>
+                                                            <span class="text-white font-mono">{{ number_format($gfr['9'] ?? 0, 2) }}</span>
+                                                        </div>
+                                                        <div class="flex justify-between">
+                                                            <span class="text-gray-400">13.5% Rate:</span>
+                                                            <span class="text-white font-mono">{{ number_format($gfr['13.5'] ?? 0, 2) }}</span>
+                                                        </div>
+                                                        <div class="flex justify-between">
+                                                            <span class="text-gray-400">23% Rate:</span>
+                                                            <span class="text-white font-mono">{{ number_format($gfr['23'] ?? 0, 2) }}</span>
+                                                        </div>
+                                                        <div class="flex justify-between pt-2 border-t border-gray-600 font-semibold">
+                                                            <span class="text-gray-300">Subtotal:</span>
+                                                            <span class="text-green-400 font-mono">{{ number_format($rtdTotal, 2) }}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {{-- Excluded --}}
+                                                <div class="bg-gray-800 rounded-lg p-3">
+                                                    <h4 class="text-sm font-semibold text-blue-400 mb-2 flex items-center">
+                                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                                        </svg>
+                                                        Excluded
+                                                    </h4>
+                                                    <div class="space-y-1 text-sm">
+                                                        <div class="flex justify-between">
+                                                            <span class="text-gray-400">Freight:</span>
+                                                            <span class="text-white font-mono">{{ number_format($excluded['freight'] ?? 0, 2) }}</span>
+                                                        </div>
+                                                        <div class="flex justify-between">
+                                                            <span class="text-gray-400">Deposits:</span>
+                                                            <span class="text-white font-mono">{{ number_format($excluded['deposits'] ?? 0, 2) }}</span>
+                                                        </div>
+                                                        @if(($excluded['drs'] ?? 0) > 0)
+                                                        <div class="flex justify-between">
+                                                            <span class="text-gray-400">DRS:</span>
+                                                            <span class="text-white font-mono">{{ number_format($excluded['drs'] ?? 0, 2) }}</span>
+                                                        </div>
+                                                        @endif
+                                                        <div class="flex justify-between pt-2 border-t border-gray-600 font-semibold">
+                                                            <span class="text-gray-300">Subtotal:</span>
+                                                            <span class="text-blue-400 font-mono">{{ number_format($excludedTotal, 2) }}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {{-- Unresolved --}}
+                                                <div class="bg-gray-800 rounded-lg p-3">
+                                                    <h4 class="text-sm font-semibold {{ ($unresolved['count'] ?? 0) > 0 ? 'text-red-400' : 'text-gray-400' }} mb-2 flex items-center">
+                                                        @if(($unresolved['count'] ?? 0) > 0)
+                                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                                            </svg>
+                                                        @else
+                                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                                            </svg>
+                                                        @endif
+                                                        Unresolved
+                                                    </h4>
+                                                    @if(($unresolved['count'] ?? 0) > 0)
+                                                        <div class="space-y-1 text-sm">
+                                                            <div class="flex justify-between text-red-400">
+                                                                <span>{{ $unresolved['count'] }} items</span>
+                                                                <span class="font-mono">{{ number_format($unresolvedTotal, 2) }}</span>
+                                                            </div>
+                                                            @if(!empty($invoice->rtd_resolution_issues))
+                                                                <ul class="mt-1 space-y-0.5 text-xs text-gray-400 max-h-16 overflow-y-auto">
+                                                                    @foreach(array_slice($invoice->rtd_resolution_issues, 0, 3) as $issue)
+                                                                        <li class="flex justify-between">
+                                                                            <span class="font-mono truncate mr-2">{{ $issue['article_code'] }}</span>
+                                                                            <span class="font-mono">{{ number_format($issue['line_total'], 2) }}</span>
+                                                                        </li>
+                                                                    @endforeach
+                                                                    @if(count($invoice->rtd_resolution_issues) > 3)
+                                                                        <li class="text-gray-500">+{{ count($invoice->rtd_resolution_issues) - 3 }} more</li>
+                                                                    @endif
+                                                                </ul>
+                                                            @endif
+                                                            <a href="{{ route('rtd-fallbacks.unresolved', ['invoice_id' => $invoice->id]) }}"
+                                                               class="inline-block mt-1 text-xs text-blue-400 hover:text-blue-300">
+                                                                Resolve →
+                                                            </a>
+                                                        </div>
+                                                    @else
+                                                        <div class="text-sm">
+                                                            <p class="text-green-400 text-xs mb-1">All items resolved</p>
+                                                            <div class="flex justify-between pt-2 border-t border-gray-600 font-semibold">
+                                                                <span class="text-gray-300">Subtotal:</span>
+                                                                <span class="text-gray-400 font-mono">0.00</span>
+                                                            </div>
+                                                        </div>
+                                                    @endif
+                                                </div>
+
+                                                {{-- Reconciliation Summary --}}
+                                                <div class="bg-gray-800 rounded-lg p-3 border-2 {{ $isBalanced ? 'border-green-600' : 'border-yellow-600' }}">
+                                                    <h4 class="text-sm font-semibold {{ $isBalanced ? 'text-green-400' : 'text-yellow-400' }} mb-2 flex items-center">
+                                                        @if($isBalanced)
+                                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                            </svg>
+                                                        @else
+                                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                            </svg>
+                                                        @endif
+                                                        Reconciliation
+                                                    </h4>
+                                                    <div class="space-y-1 text-sm">
+                                                        <div class="flex justify-between">
+                                                            <span class="text-green-400">+ Goods:</span>
+                                                            <span class="text-white font-mono">{{ number_format($rtdTotal, 2) }}</span>
+                                                        </div>
+                                                        <div class="flex justify-between">
+                                                            <span class="text-blue-400">+ Excluded:</span>
+                                                            <span class="text-white font-mono">{{ number_format($excludedTotal, 2) }}</span>
+                                                        </div>
+                                                        <div class="flex justify-between">
+                                                            <span class="text-red-400">+ Unresolved:</span>
+                                                            <span class="text-white font-mono">{{ number_format($unresolvedTotal, 2) }}</span>
+                                                        </div>
+                                                        <div class="flex justify-between pt-1 border-t border-gray-600">
+                                                            <span class="text-gray-300 font-semibold">= Calculated:</span>
+                                                            <span class="text-white font-mono font-semibold">{{ number_format($calculatedTotal, 2) }}</span>
+                                                        </div>
+                                                        <div class="flex justify-between">
+                                                            <span class="text-gray-300 font-semibold">Invoice Total:</span>
+                                                            <span class="text-white font-mono font-semibold">{{ number_format($invoiceTotal, 2) }}</span>
+                                                        </div>
+                                                        @if(!$isBalanced)
+                                                            <div class="flex justify-between pt-1 border-t border-yellow-600 text-yellow-400">
+                                                                <span class="font-semibold">Difference:</span>
+                                                                <span class="font-mono font-semibold">{{ number_format($difference, 2) }}</span>
+                                                            </div>
+                                                        @else
+                                                            <div class="pt-1 text-center">
+                                                                <span class="text-green-400 text-xs">✓ Balanced</span>
+                                                            </div>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {{-- Frozen Info --}}
+                                            @if($invoice->rtd_status === 'frozen')
+                                                <div class="mt-3 pt-3 border-t border-gray-700 text-xs text-gray-500">
+                                                    Frozen {{ $invoice->rtd_accepted_at?->format('d M Y H:i') }}
+                                                    @if($invoice->rtdAcceptedByUser) by {{ $invoice->rtdAcceptedByUser->name }} @endif
+                                                </div>
+                                            @endif
+                                        @elseif($invoice->canComputeRtd())
+                                            <div class="text-center py-4">
+                                                <p class="text-gray-400 mb-4">This invoice has parsed line data. Click Compute to generate RTD breakdown.</p>
+                                                <form action="{{ route('rtd.compute', $invoice) }}" method="POST" class="inline">
+                                                    @csrf
+                                                    <button type="submit" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded">
+                                                        Compute RTD
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        @elseif($invoice->canReparseForRtd())
+                                            <div class="text-center py-4">
+                                                <p class="text-gray-400 mb-4">This invoice has a PDF attachment. Click Parse to extract line items.</p>
+                                                <form action="{{ route('rtd.parse', $invoice) }}" method="POST" class="inline">
+                                                    @csrf
+                                                    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">
+                                                        Parse PDF
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        @else
+                                            <div class="text-center py-4 text-gray-500">
+                                                <p>No PDF attachment found for this invoice.</p>
+                                                <a href="{{ route('invoices.edit', $invoice) }}" class="text-blue-400 hover:text-blue-300">
+                                                    Upload attachment
+                                                </a>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+
+                {{-- Pagination --}}
+                @if($lastPage > 1)
+                    <div class="bg-gray-900 px-4 py-3 flex items-center justify-between border-t border-gray-700">
+                        <div class="text-sm text-gray-400">
+                            Showing {{ ($currentPage - 1) * 20 + 1 }} to {{ min($currentPage * 20, $total) }} of {{ $total }} invoices
+                        </div>
+                        <div class="flex space-x-2">
+                            @if($currentPage > 1)
+                                <a href="{{ route('rtd.index', ['filter' => $filter, 'search' => $search, 'page' => $currentPage - 1]) }}"
+                                   class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded">
+                                    Previous
+                                </a>
+                            @endif
+                            @if($currentPage < $lastPage)
+                                <a href="{{ route('rtd.index', ['filter' => $filter, 'search' => $search, 'page' => $currentPage + 1]) }}"
+                                   class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded">
+                                    Next
+                                </a>
+                            @endif
+                        </div>
+                    </div>
+                @endif
+            @endif
+        </div>
+    </div>
+
+    <script>
+        // Force Reparse Mode state
+        let forceReparseMode = localStorage.getItem('rtd_force_reparse_mode') === 'true';
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggle = document.getElementById('force-reparse-toggle');
+            if (toggle) {
+                toggle.checked = forceReparseMode;
+            }
+            updateForceReparseUI();
+        });
+
+        function toggleForceReparseMode() {
+            forceReparseMode = !forceReparseMode;
+            localStorage.setItem('rtd_force_reparse_mode', forceReparseMode);
+            const toggle = document.getElementById('force-reparse-toggle');
+            if (toggle) {
+                toggle.checked = forceReparseMode;
+            }
+            updateForceReparseUI();
+        }
+
+        function updateForceReparseUI() {
+            const banner = document.getElementById('force-reparse-banner');
+            const buttons = document.querySelectorAll('.force-reparse-btn');
+
+            if (forceReparseMode) {
+                banner.classList.remove('hidden');
+                buttons.forEach(btn => btn.classList.remove('hidden'));
+            } else {
+                banner.classList.add('hidden');
+                buttons.forEach(btn => btn.classList.add('hidden'));
+            }
+        }
+
+        function toggleExpand(invoiceId) {
+            const detailRow = document.getElementById('detail-' + invoiceId);
+            const chevron = document.getElementById('chevron-' + invoiceId);
+
+            if (detailRow.classList.contains('hidden')) {
+                detailRow.classList.remove('hidden');
+                chevron.style.transform = 'rotate(90deg)';
+            } else {
+                detailRow.classList.add('hidden');
+                chevron.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        function viewInvoicePdf(invoiceId) {
+            // Fetch attachment info for this invoice
+            fetch(`/invoices/${invoiceId}/attachments`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.attachments && data.attachments.length > 0) {
+                        // Find PDF attachment (primary first, then any PDF)
+                        let pdfAttachment = data.attachments.find(att => att.is_primary) || data.attachments[0];
+
+                        // Open in minimal viewer in new window
+                        const viewerUrl = pdfAttachment.viewer_minimal_url;
+                        const windowName = `rtd_pdf_${invoiceId}_${pdfAttachment.id}`;
+                        const windowFeatures = 'width=900,height=1000,scrollbars=yes,resizable=yes,toolbar=no,menubar=no,location=no,status=no';
+
+                        window.open(viewerUrl, windowName, windowFeatures);
+                    } else {
+                        alert('No PDF attachment found for this invoice.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading attachments:', error);
+                    alert('Failed to load PDF attachment.');
+                });
+        }
+
+        // AJAX action handler for RTD operations (parse, compute, accept)
+        function rtdAction(invoiceId, action, loadingText) {
+            const loading = document.getElementById('loading-' + invoiceId);
+            const loadingTextEl = document.getElementById('loading-text-' + invoiceId);
+            const buttons = document.getElementById('buttons-' + invoiceId);
+
+            // Show loading state
+            loading.classList.remove('hidden');
+            loading.classList.add('inline-flex');
+            loadingTextEl.textContent = loadingText + '...';
+            buttons.classList.add('hidden');
+
+            // Determine the URL based on action
+            let url;
+            switch(action) {
+                case 'parse':
+                    url = `/rtd/${invoiceId}/parse`;
+                    break;
+                case 'force-parse':
+                    url = `/rtd/${invoiceId}/force-parse`;
+                    break;
+                case 'compute':
+                    url = `/rtd/${invoiceId}/compute`;
+                    break;
+                case 'accept':
+                    url = `/rtd/${invoiceId}/accept`;
+                    break;
+                default:
+                    console.error('Unknown action:', action);
+                    return;
+            }
+
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showFlashMessage(data.message, 'success');
+                    updateRowStatus(invoiceId, data);
+                } else {
+                    showFlashMessage(data.message || 'Action failed', 'error');
+                    // Restore buttons on error
+                    loading.classList.add('hidden');
+                    loading.classList.remove('inline-flex');
+                    buttons.classList.remove('hidden');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showFlashMessage('An error occurred. Please try again.', 'error');
+                // Restore buttons on error
+                loading.classList.add('hidden');
+                loading.classList.remove('inline-flex');
+                buttons.classList.remove('hidden');
+            });
+        }
+
+        // Update row status and buttons after successful AJAX action
+        function updateRowStatus(invoiceId, data) {
+            const loading = document.getElementById('loading-' + invoiceId);
+            const buttons = document.getElementById('buttons-' + invoiceId);
+            const row = document.getElementById('row-' + invoiceId);
+            const actionsDiv = document.getElementById('actions-' + invoiceId);
+
+            // Hide loading, show buttons
+            loading.classList.add('hidden');
+            loading.classList.remove('inline-flex');
+            buttons.classList.remove('hidden');
+
+            // Update data attributes for force reparse logic
+            if (actionsDiv && data.is_frozen !== undefined) {
+                actionsDiv.dataset.isFrozen = data.is_frozen ? 'true' : 'false';
+            }
+
+            // Update status badge
+            const statusCell = row.querySelector('td:nth-child(4)');
+            if (statusCell) {
+                statusCell.innerHTML = getStatusBadgeHtml(data.new_status);
+            }
+
+            // Update issues count
+            const issuesCell = row.querySelector('td:nth-child(5)');
+            if (issuesCell && data.unresolved_count !== undefined) {
+                if (data.unresolved_count > 0) {
+                    issuesCell.innerHTML = `<span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-900 text-red-300">${data.unresolved_count}</span>`;
+                } else if (data.has_rtd_data) {
+                    issuesCell.innerHTML = '<span class="text-green-400">0</span>';
+                } else {
+                    issuesCell.innerHTML = '<span class="text-gray-500">-</span>';
+                }
+            }
+
+            // Update action buttons based on new status
+            buttons.innerHTML = getActionButtonsHtml(invoiceId, data);
+
+            // Update the detail row content
+            updateDetailRow(invoiceId, data);
+        }
+
+        // Update the expandable detail row content
+        function updateDetailRow(invoiceId, data) {
+            const detailRow = document.getElementById('detail-' + invoiceId);
+            if (!detailRow) return;
+
+            const contentDiv = detailRow.querySelector('.bg-gray-900.rounded-lg.p-4');
+            if (!contentDiv) return;
+
+            let html = '';
+
+            if (data.has_rtd_data && data.rtd_breakdown) {
+                const gfr = data.rtd_breakdown.goods_for_resale || {};
+                const excluded = data.rtd_breakdown.excluded || {};
+                const unresolved = data.rtd_breakdown.unresolved || {};
+                const issues = data.rtd_resolution_issues || [];
+
+                const rtdTotal = parseFloat(data.rtd_total) || 0;
+                const drsAmount = parseFloat(excluded.drs) || 0;
+                const excludedTotal = (parseFloat(excluded.freight) || 0) + (parseFloat(excluded.deposits) || 0) + drsAmount;
+                const unresolvedTotal = parseFloat(unresolved.net_total) || 0;
+                const calculatedTotal = rtdTotal + excludedTotal + unresolvedTotal;
+                const invoiceTotal = parseFloat(data.invoice_total) || 0;
+                const difference = Math.abs(calculatedTotal - invoiceTotal);
+                const isBalanced = difference < 0.50;
+
+                html = `
+                    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                        <!-- Goods for Resale -->
+                        <div class="bg-gray-800 rounded-lg p-3">
+                            <h4 class="text-sm font-semibold text-green-400 mb-2 flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                Goods for Resale
+                            </h4>
+                            <div class="space-y-1 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">0% Rate:</span>
+                                    <span class="text-white font-mono">${formatNumber(gfr['0'] || 0)}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">9% Rate:</span>
+                                    <span class="text-white font-mono">${formatNumber(gfr['9'] || 0)}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">13.5% Rate:</span>
+                                    <span class="text-white font-mono">${formatNumber(gfr['13.5'] || 0)}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">23% Rate:</span>
+                                    <span class="text-white font-mono">${formatNumber(gfr['23'] || 0)}</span>
+                                </div>
+                                <div class="flex justify-between pt-2 border-t border-gray-600 font-semibold">
+                                    <span class="text-gray-300">Subtotal:</span>
+                                    <span class="text-green-400 font-mono">${formatNumber(rtdTotal)}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Excluded -->
+                        <div class="bg-gray-800 rounded-lg p-3">
+                            <h4 class="text-sm font-semibold text-blue-400 mb-2 flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                </svg>
+                                Excluded
+                            </h4>
+                            <div class="space-y-1 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">Freight:</span>
+                                    <span class="text-white font-mono">${formatNumber(excluded.freight || 0)}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">Deposits:</span>
+                                    <span class="text-white font-mono">${formatNumber(excluded.deposits || 0)}</span>
+                                </div>
+                                ${drsAmount > 0 ? `
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">DRS:</span>
+                                    <span class="text-white font-mono">${formatNumber(drsAmount)}</span>
+                                </div>
+                                ` : ''}
+                                <div class="flex justify-between pt-2 border-t border-gray-600 font-semibold">
+                                    <span class="text-gray-300">Subtotal:</span>
+                                    <span class="text-blue-400 font-mono">${formatNumber(excludedTotal)}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Unresolved -->
+                        <div class="bg-gray-800 rounded-lg p-3">
+                            <h4 class="text-sm font-semibold ${(unresolved.count || 0) > 0 ? 'text-red-400' : 'text-gray-400'} mb-2 flex items-center">
+                                ${(unresolved.count || 0) > 0 ? `
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                    </svg>
+                                ` : `
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                `}
+                                Unresolved
+                            </h4>
+                            ${(unresolved.count || 0) > 0 ? `
+                                <div class="space-y-1 text-sm">
+                                    <div class="flex justify-between text-red-400">
+                                        <span>${unresolved.count} items</span>
+                                        <span class="font-mono">${formatNumber(unresolvedTotal)}</span>
+                                    </div>
+                                    ${issues.length > 0 ? `
+                                        <ul class="mt-1 space-y-0.5 text-xs text-gray-400 max-h-16 overflow-y-auto">
+                                            ${issues.slice(0, 3).map(issue => `
+                                                <li class="flex justify-between">
+                                                    <span class="font-mono truncate mr-2">${escapeHtml(issue.article_code)}</span>
+                                                    <span class="font-mono">${formatNumber(issue.line_total)}</span>
+                                                </li>
+                                            `).join('')}
+                                            ${issues.length > 3 ? `<li class="text-gray-500">+${issues.length - 3} more</li>` : ''}
+                                        </ul>
+                                    ` : ''}
+                                    <a href="/rtd-fallbacks/unresolved?invoice_id=${invoiceId}"
+                                       class="inline-block mt-1 text-xs text-blue-400 hover:text-blue-300">
+                                        Resolve →
+                                    </a>
+                                </div>
+                            ` : `
+                                <div class="text-sm">
+                                    <p class="text-green-400 text-xs mb-1">All items resolved</p>
+                                    <div class="flex justify-between pt-2 border-t border-gray-600 font-semibold">
+                                        <span class="text-gray-300">Subtotal:</span>
+                                        <span class="text-gray-400 font-mono">0.00</span>
+                                    </div>
+                                </div>
+                            `}
+                        </div>
+
+                        <!-- Reconciliation Summary -->
+                        <div class="bg-gray-800 rounded-lg p-3 border-2 ${isBalanced ? 'border-green-600' : 'border-yellow-600'}">
+                            <h4 class="text-sm font-semibold ${isBalanced ? 'text-green-400' : 'text-yellow-400'} mb-2 flex items-center">
+                                ${isBalanced ? `
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                ` : `
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                `}
+                                Reconciliation
+                            </h4>
+                            <div class="space-y-1 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-green-400">+ Goods:</span>
+                                    <span class="text-white font-mono">${formatNumber(rtdTotal)}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-blue-400">+ Excluded:</span>
+                                    <span class="text-white font-mono">${formatNumber(excludedTotal)}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-red-400">+ Unresolved:</span>
+                                    <span class="text-white font-mono">${formatNumber(unresolvedTotal)}</span>
+                                </div>
+                                <div class="flex justify-between pt-1 border-t border-gray-600">
+                                    <span class="text-gray-300 font-semibold">= Calculated:</span>
+                                    <span class="text-white font-mono font-semibold">${formatNumber(calculatedTotal)}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-300 font-semibold">Invoice Total:</span>
+                                    <span class="text-white font-mono font-semibold">${formatNumber(invoiceTotal)}</span>
+                                </div>
+                                ${!isBalanced ? `
+                                    <div class="flex justify-between pt-1 border-t border-yellow-600 text-yellow-400">
+                                        <span class="font-semibold">Difference:</span>
+                                        <span class="font-mono font-semibold">${formatNumber(difference)}</span>
+                                    </div>
+                                ` : `
+                                    <div class="pt-1 text-center">
+                                        <span class="text-green-400 text-xs">✓ Balanced</span>
+                                    </div>
+                                `}
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // Add frozen info if applicable
+                if (data.is_frozen && data.rtd_accepted_at) {
+                    html += `
+                        <div class="mt-3 pt-3 border-t border-gray-700 text-xs text-gray-500">
+                            Frozen ${data.rtd_accepted_at}${data.rtd_accepted_by ? ` by ${escapeHtml(data.rtd_accepted_by)}` : ''}
+                        </div>
+                    `;
+                }
+            } else if (data.can_compute) {
+                html = `
+                    <div class="text-center py-4">
+                        <p class="text-gray-400 mb-4">This invoice has parsed line data. Click Compute to generate RTD breakdown.</p>
+                        <button type="button" onclick="rtdAction(${invoiceId}, 'compute', 'Computing')"
+                                class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded">
+                            Compute RTD
+                        </button>
+                    </div>
+                `;
+            } else if (data.can_parse) {
+                html = `
+                    <div class="text-center py-4">
+                        <p class="text-gray-400 mb-4">This invoice has a PDF attachment. Click Parse to extract line items.</p>
+                        <button type="button" onclick="rtdAction(${invoiceId}, 'parse', 'Parsing')"
+                                class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">
+                            Parse PDF
+                        </button>
+                    </div>
+                `;
+            } else {
+                html = `
+                    <div class="text-center py-4 text-gray-500">
+                        <p>No PDF attachment found for this invoice.</p>
+                    </div>
+                `;
+            }
+
+            contentDiv.innerHTML = html;
+        }
+
+        // Helper to format numbers
+        function formatNumber(num) {
+            return parseFloat(num || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+
+        // Helper to escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
+
+        // Generate status badge HTML
+        function getStatusBadgeHtml(status) {
+            const badges = {
+                'frozen': '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-900 text-green-300">Frozen</span>',
+                'computed': '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-900 text-blue-300">Computed</span>',
+                'has_issues': '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-900 text-yellow-300">Has Issues</span>',
+                'needs_computation': '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-orange-900 text-orange-300">Needs Compute</span>',
+                'needs_parsing': '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-900 text-red-300">Needs Parsing</span>',
+                'pdf_missing': '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-700 text-gray-300">PDF Missing</span>'
+            };
+            return badges[status] || '<span class="text-gray-500">Unknown</span>';
+        }
+
+        // Generate action buttons HTML based on new status
+        // Note: Force reparse button is rendered in Blade and controlled by updateForceReparseUI()
+        function getActionButtonsHtml(invoiceId, data) {
+            let html = '';
+
+            if (data.is_frozen) {
+                // Frozen - no action buttons
+                html = '';
+            } else if (data.new_status === 'needs_parsing' && data.can_parse) {
+                html = `<button type="button" onclick="rtdAction(${invoiceId}, 'parse', 'Parsing')" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded">Parse</button>`;
+            } else if (data.new_status === 'needs_computation' && data.can_compute) {
+                html = `<button type="button" onclick="rtdAction(${invoiceId}, 'compute', 'Computing')" class="bg-orange-600 hover:bg-orange-700 text-white text-xs px-3 py-1 rounded">Compute</button>`;
+            } else if (data.new_status === 'has_issues') {
+                html = `<button type="button" onclick="rtdAction(${invoiceId}, 'compute', 'Recomputing')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded">Recompute</button>`;
+            } else if (data.new_status === 'computed') {
+                html = `<button type="button" onclick="rtdAction(${invoiceId}, 'compute', 'Recomputing')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded">Recompute</button>`;
+                html += `<button type="button" onclick="rtdAction(${invoiceId}, 'accept', 'Freezing')" class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 rounded ml-2">Freeze</button>`;
+            } else if (data.new_status === 'pdf_missing') {
+                html = '<span class="text-gray-400 text-xs">No PDF file</span>';
+            }
+
+            return html;
+        }
+
+        // Show flash message at top of page
+        function showFlashMessage(message, type) {
+            // Remove existing flash messages
+            const existingFlash = document.querySelectorAll('.ajax-flash-message');
+            existingFlash.forEach(el => el.remove());
+
+            // Create new flash message
+            const flashDiv = document.createElement('div');
+            flashDiv.className = 'ajax-flash-message px-4 py-3 rounded mb-4 ' +
+                (type === 'success' ? 'bg-green-900/50 border border-green-500 text-green-300' : 'bg-red-900/50 border border-red-500 text-red-300');
+            flashDiv.innerHTML = `
+                <div class="flex justify-between items-center">
+                    <span>${message}</span>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-lg leading-none">&times;</button>
+                </div>
+            `;
+
+            // Insert after the header section
+            const headerDiv = document.querySelector('.max-w-7xl');
+            const flashContainer = headerDiv.querySelector('.flex.justify-between.items-center.mb-6');
+            if (flashContainer) {
+                flashContainer.after(flashDiv);
+            }
+
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (flashDiv.parentElement) {
+                    flashDiv.remove();
+                }
+            }, 5000);
+        }
+    </script>
+</x-admin-layout>

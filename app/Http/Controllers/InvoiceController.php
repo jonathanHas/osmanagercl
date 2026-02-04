@@ -26,7 +26,7 @@ class InvoiceController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Invoice::with(['supplier', 'vatLines']);
+        $query = Invoice::with(['supplier', 'vatLines', 'attachments']);
 
         // Default to last 3 months if no date filters provided
         $fromDate = $request->filled('from_date') ? $request->from_date : now()->subMonths(3)->format('Y-m-d');

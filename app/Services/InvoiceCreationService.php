@@ -166,6 +166,9 @@ class InvoiceCreationService
                     'total' => $totalAmount,
                 ]);
 
+                // Compute RTD for Udea invoices with parsed line data
+                $this->computeRtdIfApplicable($invoice, $file);
+
                 return $invoice;
             });
         } catch (\Exception $e) {
@@ -560,6 +563,47 @@ class InvoiceCreationService
                 'directory' => $directory,
                 'error' => $e->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * Compute RTD breakdown for Udea invoices with parsed line data
+     */
+    private function computeRtdIfApplicable(Invoice $invoice, InvoiceUploadFile $file): void
+    {
+        try {
+            // Only compute RTD for Udea invoices with parsed line data
+            if ($file->supplier_detected !== 'Udea') {
+                return;
+            }
+
+            $parsedData = $file->parsed_data;
+            if (! $parsedData || ! isset($parsedData['lines']) || empty($parsedData['lines'])) {
+                return;
+            }
+
+            $rtdService = app(RtdResolutionService::class);
+            $result = $rtdService->computeRtd($invoice);
+
+            $invoice->update([
+                'rtd_breakdown' => $result['breakdown'],
+                'rtd_resolution_issues' => $result['issues'],
+                'rtd_status' => 'computed',
+                'rtd_computed_at' => now(),
+            ]);
+
+            Log::info('RTD computed for Udea invoice', [
+                'invoice_id' => $invoice->id,
+                'resolved_lines' => $result['breakdown']['stats']['resolved_lines'] ?? 0,
+                'unresolved_count' => $result['breakdown']['unresolved']['count'] ?? 0,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::warning('Failed to compute RTD for invoice', [
+                'invoice_id' => $invoice->id,
+                'error' => $e->getMessage(),
+            ]);
+            // Don't fail the invoice creation if RTD computation fails
         }
     }
 }

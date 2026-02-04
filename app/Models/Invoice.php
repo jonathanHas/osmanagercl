@@ -41,6 +41,14 @@ class Invoice extends Model
         'updated_by',
         'external_osaccounts_id',
         'vat_return_id',
+        // RTD fields
+        'rtd_breakdown',
+        'rtd_status',
+        'rtd_resolution_issues',
+        'rtd_snapshot',
+        'rtd_computed_at',
+        'rtd_accepted_at',
+        'rtd_accepted_by',
     ];
 
     protected $casts = [
@@ -58,6 +66,12 @@ class Invoice extends Model
         'second_reduced_vat' => 'decimal:2',
         'zero_net' => 'decimal:2',
         'zero_vat' => 'decimal:2',
+        // RTD casts
+        'rtd_breakdown' => 'array',
+        'rtd_resolution_issues' => 'array',
+        'rtd_snapshot' => 'array',
+        'rtd_computed_at' => 'datetime',
+        'rtd_accepted_at' => 'datetime',
     ];
 
     /**
@@ -365,5 +379,265 @@ class Invoice extends Model
     public function getAttachmentCountAttribute(): int
     {
         return $this->attachments()->count();
+    }
+
+    /**
+     * Check if any attachment files are missing from disk.
+     * Returns true if attachments exist in DB but at least one file is missing.
+     */
+    public function hasMissingAttachments(): bool
+    {
+        // If attachments are already loaded, use them
+        if ($this->relationLoaded('attachments')) {
+            foreach ($this->attachments as $attachment) {
+                if (! $attachment->exists()) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // Otherwise query and check each attachment
+        foreach ($this->attachments()->get() as $attachment) {
+            if (! $attachment->exists()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Get count of missing attachment files.
+     */
+    public function getMissingAttachmentCountAttribute(): int
+    {
+        $count = 0;
+
+        // If attachments are already loaded, use them
+        if ($this->relationLoaded('attachments')) {
+            foreach ($this->attachments as $attachment) {
+                if (! $attachment->exists()) {
+                    $count++;
+                }
+            }
+
+            return $count;
+        }
+
+        // Otherwise query and check each attachment
+        foreach ($this->attachments()->get() as $attachment) {
+            if (! $attachment->exists()) {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
+    // ==================== RTD Methods ====================
+
+    /**
+     * Check if invoice has RTD data.
+     */
+    public function hasRtdData(): bool
+    {
+        return ! empty($this->rtd_breakdown);
+    }
+
+    /**
+     * Get total RTD amount (goods for resale).
+     */
+    public function getRtdTotal(): float
+    {
+        if (! $this->rtd_breakdown) {
+            return 0;
+        }
+        $gfr = $this->rtd_breakdown['goods_for_resale'] ?? [];
+
+        return array_sum($gfr);
+    }
+
+    /**
+     * Check if all RTD lines are resolved (no unresolved issues).
+     */
+    public function isRtdComplete(): bool
+    {
+        if (! $this->rtd_breakdown) {
+            return false;
+        }
+
+        return ($this->rtd_breakdown['unresolved']['count'] ?? 0) === 0;
+    }
+
+    /**
+     * Check if RTD can be modified (not frozen).
+     */
+    public function canModifyRtd(): bool
+    {
+        return $this->rtd_status !== 'frozen';
+    }
+
+    /**
+     * Check if RTD can be computed (has valid Udea or Dynamis upload file with line data).
+     */
+    public function canComputeRtd(): bool
+    {
+        $rtdService = app(\App\Services\RtdResolutionService::class);
+
+        return $rtdService->getSourceUploadFile($this) !== null;
+    }
+
+    /**
+     * Check if invoice can be re-parsed with RTD line parser.
+     * True if: has RTD-supported upload file (Udea/Dynamis/Independent), has PDF on disk, but no line data yet.
+     */
+    public function canReparseForRtd(): bool
+    {
+        // Must have a PDF file that actually exists on disk
+        if (! $this->hasPdfOnDisk()) {
+            return false;
+        }
+
+        // Check for existing RTD-supported upload file (Udea, Dynamis, or Independent)
+        $uploadFile = $this->uploadFiles()
+            ->where(function ($q) {
+                $q->where('supplier_detected', 'Udea')
+                    ->orWhere('supplier_detected', 'Dynamis')
+                    ->orWhere('supplier_detected', 'Independent');
+            })
+            ->whereNotNull('parsed_data')
+            ->first();
+
+        // Case 1: Has upload file without line data or VAT summary yet
+        if ($uploadFile) {
+            $hasLines = isset($uploadFile->parsed_data['lines']);
+            $hasVatSummary = isset($uploadFile->parsed_data['vat_summary']);
+            if (! $hasLines && ! $hasVatSummary) {
+                return true;
+            }
+
+            // Case 1b: Independent invoices can be re-parsed if parsed by legacy parser
+            // (legacy parser uses vat_breakdown, new RTD parser uses vat_summary with drs)
+            if ($uploadFile->supplier_detected === 'Independent') {
+                $hasVatSummary = isset($uploadFile->parsed_data['vat_summary']);
+                $hasDrs = isset($uploadFile->parsed_data['drs']['total']);
+                // Allow re-parse if missing vat_summary (legacy format) or missing DRS
+                if (! $hasVatSummary || ! $hasDrs) {
+                    return true;
+                }
+            }
+        }
+
+        // Case 2: No upload file but has RTD parser available (allows initial parsing)
+        if (! $uploadFile && $this->hasRtdParser()) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if this invoice is from a Udea supplier.
+     */
+    public function isUdeaSupplier(): bool
+    {
+        // Check linked supplier relationship
+        if ($this->supplier && stripos($this->supplier->name, 'udea') !== false) {
+            return true;
+        }
+
+        // Fall back to supplier_name field
+        return stripos($this->supplier_name ?? '', 'udea') !== false;
+    }
+
+    /**
+     * Check if this invoice is from a Dynamis supplier.
+     */
+    public function isDynamisSupplier(): bool
+    {
+        // Check linked supplier relationship
+        if ($this->supplier && stripos($this->supplier->name, 'dynamis') !== false) {
+            return true;
+        }
+
+        // Fall back to supplier_name field
+        return stripos($this->supplier_name ?? '', 'dynamis') !== false;
+    }
+
+    /**
+     * Check if this invoice is from an Independent Irish Health Foods supplier.
+     */
+    public function isIndependentSupplier(): bool
+    {
+        // Check linked supplier relationship
+        if ($this->supplier && stripos($this->supplier->name, 'independent') !== false) {
+            return true;
+        }
+
+        // Fall back to supplier_name field
+        $name = strtolower($this->supplier_name ?? '');
+
+        return str_contains($name, 'independent') || str_contains($name, 'iih');
+    }
+
+    /**
+     * Check if this invoice has an RTD parser available.
+     */
+    public function hasRtdParser(): bool
+    {
+        return $this->isUdeaSupplier() || $this->isDynamisSupplier() || $this->isIndependentSupplier();
+    }
+
+    /**
+     * Check if this invoice has a PDF file that actually exists on disk.
+     */
+    public function hasPdfOnDisk(): bool
+    {
+        $attachment = $this->attachments()->where('mime_type', 'application/pdf')->first();
+
+        return $attachment && $attachment->exists();
+    }
+
+    /**
+     * Get the user who accepted the RTD.
+     */
+    public function rtdAcceptedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'rtd_accepted_by');
+    }
+
+    /**
+     * Scope for invoices with pending RTD status.
+     */
+    public function scopeRtdPending($query)
+    {
+        return $query->where('rtd_status', 'pending');
+    }
+
+    /**
+     * Scope for invoices with computed RTD status.
+     */
+    public function scopeRtdComputed($query)
+    {
+        return $query->where('rtd_status', 'computed');
+    }
+
+    /**
+     * Scope for invoices with frozen RTD status.
+     */
+    public function scopeRtdFrozen($query)
+    {
+        return $query->where('rtd_status', 'frozen');
+    }
+
+    /**
+     * Scope for invoices with RTD resolution issues.
+     */
+    public function scopeRtdWithIssues($query)
+    {
+        return $query->whereNotNull('rtd_resolution_issues')
+            ->whereJsonLength('rtd_resolution_issues', '>', 0);
     }
 }

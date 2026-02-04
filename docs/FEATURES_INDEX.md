@@ -222,6 +222,23 @@ External supplier connectivity for images, pricing, and product data.
 
 ### Delivery Verification
 Comprehensive delivery processing with barcode scanning and PDF invoice parsing.
+- **Parsing Totals Verification** (NEW! 2026-01-29): Detects missing items by comparing parsed totals against PDF-stated totals
+  - Extracts "Total to deliver", "Total barrels delivered", "Total including vat" from Udea PDFs
+  - Extracts "Gross Total", "Subtotal", "Nett" from Independent PDFs
+  - €0.50 tolerance for rounding differences
+  - Totals verification table in upload preview with match/mismatch indicators
+  - Persistent discrepancy tracking in database for audit trail
+  - Warning banner on delivery show page when discrepancy detected
+- **Delivery Document Storage** (NEW! 2026-01-27): Permanent storage and viewing of delivery documents
+  - PDF and CSV files preserved permanently after upload
+  - Document viewer with clean minimal interface in popup window
+  - Collapsible documents section on delivery detail page
+  - Documents synced to legacy delivery pages
+  - Automatic cleanup when delivery is deleted
+- **Create Legacy Scan Session** (NEW! 2026-01-27): Create new scan sessions directly from `/delivery-legacy`
+  - Supplier selection with one-click session creation
+  - UUID-based session IDs
+  - Immediate redirect to match page for new session
 - **Weight-Based Product Support** (NEW! 2026-01-27): Full support for products sold by weight (kg/g)
   - Automatic detection of weight-based products from Udea PDFs
   - Stores weight_per_unit, weight_unit, total_weight in database
@@ -378,6 +395,44 @@ Modern multi-file invoice upload system with drag-and-drop interface.
 📖 [Invoice Bulk Upload Documentation](./features/invoice-bulk-upload-system.md)
 📖 [Invoice Parser Integration Guide](./features/invoice-parser-integration.md) (Phase 2)
 
+### Udea Invoice Parser (NEW! 2026-01-28, Updated 2026-01-30)
+Debug and data extraction tool for UDEA B.V. invoice PDFs with structured output.
+- **Header Extraction**: Invoice number, date, totals, zero-VAT confirmation, "Total products" expected
+- **Product Line Parsing**: Article codes, descriptions, quantities, prices, totals
+- **Line Classification**: Automatic categorization by Gb.rek account code (30302=AGF, 30322=DKW, etc.)
+- **Partial Line Extraction** (NEW!): When Gb.rek is corrupted, extracts article code, quantity, total, description
+- **Decimal Quantity Support** (NEW!): Handles weighted items like `60.212` (6 units × 0.212kg)
+- **"Total products" Validation** (NEW!): Validates parsed totals against PDF-stated "Total products" value
+- **Barrel/Deposit Extraction**: Automatic detection of returnable deposit items
+- **Freight/Costs Detection**: Extracts transport and service charges
+- **Validation**: Reconciles line totals against invoice total with tolerance checking
+- **PDF Corruption Handling**: Handles common text extraction issues (merged characters, scrambled codes)
+- **100% Line Capture**: All lines contribute to totals (full or partial parse status)
+- **Web Interface**: "Parse Udea" button on bulk-upload preview page
+
+📖 [Udea Invoice Parser Documentation](./features/udea-invoice-parser.md)
+
+### RTD (Return of Trading Details) System (NEW! 2026-02-01, Updated 2026-02-04)
+VAT categorization system for Udea, Dynamis, and IIH invoices to support Irish VAT return preparation.
+- **Multi-Supplier Support**: Udea (SupplierLink), Dynamis (EAN barcodes), IIH (VAT summary direct)
+- **Automatic VAT Categorization**: Classifies invoice line items by Irish VAT rates (0%, 9%, 13.5%, 23%)
+- **IIH DRS Exclusion** (NEW!): Deposit Return Scheme amounts excluded from 0% goods for resale
+- **Force Reparse Mode** (NEW!): Settings toggle to re-parse any invoice with latest RTD parser, bypassing validation
+- **Article Code Resolution**: Maps supplier codes to products via SupplierLink, EAN barcodes, or manual fallbacks
+- **AJAX-Powered Actions**: Parse, Compute, Freeze operations preserve scroll position with per-row loading indicators
+- **PDF Quick View**: View invoice PDF in popup window directly from RTD dashboard
+- **In-Place Updates**: Row status and detail section update without page reload
+- **Reconciliation Layout**: 4-column detail view showing how Goods + Excluded + Unresolved = Invoice Total with balance indicator
+- **Year Report Improvements**: Enhanced readability with orange-themed warning panel for non-frozen invoices
+- **Fallback Management**: Bulk assign VAT rates to unresolved article codes
+- **Excluded Items Tracking**: Separates freight, deposits, and DRS from goods for resale
+- **RTD Freezing**: Create immutable snapshots for audit compliance
+- **Unresolved Items View**: Aggregate view of all unmatched codes across invoices
+- **Batch Recomputation**: Update all affected invoices when fallbacks are added
+- **Invoice Integration**: RTD summary section on invoice show page
+
+📖 [RTD System Documentation](./features/rtd-system.md)
+
 ### Invoice Document Viewing System (NEW! 2025-09-03)
 On-the-fly document conversion system for viewing DOC/XLS invoice attachments directly in browser.
 - **Universal Document Viewing**: DOC, DOCX, XLS, XLSX files display directly in browser without download
@@ -391,6 +446,17 @@ On-the-fly document conversion system for viewing DOC/XLS invoice attachments di
 
 **System Requirements**: LibreOffice must be installed on server (`sudo apt-get install libreoffice`)
 **Performance**: First view triggers conversion (2-3 seconds), subsequent views instant
+
+### Invoice Attachments System
+Secure file management for invoice attachments with missing file detection.
+- **Multiple Attachments**: Support for up to 5 files per invoice with categorization
+- **Secure Storage**: Files stored outside web root with controlled access
+- **Quick View Integration**: One-click viewing from invoice list via attachment badge
+- **Missing File Detection** (NEW! 2026-02): Badge indicator for missing attachments with popup modal
+- **Replacement Upload** (NEW! 2026-02): Upload replacement files directly from missing files modal
+- **Parser Validation** (NEW! 2026-02): Validates replacement files against invoice data before accepting
+
+📖 [Invoice Attachments Documentation](./features/invoice-attachments-system.md)
 
 ### Invoice Payment Management System
 Comprehensive supplier payment management with bulk processing and status synchronization.

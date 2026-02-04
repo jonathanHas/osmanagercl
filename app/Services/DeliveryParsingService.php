@@ -131,6 +131,11 @@ class DeliveryParsingService
                 $barrelsTotal = $result['data']['totals']['barrels_total'] ?? 0;
                 $productsTotal = $result['data']['totals']['products_total'] ?? $result['data']['totals']['total_value'] ?? 0;
 
+                // Extract totals verification data from parser
+                $totals = $result['data']['totals'] ?? [];
+                $totalsMatch = $totals['totals_match'] ?? true;
+                $discrepancy = $totals['discrepancy'] ?? null;
+
                 $fileResults[] = [
                     'filename' => $filename,
                     'success' => $result['success'],
@@ -138,6 +143,17 @@ class DeliveryParsingService
                     'products_total' => $productsTotal,
                     'barrels_total' => $barrelsTotal,
                     'total_value' => $productsTotal + $barrelsTotal,
+                    // Stated totals from PDF
+                    'products_stated' => $totals['products_stated'] ?? null,
+                    'barrels_stated' => $totals['barrels_stated'] ?? null,
+                    'grand_stated' => $totals['grand_stated'] ?? null,
+                    // Calculated totals (sum of parsed items)
+                    'products_calculated' => $totals['products_calculated'] ?? $productsTotal,
+                    'barrels_calculated' => $totals['barrels_calculated'] ?? $barrelsTotal,
+                    'grand_calculated' => $totals['grand_calculated'] ?? ($productsTotal + $barrelsTotal),
+                    // Verification
+                    'totals_match' => $totalsMatch,
+                    'discrepancy' => $discrepancy,
                 ];
 
                 if ($result['success']) {
@@ -206,6 +222,34 @@ class DeliveryParsingService
             ? round(($passedValidations / $totalValidations) * 100, 1)
             : 0.0;
 
+        // Aggregate stated totals from all files
+        $totalStatedProducts = 0.0;
+        $totalStatedBarrels = 0.0;
+        $totalStatedGrand = 0.0;
+        $hasStatedTotals = false;
+        $allTotalsMatch = true;
+        $totalDiscrepancy = 0.0;
+
+        foreach ($fileResults as $fileResult) {
+            if (isset($fileResult['products_stated']) && $fileResult['products_stated'] !== null) {
+                $totalStatedProducts += $fileResult['products_stated'];
+                $hasStatedTotals = true;
+            }
+            if (isset($fileResult['barrels_stated']) && $fileResult['barrels_stated'] !== null) {
+                $totalStatedBarrels += $fileResult['barrels_stated'];
+            }
+            if (isset($fileResult['grand_stated']) && $fileResult['grand_stated'] !== null) {
+                $totalStatedGrand += $fileResult['grand_stated'];
+                $hasStatedTotals = true;
+            }
+            if (isset($fileResult['totals_match']) && ! $fileResult['totals_match']) {
+                $allTotalsMatch = false;
+            }
+            if (isset($fileResult['discrepancy']) && $fileResult['discrepancy'] !== null) {
+                $totalDiscrepancy += $fileResult['discrepancy'];
+            }
+        }
+
         return [
             'success' => ! empty($allItems),
             'data' => [
@@ -220,6 +264,17 @@ class DeliveryParsingService
                     'products_total' => round($totalValue, 2),
                     'barrels_total' => round($totalBarrelsValue, 2),
                     'total_value' => round($totalValue + $totalBarrelsValue, 2),
+                    // Stated totals from PDF (aggregated)
+                    'products_stated' => $hasStatedTotals ? round($totalStatedProducts, 2) : null,
+                    'barrels_stated' => $totalStatedBarrels > 0 ? round($totalStatedBarrels, 2) : null,
+                    'grand_stated' => $hasStatedTotals ? round($totalStatedGrand, 2) : null,
+                    // Calculated totals
+                    'products_calculated' => round($totalValue, 2),
+                    'barrels_calculated' => round($totalBarrelsValue, 2),
+                    'grand_calculated' => round($totalValue + $totalBarrelsValue, 2),
+                    // Verification
+                    'totals_match' => $allTotalsMatch,
+                    'discrepancy' => round($totalDiscrepancy, 2),
                 ],
             ],
             'file_results' => $fileResults,

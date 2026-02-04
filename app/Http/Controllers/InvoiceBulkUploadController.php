@@ -530,6 +530,14 @@ class InvoiceBulkUploadController extends Controller
         $failedCount = 0;
         $errors = [];
 
+        // RTD statistics for Udea invoices
+        $rtdStats = [
+            'udea_invoices' => 0,
+            'resolved_lines' => 0,
+            'unresolved_lines' => 0,
+            'unresolved_value' => 0.0,
+        ];
+
         // Get payment adjustments from request
         $paymentAdjustments = $request->input('payment_adjustments', []);
 
@@ -576,6 +584,14 @@ class InvoiceBulkUploadController extends Controller
                     $invoice = $creationService->createFromParsedFile($file, $isDuplicateOverride);
                     if ($invoice) {
                         $createdCount++;
+
+                        // Collect RTD stats for Udea invoices
+                        if ($invoice->rtd_breakdown && isset($invoice->rtd_breakdown['stats'])) {
+                            $rtdStats['udea_invoices']++;
+                            $rtdStats['resolved_lines'] += $invoice->rtd_breakdown['stats']['resolved_lines'] ?? 0;
+                            $rtdStats['unresolved_lines'] += $invoice->rtd_breakdown['unresolved']['count'] ?? 0;
+                            $rtdStats['unresolved_value'] += $invoice->rtd_breakdown['unresolved']['net_total'] ?? 0.0;
+                        }
                     } else {
                         $failedCount++;
                         $errors[] = "File {$file->original_filename}: Failed to create invoice";
@@ -605,6 +621,7 @@ class InvoiceBulkUploadController extends Controller
             'created' => $createdCount,
             'failed' => $failedCount,
             'errors' => $errors,
+            'rtd_stats' => $rtdStats,
         ]);
     }
 
@@ -1046,5 +1063,269 @@ class InvoiceBulkUploadController extends Controller
                 'error' => 'Failed to update parsed data: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Parse a Udea invoice file and return debug output
+     */
+    public function parseUdeaInvoice($batchId, $fileId)
+    {
+        // Verify batch belongs to user
+        $batch = InvoiceBulkUpload::where('batch_id', $batchId)
+            ->where('user_id', auth()->id())
+            ->firstOrFail();
+
+        // Get the file
+        $file = InvoiceUploadFile::where('id', $fileId)
+            ->where('bulk_upload_id', $batch->id)
+            ->firstOrFail();
+
+        // Check if file exists
+        if (! $file->tempFileExists()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'File not found on disk',
+            ], 404);
+        }
+
+        // Check if it's a PDF
+        if (! $file->isPdf()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Only PDF files can be parsed with the Udea invoice parser',
+            ], 400);
+        }
+
+        try {
+            $pdfPath = $file->temp_file_path;
+            $parserScript = base_path('scripts/invoice-parser/parsers/invoice_udea.py');
+            $venvPython = base_path('scripts/invoice-parser/venv/bin/python');
+
+            // Check if parser script exists
+            if (! file_exists($parserScript)) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Udea invoice parser script not found',
+                ], 500);
+            }
+
+            // Use venv Python if available, otherwise fall back to system Python
+            $pythonExecutable = file_exists($venvPython) ? $venvPython : 'python3';
+
+            // Log the paths for debugging
+            Log::debug('Udea parser paths', [
+                'python' => $pythonExecutable,
+                'python_exists' => file_exists($pythonExecutable),
+                'script' => $parserScript,
+                'script_exists' => file_exists($parserScript),
+                'pdf_path' => $pdfPath,
+                'pdf_exists' => file_exists($pdfPath),
+            ]);
+
+            // Run the parser - capture stdout (JSON) and stderr separately
+            // Use --verbose flag to get debug info in the JSON metadata, not stderr
+            $command = sprintf(
+                '%s %s %s 2>/dev/null',
+                escapeshellarg($pythonExecutable),
+                escapeshellarg($parserScript),
+                escapeshellarg($pdfPath)
+            );
+
+            $output = shell_exec($command);
+
+            // If output is empty, try again with stderr captured for error diagnosis
+            if (empty($output)) {
+                $commandWithStderr = sprintf(
+                    '%s %s %s 2>&1',
+                    escapeshellarg($pythonExecutable),
+                    escapeshellarg($parserScript),
+                    escapeshellarg($pdfPath)
+                );
+                $errorOutput = shell_exec($commandWithStderr);
+
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Parser returned no output',
+                    'raw_output' => $errorOutput,
+                    'command' => $command,
+                ]);
+            }
+
+            // Try to parse JSON output
+            $result = json_decode($output, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                // If not valid JSON, return raw output for debugging
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Parser did not return valid JSON',
+                    'raw_output' => substr($output, 0, 5000),  // Limit output size
+                    'json_error' => json_last_error_msg(),
+                ]);
+            }
+
+            // Log the parsing attempt
+            Log::info('Udea invoice parser executed', [
+                'file_id' => $fileId,
+                'filename' => $file->original_filename,
+                'success' => $result['success'] ?? false,
+                'invoice_number' => $result['header']['invoice_number'] ?? null,
+                'lines_count' => count($result['lines'] ?? []),
+                'user_id' => auth()->id(),
+            ]);
+
+            // Compute RTD preview from parsed lines
+            $rtdPreview = null;
+            if (! empty($result['lines'])) {
+                $rtdPreview = $this->computeRtdPreview($result);
+            }
+
+            return response()->json([
+                'success' => true,
+                'filename' => $file->original_filename,
+                'parser_result' => $result,
+                'rtd_preview' => $rtdPreview,
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Udea invoice parser failed', [
+                'file_id' => $fileId,
+                'error' => $e->getMessage(),
+                'user_id' => auth()->id(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Parser execution failed: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Compute RTD preview from parsed Udea data without needing an Invoice record.
+     * This is used to give users feedback before the invoice is created.
+     */
+    private function computeRtdPreview(array $parsedData): array
+    {
+        $rtdService = app(\App\Services\RtdResolutionService::class);
+
+        // Initialize breakdown structure
+        $breakdown = [
+            'goods_for_resale' => ['0' => 0, '9' => 0, '13.5' => 0, '23' => 0],
+            'excluded' => ['freight' => 0, 'deposits' => 0],
+            'unresolved' => ['count' => 0, 'net_total' => 0],
+            'stats' => ['total_lines' => 0, 'resolved_lines' => 0, 'excluded_lines' => 0],
+        ];
+        $issues = [];
+
+        $lines = $parsedData['lines'] ?? [];
+        $barrels = $parsedData['barrels'] ?? ['total' => 0];
+        $costs = $parsedData['costs'] ?? ['total' => 0];
+
+        // Add excluded totals
+        $breakdown['excluded']['freight'] = round($rtdService->parseMonetaryValue($costs['total'] ?? 0), 2);
+        $breakdown['excluded']['deposits'] = round($rtdService->parseMonetaryValue($barrels['total'] ?? 0), 2);
+        $breakdown['stats']['total_lines'] = count($lines);
+
+        // Process product lines
+        foreach ($lines as $line) {
+            $lineType = $line['line_type'] ?? 'unknown';
+            $articleCode = $line['article_code'] ?? null;
+            $lineTotal = $rtdService->parseMonetaryValue($line['line_total'] ?? 0);
+            $description = $line['description'] ?? '';
+
+            // Skip non-resale lines
+            if ($lineType !== 'product_for_resale') {
+                $breakdown['stats']['excluded_lines']++;
+
+                continue;
+            }
+
+            // Resolve article code to product and VAT rate
+            $resolution = $rtdService->resolveArticleCode($articleCode);
+
+            if ($resolution['status'] === 'no_product_match') {
+                $issues[] = [
+                    'article_code' => $articleCode,
+                    'line_total' => round($lineTotal, 2),
+                    'description' => substr($description, 0, 50),
+                    'reason' => 'no_product_match',
+                    'reason_text' => 'No product linked',
+                ];
+                $breakdown['unresolved']['count']++;
+                $breakdown['unresolved']['net_total'] += $lineTotal;
+
+                continue;
+            }
+
+            if ($resolution['status'] === 'no_tax_category') {
+                $issues[] = [
+                    'article_code' => $articleCode,
+                    'line_total' => round($lineTotal, 2),
+                    'description' => substr($description, 0, 50),
+                    'reason' => 'no_tax_category',
+                    'reason_text' => 'No VAT rate set',
+                    'product_code' => $resolution['product_code'],
+                    'product_name' => $resolution['product_name'] ?? null,
+                ];
+                $breakdown['unresolved']['count']++;
+                $breakdown['unresolved']['net_total'] += $lineTotal;
+
+                continue;
+            }
+
+            $vatRate = $resolution['vat_rate'];
+
+            // Check if VAT rate is valid Irish rate
+            if (! $rtdService->isValidIrishVatRate($vatRate)) {
+                $issues[] = [
+                    'article_code' => $articleCode,
+                    'line_total' => round($lineTotal, 2),
+                    'description' => substr($description, 0, 50),
+                    'reason' => 'invalid_vat_rate',
+                    'reason_text' => "Invalid rate: {$vatRate}%",
+                    'vat_rate_found' => $vatRate,
+                    'product_code' => $resolution['product_code'],
+                    'product_name' => $resolution['product_name'] ?? null,
+                ];
+                $breakdown['unresolved']['count']++;
+                $breakdown['unresolved']['net_total'] += $lineTotal;
+
+                continue;
+            }
+
+            // Add to correct VAT bucket
+            $bucketKey = $rtdService->vatRateToBucketKey($vatRate);
+            $breakdown['goods_for_resale'][$bucketKey] += $lineTotal;
+            $breakdown['stats']['resolved_lines']++;
+        }
+
+        // Round all values
+        foreach ($breakdown['goods_for_resale'] as $key => $value) {
+            $breakdown['goods_for_resale'][$key] = round($value, 2);
+        }
+        $breakdown['unresolved']['net_total'] = round($breakdown['unresolved']['net_total'], 2);
+
+        // Calculate totals
+        $totalResolved = array_sum($breakdown['goods_for_resale']);
+        $totalUnresolved = $breakdown['unresolved']['net_total'];
+        $resolvedPercentage = $breakdown['stats']['total_lines'] > 0
+            ? round(($breakdown['stats']['resolved_lines'] / $breakdown['stats']['total_lines']) * 100, 1)
+            : 0;
+
+        return [
+            'breakdown' => $breakdown,
+            'issues' => $issues,
+            'summary' => [
+                'total_resolved' => round($totalResolved, 2),
+                'total_unresolved' => round($totalUnresolved, 2),
+                'resolved_lines' => $breakdown['stats']['resolved_lines'],
+                'unresolved_lines' => $breakdown['unresolved']['count'],
+                'excluded_lines' => $breakdown['stats']['excluded_lines'],
+                'total_lines' => $breakdown['stats']['total_lines'],
+                'resolved_percentage' => $resolvedPercentage,
+                'is_complete' => $breakdown['unresolved']['count'] === 0,
+            ],
+        ];
     }
 }

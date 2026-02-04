@@ -47,6 +47,10 @@ The delivery verification system provides a complete workflow for handling suppl
 - total_expected (decimal 8,2)
 - total_received (decimal 8,2, nullable)
 - import_data (JSON metadata)
+- invoice_stated_total (decimal 10,2, nullable) -- NEW: PDF-stated total
+- calculated_total (decimal 10,2, nullable) -- NEW: Sum of parsed items
+- total_discrepancy (decimal 10,2, nullable) -- NEW: Difference amount
+- has_discrepancy (boolean, default false) -- NEW: Quick filter flag
 - timestamps
 ```
 
@@ -76,6 +80,24 @@ The delivery verification system provides a complete workflow for handling suppl
 - barcode (scanned code)
 - quantity, matched (boolean)
 - scanned_by (user identifier)
+- timestamps
+```
+
+### Delivery Documents Table (NEW! 2026-01-27)
+```sql
+- id (primary key)
+- delivery_id (foreign key, cascades on delete)
+- original_filename (original uploaded filename)
+- stored_filename (UUID-based storage filename)
+- file_path (relative path in storage)
+- mime_type (application/pdf, text/csv, etc.)
+- file_size (unsigned big integer)
+- file_hash (SHA-256, nullable, for duplicate detection)
+- document_type (enum: invoice_pdf, csv_import, delivery_note, other)
+- is_primary (boolean, default false)
+- parsing_metadata (JSON, nullable) -- NEW: Full parsing details for audit
+- uploaded_by (foreign key to users, nullable)
+- uploaded_at (timestamp)
 - timestamps
 ```
 
@@ -239,6 +261,15 @@ Route::post('/delivery-items/{item}/refresh-barcode', [DeliveryController::class
 Route::patch('/deliveries/{delivery}/items/{item}/price', [DeliveryController::class, 'updateItemPrice']);
 Route::post('/deliveries/{delivery}/update-costs', [DeliveryController::class, 'updateCosts']);
 Route::post('/deliveries/{delivery}/sync-legacy', [DeliveryController::class, 'syncToLegacy']);
+
+// Delivery Document Routes (NEW! 2026-01-27)
+Route::get('/delivery-documents/{document}/viewer', [DeliveryDocumentController::class, 'viewEmbedded']);
+Route::get('/delivery-documents/{document}/viewer-minimal', [DeliveryDocumentController::class, 'viewEmbeddedMinimal']);
+Route::get('/delivery-documents/{document}/download', [DeliveryDocumentController::class, 'download']);
+Route::get('/delivery-documents/{document}/serve', [DeliveryDocumentController::class, 'view']);
+
+// Legacy Scan Session Creation (NEW! 2026-01-27)
+Route::post('/delivery-legacy/create-session', [DeliveryLegacyController::class, 'createSession']);
 ```
 
 **Note**: The `Route::resource('deliveries', DeliveryController::class)` includes the `destroy` method for delivery deletion, accessible via `DELETE /deliveries/{delivery}` with safety restrictions.
@@ -513,6 +544,109 @@ UDEA multi-PDF test (3 files):
 - Order_4294423.pdf: 145 items, €2,353.58, 99.3% confidence
 - Order_4295657.pdf: 95 items, €1,273.45, 100% confidence
 - **Combined**: 257 items, €3,938.47
+
+### Totals Verification System (NEW! 2026-01-29)
+
+#### Overview
+The delivery parsing system now extracts and verifies invoice totals from PDFs to detect if any items failed to parse. This prevents silent data loss when PDF parsing misses line items.
+
+#### How It Works
+
+1. **Total Extraction**: Python parsers extract stated totals from PDF footer sections:
+   - **UDEA**: "Total to deliver" (products), "Total barrels delivered", "Total excluding/including vat"
+   - **Independent**: "Gross Total", "Subtotal", "Nett"
+
+2. **Comparison**: The system compares:
+   - `calculated_total` = Sum of all parsed line items
+   - `stated_total` = Total extracted from PDF footer
+
+3. **Validation**: If `|calculated - stated| > €0.50`, a mismatch is flagged
+
+#### Data Structure
+
+Parser output includes:
+```json
+{
+  "totals": {
+    "products_stated": 949.34,     // From PDF "Total to deliver"
+    "products_calculated": 949.34,  // Sum of parsed product items
+    "barrels_stated": 40.10,       // From PDF "Total barrels delivered"
+    "barrels_calculated": 40.10,   // Sum of parsed barrel items
+    "grand_stated": 989.44,        // From PDF "Total including vat"
+    "grand_calculated": 989.44,    // products + barrels calculated
+    "totals_match": true,          // All totals within tolerance
+    "discrepancy": 0.0             // Absolute difference
+  }
+}
+```
+
+#### User Interface
+
+**Preview (create.blade.php)**:
+```
+┌─────────────────────────────────────────────────────┐
+│ ✓ Totals Verified                                   │
+├─────────────────────────────────────────────────────┤
+│                    PDF States    Parsed     Status  │
+│ Products:          €949.34      €949.34       ✓    │
+│ Grand Total:       €989.44      €989.44       ✓    │
+└─────────────────────────────────────────────────────┘
+```
+
+If mismatch detected:
+```
+┌─────────────────────────────────────────────────────┐
+│ ⚠️ Totals Mismatch Detected                         │
+├─────────────────────────────────────────────────────┤
+│                    PDF States    Parsed     Status  │
+│ Products:          €949.34      €942.89       ✗    │
+│ Grand Total:       €989.44      €982.99       ✗    │
+│                                                     │
+│ ⚠️ €6.45 discrepancy - some items may not have     │
+│    been parsed!                                     │
+└─────────────────────────────────────────────────────┘
+```
+
+**Show Page (show.blade.php)**:
+- Red warning banner displays when `has_discrepancy` is true
+- Shows stated vs calculated totals and discrepancy amount
+
+#### Database Schema
+
+New fields in `deliveries` table:
+```sql
+- invoice_stated_total DECIMAL(10,2) NULLABLE  -- PDF-stated grand total
+- calculated_total DECIMAL(10,2) NULLABLE      -- Sum of parsed items
+- total_discrepancy DECIMAL(10,2) NULLABLE     -- Absolute difference
+- has_discrepancy BOOLEAN DEFAULT FALSE        -- Quick flag for filtering
+```
+
+New field in `delivery_documents` table:
+```sql
+- parsing_metadata JSON NULLABLE  -- Full parsing details for audit trail
+```
+
+#### Files Modified
+
+| File | Change |
+|------|--------|
+| `delivery_udea.py` | `_extract_invoice_totals()` extracts totals from PDF |
+| `delivery_independent.py` | `_extract_invoice_totals()` extracts totals from PDF |
+| `DeliveryParsingService.php` | Passes stated/calculated totals through pipeline |
+| `DeliveryService.php` | Stores discrepancy data on import |
+| `DeliveryController.php` | Passes totals to service method |
+| `Delivery.php` | Added fillable fields and casts |
+| `DeliveryDocument.php` | Added `parsing_metadata` field |
+| `create.blade.php` | Totals verification section in preview |
+| `show.blade.php` | Discrepancy warning banner |
+
+#### Benefits
+
+- ✅ **Silent Failures Detected**: Missing items no longer go unnoticed
+- ✅ **Audit Trail**: Discrepancy data persisted in database
+- ✅ **Visual Warnings**: Clear UI indicators when issues detected
+- ✅ **Per-File Verification**: Each PDF in multi-file upload verified separately
+- ✅ **Tolerance Handling**: €0.50 tolerance prevents false positives from rounding
 
 ## Troubleshooting Guide
 
@@ -1874,9 +2008,155 @@ The `<x-product-image>` component was enhanced for better hover preview:
 
 ---
 
-**Last Updated**: 2026-01-26
+---
+
+### 2026-01-27 - Delivery Document Storage & Viewing
+
+#### Permanent Document Storage System
+
+**Enhancement**: PDF and CSV files uploaded during delivery creation are now stored permanently, providing access to original invoice documents directly from delivery pages.
+
+**Problem Solved**: Previously, uploaded delivery files (PDFs, CSVs) were deleted immediately after parsing. Users had no way to view the original documents later.
+
+**New Features Implemented**:
+
+1. **Permanent Storage**:
+   - Documents stored in `storage/app/private/delivery-documents/YYYY/MM/`
+   - UUID-based filenames for security
+   - SHA-256 hashes for duplicate detection
+   - Automatic cleanup when delivery is deleted
+
+2. **Document Viewer**:
+   - **Full Viewer**: `/delivery-documents/{id}/viewer` - Header with navigation
+   - **Minimal Viewer**: `/delivery-documents/{id}/viewer-minimal` - Clean, no navigation
+   - **Popup Window**: Opens in 900x700 popup window using `window.open()`
+   - Supports PDF and CSV document types
+
+3. **Delivery Page Integration**:
+   - Collapsible "Delivery Documents" section (collapsed by default)
+   - Alpine.js `x-collapse` for smooth animation
+   - View and download buttons for each document
+   - File type indicator (PDF/CSV icons)
+
+4. **Legacy Integration**:
+   - Synced delivery documents appear on `/delivery-legacy` index page
+   - "Invoice Documents" section on `/delivery-legacy/match` page
+   - Uses cache to track which delivery's documents to show
+
+**Technical Implementation**:
+
+```php
+// Model: DeliveryDocument
+class DeliveryDocument extends Model
+{
+    public static function generateStoredFilename(string $originalFilename): string
+    {
+        return Str::uuid()->toString() . '.' . pathinfo($originalFilename, PATHINFO_EXTENSION);
+    }
+
+    public function getViewerMinimalUrlAttribute(): string
+    {
+        return route('delivery-documents.viewer-minimal', $this->id);
+    }
+
+    protected static function booted(): void
+    {
+        static::deleting(function ($document) {
+            $document->deleteFile(); // Cleanup on delete
+        });
+    }
+}
+```
+
+```blade
+{{-- Popup window link --}}
+<a href="{{ $document->viewer_minimal_url }}"
+   onclick="window.open(this.href, 'documentViewer', 'width=900,height=700,scrollbars=yes,resizable=yes'); return false;">
+    View
+</a>
+```
+
+**Files Created**:
+- `database/migrations/2026_01_27_143710_create_delivery_documents_table.php`
+- `app/Models/DeliveryDocument.php`
+- `app/Http/Controllers/DeliveryDocumentController.php`
+- `resources/views/deliveries/document-viewer.blade.php`
+- `resources/views/deliveries/document-viewer-minimal.blade.php`
+
+**Files Modified**:
+- `app/Http/Controllers/DeliveryController.php` - Saves documents in store() and storePdf()
+- `app/Models/Delivery.php` - Added documents() relationship
+- `routes/web.php` - Added delivery document routes
+- `resources/views/deliveries/show.blade.php` - Collapsible documents section
+
+#### Impact & Benefits
+- ✅ **Document Preservation**: Original invoices always accessible
+- ✅ **Easy Access**: View documents directly from delivery page
+- ✅ **Clean Interface**: Popup viewer without navigation clutter
+- ✅ **Legacy Support**: Documents available on legacy verification pages
+- ✅ **Automatic Cleanup**: Files deleted when delivery is removed
+
+---
+
+### 2026-01-27 - Create Legacy Scan Session
+
+#### Manual Session Creation from Legacy Page
+
+**Enhancement**: Added ability to create new delivery scan sessions directly from the `/delivery-legacy` page, eliminating the need to use external tools.
+
+**New Features Implemented**:
+
+1. **Create Session Form**:
+   - Located below the "Select Delivery to Match" form
+   - Supplier dropdown selection
+   - "Create New Session" button
+
+2. **Session Creation**:
+   - Creates entry in POS `deliveriesScan` table
+   - Uses UUID for session ID
+   - Sets initial status to 0 (pending)
+   - Records creation timestamp
+
+3. **Workflow**:
+   - Select supplier → Click "Create New Session"
+   - Redirects to `/delivery-legacy/match` for the new session
+   - Ready for scanning/verification
+
+**Technical Implementation**:
+
+```php
+public function createSession(Request $request)
+{
+    $validated = $request->validate([
+        'supplierID' => 'required|string',
+    ]);
+
+    $sessionId = (string) Str::uuid();
+
+    DB::connection('pos')->table('deliveriesScan')->insert([
+        'ID' => $sessionId,
+        'supID' => $validated['supplierID'],
+        'dateUpload' => now(),
+        'status' => 0,
+    ]);
+
+    return redirect()->route('delivery-legacy.match', [
+        'delID' => $sessionId,
+        'supplierID' => $validated['supplierID'],
+    ])->with('success', 'New scan session created successfully.');
+}
+```
+
+**Files Modified**:
+- `app/Http/Controllers/DeliveryLegacyController.php` - Added createSession() method
+- `routes/web.php` - Added POST route for create-session
+- `resources/views/delivery-legacy/index.blade.php` - Added create session form
+
+---
+
+**Last Updated**: 2026-01-29
 **System Status**: ✅ Fully Operational
 **Test Coverage**: Manual testing completed
 **Performance**: Tested with 292-item deliveries
-**Recent Enhancement**: Product images in delivery-legacy, barcode exists highlighting, OOS handling, auto supplier detection, clickable case badges
-**New Features**: Product images in delivery-legacy, barcode exists highlighting, PDF delivery parsing (Independent & UDEA), multi-PDF upload, price comparison matrix, bulk cost updates, quick price editing, professional table sorting, enhanced product navigation, inline cost editing, sync to legacy, case unit editing, pending item quantity entry, stock update & completion, stock verification preview, extra items stock column, OOS section, auto supplier detection, clickable case badges
+**Recent Enhancement**: Delivery parsing totals verification, delivery document storage, create legacy scan session, product images in delivery-legacy, barcode exists highlighting, OOS handling, auto supplier detection, clickable case badges
+**New Features**: Delivery parsing totals verification, delivery document storage & viewing, create legacy scan session, product images in delivery-legacy, barcode exists highlighting, PDF delivery parsing (Independent & UDEA), multi-PDF upload, price comparison matrix, bulk cost updates, quick price editing, professional table sorting, enhanced product navigation, inline cost editing, sync to legacy, case unit editing, pending item quantity entry, stock update & completion, stock verification preview, extra items stock column, OOS section, auto supplier detection, clickable case badges

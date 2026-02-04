@@ -29,6 +29,16 @@ The Invoice Attachments System provides secure file management capabilities for 
 - **File Organization**: Structured by year/month/invoice for scalability
 - **Duplicate Detection**: SHA-256 hash-based duplicate prevention
 
+### ✅ Missing File Detection & Replacement (NEW! 2026-02)
+- **Missing File Indicator**: Red badge on invoice list showing count of missing attachments
+- **Missing Files Modal**: Click badge to open popup showing all missing filenames
+- **One-Click Copy**: Copy filename button for easy file lookup (works on HTTP and HTTPS)
+- **Direct Upload**: Upload replacement files directly from modal
+- **Parser Validation**: Validates uploaded files against invoice data before accepting
+  - Compares: total amount, invoice number, supplier name, invoice date
+  - Shows mismatches with confirm/cancel option
+- **In-Place Updates**: Modal updates after successful upload without page reload
+
 ## Technical Architecture
 
 ### Database Schema
@@ -93,6 +103,8 @@ Added methods:
 - `primaryAttachment()` - Get primary attachment
 - `hasAttachments()` - Boolean check for attachments
 - `getAttachmentCountAttribute()` - Count of attachments
+- `hasMissingAttachments()` - Check if any attachments are missing from disk *(NEW!)*
+- `getMissingAttachmentCountAttribute()` - Count of missing attachments *(NEW!)*
 
 ### Controllers
 
@@ -102,6 +114,8 @@ Located: `app/Http/Controllers/InvoiceAttachmentController.php`
 **Endpoints:**
 - `POST /invoices/{invoice}/attachments` - Upload files
 - `GET /invoices/{invoice}/attachments` - List attachments (JSON)
+- `GET /invoices/{invoice}/attachments/missing` - List missing attachments (JSON) *(NEW!)*
+- `POST /invoices/{invoice}/attachments/replace` - Upload replacement file *(NEW!)*
 - `GET /invoice-attachments/{attachment}/view` - View file in browser
 - `GET /invoice-attachments/{attachment}/download` - Download file
 - `PATCH /invoice-attachments/{attachment}` - Update attachment details
@@ -115,6 +129,8 @@ Route::prefix('invoices/{invoice}/attachments')->name('invoices.attachments.')->
     Route::get('/', [InvoiceAttachmentController::class, 'index'])->name('index');
     Route::post('/', [InvoiceAttachmentController::class, 'store'])->name('store');
     Route::get('/config', [InvoiceAttachmentController::class, 'getUploadConfig'])->name('config');
+    Route::get('/missing', [InvoiceAttachmentController::class, 'getMissing'])->name('missing');
+    Route::post('/replace', [InvoiceAttachmentController::class, 'replace'])->name('replace');
 });
 
 Route::prefix('invoice-attachments/{attachment}')->name('invoices.attachments.')->group(function () {

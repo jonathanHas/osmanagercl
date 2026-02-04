@@ -21,6 +21,11 @@ class Delivery extends Model
         'total_received',
         'import_data',
         'notes',
+        // Totals verification fields
+        'invoice_stated_total',
+        'calculated_total',
+        'total_discrepancy',
+        'has_discrepancy',
     ];
 
     protected $casts = [
@@ -29,6 +34,11 @@ class Delivery extends Model
         'total_received' => 'decimal:2',
         'import_data' => 'array',
         'include_in_order_stock' => 'boolean',
+        // Totals verification casts
+        'invoice_stated_total' => 'decimal:2',
+        'calculated_total' => 'decimal:2',
+        'total_discrepancy' => 'decimal:2',
+        'has_discrepancy' => 'boolean',
     ];
 
     public function supplier(): BelongsTo

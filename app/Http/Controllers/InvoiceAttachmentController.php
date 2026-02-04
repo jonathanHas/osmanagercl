@@ -358,4 +358,265 @@ class InvoiceAttachmentController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Get missing attachments for an invoice (AJAX endpoint).
+     */
+    public function getMissing(Invoice $invoice)
+    {
+        $attachments = $invoice->attachments()
+            ->orderBy('is_primary', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $missing = $attachments->filter(function ($attachment) {
+            return ! $attachment->exists();
+        });
+
+        return response()->json([
+            'success' => true,
+            'invoice_id' => $invoice->id,
+            'invoice_number' => $invoice->invoice_number,
+            'supplier_name' => $invoice->supplier_name,
+            'total_attachments' => $attachments->count(),
+            'missing_count' => $missing->count(),
+            'missing_attachments' => $missing->map(function ($attachment) {
+                return [
+                    'id' => $attachment->id,
+                    'original_filename' => $attachment->original_filename,
+                    'file_path' => $attachment->file_path,
+                    'mime_type' => $attachment->mime_type,
+                    'formatted_file_size' => $attachment->formatted_file_size,
+                    'attachment_type' => $attachment->attachment_type,
+                    'attachment_type_label' => $attachment->attachment_type_label,
+                    'is_primary' => $attachment->is_primary,
+                    'uploaded_at' => $attachment->uploaded_at?->format('d/m/Y H:i'),
+                ];
+            })->values(),
+        ]);
+    }
+
+    /**
+     * Replace a missing attachment file.
+     */
+    public function replace(Request $request, InvoiceAttachment $attachment)
+    {
+        $validated = $request->validate([
+            'file' => [
+                'required',
+                'file',
+                'max:10240', // 10MB max
+                'mimes:pdf,jpg,jpeg,png,gif,webp,txt,doc,docx,xls,xlsx',
+            ],
+            'skip_validation' => 'nullable|boolean',
+        ]);
+
+        try {
+            $file = $validated['file'];
+            $originalFilename = $file->getClientOriginalName();
+            $mimeType = $file->getMimeType();
+            $fileSize = $file->getSize();
+            $fileHash = hash_file('sha256', $file->getPathname());
+            $skipValidation = $request->boolean('skip_validation', false);
+
+            // Get the invoice for this attachment
+            $invoice = $attachment->invoice;
+
+            // For PDF files, validate against invoice data (unless skipped)
+            $validationResult = null;
+            if ($mimeType === 'application/pdf' && ! $skipValidation) {
+                $validationResult = $this->validateFileAgainstInvoice($file, $invoice);
+
+                // If validation found mismatches and user hasn't confirmed, return for confirmation
+                if ($validationResult && ! empty($validationResult['mismatches'])) {
+                    return response()->json([
+                        'success' => false,
+                        'needs_confirmation' => true,
+                        'validation' => $validationResult,
+                        'message' => 'File validation found potential mismatches. Please confirm.',
+                    ]);
+                }
+            }
+
+            // Store validation result for success response
+            $validationMatches = $validationResult['matches'] ?? [];
+
+            // Ensure directory exists with proper permissions
+            $directory = dirname($attachment->file_path);
+            if (! Storage::disk('private')->exists($directory)) {
+                Storage::disk('private')->makeDirectory($directory, 0775, true);
+            }
+
+            // Store the file at the same path
+            $file->storeAs($directory, basename($attachment->file_path), 'private');
+
+            // Ensure proper permissions for web server access
+            $fullPath = Storage::disk('private')->path($attachment->file_path);
+            chmod($fullPath, 0644);
+
+            // Update attachment record with new file info
+            $attachment->update([
+                'original_filename' => $originalFilename,
+                'mime_type' => $mimeType,
+                'file_size' => $fileSize,
+                'file_hash' => $fileHash,
+                'uploaded_by' => auth()->id(),
+                'uploaded_at' => now(),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => "File '{$originalFilename}' uploaded successfully",
+                'validation_matches' => $validationMatches,
+                'attachment' => [
+                    'id' => $attachment->id,
+                    'original_filename' => $attachment->original_filename,
+                    'formatted_file_size' => $attachment->formatted_file_size,
+                    'is_viewable' => $attachment->isViewable(),
+                    'view_url' => $attachment->view_url,
+                    'viewer_url' => $attachment->viewer_url,
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to upload file: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Validate uploaded file against invoice data using the parser.
+     */
+    protected function validateFileAgainstInvoice($file, Invoice $invoice): array
+    {
+        $result = [
+            'parsed' => false,
+            'mismatches' => [],
+            'matches' => [],
+            'parsed_data' => null,
+        ];
+
+        try {
+            // Copy uploaded file to temp location with proper extension (parser needs it)
+            $tempPath = sys_get_temp_dir().'/invoice_validate_'.uniqid().'.pdf';
+            copy($file->getPathname(), $tempPath);
+
+            $parsingService = app(\App\Services\InvoiceParsingService::class);
+            $parseResult = $parsingService->testParser($tempPath);
+
+            // Clean up temp file
+            @unlink($tempPath);
+
+            if (! $parseResult['success']) {
+                // Parser failed - can't validate, allow upload
+                $result['parse_error'] = $parseResult['error'] ?? 'Unknown parsing error';
+
+                return $result;
+            }
+
+            $result['parsed'] = true;
+            $parsedData = $parseResult['result']['data'] ?? [];
+            $result['parsed_data'] = $parsedData;
+
+            // Compare total amount (most important check)
+            if (isset($parsedData['total_amount'])) {
+                $parsedTotal = (float) $parsedData['total_amount'];
+                $invoiceTotal = (float) $invoice->total_amount;
+                $difference = abs($parsedTotal - $invoiceTotal);
+
+                if ($difference < 0.02) {
+                    $result['matches'][] = [
+                        'field' => 'Total Amount',
+                        'expected' => '€'.number_format($invoiceTotal, 2),
+                        'found' => '€'.number_format($parsedTotal, 2),
+                    ];
+                } else {
+                    $result['mismatches'][] = [
+                        'field' => 'Total Amount',
+                        'expected' => '€'.number_format($invoiceTotal, 2),
+                        'found' => '€'.number_format($parsedTotal, 2),
+                        'severity' => 'high',
+                    ];
+                }
+            }
+
+            // Compare invoice number if parsed
+            if (isset($parsedData['invoice_number']) && $parsedData['invoice_number']) {
+                $parsedNumber = trim($parsedData['invoice_number']);
+                $invoiceNumber = trim($invoice->invoice_number);
+
+                // Normalize for comparison (remove common prefixes, spaces, etc.)
+                $normalizedParsed = preg_replace('/[^a-zA-Z0-9]/', '', strtolower($parsedNumber));
+                $normalizedInvoice = preg_replace('/[^a-zA-Z0-9]/', '', strtolower($invoiceNumber));
+
+                if ($normalizedParsed === $normalizedInvoice || str_contains($normalizedParsed, $normalizedInvoice) || str_contains($normalizedInvoice, $normalizedParsed)) {
+                    $result['matches'][] = [
+                        'field' => 'Invoice Number',
+                        'expected' => $invoiceNumber,
+                        'found' => $parsedNumber,
+                    ];
+                } else {
+                    $result['mismatches'][] = [
+                        'field' => 'Invoice Number',
+                        'expected' => $invoiceNumber,
+                        'found' => $parsedNumber,
+                        'severity' => 'medium',
+                    ];
+                }
+            }
+
+            // Compare supplier if parsed
+            if (isset($parsedData['supplier_name']) && $parsedData['supplier_name']) {
+                $parsedSupplier = trim($parsedData['supplier_name']);
+                $invoiceSupplier = trim($invoice->supplier_name);
+
+                // Fuzzy match on supplier name
+                $normalizedParsed = strtolower($parsedSupplier);
+                $normalizedInvoice = strtolower($invoiceSupplier);
+
+                if ($normalizedParsed === $normalizedInvoice || str_contains($normalizedParsed, $normalizedInvoice) || str_contains($normalizedInvoice, $normalizedParsed)) {
+                    $result['matches'][] = [
+                        'field' => 'Supplier',
+                        'expected' => $invoiceSupplier,
+                        'found' => $parsedSupplier,
+                    ];
+                } else {
+                    $result['mismatches'][] = [
+                        'field' => 'Supplier',
+                        'expected' => $invoiceSupplier,
+                        'found' => $parsedSupplier,
+                        'severity' => 'medium',
+                    ];
+                }
+            }
+
+            // Compare date if parsed
+            if (isset($parsedData['invoice_date']) && $parsedData['invoice_date']) {
+                $parsedDate = $parsedData['invoice_date'];
+                $invoiceDate = $invoice->invoice_date->format('Y-m-d');
+
+                if ($parsedDate === $invoiceDate) {
+                    $result['matches'][] = [
+                        'field' => 'Invoice Date',
+                        'expected' => $invoice->invoice_date->format('d/m/Y'),
+                        'found' => date('d/m/Y', strtotime($parsedDate)),
+                    ];
+                } else {
+                    $result['mismatches'][] = [
+                        'field' => 'Invoice Date',
+                        'expected' => $invoice->invoice_date->format('d/m/Y'),
+                        'found' => date('d/m/Y', strtotime($parsedDate)),
+                        'severity' => 'low',
+                    ];
+                }
+            }
+
+        } catch (\Exception $e) {
+            $result['parse_error'] = $e->getMessage();
+        }
+
+        return $result;
+    }
 }

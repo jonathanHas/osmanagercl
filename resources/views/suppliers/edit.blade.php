@@ -343,6 +343,79 @@
                     </div>
                 </div>
 
+                {{-- VAT Classification --}}
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <h3 class="text-lg font-semibold text-gray-100 mb-4">
+                        VAT Classification
+                        <span class="text-sm font-normal text-gray-400 ml-2">(for VAT3 / RTD reporting)</span>
+                    </h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">Country</label>
+                            <select name="country_code" id="country_code"
+                                    class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md @error('country_code') border-red-500 @enderror">
+                                <option value="">Select Country</option>
+                                @foreach($countryCodes as $code => $name)
+                                    <option value="{{ $code }}" {{ old('country_code', $supplier->country_code) === $code ? 'selected' : '' }}>
+                                        {{ $name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1">Used to auto-suggest VAT treatment</p>
+                            @error('country_code')
+                                <p class="text-red-400 text-xs mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">VAT Treatment</label>
+                            <select name="vat_treatment" id="vat_treatment"
+                                    class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md @error('vat_treatment') border-red-500 @enderror">
+                                <option value="">Auto (based on country)</option>
+                                @foreach($vatTreatments as $value => $label)
+                                    <option value="{{ $value }}" {{ old('vat_treatment', $supplier->vat_treatment) === $value ? 'selected' : '' }}>
+                                        {{ $label }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1">How VAT is accounted for on purchases</p>
+                            @error('vat_treatment')
+                                <p class="text-red-400 text-xs mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">Default Purchase Use</label>
+                            <select name="default_purchase_use"
+                                    class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md @error('default_purchase_use') border-red-500 @enderror">
+                                @foreach($purchaseUses as $value => $label)
+                                    <option value="{{ $value }}" {{ old('default_purchase_use', $supplier->default_purchase_use ?? 'resale') === $value ? 'selected' : '' }}>
+                                        {{ $label }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1">T1 (resale) or T2 (overhead) on RTD</p>
+                            @error('default_purchase_use')
+                                <p class="text-red-400 text-xs mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    </div>
+
+                    {{-- VAT Treatment Helper Info --}}
+                    <div class="mt-4 p-3 bg-gray-750 rounded-md border border-gray-600">
+                        <p class="text-xs text-gray-400">
+                            <i class="fas fa-info-circle text-blue-400 mr-1"></i>
+                            <strong>VAT Treatment Guide:</strong>
+                            <span class="text-green-400">Irish VAT</span> = Standard Irish suppliers |
+                            <span class="text-blue-400">EU Goods Zero Rated</span> = EU product suppliers (Intrastat) |
+                            <span class="text-purple-400">EU Reverse Charge</span> = EU service suppliers |
+                            <span class="text-yellow-400">Postponed Import</span> = Non-EU imports |
+                            <span class="text-gray-400">Outside Scope</span> = GB/Other
+                        </p>
+                    </div>
+                </div>
+
                 {{-- Additional Information --}}
                 <div class="bg-gray-800 rounded-lg p-6">
                     <h3 class="text-lg font-semibold text-gray-100 mb-4">Additional Information</h3>

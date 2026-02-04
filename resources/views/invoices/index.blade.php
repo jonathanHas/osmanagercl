@@ -21,7 +21,7 @@
                     </svg>
                     Bulk Upload
                 </a>
-                <a href="{{ route('vat-rates.index') }}" 
+                <a href="{{ route('vat-rates.index') }}"
                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -50,6 +50,18 @@
                 </div>
             </div>
         </div>
+
+        {{-- Flash Messages --}}
+        @if(session('success'))
+            <div class="bg-green-600 text-white px-4 py-3 rounded mb-6">
+                {{ session('success') }}
+            </div>
+        @endif
+        @if(session('error'))
+            <div class="bg-red-600 text-white px-4 py-3 rounded mb-6">
+                {{ session('error') }}
+            </div>
+        @endif
 
         {{-- Statistics Cards --}}
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -407,14 +419,31 @@
                                     @endphp
                                     {!! $displayNum !!}
                                     @if($invoice->hasAttachments())
-                                        <span class="inline-flex items-center ml-1 px-1 py-0.5 rounded-full text-xs bg-blue-600 text-blue-100 hover:bg-blue-500 cursor-pointer transition-colors" 
-                                              title="Click to view attachment ({{ $invoice->attachment_count }} file{{ $invoice->attachment_count > 1 ? 's' : '' }})"
-                                              onclick="event.preventDefault(); event.stopPropagation(); viewInvoiceAttachment({{ $invoice->id }});">
-                                            <svg class="w-2 h-2 mr-0.5" fill="currentColor" viewBox="0 0 24 24">
-                                                <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
-                                            </svg>
-                                            {{ $invoice->attachment_count }}
-                                        </span>
+                                        @php
+                                            $hasMissing = $invoice->hasMissingAttachments();
+                                            $missingCount = $hasMissing ? $invoice->missing_attachment_count : 0;
+                                        @endphp
+                                        @if($hasMissing)
+                                            {{-- Files missing - show warning badge (clickable to upload) --}}
+                                            <span class="inline-flex items-center ml-1 px-1 py-0.5 rounded-full text-xs bg-red-600 text-red-100 hover:bg-red-500 cursor-pointer transition-colors"
+                                                  title="File{{ $missingCount > 1 ? 's' : '' }} missing! Click to upload replacement"
+                                                  onclick="event.preventDefault(); event.stopPropagation(); showMissingFilesModal({{ $invoice->id }});">
+                                                <svg class="w-2 h-2 mr-0.5" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M13,13H11V7H13M13,17H11V15H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z" />
+                                                </svg>
+                                                {{ $invoice->attachment_count }}!
+                                            </span>
+                                        @else
+                                            {{-- Files exist - show normal clickable badge --}}
+                                            <span class="inline-flex items-center ml-1 px-1 py-0.5 rounded-full text-xs bg-blue-600 text-blue-100 hover:bg-blue-500 cursor-pointer transition-colors"
+                                                  title="Click to view attachment ({{ $invoice->attachment_count }} file{{ $invoice->attachment_count > 1 ? 's' : '' }})"
+                                                  onclick="event.preventDefault(); event.stopPropagation(); viewInvoiceAttachment({{ $invoice->id }});">
+                                                <svg class="w-2 h-2 mr-0.5" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+                                                </svg>
+                                                {{ $invoice->attachment_count }}
+                                            </span>
+                                        @endif
                                     @endif
                                 </a>
                             </td>
@@ -446,6 +475,16 @@
                                             {{ $invoice->payment_date->format('d/m/Y') }}
                                         </div>
                                     @endif
+                                    {{-- RTD Status Badge --}}
+                                    @if($invoice->hasRtdData())
+                                        @if($invoice->rtd_status === 'frozen')
+                                            <span class="px-1.5 py-0.5 rounded text-xs bg-green-700 text-green-200" title="RTD Frozen">RTD</span>
+                                        @elseif($invoice->isRtdComplete())
+                                            <span class="px-1.5 py-0.5 rounded text-xs bg-blue-700 text-blue-200" title="RTD Complete">RTD</span>
+                                        @else
+                                            <span class="px-1.5 py-0.5 rounded text-xs bg-yellow-700 text-yellow-200" title="{{ $invoice->rtd_breakdown['unresolved']['count'] ?? 0 }} unresolved">RTD!</span>
+                                        @endif
+                                    @endif
                                 </div>
                             </td>
                             <td class="px-3 py-3 whitespace-nowrap text-right text-gray-300 text-sm">
@@ -466,7 +505,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                         </svg>
                                     </a>
-                                    <a href="{{ route('invoices.edit', $invoice) }}" 
+                                    <a href="{{ route('invoices.edit', $invoice) }}"
                                        class="text-blue-400 hover:text-blue-300" title="Edit">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -556,10 +595,50 @@
         </div>
     </div>
 
+    {{-- Missing Files Upload Modal --}}
+    <div id="missing-files-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-gray-100">
+                        <svg class="w-6 h-6 inline-block mr-2 text-red-400" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M13,13H11V7H13M13,17H11V15H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z" />
+                        </svg>
+                        Missing Files
+                    </h3>
+                    <button id="close-missing-modal" class="text-gray-400 hover:text-gray-200">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                {{-- Invoice Info --}}
+                <div class="bg-gray-700 rounded p-3 mb-4">
+                    <div class="text-sm text-gray-400">Invoice</div>
+                    <div class="text-lg font-semibold text-white" id="missing-invoice-number"></div>
+                    <div class="text-sm text-gray-300" id="missing-supplier-name"></div>
+                </div>
+
+                {{-- Missing Files List --}}
+                <div id="missing-files-list" class="space-y-3 mb-6">
+                    <!-- Missing files will be inserted here -->
+                </div>
+
+                <div class="flex justify-end">
+                    <button type="button" id="close-missing-btn"
+                            class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     @push('scripts')
     <script>
         let selectedInvoices = new Map();
-        
+
         document.addEventListener('DOMContentLoaded', function() {
             const selectAllCheckbox = document.getElementById('select-all');
             const invoiceCheckboxes = document.querySelectorAll('.invoice-checkbox');
@@ -800,6 +879,51 @@
             }
         });
 
+        // Function to copy filename to clipboard
+        function copyFilename(filename, button) {
+            // Try modern clipboard API first, fallback to execCommand
+            function doCopy() {
+                if (navigator.clipboard && window.isSecureContext) {
+                    return navigator.clipboard.writeText(filename);
+                } else {
+                    // Fallback for older browsers or non-HTTPS
+                    const textArea = document.createElement('textarea');
+                    textArea.value = filename;
+                    textArea.style.position = 'fixed';
+                    textArea.style.left = '-999999px';
+                    textArea.style.top = '-999999px';
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    return new Promise((resolve, reject) => {
+                        document.execCommand('copy') ? resolve() : reject();
+                        textArea.remove();
+                    });
+                }
+            }
+
+            doCopy().then(() => {
+                // Show success feedback
+                const originalHtml = button.innerHTML;
+                button.innerHTML = `
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" />
+                    </svg>
+                `;
+                button.classList.remove('text-gray-400');
+                button.classList.add('text-green-400');
+
+                // Reset after 1.5 seconds
+                setTimeout(() => {
+                    button.innerHTML = originalHtml;
+                    button.classList.remove('text-green-400');
+                    button.classList.add('text-gray-400');
+                }, 1500);
+            }).catch(err => {
+                alert('Failed to copy: ' + filename);
+            });
+        }
+
         // Function to view invoice attachment in new window
         function viewInvoiceAttachment(invoiceId) {
             // Fetch attachment info for this invoice
@@ -809,12 +933,12 @@
                     if (data.success && data.attachments && data.attachments.length > 0) {
                         // Find primary attachment or use first one
                         let attachmentToView = data.attachments.find(att => att.is_primary) || data.attachments[0];
-                        
+
                         // Open attachment viewer in new window
                         const viewerUrl = attachmentToView.viewer_url;
                         const windowName = `invoice_attachment_${invoiceId}_${attachmentToView.id}`;
                         const windowFeatures = 'width=1200,height=800,scrollbars=yes,resizable=yes,toolbar=no,menubar=no,location=no,status=no';
-                        
+
                         window.open(viewerUrl, windowName, windowFeatures);
                     } else {
                         alert('No attachments found for this invoice.');
@@ -825,6 +949,294 @@
                     alert('Failed to load attachments.');
                 });
         }
+
+        // Function to show missing files modal
+        function showMissingFilesModal(invoiceId) {
+            const modal = document.getElementById('missing-files-modal');
+            const filesList = document.getElementById('missing-files-list');
+            const invoiceNumber = document.getElementById('missing-invoice-number');
+            const supplierName = document.getElementById('missing-supplier-name');
+
+            // Show loading state
+            filesList.innerHTML = '<div class="text-center text-gray-400 py-4">Loading...</div>';
+            modal.classList.remove('hidden');
+
+            // Fetch missing attachment info
+            fetch(`/invoices/${invoiceId}/attachments/missing`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        invoiceNumber.textContent = '#' + data.invoice_number;
+                        supplierName.textContent = data.supplier_name;
+
+                        if (data.missing_attachments.length === 0) {
+                            filesList.innerHTML = '<div class="text-center text-green-400 py-4">All files are now available!</div>';
+                            return;
+                        }
+
+                        filesList.innerHTML = '';
+                        data.missing_attachments.forEach(attachment => {
+                            const div = document.createElement('div');
+                            div.className = 'bg-gray-700 rounded p-4';
+                            div.id = `missing-file-${attachment.id}`;
+                            div.innerHTML = `
+                                <div class="flex items-start justify-between mb-3">
+                                    <div class="flex-1">
+                                        <div class="flex items-center">
+                                            <svg class="w-5 h-5 text-red-400 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z" />
+                                            </svg>
+                                            <span class="text-white font-medium break-all">${attachment.original_filename}</span>
+                                            <button type="button"
+                                                    class="copy-filename-btn ml-2 p-1 text-gray-400 hover:text-blue-400 hover:bg-gray-600 rounded transition-colors flex-shrink-0"
+                                                    data-filename="${attachment.original_filename.replace(/"/g, '&quot;')}"
+                                                    title="Copy filename">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                        <div class="text-sm text-gray-400 mt-1 ml-7">
+                                            ${attachment.attachment_type_label} &bull; ${attachment.formatted_file_size}
+                                            ${attachment.is_primary ? '<span class="text-yellow-400 ml-2">(Primary)</span>' : ''}
+                                        </div>
+                                        <div class="text-xs text-gray-500 mt-1 ml-7">
+                                            Uploaded: ${attachment.uploaded_at || 'Unknown'}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="ml-7">
+                                    <label class="block">
+                                        <span class="text-sm text-gray-300 mb-1 block">Upload replacement file:</span>
+                                        <input type="file"
+                                               id="file-input-${attachment.id}"
+                                               data-attachment-id="${attachment.id}"
+                                               accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.txt,.doc,.docx,.xls,.xlsx"
+                                               class="block w-full text-sm text-gray-400
+                                                      file:mr-4 file:py-2 file:px-4
+                                                      file:rounded file:border-0
+                                                      file:text-sm file:font-semibold
+                                                      file:bg-blue-600 file:text-white
+                                                      hover:file:bg-blue-700
+                                                      cursor-pointer">
+                                    </label>
+                                    <div id="upload-status-${attachment.id}" class="mt-2 text-sm hidden"></div>
+                                </div>
+                            `;
+                            filesList.appendChild(div);
+
+                            // Add change listener to file input
+                            const fileInput = div.querySelector(`#file-input-${attachment.id}`);
+                            fileInput.addEventListener('change', function(e) {
+                                if (e.target.files.length > 0) {
+                                    uploadReplacementFile(attachment.id, e.target.files[0], invoiceId);
+                                }
+                            });
+
+                            // Add click listener to copy button
+                            const copyBtn = div.querySelector('.copy-filename-btn');
+                            if (copyBtn) {
+                                copyBtn.addEventListener('click', function(e) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    copyFilename(this.dataset.filename, this);
+                                });
+                            }
+                        });
+                    } else {
+                        filesList.innerHTML = '<div class="text-center text-red-400 py-4">Failed to load missing files.</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    filesList.innerHTML = '<div class="text-center text-red-400 py-4">Error loading missing files.</div>';
+                });
+        }
+
+        // Function to upload replacement file
+        function uploadReplacementFile(attachmentId, file, invoiceId, skipValidation = false) {
+            const statusDiv = document.getElementById(`upload-status-${attachmentId}`);
+            const fileInput = document.getElementById(`file-input-${attachmentId}`);
+            const fileRow = document.getElementById(`missing-file-${attachmentId}`);
+
+            // Show uploading/validating status
+            statusDiv.classList.remove('hidden', 'text-green-400', 'text-red-400', 'text-yellow-400');
+            statusDiv.classList.add('text-blue-400');
+            statusDiv.innerHTML = `
+                <svg class="w-4 h-4 inline-block animate-spin mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                ${skipValidation ? 'Uploading' : 'Validating'} ${file.name}...
+            `;
+            fileInput.disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', file);
+            if (skipValidation) {
+                formData.append('skip_validation', '1');
+            }
+
+            fetch(`/invoice-attachments/${attachmentId}/replace`, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    statusDiv.classList.remove('text-blue-400');
+                    statusDiv.classList.add('text-green-400');
+
+                    // Build success message with validation matches
+                    let successHtml = `
+                        <svg class="w-4 h-4 inline-block mr-2" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" />
+                        </svg>
+                        File uploaded successfully!
+                    `;
+
+                    // Show validation matches if any
+                    if (data.validation_matches && data.validation_matches.length > 0) {
+                        successHtml += `<div class="mt-2 text-sm">`;
+                        data.validation_matches.forEach(m => {
+                            successHtml += `<div class="text-green-300">${m.field}: ${m.found} ✓</div>`;
+                        });
+                        successHtml += `</div>`;
+                    }
+
+                    statusDiv.innerHTML = successHtml;
+
+                    // Update the row to show success state
+                    setTimeout(() => {
+                        fileRow.classList.add('bg-green-900/30', 'border', 'border-green-600');
+                        fileRow.classList.remove('bg-gray-700');
+                    }, 500);
+
+                    // Refresh page to update the invoice list
+                    window.location.reload();
+                } else if (data.needs_confirmation) {
+                    // Show validation mismatch warning
+                    showValidationWarning(attachmentId, file, invoiceId, data.validation, statusDiv, fileInput);
+                } else {
+                    statusDiv.classList.remove('text-blue-400');
+                    statusDiv.classList.add('text-red-400');
+                    statusDiv.textContent = data.message || 'Upload failed';
+                    fileInput.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                statusDiv.classList.remove('text-blue-400');
+                statusDiv.classList.add('text-red-400');
+                statusDiv.textContent = 'Upload failed. Please try again.';
+                fileInput.disabled = false;
+            });
+        }
+
+        // Function to show validation warning and confirmation
+        function showValidationWarning(attachmentId, file, invoiceId, validation, statusDiv, fileInput) {
+            statusDiv.classList.remove('text-blue-400');
+            statusDiv.classList.add('text-yellow-400');
+
+            let html = `
+                <div class="bg-yellow-900/50 border border-yellow-600 rounded p-3 mt-2">
+                    <div class="flex items-center mb-2">
+                        <svg class="w-5 h-5 mr-2 text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M13,13H11V7H13M13,17H11V15H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z" />
+                        </svg>
+                        <span class="font-semibold text-yellow-300">File Validation Warning</span>
+                    </div>
+            `;
+
+            // Show mismatches
+            if (validation.mismatches && validation.mismatches.length > 0) {
+                html += `<div class="text-sm mb-2">`;
+                validation.mismatches.forEach(m => {
+                    const severityColor = m.severity === 'high' ? 'text-red-400' : (m.severity === 'medium' ? 'text-yellow-400' : 'text-gray-400');
+                    html += `
+                        <div class="flex justify-between py-1 border-b border-yellow-700/50">
+                            <span class="text-gray-300">${m.field}:</span>
+                            <div class="text-right">
+                                <span class="text-gray-400">Expected:</span> <span class="text-white">${m.expected}</span><br>
+                                <span class="text-gray-400">Found:</span> <span class="${severityColor}">${m.found}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += `</div>`;
+            }
+
+            // Show matches
+            if (validation.matches && validation.matches.length > 0) {
+                html += `<div class="text-sm text-green-400 mb-2">`;
+                validation.matches.forEach(m => {
+                    html += `<div class="py-0.5"><span class="text-gray-400">${m.field}:</span> ${m.found} ✓</div>`;
+                });
+                html += `</div>`;
+            }
+
+            html += `
+                    <div class="flex space-x-2 mt-3">
+                        <button type="button" onclick="confirmUpload(${attachmentId}, '${invoiceId}')"
+                                class="bg-yellow-600 hover:bg-yellow-700 text-white text-sm px-3 py-1 rounded">
+                            Upload Anyway
+                        </button>
+                        <button type="button" onclick="cancelUpload(${attachmentId})"
+                                class="bg-gray-600 hover:bg-gray-700 text-white text-sm px-3 py-1 rounded">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            statusDiv.innerHTML = html;
+
+            // Store file reference for later use
+            statusDiv.dataset.pendingFile = file.name;
+            window.pendingFiles = window.pendingFiles || {};
+            window.pendingFiles[attachmentId] = file;
+        }
+
+        // Function to confirm upload despite validation warning
+        function confirmUpload(attachmentId, invoiceId) {
+            const file = window.pendingFiles[attachmentId];
+            if (file) {
+                uploadReplacementFile(attachmentId, file, invoiceId, true);
+            }
+        }
+
+        // Function to cancel upload
+        function cancelUpload(attachmentId) {
+            const statusDiv = document.getElementById(`upload-status-${attachmentId}`);
+            const fileInput = document.getElementById(`file-input-${attachmentId}`);
+
+            statusDiv.classList.add('hidden');
+            statusDiv.innerHTML = '';
+            fileInput.disabled = false;
+            fileInput.value = '';
+
+            // Clean up pending file
+            if (window.pendingFiles) {
+                delete window.pendingFiles[attachmentId];
+            }
+        }
+
+        // Close missing files modal handlers
+        document.getElementById('close-missing-modal').addEventListener('click', function() {
+            document.getElementById('missing-files-modal').classList.add('hidden');
+        });
+        document.getElementById('close-missing-btn').addEventListener('click', function() {
+            document.getElementById('missing-files-modal').classList.add('hidden');
+        });
+
+        // Close modal on backdrop click
+        document.getElementById('missing-files-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.classList.add('hidden');
+            }
+        });
     </script>
     @endpush
 </x-admin-layout>

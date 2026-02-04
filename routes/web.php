@@ -1,9 +1,9 @@
 <?php
 
+use App\Http\Controllers\BarrelCodeController;
 use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\CoffeeController;
 use App\Http\Controllers\CoffeeMetadataController;
-use App\Http\Controllers\BarrelCodeController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\DeliveryDocumentController;
 use App\Http\Controllers\DeliveryLegacyController;
@@ -113,6 +113,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'index'])->name('index');
         Route::post('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'store'])->name('store');
         Route::get('/config', [\App\Http\Controllers\InvoiceAttachmentController::class, 'getUploadConfig'])->name('config');
+        Route::get('/missing', [\App\Http\Controllers\InvoiceAttachmentController::class, 'getMissing'])->name('missing');
     });
     Route::prefix('invoice-attachments/{attachment}')->name('invoices.attachments.')->group(function () {
         Route::get('/view', [\App\Http\Controllers\InvoiceAttachmentController::class, 'view'])->name('view');
@@ -121,6 +122,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/download', [\App\Http\Controllers\InvoiceAttachmentController::class, 'download'])->name('download');
         Route::patch('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'update'])->name('update');
         Route::delete('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'destroy'])->name('destroy');
+        Route::post('/replace', [\App\Http\Controllers\InvoiceAttachmentController::class, 'replace'])->name('replace');
     });
 
     // Bulk Upload Routes (must be before resource route)
@@ -142,6 +144,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/{batchId}/file/{fileId}/thumbnails', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'getThumbnails'])->name('get-thumbnails');
         Route::post('/{batchId}/file/{fileId}/split', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'splitPdf'])->name('split-pdf');
         Route::put('/{batchId}/file/{fileId}/parsed-data', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'updateParsedData'])->name('update-parsed-data');
+        Route::post('/{batchId}/file/{fileId}/parse-udea', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'parseUdeaInvoice'])->name('parse-udea');
     });
 
     Route::post('/invoices/bulk-mark-paid', [\App\Http\Controllers\InvoiceController::class, 'bulkMarkPaid'])->name('invoices.bulk-mark-paid');
@@ -162,6 +165,29 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::get('/invoices/export', [\App\Http\Controllers\InvoiceController::class, 'exportCsv'])->name('invoices.export');
+
+    // RTD (Return of Trading Details) Management
+    Route::prefix('rtd')->name('rtd.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\RtdController::class, 'index'])->name('index');
+        Route::get('/year-report', [\App\Http\Controllers\RtdController::class, 'yearReport'])->name('year-report');
+        Route::get('/issues', [\App\Http\Controllers\RtdController::class, 'issues'])->name('issues');
+        Route::post('/{invoice}/parse', [\App\Http\Controllers\RtdController::class, 'parse'])->name('parse');
+        Route::post('/{invoice}/force-parse', [\App\Http\Controllers\RtdController::class, 'forceParse'])->name('force-parse');
+        Route::post('/{invoice}/compute', [\App\Http\Controllers\RtdController::class, 'compute'])->name('compute');
+        Route::post('/{invoice}/accept', [\App\Http\Controllers\RtdController::class, 'accept'])->name('accept');
+        Route::post('/recompute-all', [\App\Http\Controllers\RtdController::class, 'recomputeAll'])->name('recompute-all');
+    });
+
+    // RTD Fallback Management
+    Route::prefix('rtd-fallbacks')->group(function () {
+        Route::get('/', [\App\Http\Controllers\RtdFallbackController::class, 'index'])->name('rtd-fallbacks.index');
+        Route::get('/unresolved', [\App\Http\Controllers\RtdFallbackController::class, 'unresolved'])->name('rtd-fallbacks.unresolved');
+        Route::post('/bulk-assign', [\App\Http\Controllers\RtdFallbackController::class, 'bulkAssign'])->name('rtd-fallbacks.bulk-assign');
+        Route::post('/recompute-affected', [\App\Http\Controllers\RtdFallbackController::class, 'recomputeAffected'])->name('rtd-fallbacks.recompute-affected');
+        Route::put('/{fallback}', [\App\Http\Controllers\RtdFallbackController::class, 'update'])->name('rtd-fallbacks.update');
+        Route::delete('/{fallback}', [\App\Http\Controllers\RtdFallbackController::class, 'destroy'])->name('rtd-fallbacks.destroy');
+    });
+
     Route::resource('invoices', \App\Http\Controllers\InvoiceController::class);
 
     // VAT Rates Management
@@ -173,6 +199,7 @@ Route::middleware('auth')->group(function () {
     // Supplier Management routes
     Route::post('/suppliers/{supplier}/refresh-analytics', [\App\Http\Controllers\AccountingSuppliersController::class, 'refreshAnalytics'])->name('suppliers.refresh-analytics');
     Route::post('/suppliers/{supplier}/toggle-status', [\App\Http\Controllers\AccountingSuppliersController::class, 'toggleStatus'])->name('suppliers.toggle-status');
+    Route::post('/suppliers/{supplier}/update-vat-classification', [\App\Http\Controllers\AccountingSuppliersController::class, 'updateVatClassification'])->name('suppliers.update-vat-classification');
     Route::get('/suppliers/outstanding-report', [\App\Http\Controllers\SupplierOutstandingController::class, 'index'])->name('suppliers.outstanding-report');
     Route::get('/suppliers/outstanding-report/export', [\App\Http\Controllers\SupplierOutstandingController::class, 'exportCsv'])->name('suppliers.outstanding-report.export');
     Route::get('/suppliers/payments', [\App\Http\Controllers\SupplierPaymentsController::class, 'index'])->name('suppliers.payments');

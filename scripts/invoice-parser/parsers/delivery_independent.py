@@ -155,6 +155,74 @@ class DeliveryIndependentParser:
         unit_cost = value / total_delivered_units if total_delivered_units > 0 else 0
         return False, "No matching calculation", 0.0, unit_cost
 
+    def _clean_number_string(self, value: str) -> str:
+        """Clean a number string by converting European format to standard."""
+        # Handle European format (1.234,56 -> 1234.56)
+        if ',' in value and '.' in value:
+            # European format: 1.234,56
+            value = value.replace('.', '').replace(',', '.')
+        elif ',' in value:
+            # Could be European decimal (1,56) or thousands (1,234)
+            if value.count(',') == 1 and len(value.split(',')[1]) == 2:
+                # Likely decimal
+                value = value.replace(',', '.')
+            else:
+                # Likely thousands separator
+                value = value.replace(',', '')
+        return value
+
+    def _extract_invoice_totals(self, text: str) -> Dict[str, Optional[float]]:
+        """Extract the invoice's stated totals from footer section.
+
+        Independent invoices typically have:
+        - "Gross Total" or "Total:" followed by the amount
+        - "Subtotal" for products only
+        - "Nett" for net amount
+
+        Returns:
+            Dictionary with stated totals:
+            {
+                'products_stated': float or None,   # Subtotal or Nett
+                'grand_stated': float or None,      # Gross Total
+            }
+        """
+        totals: Dict[str, Optional[float]] = {
+            'products_stated': None,
+            'grand_stated': None,
+        }
+
+        # Patterns for Independent invoice format
+        # "Gross Total    123.45"
+        # "Subtotal       99.00"
+        # "Nett           95.00"
+        # "Total:         123.45"
+        patterns = {
+            'grand_stated': r'Gross\s+Total\s*[:\s€£]*([\d.,]+)',
+            'products_stated': r'(?:Subtotal|Nett)\s*[:\s€£]*([\d.,]+)',
+        }
+
+        # Also try generic "Total:" if Gross Total not found
+        for key, pattern in patterns.items():
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                try:
+                    totals[key] = float(self._clean_number_string(match.group(1)))
+                    self.log(f"Extracted {key}: {totals[key]}", "DEBUG")
+                except (ValueError, AttributeError) as e:
+                    self.log(f"Failed to parse {key}: {e}", "WARNING")
+
+        # Fallback: try generic "Total:" pattern for grand total
+        if totals['grand_stated'] is None:
+            total_match = re.search(r'Total[:\s]+[€£]?\s*([\d.,]+)', text, re.IGNORECASE)
+            if total_match:
+                try:
+                    totals['grand_stated'] = float(self._clean_number_string(total_match.group(1)))
+                    self.log(f"Extracted grand_stated from Total: {totals['grand_stated']}", "DEBUG")
+                except (ValueError, AttributeError):
+                    pass
+
+        return totals
+
     def parse_invoice(self, pdf_path: str) -> Dict[str, Any]:
         """
         Parse a delivery invoice PDF and return structured data.
@@ -327,6 +395,48 @@ class DeliveryIndependentParser:
             result["items"] = items
             result["totals"]["line_count"] = len(items)
             result["totals"]["total_value"] = round(total_value, 2)
+            result["totals"]["products_total"] = round(total_value, 2)
+
+            # Extract stated totals from PDF footer and compare
+            stated = self._extract_invoice_totals(text)
+            tolerance = 0.50  # Allow for rounding differences
+
+            # Store stated totals
+            result["totals"]["products_stated"] = stated['products_stated']
+            result["totals"]["grand_stated"] = stated['grand_stated']
+
+            # Store calculated totals explicitly
+            result["totals"]["products_calculated"] = round(total_value, 2)
+            result["totals"]["grand_calculated"] = round(total_value, 2)
+
+            # Compare calculated vs stated totals
+            products_match = True
+            grand_match = True
+            discrepancy = None
+
+            if stated['products_stated'] is not None:
+                products_discrepancy = abs(total_value - stated['products_stated'])
+                products_match = products_discrepancy <= tolerance
+                if not products_match:
+                    result["warnings"].append(
+                        f"Products total mismatch: PDF states €{stated['products_stated']:.2f} "
+                        f"but parsed items sum to €{total_value:.2f} (difference: €{products_discrepancy:.2f})"
+                    )
+                    self.log(f"Products total mismatch: stated={stated['products_stated']}, calculated={total_value}", "WARNING")
+
+            if stated['grand_stated'] is not None:
+                discrepancy = abs(total_value - stated['grand_stated'])
+                grand_match = discrepancy <= tolerance
+                if not grand_match:
+                    result["warnings"].append(
+                        f"Grand total mismatch: PDF states €{stated['grand_stated']:.2f} "
+                        f"but parsed items sum to €{total_value:.2f} (difference: €{discrepancy:.2f})"
+                    )
+                    self.log(f"Grand total mismatch: stated={stated['grand_stated']}, calculated={total_value}", "WARNING")
+
+            result["totals"]["totals_match"] = products_match and grand_match
+            result["totals"]["discrepancy"] = round(discrepancy, 2) if discrepancy is not None else None
+
             result["success"] = len(items) > 0
             result["metadata"]["stats"] = self.stats
 

@@ -145,6 +145,11 @@ class InvoiceParsingService
                 ]);
             }
 
+            // Special handling for Udea invoices - parse line items for RTD
+            if ($this->isUdeaInvoice($file)) {
+                $this->parseUdeaLineItems($file);
+            }
+
             // Special handling for Amazon invoices - create pending record
             if ($this->isAmazonInvoice($file)) {
                 $this->createAmazonPendingRecord($file);
@@ -398,6 +403,126 @@ class InvoiceParsingService
     protected function isAmazonInvoice(InvoiceUploadFile $file): bool
     {
         return $file->supplier_detected === 'Amazon';
+    }
+
+    /**
+     * Check if the parsed file is a Udea invoice
+     */
+    protected function isUdeaInvoice(InvoiceUploadFile $file): bool
+    {
+        return $file->supplier_detected === 'Udea';
+    }
+
+    /**
+     * Parse Udea invoice with line-item parser for RTD data
+     */
+    protected function parseUdeaLineItems(InvoiceUploadFile $file): void
+    {
+        try {
+            $filePath = $file->temp_file_path;
+
+            if (! $filePath || ! file_exists($filePath)) {
+                Log::warning('Cannot parse Udea line items - file not found', [
+                    'file_id' => $file->id,
+                    'temp_file_path' => $filePath,
+                ]);
+
+                return;
+            }
+
+            // Path to Udea-specific parser
+            $udeaParserScript = base_path('scripts/invoice-parser/parsers/invoice_udea.py');
+
+            if (! file_exists($udeaParserScript)) {
+                Log::warning('Udea parser script not found', [
+                    'file_id' => $file->id,
+                    'script_path' => $udeaParserScript,
+                ]);
+
+                return;
+            }
+
+            // Build the command using venv Python
+            $venvPython = $this->venvPath.'/bin/python';
+            $pythonExecutable = file_exists($venvPython) ? $venvPython : $this->pythonPath;
+
+            $command = [
+                $pythonExecutable,
+                $udeaParserScript,
+                $filePath,
+            ];
+
+            Log::info('Executing Udea line-item parser', [
+                'file_id' => $file->id,
+                'command' => implode(' ', $command),
+            ]);
+
+            // Execute the Udea parser
+            $result = Process::timeout($this->timeout)->run($command);
+
+            if (! $result->successful()) {
+                Log::warning('Udea line-item parser failed', [
+                    'file_id' => $file->id,
+                    'exit_code' => $result->exitCode(),
+                    'stderr' => $result->errorOutput(),
+                ]);
+
+                return;
+            }
+
+            // Parse the JSON output
+            $udeaOutput = json_decode($result->output(), true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                Log::warning('Invalid JSON from Udea parser', [
+                    'file_id' => $file->id,
+                    'error' => json_last_error_msg(),
+                ]);
+
+                return;
+            }
+
+            // Check if parsing was successful and has lines
+            if (! isset($udeaOutput['success']) || ! $udeaOutput['success']) {
+                Log::info('Udea parser did not return success', [
+                    'file_id' => $file->id,
+                ]);
+
+                return;
+            }
+
+            if (! isset($udeaOutput['lines']) || empty($udeaOutput['lines'])) {
+                Log::info('Udea parser returned no lines', [
+                    'file_id' => $file->id,
+                ]);
+
+                return;
+            }
+
+            // Merge Udea line data into existing parsed_data
+            $parsedData = $file->parsed_data ?? [];
+            $parsedData['lines'] = $udeaOutput['lines'];
+            $parsedData['barrels'] = $udeaOutput['barrels'] ?? [];
+            $parsedData['costs'] = $udeaOutput['costs'] ?? [];
+            $parsedData['header'] = $udeaOutput['header'] ?? [];
+            $parsedData['udea_parser_success'] = true;
+            $parsedData['udea_line_count'] = count($udeaOutput['lines']);
+
+            $file->parsed_data = $parsedData;
+            $file->parsed_at = now();
+            $file->save();
+
+            Log::info('Udea line items parsed successfully', [
+                'file_id' => $file->id,
+                'line_count' => count($udeaOutput['lines']),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error parsing Udea line items', [
+                'file_id' => $file->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

@@ -24,12 +24,14 @@ class DeliveryDocument extends Model
         'is_primary',
         'uploaded_by',
         'uploaded_at',
+        'parsing_metadata',
     ];
 
     protected $casts = [
         'uploaded_at' => 'datetime',
         'file_size' => 'integer',
         'is_primary' => 'boolean',
+        'parsing_metadata' => 'array',
     ];
 
     /**

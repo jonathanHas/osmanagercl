@@ -651,6 +651,28 @@ redis-cli ping
 4. **Resource Limits**: Prevent DOS via large files
 5. **Audit Logging**: Track all parsing activities
 
+## Implemented Parsers
+
+The following supplier-specific parsers have been implemented:
+
+### Udea Invoice Parser
+Located at `scripts/invoice-parser/parsers/invoice_udea.py`, this parser handles UDEA B.V. supplier invoices with:
+- Invoice header extraction (number, date, totals, VAT status, "Total products" expected)
+- Product line classification by Gb.rek account codes
+- **Partial line extraction** when Gb.rek is corrupted (extracts article, quantity, total, description)
+- **Decimal quantity support** for weighted items (e.g., `60.212` for 6 units × 0.212kg)
+- **"Total products" validation** comparing parsed totals against PDF-stated value
+- Barrel/deposit tracking
+- Freight/cost extraction
+- 100% line capture with `parse_status: "full"` or `"partial"`
+
+See [Udea Invoice Parser Documentation](./udea-invoice-parser.md) for full details.
+
+### Delivery PDFs
+The `scripts/invoice-parser/parsers/delivery_udea.py` parser handles Udea delivery PDFs for the delivery verification system.
+
+See [Delivery System Documentation](./delivery-system.md) for details.
+
 ## Next Steps
 
 1. Implement Python parser with your existing code

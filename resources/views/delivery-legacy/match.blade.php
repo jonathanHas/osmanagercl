@@ -163,11 +163,6 @@
                 </div>
             </div>
 
-            @php
-                // Calculate OOS count early for progress bar display
-                $oosCount = collect($matchedItems)->filter(fn($item) => ($item->myOrder ?? 0) == 0)->count();
-            @endphp
-
             <!-- Progress Bar -->
             <div class="bg-white rounded-lg shadow p-4 mb-6">
                 <div class="flex justify-between text-sm mb-2">
@@ -178,10 +173,12 @@
                         <span class="text-red-600 font-medium" x-text="financials.mismatchCount"></span> mismatched
                         <span class="text-gray-400 mx-1">|</span>
                         <span class="text-gray-500 font-medium" x-text="financials.pendingCount"></span> pending
-                        @if($oosCount > 0)
-                        <span class="text-gray-400 mx-1">|</span>
-                        <span class="text-orange-600 font-medium">{{ $oosCount }}</span> OOS
-                        @endif
+                        <template x-if="financials.oosCount > 0">
+                            <span>
+                                <span class="text-gray-400 mx-1">|</span>
+                                <span class="text-orange-600 font-medium" x-text="financials.oosCount"></span> OOS
+                            </span>
+                        </template>
                         <span class="text-gray-400 mx-1">|</span>
                         <span x-text="financials.totalItems"></span> total
                     </span>

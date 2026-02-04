@@ -172,6 +172,11 @@
                                         </div>
                                     </div>
 
+                                    <!-- Totals Verification Section -->
+                                    <div id="pdf-totals-verification" class="mb-3 hidden">
+                                        <!-- Content populated by JavaScript -->
+                                    </div>
+
                                     <!-- Barrels Section (collapsible) -->
                                     <div id="pdf-barrels-section" class="hidden mb-3">
                                         <details class="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded">
@@ -604,6 +609,96 @@
                 confidenceBadge.className = 'text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
             } else {
                 confidenceBadge.className = 'text-xs px-2 py-1 rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+            }
+
+            // Update totals verification section
+            const totalsVerification = document.getElementById('pdf-totals-verification');
+            const totals = data.totals;
+
+            if (totals.grand_stated !== null && totals.grand_stated !== undefined) {
+                const match = totals.totals_match;
+                const bgClass = match
+                    ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700'
+                    : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700';
+                const headerClass = match
+                    ? 'text-green-800 dark:text-green-200'
+                    : 'text-red-800 dark:text-red-200';
+                const icon = match
+                    ? '<svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>'
+                    : '<svg class="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>';
+
+                const checkMark = (val1, val2) => {
+                    if (val1 === null || val2 === null) return '';
+                    return Math.abs(val1 - val2) <= 0.50
+                        ? '<span class="text-green-600 dark:text-green-400">&#10003;</span>'
+                        : '<span class="text-red-600 dark:text-red-400">&#10007;</span>';
+                };
+
+                const formatVal = (val) => val !== null && val !== undefined ? '\u20AC' + val.toFixed(2) : 'N/A';
+
+                let html = `
+                    <div class="${bgClass} border rounded-lg p-3">
+                        <h5 class="text-xs font-semibold ${headerClass} mb-2">
+                            ${icon} ${match ? 'Totals Verified' : 'Totals Mismatch Detected'}
+                        </h5>
+                        <table class="text-xs w-full">
+                            <thead>
+                                <tr class="text-gray-500 dark:text-gray-400">
+                                    <th class="text-left py-1"></th>
+                                    <th class="text-right py-1">PDF States</th>
+                                    <th class="text-right py-1">Parsed</th>
+                                    <th class="text-center py-1 w-8"></th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-gray-700 dark:text-gray-300">`;
+
+                // Products row
+                if (totals.products_stated !== null) {
+                    html += `
+                                <tr>
+                                    <td class="py-1">Products:</td>
+                                    <td class="text-right py-1">${formatVal(totals.products_stated)}</td>
+                                    <td class="text-right py-1">${formatVal(totals.products_calculated)}</td>
+                                    <td class="text-center py-1">${checkMark(totals.products_stated, totals.products_calculated)}</td>
+                                </tr>`;
+                }
+
+                // Barrels row (if applicable)
+                if (totals.barrels_stated !== null && totals.barrels_stated > 0) {
+                    html += `
+                                <tr>
+                                    <td class="py-1">Barrels:</td>
+                                    <td class="text-right py-1">${formatVal(totals.barrels_stated)}</td>
+                                    <td class="text-right py-1">${formatVal(totals.barrels_calculated)}</td>
+                                    <td class="text-center py-1">${checkMark(totals.barrels_stated, totals.barrels_calculated)}</td>
+                                </tr>`;
+                }
+
+                // Grand total row
+                html += `
+                                <tr class="font-semibold border-t border-gray-200 dark:border-gray-600">
+                                    <td class="py-1">Grand Total:</td>
+                                    <td class="text-right py-1">${formatVal(totals.grand_stated)}</td>
+                                    <td class="text-right py-1">${formatVal(totals.grand_calculated)}</td>
+                                    <td class="text-center py-1">${checkMark(totals.grand_stated, totals.grand_calculated)}</td>
+                                </tr>
+                            </tbody>
+                        </table>`;
+
+                // Warning message if mismatch
+                if (!match && totals.discrepancy !== null && totals.discrepancy > 0.50) {
+                    html += `
+                        <p class="mt-2 text-xs text-red-700 dark:text-red-300 font-semibold">
+                            Warning: \u20AC${totals.discrepancy.toFixed(2)} discrepancy - some items may not have been parsed!
+                        </p>`;
+                }
+
+                html += `</div>`;
+
+                totalsVerification.innerHTML = html;
+                totalsVerification.classList.remove('hidden');
+            } else {
+                totalsVerification.classList.add('hidden');
             }
 
             // Update files processed (for multi-file uploads)
