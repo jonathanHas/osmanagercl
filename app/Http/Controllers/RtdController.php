@@ -266,7 +266,19 @@ class RtdController extends Controller
             ]);
 
             $lineCount = count($result['lines']);
-            $message = "Invoice #{$invoice->invoice_number} parsed successfully. Found {$lineCount} line items.";
+
+            // Auto-compute RTD after successful parse
+            $invoice->refresh();
+            $rtdResult = $this->rtdService->computeRtd($invoice);
+            $invoice->update([
+                'rtd_breakdown' => $rtdResult['breakdown'],
+                'rtd_resolution_issues' => $rtdResult['issues'],
+                'rtd_status' => 'computed',
+                'rtd_computed_at' => now(),
+            ]);
+
+            $unresolvedCount = $rtdResult['breakdown']['unresolved']['count'] ?? 0;
+            $message = "Invoice #{$invoice->invoice_number} parsed and computed. Found {$lineCount} lines, {$unresolvedCount} unresolved.";
 
             // Refresh invoice to get updated status
             $invoice->refresh();
@@ -395,16 +407,20 @@ class RtdController extends Controller
                 'status' => 'completed',
             ]);
 
-            // Clear existing RTD data so it needs recomputation
+            $lineCount = count($result['lines']);
+
+            // Auto-compute RTD after successful parse
+            $invoice->refresh();
+            $rtdResult = $this->rtdService->computeRtd($invoice);
             $invoice->update([
-                'rtd_breakdown' => null,
-                'rtd_resolution_issues' => null,
-                'rtd_status' => null,
-                'rtd_computed_at' => null,
+                'rtd_breakdown' => $rtdResult['breakdown'],
+                'rtd_resolution_issues' => $rtdResult['issues'],
+                'rtd_status' => 'computed',
+                'rtd_computed_at' => now(),
             ]);
 
-            $lineCount = count($result['lines']);
-            $message = "Invoice #{$invoice->invoice_number} force-parsed successfully. Found {$lineCount} line items.";
+            $unresolvedCount = $rtdResult['breakdown']['unresolved']['count'] ?? 0;
+            $message = "Invoice #{$invoice->invoice_number} parsed and computed. Found {$lineCount} lines, {$unresolvedCount} unresolved.";
 
             // Refresh invoice to get updated status
             $invoice->refresh();
