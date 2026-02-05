@@ -156,11 +156,25 @@ class DeliveryIndependentParser:
         return False, "No matching calculation", 0.0, unit_cost
 
     def _clean_number_string(self, value: str) -> str:
-        """Clean a number string by converting European format to standard."""
-        # Handle European format (1.234,56 -> 1234.56)
+        """Clean a number string by converting to standard format.
+
+        Handles both European and UK/US number formats:
+        - UK/US: 1,978.38 (comma=thousands, period=decimal)
+        - European: 1.978,38 (period=thousands, comma=decimal)
+
+        Detection: The decimal separator is always the LAST separator in the number.
+        """
         if ',' in value and '.' in value:
-            # European format: 1.234,56
-            value = value.replace('.', '').replace(',', '.')
+            # Determine format by which separator comes last
+            last_comma = value.rfind(',')
+            last_period = value.rfind('.')
+
+            if last_period > last_comma:
+                # UK/US format: 1,978.38 (comma=thousands, period=decimal)
+                value = value.replace(',', '')
+            else:
+                # European format: 1.978,38 (period=thousands, comma=decimal)
+                value = value.replace('.', '').replace(',', '.')
         elif ',' in value:
             # Could be European decimal (1,56) or thousands (1,234)
             if value.count(',') == 1 and len(value.split(',')[1]) == 2:
