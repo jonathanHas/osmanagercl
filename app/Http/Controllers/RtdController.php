@@ -593,6 +593,7 @@ class RtdController extends Controller
             'freight' => 0,
             'deposits' => 0,
             'drs' => 0,
+            'vat' => 0,
         ];
         $grandTotal = 0;
 
@@ -611,6 +612,7 @@ class RtdController extends Controller
             $excludedTotals['freight'] += (float) ($excluded['freight'] ?? 0);
             $excludedTotals['deposits'] += (float) ($excluded['deposits'] ?? 0);
             $excludedTotals['drs'] += (float) ($excluded['drs'] ?? 0);
+            $excludedTotals['vat'] += (float) ($excluded['vat'] ?? 0);
 
             $grandTotal += array_sum(array_map('floatval', $gfr));
         }

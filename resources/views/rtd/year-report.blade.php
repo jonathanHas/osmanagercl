@@ -178,6 +178,9 @@
                             @if(($excludedTotals['drs'] ?? 0) > 0)
                             <br>DRS: {{ number_format($excludedTotals['drs'], 2) }}
                             @endif
+                            @if(($excludedTotals['vat'] ?? 0) > 0)
+                            <br>VAT: {{ number_format($excludedTotals['vat'], 2) }}
+                            @endif
                         </dd>
                     </div>
                 </dl>

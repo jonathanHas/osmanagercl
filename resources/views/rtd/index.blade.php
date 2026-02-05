@@ -325,7 +325,7 @@
                                                 $excluded = $invoice->rtd_breakdown['excluded'] ?? [];
                                                 $unresolved = $invoice->rtd_breakdown['unresolved'] ?? [];
                                                 $rtdTotal = $invoice->getRtdTotal();
-                                                $excludedTotal = ($excluded['freight'] ?? 0) + ($excluded['deposits'] ?? 0) + ($excluded['drs'] ?? 0);
+                                                $excludedTotal = ($excluded['freight'] ?? 0) + ($excluded['deposits'] ?? 0) + ($excluded['drs'] ?? 0) + ($excluded['vat'] ?? 0);
                                                 $unresolvedTotal = $unresolved['net_total'] ?? 0;
                                                 $calculatedTotal = $rtdTotal + $excludedTotal + $unresolvedTotal;
                                                 $invoiceTotal = $invoice->total_amount;
@@ -387,6 +387,12 @@
                                                         <div class="flex justify-between">
                                                             <span class="text-gray-400">DRS:</span>
                                                             <span class="text-white font-mono">{{ number_format($excluded['drs'] ?? 0, 2) }}</span>
+                                                        </div>
+                                                        @endif
+                                                        @if(($excluded['vat'] ?? 0) > 0)
+                                                        <div class="flex justify-between">
+                                                            <span class="text-gray-400">VAT:</span>
+                                                            <span class="text-white font-mono">{{ number_format($excluded['vat'] ?? 0, 2) }}</span>
                                                         </div>
                                                         @endif
                                                         <div class="flex justify-between pt-2 border-t border-gray-600 font-semibold">
@@ -759,7 +765,8 @@
 
                 const rtdTotal = parseFloat(data.rtd_total) || 0;
                 const drsAmount = parseFloat(excluded.drs) || 0;
-                const excludedTotal = (parseFloat(excluded.freight) || 0) + (parseFloat(excluded.deposits) || 0) + drsAmount;
+                const vatAmount = parseFloat(excluded.vat) || 0;
+                const excludedTotal = (parseFloat(excluded.freight) || 0) + (parseFloat(excluded.deposits) || 0) + drsAmount + vatAmount;
                 const unresolvedTotal = parseFloat(unresolved.net_total) || 0;
                 const calculatedTotal = rtdTotal + excludedTotal + unresolvedTotal;
                 const invoiceTotal = parseFloat(data.invoice_total) || 0;
@@ -821,6 +828,12 @@
                                 <div class="flex justify-between">
                                     <span class="text-gray-400">DRS:</span>
                                     <span class="text-white font-mono">${formatNumber(drsAmount)}</span>
+                                </div>
+                                ` : ''}
+                                ${vatAmount > 0 ? `
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">VAT:</span>
+                                    <span class="text-white font-mono">${formatNumber(vatAmount)}</span>
                                 </div>
                                 ` : ''}
                                 <div class="flex justify-between pt-2 border-t border-gray-600 font-semibold">
@@ -1015,16 +1028,16 @@
             return html;
         }
 
-        // Show flash message at top of page
+        // Show toast-style flash message (fixed position, no layout shift)
         function showFlashMessage(message, type) {
             // Remove existing flash messages
             const existingFlash = document.querySelectorAll('.ajax-flash-message');
             existingFlash.forEach(el => el.remove());
 
-            // Create new flash message
+            // Create toast-style flash message (fixed position, top-right)
             const flashDiv = document.createElement('div');
-            flashDiv.className = 'ajax-flash-message px-4 py-3 rounded mb-4 ' +
-                (type === 'success' ? 'bg-green-900/50 border border-green-500 text-green-300' : 'bg-red-900/50 border border-red-500 text-red-300');
+            flashDiv.className = 'ajax-flash-message fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg max-w-md ' +
+                (type === 'success' ? 'bg-green-900 border border-green-500 text-green-300' : 'bg-red-900 border border-red-500 text-red-300');
             flashDiv.innerHTML = `
                 <div class="flex justify-between items-center">
                     <span>${message}</span>
@@ -1032,12 +1045,7 @@
                 </div>
             `;
 
-            // Insert after the header section
-            const headerDiv = document.querySelector('.max-w-7xl');
-            const flashContainer = headerDiv.querySelector('.flex.justify-between.items-center.mb-6');
-            if (flashContainer) {
-                flashContainer.after(flashDiv);
-            }
+            document.body.appendChild(flashDiv);
 
             // Auto-remove after 5 seconds
             setTimeout(() => {

@@ -318,8 +318,14 @@ class RtdResolutionService
 
         // Validation: check if totals reconcile
         $header = $parsedData['header'] ?? [];
+
+        // Extract VAT amount from header (IIH invoices have tax_amount)
+        $vatAmount = round($this->parseMonetaryValue($header['tax_amount'] ?? 0), 2);
+        $breakdown['excluded']['vat'] = $vatAmount;
+
+        // For IIH: Goods (net) + DRS + VAT = Invoice Total (gross)
         $expectedGrossTotal = $this->parseMonetaryValue($header['gross_total'] ?? $invoice->total_amount ?? 0);
-        $calculatedTotal = array_sum($breakdown['goods_for_resale']) + $drsTotal;
+        $calculatedTotal = array_sum($breakdown['goods_for_resale']) + $drsTotal + $vatAmount;
         $difference = abs($calculatedTotal - $expectedGrossTotal);
 
         $breakdown['integrity'] = [
@@ -327,6 +333,7 @@ class RtdResolutionService
             'calculated_total' => round($calculatedTotal, 2),
             'difference' => round($difference, 2),
             'drs_excluded' => $drsTotal,
+            'vat_amount' => $vatAmount,
             'reconciled' => $difference < 1.00,
         ];
 
