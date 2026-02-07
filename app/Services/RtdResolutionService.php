@@ -154,7 +154,7 @@ class RtdResolutionService
         // Initialize breakdown structure
         $breakdown = [
             'goods_for_resale' => ['0' => 0, '9' => 0, '13.5' => 0, '23' => 0],
-            'excluded' => ['freight' => 0, 'deposits' => 0, 'drs' => 0],
+            'excluded' => ['freight' => 0, 'deposits' => 0, 'drs' => 0, 'vat' => 0],
             'unresolved' => ['count' => 0, 'net_total' => 0],
             'stats' => ['total_lines' => 0, 'resolved_lines' => 0, 'excluded_lines' => 0],
         ];
@@ -261,6 +261,9 @@ class RtdResolutionService
             $breakdown['goods_for_resale'][$key] = round($value, 2);
         }
         $breakdown['unresolved']['net_total'] = round($breakdown['unresolved']['net_total'], 2);
+
+        // Track VAT amount as excluded (not part of goods for resale)
+        $breakdown['excluded']['vat'] = round((float) ($invoice->vat_amount ?? 0), 2);
 
         // RTD integrity check: verify totals reconcile
         $validation = $parsedData['validation'] ?? [];
@@ -407,7 +410,7 @@ class RtdResolutionService
                 'freight' => 0,
                 'deposits' => 0,
                 'drs' => 0,
-                'vat' => round((float) ($invoice->total_vat ?? 0), 2),
+                'vat' => round((float) ($invoice->vat_amount ?? 0), 2),
             ],
             'unresolved' => ['count' => 0, 'net_total' => 0],
             'stats' => [
@@ -453,7 +456,7 @@ class RtdResolutionService
             '23' => round((float) ($invoice->standard_net ?? 0), 2),
         ];
         $serviceTotal = array_sum($serviceByVat);
-        $vatAmount = round((float) ($invoice->total_vat ?? 0), 2);
+        $vatAmount = round((float) ($invoice->vat_amount ?? 0), 2);
         if ($vatAmount == 0) {
             // VAT is missing - calculate from net amounts and VAT rates
             $vatAmount = round(
