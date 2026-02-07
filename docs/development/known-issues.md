@@ -8,6 +8,7 @@ This document tracks known issues that have been identified and resolved in the 
 - [File Upload & Permissions Issues](#file-upload--permissions-issues)
 - [Document Conversion Issues](#document-conversion-issues)
 - [Validation Issues](#validation-issues)
+- [Invoice Parsing Issues](#invoice-parsing-issues)
 
 ---
 
@@ -243,6 +244,49 @@ Images save correctly to POS database but 24-hour browser cache prevents updated
 4. Automatic content-type detection
 
 Images now appear immediately after upload.
+
+---
+
+## Invoice Parsing Issues
+
+### Delivery Invoice Total Parsed Incorrectly (UK/US Number Format)
+**Status:** Fixed 2026-02-05
+
+#### Problem
+Invoice stated total was parsed as `1.98` instead of `1978.38` for Independent supplier invoices. The discrepancy warning showed: "PDF states €1.98 but parsed items sum to €1978.38".
+
+#### Root Cause
+The `_clean_number_string()` function in `delivery_independent.py` incorrectly assumed European number format when both comma and period were present in a number string.
+
+When parsing `1,978.38` (UK/US format where comma=thousands, period=decimal):
+1. Code assumed European format (where period=thousands, comma=decimal)
+2. Removed the period: `1,978.38` → `1,97838`
+3. Replaced comma with period: `1,97838` → `1.97838`
+4. Result: `1.97838` rounded to `1.98`
+
+#### Solution
+Modified the function to detect the format by checking which separator comes **last** in the number:
+- If period comes last → UK/US format (comma is thousands separator)
+- If comma comes last → European format (period is thousands separator)
+
+```python
+if ',' in value and '.' in value:
+    last_comma = value.rfind(',')
+    last_period = value.rfind('.')
+
+    if last_period > last_comma:
+        # UK/US format: 1,978.38
+        value = value.replace(',', '')
+    else:
+        # European format: 1.978,38
+        value = value.replace('.', '').replace(',', '.')
+```
+
+#### Files Modified
+- `scripts/invoice-parser/parsers/delivery_independent.py` (lines 158-184)
+
+#### How to Detect
+Check delivery records for large discrepancies between `invoice_stated_total` and `calculated_total` where the stated total is suspiciously small (e.g., 1.98 vs 1978.38).
 
 ---
 

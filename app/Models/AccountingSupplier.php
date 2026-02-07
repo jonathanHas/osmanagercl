@@ -57,6 +57,7 @@ class AccountingSupplier extends Model
         'tags',
         'created_by',
         'updated_by',
+        'rtd_classification',
     ];
 
     protected $casts = [
@@ -382,6 +383,48 @@ class AccountingSupplier extends Model
         'overhead' => 'Overhead (T2)',
         'mixed' => 'Mixed Use',
     ];
+
+    /**
+     * RTD classification options with display labels.
+     */
+    public const RTD_CLASSIFICATIONS = [
+        'goods_simple' => 'Goods - Simple VAT',
+        'goods_parser' => 'Goods - Dedicated Parser',
+        'service_overhead' => 'Service/Overhead',
+        'not_applicable' => 'Not Applicable',
+    ];
+
+    /**
+     * Check if this supplier provides goods (T1 on RTD).
+     */
+    public function isGoodsSupplier(): bool
+    {
+        return in_array($this->rtd_classification, ['goods_simple', 'goods_parser']);
+    }
+
+    /**
+     * Check if this supplier is a service/overhead supplier (T2 on RTD).
+     */
+    public function isServiceSupplier(): bool
+    {
+        return $this->rtd_classification === 'service_overhead';
+    }
+
+    /**
+     * Check if this supplier has a dedicated RTD parser.
+     */
+    public function hasParser(): bool
+    {
+        return $this->rtd_classification === 'goods_parser';
+    }
+
+    /**
+     * Check if this supplier is tracked in RTD.
+     */
+    public function isRtdTracked(): bool
+    {
+        return $this->rtd_classification !== 'not_applicable';
+    }
 
     /**
      * Infer the appropriate VAT treatment based on country code.

@@ -20,17 +20,28 @@
         <div x-data="{
             sidebarOpen: false,
             sidebarCollapsed: localStorage.getItem('sidebarCollapsed') === 'true',
-            operationsOpen: false,
-            kitchenOpen: false,
-            ordersOpen: false,
-            stockMonitoringOpen: false,
-            financialOpen: false,
-            revenueOpen: false,
-            stockOpen: false,
-            systemToolsOpen: false,
-            adminOpen: false
+            operationsOpen: localStorage.getItem('nav_operationsOpen') === 'true',
+            kitchenOpen: localStorage.getItem('nav_kitchenOpen') === 'true',
+            ordersOpen: localStorage.getItem('nav_ordersOpen') === 'true',
+            stockMonitoringOpen: localStorage.getItem('nav_stockMonitoringOpen') === 'true',
+            financialOpen: localStorage.getItem('nav_financialOpen') === 'true',
+            revenueOpen: localStorage.getItem('nav_revenueOpen') === 'true',
+            stockOpen: localStorage.getItem('nav_stockOpen') === 'true',
+            systemToolsOpen: localStorage.getItem('nav_systemToolsOpen') === 'true',
+            adminOpen: localStorage.getItem('nav_adminOpen') === 'true'
         }"
-        x-init="$watch('sidebarCollapsed', val => localStorage.setItem('sidebarCollapsed', val))"
+        x-init="
+            $watch('sidebarCollapsed', val => localStorage.setItem('sidebarCollapsed', val));
+            $watch('operationsOpen', val => localStorage.setItem('nav_operationsOpen', val));
+            $watch('kitchenOpen', val => localStorage.setItem('nav_kitchenOpen', val));
+            $watch('ordersOpen', val => localStorage.setItem('nav_ordersOpen', val));
+            $watch('stockMonitoringOpen', val => localStorage.setItem('nav_stockMonitoringOpen', val));
+            $watch('financialOpen', val => localStorage.setItem('nav_financialOpen', val));
+            $watch('revenueOpen', val => localStorage.setItem('nav_revenueOpen', val));
+            $watch('stockOpen', val => localStorage.setItem('nav_stockOpen', val));
+            $watch('systemToolsOpen', val => localStorage.setItem('nav_systemToolsOpen', val));
+            $watch('adminOpen', val => localStorage.setItem('nav_adminOpen', val));
+        "
         class="flex h-screen bg-gray-100">
             <!-- Sidebar -->
             <div :class="{

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AccountingSupplier;
 use App\Models\Invoice;
 use App\Models\InvoiceUploadFile;
 use App\Services\RtdResolutionService;
@@ -20,27 +21,47 @@ class RtdController extends Controller
     {
         $filter = $request->get('filter', 'all');
         $search = $request->get('search', '');
+        $supplierType = $request->get('supplier_type', 'all'); // all, parser, simple, service
 
-        // Get all RTD-supported supplier invoices (Udea, Dynamis, Independent)
+        // Get all RTD-supported supplier invoices
+        // Now queries by supplier rtd_classification OR legacy name-based detection
         $query = Invoice::with(['supplier', 'attachments', 'uploadFiles'])
             ->where(function ($q) {
-                // Udea
-                $q->where('supplier_name', 'like', '%udea%')
+                // New: Suppliers with rtd_classification set (not 'not_applicable')
+                $q->whereHas('supplier', function ($sq) {
+                    $sq->where('rtd_classification', '!=', 'not_applicable')
+                        ->whereNotNull('rtd_classification');
+                })
+                // Legacy: Udea, Dynamis, Independent (for backwards compatibility)
+                    ->orWhere('supplier_name', 'like', '%udea%')
                     ->orWhereHas('supplier', function ($sq) {
                         $sq->where('name', 'like', '%udea%');
                     })
-                    // Dynamis
                     ->orWhere('supplier_name', 'like', '%dynamis%')
                     ->orWhereHas('supplier', function ($sq) {
                         $sq->where('name', 'like', '%dynamis%');
                     })
-                    // Independent Irish Health Foods
                     ->orWhere('supplier_name', 'like', '%independent%')
                     ->orWhereHas('supplier', function ($sq) {
                         $sq->where('name', 'like', '%independent%');
                     });
             })
             ->orderByDesc('invoice_date');
+
+        // Filter by supplier type
+        if ($supplierType === 'parser') {
+            $query->whereHas('supplier', function ($sq) {
+                $sq->where('rtd_classification', 'goods_parser');
+            });
+        } elseif ($supplierType === 'simple') {
+            $query->whereHas('supplier', function ($sq) {
+                $sq->where('rtd_classification', 'goods_simple');
+            });
+        } elseif ($supplierType === 'service') {
+            $query->whereHas('supplier', function ($sq) {
+                $sq->where('rtd_classification', 'service_overhead');
+            });
+        }
 
         // Apply search filter
         if ($search) {
@@ -69,8 +90,31 @@ class RtdController extends Controller
         $total = $allInvoices->count();
         $invoices = $allInvoices->forPage($page, $perPage)->values();
 
-        // Add RTD status to each invoice
+        // Add RTD status to each invoice, auto-computing for simple VAT and service suppliers
         $invoices = $invoices->map(function ($invoice) {
+            // Auto-compute RTD for simple VAT and service suppliers that haven't been computed yet
+            if ($invoice->supplier &&
+                in_array($invoice->supplier->rtd_classification, ['goods_simple', 'service_overhead']) &&
+                !$invoice->hasRtdData() &&
+                $invoice->rtd_status !== 'frozen') {
+
+                // Check invoice has VAT data to compute from
+                $hasVatData = ($invoice->standard_net > 0 || $invoice->reduced_net > 0 ||
+                               $invoice->second_reduced_net > 0 || $invoice->zero_net > 0 ||
+                               $invoice->total_net > 0);
+
+                if ($hasVatData) {
+                    $rtdResult = $this->rtdService->computeRtd($invoice);
+                    $invoice->update([
+                        'rtd_breakdown' => $rtdResult['breakdown'],
+                        'rtd_resolution_issues' => $rtdResult['issues'],
+                        'rtd_status' => 'computed',
+                        'rtd_computed_at' => now(),
+                    ]);
+                    $invoice->refresh();
+                }
+            }
+
             $invoice->rtd_display_status = $this->getInvoiceRtdStatus($invoice);
 
             return $invoice;
@@ -81,6 +125,7 @@ class RtdController extends Controller
             'stats' => $stats,
             'filter' => $filter,
             'search' => $search,
+            'supplierType' => $supplierType,
             'currentPage' => $page,
             'lastPage' => ceil($total / $perPage),
             'total' => $total,
@@ -541,6 +586,7 @@ class RtdController extends Controller
 
     /**
      * Display RTD Accounting Year report with aggregated totals.
+     * Now supports T1 (goods for resale) and T2 (service/overhead) separation.
      */
     public function yearReport(Request $request)
     {
@@ -550,18 +596,21 @@ class RtdController extends Controller
         $endDate = $request->get('end_date', "{$year}-12-31");
 
         // Base query for RTD-supported supplier invoices in date range
-        $baseQuery = Invoice::where(function ($q) {
-            // Udea
-            $q->where('supplier_name', 'like', '%udea%')
+        $baseQuery = Invoice::with('supplier')->where(function ($q) {
+            // New: Suppliers with rtd_classification set (not 'not_applicable')
+            $q->whereHas('supplier', function ($sq) {
+                $sq->where('rtd_classification', '!=', 'not_applicable')
+                    ->whereNotNull('rtd_classification');
+            })
+            // Legacy: Udea, Dynamis, Independent
+                ->orWhere('supplier_name', 'like', '%udea%')
                 ->orWhereHas('supplier', function ($sq) {
                     $sq->where('name', 'like', '%udea%');
                 })
-                // Dynamis
                 ->orWhere('supplier_name', 'like', '%dynamis%')
                 ->orWhereHas('supplier', function ($sq) {
                     $sq->where('name', 'like', '%dynamis%');
                 })
-                // Independent Irish Health Foods
                 ->orWhere('supplier_name', 'like', '%independent%')
                 ->orWhereHas('supplier', function ($sq) {
                     $sq->where('name', 'like', '%independent%');
@@ -582,8 +631,14 @@ class RtdController extends Controller
             ->orderBy('invoice_date')
             ->get();
 
-        // Aggregate totals from frozen invoices
+        // Aggregate totals from frozen invoices - separate T1 (goods) and T2 (service/overhead)
         $totals = [
+            '0' => 0,
+            '9' => 0,
+            '13.5' => 0,
+            '23' => 0,
+        ];
+        $serviceTotals = [
             '0' => 0,
             '9' => 0,
             '13.5' => 0,
@@ -596,25 +651,51 @@ class RtdController extends Controller
             'vat' => 0,
         ];
         $grandTotal = 0;
+        $serviceGrandTotal = 0;
+
+        // Separate frozen invoices into T1 (goods) and T2 (service)
+        $goodsInvoices = collect();
+        $serviceInvoices = collect();
 
         foreach ($frozenInvoices as $invoice) {
             $snapshot = $invoice->rtd_snapshot;
-            if (! $snapshot || ! isset($snapshot['breakdown']['goods_for_resale'])) {
+            if (! $snapshot) {
                 continue;
             }
 
-            $gfr = $snapshot['breakdown']['goods_for_resale'];
-            foreach ($totals as $rate => $value) {
-                $totals[$rate] += (float) ($gfr[$rate] ?? 0);
+            // Check if service/overhead invoice
+            $isService = ($snapshot['breakdown']['stats']['is_service'] ?? false)
+                || ($invoice->supplier && $invoice->supplier->rtd_classification === 'service_overhead');
+
+            if ($isService) {
+                $serviceInvoices->push($invoice);
+
+                // Aggregate service totals from service_overhead breakdown
+                $serviceBreakdown = $snapshot['breakdown']['service_overhead'] ?? $snapshot['breakdown']['goods_for_resale'] ?? [];
+                foreach ($serviceTotals as $rate => $value) {
+                    $serviceTotals[$rate] += (float) ($serviceBreakdown[$rate] ?? 0);
+                }
+                $serviceGrandTotal += array_sum(array_map('floatval', $serviceBreakdown));
+            } else {
+                $goodsInvoices->push($invoice);
+
+                if (! isset($snapshot['breakdown']['goods_for_resale'])) {
+                    continue;
+                }
+
+                $gfr = $snapshot['breakdown']['goods_for_resale'];
+                foreach ($totals as $rate => $value) {
+                    $totals[$rate] += (float) ($gfr[$rate] ?? 0);
+                }
+                $grandTotal += array_sum(array_map('floatval', $gfr));
             }
 
+            // Excluded totals are aggregated regardless of type
             $excluded = $snapshot['breakdown']['excluded'] ?? [];
             $excludedTotals['freight'] += (float) ($excluded['freight'] ?? 0);
             $excludedTotals['deposits'] += (float) ($excluded['deposits'] ?? 0);
             $excludedTotals['drs'] += (float) ($excluded['drs'] ?? 0);
             $excludedTotals['vat'] += (float) ($excluded['vat'] ?? 0);
-
-            $grandTotal += array_sum(array_map('floatval', $gfr));
         }
 
         // Available years for dropdown (from earliest RTD-supported supplier invoice to current year)
@@ -649,10 +730,14 @@ class RtdController extends Controller
 
         return view('rtd.year-report', [
             'frozenInvoices' => $frozenInvoices,
+            'goodsInvoices' => $goodsInvoices,
+            'serviceInvoices' => $serviceInvoices,
             'nonFrozenInvoices' => $nonFrozenInvoices,
             'totals' => $totals,
+            'serviceTotals' => $serviceTotals,
             'excludedTotals' => $excludedTotals,
             'grandTotal' => $grandTotal,
+            'serviceGrandTotal' => $serviceGrandTotal,
             'startDate' => $startDate,
             'endDate' => $endDate,
             'year' => $year,
@@ -747,5 +832,111 @@ class RtdController extends Controller
         }
 
         return back()->with('error', $message);
+    }
+
+    /**
+     * Display the supplier RTD classification editor.
+     */
+    public function suppliers(Request $request)
+    {
+        $search = $request->get('search', '');
+        $filterClassification = $request->get('classification', 'all');
+        $filterType = $request->get('type', 'all');
+
+        $query = AccountingSupplier::query()
+            ->withCount('invoices')
+            ->orderBy('name');
+
+        // Search filter
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%");
+            });
+        }
+
+        // Classification filter
+        if ($filterClassification !== 'all') {
+            $query->where('rtd_classification', $filterClassification);
+        }
+
+        // Supplier type filter
+        if ($filterType !== 'all') {
+            $query->where('supplier_type', $filterType);
+        }
+
+        $suppliers = $query->get();
+
+        // Get stats
+        $stats = [
+            'total' => AccountingSupplier::count(),
+            'goods_parser' => AccountingSupplier::where('rtd_classification', 'goods_parser')->count(),
+            'goods_simple' => AccountingSupplier::where('rtd_classification', 'goods_simple')->count(),
+            'service_overhead' => AccountingSupplier::where('rtd_classification', 'service_overhead')->count(),
+            'not_applicable' => AccountingSupplier::where('rtd_classification', 'not_applicable')->count(),
+        ];
+
+        // Get unique supplier types for filter
+        $supplierTypes = AccountingSupplier::distinct()
+            ->pluck('supplier_type')
+            ->filter()
+            ->sort()
+            ->values();
+
+        $rtdClassifications = AccountingSupplier::RTD_CLASSIFICATIONS;
+
+        return view('rtd.suppliers', [
+            'suppliers' => $suppliers,
+            'stats' => $stats,
+            'search' => $search,
+            'filterClassification' => $filterClassification,
+            'filterType' => $filterType,
+            'supplierTypes' => $supplierTypes,
+            'rtdClassifications' => $rtdClassifications,
+        ]);
+    }
+
+    /**
+     * Update a supplier's RTD classification via AJAX.
+     */
+    public function classifySupplier(Request $request, AccountingSupplier $supplier)
+    {
+        $validated = $request->validate([
+            'rtd_classification' => 'required|in:goods_simple,goods_parser,service_overhead,not_applicable',
+        ]);
+
+        try {
+            $oldClassification = $supplier->rtd_classification;
+            $supplier->update([
+                'rtd_classification' => $validated['rtd_classification'],
+                'updated_by' => auth()->id(),
+            ]);
+
+            \Log::info('Supplier RTD classification updated', [
+                'supplier_id' => $supplier->id,
+                'supplier_name' => $supplier->name,
+                'old_classification' => $oldClassification,
+                'new_classification' => $validated['rtd_classification'],
+                'updated_by' => auth()->id(),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Classification updated for '{$supplier->name}'",
+                'supplier_id' => $supplier->id,
+                'rtd_classification' => $supplier->rtd_classification,
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to update supplier RTD classification', [
+                'supplier_id' => $supplier->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update classification',
+            ], 422);
+        }
     }
 }

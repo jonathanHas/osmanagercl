@@ -103,8 +103,53 @@ class RtdResolutionService
 
     /**
      * Compute RTD breakdown from parsed invoice lines.
+     * Routes to appropriate method based on supplier RTD classification.
      */
     public function computeRtd(Invoice $invoice): array
+    {
+        // Ensure supplier relationship is loaded for classification check
+        $invoice->loadMissing('supplier');
+
+        // Check supplier RTD classification
+        $supplier = $invoice->supplier;
+        if ($supplier && $supplier->rtd_classification) {
+            // Route based on supplier classification
+            switch ($supplier->rtd_classification) {
+                case 'goods_simple':
+                    return $this->computeRtdFromInvoiceVat($invoice);
+
+                case 'service_overhead':
+                    return $this->computeRtdForServiceSupplier($invoice);
+
+                case 'goods_parser':
+                    // Fall through to parser-based computation
+                    break;
+
+                case 'not_applicable':
+                default:
+                    // Return empty breakdown for non-tracked suppliers
+                    return [
+                        'breakdown' => [
+                            'goods_for_resale' => ['0' => 0, '9' => 0, '13.5' => 0, '23' => 0],
+                            'excluded' => ['freight' => 0, 'deposits' => 0, 'drs' => 0],
+                            'unresolved' => ['count' => 0, 'net_total' => 0],
+                            'stats' => ['total_lines' => 0, 'resolved_lines' => 0, 'excluded_lines' => 0, 'method' => 'not_applicable'],
+                        ],
+                        'issues' => [],
+                        'source_file_id' => null,
+                    ];
+            }
+        }
+
+        // Default: parser-based computation for legacy suppliers (Udea, Dynamis, IIH)
+        return $this->computeRtdWithParser($invoice);
+    }
+
+    /**
+     * Compute RTD breakdown using parser-based line item resolution.
+     * Used for suppliers with dedicated parsers (Udea, Dynamis, IIH).
+     */
+    protected function computeRtdWithParser(Invoice $invoice): array
     {
         // Initialize breakdown structure
         $breakdown = [
@@ -341,6 +386,124 @@ class RtdResolutionService
             'breakdown' => $breakdown,
             'issues' => $issues,
             'source_file_id' => $sourceFileId,
+        ];
+    }
+
+    /**
+     * Compute RTD from invoice VAT breakdown fields.
+     * Used for suppliers classified as 'goods_simple' - no parser, just uses invoice VAT fields.
+     * This is T1 (goods for resale).
+     */
+    public function computeRtdFromInvoiceVat(Invoice $invoice): array
+    {
+        $breakdown = [
+            'goods_for_resale' => [
+                '0' => round((float) ($invoice->zero_net ?? 0), 2),
+                '9' => round((float) ($invoice->second_reduced_net ?? 0), 2),
+                '13.5' => round((float) ($invoice->reduced_net ?? 0), 2),
+                '23' => round((float) ($invoice->standard_net ?? 0), 2),
+            ],
+            'excluded' => [
+                'freight' => 0,
+                'deposits' => 0,
+                'drs' => 0,
+                'vat' => round((float) ($invoice->total_vat ?? 0), 2),
+            ],
+            'unresolved' => ['count' => 0, 'net_total' => 0],
+            'stats' => [
+                'total_lines' => 0,
+                'resolved_lines' => 4, // 4 VAT categories
+                'excluded_lines' => 0,
+                'method' => 'simple_vat',
+            ],
+        ];
+
+        // Verify totals reconcile
+        $goodsTotal = array_sum($breakdown['goods_for_resale']);
+        $vatAmount = $breakdown['excluded']['vat'];
+        $calculatedTotal = $goodsTotal + $vatAmount;
+        $invoiceTotal = (float) ($invoice->total_amount ?? 0);
+        $difference = abs($calculatedTotal - $invoiceTotal);
+
+        $breakdown['integrity'] = [
+            'expected_products_total' => round($invoiceTotal, 2),
+            'calculated_total' => round($calculatedTotal, 2),
+            'difference' => round($difference, 2),
+            'reconciled' => $difference < 1.00,
+        ];
+
+        return [
+            'breakdown' => $breakdown,
+            'issues' => [],
+            'source_file_id' => null,
+        ];
+    }
+
+    /**
+     * Compute RTD for service/overhead suppliers (T2).
+     * Uses invoice VAT breakdown, tracked as overhead, not goods for resale.
+     */
+    public function computeRtdForServiceSupplier(Invoice $invoice): array
+    {
+        // Calculate service total from invoice VAT breakdown fields
+        $serviceByVat = [
+            '0' => round((float) ($invoice->zero_net ?? 0), 2),
+            '9' => round((float) ($invoice->second_reduced_net ?? 0), 2),
+            '13.5' => round((float) ($invoice->reduced_net ?? 0), 2),
+            '23' => round((float) ($invoice->standard_net ?? 0), 2),
+        ];
+        $serviceTotal = array_sum($serviceByVat);
+        $vatAmount = round((float) ($invoice->total_vat ?? 0), 2);
+        if ($vatAmount == 0) {
+            // VAT is missing - calculate from net amounts and VAT rates
+            $vatAmount = round(
+                ($serviceByVat['0'] * 0.00) +
+                ($serviceByVat['9'] * 0.09) +
+                ($serviceByVat['13.5'] * 0.135) +
+                ($serviceByVat['23'] * 0.23),
+                2
+            );
+        }
+        $invoiceTotal = (float) ($invoice->total_amount ?? 0);
+
+        $breakdown = [
+            // T1 goods for resale: always zero for service suppliers
+            'goods_for_resale' => ['0' => 0, '9' => 0, '13.5' => 0, '23' => 0],
+            // All service amounts go into excluded (not contributing to T1)
+            'excluded' => [
+                'freight' => 0,
+                'deposits' => 0,
+                'drs' => 0,
+                'vat' => $vatAmount,
+                'service_overhead' => round($serviceTotal, 2),
+            ],
+            'unresolved' => ['count' => 0, 'net_total' => 0],
+            'stats' => [
+                'total_lines' => 0,
+                'resolved_lines' => 0,
+                'excluded_lines' => 1,
+                'method' => 'service_overhead',
+                'is_service' => true,
+                // Keep VAT breakdown for display purposes
+                'service_by_vat' => $serviceByVat,
+            ],
+        ];
+
+        // Reconciliation: excluded total (service + VAT) should match invoice total
+        $excludedTotal = $serviceTotal + $vatAmount;
+        $difference = abs($excludedTotal - $invoiceTotal);
+
+        $breakdown['integrity'] = [
+            'expected_products_total' => round($invoiceTotal, 2),
+            'calculated_total' => round($excludedTotal, 2),
+            'difference' => round($difference, 2),
+            'reconciled' => $difference < 1.00,
+        ];
+
+        return [
+            'breakdown' => $breakdown,
+            'issues' => [],
+            'source_file_id' => null,
         ];
     }
 

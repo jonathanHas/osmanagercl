@@ -53,8 +53,11 @@ class DeliveryLegacyController extends Controller
             ->toArray();
 
         // Get synced delivery with documents (if any)
+        // Using database table instead of cache to survive cache clears during deployment
         $syncedDelivery = null;
-        $syncedDeliveryId = cache('legacy_synced_delivery_id');
+        $syncedDeliveryId = DB::table('app_settings')
+            ->where('key', 'legacy_synced_delivery_id')
+            ->value('value');
         if ($syncedDeliveryId) {
             $syncedDelivery = Delivery::with(['documents', 'supplier'])->find($syncedDeliveryId);
         }
@@ -107,8 +110,11 @@ class DeliveryLegacyController extends Controller
         $isCompleted = $scanSession && $scanSession->status == 1;
 
         // Get synced delivery with documents (if any)
+        // Using database table instead of cache to survive cache clears during deployment
         $syncedDelivery = null;
-        $syncedDeliveryId = cache('legacy_synced_delivery_id');
+        $syncedDeliveryId = DB::table('app_settings')
+            ->where('key', 'legacy_synced_delivery_id')
+            ->value('value');
         if ($syncedDeliveryId) {
             $syncedDelivery = Delivery::with(['documents', 'supplier'])->find($syncedDeliveryId);
         }

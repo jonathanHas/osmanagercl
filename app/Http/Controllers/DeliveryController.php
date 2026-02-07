@@ -1401,7 +1401,11 @@ class DeliveryController extends Controller
             });
 
             // Store the synced delivery ID so legacy pages can access documents
-            cache()->forever('legacy_synced_delivery_id', $delivery->id);
+            // Using database table instead of cache to survive cache clears during deployment
+            DB::table('app_settings')->updateOrInsert(
+                ['key' => 'legacy_synced_delivery_id'],
+                ['value' => $delivery->id, 'updated_at' => now()]
+            );
 
             return redirect()->route('delivery-legacy.index')
                 ->with('success', "Synced {$itemCount} items to legacy. Select a scan session to compare.");

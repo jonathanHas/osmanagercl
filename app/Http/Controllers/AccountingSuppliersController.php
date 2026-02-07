@@ -178,6 +178,7 @@ class AccountingSuppliersController extends Controller
         $paymentMethods = ['bacs', 'cheque', 'card', 'cash', 'other'];
         $vatTreatments = AccountingSupplier::VAT_TREATMENTS;
         $purchaseUses = AccountingSupplier::PURCHASE_USES;
+        $rtdClassifications = AccountingSupplier::RTD_CLASSIFICATIONS;
         $countryCodes = $this->getCountryCodes();
 
         return view('suppliers.create', compact(
@@ -186,6 +187,7 @@ class AccountingSuppliersController extends Controller
             'paymentMethods',
             'vatTreatments',
             'purchaseUses',
+            'rtdClassifications',
             'countryCodes'
         ));
     }
@@ -224,6 +226,8 @@ class AccountingSuppliersController extends Controller
             'country_code' => 'nullable|string|size:2',
             'vat_treatment' => 'nullable|in:irish_vat,eu_goods_zero_rated,eu_reverse_charge_services,postponed_import,outside_scope_or_exempt',
             'default_purchase_use' => 'nullable|in:resale,overhead,mixed',
+            // RTD classification
+            'rtd_classification' => 'nullable|in:goods_simple,goods_parser,service_overhead,not_applicable',
         ]);
 
         // Auto-generate code if not provided
@@ -331,6 +335,7 @@ class AccountingSuppliersController extends Controller
         $paymentMethods = ['bacs', 'cheque', 'card', 'cash', 'other'];
         $vatTreatments = AccountingSupplier::VAT_TREATMENTS;
         $purchaseUses = AccountingSupplier::PURCHASE_USES;
+        $rtdClassifications = AccountingSupplier::RTD_CLASSIFICATIONS;
         $countryCodes = $this->getCountryCodes();
 
         return view('suppliers.edit', compact(
@@ -340,6 +345,7 @@ class AccountingSuppliersController extends Controller
             'paymentMethods',
             'vatTreatments',
             'purchaseUses',
+            'rtdClassifications',
             'countryCodes'
         ));
     }
@@ -378,6 +384,8 @@ class AccountingSuppliersController extends Controller
             'country_code' => 'nullable|string|size:2',
             'vat_treatment' => 'nullable|in:irish_vat,eu_goods_zero_rated,eu_reverse_charge_services,postponed_import,outside_scope_or_exempt',
             'default_purchase_use' => 'nullable|in:resale,overhead,mixed',
+            // RTD classification
+            'rtd_classification' => 'nullable|in:goods_simple,goods_parser,service_overhead,not_applicable',
         ]);
 
         // Process tags

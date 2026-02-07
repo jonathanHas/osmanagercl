@@ -489,10 +489,12 @@ class InvoiceCreationService
         // Create directory structure if it doesn't exist
         if (! Storage::disk('local')->exists($directory)) {
             Storage::disk('local')->makeDirectory($directory, 0775, true);
-
-            // Manually set permissions and ownership to ensure consistency
-            $this->fixDirectoryPermissions($fullDirPath);
         }
+
+        // Always fix permissions on the full directory chain, even if the directory
+        // already exists. Parent directories (e.g. invoices/2026/02/) may have been
+        // created by a different process (web server) with restrictive permissions.
+        $this->fixDirectoryPermissions($fullDirPath);
     }
 
     /**

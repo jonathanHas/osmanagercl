@@ -4,6 +4,13 @@
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-2xl font-bold text-gray-100">RTD Management</h2>
             <div class="flex space-x-2">
+                <a href="{{ route('rtd.suppliers') }}"
+                   class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                    </svg>
+                    Classify Suppliers
+                </a>
                 <a href="{{ route('rtd.year-report') }}"
                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -117,10 +124,17 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                     </svg>
                 </div>
+                {{-- Supplier Type Filter --}}
+                <select name="supplier_type" class="bg-gray-700 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <option value="all" {{ ($supplierType ?? 'all') === 'all' ? 'selected' : '' }}>All Types</option>
+                    <option value="parser" {{ ($supplierType ?? '') === 'parser' ? 'selected' : '' }}>Parser (Udea, etc)</option>
+                    <option value="simple" {{ ($supplierType ?? '') === 'simple' ? 'selected' : '' }}>Simple VAT</option>
+                    <option value="service" {{ ($supplierType ?? '') === 'service' ? 'selected' : '' }}>Service/Overhead</option>
+                </select>
                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
                     Search
                 </button>
-                @if($search)
+                @if($search || ($supplierType ?? 'all') !== 'all')
                     <a href="{{ route('rtd.index', ['filter' => $filter]) }}" class="text-gray-400 hover:text-white">
                         Clear
                     </a>
@@ -188,6 +202,7 @@
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Invoice</th>
                             <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
                             <th class="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Total</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Breakdown</th>
                             <th class="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
                             <th class="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">Issues</th>
                             <th class="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
@@ -204,7 +219,14 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                                         </svg>
                                         <div>
-                                            <div class="text-white font-medium">#{{ $invoice->invoice_number }}</div>
+                                            <div class="text-white font-medium flex items-center gap-2">
+                                                #{{ $invoice->invoice_number }}
+                                                @if($invoice->supplier && $invoice->supplier->rtd_classification === 'service_overhead')
+                                                    <span class="px-1.5 py-0.5 text-xs font-semibold rounded bg-yellow-900 text-yellow-300">Service</span>
+                                                @elseif($invoice->supplier && $invoice->supplier->rtd_classification === 'goods_simple')
+                                                    <span class="px-1.5 py-0.5 text-xs font-semibold rounded bg-purple-900 text-purple-300">Simple</span>
+                                                @endif
+                                            </div>
                                             <div class="text-xs text-gray-400">{{ $invoice->supplier_name }}</div>
                                         </div>
                                     </div>
@@ -212,8 +234,58 @@
                                 <td class="px-4 py-3 text-gray-300">
                                     {{ $invoice->invoice_date->format('d/m/Y') }}
                                 </td>
-                                <td class="px-4 py-3 text-right text-gray-300">
-                                    {{ number_format($invoice->total_amount, 2) }}
+                                <td class="px-4 py-3 text-right">
+                                    <div class="flex items-center justify-end gap-1.5">
+                                        <span class="text-gray-300">{{ number_format($invoice->total_amount, 2) }}</span>
+                                        @if($invoice->hasRtdData())
+                                            @php
+                                                $gfrRow = $invoice->rtd_breakdown['goods_for_resale'] ?? [];
+                                                $exclRow = $invoice->rtd_breakdown['excluded'] ?? [];
+                                                $unresRow = $invoice->rtd_breakdown['unresolved'] ?? [];
+                                                $statsRow = $invoice->rtd_breakdown['stats'] ?? [];
+                                                $isServiceRow = ($statsRow['is_service'] ?? false) || ($invoice->supplier && $invoice->supplier->rtd_classification === 'service_overhead');
+                                                $serviceOhRow = (float) ($exclRow['service_overhead'] ?? 0);
+                                                $rtdTotalRow = $isServiceRow ? 0 : $invoice->getRtdTotal();
+                                                $exclTotalRow = ($exclRow['freight'] ?? 0) + ($exclRow['deposits'] ?? 0) + ($exclRow['drs'] ?? 0) + ($exclRow['vat'] ?? 0) + $serviceOhRow;
+                                                $unrTotalRow = $unresRow['net_total'] ?? 0;
+                                                $calcTotalRow = $rtdTotalRow + $exclTotalRow + $unrTotalRow;
+                                                $diffRow = abs($calcTotalRow - $invoice->total_amount);
+                                                $isBalancedRow = $diffRow < 0.50;
+                                            @endphp
+                                            @if($isBalancedRow)
+                                                <svg class="w-4 h-4 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                                                </svg>
+                                            @else
+                                                <svg class="w-4 h-4 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+                                                </svg>
+                                            @endif
+                                        @else
+                                            <span class="text-gray-600 text-xs">-</span>
+                                        @endif
+                                    </div>
+                                </td>
+                                {{-- Breakdown column: G / E / U --}}
+                                <td class="px-4 py-3">
+                                    @if($invoice->hasRtdData())
+                                        <div class="text-xs font-mono space-y-0.5 whitespace-nowrap">
+                                            <div class="flex justify-between gap-2">
+                                                <span class="text-green-400">G:</span>
+                                                <span class="text-green-400">{{ number_format($rtdTotalRow, 2) }}</span>
+                                            </div>
+                                            <div class="flex justify-between gap-2">
+                                                <span class="text-blue-400">E:</span>
+                                                <span class="text-blue-400">{{ number_format($exclTotalRow, 2) }}</span>
+                                            </div>
+                                            <div class="flex justify-between gap-2">
+                                                <span class="{{ $unrTotalRow > 0 ? 'text-red-400' : 'text-gray-500' }}">U:</span>
+                                                <span class="{{ $unrTotalRow > 0 ? 'text-red-400' : 'text-gray-500' }}">{{ number_format($unrTotalRow, 2) }}</span>
+                                            </div>
+                                        </div>
+                                    @else
+                                        <span class="text-gray-600 text-xs">-</span>
+                                    @endif
                                 </td>
                                 <td class="px-4 py-3 text-center">
                                     @switch($invoice->rtd_display_status)
@@ -237,11 +309,13 @@
                                             @break
                                     @endswitch
                                 </td>
-                                <td class="px-4 py-3 text-center">
+                                <td class="px-4 py-3 text-center" onclick="event.stopPropagation()">
                                     @if($invoice->hasRtdData())
                                         @php $unresolvedCount = $invoice->rtd_breakdown['unresolved']['count'] ?? 0; @endphp
                                         @if($unresolvedCount > 0)
-                                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-900 text-red-300">{{ $unresolvedCount }}</span>
+                                            <a href="{{ route('rtd-fallbacks.unresolved', ['invoice_id' => $invoice->id]) }}"
+                                               class="px-2 py-1 text-xs font-semibold rounded-full bg-red-900 text-red-300 hover:bg-red-800 transition"
+                                               title="Resolve unresolved items">{{ $unresolvedCount }}</a>
                                         @else
                                             <span class="text-green-400">0</span>
                                         @endif
@@ -317,15 +391,26 @@
                             </tr>
                             {{-- Expandable Detail Row --}}
                             <tr id="detail-{{ $invoice->id }}" class="hidden bg-gray-850">
-                                <td colspan="6" class="px-4 py-4">
+                                <td colspan="7" class="px-4 py-4">
                                     <div class="bg-gray-900 rounded-lg p-4">
                                         @if($invoice->hasRtdData())
                                             @php
                                                 $gfr = $invoice->rtd_breakdown['goods_for_resale'] ?? [];
                                                 $excluded = $invoice->rtd_breakdown['excluded'] ?? [];
                                                 $unresolved = $invoice->rtd_breakdown['unresolved'] ?? [];
-                                                $rtdTotal = $invoice->getRtdTotal();
-                                                $excludedTotal = ($excluded['freight'] ?? 0) + ($excluded['deposits'] ?? 0) + ($excluded['drs'] ?? 0) + ($excluded['vat'] ?? 0);
+                                                $stats = $invoice->rtd_breakdown['stats'] ?? [];
+                                                $isService = ($stats['is_service'] ?? false) || ($invoice->supplier && $invoice->supplier->rtd_classification === 'service_overhead');
+                                                $rtdMethod = $stats['method'] ?? 'parser';
+
+                                                // For service suppliers, VAT breakdown is in stats.service_by_vat
+                                                $serviceByVat = $stats['service_by_vat'] ?? [];
+                                                $serviceOverheadAmount = (float) ($excluded['service_overhead'] ?? 0);
+
+                                                // T1 total (goods for resale) - always 0 for service suppliers
+                                                $rtdTotal = $isService ? 0 : $invoice->getRtdTotal();
+
+                                                // Excluded total includes service_overhead for service suppliers
+                                                $excludedTotal = ($excluded['freight'] ?? 0) + ($excluded['deposits'] ?? 0) + ($excluded['drs'] ?? 0) + ($excluded['vat'] ?? 0) + $serviceOverheadAmount;
                                                 $unresolvedTotal = $unresolved['net_total'] ?? 0;
                                                 $calculatedTotal = $rtdTotal + $excludedTotal + $unresolvedTotal;
                                                 $invoiceTotal = $invoice->total_amount;
@@ -333,35 +418,47 @@
                                                 $isBalanced = $difference < 0.50;
                                             @endphp
 
+                                            {{-- Method/Type Badge --}}
+                                            @if($rtdMethod !== 'parser' || $isService)
+                                                <div class="mb-3 flex items-center gap-2">
+                                                    @if($isService)
+                                                        <span class="px-2 py-1 text-xs font-semibold rounded bg-yellow-900 text-yellow-300">T2 - Service/Overhead</span>
+                                                    @elseif($rtdMethod === 'simple_vat')
+                                                        <span class="px-2 py-1 text-xs font-semibold rounded bg-purple-900 text-purple-300">Simple VAT Breakdown</span>
+                                                    @endif
+                                                </div>
+                                            @endif
+
                                             <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
-                                                {{-- Goods for Resale --}}
+                                                {{-- Goods for Resale or Service/Overhead --}}
                                                 <div class="bg-gray-800 rounded-lg p-3">
-                                                    <h4 class="text-sm font-semibold text-green-400 mb-2 flex items-center">
+                                                    <h4 class="text-sm font-semibold {{ $isService ? 'text-yellow-400' : 'text-green-400' }} mb-2 flex items-center">
                                                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                                         </svg>
-                                                        Goods for Resale
+                                                        {{ $isService ? 'Service/Overhead (T2)' : 'Goods for Resale (T1)' }}
                                                     </h4>
+                                                    @php $vatSource = $isService ? $serviceByVat : $gfr; @endphp
                                                     <div class="space-y-1 text-sm">
                                                         <div class="flex justify-between">
                                                             <span class="text-gray-400">0% Rate:</span>
-                                                            <span class="text-white font-mono">{{ number_format($gfr['0'] ?? 0, 2) }}</span>
+                                                            <span class="text-white font-mono">{{ number_format($vatSource['0'] ?? 0, 2) }}</span>
                                                         </div>
                                                         <div class="flex justify-between">
                                                             <span class="text-gray-400">9% Rate:</span>
-                                                            <span class="text-white font-mono">{{ number_format($gfr['9'] ?? 0, 2) }}</span>
+                                                            <span class="text-white font-mono">{{ number_format($vatSource['9'] ?? 0, 2) }}</span>
                                                         </div>
                                                         <div class="flex justify-between">
                                                             <span class="text-gray-400">13.5% Rate:</span>
-                                                            <span class="text-white font-mono">{{ number_format($gfr['13.5'] ?? 0, 2) }}</span>
+                                                            <span class="text-white font-mono">{{ number_format($vatSource['13.5'] ?? 0, 2) }}</span>
                                                         </div>
                                                         <div class="flex justify-between">
                                                             <span class="text-gray-400">23% Rate:</span>
-                                                            <span class="text-white font-mono">{{ number_format($gfr['23'] ?? 0, 2) }}</span>
+                                                            <span class="text-white font-mono">{{ number_format($vatSource['23'] ?? 0, 2) }}</span>
                                                         </div>
                                                         <div class="flex justify-between pt-2 border-t border-gray-600 font-semibold">
                                                             <span class="text-gray-300">Subtotal:</span>
-                                                            <span class="text-green-400 font-mono">{{ number_format($rtdTotal, 2) }}</span>
+                                                            <span class="{{ $isService ? 'text-yellow-400' : 'text-green-400' }} font-mono">{{ number_format($rtdTotal, 2) }}</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -393,6 +490,12 @@
                                                         <div class="flex justify-between">
                                                             <span class="text-gray-400">VAT:</span>
                                                             <span class="text-white font-mono">{{ number_format($excluded['vat'] ?? 0, 2) }}</span>
+                                                        </div>
+                                                        @endif
+                                                        @if($serviceOverheadAmount > 0)
+                                                        <div class="flex justify-between text-yellow-400">
+                                                            <span>Service/Overhead:</span>
+                                                            <span class="font-mono">{{ number_format($serviceOverheadAmount, 2) }}</span>
                                                         </div>
                                                         @endif
                                                         <div class="flex justify-between pt-2 border-t border-gray-600 font-semibold">
@@ -466,8 +569,20 @@
                                                         Reconciliation
                                                     </h4>
                                                     <div class="space-y-1 text-sm">
+                                                        @if($isService)
+                                                        {{-- Service suppliers: show simplified reconciliation --}}
                                                         <div class="flex justify-between">
-                                                            <span class="text-green-400">+ Goods:</span>
+                                                            <span class="text-yellow-400">+ Service (T2):</span>
+                                                            <span class="text-white font-mono">{{ number_format($serviceOverheadAmount, 2) }}</span>
+                                                        </div>
+                                                        <div class="flex justify-between">
+                                                            <span class="text-blue-400">+ VAT:</span>
+                                                            <span class="text-white font-mono">{{ number_format($excluded['vat'] ?? 0, 2) }}</span>
+                                                        </div>
+                                                        @else
+                                                        {{-- Goods suppliers: show full breakdown --}}
+                                                        <div class="flex justify-between">
+                                                            <span class="text-green-400">+ Goods (T1):</span>
                                                             <span class="text-white font-mono">{{ number_format($rtdTotal, 2) }}</span>
                                                         </div>
                                                         <div class="flex justify-between">
@@ -478,6 +593,7 @@
                                                             <span class="text-red-400">+ Unresolved:</span>
                                                             <span class="text-white font-mono">{{ number_format($unresolvedTotal, 2) }}</span>
                                                         </div>
+                                                        @endif
                                                         <div class="flex justify-between pt-1 border-t border-gray-600">
                                                             <span class="text-gray-300 font-semibold">= Calculated:</span>
                                                             <span class="text-white font-mono font-semibold">{{ number_format($calculatedTotal, 2) }}</span>
@@ -722,17 +838,51 @@
                 actionsDiv.dataset.isFrozen = data.is_frozen ? 'true' : 'false';
             }
 
-            // Update status badge
-            const statusCell = row.querySelector('td:nth-child(4)');
+            // Update balance indicator on total cell (3rd column)
+            const totalCell = row.querySelector('td:nth-child(3)');
+            if (totalCell && data.has_rtd_data && data.rtd_breakdown) {
+                const gfr = data.rtd_breakdown.goods_for_resale || {};
+                const excl = data.rtd_breakdown.excluded || {};
+                const unres = data.rtd_breakdown.unresolved || {};
+                const rtdT = parseFloat(data.rtd_total) || 0;
+                const serviceOh = parseFloat(excl.service_overhead) || 0;
+                const exclT = (parseFloat(excl.freight) || 0) + (parseFloat(excl.deposits) || 0) + (parseFloat(excl.drs) || 0) + (parseFloat(excl.vat) || 0) + serviceOh;
+                const unresT = parseFloat(unres.net_total) || 0;
+                const calcT = rtdT + exclT + unresT;
+                const invT = parseFloat(data.invoice_total) || 0;
+                const diff = Math.abs(calcT - invT);
+                const balanced = diff < 0.50;
+
+                const balanceIcon = balanced
+                    ? `<svg class="w-4 h-4 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>`
+                    : `<svg class="w-4 h-4 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>`;
+
+                totalCell.innerHTML = `<div class="flex items-center justify-end gap-1.5"><span class="text-gray-300">${formatNumber(invT)}</span>${balanceIcon}</div>`;
+
+                // Update breakdown column (4th column)
+                const breakdownCell = row.querySelector('td:nth-child(4)');
+                if (breakdownCell) {
+                    const unresClass = unresT > 0 ? 'text-red-400' : 'text-gray-500';
+                    breakdownCell.innerHTML = `
+                        <div class="text-xs font-mono space-y-0.5 whitespace-nowrap">
+                            <div class="flex justify-between gap-2"><span class="text-green-400">G:</span><span class="text-green-400">${formatNumber(rtdT)}</span></div>
+                            <div class="flex justify-between gap-2"><span class="text-blue-400">E:</span><span class="text-blue-400">${formatNumber(exclT)}</span></div>
+                            <div class="flex justify-between gap-2"><span class="${unresClass}">U:</span><span class="${unresClass}">${formatNumber(unresT)}</span></div>
+                        </div>`;
+                }
+            }
+
+            // Update status badge (5th column)
+            const statusCell = row.querySelector('td:nth-child(5)');
             if (statusCell) {
                 statusCell.innerHTML = getStatusBadgeHtml(data.new_status);
             }
 
-            // Update issues count
-            const issuesCell = row.querySelector('td:nth-child(5)');
+            // Update issues count (6th column)
+            const issuesCell = row.querySelector('td:nth-child(6)');
             if (issuesCell && data.unresolved_count !== undefined) {
                 if (data.unresolved_count > 0) {
-                    issuesCell.innerHTML = `<span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-900 text-red-300">${data.unresolved_count}</span>`;
+                    issuesCell.innerHTML = `<a href="/rtd-fallbacks/unresolved?invoice_id=${invoiceId}" class="px-2 py-1 text-xs font-semibold rounded-full bg-red-900 text-red-300 hover:bg-red-800 transition" title="Resolve unresolved items">${data.unresolved_count}</a>`;
                 } else if (data.has_rtd_data) {
                     issuesCell.innerHTML = '<span class="text-green-400">0</span>';
                 } else {

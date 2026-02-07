@@ -99,9 +99,11 @@
 
         {{-- Summary Totals --}}
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            {{-- VAT Rate Breakdown --}}
+            {{-- T1 - Goods for Resale VAT Rate Breakdown --}}
             <div class="lg:col-span-2 bg-gray-800 rounded-lg p-6">
-                <h3 class="text-lg font-semibold text-gray-100 mb-4">Goods for Resale by VAT Rate</h3>
+                <h3 class="text-lg font-semibold text-gray-100 mb-4">
+                    <span class="text-green-400">T1</span> - Goods for Resale by VAT Rate
+                </h3>
                 <table class="w-full">
                     <thead>
                         <tr class="border-b border-gray-700">
@@ -147,11 +149,70 @@
                             <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($totals['23'], 2) }}</td>
                         </tr>
                         <tr class="border-t-2 border-gray-600">
-                            <td class="py-3 font-semibold text-gray-200">Total Goods for Resale</td>
+                            <td class="py-3 font-semibold text-gray-200">Total T1 - Goods for Resale</td>
                             <td class="py-3 text-right text-green-400 font-mono text-xl font-bold">{{ number_format($grandTotal, 2) }}</td>
                         </tr>
                     </tbody>
                 </table>
+
+                {{-- T2 - Service/Overhead Section --}}
+                @if($serviceGrandTotal > 0)
+                <div class="mt-6 pt-6 border-t border-gray-700">
+                    <h3 class="text-lg font-semibold text-gray-100 mb-4">
+                        <span class="text-yellow-400">T2</span> - Service/Overhead by VAT Rate
+                    </h3>
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b border-gray-700">
+                                <th class="text-left text-gray-400 pb-2">VAT Rate</th>
+                                <th class="text-right text-gray-400 pb-2">Net Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-700">
+                            <tr>
+                                <td class="py-3">
+                                    <span class="inline-flex items-center">
+                                        <span class="w-3 h-3 rounded-full bg-purple-500 mr-2"></span>
+                                        0% (Zero Rated)
+                                    </span>
+                                </td>
+                                <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($serviceTotals['0'], 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="py-3">
+                                    <span class="inline-flex items-center">
+                                        <span class="w-3 h-3 rounded-full bg-blue-500 mr-2"></span>
+                                        9% (Reduced)
+                                    </span>
+                                </td>
+                                <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($serviceTotals['9'], 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="py-3">
+                                    <span class="inline-flex items-center">
+                                        <span class="w-3 h-3 rounded-full bg-yellow-500 mr-2"></span>
+                                        13.5% (Second Reduced)
+                                    </span>
+                                </td>
+                                <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($serviceTotals['13.5'], 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="py-3">
+                                    <span class="inline-flex items-center">
+                                        <span class="w-3 h-3 rounded-full bg-green-500 mr-2"></span>
+                                        23% (Standard)
+                                    </span>
+                                </td>
+                                <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($serviceTotals['23'], 2) }}</td>
+                            </tr>
+                            <tr class="border-t-2 border-gray-600">
+                                <td class="py-3 font-semibold text-gray-200">Total T2 - Service/Overhead</td>
+                                <td class="py-3 text-right text-yellow-400 font-mono text-xl font-bold">{{ number_format($serviceGrandTotal, 2) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                @endif
             </div>
 
             {{-- Stats Card --}}
@@ -165,6 +226,10 @@
                     <div>
                         <dt class="text-gray-400 text-sm">Frozen Invoices Included</dt>
                         <dd class="text-green-400 font-semibold text-2xl">{{ $frozenInvoices->count() }}</dd>
+                    </div>
+                    <div class="pl-4 text-sm text-gray-400">
+                        <span class="text-green-400">T1 Goods:</span> {{ $goodsInvoices->count() }} |
+                        <span class="text-yellow-400">T2 Service:</span> {{ $serviceInvoices->count() }}
                     </div>
                     <div>
                         <dt class="text-gray-400 text-sm">Non-Frozen (Not Included)</dt>
@@ -187,14 +252,16 @@
             </div>
         </div>
 
-        {{-- Included Invoices List --}}
-        <div class="bg-gray-800 rounded-lg overflow-hidden">
+        {{-- T1 - Goods Invoices List --}}
+        <div class="bg-gray-800 rounded-lg overflow-hidden mb-6">
             <div class="px-6 py-4 border-b border-gray-700">
-                <h3 class="text-lg font-semibold text-gray-100">Frozen Invoices Included ({{ $frozenInvoices->count() }})</h3>
+                <h3 class="text-lg font-semibold text-gray-100">
+                    <span class="text-green-400">T1</span> - Goods for Resale Invoices ({{ $goodsInvoices->count() }})
+                </h3>
             </div>
-            @if($frozenInvoices->isEmpty())
+            @if($goodsInvoices->isEmpty())
                 <div class="p-8 text-center text-gray-400">
-                    <p>No frozen invoices found for this period.</p>
+                    <p>No frozen goods invoices found for this period.</p>
                 </div>
             @else
                 <table class="min-w-full divide-y divide-gray-700">
@@ -211,7 +278,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-700">
-                        @foreach($frozenInvoices as $invoice)
+                        @foreach($goodsInvoices as $invoice)
                             @php
                                 $gfr = $invoice->rtd_snapshot['breakdown']['goods_for_resale'] ?? [];
                                 $invoiceRtdTotal = array_sum(array_map('floatval', $gfr));
@@ -221,6 +288,7 @@
                                     <a href="{{ route('invoices.show', $invoice) }}" class="text-blue-400 hover:text-blue-300">
                                         #{{ $invoice->invoice_number }}
                                     </a>
+                                    <span class="text-xs text-gray-500 ml-2">{{ $invoice->supplier_name }}</span>
                                 </td>
                                 <td class="px-4 py-3 text-gray-300">{{ $invoice->invoice_date->format('d/m/Y') }}</td>
                                 <td class="px-4 py-3 text-right text-gray-300 font-mono">{{ number_format($gfr['0'] ?? 0, 2) }}</td>
@@ -236,7 +304,7 @@
                     </tbody>
                     <tfoot class="bg-gray-900 border-t-2 border-gray-600">
                         <tr>
-                            <td class="px-4 py-3 font-semibold text-gray-200" colspan="2">Totals</td>
+                            <td class="px-4 py-3 font-semibold text-gray-200" colspan="2">T1 Totals</td>
                             <td class="px-4 py-3 text-right text-white font-mono font-bold">{{ number_format($totals['0'], 2) }}</td>
                             <td class="px-4 py-3 text-right text-white font-mono font-bold">{{ number_format($totals['9'], 2) }}</td>
                             <td class="px-4 py-3 text-right text-white font-mono font-bold">{{ number_format($totals['13.5'], 2) }}</td>
@@ -248,6 +316,68 @@
                 </table>
             @endif
         </div>
+
+        {{-- T2 - Service/Overhead Invoices List --}}
+        @if($serviceInvoices->count() > 0)
+        <div class="bg-gray-800 rounded-lg overflow-hidden mb-6">
+            <div class="px-6 py-4 border-b border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-100">
+                    <span class="text-yellow-400">T2</span> - Service/Overhead Invoices ({{ $serviceInvoices->count() }})
+                </h3>
+            </div>
+            <table class="min-w-full divide-y divide-gray-700">
+                <thead class="bg-gray-900">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Invoice #</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Date</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">0%</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">9%</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">13.5%</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">23%</th>
+                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">T2 Total</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase">Frozen</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700">
+                    @foreach($serviceInvoices as $invoice)
+                        @php
+                            $so = $invoice->rtd_snapshot['breakdown']['service_overhead'] ?? $invoice->rtd_snapshot['breakdown']['goods_for_resale'] ?? [];
+                            $invoiceT2Total = array_sum(array_map('floatval', $so));
+                        @endphp
+                        <tr class="hover:bg-gray-750">
+                            <td class="px-4 py-3">
+                                <a href="{{ route('invoices.show', $invoice) }}" class="text-blue-400 hover:text-blue-300">
+                                    #{{ $invoice->invoice_number }}
+                                </a>
+                                <span class="px-1.5 py-0.5 text-xs rounded bg-yellow-900 text-yellow-300 ml-2">Service</span>
+                                <span class="text-xs text-gray-500 ml-2">{{ $invoice->supplier_name }}</span>
+                            </td>
+                            <td class="px-4 py-3 text-gray-300">{{ $invoice->invoice_date->format('d/m/Y') }}</td>
+                            <td class="px-4 py-3 text-right text-gray-300 font-mono">{{ number_format($so['0'] ?? 0, 2) }}</td>
+                            <td class="px-4 py-3 text-right text-gray-300 font-mono">{{ number_format($so['9'] ?? 0, 2) }}</td>
+                            <td class="px-4 py-3 text-right text-gray-300 font-mono">{{ number_format($so['13.5'] ?? 0, 2) }}</td>
+                            <td class="px-4 py-3 text-right text-gray-300 font-mono">{{ number_format($so['23'] ?? 0, 2) }}</td>
+                            <td class="px-4 py-3 text-right text-white font-mono font-semibold">{{ number_format($invoiceT2Total, 2) }}</td>
+                            <td class="px-4 py-3 text-center text-xs text-gray-400">
+                                {{ $invoice->rtd_accepted_at?->format('d/m/Y') }}
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+                <tfoot class="bg-gray-900 border-t-2 border-gray-600">
+                    <tr>
+                        <td class="px-4 py-3 font-semibold text-gray-200" colspan="2">T2 Totals</td>
+                        <td class="px-4 py-3 text-right text-white font-mono font-bold">{{ number_format($serviceTotals['0'], 2) }}</td>
+                        <td class="px-4 py-3 text-right text-white font-mono font-bold">{{ number_format($serviceTotals['9'], 2) }}</td>
+                        <td class="px-4 py-3 text-right text-white font-mono font-bold">{{ number_format($serviceTotals['13.5'], 2) }}</td>
+                        <td class="px-4 py-3 text-right text-white font-mono font-bold">{{ number_format($serviceTotals['23'], 2) }}</td>
+                        <td class="px-4 py-3 text-right text-yellow-400 font-mono font-bold text-lg">{{ number_format($serviceGrandTotal, 2) }}</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        @endif
     </div>
 
     <script>

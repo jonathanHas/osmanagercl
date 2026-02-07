@@ -171,6 +171,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [\App\Http\Controllers\RtdController::class, 'index'])->name('index');
         Route::get('/year-report', [\App\Http\Controllers\RtdController::class, 'yearReport'])->name('year-report');
         Route::get('/issues', [\App\Http\Controllers\RtdController::class, 'issues'])->name('issues');
+        Route::get('/suppliers', [\App\Http\Controllers\RtdController::class, 'suppliers'])->name('suppliers');
+        Route::post('/suppliers/{supplier}/classify', [\App\Http\Controllers\RtdController::class, 'classifySupplier'])->name('suppliers.classify');
         Route::post('/{invoice}/parse', [\App\Http\Controllers\RtdController::class, 'parse'])->name('parse');
         Route::post('/{invoice}/force-parse', [\App\Http\Controllers\RtdController::class, 'forceParse'])->name('force-parse');
         Route::post('/{invoice}/compute', [\App\Http\Controllers\RtdController::class, 'compute'])->name('compute');

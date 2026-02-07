@@ -350,7 +350,7 @@
                         <span class="text-sm font-normal text-gray-400 ml-2">(for VAT3 / RTD reporting)</span>
                     </h3>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-400 mb-1">Country</label>
                             <select name="country_code" id="country_code"
@@ -400,6 +400,22 @@
                                 <p class="text-red-400 text-xs mt-1">{{ $message }}</p>
                             @enderror
                         </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">RTD Classification</label>
+                            <select name="rtd_classification"
+                                    class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md @error('rtd_classification') border-red-500 @enderror">
+                                @foreach($rtdClassifications as $value => $label)
+                                    <option value="{{ $value }}" {{ old('rtd_classification', $supplier->rtd_classification ?? 'not_applicable') === $value ? 'selected' : '' }}>
+                                        {{ $label }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1">Include in RTD dashboard?</p>
+                            @error('rtd_classification')
+                                <p class="text-red-400 text-xs mt-1">{{ $message }}</p>
+                            @enderror
+                        </div>
                     </div>
 
                     {{-- VAT Treatment Helper Info --}}
@@ -412,6 +428,18 @@
                             <span class="text-purple-400">EU Reverse Charge</span> = EU service suppliers |
                             <span class="text-yellow-400">Postponed Import</span> = Non-EU imports |
                             <span class="text-gray-400">Outside Scope</span> = GB/Other
+                        </p>
+                    </div>
+
+                    {{-- RTD Classification Helper Info --}}
+                    <div class="mt-3 p-3 bg-gray-750 rounded-md border border-gray-600">
+                        <p class="text-xs text-gray-400">
+                            <i class="fas fa-info-circle text-purple-400 mr-1"></i>
+                            <strong>RTD Classification Guide:</strong>
+                            <span class="text-green-400">Goods - Simple VAT</span> = Uses invoice VAT breakdown fields (T1) |
+                            <span class="text-blue-400">Goods - Dedicated Parser</span> = Has specialized parser (Udea, Dynamis, IIH) (T1) |
+                            <span class="text-yellow-400">Service/Overhead</span> = Tracked as T2 overhead |
+                            <span class="text-gray-400">Not Applicable</span> = Not tracked in RTD
                         </p>
                     </div>
                 </div>

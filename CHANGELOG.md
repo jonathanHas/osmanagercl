@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Invoice Total Parsing - Number Format Detection** (2026-02-05)
+  - **Bug**: Invoice stated total was parsing `1,978.38` as `1.98` instead of `1978.38`
+  - **Root Cause**: `_clean_number_string()` in Independent parser assumed European format when both comma and period present
+  - **Fix**: Now detects format by checking which separator comes last (period last = UK/US, comma last = European)
+  - **File Modified**: `scripts/invoice-parser/parsers/delivery_independent.py` (lines 158-184)
+
 ### Added
 
 - **✅ RTD Force Reparse Mode** (2026-02-04)
