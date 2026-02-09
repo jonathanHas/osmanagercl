@@ -42,6 +42,48 @@ NUMBER: Final[str] = r"\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?"
 class InvoiceDynamisRtdParser:
     """Parser for GROUPE DYNAMIS SAS invoices (RTD line extraction)"""
 
+    # Shared description pattern for F&V-style lines
+    _DESC = r'[A-Z][A-Za-z0-9 \'.,/-]+(?:BIO|DEMETER|CONV)?[A-Za-z0-9 \'.,/-]*?'
+
+    # F&V-style patterns (used by both F&V and grocery parsers for weight-based items)
+    _FV_PATTERNS = [
+        # Pattern with weight columns: DESC COLIS PDS_BRUT PDS_NET PU U HT
+        re.compile(
+            r'^(' + _DESC + r')\s+'
+            r'(\d+)\s+'                           # Colis
+            r'(\d+[.,]\d{2})\s+'                  # Pds Brut
+            r'(\d+[.,]\d{2})\s+'                  # Pds Net
+            r'(\d+[.,]\d{2})\s*'                  # P.U.
+            r'([CKP])\s+'                         # Unit
+            r'(\d+[.,]\d{2})\s*$'                 # H.T.
+        ),
+        # Pattern with 4 numeric cols: DESC COLIS PDS_BRUT PIECES PU U HT
+        re.compile(
+            r'^(' + _DESC + r')\s+'
+            r'(\d+)\s+'                           # Colis
+            r'(\d+[.,]\d{2})\s+'                  # Pds Brut
+            r'(\d+)\s+'                           # Pieces (integer, no decimals)
+            r'(\d+[.,]\d{2})\s*'                  # P.U.
+            r'([CKP])\s+'                         # Unit
+            r'(\d+[.,]\d{2})\s*$'                 # H.T.
+        ),
+        # Pattern without weight: DESC COLIS PU U HT (for case items)
+        re.compile(
+            r'^(' + _DESC + r')\s+'
+            r'(\d+)\s+'                           # Colis
+            r'(\d+[.,]\d{2})\s*'                  # P.U.
+            r'([CKP])\s+'                         # Unit
+            r'(\d+[.,]\d{2})\s*$'                 # H.T.
+        ),
+        # Transport line: MISCELLANEOUS TRANSPORT 1 135.00 135.00
+        re.compile(
+            r'^(MISCELLANEOUS\s+TRANSPORT|TRANSPORT|FREIGHT)\s+'
+            r'(\d+)\s+'                           # Colis
+            r'(\d+[.,]\d{2})\s+'                  # Price (no unit type)
+            r'(\d+[.,]\d{2})\s*$'                 # Total
+        ),
+    ]
+
     def __init__(self, verbose: bool = False, debug: bool = False):
         self.verbose = verbose
         self.debug = debug
@@ -150,6 +192,91 @@ class InvoiceDynamisRtdParser:
 
         return f"DYN-{product}-{country}"
 
+    def _try_fv_patterns(self, line: str) -> Optional[Dict[str, Any]]:
+        """Try to match a line against F&V-style patterns (weight-based, no EAN).
+
+        Used by both the F&V parser and the grocery parser (for weight-based items
+        that appear in MAG invoices without EAN codes).
+
+        Returns a parsed line item dict if matched, or None if no pattern matches.
+        """
+        # Try transport pattern first
+        transport_match = self._FV_PATTERNS[3].match(line)
+        if transport_match:
+            groups = transport_match.groups()
+            return {
+                'article_code': 'DYN-TRANSPORT',
+                'description': groups[0].strip(),
+                'quantity': int(groups[1]),
+                'unit_price': self._clean_number_string(groups[2]),
+                'unit_type': None,
+                'line_total': self._clean_number_string(groups[3]),
+                'line_type': 'freight_or_service',
+                'origin_country': None,
+                'ean': None,
+                'parse_status': 'full',
+            }
+
+        # Try pattern with weights (pds_brut + pds_net)
+        match = self._FV_PATTERNS[0].match(line)
+        if match:
+            groups = match.groups()
+            description = groups[0].strip()
+            return {
+                'article_code': self._generate_article_code(description),
+                'description': description[:100],
+                'quantity': int(groups[1]),  # Colis
+                'pds_brut': self._clean_number_string(groups[2]),
+                'pds_net': self._clean_number_string(groups[3]),
+                'unit_price': self._clean_number_string(groups[4]),
+                'unit_type': groups[5],
+                'line_total': self._clean_number_string(groups[6]),
+                'line_type': 'product_for_resale',
+                'origin_country': self._extract_origin_country(description),
+                'ean': None,
+                'parse_status': 'full',
+            }
+
+        # Try pattern with 4 numeric columns (pds_brut + pieces)
+        match = self._FV_PATTERNS[1].match(line)
+        if match:
+            groups = match.groups()
+            description = groups[0].strip()
+            return {
+                'article_code': self._generate_article_code(description),
+                'description': description[:100],
+                'quantity': int(groups[3]),  # Pieces column
+                'colis': int(groups[1]),
+                'pds_brut': self._clean_number_string(groups[2]),
+                'unit_price': self._clean_number_string(groups[4]),
+                'unit_type': groups[5],
+                'line_total': self._clean_number_string(groups[6]),
+                'line_type': 'product_for_resale',
+                'origin_country': self._extract_origin_country(description),
+                'ean': None,
+                'parse_status': 'full',
+            }
+
+        # Try pattern without weights (case items)
+        match = self._FV_PATTERNS[2].match(line)
+        if match:
+            groups = match.groups()
+            description = groups[0].strip()
+            return {
+                'article_code': self._generate_article_code(description),
+                'description': description[:100],
+                'quantity': int(groups[1]),  # Colis
+                'unit_price': self._clean_number_string(groups[2]),
+                'unit_type': groups[3],
+                'line_total': self._clean_number_string(groups[4]),
+                'line_type': 'product_for_resale',
+                'origin_country': self._extract_origin_country(description),
+                'ean': None,
+                'parse_status': 'full',
+            }
+
+        return None
+
     def _extract_header(self, text: str) -> Dict[str, Any]:
         """Extract invoice header information.
 
@@ -235,49 +362,6 @@ class InvoiceDynamisRtdParser:
         lines = []
         text_lines = text.split('\n')
 
-        # Pattern for F&V lines - matches various formats
-        # Description | Colis | (Pds Brut) | (Pds Net) | P.U. | U | H.T.
-        # Note: Description may contain mixed case (e.g. "10 Bunches", "cat.2")
-        DESC = r'[A-Z][A-Za-z0-9 \'.,/-]+(?:BIO|DEMETER|CONV)?[A-Za-z0-9 \'.,/-]*?'
-        fv_patterns = [
-            # Pattern with weight columns: DESC COLIS PDS_BRUT PDS_NET PU U HT
-            re.compile(
-                r'^(' + DESC + r')\s+'
-                r'(\d+)\s+'                           # Colis
-                r'(\d+[.,]\d{2})\s+'                  # Pds Brut
-                r'(\d+[.,]\d{2})\s+'                  # Pds Net
-                r'(\d+[.,]\d{2})\s*'                  # P.U.
-                r'([CKP])\s+'                         # Unit
-                r'(\d+[.,]\d{2})\s*$'                 # H.T.
-            ),
-            # Pattern with 4 numeric cols: DESC COLIS PDS_BRUT PIECES PU U HT
-            # e.g. "DILL 10 Bunches BIO - FR - cat.2 1 10.00 10 1.14 P 11.40"
-            re.compile(
-                r'^(' + DESC + r')\s+'
-                r'(\d+)\s+'                           # Colis
-                r'(\d+[.,]\d{2})\s+'                  # Pds Brut
-                r'(\d+)\s+'                           # Pieces (integer, no decimals)
-                r'(\d+[.,]\d{2})\s*'                  # P.U.
-                r'([CKP])\s+'                         # Unit
-                r'(\d+[.,]\d{2})\s*$'                 # H.T.
-            ),
-            # Pattern without weight: DESC COLIS PU U HT (for case items)
-            re.compile(
-                r'^(' + DESC + r')\s+'
-                r'(\d+)\s+'                           # Colis
-                r'(\d+[.,]\d{2})\s*'                  # P.U.
-                r'([CKP])\s+'                         # Unit
-                r'(\d+[.,]\d{2})\s*$'                 # H.T.
-            ),
-            # Transport line: MISCELLANEOUS TRANSPORT 1 135.00 135.00
-            re.compile(
-                r'^(MISCELLANEOUS\s+TRANSPORT|TRANSPORT|FREIGHT)\s+'
-                r'(\d+)\s+'                           # Colis
-                r'(\d+[.,]\d{2})\s+'                  # Price (no unit type)
-                r'(\d+[.,]\d{2})\s*$'                 # Total
-            ),
-        ]
-
         for raw_line in text_lines:
             line = raw_line.strip()
             self.stats['total_lines_scanned'] += 1
@@ -298,95 +382,16 @@ class InvoiceDynamisRtdParser:
             ]):
                 continue
 
-            # Try transport pattern first
-            transport_match = fv_patterns[3].match(line)
-            if transport_match:
-                groups = transport_match.groups()
-                line_item = {
-                    'article_code': 'DYN-TRANSPORT',
-                    'description': groups[0].strip(),
-                    'quantity': int(groups[1]),
-                    'unit_price': self._clean_number_string(groups[2]),
-                    'unit_type': None,
-                    'line_total': self._clean_number_string(groups[3]),
-                    'line_type': 'freight_or_service',
-                    'origin_country': None,
-                    'ean': None,
-                    'parse_status': 'full',
-                }
+            # Try all F&V patterns via shared method
+            line_item = self._try_fv_patterns(line)
+            if line_item:
                 lines.append(line_item)
-                self.stats['transport_lines_parsed'] += 1
-                self.log(f"Parsed transport: {line_item['line_total']}", "DEBUG")
-                continue
-
-            # Try pattern with weights (pds_brut + pds_net)
-            match = fv_patterns[0].match(line)
-            if match:
-                groups = match.groups()
-                description = groups[0].strip()
-                line_item = {
-                    'article_code': self._generate_article_code(description),
-                    'description': description[:100],
-                    'quantity': int(groups[1]),  # Colis
-                    'pds_brut': self._clean_number_string(groups[2]),
-                    'pds_net': self._clean_number_string(groups[3]),
-                    'unit_price': self._clean_number_string(groups[4]),
-                    'unit_type': groups[5],
-                    'line_total': self._clean_number_string(groups[6]),
-                    'line_type': 'product_for_resale',
-                    'origin_country': self._extract_origin_country(description),
-                    'ean': None,
-                    'parse_status': 'full',
-                }
-                lines.append(line_item)
-                self.stats['product_lines_parsed'] += 1
-                self.log(f"Parsed F&V (weight): {line_item['article_code']} - {line_item['line_total']}", "DEBUG")
-                continue
-
-            # Try pattern with 4 numeric columns (pds_brut + pieces)
-            match = fv_patterns[1].match(line)
-            if match:
-                groups = match.groups()
-                description = groups[0].strip()
-                line_item = {
-                    'article_code': self._generate_article_code(description),
-                    'description': description[:100],
-                    'quantity': int(groups[3]),  # Pieces column
-                    'colis': int(groups[1]),
-                    'pds_brut': self._clean_number_string(groups[2]),
-                    'unit_price': self._clean_number_string(groups[4]),
-                    'unit_type': groups[5],
-                    'line_total': self._clean_number_string(groups[6]),
-                    'line_type': 'product_for_resale',
-                    'origin_country': self._extract_origin_country(description),
-                    'ean': None,
-                    'parse_status': 'full',
-                }
-                lines.append(line_item)
-                self.stats['product_lines_parsed'] += 1
-                self.log(f"Parsed F&V (4-col): {line_item['article_code']} - {line_item['line_total']}", "DEBUG")
-                continue
-
-            # Try pattern without weights (case items)
-            match = fv_patterns[2].match(line)
-            if match:
-                groups = match.groups()
-                description = groups[0].strip()
-                line_item = {
-                    'article_code': self._generate_article_code(description),
-                    'description': description[:100],
-                    'quantity': int(groups[1]),  # Colis
-                    'unit_price': self._clean_number_string(groups[2]),
-                    'unit_type': groups[3],
-                    'line_total': self._clean_number_string(groups[4]),
-                    'line_type': 'product_for_resale',
-                    'origin_country': self._extract_origin_country(description),
-                    'ean': None,
-                    'parse_status': 'full',
-                }
-                lines.append(line_item)
-                self.stats['product_lines_parsed'] += 1
-                self.log(f"Parsed F&V (case): {line_item['article_code']} - {line_item['line_total']}", "DEBUG")
+                if line_item['line_type'] == 'freight_or_service':
+                    self.stats['transport_lines_parsed'] += 1
+                    self.log(f"Parsed transport: {line_item['line_total']}", "DEBUG")
+                else:
+                    self.stats['product_lines_parsed'] += 1
+                    self.log(f"Parsed F&V: {line_item['article_code']} - {line_item['line_total']}", "DEBUG")
                 continue
 
             # Fallback: try to extract just description and total from end
@@ -493,7 +498,18 @@ class InvoiceDynamisRtdParser:
             # Check if this is a product description line (starts with uppercase, no EAN: prefix)
             # Note: Check for 'EAN :' or 'EAN:' specifically, not just 'EAN' (which matches 'BEANS')
             if re.match(r'^[A-Z][A-Z0-9 \'.,/-]+', line) and not re.match(r'^EAN\s*:', line):
-                # This might be a product description, save it for next EAN line
+                # Before treating as pending_description, check if this is a weight-based line
+                # (all data on one line, no EAN) - same format as F&V items
+                # e.g.: BLEU D'AUVERGNE BLUE CHEESE BIO 2,50kg - FR - 1 2.68 2.68 18.87 K 50.57
+                weight_match = self._try_fv_patterns(line)
+                if weight_match:
+                    lines.append(weight_match)
+                    self.stats['product_lines_parsed'] += 1
+                    self.log(f"Parsed grocery (weight-based): {weight_match['article_code']} - {weight_match['line_total']}", "DEBUG")
+                    pending_description = None
+                    continue
+
+                # This is just a product description, save it for next EAN line
                 pending_description = line.strip()
                 continue
 
