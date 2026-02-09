@@ -174,6 +174,13 @@
                     </div>
                 </div>
 
+                <button type="button" id="freeze-all-btn" onclick="freezeAllBalanced()"
+                        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg inline-flex items-center hidden">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                    </svg>
+                    <span id="freeze-all-text">Freeze All Balanced (<span id="freeze-all-count">0</span>)</span>
+                </button>
                 <form action="{{ route('rtd.recompute-all') }}" method="POST">
                     @csrf
                     <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg inline-flex items-center">
@@ -210,9 +217,29 @@
                     </thead>
                     <tbody class="divide-y divide-gray-700">
                         @foreach($invoices as $invoice)
+                            @php
+                                // Pre-compute balance for row data attribute and display
+                                $isBalancedRow = false;
+                                if ($invoice->hasRtdData()) {
+                                    $gfrRow = $invoice->rtd_breakdown['goods_for_resale'] ?? [];
+                                    $exclRow = $invoice->rtd_breakdown['excluded'] ?? [];
+                                    $unresRow = $invoice->rtd_breakdown['unresolved'] ?? [];
+                                    $statsRow = $invoice->rtd_breakdown['stats'] ?? [];
+                                    $isServiceRow = ($statsRow['is_service'] ?? false) || ($invoice->supplier && $invoice->supplier->rtd_classification === 'service_overhead');
+                                    $serviceOhRow = (float) ($exclRow['service_overhead'] ?? 0);
+                                    $rtdTotalRow = $isServiceRow ? 0 : $invoice->getRtdTotal();
+                                    $exclTotalRow = ($exclRow['freight'] ?? 0) + ($exclRow['deposits'] ?? 0) + ($exclRow['drs'] ?? 0) + ($exclRow['vat'] ?? 0) + $serviceOhRow;
+                                    $unrTotalRow = $unresRow['net_total'] ?? 0;
+                                    $calcTotalRow = $rtdTotalRow + $exclTotalRow + $unrTotalRow;
+                                    $diffRow = abs($calcTotalRow - $invoice->total_amount);
+                                    $isBalancedRow = $diffRow < 0.50;
+                                }
+                            @endphp
                             <tr class="hover:bg-gray-750 cursor-pointer"
                                 onclick="toggleExpand({{ $invoice->id }})"
-                                id="row-{{ $invoice->id }}">
+                                id="row-{{ $invoice->id }}"
+                                data-status="{{ $invoice->rtd_display_status }}"
+                                data-balanced="{{ $isBalancedRow ? 'true' : 'false' }}">
                                 <td class="px-4 py-3">
                                     <div class="flex items-center">
                                         <svg class="w-4 h-4 mr-2 text-gray-500 transition-transform" id="chevron-{{ $invoice->id }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -238,28 +265,13 @@
                                     <div class="flex items-center justify-end gap-1.5">
                                         <span class="text-gray-300">{{ number_format($invoice->total_amount, 2) }}</span>
                                         @if($invoice->hasRtdData())
-                                            @php
-                                                $gfrRow = $invoice->rtd_breakdown['goods_for_resale'] ?? [];
-                                                $exclRow = $invoice->rtd_breakdown['excluded'] ?? [];
-                                                $unresRow = $invoice->rtd_breakdown['unresolved'] ?? [];
-                                                $statsRow = $invoice->rtd_breakdown['stats'] ?? [];
-                                                $isServiceRow = ($statsRow['is_service'] ?? false) || ($invoice->supplier && $invoice->supplier->rtd_classification === 'service_overhead');
-                                                $serviceOhRow = (float) ($exclRow['service_overhead'] ?? 0);
-                                                $rtdTotalRow = $isServiceRow ? 0 : $invoice->getRtdTotal();
-                                                $exclTotalRow = ($exclRow['freight'] ?? 0) + ($exclRow['deposits'] ?? 0) + ($exclRow['drs'] ?? 0) + ($exclRow['vat'] ?? 0) + $serviceOhRow;
-                                                $unrTotalRow = $unresRow['net_total'] ?? 0;
-                                                $calcTotalRow = $rtdTotalRow + $exclTotalRow + $unrTotalRow;
-                                                $diffRow = abs($calcTotalRow - $invoice->total_amount);
-                                                $isBalancedRow = $diffRow < 0.50;
-                                            @endphp
+                                            {{-- $isBalancedRow pre-computed above the <tr> --}}
                                             @if($isBalancedRow)
                                                 <svg class="w-4 h-4 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
                                                 </svg>
                                             @else
-                                                <svg class="w-4 h-4 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
-                                                </svg>
+                                                <span class="text-red-400 text-xs font-mono flex-shrink-0">{{ number_format($diffRow, 2) }}</span>
                                             @endif
                                         @else
                                             <span class="text-gray-600 text-xs">-</span>
@@ -696,6 +708,7 @@
                 toggle.checked = forceReparseMode;
             }
             updateForceReparseUI();
+            updateFreezeAllButton();
         });
 
         function toggleForceReparseMode() {
@@ -854,11 +867,11 @@
                 const diff = Math.abs(calcT - invT);
                 const balanced = diff < 0.50;
 
-                const balanceIcon = balanced
+                const balanceIndicator = balanced
                     ? `<svg class="w-4 h-4 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>`
-                    : `<svg class="w-4 h-4 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>`;
+                    : `<span class="text-red-400 text-xs font-mono flex-shrink-0">${formatNumber(diff)}</span>`;
 
-                totalCell.innerHTML = `<div class="flex items-center justify-end gap-1.5"><span class="text-gray-300">${formatNumber(invT)}</span>${balanceIcon}</div>`;
+                totalCell.innerHTML = `<div class="flex items-center justify-end gap-1.5"><span class="text-gray-300">${formatNumber(invT)}</span>${balanceIndicator}</div>`;
 
                 // Update breakdown column (4th column)
                 const breakdownCell = row.querySelector('td:nth-child(4)');
@@ -894,8 +907,30 @@
             // Update action buttons based on new status
             buttons.innerHTML = getActionButtonsHtml(invoiceId, data);
 
+            // Update data-status and data-balanced attributes on the row
+            if (row && data.new_status) {
+                row.dataset.status = data.new_status;
+                // Recompute balanced state from response data
+                if (data.has_rtd_data && data.rtd_breakdown) {
+                    const excl = data.rtd_breakdown.excluded || {};
+                    const unres = data.rtd_breakdown.unresolved || {};
+                    const rtdT = parseFloat(data.rtd_total) || 0;
+                    const svcOh = parseFloat(excl.service_overhead) || 0;
+                    const exclT = (parseFloat(excl.freight) || 0) + (parseFloat(excl.deposits) || 0) + (parseFloat(excl.drs) || 0) + (parseFloat(excl.vat) || 0) + svcOh;
+                    const unresT = parseFloat(unres.net_total) || 0;
+                    const calcT = rtdT + exclT + unresT;
+                    const invT = parseFloat(data.invoice_total) || 0;
+                    row.dataset.balanced = Math.abs(calcT - invT) < 0.50 ? 'true' : 'false';
+                } else {
+                    row.dataset.balanced = 'false';
+                }
+            }
+
             // Update the detail row content
             updateDetailRow(invoiceId, data);
+
+            // Update freeze all button count
+            updateFreezeAllButton();
         }
 
         // Update the expandable detail row content
@@ -1179,6 +1214,69 @@
             return html;
         }
 
+        // Update the "Freeze All Balanced" button visibility and count
+        function updateFreezeAllButton() {
+            const rows = document.querySelectorAll('tr[data-status="computed"][data-balanced="true"]');
+            const btn = document.getElementById('freeze-all-btn');
+            const countEl = document.getElementById('freeze-all-count');
+            if (btn) {
+                if (rows.length > 0) {
+                    btn.classList.remove('hidden');
+                    countEl.textContent = rows.length;
+                } else {
+                    btn.classList.add('hidden');
+                }
+            }
+        }
+
+        // Freeze all computed + balanced invoices sequentially
+        async function freezeAllBalanced() {
+            const rows = document.querySelectorAll('tr[data-status="computed"][data-balanced="true"]');
+            if (rows.length === 0) return;
+
+            if (!confirm(`Freeze ${rows.length} balanced invoice(s)?`)) return;
+
+            const btn = document.getElementById('freeze-all-btn');
+            const textEl = document.getElementById('freeze-all-text');
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            const ids = Array.from(rows).map(r => r.id.replace('row-', ''));
+            let frozen = 0, failed = 0;
+
+            for (let i = 0; i < ids.length; i++) {
+                textEl.textContent = `Freezing ${i + 1}/${ids.length}...`;
+                try {
+                    const resp = await fetch(`/rtd/${ids[i]}/accept`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    const data = await resp.json();
+                    if (data.success) {
+                        frozen++;
+                        updateRowStatus(ids[i], data);
+                    } else {
+                        failed++;
+                    }
+                } catch (e) {
+                    failed++;
+                }
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+            let msg = `Frozen ${frozen} invoice(s) successfully.`;
+            if (failed > 0) msg += ` ${failed} failed.`;
+            showFlashMessage(msg, failed > 0 ? 'warning' : 'success');
+
+            updateFreezeAllButton();
+        }
+
         // Show toast-style flash message (fixed position, no layout shift)
         function showFlashMessage(message, type) {
             // Remove existing flash messages
@@ -1187,8 +1285,13 @@
 
             // Create toast-style flash message (fixed position, top-right)
             const flashDiv = document.createElement('div');
+            const typeClasses = {
+                success: 'bg-green-900 border border-green-500 text-green-300',
+                warning: 'bg-yellow-900 border border-yellow-500 text-yellow-300',
+                error: 'bg-red-900 border border-red-500 text-red-300'
+            };
             flashDiv.className = 'ajax-flash-message fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg max-w-md ' +
-                (type === 'success' ? 'bg-green-900 border border-green-500 text-green-300' : 'bg-red-900 border border-red-500 text-red-300');
+                (typeClasses[type] || typeClasses.error);
             flashDiv.innerHTML = `
                 <div class="flex justify-between items-center">
                     <span>${message}</span>
