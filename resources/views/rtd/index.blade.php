@@ -659,20 +659,21 @@
                 </table>
 
                 {{-- Pagination --}}
-                @if($lastPage > 1)
+                @if($invoices->hasPages())
                     <div class="bg-gray-900 px-4 py-3 flex items-center justify-between border-t border-gray-700">
                         <div class="text-sm text-gray-400">
-                            Showing {{ ($currentPage - 1) * 20 + 1 }} to {{ min($currentPage * 20, $total) }} of {{ $total }} invoices
+                            Showing {{ $invoices->firstItem() }} to {{ $invoices->lastItem() }} of {{ $invoices->total() }} invoices
                         </div>
                         <div class="flex space-x-2">
-                            @if($currentPage > 1)
-                                <a href="{{ route('rtd.index', ['filter' => $filter, 'search' => $search, 'page' => $currentPage - 1]) }}"
+                            @if($invoices->onFirstPage())
+                            @else
+                                <a href="{{ $invoices->appends(request()->query())->previousPageUrl() }}"
                                    class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded">
                                     Previous
                                 </a>
                             @endif
-                            @if($currentPage < $lastPage)
-                                <a href="{{ route('rtd.index', ['filter' => $filter, 'search' => $search, 'page' => $currentPage + 1]) }}"
+                            @if($invoices->hasMorePages())
+                                <a href="{{ $invoices->appends(request()->query())->nextPageUrl() }}"
                                    class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded">
                                     Next
                                 </a>

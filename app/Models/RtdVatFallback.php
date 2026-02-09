@@ -54,6 +54,13 @@ class RtdVatFallback extends Model
             ->where('supplier_id', $supplierId)
             ->first();
 
+        // If no exact match, try XX wildcard for DYN codes (country-agnostic fallback)
+        if (!$fallback && preg_match('/^(DYN-.+)-[A-Z]{2}$/', $articleCode, $m)) {
+            $fallback = self::where('article_code', $m[1] . '-XX')
+                ->where('supplier_id', $supplierId)
+                ->first();
+        }
+
         return $fallback?->vat_rate;
     }
 

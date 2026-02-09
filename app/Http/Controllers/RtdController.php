@@ -23,99 +23,87 @@ class RtdController extends Controller
         $search = $request->get('search', '');
         $supplierType = $request->get('supplier_type', 'all'); // all, parser, simple, service
 
-        // Get all RTD-supported supplier invoices
-        // Now queries by supplier rtd_classification OR legacy name-based detection
-        $query = Invoice::with(['supplier', 'attachments', 'uploadFiles'])
-            ->where(function ($q) {
-                // New: Suppliers with rtd_classification set (not 'not_applicable')
-                $q->whereHas('supplier', function ($sq) {
-                    $sq->where('rtd_classification', '!=', 'not_applicable')
-                        ->whereNotNull('rtd_classification');
-                })
-                // Legacy: Udea, Dynamis, Independent (for backwards compatibility)
-                    ->orWhere('supplier_name', 'like', '%udea%')
-                    ->orWhereHas('supplier', function ($sq) {
-                        $sq->where('name', 'like', '%udea%');
-                    })
-                    ->orWhere('supplier_name', 'like', '%dynamis%')
-                    ->orWhereHas('supplier', function ($sq) {
-                        $sq->where('name', 'like', '%dynamis%');
-                    })
-                    ->orWhere('supplier_name', 'like', '%independent%')
-                    ->orWhereHas('supplier', function ($sq) {
-                        $sq->where('name', 'like', '%independent%');
-                    });
+        // Base query for RTD-eligible invoices
+        $baseQuery = Invoice::where(function ($q) {
+            $q->whereHas('supplier', function ($sq) {
+                $sq->where('rtd_classification', '!=', 'not_applicable')
+                    ->whereNotNull('rtd_classification');
             })
-            ->orderByDesc('invoice_date');
+                ->orWhere('supplier_name', 'like', '%udea%')
+                ->orWhereHas('supplier', function ($sq) {
+                    $sq->where('name', 'like', '%udea%');
+                })
+                ->orWhere('supplier_name', 'like', '%dynamis%')
+                ->orWhereHas('supplier', function ($sq) {
+                    $sq->where('name', 'like', '%dynamis%');
+                })
+                ->orWhere('supplier_name', 'like', '%independent%')
+                ->orWhereHas('supplier', function ($sq) {
+                    $sq->where('name', 'like', '%independent%');
+                });
+        });
 
         // Filter by supplier type
         if ($supplierType === 'parser') {
-            $query->whereHas('supplier', function ($sq) {
+            $baseQuery->whereHas('supplier', function ($sq) {
                 $sq->where('rtd_classification', 'goods_parser');
             });
         } elseif ($supplierType === 'simple') {
-            $query->whereHas('supplier', function ($sq) {
+            $baseQuery->whereHas('supplier', function ($sq) {
                 $sq->where('rtd_classification', 'goods_simple');
             });
         } elseif ($supplierType === 'service') {
-            $query->whereHas('supplier', function ($sq) {
+            $baseQuery->whereHas('supplier', function ($sq) {
                 $sq->where('rtd_classification', 'service_overhead');
             });
         }
 
         // Apply search filter
         if ($search) {
-            $query->where(function ($q) use ($search) {
+            $baseQuery->where(function ($q) use ($search) {
                 $q->where('invoice_number', 'like', "%{$search}%")
                     ->orWhere('supplier_name', 'like', "%{$search}%");
             });
         }
 
-        // Get all invoices for stats calculation
-        $allInvoices = $query->get();
+        // Stats: single aggregate query using rtd_status grouping
+        $statusCounts = (clone $baseQuery)
+            ->selectRaw('rtd_status, COUNT(*) as count')
+            ->groupBy('rtd_status')
+            ->pluck('count', 'rtd_status')
+            ->toArray();
 
-        // Calculate stats
-        $stats = $this->calculateStats($allInvoices);
+        // 'pending' is the default for invoices not yet backfilled - treat as needs_parsing
+        $pendingCount = $statusCounts['pending'] ?? 0;
+        $stats = [
+            'total' => array_sum($statusCounts),
+            'needs_parsing' => ($statusCounts['needs_parsing'] ?? 0) + ($statusCounts['pdf_missing'] ?? 0) + $pendingCount,
+            'pdf_missing' => $statusCounts['pdf_missing'] ?? 0,
+            'needs_computation' => $statusCounts['needs_computation'] ?? 0,
+            'has_issues' => $statusCounts['has_issues'] ?? 0,
+            'computed' => $statusCounts['computed'] ?? 0,
+            'frozen' => $statusCounts['frozen'] ?? 0,
+        ];
 
-        // Apply status filter
+        // Apply status filter at DATABASE level
         if ($filter !== 'all') {
-            $allInvoices = $allInvoices->filter(function ($invoice) use ($filter) {
-                return $this->getInvoiceRtdStatus($invoice) === $filter;
-            });
+            if ($filter === 'needs_parsing') {
+                // needs_parsing filter includes pdf_missing and pending (not yet backfilled)
+                $baseQuery->whereIn('rtd_status', ['needs_parsing', 'pdf_missing', 'pending']);
+            } else {
+                $baseQuery->where('rtd_status', $filter);
+            }
         }
 
-        // Paginate manually since we filtered in memory
-        $page = $request->get('page', 1);
-        $perPage = 20;
-        $total = $allInvoices->count();
-        $invoices = $allInvoices->forPage($page, $perPage)->values();
+        // Database-level pagination
+        $invoices = $baseQuery
+            ->with(['supplier', 'attachments', 'uploadFiles'])
+            ->orderByDesc('invoice_date')
+            ->paginate(20);
 
-        // Add RTD status to each invoice, auto-computing for simple VAT and service suppliers
-        $invoices = $invoices->map(function ($invoice) {
-            // Auto-compute RTD for simple VAT and service suppliers that haven't been computed yet
-            if ($invoice->supplier &&
-                in_array($invoice->supplier->rtd_classification, ['goods_simple', 'service_overhead']) &&
-                !$invoice->hasRtdData() &&
-                $invoice->rtd_status !== 'frozen') {
-
-                // Check invoice has VAT data to compute from
-                $hasVatData = ($invoice->standard_net > 0 || $invoice->reduced_net > 0 ||
-                               $invoice->second_reduced_net > 0 || $invoice->zero_net > 0 ||
-                               $invoice->total_net > 0);
-
-                if ($hasVatData) {
-                    $rtdResult = $this->rtdService->computeRtd($invoice);
-                    $invoice->update([
-                        'rtd_breakdown' => $rtdResult['breakdown'],
-                        'rtd_resolution_issues' => $rtdResult['issues'],
-                        'rtd_status' => 'computed',
-                        'rtd_computed_at' => now(),
-                    ]);
-                    $invoice->refresh();
-                }
-            }
-
-            $invoice->rtd_display_status = $this->getInvoiceRtdStatus($invoice);
+        // Add display status from the database field (no extra queries)
+        $invoices->getCollection()->transform(function ($invoice) {
+            $invoice->rtd_display_status = $invoice->rtd_status === 'pending' ? 'needs_parsing' : $invoice->rtd_status;
 
             return $invoice;
         });
@@ -126,75 +114,10 @@ class RtdController extends Controller
             'filter' => $filter,
             'search' => $search,
             'supplierType' => $supplierType,
-            'currentPage' => $page,
-            'lastPage' => ceil($total / $perPage),
-            'total' => $total,
+            'currentPage' => $invoices->currentPage(),
+            'lastPage' => $invoices->lastPage(),
+            'total' => $invoices->total(),
         ]);
-    }
-
-    /**
-     * Calculate RTD statistics for all Udea invoices.
-     */
-    private function calculateStats($invoices): array
-    {
-        $stats = [
-            'total' => $invoices->count(),
-            'needs_parsing' => 0,
-            'pdf_missing' => 0,
-            'needs_computation' => 0,
-            'has_issues' => 0,
-            'computed' => 0,
-            'frozen' => 0,
-        ];
-
-        foreach ($invoices as $invoice) {
-            $status = $this->getInvoiceRtdStatus($invoice);
-            if (isset($stats[$status])) {
-                $stats[$status]++;
-            }
-        }
-
-        return $stats;
-    }
-
-    /**
-     * Determine the RTD status of an invoice.
-     */
-    private function getInvoiceRtdStatus(Invoice $invoice): string
-    {
-        // Check if frozen
-        if ($invoice->rtd_status === 'frozen') {
-            return 'frozen';
-        }
-
-        // Check if has RTD data with issues
-        if ($invoice->hasRtdData()) {
-            $unresolvedCount = $invoice->rtd_breakdown['unresolved']['count'] ?? 0;
-            if ($unresolvedCount > 0) {
-                return 'has_issues';
-            }
-
-            return 'computed';
-        }
-
-        // Check if can compute (has parsed line data)
-        if ($invoice->canComputeRtd()) {
-            return 'needs_computation';
-        }
-
-        // Check if can parse (has PDF but no line data)
-        if ($invoice->canReparseForRtd()) {
-            return 'needs_parsing';
-        }
-
-        // Check if has attachment record but file missing from disk
-        $hasPdfRecord = $invoice->attachments()->where('mime_type', 'application/pdf')->exists();
-        if ($hasPdfRecord && ! $invoice->hasPdfOnDisk()) {
-            return 'pdf_missing';
-        }
-
-        // No PDF at all
-        return 'needs_parsing';
     }
 
     /**
@@ -315,14 +238,14 @@ class RtdController extends Controller
             // Auto-compute RTD after successful parse
             $invoice->refresh();
             $rtdResult = $this->rtdService->computeRtd($invoice);
+            $unresolvedCount = $rtdResult['breakdown']['unresolved']['count'] ?? 0;
             $invoice->update([
                 'rtd_breakdown' => $rtdResult['breakdown'],
                 'rtd_resolution_issues' => $rtdResult['issues'],
-                'rtd_status' => 'computed',
+                'rtd_status' => $unresolvedCount > 0 ? 'has_issues' : 'computed',
                 'rtd_computed_at' => now(),
             ]);
 
-            $unresolvedCount = $rtdResult['breakdown']['unresolved']['count'] ?? 0;
             $message = "Invoice #{$invoice->invoice_number} parsed and computed. Found {$lineCount} lines, {$unresolvedCount} unresolved.";
 
             // Refresh invoice to get updated status
@@ -457,14 +380,14 @@ class RtdController extends Controller
             // Auto-compute RTD after successful parse
             $invoice->refresh();
             $rtdResult = $this->rtdService->computeRtd($invoice);
+            $unresolvedCount = $rtdResult['breakdown']['unresolved']['count'] ?? 0;
             $invoice->update([
                 'rtd_breakdown' => $rtdResult['breakdown'],
                 'rtd_resolution_issues' => $rtdResult['issues'],
-                'rtd_status' => 'computed',
+                'rtd_status' => $unresolvedCount > 0 ? 'has_issues' : 'computed',
                 'rtd_computed_at' => now(),
             ]);
 
-            $unresolvedCount = $rtdResult['breakdown']['unresolved']['count'] ?? 0;
             $message = "Invoice #{$invoice->invoice_number} parsed and computed. Found {$lineCount} lines, {$unresolvedCount} unresolved.";
 
             // Refresh invoice to get updated status
@@ -493,15 +416,15 @@ class RtdController extends Controller
 
         $result = $this->rtdService->computeRtd($invoice);
 
+        $unresolvedCount = $result['breakdown']['unresolved']['count'] ?? 0;
         $invoice->update([
             'rtd_breakdown' => $result['breakdown'],
             'rtd_resolution_issues' => $result['issues'],
-            'rtd_status' => 'computed',
+            'rtd_status' => $unresolvedCount > 0 ? 'has_issues' : 'computed',
             'rtd_computed_at' => now(),
         ]);
 
         $stats = $result['breakdown']['stats'] ?? [];
-        $unresolvedCount = $result['breakdown']['unresolved']['count'] ?? 0;
         $message = sprintf(
             'RTD computed for #%s: %d lines resolved, %d unresolved.',
             $invoice->invoice_number,
@@ -567,15 +490,15 @@ class RtdController extends Controller
 
             $result = $this->rtdService->computeRtd($invoice);
 
+            $newCount = $result['breakdown']['unresolved']['count'] ?? 0;
             $invoice->update([
                 'rtd_breakdown' => $result['breakdown'],
                 'rtd_resolution_issues' => $result['issues'],
-                'rtd_status' => 'computed',
+                'rtd_status' => $newCount > 0 ? 'has_issues' : 'computed',
                 'rtd_computed_at' => now(),
             ]);
 
             $recomputed++;
-            $newCount = $result['breakdown']['unresolved']['count'] ?? 0;
             if ($newCount < $previousCount) {
                 $improved++;
             }
@@ -803,7 +726,7 @@ class RtdController extends Controller
     private function rtdResponse(bool $success, string $message, Invoice $invoice)
     {
         if (request()->wantsJson() || request()->ajax()) {
-            $status = $this->getInvoiceRtdStatus($invoice);
+            $status = $invoice->rtd_status;
             $breakdown = $invoice->rtd_breakdown ?? [];
             $unresolvedCount = $breakdown['unresolved']['count'] ?? 0;
 

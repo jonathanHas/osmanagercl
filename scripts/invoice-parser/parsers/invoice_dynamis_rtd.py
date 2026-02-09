@@ -237,10 +237,12 @@ class InvoiceDynamisRtdParser:
 
         # Pattern for F&V lines - matches various formats
         # Description | Colis | (Pds Brut) | (Pds Net) | P.U. | U | H.T.
+        # Note: Description may contain mixed case (e.g. "10 Bunches", "cat.2")
+        DESC = r'[A-Z][A-Za-z0-9 \'.,/-]+(?:BIO|DEMETER|CONV)?[A-Za-z0-9 \'.,/-]*?'
         fv_patterns = [
             # Pattern with weight columns: DESC COLIS PDS_BRUT PDS_NET PU U HT
             re.compile(
-                r'^([A-Z][A-Z0-9 \'.,/-]+(?:BIO|DEMETER|CONV)?[A-Z0-9 \'.,/-]*?)\s+'
+                r'^(' + DESC + r')\s+'
                 r'(\d+)\s+'                           # Colis
                 r'(\d+[.,]\d{2})\s+'                  # Pds Brut
                 r'(\d+[.,]\d{2})\s+'                  # Pds Net
@@ -248,9 +250,20 @@ class InvoiceDynamisRtdParser:
                 r'([CKP])\s+'                         # Unit
                 r'(\d+[.,]\d{2})\s*$'                 # H.T.
             ),
+            # Pattern with 4 numeric cols: DESC COLIS PDS_BRUT PIECES PU U HT
+            # e.g. "DILL 10 Bunches BIO - FR - cat.2 1 10.00 10 1.14 P 11.40"
+            re.compile(
+                r'^(' + DESC + r')\s+'
+                r'(\d+)\s+'                           # Colis
+                r'(\d+[.,]\d{2})\s+'                  # Pds Brut
+                r'(\d+)\s+'                           # Pieces (integer, no decimals)
+                r'(\d+[.,]\d{2})\s*'                  # P.U.
+                r'([CKP])\s+'                         # Unit
+                r'(\d+[.,]\d{2})\s*$'                 # H.T.
+            ),
             # Pattern without weight: DESC COLIS PU U HT (for case items)
             re.compile(
-                r'^([A-Z][A-Z0-9 \'.,/-]+(?:BIO|DEMETER|CONV)?[A-Z0-9 \'.,/-]*?)\s+'
+                r'^(' + DESC + r')\s+'
                 r'(\d+)\s+'                           # Colis
                 r'(\d+[.,]\d{2})\s*'                  # P.U.
                 r'([CKP])\s+'                         # Unit
@@ -286,7 +299,7 @@ class InvoiceDynamisRtdParser:
                 continue
 
             # Try transport pattern first
-            transport_match = fv_patterns[2].match(line)
+            transport_match = fv_patterns[3].match(line)
             if transport_match:
                 groups = transport_match.groups()
                 line_item = {
@@ -306,7 +319,7 @@ class InvoiceDynamisRtdParser:
                 self.log(f"Parsed transport: {line_item['line_total']}", "DEBUG")
                 continue
 
-            # Try pattern with weights
+            # Try pattern with weights (pds_brut + pds_net)
             match = fv_patterns[0].match(line)
             if match:
                 groups = match.groups()
@@ -330,8 +343,32 @@ class InvoiceDynamisRtdParser:
                 self.log(f"Parsed F&V (weight): {line_item['article_code']} - {line_item['line_total']}", "DEBUG")
                 continue
 
-            # Try pattern without weights (case items)
+            # Try pattern with 4 numeric columns (pds_brut + pieces)
             match = fv_patterns[1].match(line)
+            if match:
+                groups = match.groups()
+                description = groups[0].strip()
+                line_item = {
+                    'article_code': self._generate_article_code(description),
+                    'description': description[:100],
+                    'quantity': int(groups[3]),  # Pieces column
+                    'colis': int(groups[1]),
+                    'pds_brut': self._clean_number_string(groups[2]),
+                    'unit_price': self._clean_number_string(groups[4]),
+                    'unit_type': groups[5],
+                    'line_total': self._clean_number_string(groups[6]),
+                    'line_type': 'product_for_resale',
+                    'origin_country': self._extract_origin_country(description),
+                    'ean': None,
+                    'parse_status': 'full',
+                }
+                lines.append(line_item)
+                self.stats['product_lines_parsed'] += 1
+                self.log(f"Parsed F&V (4-col): {line_item['article_code']} - {line_item['line_total']}", "DEBUG")
+                continue
+
+            # Try pattern without weights (case items)
+            match = fv_patterns[2].match(line)
             if match:
                 groups = match.groups()
                 description = groups[0].strip()
@@ -357,9 +394,15 @@ class InvoiceDynamisRtdParser:
             if re.match(r'^[A-Z]', line) and re.search(r'(\d+[.,]\d{2})\s*$', line):
                 total_match = re.search(r'(\d+[.,]\d{2})\s*$', line)
                 if total_match:
-                    # Get description (everything before numbers at end)
-                    desc_part = re.sub(r'\s+\d+.*$', '', line).strip()
-                    if len(desc_part) > 5:
+                    # Get description: strip trailing numeric columns and unit letter
+                    # Use a pattern that removes the structured tail (numbers + unit + total)
+                    desc_part = re.sub(r'(?:\s+\d+){1,4}\s+\d+[.,]\d{2}\s*[CKP]\s+\d+[.,]\d{2}\s*$', '', line).strip()
+                    if not desc_part or len(desc_part) < 3:
+                        # Simpler fallback: strip from the last sequence of digit groups
+                        desc_part = re.sub(r'\s+\d+[.,]\d{2}\s*$', '', line)
+                        desc_part = re.sub(r'\s+\d+[.,]\d{2}\s*$', '', desc_part)
+                        desc_part = re.sub(r'\s+\d+\s*$', '', desc_part).strip()
+                    if len(desc_part) > 3:
                         line_item = {
                             'article_code': self._generate_article_code(desc_part),
                             'description': desc_part[:100],
