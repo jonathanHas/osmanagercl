@@ -460,13 +460,13 @@ class InvoiceDynamisRtdParser:
                 pending_description = None
                 continue
 
-            # Check for EAN line
-            # Format: EAN : 3301595002651 1 6.00 6 2.98 P 17.88
+            # Check for EAN line (piece-based: integer Pieces column)
+            # Format: EAN : 3252920015580 1 12.00 12 3.52 P 42.24
             ean_match = re.match(
                 r'EAN\s*:\s*(\d{13})\s+'     # EAN code
                 r'(\d+)\s+'                   # Colis
                 r'(\d+[.,]\d{2})\s+'          # Pds Brut/qty
-                r'(\d+)\s+'                   # Pieces
+                r'(\d+)\s+'                   # Pieces (integer)
                 r'(\d+[.,]\d{2})\s*'          # P.U.
                 r'([CKP])\s+'                 # Unit
                 r'(\d+[.,]\d{2})\s*$',        # H.T.
@@ -492,6 +492,43 @@ class InvoiceDynamisRtdParser:
                 lines.append(line_item)
                 self.stats['ean_lines_parsed'] += 1
                 self.log(f"Parsed grocery EAN: {ean} - {line_item['description'][:30]}... Total: {line_item['line_total']}", "DEBUG")
+                pending_description = None
+                continue
+
+            # Check for EAN line (weight-based: decimal Pds Net column)
+            # Format: EAN : 3477730200067 1 5.00 5.00 20.43 K 102.15
+            ean_weight_match = re.match(
+                r'EAN\s*:\s*(\d{13})\s+'     # EAN code
+                r'(\d+)\s+'                   # Colis
+                r'(\d+[.,]\d{2})\s+'          # Pds Brut
+                r'(\d+[.,]\d{2})\s+'          # Pds Net (decimal, not integer)
+                r'(\d+[.,]\d{2})\s*'          # P.U.
+                r'([CKP])\s+'                 # Unit
+                r'(\d+[.,]\d{2})\s*$',        # H.T.
+                line
+            )
+
+            if ean_weight_match and pending_description:
+                groups = ean_weight_match.groups()
+                ean = groups[0]
+                line_item = {
+                    'article_code': ean,
+                    'ean': ean,
+                    'description': pending_description[:100],
+                    'quantity': int(groups[1]),  # Colis (weight items don't have integer pieces)
+                    'colis': int(groups[1]),
+                    'pds_brut': self._clean_number_string(groups[2]),
+                    'pds_net': self._clean_number_string(groups[3]),
+                    'unit_price': self._clean_number_string(groups[4]),
+                    'unit_type': groups[5],
+                    'line_total': self._clean_number_string(groups[6]),
+                    'line_type': 'product_for_resale',
+                    'origin_country': self._extract_origin_country(pending_description),
+                    'parse_status': 'full',
+                }
+                lines.append(line_item)
+                self.stats['ean_lines_parsed'] += 1
+                self.log(f"Parsed grocery EAN (weight): {ean} - {line_item['description'][:30]}... Total: {line_item['line_total']}", "DEBUG")
                 pending_description = None
                 continue
 

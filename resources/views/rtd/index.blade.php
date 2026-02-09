@@ -1327,14 +1327,21 @@
                             'Content-Type': 'application/json'
                         }
                     });
+                    if (!resp.ok) {
+                        console.error(`Compute failed for invoice ${ids[i]}: HTTP ${resp.status}`);
+                        failed++;
+                        continue;
+                    }
                     const data = await resp.json();
                     if (data.success) {
                         computed++;
-                        updateRowStatus(ids[i], data);
+                        try { updateRowStatus(ids[i], data); } catch (e) { /* DOM update non-critical */ }
                     } else {
+                        console.error(`Compute returned failure for invoice ${ids[i]}:`, data.message);
                         failed++;
                     }
                 } catch (e) {
+                    console.error(`Compute error for invoice ${ids[i]}:`, e);
                     failed++;
                 }
             }
