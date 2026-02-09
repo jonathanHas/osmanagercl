@@ -480,10 +480,19 @@ class Invoice extends Model
     }
 
     /**
-     * Check if RTD can be computed (has valid Udea or Dynamis upload file with line data).
+     * Check if RTD can be computed.
+     * goods_simple/service_overhead suppliers compute from invoice VAT fields directly.
+     * goods_parser suppliers need a parsed upload file with line data.
      */
     public function canComputeRtd(): bool
     {
+        // goods_simple and service_overhead suppliers compute from invoice VAT fields directly
+        $supplier = $this->supplier;
+        if ($supplier && in_array($supplier->rtd_classification, ['goods_simple', 'service_overhead'])) {
+            return true;
+        }
+
+        // goods_parser suppliers need a parsed upload file with line data
         $rtdService = app(\App\Services\RtdResolutionService::class);
 
         return $rtdService->getSourceUploadFile($this) !== null;

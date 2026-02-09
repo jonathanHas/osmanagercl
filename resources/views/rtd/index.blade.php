@@ -175,19 +175,26 @@
                 </div>
 
                 <button type="button" id="freeze-all-btn" onclick="freezeAllBalanced()"
-                        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg inline-flex items-center hidden">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded inline-flex items-center hidden">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                     </svg>
-                    <span id="freeze-all-text">Freeze All Balanced (<span id="freeze-all-count">0</span>)</span>
+                    <span id="freeze-all-text">Freeze All (<span id="freeze-all-count">0</span>)</span>
+                </button>
+                <button type="button" id="compute-all-btn" onclick="computeAllPending()"
+                        class="bg-orange-600 hover:bg-orange-700 text-white text-xs px-3 py-1.5 rounded inline-flex items-center hidden">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                    </svg>
+                    <span id="compute-all-text">Compute All (<span id="compute-all-count">0</span>)</span>
                 </button>
                 <form action="{{ route('rtd.recompute-all') }}" method="POST">
                     @csrf
-                    <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg inline-flex items-center">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-1.5 rounded inline-flex items-center">
+                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                         </svg>
-                        Recompute All with Issues
+                        Recompute All
                     </button>
                 </form>
             </div>
@@ -709,6 +716,7 @@
             }
             updateForceReparseUI();
             updateFreezeAllButton();
+            updateComputeAllButton();
         });
 
         function toggleForceReparseMode() {
@@ -929,8 +937,9 @@
             // Update the detail row content
             updateDetailRow(invoiceId, data);
 
-            // Update freeze all button count
+            // Update batch button counts
             updateFreezeAllButton();
+            updateComputeAllButton();
         }
 
         // Update the expandable detail row content
@@ -1229,6 +1238,21 @@
             }
         }
 
+        // Update the "Compute All" button visibility and count
+        function updateComputeAllButton() {
+            const rows = document.querySelectorAll('tr[data-status="needs_computation"]');
+            const btn = document.getElementById('compute-all-btn');
+            const countEl = document.getElementById('compute-all-count');
+            if (btn) {
+                if (rows.length > 0) {
+                    btn.classList.remove('hidden');
+                    countEl.textContent = rows.length;
+                } else {
+                    btn.classList.add('hidden');
+                }
+            }
+        }
+
         // Freeze all computed + balanced invoices sequentially
         async function freezeAllBalanced() {
             const rows = document.querySelectorAll('tr[data-status="computed"][data-balanced="true"]');
@@ -1274,6 +1298,55 @@
             if (failed > 0) msg += ` ${failed} failed.`;
             showFlashMessage(msg, failed > 0 ? 'warning' : 'success');
 
+            updateFreezeAllButton();
+        }
+
+        // Compute all needs_computation invoices sequentially
+        async function computeAllPending() {
+            const rows = document.querySelectorAll('tr[data-status="needs_computation"]');
+            if (rows.length === 0) return;
+
+            if (!confirm(`Compute RTD for ${rows.length} invoice(s)?`)) return;
+
+            const btn = document.getElementById('compute-all-btn');
+            const textEl = document.getElementById('compute-all-text');
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            const ids = Array.from(rows).map(r => r.id.replace('row-', ''));
+            let computed = 0, failed = 0;
+
+            for (let i = 0; i < ids.length; i++) {
+                textEl.textContent = `Computing ${i + 1}/${ids.length}...`;
+                try {
+                    const resp = await fetch(`/rtd/${ids[i]}/compute`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    const data = await resp.json();
+                    if (data.success) {
+                        computed++;
+                        updateRowStatus(ids[i], data);
+                    } else {
+                        failed++;
+                    }
+                } catch (e) {
+                    failed++;
+                }
+            }
+
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+            let msg = `Computed ${computed} invoice(s) successfully.`;
+            if (failed > 0) msg += ` ${failed} failed.`;
+            showFlashMessage(msg, failed > 0 ? 'warning' : 'success');
+
+            updateComputeAllButton();
             updateFreezeAllButton();
         }
 

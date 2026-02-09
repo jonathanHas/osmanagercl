@@ -103,7 +103,11 @@ class RtdController extends Controller
 
         // Add display status from the database field (no extra queries)
         $invoices->getCollection()->transform(function ($invoice) {
-            $invoice->rtd_display_status = $invoice->rtd_status === 'pending' ? 'needs_parsing' : $invoice->rtd_status;
+            $invoice->rtd_display_status = match (true) {
+                $invoice->rtd_status !== 'pending' => $invoice->rtd_status,
+                $invoice->supplier && in_array($invoice->supplier->rtd_classification, ['goods_simple', 'service_overhead']) => 'needs_computation',
+                default => 'needs_parsing',
+            };
 
             return $invoice;
         });
