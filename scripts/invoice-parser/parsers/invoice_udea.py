@@ -680,6 +680,81 @@ class InvoiceUdeaParser:
 
         return lines
 
+    def _extract_product_returns(self, text: str) -> List[Dict[str, Any]]:
+        """Extract returned product lines from the 'Products Returned' section.
+
+        Return lines have negative amounts and totals:
+        16.10.254126155 -1 1 140gram Roompaté, St. Hendrick 5936 30282 NL 1,95 1 -1,95
+
+        Returns list of line items with negative line_total values.
+        """
+        lines = []
+
+        returns_start = text.find('Products Returned')
+        if returns_start == -1:
+            return lines
+
+        returns_text = text[returns_start:]
+
+        # Pattern for return lines - like product lines but with negative amount and negative total
+        # Date+OrderCode  -Amount  SKU  Content  Description  ArticleCode  Gb.rek  Country  Price  VAT  -Total
+        return_pattern = re.compile(
+            r'^(\d{2}\.\d{2}\.\d{2})'     # Date DD.MM.YY
+            r'(\d{2,7})\s+'               # Order code (merged with date)
+            r'(-\d+)\s+'                  # Negative amount
+            r'(\d+)\s+'                   # SKU
+            r'(\S+)\s+'                   # Content (e.g., "140gram")
+            r'(.+?)'                      # Description (non-greedy)
+            r'\s*?(\d{3,7})\s+'           # Article code (may be merged with description)
+            r'(\d{5})\s+'                 # Gb.rek code
+            r'([A-Z]{2})\s+'              # Country code
+            rf'({NUMBER})\s+'             # Unit price
+            r'(\d+)\s+'                   # VAT code
+            r'(-' + NUMBER + r')\s*$'     # Negative total
+        )
+
+        for raw_line in returns_text.split('\n'):
+            line = raw_line.strip()
+
+            if not line:
+                continue
+
+            # Stop at end of returns section
+            if 'Total products returned' in line or 'Barrels delivered' in line or 'Cost code' in line:
+                break
+
+            # Skip headers
+            if line.startswith('Products Returned') or line.startswith('Date '):
+                continue
+
+            match = return_pattern.match(line)
+            if match:
+                date, order, amount, sku, content, description, article, gbrek, country, price, vat_code, total = match.groups()
+
+                description = description.strip().rstrip(' ,.')
+                line_type = GBREK_CLASSIFICATIONS.get(gbrek, 'product_for_resale')
+
+                line_item = {
+                    'article_code': article,
+                    'description': f"{content} {description}".strip()[:100],
+                    'quantity': int(amount),  # Negative
+                    'unit_price': self._clean_number_string(price),
+                    'line_total': self._clean_number_string(total),  # Negative
+                    'line_type': line_type,
+                    'gbrek': gbrek,
+                    'parse_status': 'full',
+                    'content': content,
+                    'country': country,
+                    'date': date,
+                    'is_return': True,
+                }
+
+                lines.append(line_item)
+                self.stats['product_lines_parsed'] += 1
+                self.log(f"Parsed return: {article} - {description[:30]}... Total: {line_item['line_total']}", "DEBUG")
+
+        return lines
+
     def _extract_barrels(self, text: str) -> Dict[str, Any]:
         """Extract barrel deposits from the invoice.
 
@@ -941,6 +1016,13 @@ class InvoiceUdeaParser:
 
             # Extract product lines
             products = self._extract_product_lines(text)
+
+            # Extract product returns (negative amounts)
+            returns = self._extract_product_returns(text)
+            if returns:
+                products.extend(returns)
+                self.log(f"Added {len(returns)} return lines (negative totals)", "INFO")
+
             result["lines"] = products
 
             if not products:
