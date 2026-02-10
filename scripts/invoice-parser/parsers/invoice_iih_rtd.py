@@ -205,10 +205,11 @@ class InvoiceIIHParser:
 
         # Pattern for VAT summary rows within the section
         # Matches lines like: "1 23.00 894.51 205.75" or "0 0.00 1,525.16 0.00"
-        # The rate must be 0.00, 9.00, 13.50, or 23.00
+        # Accept any numeric rate (IIH may use non-standard rates like 22.50 for 23%)
+        # Anchor to line start to avoid matching partial numbers from headers
         vat_pattern = re.compile(
-            r'(\d)\s+'                            # Tax code (single digit 0, 1, 2)
-            r'(0\.00|9\.00|13\.50|23\.00)\s+'     # Rate (exact matches only)
+            r'^\s*(\d)\s+'                        # Tax code (single digit at line start)
+            r'(\d+\.\d{2})\s+'                    # Rate (must have exactly 2 decimal places)
             r'([\d,]+\.?\d*)\s+'                  # Taxable amount
             r'([\d,]+\.?\d*)',                    # Tax amount
             re.MULTILINE
@@ -221,14 +222,19 @@ class InvoiceIIHParser:
 
             self.log(f"VAT row: code={tax_code}, rate={rate_float}, taxable={taxable_amount}", "DEBUG")
 
-            # Map rate to our bucket keys
-            if rate_float == 0.0:
+            # Map rate to closest valid Irish VAT bucket
+            # Use wider tolerance to handle non-standard rates (e.g. 22.50 → 23%)
+            if rate_float < 1.0:
                 vat_summary['0'] += taxable_amount
-            elif abs(rate_float - 9.0) < 0.1:
+            elif abs(rate_float - 9.0) < 1.5:
                 vat_summary['9'] += taxable_amount
-            elif abs(rate_float - 13.5) < 0.1 or abs(rate_float - 13.50) < 0.1:
+            elif abs(rate_float - 13.5) < 1.5:
                 vat_summary['13.5'] += taxable_amount
-            elif abs(rate_float - 23.0) < 0.1:
+            elif rate_float >= 20.0:
+                vat_summary['23'] += taxable_amount
+            else:
+                # Unknown rate - log warning and add to closest bucket
+                self.log(f"Unexpected VAT rate {rate_float}%, mapping to 23%", "WARNING")
                 vat_summary['23'] += taxable_amount
 
         self.log(f"VAT summary: {vat_summary}", "DEBUG")
