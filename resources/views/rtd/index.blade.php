@@ -55,41 +55,57 @@
         @endif
 
         {{-- Stats Cards --}}
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-            <a href="{{ route('rtd.index', ['filter' => 'all']) }}"
-               class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition {{ $filter === 'all' ? 'ring-2 ring-blue-500' : '' }}">
+        @php
+            $cardParams = array_filter(['search' => $search, 'supplier_type' => $supplierType !== 'all' ? $supplierType : null]);
+            $allStatuses = ['needs_parsing', 'needs_computation', 'has_issues', 'computed', 'frozen'];
+            if (($stats['pdf_missing'] ?? 0) > 0) {
+                array_splice($allStatuses, 1, 0, ['pdf_missing']);
+            }
+        @endphp
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
+            <a href="{{ route('rtd.index', $cardParams) }}"
+               class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition {{ empty($filters) ? 'ring-2 ring-blue-500' : '' }}">
                 <div class="text-3xl font-bold text-white">{{ $stats['total'] }}</div>
                 <div class="text-sm text-gray-400">Total Invoices</div>
             </a>
-            <a href="{{ route('rtd.index', ['filter' => 'needs_parsing']) }}"
-               class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition {{ $filter === 'needs_parsing' ? 'ring-2 ring-red-500' : '' }}">
+            @php
+                // Toggle helper: if status is active remove it, otherwise add it
+                function toggleFilter($status, $currentFilters, $baseParams) {
+                    $newFilters = in_array($status, $currentFilters)
+                        ? array_values(array_diff($currentFilters, [$status]))
+                        : array_merge($currentFilters, [$status]);
+                    return array_merge($baseParams, empty($newFilters) ? [] : ['filter' => $newFilters]);
+                }
+            @endphp
+            <a href="{{ route('rtd.index', toggleFilter('needs_parsing', $filters, $cardParams)) }}"
+               class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition {{ in_array('needs_parsing', $filters) ? 'ring-2 ring-red-500' : '' }}">
                 <div class="text-3xl font-bold text-red-400">{{ $stats['needs_parsing'] }}</div>
                 <div class="text-sm text-gray-400">Needs Parsing</div>
             </a>
             @if(($stats['pdf_missing'] ?? 0) > 0)
-            <a href="{{ route('rtd.index', ['filter' => 'pdf_missing']) }}"
-               class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition {{ $filter === 'pdf_missing' ? 'ring-2 ring-gray-500' : '' }}">
+            <a href="{{ route('rtd.index', toggleFilter('pdf_missing', $filters, $cardParams)) }}"
+               class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition {{ in_array('pdf_missing', $filters) ? 'ring-2 ring-gray-500' : '' }}">
                 <div class="text-3xl font-bold text-gray-400">{{ $stats['pdf_missing'] }}</div>
                 <div class="text-sm text-gray-400">PDF Missing</div>
             </a>
             @endif
-            <a href="{{ route('rtd.index', ['filter' => 'needs_computation']) }}"
-               class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition {{ $filter === 'needs_computation' ? 'ring-2 ring-orange-500' : '' }}">
+            <a href="{{ route('rtd.index', toggleFilter('needs_computation', $filters, $cardParams)) }}"
+               class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition {{ in_array('needs_computation', $filters) ? 'ring-2 ring-orange-500' : '' }}">
                 <div class="text-3xl font-bold text-orange-400">{{ $stats['needs_computation'] }}</div>
                 <div class="text-sm text-gray-400">Needs Compute</div>
             </a>
-            <a href="{{ route('rtd.index', ['filter' => 'has_issues']) }}"
-               class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition {{ $filter === 'has_issues' ? 'ring-2 ring-yellow-500' : '' }}">
+            <a href="{{ route('rtd.index', toggleFilter('has_issues', $filters, $cardParams)) }}"
+               class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition {{ in_array('has_issues', $filters) ? 'ring-2 ring-yellow-500' : '' }}">
                 <div class="text-3xl font-bold text-yellow-400">{{ $stats['has_issues'] }}</div>
                 <div class="text-sm text-gray-400">Has Issues</div>
             </a>
-            <a href="{{ route('rtd.index', ['filter' => 'computed']) }}"
-               class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition {{ $filter === 'computed' ? 'ring-2 ring-blue-500' : '' }}">
+            <a href="{{ route('rtd.index', toggleFilter('computed', $filters, $cardParams)) }}"
+               class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition {{ in_array('computed', $filters) ? 'ring-2 ring-blue-500' : '' }}">
                 <div class="text-3xl font-bold text-blue-400">{{ $stats['computed'] }}</div>
                 <div class="text-sm text-gray-400">Computed</div>
             </a>
-            <a href="{{ route('rtd.index', ['filter' => 'frozen']) }}"
-               class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition {{ $filter === 'frozen' ? 'ring-2 ring-green-500' : '' }}">
+            <a href="{{ route('rtd.index', toggleFilter('frozen', $filters, $cardParams)) }}"
+               class="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition {{ in_array('frozen', $filters) ? 'ring-2 ring-green-500' : '' }}">
                 <div class="text-3xl font-bold text-green-400">{{ $stats['frozen'] }}</div>
                 <div class="text-sm text-gray-400">Frozen</div>
             </a>
@@ -116,13 +132,56 @@
         {{-- Filters and Actions --}}
         <div class="bg-gray-800 rounded-lg p-4 mb-4 flex flex-wrap items-center justify-between gap-4">
             <form action="{{ route('rtd.index') }}" method="GET" class="flex items-center gap-4">
-                <input type="hidden" name="filter" value="{{ $filter }}">
                 <div class="relative">
                     <input type="text" name="search" value="{{ $search }}" placeholder="Search invoice #..."
                            class="bg-gray-700 text-white rounded-lg pl-10 pr-4 py-2 w-64 focus:ring-2 focus:ring-blue-500 focus:outline-none">
                     <svg class="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                     </svg>
+                </div>
+                {{-- Status Filter (multi-select checkboxes) --}}
+                <div class="relative" x-data="{ open: false }" @click.away="open = false">
+                    <button type="button" @click="open = !open"
+                            class="bg-gray-700 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none inline-flex items-center gap-2 min-w-[160px]">
+                        <span class="truncate">
+                            @if(empty($filters))
+                                All Statuses
+                            @else
+                                {{ count($filters) }} status{{ count($filters) > 1 ? 'es' : '' }} selected
+                            @endif
+                        </span>
+                        <svg class="w-4 h-4 flex-shrink-0 transition-transform" :class="open && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <div x-show="open" x-transition
+                         class="absolute left-0 mt-1 w-64 rounded-lg bg-gray-700 shadow-lg ring-1 ring-black ring-opacity-5 z-50 py-2">
+                        @php
+                            $statusOptions = [
+                                'needs_parsing' => ['label' => 'Needs Parsing', 'count' => $stats['needs_parsing'], 'color' => 'text-red-400'],
+                                'needs_computation' => ['label' => 'Needs Computation', 'count' => $stats['needs_computation'], 'color' => 'text-orange-400'],
+                                'has_issues' => ['label' => 'Has Issues', 'count' => $stats['has_issues'], 'color' => 'text-yellow-400'],
+                                'computed' => ['label' => 'Computed', 'count' => $stats['computed'], 'color' => 'text-blue-400'],
+                                'frozen' => ['label' => 'Frozen', 'count' => $stats['frozen'], 'color' => 'text-green-400'],
+                            ];
+                            if (($stats['pdf_missing'] ?? 0) > 0) {
+                                $statusOptions = array_merge(
+                                    array_slice($statusOptions, 0, 1),
+                                    ['pdf_missing' => ['label' => 'PDF Missing', 'count' => $stats['pdf_missing'], 'color' => 'text-gray-400']],
+                                    array_slice($statusOptions, 1)
+                                );
+                            }
+                        @endphp
+                        @foreach($statusOptions as $value => $opt)
+                            <label class="flex items-center px-3 py-1.5 hover:bg-gray-600 cursor-pointer">
+                                <input type="checkbox" name="filter[]" value="{{ $value }}"
+                                       {{ in_array($value, $filters) ? 'checked' : '' }}
+                                       class="form-checkbox h-4 w-4 rounded border-gray-500 bg-gray-600 text-blue-500 focus:ring-blue-500 focus:ring-offset-0">
+                                <span class="ml-2 text-sm text-white">{{ $opt['label'] }}</span>
+                                <span class="ml-auto text-xs {{ $opt['color'] }}">{{ $opt['count'] }}</span>
+                            </label>
+                        @endforeach
+                    </div>
                 </div>
                 {{-- Supplier Type Filter --}}
                 <select name="supplier_type" class="bg-gray-700 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
@@ -132,10 +191,10 @@
                     <option value="service" {{ ($supplierType ?? '') === 'service' ? 'selected' : '' }}>Service/Overhead</option>
                 </select>
                 <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
-                    Search
+                    Filter
                 </button>
-                @if($search || ($supplierType ?? 'all') !== 'all')
-                    <a href="{{ route('rtd.index', ['filter' => $filter]) }}" class="text-gray-400 hover:text-white">
+                @if($search || ($supplierType ?? 'all') !== 'all' || !empty($filters))
+                    <a href="{{ route('rtd.index') }}" class="text-gray-400 hover:text-white">
                         Clear
                     </a>
                 @endif
@@ -207,7 +266,7 @@
                     <svg class="w-12 h-12 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
-                    <p>No Udea invoices found{{ $filter !== 'all' ? ' matching this filter' : '' }}.</p>
+                    <p>No invoices found{{ !empty($filters) ? ' matching this filter' : '' }}.</p>
                 </div>
             @else
                 <table class="min-w-full divide-y divide-gray-700">

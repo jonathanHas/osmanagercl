@@ -19,7 +19,8 @@ class RtdController extends Controller
      */
     public function index(Request $request)
     {
-        $filter = $request->get('filter', 'all');
+        $filterInput = $request->get('filter', []);
+        $filters = is_array($filterInput) ? array_filter($filterInput) : ($filterInput === 'all' ? [] : [$filterInput]);
         $search = $request->get('search', '');
         $supplierType = $request->get('supplier_type', 'all'); // all, parser, simple, service
 
@@ -85,14 +86,18 @@ class RtdController extends Controller
             'frozen' => $statusCounts['frozen'] ?? 0,
         ];
 
-        // Apply status filter at DATABASE level
-        if ($filter !== 'all') {
-            if ($filter === 'needs_parsing') {
-                // needs_parsing filter includes pdf_missing and pending (not yet backfilled)
-                $baseQuery->whereIn('rtd_status', ['needs_parsing', 'pdf_missing', 'pending']);
-            } else {
-                $baseQuery->where('rtd_status', $filter);
+        // Apply status filter at DATABASE level (supports multi-select)
+        if (! empty($filters)) {
+            $dbStatuses = [];
+            foreach ($filters as $f) {
+                if ($f === 'needs_parsing') {
+                    // needs_parsing filter includes pdf_missing and pending (not yet backfilled)
+                    $dbStatuses = array_merge($dbStatuses, ['needs_parsing', 'pdf_missing', 'pending']);
+                } else {
+                    $dbStatuses[] = $f;
+                }
             }
+            $baseQuery->whereIn('rtd_status', array_unique($dbStatuses));
         }
 
         // Database-level pagination
@@ -115,7 +120,7 @@ class RtdController extends Controller
         return view('rtd.index', [
             'invoices' => $invoices,
             'stats' => $stats,
-            'filter' => $filter,
+            'filters' => $filters,
             'search' => $search,
             'supplierType' => $supplierType,
             'currentPage' => $invoices->currentPage(),
