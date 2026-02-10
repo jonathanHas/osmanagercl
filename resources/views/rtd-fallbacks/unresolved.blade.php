@@ -86,6 +86,11 @@
                             </select>
                         </label>
 
+                        <label class="flex items-center text-gray-300 text-sm">
+                            <input type="checkbox" name="is_non_retail" value="1" class="mr-2 rounded bg-gray-700 border-gray-600">
+                            Non-retail
+                        </label>
+
                         <button type="submit"
                                 class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50"
                                 id="assignBtn" disabled>
@@ -111,7 +116,8 @@
                             @foreach($unresolvedItems as $item)
                                 @php
                                     $hasExistingFallback = isset($existingFallbacks[$item['article_code']]);
-                                    $existingRate = $hasExistingFallback ? $existingFallbacks[$item['article_code']] : null;
+                                    $existingRate = $hasExistingFallback ? $existingFallbacks[$item['article_code']]['vat_rate'] : null;
+                                    $existingNonRetail = $hasExistingFallback ? ($existingFallbacks[$item['article_code']]['is_non_retail'] ?? false) : false;
                                 @endphp
                                 <tr class="hover:bg-gray-700/50 {{ $hasExistingFallback ? 'opacity-60' : '' }}">
                                     <td class="px-4 py-3">
@@ -138,8 +144,8 @@
                                     </td>
                                     <td class="px-4 py-3 text-center">
                                         @if($hasExistingFallback)
-                                            <span class="px-2 py-1 bg-green-600 text-white text-xs rounded">
-                                                {{ $existingRate }}% assigned
+                                            <span class="px-2 py-1 {{ $existingNonRetail ? 'bg-yellow-600' : 'bg-green-600' }} text-white text-xs rounded">
+                                                {{ $existingRate }}%{{ $existingNonRetail ? ' non-retail' : '' }}
                                             </span>
                                         @else
                                             <span class="px-2 py-1 bg-red-600 text-white text-xs rounded">

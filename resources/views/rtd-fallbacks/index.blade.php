@@ -71,6 +71,11 @@
                                         @endif">
                                         {{ number_format($fallback->vat_rate, 1) }}%
                                     </span>
+                                    @if($fallback->is_non_retail)
+                                        <span class="ml-1 px-2 py-1 rounded text-xs font-medium bg-yellow-600 text-white">
+                                            Non-retail
+                                        </span>
+                                    @endif
                                 </td>
                                 <td class="px-4 py-3 text-gray-300 text-sm">
                                     {{ $fallback->description ?: '-' }}
@@ -151,6 +156,15 @@
                         </div>
 
                         <div>
+                            <label class="flex items-center text-gray-300 text-sm">
+                                <input type="hidden" name="is_non_retail" value="0">
+                                <input type="checkbox" name="is_non_retail" value="1" id="edit_is_non_retail"
+                                       class="mr-2 rounded bg-gray-700 border-gray-600">
+                                Non-retail (exclude from goods for resale)
+                            </label>
+                        </div>
+
+                        <div>
                             <label class="block text-sm font-medium text-gray-300 mb-1">Description</label>
                             <input type="text" name="description" id="edit_description" maxlength="100"
                                    class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white">
@@ -184,6 +198,7 @@
             document.getElementById('editForm').action = '/rtd-fallbacks/' + fallback.id;
             document.getElementById('edit_article_code').value = fallback.article_code;
             document.getElementById('edit_vat_rate').value = fallback.vat_rate;
+            document.getElementById('edit_is_non_retail').checked = !!fallback.is_non_retail;
             document.getElementById('edit_description').value = fallback.description || '';
             document.getElementById('edit_notes').value = fallback.notes || '';
             document.getElementById('editModal').classList.remove('hidden');

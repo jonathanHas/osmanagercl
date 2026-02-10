@@ -572,7 +572,7 @@
                                                         @endif
                                                         @if($serviceOverheadAmount > 0)
                                                         <div class="flex justify-between text-yellow-400">
-                                                            <span>Service/Overhead:</span>
+                                                            <span>{{ $isService ? 'Service/Overhead:' : 'Non-retail:' }}</span>
                                                             <span class="font-mono">{{ number_format($serviceOverheadAmount, 2) }}</span>
                                                         </div>
                                                         @endif
@@ -1020,7 +1020,8 @@
                 const rtdTotal = parseFloat(data.rtd_total) || 0;
                 const drsAmount = parseFloat(excluded.drs) || 0;
                 const vatAmount = parseFloat(excluded.vat) || 0;
-                const excludedTotal = (parseFloat(excluded.freight) || 0) + (parseFloat(excluded.deposits) || 0) + drsAmount + vatAmount;
+                const nonRetailAmount = parseFloat(excluded.service_overhead) || 0;
+                const excludedTotal = (parseFloat(excluded.freight) || 0) + (parseFloat(excluded.deposits) || 0) + drsAmount + vatAmount + nonRetailAmount;
                 const unresolvedTotal = parseFloat(unresolved.net_total) || 0;
                 const calculatedTotal = rtdTotal + excludedTotal + unresolvedTotal;
                 const invoiceTotal = parseFloat(data.invoice_total) || 0;
@@ -1088,6 +1089,12 @@
                                 <div class="flex justify-between">
                                     <span class="text-gray-400">VAT:</span>
                                     <span class="text-white font-mono">${formatNumber(vatAmount)}</span>
+                                </div>
+                                ` : ''}
+                                ${nonRetailAmount > 0 ? `
+                                <div class="flex justify-between text-yellow-400">
+                                    <span>Non-retail:</span>
+                                    <span class="font-mono">${formatNumber(nonRetailAmount)}</span>
                                 </div>
                                 ` : ''}
                                 <div class="flex justify-between pt-2 border-t border-gray-600 font-semibold">

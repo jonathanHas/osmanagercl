@@ -66,7 +66,10 @@ class RtdFallbackController extends Controller
 
         // Get existing fallbacks to show which are already assigned
         $existingFallbacks = $supplierId
-            ? RtdVatFallback::forSupplier($supplierId)->pluck('vat_rate', 'article_code')->toArray()
+            ? RtdVatFallback::forSupplier($supplierId)->get()->keyBy('article_code')->map(fn ($f) => [
+                'vat_rate' => $f->vat_rate,
+                'is_non_retail' => $f->is_non_retail,
+            ])->toArray()
             : [];
 
         return view('rtd-fallbacks.unresolved', compact('unresolvedItems', 'existingFallbacks', 'supplierId', 'supplier', 'filteredInvoice'));
@@ -83,9 +86,11 @@ class RtdFallbackController extends Controller
             'vat_rate' => 'required|in:0,9,13.5,23',
             'supplier_id' => 'required|exists:accounting_suppliers,id',
             'descriptions' => 'nullable|array',
+            'is_non_retail' => 'sometimes|boolean',
         ]);
 
         $supplierId = $validated['supplier_id'];
+        $isNonRetail = (bool) ($validated['is_non_retail'] ?? false);
 
         $created = 0;
         $updated = 0;
@@ -99,6 +104,7 @@ class RtdFallbackController extends Controller
                 ['article_code' => $code, 'supplier_id' => $supplierId],
                 [
                     'vat_rate' => $validated['vat_rate'],
+                    'is_non_retail' => $isNonRetail,
                     'description' => $validated['descriptions'][$code] ?? null,
                     'created_by' => $existing ? $existing->created_by : auth()->id(),
                     'updated_by' => auth()->id(),
@@ -177,10 +183,12 @@ class RtdFallbackController extends Controller
             'vat_rate' => 'required|in:0,9,13.5,23',
             'description' => 'nullable|string|max:100',
             'notes' => 'nullable|string|max:500',
+            'is_non_retail' => 'sometimes|boolean',
         ]);
 
         $fallback->update([
             'vat_rate' => $validated['vat_rate'],
+            'is_non_retail' => (bool) ($validated['is_non_retail'] ?? false),
             'description' => $validated['description'],
             'notes' => $validated['notes'],
             'updated_by' => auth()->id(),

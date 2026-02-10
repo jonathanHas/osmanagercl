@@ -154,7 +154,7 @@ class RtdResolutionService
         // Initialize breakdown structure
         $breakdown = [
             'goods_for_resale' => ['0' => 0, '9' => 0, '13.5' => 0, '23' => 0],
-            'excluded' => ['freight' => 0, 'deposits' => 0, 'drs' => 0, 'vat' => 0],
+            'excluded' => ['freight' => 0, 'deposits' => 0, 'drs' => 0, 'vat' => 0, 'service_overhead' => 0],
             'unresolved' => ['count' => 0, 'net_total' => 0],
             'stats' => ['total_lines' => 0, 'resolved_lines' => 0, 'excluded_lines' => 0],
         ];
@@ -250,16 +250,23 @@ class RtdResolutionService
                 continue;
             }
 
-            // Add to correct VAT bucket
-            $bucketKey = $this->vatRateToBucketKey($vatRate);
-            $breakdown['goods_for_resale'][$bucketKey] += $lineTotal;
-            $breakdown['stats']['resolved_lines']++;
+            // Non-retail fallback items go to excluded.service_overhead instead of goods_for_resale
+            if (! empty($resolution['is_non_retail'])) {
+                $breakdown['excluded']['service_overhead'] += $lineTotal;
+                $breakdown['stats']['resolved_lines']++;
+            } else {
+                // Add to correct VAT bucket
+                $bucketKey = $this->vatRateToBucketKey($vatRate);
+                $breakdown['goods_for_resale'][$bucketKey] += $lineTotal;
+                $breakdown['stats']['resolved_lines']++;
+            }
         }
 
         // Round all values
         foreach ($breakdown['goods_for_resale'] as $key => $value) {
             $breakdown['goods_for_resale'][$key] = round($value, 2);
         }
+        $breakdown['excluded']['service_overhead'] = round($breakdown['excluded']['service_overhead'], 2);
         $breakdown['unresolved']['net_total'] = round($breakdown['unresolved']['net_total'], 2);
 
         // Track VAT amount as excluded (not part of goods for resale)
@@ -270,8 +277,9 @@ class RtdResolutionService
         if (isset($validation['products_total'])) {
             $expectedProductsTotal = $this->parseMonetaryValue($validation['products_total']);
             $resolvedTotal = array_sum($breakdown['goods_for_resale']);
+            $nonRetailTotal = $breakdown['excluded']['service_overhead'];
             $unresolvedTotal = $breakdown['unresolved']['net_total'];
-            $calculatedTotal = $resolvedTotal + $unresolvedTotal;
+            $calculatedTotal = $resolvedTotal + $nonRetailTotal + $unresolvedTotal;
             $difference = abs($calculatedTotal - $expectedProductsTotal);
 
             $breakdown['integrity'] = [
@@ -592,11 +600,12 @@ class RtdResolutionService
 
         // Try fallback table for manual VAT rate assignments (requires supplier_id)
         if ($supplierId !== null) {
-            $fallbackRate = RtdVatFallback::findVatRate($articleCode, $supplierId);
-            if ($fallbackRate !== null) {
+            $fallbackData = RtdVatFallback::findFallback($articleCode, $supplierId);
+            if ($fallbackData !== null) {
                 return [
                     'status' => 'resolved',
-                    'vat_rate' => $fallbackRate,
+                    'vat_rate' => $fallbackData['vat_rate'],
+                    'is_non_retail' => $fallbackData['is_non_retail'],
                     'source' => 'fallback',
                 ];
             }
