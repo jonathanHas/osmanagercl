@@ -49,6 +49,7 @@ class Invoice extends Model
         'rtd_computed_at',
         'rtd_accepted_at',
         'rtd_accepted_by',
+        'rtd_submission_id',
     ];
 
     protected $casts = [
@@ -610,6 +611,14 @@ class Invoice extends Model
     }
 
     /**
+     * Get the RTD submission this invoice is linked to.
+     */
+    public function rtdSubmission(): BelongsTo
+    {
+        return $this->belongsTo(RtdSubmission::class, 'rtd_submission_id');
+    }
+
+    /**
      * Get the user who accepted the RTD.
      */
     public function rtdAcceptedByUser(): BelongsTo
@@ -648,5 +657,14 @@ class Invoice extends Model
     {
         return $query->whereNotNull('rtd_resolution_issues')
             ->whereJsonLength('rtd_resolution_issues', '>', 0);
+    }
+
+    /**
+     * Scope for frozen invoices not yet linked to any RTD submission.
+     */
+    public function scopeRtdUnsubmitted($query)
+    {
+        return $query->where('rtd_status', 'frozen')
+            ->whereNull('rtd_submission_id');
     }
 }

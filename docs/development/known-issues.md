@@ -8,6 +8,7 @@ This document tracks known issues that have been identified and resolved in the 
 - [File Upload & Permissions Issues](#file-upload--permissions-issues)
 - [Document Conversion Issues](#document-conversion-issues)
 - [Validation Issues](#validation-issues)
+- [VAT & Tax Issues](#vat--tax-issues)
 - [Invoice Parsing Issues](#invoice-parsing-issues)
 
 ---
@@ -244,6 +245,41 @@ Images save correctly to POS database but 24-hour browser cache prevents updated
 4. Automatic content-type detection
 
 Images now appear immediately after upload.
+
+---
+
+## VAT & Tax Issues
+
+### Sales VAT Breakdown Only Showing One Rate
+**Status:** Fixed 2026-02-10
+
+#### Problem
+The Sales VAT Breakdown table on the VAT return creation page (`/management/vat-returns/create`) only displayed one VAT rate (0.0%) instead of all four Irish rates (0%, 9%, 13.5%, 23%). The single displayed row showed the 23% rate data but was labeled as "0.0%". Total row was correct.
+
+#### Root Cause
+PHP truncates float values used as array keys to integers. The `keyBy('vat_rate')` call in `getSalesVatData()` caused all rates between 0 and 1 (i.e., 0, 0.09, 0.135, 0.23) to collapse to integer key `0`. Each subsequent rate overwrote the previous entry, leaving only the last one (0.23 rate data) keyed as `0`.
+
+```php
+// BROKEN: float keys truncated to int
+collect($salesData)->keyBy('vat_rate');
+// Result: [0 => {23% data}] — only 1 entry, all others overwritten
+
+// FIXED: string keys preserved
+collect($salesData)->keyBy(fn ($item) => (string) $item->vat_rate);
+// Result: ['0' => {0% data}, '0.09' => {9% data}, '0.135' => {13.5% data}, '0.23' => {23% data}]
+```
+
+#### Solution
+Cast `vat_rate` to string in the `keyBy` callback for both the optimized and real-time data paths in `VatReturnController::getSalesVatData()`.
+
+#### Files Modified
+- `app/Http/Controllers/Management/VatReturnController.php` (lines 185, 221)
+
+#### How to Detect
+If the Sales VAT Breakdown table shows only one row with a "0.0%" label but has non-zero VAT amount, or the per-rate totals don't sum to match the TOTAL row, this issue is occurring.
+
+#### General Lesson
+**Never use `keyBy()` with float/decimal column values in PHP.** Always cast to string first, or use an alternative keying strategy. This is a well-known PHP gotcha where float array keys are silently truncated to integers.
 
 ---
 

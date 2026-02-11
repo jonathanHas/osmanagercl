@@ -7,7 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **RTD Submission Tracking** (2026-02-10)
+  - New submission management page to track which invoices were filed with Revenue as part of RTD submissions
+  - Create submissions with flexible date ranges, selecting from frozen invoices not yet in any submission
+  - VAT breakdown snapshot (T1 goods by rate, T2 service by rate, excluded totals) saved at submission time
+  - Mark submissions as filed with Revenue date and reference number
+  - Remove invoices from draft submissions; next submission automatically shows previously missed invoices
+  - **Files Created**: `RtdSubmission` model, `RtdSubmissionController`, 3 Blade views, 2 migrations
+
 ### Fixed
+
+- **IIH Parser - Non-Standard VAT Rate Handling** (2026-02-10)
+  - **Bug**: IIH invoice #9588 showed 164.74 reconciliation difference — 164.75 in taxable goods missing from RTD
+  - **Root Cause**: IIH VAT summary regex only matched exact rates (`0.00|9.00|13.50|23.00`); invoice used rate `22.50` which was silently skipped
+  - **Fix**: Changed regex to accept any numeric rate with 2 decimal places, anchored to line start; bucket mapping uses wider tolerance (rates >=20% → 23% bucket)
+  - **File Modified**: `scripts/invoice-parser/parsers/invoice_iih_rtd.py` (`_extract_vat_summary()` method)
+
+- **VAT Returns - Sales VAT Breakdown Missing Rates** (2026-02-10)
+  - **Bug**: Sales VAT Breakdown on VAT return create page only showed one rate (0.0%) instead of all 4 rates (0%, 9%, 13.5%, 23%)
+  - **Root Cause**: PHP truncates float array keys to integers — `keyBy('vat_rate')` caused rates 0, 0.09, 0.135, 0.23 to all collapse to integer key `0`, with each overwriting the last
+  - **Impact**: Only the 23% rate data survived but displayed as "0.0%"; totals were correct but per-rate breakdown was wrong
+  - **Fix**: Cast vat_rate to string before using as key: `keyBy(fn ($item) => (string) $item->vat_rate)`
+  - **File Modified**: `app/Http/Controllers/Management/VatReturnController.php` (`getSalesVatData()` method, both optimized and real-time paths)
 
 - **Invoice Total Parsing - Number Format Detection** (2026-02-05)
   - **Bug**: Invoice stated total was parsing `1,978.38` as `1.98` instead of `1978.38`
@@ -16,6 +39,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **File Modified**: `scripts/invoice-parser/parsers/delivery_independent.py` (lines 158-184)
 
 ### Added
+
+- **✅ RTD Non-Retail Classification for Fallback Entries** (2026-02-10)
+  - **Non-Retail Flag**: New `is_non_retail` boolean on RTD VAT fallback entries (default: false)
+  - **Correct VAT Routing**: Non-retail items (cleaning supplies, office equipment) go to `excluded.service_overhead` instead of `goods_for_resale`, preventing T1 inflation
+  - **Minimal UX Impact**: Checkbox in bulk assign bar (unchecked by default — zero extra clicks for the common case)
+  - **Fallback Index**: Non-retail entries show yellow "Non-retail" badge; edit modal includes checkbox
+  - **RTD Display**: Excluded section shows "Non-retail" line (yellow) for parser-based suppliers, "Service/Overhead" for service suppliers
+  - **JS Detail Row**: Recompute AJAX response now correctly includes `service_overhead` in excluded total and renders Non-retail line
+  - **Files Created**:
+    - `database/migrations/2026_02_10_120000_add_is_non_retail_to_rtd_vat_fallbacks_table.php`
+  - **Files Modified**:
+    - `app/Models/RtdVatFallback.php` - Added `findFallback()` returning `[vat_rate, is_non_retail]`, `findVatRate()` kept as wrapper
+    - `app/Services/RtdResolutionService.php` - Non-retail routing to `excluded.service_overhead`, integrity check includes non-retail total
+    - `app/Http/Controllers/RtdFallbackController.php` - `is_non_retail` validation in `bulkAssign()` and `update()`
+    - `resources/views/rtd-fallbacks/unresolved.blade.php` - Non-retail checkbox, yellow badge for non-retail assigned items
+    - `resources/views/rtd-fallbacks/index.blade.php` - Non-retail badge, edit modal checkbox
+    - `resources/views/rtd/index.blade.php` - JS `excludedTotal` includes `service_overhead`, Non-retail line in Excluded section
 
 - **✅ RTD Force Reparse Mode** (2026-02-04)
   - **Force Reparse Toggle**: Settings dropdown with toggle to enable force reparse mode

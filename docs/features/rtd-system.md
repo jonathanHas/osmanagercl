@@ -26,7 +26,7 @@ The RTD system processes supplier invoices (Udea and Dynamis) to extract and cat
 
 **Workflow Summary:**
 ```
-Upload PDF → Parse Lines → Resolve Article Codes → Categorize by VAT → Review → Freeze → Year Report
+Upload PDF → Parse Lines → Resolve Article Codes → Categorize by VAT → Review → Freeze → Submit to Revenue
 ```
 
 **Complete Workflow:**
@@ -39,6 +39,27 @@ Upload PDF → Parse Lines → Resolve Article Codes → Categorize by VAT → R
    - Recompute affected invoices
 5. Freeze completed invoices (`/rtd` → Freeze)
 6. Generate Year Report (`/rtd/year-report`) for VAT returns
+7. Create Submission (`/rtd/submissions/create`) — select frozen invoices for a period and link them to a Revenue filing
+8. Mark Submission as filed with Revenue date and reference number
+
+## Submission Tracking
+
+Submissions track which frozen invoices were included in each RTD filing with Revenue.
+
+**Navigation:** RTD Management → Submissions
+
+**Key Concepts:**
+- Only frozen invoices can be added to a submission
+- Each invoice can only belong to one submission
+- The next submission automatically shows invoices not yet linked to any previous submission
+- Submissions store a snapshot of VAT breakdown totals (T1 goods, T2 service, excluded) at creation time
+- Draft submissions allow removing invoices; submitted ones are read-only
+
+**Routes:**
+- `GET /rtd/submissions` — list all submissions
+- `GET /rtd/submissions/create` — create form with invoice selection
+- `GET /rtd/submissions/{id}` — view submission details and totals
+- `POST /rtd/submissions/{id}/submit` — mark as filed with Revenue
 
 ## RTD Status Types
 
@@ -78,7 +99,9 @@ Upload PDF → Parse Lines → Resolve Article Codes → Categorize by VAT → R
   "excluded": {
     "freight": 25.00,
     "deposits": 50.00,
-    "drs": 4.35
+    "drs": 4.35,
+    "vat": 50.00,
+    "service_overhead": 12.84
   },
   "unresolved": {
     "count": 3,
@@ -92,7 +115,10 @@ Upload PDF → Parse Lines → Resolve Article Codes → Categorize by VAT → R
 }
 ```
 
-**Note:** The `drs` field (Deposit Return Scheme) is populated for IIH invoices only.
+**Notes:**
+- The `drs` field (Deposit Return Scheme) is populated for IIH invoices only.
+- The `service_overhead` field holds non-retail fallback items (cleaning supplies, office equipment) that should not inflate T1 goods for resale. Also used for service/overhead classified suppliers.
+- The `vat` field holds the VAT amount from the invoice (excluded from goods for resale net totals).
 
 ### RtdVatFallback Table
 
@@ -101,12 +127,15 @@ Manual VAT rate assignments for unresolved article codes.
 | Field | Type | Purpose |
 |-------|------|---------|
 | `article_code` | String(50) | Supplier article code |
-| `supplier_identifier` | String(50) | Supplier name (e.g., "Udea") |
+| `supplier_id` | Foreign Key | Accounting supplier ID |
 | `vat_rate` | Decimal | VAT rate: 0, 9, 13.5, or 23 |
+| `is_non_retail` | Boolean | If true, routes to `excluded.service_overhead` instead of `goods_for_resale` (default: false) |
 | `description` | String(100) | Product description |
 | `notes` | Text | Additional context |
 | `created_by` | Foreign Key | User who created entry |
 | `updated_by` | Foreign Key | User who last updated |
+
+**Non-Retail Classification:** When `is_non_retail` is true, the item's value goes into `excluded.service_overhead` instead of `goods_for_resale`. This prevents non-resale items (cleaning supplies, office equipment) from inflating T1 totals. The checkbox defaults to unchecked, so the normal workflow requires no extra interaction.
 
 ## RTD Workflow
 
@@ -134,6 +163,7 @@ The system automatically detects supported suppliers and parses them using the a
 
 **Independent Irish Health Foods (IIH)** (`invoice_iih_rtd.py`):
 - Extracts VAT summary table directly from invoice (0%, 13.5%, 23%)
+- Flexible VAT rate matching — handles non-standard rates (e.g., 22.50% → 23% bucket)
 - No article code resolution needed - invoice already has VAT categorization
 - Extracts DRS (Deposit Return Scheme) totals from footer
 - Subtracts DRS from 0% goods for resale (DRS is excluded)
@@ -183,12 +213,15 @@ This is the preferred method for Udea when products are linked to supplier codes
 ### 3. RtdVatFallback (Manual Assignment)
 
 ```
-Article Code + Supplier → RtdVatFallback → VAT Rate
+Article Code + Supplier → RtdVatFallback → VAT Rate + Non-Retail flag
+  → is_non_retail=false → goods_for_resale[rate]
+  → is_non_retail=true  → excluded.service_overhead
 ```
 
 Manual fallback for codes without product links. Useful for:
 - Dynamis F&V items (no EAN codes)
 - Udea items not in SupplierLink table
+- Non-retail items (cleaning supplies, office equipment) — mark as non-retail to exclude from T1
 
 ### 4. IIH VAT Summary (Direct)
 
@@ -296,7 +329,7 @@ The expandable detail row uses a 4-column layout showing how amounts reconcile:
 | Column | Description | Color Theme |
 |--------|-------------|-------------|
 | **Goods for Resale** | VAT rates (0%, 9%, 13.5%, 23%) with subtotal | Green |
-| **Excluded** | Freight and deposits with subtotal | Blue |
+| **Excluded** | Freight, deposits, DRS, VAT, and non-retail items with subtotal | Blue |
 | **Unresolved** | Items needing resolution with subtotal | Red (or gray if none) |
 | **Reconciliation** | Shows how totals add up to invoice total | Green/Yellow border |
 
@@ -363,11 +396,14 @@ To efficiently resolve issues:
 
 **Index** (`/rtd-fallbacks`):
 - Lists all manual VAT rate assignments
-- Edit/delete individual entries
+- Yellow "Non-retail" badge shown on entries marked as non-retail
+- Edit modal with VAT rate, non-retail checkbox, description, and notes
+- Delete individual entries
 
 **Unresolved Items** (`/rtd-fallbacks/unresolved`):
 - Shows all unresolved article codes across invoices
-- Bulk assignment of VAT rates
+- Bulk assignment of VAT rates with optional "Non-retail" checkbox (unchecked by default)
+- Already-assigned non-retail items show yellow badge (e.g., "23% non-retail")
 - Recompute affected invoices
 
 ## Routes
@@ -396,10 +432,17 @@ To efficiently resolve issues:
 | Method | Purpose |
 |--------|---------|
 | `computeRtd($invoice)` | Calculate full RTD breakdown |
-| `resolveArticleCode($code, $supplier)` | Resolve single article code |
+| `resolveArticleCode($code, $supplier)` | Resolve single article code (returns `is_non_retail` for fallback source) |
 | `freezeRtd($invoice, $userId)` | Create immutable snapshot |
 | `getSourceUploadFile($invoice)` | Get parsed data file |
 | `parseMonetaryValue($value)` | Convert EU/US number formats |
+
+### RtdVatFallback Model
+
+| Method | Purpose |
+|--------|---------|
+| `findFallback($code, $supplierId)` | Returns `['vat_rate' => float, 'is_non_retail' => bool]` or `null` |
+| `findVatRate($code, $supplierId)` | Thin wrapper — returns just the VAT rate float or `null` |
 
 ### Invoice Model Methods
 

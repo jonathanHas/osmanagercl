@@ -173,6 +173,18 @@ Route::middleware('auth')->group(function () {
         Route::get('/issues', [\App\Http\Controllers\RtdController::class, 'issues'])->name('issues');
         Route::get('/suppliers', [\App\Http\Controllers\RtdController::class, 'suppliers'])->name('suppliers');
         Route::post('/suppliers/{supplier}/classify', [\App\Http\Controllers\RtdController::class, 'classifySupplier'])->name('suppliers.classify');
+
+        // RTD Submissions
+        Route::get('/submissions', [\App\Http\Controllers\RtdSubmissionController::class, 'index'])->name('submissions.index');
+        Route::get('/submissions/create', [\App\Http\Controllers\RtdSubmissionController::class, 'create'])->name('submissions.create');
+        Route::post('/submissions', [\App\Http\Controllers\RtdSubmissionController::class, 'store'])->name('submissions.store');
+        Route::get('/submissions/{submission}', [\App\Http\Controllers\RtdSubmissionController::class, 'show'])->name('submissions.show');
+        Route::get('/submissions/{submission}/report', [\App\Http\Controllers\RtdSubmissionController::class, 'report'])->name('submissions.report');
+        Route::get('/submissions/{submission}/export-csv', [\App\Http\Controllers\RtdSubmissionController::class, 'exportCsv'])->name('submissions.export-csv');
+        Route::post('/submissions/{submission}/submit', [\App\Http\Controllers\RtdSubmissionController::class, 'markSubmitted'])->name('submissions.submit');
+        Route::post('/submissions/{submission}/recalculate', [\App\Http\Controllers\RtdSubmissionController::class, 'recalculate'])->name('submissions.recalculate');
+        Route::delete('/submissions/{submission}/invoices/{invoice}', [\App\Http\Controllers\RtdSubmissionController::class, 'removeInvoice'])->name('submissions.remove-invoice');
+
         Route::post('/{invoice}/parse', [\App\Http\Controllers\RtdController::class, 'parse'])->name('parse');
         Route::post('/{invoice}/force-parse', [\App\Http\Controllers\RtdController::class, 'forceParse'])->name('force-parse');
         Route::post('/{invoice}/compute', [\App\Http\Controllers\RtdController::class, 'compute'])->name('compute');

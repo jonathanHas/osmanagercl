@@ -182,7 +182,7 @@ class VatReturnController extends Controller
                 'total_net' => $salesData->sum('total_net'),
                 'total_vat' => $salesData->sum('total_vat'),
                 'total_gross' => $salesData->sum('total_gross'),
-                'by_rate' => $salesData->keyBy('vat_rate'),
+                'by_rate' => $salesData->keyBy(fn ($item) => (string) $item->vat_rate),
                 'data_source' => 'optimized',
             ];
         } else {
@@ -218,7 +218,7 @@ class VatReturnController extends Controller
                 'total_net' => $totalNet,
                 'total_vat' => $totalVat,
                 'total_gross' => $totalNet + $totalVat,
-                'by_rate' => collect($salesData)->keyBy('vat_rate'),
+                'by_rate' => collect($salesData)->keyBy(fn ($item) => (string) $item->vat_rate),
                 'data_source' => 'real-time',
             ];
         }

@@ -487,6 +487,11 @@ class AccountingSupplier extends Model
             // Update is_eu_supplier flag if country_code changes
             if ($supplier->isDirty('country_code') && ! empty($supplier->country_code)) {
                 $supplier->is_eu_supplier = self::isEuCountry($supplier->country_code);
+
+                // Also infer vat_treatment if it's empty or if country changed
+                if (empty($supplier->vat_treatment) || $supplier->isDirty('country_code')) {
+                    $supplier->vat_treatment = self::inferVatTreatment($supplier->country_code);
+                }
             }
         });
     }

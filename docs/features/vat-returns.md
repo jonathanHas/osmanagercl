@@ -227,6 +227,10 @@ status ENUM('draft', 'finalized', 'submitted')
 
 ### Common Issues
 
+**Sales VAT Breakdown Only Shows One Rate**
+- **Fixed 2026-02-10**: Was caused by PHP truncating float array keys to integers in `keyBy('vat_rate')`. All rates (0, 0.09, 0.135, 0.23) collapsed to key `0`, showing only the last rate's data labeled as "0.0%". Fix: cast vat_rate to string before keying.
+- If this recurs, check `getSalesVatData()` in `VatReturnController` — ensure `keyBy` uses string cast.
+
 **VAT Figures Don't Match**
 - Check if using same data source (optimized vs real-time)
 - Verify date ranges match exactly

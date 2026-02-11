@@ -412,24 +412,27 @@ Debug and data extraction tool for UDEA B.V. invoice PDFs with structured output
 
 📖 [Udea Invoice Parser Documentation](./features/udea-invoice-parser.md)
 
-### RTD (Return of Trading Details) System (NEW! 2026-02-01, Updated 2026-02-04)
+### RTD (Return of Trading Details) System (NEW! 2026-02-01, Updated 2026-02-10)
 VAT categorization system for Udea, Dynamis, and IIH invoices to support Irish VAT return preparation.
 - **Multi-Supplier Support**: Udea (SupplierLink), Dynamis (EAN barcodes), IIH (VAT summary direct)
 - **Automatic VAT Categorization**: Classifies invoice line items by Irish VAT rates (0%, 9%, 13.5%, 23%)
-- **IIH DRS Exclusion** (NEW!): Deposit Return Scheme amounts excluded from 0% goods for resale
-- **Force Reparse Mode** (NEW!): Settings toggle to re-parse any invoice with latest RTD parser, bypassing validation
+- **Non-Retail Classification** (NEW!): Mark fallback entries as non-retail to route to `excluded.service_overhead` instead of inflating T1 goods
+- **IIH Flexible Rate Matching** (NEW!): Handles non-standard VAT rates in IIH invoices (e.g., 22.50% → 23%)
+- **IIH DRS Exclusion**: Deposit Return Scheme amounts excluded from 0% goods for resale
+- **Force Reparse Mode**: Settings toggle to re-parse any invoice with latest RTD parser, bypassing validation
 - **Article Code Resolution**: Maps supplier codes to products via SupplierLink, EAN barcodes, or manual fallbacks
 - **AJAX-Powered Actions**: Parse, Compute, Freeze operations preserve scroll position with per-row loading indicators
 - **PDF Quick View**: View invoice PDF in popup window directly from RTD dashboard
 - **In-Place Updates**: Row status and detail section update without page reload
 - **Reconciliation Layout**: 4-column detail view showing how Goods + Excluded + Unresolved = Invoice Total with balance indicator
 - **Year Report Improvements**: Enhanced readability with orange-themed warning panel for non-frozen invoices
-- **Fallback Management**: Bulk assign VAT rates to unresolved article codes
-- **Excluded Items Tracking**: Separates freight, deposits, and DRS from goods for resale
+- **Fallback Management**: Bulk assign VAT rates to unresolved article codes with optional non-retail flag
+- **Excluded Items Tracking**: Separates freight, deposits, DRS, and non-retail items from goods for resale
 - **RTD Freezing**: Create immutable snapshots for audit compliance
 - **Unresolved Items View**: Aggregate view of all unmatched codes across invoices
 - **Batch Recomputation**: Update all affected invoices when fallbacks are added
 - **Invoice Integration**: RTD summary section on invoice show page
+- **Submission Tracking** (NEW! 2026-02-10): Create submissions linking frozen invoices to Revenue filings, track which invoices were included, auto-surface unsubmitted invoices for next filing
 
 📖 [RTD System Documentation](./features/rtd-system.md)
 
