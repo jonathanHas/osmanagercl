@@ -380,7 +380,7 @@ class InvoiceUploadFile extends Model
         }
 
         if (isset($data['is_credit_note'])) {
-            $updateData['is_credit_note'] = $data['is_credit_note'];
+            $updateData['is_credit_note'] = filter_var($data['is_credit_note'], FILTER_VALIDATE_BOOLEAN);
         }
 
         $this->update($updateData);
