@@ -683,6 +683,34 @@ class RtdResolutionService
     }
 
     /**
+     * Unfreeze a frozen RTD invoice so it can be reparsed/recomputed.
+     * Blocks if invoice is in a submitted submission.
+     */
+    public function unfreezeRtd(Invoice $invoice): bool
+    {
+        if ($invoice->rtd_status !== 'frozen') {
+            return false;
+        }
+
+        // Block if in a submitted submission
+        if ($invoice->rtd_submission_id) {
+            $submission = $invoice->rtdSubmission;
+            if ($submission && $submission->isSubmitted()) {
+                return false;
+            }
+        }
+
+        $invoice->update([
+            'rtd_status' => 'needs_computation',
+            'rtd_snapshot' => null,
+            'rtd_accepted_at' => null,
+            'rtd_accepted_by' => null,
+        ]);
+
+        return true;
+    }
+
+    /**
      * Check if RTD can be recomputed.
      */
     public function canRecompute(Invoice $invoice): bool

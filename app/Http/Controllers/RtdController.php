@@ -283,6 +283,13 @@ class RtdController extends Controller
             return $this->rtdResponse(false, 'PDF file not found on disk.', $invoice);
         }
 
+        // Auto-unfreeze if frozen (block if in submitted submission)
+        if ($invoice->rtd_status === 'frozen') {
+            if (! $this->rtdService->unfreezeRtd($invoice)) {
+                return $this->rtdResponse(false, 'Cannot reparse — invoice is in a submitted submission.', $invoice);
+            }
+        }
+
         // Get the PDF attachment
         $attachment = $invoice->attachments()->where('mime_type', 'application/pdf')->first();
         if (! $attachment || ! $attachment->exists()) {
@@ -748,6 +755,10 @@ class RtdController extends Controller
                 'can_parse' => $invoice->canReparseForRtd(),
                 'has_rtd_data' => $invoice->hasRtdData(),
                 'is_frozen' => $invoice->rtd_status === 'frozen',
+                'has_pdf' => $invoice->hasPdfOnDisk(),
+                'in_submitted_submission' => $invoice->rtd_submission_id
+                    && ($sub = $invoice->rtdSubmission)
+                    && $sub->isSubmitted(),
                 'unresolved_count' => $unresolvedCount,
                 // RTD breakdown data for detail row update
                 'rtd_breakdown' => $breakdown,

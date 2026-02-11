@@ -419,7 +419,7 @@
                                             <span id="loading-text-{{ $invoice->id }}">Processing...</span>
                                         </span>
                                         {{-- Force Reparse button (hidden by default, shown in force mode) --}}
-                                        @if($invoice->hasPdfOnDisk() && $invoice->rtd_status !== 'frozen')
+                                        @if($invoice->hasPdfOnDisk())
                                             <button type="button" onclick="rtdAction({{ $invoice->id }}, 'force-parse', 'Reparsing')"
                                                     class="force-reparse-btn hidden bg-orange-600 hover:bg-orange-700 text-white text-xs px-3 py-1 rounded"
                                                     title="Force reparse with latest RTD parser">
@@ -1006,6 +1006,7 @@
             // Update batch button counts
             updateFreezeAllButton();
             updateComputeAllButton();
+            updateForceReparseUI();
         }
 
         // Update the expandable detail row content
@@ -1278,7 +1279,7 @@
             let html = '';
 
             if (data.is_frozen) {
-                // Frozen - no action buttons
+                // Frozen - no action buttons (use Force Reparse to unfreeze + reparse)
                 html = '';
             } else if (data.new_status === 'needs_parsing' && data.can_parse) {
                 html = `<button type="button" onclick="rtdAction(${invoiceId}, 'parse', 'Parsing')" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded">Parse</button>`;
