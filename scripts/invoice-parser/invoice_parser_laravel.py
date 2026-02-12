@@ -257,15 +257,15 @@ def process_invoice(file_path):
                     },
                     'vat_9': {
                         'net': float(data.get('VAT 9%', '0.00')),
-                        'vat': float(data.get('VAT 9%', '0.00')) * 0.09 if float(data.get('VAT 9%', '0.00')) > 0 else 0.00
+                        'vat': round(float(data.get('VAT 9%', '0.00')) * 0.09, 2) if float(data.get('VAT 9%', '0.00')) != 0 else 0.00
                     },
                     'vat_13_5': {
                         'net': float(data.get('VAT 13.5%', '0.00')),
-                        'vat': float(data.get('VAT 13.5%', '0.00')) * 0.135 if float(data.get('VAT 13.5%', '0.00')) > 0 else 0.00
+                        'vat': round(float(data.get('VAT 13.5%', '0.00')) * 0.135, 2) if float(data.get('VAT 13.5%', '0.00')) != 0 else 0.00
                     },
                     'vat_23': {
                         'net': float(data.get('VAT 23%', '0.00')),
-                        'vat': float(data.get('VAT 23%', '0.00')) * 0.23 if float(data.get('VAT 23%', '0.00')) > 0 else 0.00
+                        'vat': round(float(data.get('VAT 23%', '0.00')) * 0.23, 2) if float(data.get('VAT 23%', '0.00')) != 0 else 0.00
                     }
                 },
                 'total_amount': sum([
@@ -276,6 +276,19 @@ def process_invoice(file_path):
                 ])
             }
             
+            # Cross-check calculated VAT against invoice's stated Total VAT
+            invoice_total_vat = data.get('Total_VAT')
+            if invoice_total_vat is not None:
+                calculated_vat = sum(
+                    formatted_data['vat_breakdown'][k]['vat']
+                    for k in ['vat_0', 'vat_9', 'vat_13_5', 'vat_23']
+                )
+                vat_diff = abs(calculated_vat - invoice_total_vat)
+                if vat_diff > 0.05:
+                    response['warnings'].append(
+                        f"VAT mismatch: calculated \u20ac{calculated_vat:.2f} vs invoice \u20ac{invoice_total_vat:.2f} (diff: \u20ac{vat_diff:.2f})"
+                    )
+
             # Preserve all original parser data by merging with formatted data
             # This ensures custom fields from individual parsers (like Amazon's EUR_VAT_Found) are preserved
             for key, value in data.items():

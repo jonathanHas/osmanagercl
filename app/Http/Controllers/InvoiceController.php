@@ -540,6 +540,20 @@ class InvoiceController extends Controller
     public function destroy(Invoice $invoice)
     {
         try {
+            // Block deletion if invoice is part of a submitted RTD submission
+            if ($invoice->rtd_submission_id) {
+                $submission = $invoice->rtdSubmission;
+                if ($submission && $submission->isSubmitted()) {
+                    return back()->with('error',
+                        'Cannot delete this invoice — it is part of submitted RTD submission: '
+                        .$submission->reference_number);
+                }
+
+                // Unlink from draft submission and recalculate its totals
+                $invoice->update(['rtd_submission_id' => null]);
+                $submission->calculateTotalsSnapshot();
+            }
+
             $invoice->delete();
 
             return redirect()->route('invoices.index')

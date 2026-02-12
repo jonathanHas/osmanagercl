@@ -61,6 +61,15 @@ def parse_invoice(text, filename):
 
         print(f"[DEBUG] Net Bill: {net_bill}", file=sys.stderr)
 
+        # === Total VAT from invoice (for cross-check validation) ===
+        total_vat_from_invoice = None
+        for line in lines:
+            m = re.search(r'Total VAT\s+€?(-?\d[\d,]*\.\d{2})', line)
+            if m:
+                total_vat_from_invoice = float(m.group(1).replace(",", ""))
+                print(f"[DEBUG] Total VAT from invoice: {total_vat_from_invoice}", file=sys.stderr)
+                break
+
         # === VAT Breakdown ===
         # Strategy 1: pdfplumber format — "VAT (R) 9.00% on <net_amount> <vat_charge>"
         # These lines already include everything (export credits are in VAT (Z))
@@ -171,6 +180,7 @@ def parse_invoice(text, filename):
             'VAT 9%': f"{vat_9:.2f}",
             'VAT 13.5%': f"{vat_135:.2f}",
             'VAT 23%': f"{vat_23:.2f}",
+            'Total_VAT': total_vat_from_invoice,
         }
 
         print(f"[DEBUG] Parsed Data: {parsed_data}", file=sys.stderr)
