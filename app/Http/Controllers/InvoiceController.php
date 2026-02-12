@@ -537,9 +537,38 @@ class InvoiceController extends Controller
     /**
      * Remove the specified invoice from storage.
      */
-    public function destroy(Invoice $invoice)
+    public function destroy(Request $request, Invoice $invoice)
     {
         try {
+            // Block deletion if invoice is assigned to a VAT return
+            if ($invoice->vat_return_id) {
+                $vatReturn = $invoice->vatReturn;
+
+                if ($vatReturn && ! $vatReturn->canBeModified()) {
+                    // Finalized/submitted/paid VAT return
+                    if (abs($invoice->vat_amount) > 0) {
+                        return back()->with('error',
+                            'Cannot delete this invoice — it contributes VAT to '
+                            .$vatReturn->status.' VAT return: '.$vatReturn->return_period
+                            .'. You must revert the VAT return to draft first.');
+                    }
+
+                    // No VAT impact — allow only if user confirmed
+                    if (! $request->boolean('force')) {
+                        return back()->with('warning',
+                            'This invoice is assigned to '.$vatReturn->status
+                            .' VAT return: '.$vatReturn->return_period
+                            .'. It has no VAT impact so it can be removed.');
+                    }
+                }
+
+                // Unlink from VAT return and recalculate if draft
+                $invoice->update(['vat_return_id' => null]);
+                if ($vatReturn && $vatReturn->canBeModified()) {
+                    $vatReturn->calculateTotals();
+                }
+            }
+
             // Block deletion if invoice is part of a submitted RTD submission
             if ($invoice->rtd_submission_id) {
                 $submission = $invoice->rtdSubmission;

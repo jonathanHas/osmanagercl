@@ -6,7 +6,7 @@ def parse_invoice(text, filename):
 
     try:
         # === Total ===
-        total_match = re.search(r'Total including vat EUR\s+([\d.,]+)', text, re.IGNORECASE)
+        total_match = re.search(r'Total including vat EUR\s+(-?[\d.,]+)', text, re.IGNORECASE)
         total = total_match.group(1).replace(',', '.').strip() if total_match else None
         print(f"[DEBUG] Total: {total if total else 'Not found'}", file=sys.stderr)
 
@@ -17,6 +17,13 @@ def parse_invoice(text, filename):
         )
         print(f"[DEBUG] Invoice Date: {invoice_date}", file=sys.stderr)
 
+        # === Detect credit note from negative total ===
+        is_credit_note = False
+        if total:
+            if float(total) < 0:
+                is_credit_note = True
+                print(f"[DEBUG] Credit note detected (negative total: {total})", file=sys.stderr)
+
         # === VAT Info (all values are within 0% range)
         vat_0 = total if total else "0.00"
 
@@ -25,7 +32,7 @@ def parse_invoice(text, filename):
             'Supplier': 'Udea',
             'Invoice Date': invoice_date,
             'Tax Free': True,
-            'Credit Note': False,
+            'Credit Note': is_credit_note,
             'VAT 0%': vat_0,
             'VAT 9%': '0.00',
             'VAT 13.5%': '0.00',

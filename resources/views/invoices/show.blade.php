@@ -354,15 +354,42 @@
                            class="block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-center">
                             Edit Invoice
                         </a>
-                        <form action="{{ route('invoices.destroy', $invoice) }}" method="POST" 
-                              onsubmit="return confirm('Are you sure you want to delete this invoice?');">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" 
-                                    class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
-                                Delete Invoice
-                            </button>
-                        </form>
+                        @if ($invoice->vat_return_id && $invoice->vatReturn && !$invoice->vatReturn->canBeModified())
+                            @if (abs($invoice->vat_amount) > 0)
+                                {{-- Has VAT on finalized return — block deletion --}}
+                                <button type="button" disabled
+                                        class="w-full bg-gray-400 text-white font-bold py-2 px-4 rounded cursor-not-allowed"
+                                        title="Cannot delete — contributes VAT to {{ $invoice->vatReturn->status }} VAT return: {{ $invoice->vatReturn->return_period }}">
+                                    Delete Invoice
+                                </button>
+                                <p class="text-xs text-red-400 mt-1">
+                                    Assigned to {{ $invoice->vatReturn->status }} VAT return ({{ $invoice->vatReturn->return_period }}).
+                                    Revert to draft to delete.
+                                </p>
+                            @else
+                                {{-- Zero VAT on finalized return — allow with warning --}}
+                                <form action="{{ route('invoices.destroy', $invoice) }}?force=1" method="POST"
+                                      onsubmit="return confirm('This invoice is assigned to {{ $invoice->vatReturn->status }} VAT return: {{ $invoice->vatReturn->return_period }}.\n\nIt has no VAT impact so it can safely be removed.\n\nAre you sure you want to delete it?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit"
+                                            class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                                        Delete Invoice
+                                    </button>
+                                </form>
+                            @endif
+                        @else
+                            {{-- Normal delete (no VAT return, or draft VAT return) --}}
+                            <form action="{{ route('invoices.destroy', $invoice) }}" method="POST"
+                                  onsubmit="return confirm('Are you sure you want to delete this invoice?');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit"
+                                        class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                                    Delete Invoice
+                                </button>
+                            </form>
+                        @endif
                     </div>
                 </div>
             </div>
