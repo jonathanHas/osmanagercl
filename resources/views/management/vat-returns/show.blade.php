@@ -102,10 +102,128 @@
                 </div>
             </div>
 
-            <!-- VAT Summary -->
+            <!-- ROS VAT Return Summary -->
+            @if($rosFields)
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
                 <div class="p-6 bg-white border-b border-gray-200">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">VAT Summary</h3>
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">VAT Return Summary (ROS Format)</h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Left Column - VAT Calculations -->
+                        <div>
+                            <h4 class="text-sm font-semibold text-gray-700 mb-3">VAT Calculations</h4>
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center py-2 border-b">
+                                    <span class="text-sm font-medium text-gray-600">T1 - VAT on Sales</span>
+                                    <span class="text-sm font-bold text-gray-900">€{{ number_format($rosFields['T1'], 2) }}</span>
+                                </div>
+                                <div class="flex justify-between items-center py-2 border-b">
+                                    <span class="text-sm font-medium text-gray-600">T2 - VAT on Purchases</span>
+                                    <span class="text-sm font-bold text-gray-900">€{{ number_format($rosFields['T2'], 2) }}</span>
+                                </div>
+                                @if($rosFields['T3'] > 0)
+                                <div class="flex justify-between items-center py-2 bg-red-50 px-2 rounded">
+                                    <span class="text-sm font-medium text-red-700">T3 - Net Payable</span>
+                                    <span class="text-sm font-bold text-red-700">€{{ number_format($rosFields['T3'], 2) }}</span>
+                                </div>
+                                @else
+                                <div class="flex justify-between items-center py-2 bg-green-50 px-2 rounded">
+                                    <span class="text-sm font-medium text-green-700">T4 - Net Repayable</span>
+                                    <span class="text-sm font-bold text-green-700">€{{ number_format($rosFields['T4'], 2) }}</span>
+                                </div>
+                                @endif
+                            </div>
+                        </div>
+
+                        <!-- Right Column - Intra-EU Trade -->
+                        <div>
+                            <h4 class="text-sm font-semibold text-gray-700 mb-3">Intra-EU Trade (INTRASTAT)</h4>
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-center py-2 border-b">
+                                    <span class="text-sm font-medium text-gray-600">E1 - Goods to EU</span>
+                                    <span class="text-sm font-bold text-gray-900">€{{ number_format($rosFields['E1'], 2) }}</span>
+                                </div>
+                                <div class="flex justify-between items-center py-2 border-b">
+                                    <span class="text-sm font-medium text-gray-600">E2 - Goods from EU</span>
+                                    <span class="text-sm font-bold text-gray-900">€{{ number_format($rosFields['E2'], 2) }}</span>
+                                </div>
+                                @if($euInvoices->count() > 0)
+                                <div class="mt-2 text-xs text-gray-500">
+                                    EU Suppliers:
+                                    @foreach($euInvoices->groupBy('supplier_name') as $supplierName => $supplierEuInvoices)
+                                        {{ $supplierName }} (€{{ number_format($supplierEuInvoices->sum('subtotal'), 2) }})@if(!$loop->last), @endif
+                                    @endforeach
+                                </div>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            <!-- Sales VAT Breakdown -->
+            @if($salesData && isset($salesData['by_rate']))
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
+                <div class="p-6 bg-white border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">
+                        Sales VAT Breakdown
+                        @if(($salesData['data_source'] ?? '') === 'optimized')
+                            <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded ml-2">Optimized Data</span>
+                        @elseif(($salesData['data_source'] ?? '') === 'real-time')
+                            <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded ml-2">Real-time Data</span>
+                        @endif
+                    </h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VAT Rate</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Net Sales</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">VAT Amount</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Gross Sales</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                @foreach($salesData['by_rate'] as $rateData)
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {{ number_format(($rateData['vat_rate'] ?? 0) * 100, 1) }}%
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                                        €{{ number_format($rateData['total_net'] ?? 0, 2) }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                                        €{{ number_format($rateData['total_vat'] ?? 0, 2) }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                                        €{{ number_format(($rateData['total_net'] ?? 0) + ($rateData['total_vat'] ?? 0), 2) }}
+                                    </td>
+                                </tr>
+                                @endforeach
+                                <tr class="bg-gray-50 font-bold">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">TOTAL</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                                        €{{ number_format($salesData['total_net'] ?? 0, 2) }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                                        €{{ number_format($salesData['total_vat'] ?? 0, 2) }}
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                                        €{{ number_format($salesData['total_gross'] ?? 0, 2) }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            <!-- Purchase VAT Summary -->
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
+                <div class="p-6 bg-white border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Purchase VAT Summary</h3>
                     <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">

@@ -28,6 +28,8 @@ class VatReturn extends Model
         'reduced_vat',
         'standard_net',
         'standard_vat',
+        'sales_vat_data',
+        'eu_total_amount',
         'notes',
         'submitted_date',
         'reference_number',
@@ -51,6 +53,8 @@ class VatReturn extends Model
         'reduced_vat' => 'decimal:2',
         'standard_net' => 'decimal:2',
         'standard_vat' => 'decimal:2',
+        'sales_vat_data' => 'array',
+        'eu_total_amount' => 'decimal:2',
         'is_historical' => 'boolean',
     ];
 

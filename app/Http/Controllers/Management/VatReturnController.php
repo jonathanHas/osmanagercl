@@ -270,6 +270,28 @@ class VatReturnController extends Controller
             // Calculate totals
             $vatReturn->calculateTotals();
 
+            // Save sales VAT data and EU total
+            $salesData = $this->getSalesVatData($periodStart, $periodEnd);
+            $salesVatData = [
+                'total_net' => $salesData['total_net'],
+                'total_vat' => $salesData['total_vat'],
+                'total_gross' => $salesData['total_gross'],
+                'data_source' => $salesData['data_source'],
+                'by_rate' => collect($salesData['by_rate'])->map(fn ($item) => [
+                    'vat_rate' => is_object($item) ? $item->vat_rate : ($item['vat_rate'] ?? null),
+                    'total_net' => is_object($item) ? ($item->total_net ?? 0) : ($item['total_net'] ?? 0),
+                    'total_vat' => is_object($item) ? ($item->total_vat ?? 0) : ($item['total_vat'] ?? 0),
+                ])->values()->toArray(),
+            ];
+
+            $euSupplierIds = AccountingSupplier::euSuppliers()->pluck('id');
+            $euTotalAmount = $vatReturn->invoices()->whereIn('supplier_id', $euSupplierIds)->sum('subtotal');
+
+            $vatReturn->update([
+                'sales_vat_data' => $salesVatData,
+                'eu_total_amount' => $euTotalAmount,
+            ]);
+
             DB::commit();
 
             return redirect()->route('management.vat-returns.show', $vatReturn)
@@ -315,7 +337,25 @@ class VatReturnController extends Controller
         // Get EU supplier invoices
         $euSupplierIds = AccountingSupplier::euSuppliers()->pluck('id');
         $euInvoices = $vatReturn->invoices->whereIn('supplier_id', $euSupplierIds);
-        $euTotalAmount = $euInvoices->sum('subtotal');
+        $euTotalAmount = $vatReturn->eu_total_amount > 0 ? $vatReturn->eu_total_amount : $euInvoices->sum('subtotal');
+
+        // Build ROS fields from persisted sales data
+        $salesData = $vatReturn->sales_vat_data;
+        $rosFields = null;
+        if ($salesData) {
+            $vatOnSales = $salesData['total_vat'] ?? 0;
+            $vatOnPurchases = $vatReturn->total_vat;
+            $netPayable = $vatOnSales - $vatOnPurchases;
+
+            $rosFields = [
+                'T1' => $vatOnSales,
+                'T2' => $vatOnPurchases,
+                'T3' => max(0, $netPayable),
+                'T4' => max(0, -$netPayable),
+                'E1' => 0,
+                'E2' => $euTotalAmount,
+            ];
+        }
 
         return view('management.vat-returns.show', compact(
             'vatReturn',
@@ -323,7 +363,9 @@ class VatReturnController extends Controller
             'supplierTotals',
             'vatBreakdown',
             'euInvoices',
-            'euTotalAmount'
+            'euTotalAmount',
+            'salesData',
+            'rosFields'
         ));
     }
 
