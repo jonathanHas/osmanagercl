@@ -64,6 +64,7 @@ GBREK_CLASSIFICATIONS: Final[Dict[str, str]] = {
     # Service categories
     '30862': 'freight_or_service',  # Transport doorbel. eu (Transport)
     # Deposit categories
+    '34010': 'deposit_or_returnable_packaging',  # Fust inkomend debiteuren (Barrel returns)
     '34120': 'deposit_or_returnable_packaging',  # Fust uitgaand debiteuren (Barrels/crates)
 }
 
@@ -194,10 +195,11 @@ class InvoiceUdeaParser:
 
         # Extract total excluding VAT - Udea specific patterns
         # Use TOTAL_NUMBER which is more flexible for larger amounts
+        # Allow optional minus sign for credit notes
         excl_patterns = [
-            rf'Total\s+excluding\s+vat\s+({TOTAL_NUMBER})',
-            rf'Totaal\s+exclusief\s+BTW\s+[€]?\s*({TOTAL_NUMBER})',
-            rf'Total\s+excl\.?\s+VAT\s+[€]?\s*({TOTAL_NUMBER})',
+            rf'Total\s+excluding\s+vat\s+(-?{TOTAL_NUMBER})',
+            rf'Totaal\s+exclusief\s+BTW\s+[€]?\s*(-?{TOTAL_NUMBER})',
+            rf'Total\s+excl\.?\s+VAT\s+[€]?\s*(-?{TOTAL_NUMBER})',
         ]
         for pattern in excl_patterns:
             match = re.search(pattern, text, re.IGNORECASE)
@@ -209,7 +211,7 @@ class InvoiceUdeaParser:
         # Extract VAT amount - look for "No VAT over X Y" pattern (Y is the VAT amount)
         # Or standard VAT patterns
         vat_patterns = [
-            rf'No\s+VAT\s+over\s+{TOTAL_NUMBER}\s+({TOTAL_NUMBER})',  # "No VAT over 4516,55 0,00"
+            rf'No\s+VAT\s+over\s+-?{TOTAL_NUMBER}\s+({TOTAL_NUMBER})',  # "No VAT over -3873,20 0,00"
             rf'VAT\s+\d+%?\s+[€]?\s*({TOTAL_NUMBER})',
             rf'BTW\s+\d+%?\s+[€]?\s*({TOTAL_NUMBER})',
         ]
@@ -228,10 +230,10 @@ class InvoiceUdeaParser:
 
         # Try to find explicit total including VAT
         incl_patterns = [
-            rf'Total\s+including\s+vat\s+(?:EUR\s+)?({TOTAL_NUMBER})',
-            rf'Totaal\s+inclusief\s+BTW\s+[€]?\s*({TOTAL_NUMBER})',
-            rf'Total\s+incl\.?\s+VAT\s+[€]?\s*({TOTAL_NUMBER})',
-            rf'Te\s+betalen\s*[€]?\s*({TOTAL_NUMBER})',
+            rf'Total\s+including\s+vat\s+(?:EUR\s+)?(-?{TOTAL_NUMBER})',
+            rf'Totaal\s+inclusief\s+BTW\s+[€]?\s*(-?{TOTAL_NUMBER})',
+            rf'Total\s+incl\.?\s+VAT\s+[€]?\s*(-?{TOTAL_NUMBER})',
+            rf'Te\s+betalen\s*[€]?\s*(-?{TOTAL_NUMBER})',
         ]
         for pattern in incl_patterns:
             match = re.search(pattern, text, re.IGNORECASE)
@@ -814,6 +816,72 @@ class InvoiceUdeaParser:
 
         return result
 
+    def _extract_barrel_returns(self, text: str) -> Dict[str, Any]:
+        """Extract barrel returns from a credit note.
+
+        Credit note format (section "Barrels returned"):
+        Date Brl -Amount TicketNr Description Price VAT -Total
+        21.10.25 7 -1 90202431 Europallet 15,00 1 -15,00
+
+        Returns same structure as _extract_barrels but with negative totals.
+        """
+        result = {'items': [], 'total': 0.0}
+
+        # Find barrel returns section
+        returns_start = text.find('Barrels returned')
+        if returns_start == -1:
+            return result
+
+        # Find end of section
+        returns_text = text[returns_start:]
+        for end_marker in ['Total barrels returned', 'Distribution by group', 'Total excluding']:
+            end_pos = returns_text.find(end_marker)
+            if end_pos != -1:
+                returns_section = returns_text[:end_pos + 200]  # Include total line
+                break
+        else:
+            returns_section = returns_text[:2000]
+
+        # Parse barrel return lines:
+        # DD.MM.YY BrlCode -Amount TicketNr Description Price VAT -Total
+        barrel_return_pattern = re.compile(
+            r'^(\d{2}\.\d{2}\.\d{2})\s+'      # Date DD.MM.YY
+            r'(\d+)\s+'                         # Barrel code
+            r'(-\d+)\s+'                        # Negative amount
+            r'(\d+)\s+'                         # Ticket number
+            r'(.+?)\s+'                         # Description
+            rf'({NUMBER})\s+'                   # Price
+            r'\d+\s+'                           # VAT code
+            rf'(-{NUMBER})\s*$',                # Negative total
+            re.MULTILINE
+        )
+
+        for match in barrel_return_pattern.finditer(returns_section):
+            date, code, qty, ticket, desc, price, total = match.groups()
+            item = {
+                'code': code,
+                'quantity': int(qty),
+                'description': desc.strip()[:50],
+                'price': self._clean_number_string(price),
+                'total': self._clean_number_string(total),
+                'line_type': 'deposit_or_returnable_packaging',
+                'ticket': ticket,
+                'date': date,
+                'is_return': True,
+            }
+            result['items'].append(item)
+            self.stats['barrel_lines_parsed'] += 1
+            self.log(f"Parsed barrel return: {code} - {desc.strip()[:30]}... Total: {item['total']}", "DEBUG")
+
+        # Extract total barrel returns
+        total_match = re.search(rf'Total barrels returned\s+(-{TOTAL_NUMBER})', returns_section)
+        if total_match:
+            result['total'] = self._clean_number_string(total_match.group(1))
+        elif result['items']:
+            result['total'] = sum(item['total'] for item in result['items'])
+
+        return result
+
     def _extract_costs(self, text: str) -> Dict[str, Any]:
         """Extract costs/freight from the invoice.
 
@@ -1028,8 +1096,22 @@ class InvoiceUdeaParser:
             if not products:
                 result["warnings"].append("No product lines could be extracted")
 
+            # Detect credit note (negative total)
+            is_credit_note = header.get('total_excl_vat', 0) < 0
+            if is_credit_note:
+                result["is_credit_note"] = True
+                self.log("Credit note detected (negative total)", "INFO")
+
             # Extract barrels (deposits)
             barrels = self._extract_barrels(text)
+
+            # Extract barrel returns (credit notes for returned crates)
+            barrel_returns = self._extract_barrel_returns(text)
+            if barrel_returns['items']:
+                barrels['items'].extend(barrel_returns['items'])
+                barrels['total'] += barrel_returns['total']
+                self.log(f"Added {len(barrel_returns['items'])} barrel return lines", "INFO")
+
             result["barrels"] = barrels
 
             # Extract costs (freight/service)

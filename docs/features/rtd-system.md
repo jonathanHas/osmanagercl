@@ -151,6 +151,7 @@ The system automatically detects supported suppliers and parses them using the a
 
 **Udea** (`invoice_udea.py`):
 - Extracts header info (invoice number, date, totals)
+- Supports credit notes with negative totals (e.g., returned crates/barrels)
 - Extracts line items with article codes
 - Identifies barrels (deposits) and costs (freight)
 - Classifies items by Gb.rek account codes

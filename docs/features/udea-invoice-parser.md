@@ -19,9 +19,10 @@ This tool is primarily used for debugging and understanding invoice structure, w
 ### Invoice Header Extraction
 - **Invoice Number**: Extracted from "Invoice number:" or "Factuurnummer" patterns
 - **Invoice Date**: Parsed from DD.MM.YYYY format, converted to ISO format
-- **Total Excl VAT**: Extracted from "Total excluding vat" line
+- **Total Incl VAT**: Extracted from "Total including vat" line (supports negative amounts for credit notes)
 - **VAT Amount**: Extracted from "No VAT over X Y" pattern (Y is the VAT)
 - **Zero VAT Confirmation**: Boolean flag confirming EU zero-rated status
+- **Credit Note Detection** (NEW! 2026-02-12): Negative totals automatically detected and flagged as `is_credit_note: true`
 
 ### Product Line Extraction
 - **Article Code**: Supplier's product code
@@ -48,6 +49,12 @@ Lines are automatically classified based on their account code:
 | 30372 | Other sales | product_for_resale |
 | 30862 | Transport | freight_or_service |
 | 34120 | Barrels/Deposits | deposit_or_returnable_packaging |
+
+### Credit Note Support (NEW! 2026-02-12)
+The parser handles Udea credit notes (e.g., returned crates and barrels):
+- **Negative Totals**: Regex matches `Total including vat EUR -3873,20` (previously failed on the minus sign)
+- **Automatic Detection**: Negative total triggers `is_credit_note: true` in output
+- **Zero VAT**: Credit notes are typically at 0% VAT (EU zero-rated returns)
 
 ### Barrels/Deposits Extraction
 - Automatic detection of "Barrels delivered" section

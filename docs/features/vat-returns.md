@@ -223,6 +223,22 @@ status ENUM('draft', 'finalized', 'submitted')
 - Unassigned invoice tracking
 - Cross-database supplier matching
 
+## Invoice Deletion Protection
+
+When an invoice is assigned to a VAT return, deletion is protected to prevent stale totals:
+
+| VAT Return Status | Invoice VAT Amount | Behaviour |
+|---|---|---|
+| Draft | Any | Unlink from VAT return, recalculate totals, delete |
+| Finalized/Submitted/Paid | Non-zero | **Blocked** — delete button disabled, must revert return to draft first |
+| Finalized/Submitted/Paid | Zero (e.g. tax-free Udea) | **Warning** — user can confirm and proceed; invoice is unlinked |
+| No VAT return | Any | Normal deletion |
+
+### Implementation Details
+- **Backend**: `InvoiceController::destroy()` checks `vat_return_id` and `canBeModified()` before allowing deletion
+- **Frontend**: Delete button on invoice show page adapts based on VAT return status and invoice VAT amount
+- **Override**: Zero-VAT invoices on finalized returns pass `?force=1` when user confirms the warning dialog
+
 ## Troubleshooting
 
 ### Common Issues

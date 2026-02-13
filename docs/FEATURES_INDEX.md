@@ -395,8 +395,9 @@ Modern multi-file invoice upload system with drag-and-drop interface.
 📖 [Invoice Bulk Upload Documentation](./features/invoice-bulk-upload-system.md)
 📖 [Invoice Parser Integration Guide](./features/invoice-parser-integration.md) (Phase 2)
 
-### Udea Invoice Parser (NEW! 2026-01-28, Updated 2026-01-30)
+### Udea Invoice Parser (NEW! 2026-01-28, Updated 2026-02-12)
 Debug and data extraction tool for UDEA B.V. invoice PDFs with structured output.
+- **Credit Note Support** (NEW! 2026-02-12): Parses negative totals for returned crates/barrels, sets `is_credit_note: true`
 - **Header Extraction**: Invoice number, date, totals, zero-VAT confirmation, "Total products" expected
 - **Product Line Parsing**: Article codes, descriptions, quantities, prices, totals
 - **Line Classification**: Automatic categorization by Gb.rek account code (30302=AGF, 30322=DKW, etc.)
@@ -516,6 +517,7 @@ Complete Irish Revenue Online Service (ROS) VAT returns with automated calculati
 - **Bi-Monthly Periods**: Supports Irish VAT periods (Jan-Feb, Mar-Apr, May-Jun, etc.)
 - **Complete VAT Integration**: Sales VAT from POS + Purchase VAT from invoices
 - **EU Trade Tracking**: Automatic INTRASTAT reporting for EU suppliers (Dynamis, Udea)
+- **Invoice Deletion Protection** (NEW! 2026-02-12): Blocks deletion of invoices with VAT on finalized returns; allows zero-VAT invoice removal with warning
 - **Auto-Selection UX**: All period invoices selected by default with smart controls
 - **Comprehensive Exports**: Automatic CSV download with all ROS data and breakdowns
 - **Dual Performance**: Uses optimized data (100x+ faster) with real-time fallback

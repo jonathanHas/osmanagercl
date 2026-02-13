@@ -221,8 +221,10 @@ class RtdController extends Controller
                 return $this->rtdResponse(false, 'Parser returned invalid JSON.', $invoice);
             }
 
-            if (! isset($result['lines']) || empty($result['lines'])) {
-                return $this->rtdResponse(false, 'Parser found no line items.', $invoice);
+            $hasLines = ! empty($result['lines']);
+            $hasBarrels = ! empty($result['barrels']['items'] ?? []);
+            if (! $hasLines && ! $hasBarrels) {
+                return $this->rtdResponse(false, 'Parser found no line items or barrel data.', $invoice);
             }
 
             // Merge new line data into existing parsed_data
@@ -242,7 +244,8 @@ class RtdController extends Controller
                 'status' => 'completed',
             ]);
 
-            $lineCount = count($result['lines']);
+            $lineCount = count($result['lines'] ?? []);
+            $barrelCount = count($result['barrels']['items'] ?? []);
 
             // Auto-compute RTD after successful parse
             $invoice->refresh();
@@ -255,7 +258,15 @@ class RtdController extends Controller
                 'rtd_computed_at' => now(),
             ]);
 
-            $message = "Invoice #{$invoice->invoice_number} parsed and computed. Found {$lineCount} lines, {$unresolvedCount} unresolved.";
+            $parts = [];
+            if ($lineCount > 0) {
+                $parts[] = "{$lineCount} lines";
+            }
+            if ($barrelCount > 0) {
+                $parts[] = "{$barrelCount} barrel entries";
+            }
+            $parts[] = "{$unresolvedCount} unresolved";
+            $message = "Invoice #{$invoice->invoice_number} parsed and computed. Found ".implode(', ', $parts).'.';
 
             // Refresh invoice to get updated status
             $invoice->refresh();
@@ -369,8 +380,10 @@ class RtdController extends Controller
                 return $this->rtdResponse(false, 'Parser returned invalid JSON.', $invoice);
             }
 
-            if (! isset($result['lines']) || empty($result['lines'])) {
-                return $this->rtdResponse(false, 'Parser found no line items.', $invoice);
+            $hasLines = ! empty($result['lines']);
+            $hasBarrels = ! empty($result['barrels']['items'] ?? []);
+            if (! $hasLines && ! $hasBarrels) {
+                return $this->rtdResponse(false, 'Parser found no line items or barrel data.', $invoice);
             }
 
             // Save all parsed data (fresh, not merged)
@@ -391,7 +404,8 @@ class RtdController extends Controller
                 'status' => 'completed',
             ]);
 
-            $lineCount = count($result['lines']);
+            $lineCount = count($result['lines'] ?? []);
+            $barrelCount = count($result['barrels']['items'] ?? []);
 
             // Auto-compute RTD after successful parse
             $invoice->refresh();
@@ -404,7 +418,15 @@ class RtdController extends Controller
                 'rtd_computed_at' => now(),
             ]);
 
-            $message = "Invoice #{$invoice->invoice_number} parsed and computed. Found {$lineCount} lines, {$unresolvedCount} unresolved.";
+            $parts = [];
+            if ($lineCount > 0) {
+                $parts[] = "{$lineCount} lines";
+            }
+            if ($barrelCount > 0) {
+                $parts[] = "{$barrelCount} barrel entries";
+            }
+            $parts[] = "{$unresolvedCount} unresolved";
+            $message = "Invoice #{$invoice->invoice_number} parsed and computed. Found ".implode(', ', $parts).'.';
 
             // Refresh invoice to get updated status
             $invoice->refresh();

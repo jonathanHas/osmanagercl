@@ -19,6 +19,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Udea Parser - Credit Note / Negative Total Support** (2026-02-12)
+  - **Bug**: Udea credit notes (e.g., returned crates) have negative totals like `Total including vat EUR -3873,20`, but the parser regex `[\d.,]+` didn't match the negative sign, causing total to be `None` and all amounts to be 0
+  - **Fix**: Changed total regex to `-?[\d.,]+` to allow negative amounts; detect credit notes from negative total and set `is_credit_note: true`
+  - **File Modified**: `scripts/invoice-parser/parsers/udea.py`
+
+- **Invoice Deletion - VAT Return Protection** (2026-02-12)
+  - **Bug**: Deleting an invoice assigned to a finalized/submitted VAT return silently succeeded, leaving VAT return totals stale and incorrect
+  - **Fix**: Added three-tier protection:
+    - **Block**: Invoices with non-zero VAT on finalized/submitted/paid returns cannot be deleted (button disabled with explanation)
+    - **Warn**: Invoices with zero VAT on finalized returns show confirmation warning, user can override
+    - **Draft**: Invoices on draft returns are unlinked and totals recalculated automatically
+  - **Files Modified**: `app/Http/Controllers/InvoiceController.php` (`destroy()` method), `resources/views/invoices/show.blade.php` (delete button)
+
 - **IIH Parser - Non-Standard VAT Rate Handling** (2026-02-10)
   - **Bug**: IIH invoice #9588 showed 164.74 reconciliation difference — 164.75 in taxable goods missing from RTD
   - **Root Cause**: IIH VAT summary regex only matched exact rates (`0.00|9.00|13.50|23.00`); invoice used rate `22.50` which was silently skipped
