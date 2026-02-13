@@ -189,6 +189,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/{invoice}/force-parse', [\App\Http\Controllers\RtdController::class, 'forceParse'])->name('force-parse');
         Route::post('/{invoice}/compute', [\App\Http\Controllers\RtdController::class, 'compute'])->name('compute');
         Route::post('/{invoice}/accept', [\App\Http\Controllers\RtdController::class, 'accept'])->name('accept');
+        Route::post('/{invoice}/manual-assign', [\App\Http\Controllers\RtdController::class, 'manualAssign'])->name('manual-assign');
         Route::post('/recompute-all', [\App\Http\Controllers\RtdController::class, 'recomputeAll'])->name('recompute-all');
     });
 

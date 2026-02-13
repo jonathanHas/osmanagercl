@@ -433,6 +433,11 @@
                                                     class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded">
                                                 Parse
                                             </button>
+                                            <button type="button" onclick="openManualEdit({{ $invoice->id }}, {{ json_encode($invoice->total_amount) }})"
+                                                    class="bg-yellow-600 hover:bg-yellow-700 text-white text-xs px-3 py-1 rounded"
+                                                    title="Manually enter RTD breakdown">
+                                                Manual
+                                            </button>
                                         @elseif($invoice->rtd_display_status === 'needs_computation')
                                             <button type="button" onclick="rtdAction({{ $invoice->id }}, 'compute', 'Computing')"
                                                     class="bg-orange-600 hover:bg-orange-700 text-white text-xs px-3 py-1 rounded">
@@ -443,10 +448,20 @@
                                                     class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded">
                                                 Recompute
                                             </button>
+                                            <button type="button" onclick="openManualEdit({{ $invoice->id }}, {{ json_encode($invoice->total_amount) }})"
+                                                    class="bg-yellow-600 hover:bg-yellow-700 text-white text-xs px-3 py-1 rounded"
+                                                    title="Manually edit RTD breakdown">
+                                                Edit
+                                            </button>
                                         @elseif($invoice->rtd_display_status === 'computed')
                                             <button type="button" onclick="rtdAction({{ $invoice->id }}, 'compute', 'Recomputing')"
                                                     class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded">
                                                 Recompute
+                                            </button>
+                                            <button type="button" onclick="openManualEdit({{ $invoice->id }}, {{ json_encode($invoice->total_amount) }})"
+                                                    class="bg-yellow-600 hover:bg-yellow-700 text-white text-xs px-3 py-1 rounded"
+                                                    title="Manually edit RTD breakdown">
+                                                Edit
                                             </button>
                                             <button type="button" onclick="rtdAction({{ $invoice->id }}, 'accept', 'Freezing')"
                                                     class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 rounded">
@@ -475,7 +490,10 @@
                                 </td>
                             </tr>
                             {{-- Expandable Detail Row --}}
-                            <tr id="detail-{{ $invoice->id }}" class="hidden bg-gray-850">
+                            <tr id="detail-{{ $invoice->id }}" class="hidden bg-gray-850"
+                                data-breakdown="{{ json_encode($invoice->rtd_breakdown ?? []) }}"
+                                data-invoice-total="{{ $invoice->total_amount }}"
+                            >
                                 <td colspan="7" class="px-4 py-4">
                                     <div class="bg-gray-900 rounded-lg p-4">
                                         @if($invoice->hasRtdData())
@@ -909,6 +927,216 @@
             });
         }
 
+        // Open manual RTD edit form in the detail row
+        function openManualEdit(invoiceId, invoiceTotal) {
+            const detailRow = document.getElementById('detail-' + invoiceId);
+            const chevron = document.getElementById('chevron-' + invoiceId);
+
+            // Show detail row
+            detailRow.classList.remove('hidden');
+            if (chevron) chevron.style.transform = 'rotate(90deg)';
+
+            // Try to read existing breakdown from the row's current data
+            const contentDiv = detailRow.querySelector('.bg-gray-900');
+            let gfr = { '0': 0, '9': 0, '13.5': 0, '23': 0 };
+            let excl = { freight: 0, deposits: 0, drs: 0, vat: 0, service_overhead: 0 };
+
+            // Read existing breakdown from data attribute
+            try {
+                const bd = JSON.parse(detailRow.dataset.breakdown || '{}');
+                if (bd.goods_for_resale) gfr = bd.goods_for_resale;
+                if (bd.excluded) excl = { ...excl, ...bd.excluded };
+            } catch(e) {}
+
+            const inputClass = 'bg-gray-700 text-white text-sm font-mono text-right rounded px-2 py-1 w-24 border border-gray-600 focus:border-yellow-500 focus:outline-none';
+
+            const html = `
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-4" id="manual-form-${invoiceId}">
+                    <div class="bg-gray-800 rounded-lg p-3">
+                        <h4 class="text-sm font-semibold text-green-400 mb-2">Goods for Resale (T1)</h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-400">0% Rate:</span>
+                                <input type="text" inputmode="decimal" id="me-g0-${invoiceId}" value="${parseFloat(gfr['0'] || 0).toFixed(2)}" class="${inputClass}" oninput="updateManualReconciliation(${invoiceId}, ${invoiceTotal})">
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-400">9% Rate:</span>
+                                <input type="text" inputmode="decimal" id="me-g9-${invoiceId}" value="${parseFloat(gfr['9'] || 0).toFixed(2)}" class="${inputClass}" oninput="updateManualReconciliation(${invoiceId}, ${invoiceTotal})">
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-400">13.5% Rate:</span>
+                                <input type="text" inputmode="decimal" id="me-g135-${invoiceId}" value="${parseFloat(gfr['13.5'] || 0).toFixed(2)}" class="${inputClass}" oninput="updateManualReconciliation(${invoiceId}, ${invoiceTotal})">
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-400">23% Rate:</span>
+                                <input type="text" inputmode="decimal" id="me-g23-${invoiceId}" value="${parseFloat(gfr['23'] || 0).toFixed(2)}" class="${inputClass}" oninput="updateManualReconciliation(${invoiceId}, ${invoiceTotal})">
+                            </div>
+                            <div class="flex justify-between pt-2 border-t border-gray-600 font-semibold">
+                                <span class="text-gray-300">Subtotal:</span>
+                                <span class="text-green-400 font-mono" id="me-goods-total-${invoiceId}">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-3">
+                        <h4 class="text-sm font-semibold text-blue-400 mb-2">Excluded</h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-400">Freight:</span>
+                                <input type="text" inputmode="decimal" id="me-freight-${invoiceId}" value="${parseFloat(excl.freight || 0).toFixed(2)}" class="${inputClass}" oninput="updateManualReconciliation(${invoiceId}, ${invoiceTotal})">
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-400">Deposits:</span>
+                                <input type="text" inputmode="decimal" id="me-deposits-${invoiceId}" value="${parseFloat(excl.deposits || 0).toFixed(2)}" class="${inputClass}" oninput="updateManualReconciliation(${invoiceId}, ${invoiceTotal})">
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-400">DRS:</span>
+                                <input type="text" inputmode="decimal" id="me-drs-${invoiceId}" value="${parseFloat(excl.drs || 0).toFixed(2)}" class="${inputClass}" oninput="updateManualReconciliation(${invoiceId}, ${invoiceTotal})">
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-400">VAT:</span>
+                                <input type="text" inputmode="decimal" id="me-vat-${invoiceId}" value="${parseFloat(excl.vat || 0).toFixed(2)}" class="${inputClass}" oninput="updateManualReconciliation(${invoiceId}, ${invoiceTotal})">
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-400">Service/OH:</span>
+                                <input type="text" inputmode="decimal" id="me-soh-${invoiceId}" value="${parseFloat(excl.service_overhead || 0).toFixed(2)}" class="${inputClass}" oninput="updateManualReconciliation(${invoiceId}, ${invoiceTotal})">
+                            </div>
+                            <div class="flex justify-between pt-2 border-t border-gray-600 font-semibold">
+                                <span class="text-gray-300">Subtotal:</span>
+                                <span class="text-blue-400 font-mono" id="me-excl-total-${invoiceId}">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-3" id="me-recon-${invoiceId}">
+                        <h4 class="text-sm font-semibold text-gray-400 mb-2">Reconciliation</h4>
+                        <div class="space-y-1 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-green-400">+ Goods (T1):</span>
+                                <span class="text-white font-mono" id="me-recon-goods-${invoiceId}">0.00</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-blue-400">+ Excluded:</span>
+                                <span class="text-white font-mono" id="me-recon-excl-${invoiceId}">0.00</span>
+                            </div>
+                            <div class="flex justify-between pt-1 border-t border-gray-600">
+                                <span class="text-gray-300 font-semibold">= Calculated:</span>
+                                <span class="text-white font-mono font-semibold" id="me-recon-calc-${invoiceId}">0.00</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-300 font-semibold">Invoice Total:</span>
+                                <span class="text-white font-mono font-semibold">${formatNumber(invoiceTotal)}</span>
+                            </div>
+                            <div id="me-recon-status-${invoiceId}" class="pt-1 text-center"></div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-3 flex flex-col justify-between">
+                        <div>
+                            <h4 class="text-sm font-semibold text-yellow-400 mb-2">Manual Entry</h4>
+                            <p class="text-xs text-gray-400 mb-3">Enter the RTD breakdown values manually. The reconciliation updates live as you type.</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="saveManualBreakdown(${invoiceId})"
+                                    class="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white text-sm px-4 py-2 rounded font-semibold">
+                                Save
+                            </button>
+                            <button type="button" onclick="toggleExpand(${invoiceId})"
+                                    class="flex-1 bg-gray-600 hover:bg-gray-500 text-white text-sm px-4 py-2 rounded">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            if (contentDiv) {
+                contentDiv.innerHTML = html;
+            }
+
+            // Trigger initial reconciliation calculation
+            updateManualReconciliation(invoiceId, invoiceTotal);
+        }
+
+        // Live update reconciliation as user types
+        function updateManualReconciliation(invoiceId, invoiceTotal) {
+            const g = (id) => parseFloat(document.getElementById(id)?.value || 0);
+
+            const goodsTotal = g(`me-g0-${invoiceId}`) + g(`me-g9-${invoiceId}`) + g(`me-g135-${invoiceId}`) + g(`me-g23-${invoiceId}`);
+            const exclTotal = g(`me-freight-${invoiceId}`) + g(`me-deposits-${invoiceId}`) + g(`me-drs-${invoiceId}`) + g(`me-vat-${invoiceId}`) + g(`me-soh-${invoiceId}`);
+            const calcTotal = goodsTotal + exclTotal;
+            const diff = Math.abs(calcTotal - invoiceTotal);
+            const balanced = diff < 0.50;
+
+            document.getElementById(`me-goods-total-${invoiceId}`).textContent = formatNumber(goodsTotal);
+            document.getElementById(`me-excl-total-${invoiceId}`).textContent = formatNumber(exclTotal);
+            document.getElementById(`me-recon-goods-${invoiceId}`).textContent = formatNumber(goodsTotal);
+            document.getElementById(`me-recon-excl-${invoiceId}`).textContent = formatNumber(exclTotal);
+            document.getElementById(`me-recon-calc-${invoiceId}`).textContent = formatNumber(calcTotal);
+
+            const reconDiv = document.getElementById(`me-recon-${invoiceId}`);
+            reconDiv.className = `bg-gray-800 rounded-lg p-3 border-2 ${balanced ? 'border-green-600' : 'border-yellow-600'}`;
+
+            const statusDiv = document.getElementById(`me-recon-status-${invoiceId}`);
+            if (balanced) {
+                statusDiv.innerHTML = '<span class="text-green-400 text-xs">&#10003; Balanced</span>';
+            } else {
+                statusDiv.innerHTML = `<span class="text-yellow-400 text-xs font-mono">Difference: ${formatNumber(diff)}</span>`;
+            }
+        }
+
+        // Save manual breakdown via AJAX
+        function saveManualBreakdown(invoiceId) {
+            const g = (id) => parseFloat(document.getElementById(id)?.value || 0);
+
+            const payload = {
+                goods_0: g(`me-g0-${invoiceId}`),
+                goods_9: g(`me-g9-${invoiceId}`),
+                goods_13_5: g(`me-g135-${invoiceId}`),
+                goods_23: g(`me-g23-${invoiceId}`),
+                freight: g(`me-freight-${invoiceId}`),
+                deposits: g(`me-deposits-${invoiceId}`),
+                drs: g(`me-drs-${invoiceId}`),
+                vat: g(`me-vat-${invoiceId}`),
+                service_overhead: g(`me-soh-${invoiceId}`),
+            };
+
+            const loading = document.getElementById('loading-' + invoiceId);
+            const loadingTextEl = document.getElementById('loading-text-' + invoiceId);
+            const buttons = document.getElementById('buttons-' + invoiceId);
+
+            loading.classList.remove('hidden');
+            loading.classList.add('inline-flex');
+            loadingTextEl.textContent = 'Saving...';
+            buttons.classList.add('hidden');
+
+            fetch(`/rtd/${invoiceId}/manual-assign`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showFlashMessage(data.message, 'success');
+                    updateRowStatus(invoiceId, data);
+                } else {
+                    showFlashMessage(data.message || 'Save failed', 'error');
+                    loading.classList.add('hidden');
+                    loading.classList.remove('inline-flex');
+                    buttons.classList.remove('hidden');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showFlashMessage('An error occurred. Please try again.', 'error');
+                loading.classList.add('hidden');
+                loading.classList.remove('inline-flex');
+                buttons.classList.remove('hidden');
+            });
+        }
+
         // Update row status and buttons after successful AJAX action
         function updateRowStatus(invoiceId, data) {
             const loading = document.getElementById('loading-' + invoiceId);
@@ -924,6 +1152,15 @@
             // Update data attributes for force reparse logic
             if (actionsDiv && data.is_frozen !== undefined) {
                 actionsDiv.dataset.isFrozen = data.is_frozen ? 'true' : 'false';
+            }
+
+            // Update breakdown data attribute so manual edit pre-fills correctly
+            if (data.rtd_breakdown) {
+                const detailRow = document.getElementById('detail-' + invoiceId);
+                if (detailRow) {
+                    detailRow.dataset.breakdown = JSON.stringify(data.rtd_breakdown);
+                    detailRow.dataset.invoiceTotal = data.invoice_total || 0;
+                }
             }
 
             // Update balance indicator on total cell (3rd column)
@@ -1283,12 +1520,15 @@
                 html = '';
             } else if (data.new_status === 'needs_parsing' && data.can_parse) {
                 html = `<button type="button" onclick="rtdAction(${invoiceId}, 'parse', 'Parsing')" class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1 rounded">Parse</button>`;
+                html += `<button type="button" onclick="openManualEdit(${invoiceId}, ${data.invoice_total || 0})" class="bg-yellow-600 hover:bg-yellow-700 text-white text-xs px-3 py-1 rounded">Manual</button>`;
             } else if (data.new_status === 'needs_computation' && data.can_compute) {
                 html = `<button type="button" onclick="rtdAction(${invoiceId}, 'compute', 'Computing')" class="bg-orange-600 hover:bg-orange-700 text-white text-xs px-3 py-1 rounded">Compute</button>`;
             } else if (data.new_status === 'has_issues') {
                 html = `<button type="button" onclick="rtdAction(${invoiceId}, 'compute', 'Recomputing')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded">Recompute</button>`;
+                html += `<button type="button" onclick="openManualEdit(${invoiceId}, ${data.invoice_total || 0})" class="bg-yellow-600 hover:bg-yellow-700 text-white text-xs px-3 py-1 rounded">Edit</button>`;
             } else if (data.new_status === 'computed') {
                 html = `<button type="button" onclick="rtdAction(${invoiceId}, 'compute', 'Recomputing')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded">Recompute</button>`;
+                html += `<button type="button" onclick="openManualEdit(${invoiceId}, ${data.invoice_total || 0})" class="bg-yellow-600 hover:bg-yellow-700 text-white text-xs px-3 py-1 rounded">Edit</button>`;
                 html += `<button type="button" onclick="rtdAction(${invoiceId}, 'accept', 'Freezing')" class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 rounded ml-2">Freeze</button>`;
             } else if (data.new_status === 'pdf_missing') {
                 html = '<span class="text-gray-400 text-xs">No PDF file</span>';

@@ -495,6 +495,46 @@ class RtdController extends Controller
     }
 
     /**
+     * Manually assign RTD breakdown for an invoice.
+     * Accepts individual field values for the full breakdown.
+     */
+    public function manualAssign(Invoice $invoice, \Illuminate\Http\Request $request)
+    {
+        if (! $invoice->canModifyRtd()) {
+            return $this->rtdResponse(false, 'RTD is frozen and cannot be modified.', $invoice);
+        }
+
+        $validated = $request->validate([
+            'goods_0' => 'nullable|numeric',
+            'goods_9' => 'nullable|numeric',
+            'goods_13_5' => 'nullable|numeric',
+            'goods_23' => 'nullable|numeric',
+            'freight' => 'nullable|numeric',
+            'deposits' => 'nullable|numeric',
+            'drs' => 'nullable|numeric',
+            'vat' => 'nullable|numeric',
+            'service_overhead' => 'nullable|numeric',
+        ]);
+
+        $result = $this->rtdService->buildManualBreakdown($validated, $invoice);
+
+        $invoice->update([
+            'rtd_breakdown' => $result['breakdown'],
+            'rtd_resolution_issues' => $result['issues'],
+            'rtd_status' => 'computed',
+            'rtd_computed_at' => now(),
+        ]);
+
+        $invoice->refresh();
+
+        return $this->rtdResponse(
+            true,
+            "Invoice #{$invoice->invoice_number} RTD manually assigned.",
+            $invoice
+        );
+    }
+
+    /**
      * Recompute RTD for all invoices with issues.
      */
     public function recomputeAll()

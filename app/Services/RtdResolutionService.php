@@ -519,6 +519,133 @@ class RtdResolutionService
     }
 
     /**
+     * Compute RTD for a freight/transport invoice.
+     * All net amounts go to excluded.freight (not goods for resale).
+     */
+    public function computeRtdAsFreight(Invoice $invoice): array
+    {
+        $netTotal = round((float) ($invoice->subtotal ?? $invoice->total_amount ?? 0), 2);
+        $vatAmount = round((float) ($invoice->vat_amount ?? 0), 2);
+        $invoiceTotal = round((float) ($invoice->total_amount ?? 0), 2);
+
+        $breakdown = [
+            'goods_for_resale' => ['0' => 0, '9' => 0, '13.5' => 0, '23' => 0],
+            'excluded' => [
+                'freight' => $netTotal,
+                'deposits' => 0,
+                'drs' => 0,
+                'vat' => $vatAmount,
+                'service_overhead' => 0,
+            ],
+            'unresolved' => ['count' => 0, 'net_total' => 0],
+            'stats' => [
+                'total_lines' => 0,
+                'resolved_lines' => 0,
+                'excluded_lines' => 1,
+                'method' => 'manual_freight',
+            ],
+        ];
+
+        $excludedTotal = $netTotal + $vatAmount;
+        $difference = abs($excludedTotal - $invoiceTotal);
+        $breakdown['integrity'] = [
+            'expected_products_total' => $invoiceTotal,
+            'calculated_total' => round($excludedTotal, 2),
+            'difference' => round($difference, 2),
+            'reconciled' => $difference < 1.00,
+        ];
+
+        return ['breakdown' => $breakdown, 'issues' => [], 'source_file_id' => null];
+    }
+
+    /**
+     * Compute RTD for a deposits/packaging invoice.
+     * All net amounts go to excluded.deposits (not goods for resale).
+     */
+    public function computeRtdAsDeposits(Invoice $invoice): array
+    {
+        $netTotal = round((float) ($invoice->subtotal ?? $invoice->total_amount ?? 0), 2);
+        $vatAmount = round((float) ($invoice->vat_amount ?? 0), 2);
+        $invoiceTotal = round((float) ($invoice->total_amount ?? 0), 2);
+
+        $breakdown = [
+            'goods_for_resale' => ['0' => 0, '9' => 0, '13.5' => 0, '23' => 0],
+            'excluded' => [
+                'freight' => 0,
+                'deposits' => $netTotal,
+                'drs' => 0,
+                'vat' => $vatAmount,
+                'service_overhead' => 0,
+            ],
+            'unresolved' => ['count' => 0, 'net_total' => 0],
+            'stats' => [
+                'total_lines' => 0,
+                'resolved_lines' => 0,
+                'excluded_lines' => 1,
+                'method' => 'manual_deposits',
+            ],
+        ];
+
+        $excludedTotal = $netTotal + $vatAmount;
+        $difference = abs($excludedTotal - $invoiceTotal);
+        $breakdown['integrity'] = [
+            'expected_products_total' => $invoiceTotal,
+            'calculated_total' => round($excludedTotal, 2),
+            'difference' => round($difference, 2),
+            'reconciled' => $difference < 1.00,
+        ];
+
+        return ['breakdown' => $breakdown, 'issues' => [], 'source_file_id' => null];
+    }
+
+    /**
+     * Build RTD breakdown from manually entered values.
+     */
+    public function buildManualBreakdown(array $values, Invoice $invoice): array
+    {
+        $goods = [
+            '0' => round((float) ($values['goods_0'] ?? 0), 2),
+            '9' => round((float) ($values['goods_9'] ?? 0), 2),
+            '13.5' => round((float) ($values['goods_13_5'] ?? 0), 2),
+            '23' => round((float) ($values['goods_23'] ?? 0), 2),
+        ];
+
+        $excluded = [
+            'freight' => round((float) ($values['freight'] ?? 0), 2),
+            'deposits' => round((float) ($values['deposits'] ?? 0), 2),
+            'drs' => round((float) ($values['drs'] ?? 0), 2),
+            'vat' => round((float) ($values['vat'] ?? 0), 2),
+            'service_overhead' => round((float) ($values['service_overhead'] ?? 0), 2),
+        ];
+
+        $goodsTotal = array_sum($goods);
+        $excludedTotal = array_sum($excluded);
+        $calculatedTotal = $goodsTotal + $excludedTotal;
+        $invoiceTotal = round((float) ($invoice->total_amount ?? 0), 2);
+        $difference = abs($calculatedTotal - $invoiceTotal);
+
+        $breakdown = [
+            'goods_for_resale' => $goods,
+            'excluded' => $excluded,
+            'unresolved' => ['count' => 0, 'net_total' => 0],
+            'stats' => [
+                'total_lines' => 0,
+                'resolved_lines' => 0,
+                'excluded_lines' => 0,
+                'method' => 'manual',
+            ],
+            'integrity' => [
+                'expected_products_total' => $invoiceTotal,
+                'calculated_total' => round($calculatedTotal, 2),
+                'difference' => round($difference, 2),
+                'reconciled' => $difference < 1.00,
+            ],
+        ];
+
+        return ['breakdown' => $breakdown, 'issues' => [], 'source_file_id' => null];
+    }
+
+    /**
      * Resolve article code to product and VAT rate.
      * Resolution priority:
      * 1. EAN barcode direct lookup (for Dynamis grocery invoices with 13-digit EAN)
