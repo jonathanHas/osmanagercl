@@ -121,6 +121,78 @@
             </div>
         @endif
 
+        {{-- Available Invoices to Add (draft only) --}}
+        @if($submission->isDraft() && $availableInvoices->count() > 0)
+            <div x-data="addInvoicesPanel()" class="bg-gray-800 rounded-lg mb-6 border border-blue-700/50">
+                <button @click="expanded = !expanded" class="w-full px-6 py-4 flex items-center justify-between text-left">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
+                        <span class="text-blue-300 font-semibold">{{ $availableInvoices->count() }} frozen invoice{{ $availableInvoices->count() > 1 ? 's' : '' }} available to add</span>
+                    </div>
+                    <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': expanded }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+
+                <div x-show="expanded" x-collapse x-cloak>
+                    <div class="px-6 pb-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <label class="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                                <input type="checkbox" x-model="selectAll"
+                                       @change="selectedIds = selectAll ? {{ $availableInvoices->pluck('id') }} : []"
+                                       class="rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500">
+                                Select All
+                            </label>
+                            <button @click="addSelectedInvoices()" :disabled="selectedIds.length === 0 || loading"
+                                    class="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded inline-flex items-center text-sm">
+                                <svg x-show="!loading" class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                </svg>
+                                <svg x-show="loading" class="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                </svg>
+                                <span x-text="loading ? 'Adding...' : 'Add Selected (' + selectedIds.length + ')'"></span>
+                            </button>
+                        </div>
+
+                        <table class="min-w-full divide-y divide-gray-700">
+                            <thead class="bg-gray-900">
+                                <tr>
+                                    <th class="px-4 py-2 text-left w-8"></th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase">Invoice #</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase">Supplier</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase">Date</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-400 uppercase">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-700">
+                                @foreach($availableInvoices as $avInvoice)
+                                    <tr class="hover:bg-gray-750">
+                                        <td class="px-4 py-2">
+                                            <input type="checkbox" :value="{{ $avInvoice->id }}" x-model.number="selectedIds"
+                                                   class="rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500">
+                                        </td>
+                                        <td class="px-4 py-2">
+                                            <a href="{{ route('invoices.show', $avInvoice) }}" class="text-blue-400 hover:text-blue-300 font-mono text-sm">
+                                                #{{ $avInvoice->invoice_number }}
+                                            </a>
+                                        </td>
+                                        <td class="px-4 py-2 text-gray-300 text-sm">{{ $avInvoice->supplier_name }}</td>
+                                        <td class="px-4 py-2 text-gray-300 text-sm">{{ $avInvoice->invoice_date->format('d/m/Y') }}</td>
+                                        <td class="px-4 py-2 text-right text-gray-300 font-mono text-sm">{{ number_format($avInvoice->total_amount, 2) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        @endif
+
         {{-- Notes --}}
         @if($submission->notes)
             <div class="bg-gray-800 rounded-lg p-4 mb-6">
@@ -548,6 +620,42 @@
                 }
             })
             .catch(() => alert('Failed to remove invoice.'));
+        }
+
+        function addInvoicesPanel() {
+            return {
+                expanded: false,
+                selectAll: false,
+                selectedIds: [],
+                loading: false,
+                addSelectedInvoices() {
+                    if (this.selectedIds.length === 0 || this.loading) return;
+                    this.loading = true;
+
+                    fetch('{{ route("rtd.submissions.add-invoices", $submission) }}', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ invoice_ids: this.selectedIds }),
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            location.reload();
+                        } else {
+                            alert(data.message || 'Failed to add invoices.');
+                            this.loading = false;
+                        }
+                    })
+                    .catch(() => {
+                        alert('Failed to add invoices.');
+                        this.loading = false;
+                    });
+                }
+            };
         }
     </script>
     @endif

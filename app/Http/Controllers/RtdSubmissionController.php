@@ -101,8 +101,18 @@ class RtdSubmissionController extends Controller
     {
         $submission->load(['creator', 'invoices.supplier']);
 
+        $availableInvoices = collect();
+        if ($submission->isDraft()) {
+            $availableInvoices = Invoice::with('supplier')
+                ->rtdUnsubmitted()
+                ->whereNotNull('rtd_snapshot')
+                ->orderBy('invoice_date')
+                ->get();
+        }
+
         return view('rtd.submissions.show', [
             'submission' => $submission,
+            'availableInvoices' => $availableInvoices,
         ]);
     }
 
@@ -352,6 +362,45 @@ class RtdSubmissionController extends Controller
         $submission->calculateTotalsSnapshot();
 
         return back()->with('success', 'Totals recalculated with latest supplier data.');
+    }
+
+    /**
+     * Add frozen invoices to a draft submission.
+     */
+    public function addInvoices(Request $request, RtdSubmission $submission)
+    {
+        if (! $submission->isDraft()) {
+            return response()->json(['success' => false, 'message' => 'Cannot modify a submitted submission.'], 422);
+        }
+
+        $validated = $request->validate([
+            'invoice_ids' => 'required|array|min:1',
+            'invoice_ids.*' => 'exists:App\Models\Invoice,id',
+        ]);
+
+        // Verify all selected invoices are frozen and unsubmitted
+        $invoices = Invoice::whereIn('id', $validated['invoice_ids'])
+            ->where('rtd_status', 'frozen')
+            ->whereNull('rtd_submission_id')
+            ->whereNotNull('rtd_snapshot')
+            ->get();
+
+        if ($invoices->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'No eligible invoices found.'], 422);
+        }
+
+        // Link invoices to submission
+        Invoice::whereIn('id', $invoices->pluck('id'))
+            ->update(['rtd_submission_id' => $submission->id]);
+
+        // Recalculate totals
+        $submission->calculateTotalsSnapshot();
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$invoices->count()} invoice(s) added to submission.",
+            'added_count' => $invoices->count(),
+        ]);
     }
 
     /**

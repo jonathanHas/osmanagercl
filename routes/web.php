@@ -183,6 +183,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/submissions/{submission}/export-csv', [\App\Http\Controllers\RtdSubmissionController::class, 'exportCsv'])->name('submissions.export-csv');
         Route::post('/submissions/{submission}/submit', [\App\Http\Controllers\RtdSubmissionController::class, 'markSubmitted'])->name('submissions.submit');
         Route::post('/submissions/{submission}/recalculate', [\App\Http\Controllers\RtdSubmissionController::class, 'recalculate'])->name('submissions.recalculate');
+        Route::post('/submissions/{submission}/add-invoices', [\App\Http\Controllers\RtdSubmissionController::class, 'addInvoices'])->name('submissions.add-invoices');
         Route::delete('/submissions/{submission}/invoices/{invoice}', [\App\Http\Controllers\RtdSubmissionController::class, 'removeInvoice'])->name('submissions.remove-invoice');
 
         Route::post('/{invoice}/parse', [\App\Http\Controllers\RtdController::class, 'parse'])->name('parse');
