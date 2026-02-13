@@ -53,12 +53,21 @@ Submissions track which frozen invoices were included in each RTD filing with Re
 - Each invoice can only belong to one submission
 - The next submission automatically shows invoices not yet linked to any previous submission
 - Submissions store a snapshot of VAT breakdown totals (T1 goods, T2 service, excluded) at creation time
-- Draft submissions allow removing invoices; submitted ones are read-only
+- Draft submissions allow adding and removing invoices; submitted ones are read-only
+
+**Adding Invoices to Draft Submissions (NEW! 2026-02-13):**
+
+When invoices are frozen after a draft submission is created, they can be imported directly from the submission detail page:
+- A blue banner shows the count of available frozen invoices (unsubmitted, with RTD snapshot)
+- Expand to see a table with checkboxes listing invoice #, supplier, date, and amount
+- "Select All" checkbox and "Add Selected" button for batch import
+- AJAX-powered with automatic totals recalculation after import
 
 **Routes:**
 - `GET /rtd/submissions` — list all submissions
 - `GET /rtd/submissions/create` — create form with invoice selection
 - `GET /rtd/submissions/{id}` — view submission details and totals
+- `POST /rtd/submissions/{id}/add-invoices` — add frozen invoices to a draft submission
 - `POST /rtd/submissions/{id}/submit` — mark as filed with Revenue
 
 ## RTD Status Types

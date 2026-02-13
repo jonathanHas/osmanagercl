@@ -433,7 +433,7 @@ VAT categorization system for Udea, Dynamis, and IIH invoices to support Irish V
 - **Unresolved Items View**: Aggregate view of all unmatched codes across invoices
 - **Batch Recomputation**: Update all affected invoices when fallbacks are added
 - **Invoice Integration**: RTD summary section on invoice show page
-- **Submission Tracking** (NEW! 2026-02-10): Create submissions linking frozen invoices to Revenue filings, track which invoices were included, auto-surface unsubmitted invoices for next filing
+- **Submission Tracking** (NEW! 2026-02-10, Updated 2026-02-13): Create submissions linking frozen invoices to Revenue filings, track which invoices were included, auto-surface unsubmitted invoices for next filing, import newly frozen invoices into existing draft submissions
 
 📖 [RTD System Documentation](./features/rtd-system.md)
 

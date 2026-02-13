@@ -137,6 +137,39 @@
                 </div>
             </div>
 
+            <!-- Goods from Other EU Countries -->
+            @if($euInvoices->count() > 0)
+                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
+                    <div class="p-6 bg-white border-b border-gray-200">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">Goods from Other EU Countries (E2)</h3>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Country</th>
+                                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Net Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    @foreach($euInvoices->groupBy('supplier_name') as $supplierName => $supplierEuInvoices)
+                                        <tr>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $supplierName }}</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $supplierEuInvoices->first()->supplier->country_code ?? 'EU' }}</td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">€{{ number_format($supplierEuInvoices->sum('subtotal'), 2) }}</td>
+                                        </tr>
+                                    @endforeach
+                                    <tr class="bg-gray-50 font-bold">
+                                        <td colspan="2" class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Total EU Goods</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">€{{ number_format($euTotalAmount, 2) }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            @endif
+
             <!-- Invoices by Supplier -->
             @foreach($invoicesBySupplier as $supplierName => $supplierInvoices)
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">

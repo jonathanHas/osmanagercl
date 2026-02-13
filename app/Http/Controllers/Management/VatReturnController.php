@@ -241,9 +241,16 @@ class VatReturnController extends Controller
 
         DB::beginTransaction();
         try {
-            // Determine period start based on period end (assuming monthly returns)
+            // Determine period start based on bi-monthly Irish VAT periods
+            // Periods: Jan-Feb, Mar-Apr, May-Jun, Jul-Aug, Sep-Oct, Nov-Dec
             $periodEnd = Carbon::parse($validated['period_end']);
-            $periodStart = $periodEnd->copy()->startOfMonth();
+            $month = $periodEnd->month;
+            $year = $periodEnd->year;
+            if ($month % 2 == 0) {
+                $periodStart = Carbon::create($year, $month - 1, 1);
+            } else {
+                $periodStart = Carbon::create($year, $month, 1);
+            }
 
             // Create VAT return
             $vatReturn = VatReturn::create([
@@ -305,11 +312,18 @@ class VatReturnController extends Controller
 
         $vatBreakdown = $vatReturn->getVatBreakdown();
 
+        // Get EU supplier invoices
+        $euSupplierIds = AccountingSupplier::euSuppliers()->pluck('id');
+        $euInvoices = $vatReturn->invoices->whereIn('supplier_id', $euSupplierIds);
+        $euTotalAmount = $euInvoices->sum('subtotal');
+
         return view('management.vat-returns.show', compact(
             'vatReturn',
             'invoicesBySupplier',
             'supplierTotals',
-            'vatBreakdown'
+            'vatBreakdown',
+            'euInvoices',
+            'euTotalAmount'
         ));
     }
 

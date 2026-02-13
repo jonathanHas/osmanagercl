@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RTD Submission: Import Newly Frozen Invoices** (2026-02-13)
+  - Draft submissions can now import invoices frozen after the submission was created
+  - Collapsible panel on submission detail page shows count of available frozen invoices
+  - Table with checkboxes, Select All, and "Add Selected" button for batch import
+  - AJAX-powered import with automatic totals recalculation
+  - **Files Modified**: `RtdSubmissionController` (new `addInvoices()` method, updated `show()`), `routes/web.php`, `submissions/show.blade.php`
+
 - **RTD Submission Tracking** (2026-02-10)
   - New submission management page to track which invoices were filed with Revenue as part of RTD submissions
   - Create submissions with flexible date ranges, selecting from frozen invoices not yet in any submission
