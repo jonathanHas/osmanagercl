@@ -132,7 +132,10 @@
                                             $grandNetTotal = 0;
                                             $grandVatTotal = 0;
                                             $grandGrossTotal = 0;
-                                            $grandTotalsByRate = array_fill_keys($data['all_active_rates'], ['net' => 0, 'vat' => 0]);
+                                            $grandTotalsByRate = [];
+                                            foreach ($data['all_active_rates'] as $rate) {
+                                                $grandTotalsByRate[(string) $rate] = ['net' => 0, 'vat' => 0];
+                                            }
                                         @endphp
                                         
                                         @foreach($data['payment_types'] as $paymentType)
@@ -163,8 +166,8 @@
                                                         $vat = $sale ? $sale->vat_amount : 0;
                                                         $rowNetTotal += $net;
                                                         $rowVatTotal += $vat;
-                                                        $grandTotalsByRate[$rate]['net'] += $net;
-                                                        $grandTotalsByRate[$rate]['vat'] += $vat;
+                                                        $grandTotalsByRate[(string) $rate]['net'] += $net;
+                                                        $grandTotalsByRate[(string) $rate]['vat'] += $vat;
                                                     @endphp
                                                     <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
                                                         €{{ number_format($net, 2) }}
@@ -218,8 +221,8 @@
                                                         if ($rate == 0) {
                                                             $adjustNet = -$paperinTotal;
                                                             $adjustVat = 0;
-                                                            $grandTotalsByRate[$rate]['net'] += $adjustNet;
-                                                            $grandTotalsByRate[$rate]['vat'] += $adjustVat;
+                                                            $grandTotalsByRate[(string) $rate]['net'] += $adjustNet;
+                                                            $grandTotalsByRate[(string) $rate]['vat'] += $adjustVat;
                                                             $grandNetTotal += $adjustNet;
                                                             $grandVatTotal += $adjustVat;
                                                             $grandGrossTotal += $adjustNet;
@@ -254,9 +257,9 @@
                                         <tr class="bg-gradient-to-r from-green-100 to-green-200 font-bold text-green-900 border-t-2 border-green-400">
                                             <td class="px-6 py-4 text-sm font-bold">Total Sales</td>
                                             @foreach($data['all_active_rates'] as $rate)
-                                                <td class="px-3 py-4 text-sm text-center">€{{ number_format($grandTotalsByRate[$rate]['net'], 2) }}</td>
+                                                <td class="px-3 py-4 text-sm text-center">€{{ number_format($grandTotalsByRate[(string) $rate]['net'], 2) }}</td>
                                                 @if($rate != 0)
-                                                    <td class="px-3 py-4 text-sm text-center">€{{ number_format($grandTotalsByRate[$rate]['vat'], 2) }}</td>
+                                                    <td class="px-3 py-4 text-sm text-center">€{{ number_format($grandTotalsByRate[(string) $rate]['vat'], 2) }}</td>
                                                 @endif
                                             @endforeach
                                             <td class="px-6 py-4 text-sm text-center">€{{ number_format($grandNetTotal, 2) }}</td>
@@ -317,7 +320,10 @@
                                             $transferNetTotal = 0;
                                             $transferVatTotal = 0;
                                             $transferGrossTotal = 0;
-                                            $transferTotalsByRate = array_fill_keys($data['all_active_rates'], ['net' => 0, 'vat' => 0]);
+                                            $transferTotalsByRate = [];
+                                            foreach ($data['all_active_rates'] as $rate) {
+                                                $transferTotalsByRate[(string) $rate] = ['net' => 0, 'vat' => 0];
+                                            }
                                         @endphp
                                         
                                         @foreach($data['departments'] as $department)
@@ -342,8 +348,8 @@
                                                         $vat = $transfer ? $transfer->vat_amount : 0;
                                                         $rowNetTotal += $net;
                                                         $rowVatTotal += $vat;
-                                                        $transferTotalsByRate[$rate]['net'] += $net;
-                                                        $transferTotalsByRate[$rate]['vat'] += $vat;
+                                                        $transferTotalsByRate[(string) $rate]['net'] += $net;
+                                                        $transferTotalsByRate[(string) $rate]['vat'] += $vat;
                                                     @endphp
                                                     <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
                                                         €{{ number_format($net, 2) }}
@@ -378,9 +384,9 @@
                                         <tr class="bg-gradient-to-r from-blue-100 to-blue-200 font-bold text-blue-900 border-t-2 border-blue-400">
                                             <td class="px-6 py-4 text-sm font-bold">Total Transfers</td>
                                             @foreach($data['all_active_rates'] as $rate)
-                                                <td class="px-3 py-4 text-sm text-center">€{{ number_format($transferTotalsByRate[$rate]['net'], 2) }}</td>
+                                                <td class="px-3 py-4 text-sm text-center">€{{ number_format($transferTotalsByRate[(string) $rate]['net'], 2) }}</td>
                                                 @if($rate != 0)
-                                                    <td class="px-3 py-4 text-sm text-center">€{{ number_format($transferTotalsByRate[$rate]['vat'], 2) }}</td>
+                                                    <td class="px-3 py-4 text-sm text-center">€{{ number_format($transferTotalsByRate[(string) $rate]['vat'], 2) }}</td>
                                                 @endif
                                             @endforeach
                                             <td class="px-6 py-4 text-sm text-center">€{{ number_format($transferNetTotal, 2) }}</td>

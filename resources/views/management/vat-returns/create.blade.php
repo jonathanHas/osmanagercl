@@ -165,6 +165,11 @@
                                 </tbody>
                             </table>
                         </div>
+                        @if(($salesData['paperin_adjustment'] ?? 0) > 0)
+                            <p class="mt-3 text-xs text-gray-500">
+                                * Gift voucher adjustment of €{{ number_format($salesData['paperin_adjustment'], 2) }} has been deducted from net/gross sales to prevent double-counting of voucher redemptions.
+                            </p>
+                        @endif
                     </div>
                 </div>
                 @endif

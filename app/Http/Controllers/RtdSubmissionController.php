@@ -168,6 +168,21 @@ class RtdSubmissionController extends Controller
         $nonEuAcquisitionsTotal = $totals['non_eu_acquisitions_total'] ?? 0;
         $postponedAccounting = $totals['postponed_accounting'] ?? 0;
 
+        // Sales data for ROS Section 1 (from VAT returns)
+        $sales = $totals['sales'] ?? $defaultRates;
+        $salesTotal = $totals['sales_total'] ?? 0;
+        $salesSource = $totals['sales_source'] ?? null;
+        $vatReturnsCount = $totals['vat_returns_count'] ?? 0;
+
+        // Combined acquisitions for ROS Section 2 (EU + Non-EU)
+        $combinedAcquisitions = [
+            '0' => ($euAcquisitions['0'] ?? 0) + ($nonEuAcquisitions['0'] ?? 0),
+            '9' => ($euAcquisitions['9'] ?? 0) + ($nonEuAcquisitions['9'] ?? 0),
+            '13.5' => ($euAcquisitions['13.5'] ?? 0) + ($nonEuAcquisitions['13.5'] ?? 0),
+            '23' => ($euAcquisitions['23'] ?? 0) + ($nonEuAcquisitions['23'] ?? 0),
+        ];
+        $combinedAcquisitionsTotal = $euAcquisitionsTotal + $nonEuAcquisitionsTotal;
+
         // Split VAT out from other excluded items for reconciliation display
         $vatTotal = floatval($excluded['vat'] ?? 0);
         $excludedNonVat = round($excludedTotal - $vatTotal, 2);
@@ -178,6 +193,10 @@ class RtdSubmissionController extends Controller
 
         return view('rtd.submissions.report', [
             'submission' => $submission,
+            'sales' => $sales,
+            'salesTotal' => $salesTotal,
+            'salesSource' => $salesSource,
+            'vatReturnsCount' => $vatReturnsCount,
             'goods' => $goods,
             'service' => $service,
             'excluded' => $excluded,
@@ -190,6 +209,8 @@ class RtdSubmissionController extends Controller
             'euAcquisitionsTotal' => $euAcquisitionsTotal,
             'nonEuAcquisitions' => $nonEuAcquisitions,
             'nonEuAcquisitionsTotal' => $nonEuAcquisitionsTotal,
+            'combinedAcquisitions' => $combinedAcquisitions,
+            'combinedAcquisitionsTotal' => $combinedAcquisitionsTotal,
             'postponedAccounting' => $postponedAccounting,
             'invoiceTotalSum' => $invoiceTotalSum,
             'breakdownSum' => $breakdownSum,
@@ -218,6 +239,10 @@ class RtdSubmissionController extends Controller
         $nonEuAcquisitionsTotal = $totals['non_eu_acquisitions_total'] ?? 0;
         $postponedAccounting = $totals['postponed_accounting'] ?? 0;
 
+        // Sales data for Section 1
+        $sales = $totals['sales'] ?? $defaultRates;
+        $salesTotal = $totals['sales_total'] ?? 0;
+
         $periodStart = $submission->period_start->format('d/m/Y');
         $periodEnd = $submission->period_end->format('d/m/Y');
         $status = $submission->isSubmitted() ? 'Submitted' : 'Draft';
@@ -226,7 +251,7 @@ class RtdSubmissionController extends Controller
 
         $filename = 'RTD-' . $submission->period_start->format('Y') . '-submission-' . $submission->id . '.csv';
 
-        return new StreamedResponse(function () use ($submission, $goods, $service, $excluded, $excludedTotal, $goodsTotal, $serviceTotal, $euAcquisitions, $euAcquisitionsTotal, $nonEuAcquisitions, $nonEuAcquisitionsTotal, $postponedAccounting, $periodStart, $periodEnd, $status, $date, $reference) {
+        return new StreamedResponse(function () use ($submission, $goods, $service, $excluded, $excludedTotal, $goodsTotal, $serviceTotal, $euAcquisitions, $euAcquisitionsTotal, $nonEuAcquisitions, $nonEuAcquisitionsTotal, $postponedAccounting, $sales, $salesTotal, $periodStart, $periodEnd, $status, $date, $reference) {
             $handle = fopen('php://output', 'w');
 
             // Header
@@ -236,53 +261,70 @@ class RtdSubmissionController extends Controller
             fputcsv($handle, ["Invoices: {$submission->invoices->count()}"]);
             fputcsv($handle, []);
 
-            // T1 Goods for Resale
-            fputcsv($handle, ['GOODS FOR RESALE (T1)']);
-            fputcsv($handle, ['ROS Box', 'VAT Rate', 'Net Amount']);
-            fputcsv($handle, ['J1', '0%', number_format($goods['0'] ?? 0, 2)]);
+            // Combined acquisitions for Section 2
+            $combinedAcquisitions = [
+                '0' => ($euAcquisitions['0'] ?? 0) + ($nonEuAcquisitions['0'] ?? 0),
+                '9' => ($euAcquisitions['9'] ?? 0) + ($nonEuAcquisitions['9'] ?? 0),
+                '13.5' => ($euAcquisitions['13.5'] ?? 0) + ($nonEuAcquisitions['13.5'] ?? 0),
+                '23' => ($euAcquisitions['23'] ?? 0) + ($nonEuAcquisitions['23'] ?? 0),
+            ];
+            $combinedAcquisitionsTotal = $euAcquisitionsTotal + $nonEuAcquisitionsTotal;
+
+            // Section 1: Goods and/or Services (Sales)
+            fputcsv($handle, ['SECTION 1: GOODS AND/OR SERVICES (SALES)']);
+            fputcsv($handle, ['ROS Box', 'Description', 'Net Amount']);
+            fputcsv($handle, ['E3', 'Exempt', '0.00']);
+            fputcsv($handle, ['D4', '0% Exp', '0.00']);
+            fputcsv($handle, ['D1', '0% Home', number_format($sales['0'] ?? 0, 2)]);
+            fputcsv($handle, ['C5', '4.8%', '0.00']);
+            fputcsv($handle, ['BC5', '9%', number_format($sales['9'] ?? 0, 2)]);
+            fputcsv($handle, ['AC5', '13.5%', number_format($sales['13.5'] ?? 0, 2)]);
+            fputcsv($handle, ['B5', 'FlatFarm', '0.00']);
+            fputcsv($handle, ['P1', 'Std Rate', number_format($sales['23'] ?? 0, 2)]);
+            fputcsv($handle, ['Z1', 'Total', number_format($salesTotal, 2)]);
+            fputcsv($handle, []);
+
+            // Section 2: Acquisitions from the EU and Non-EU
+            fputcsv($handle, ['SECTION 2: ACQUISITIONS FROM THE EU AND NON-EU']);
+            fputcsv($handle, ['ROS Box', 'Description', 'Net Amount']);
+            fputcsv($handle, ['E4', 'Exempt', '0.00']);
+            fputcsv($handle, ['D2', '0% Home', number_format($combinedAcquisitions['0'], 2)]);
+            fputcsv($handle, ['C6', '4.8%', '0.00']);
+            fputcsv($handle, ['BC6', '9%', number_format($combinedAcquisitions['9'], 2)]);
+            fputcsv($handle, ['AC6', '13.5%', number_format($combinedAcquisitions['13.5'], 2)]);
+            fputcsv($handle, ['B6', 'FlatFarm', '0.00']);
+            fputcsv($handle, ['P2', 'Std Rate', number_format($combinedAcquisitions['23'], 2)]);
+            fputcsv($handle, ['Z2', 'Total', number_format($combinedAcquisitionsTotal, 2)]);
+            fputcsv($handle, ['PA2', 'Postponed Accounting', number_format($postponedAccounting, 2)]);
+            fputcsv($handle, ['', '', 'Figures already included in T1/T2 totals below']);
+            fputcsv($handle, []);
+
+            // Section 3: Goods or Services Purchased for Resale
+            fputcsv($handle, ['SECTION 3: GOODS OR SERVICES PURCHASED FOR RESALE']);
+            fputcsv($handle, ['ROS Box', 'Description', 'Net Amount']);
+            fputcsv($handle, ['E5', 'Exempt', '0.00']);
+            fputcsv($handle, ['J1', '0% Home', number_format($goods['0'] ?? 0, 2)]);
+            fputcsv($handle, ['H5', '4.8%', '0.00']);
             fputcsv($handle, ['BH5', '9%', number_format($goods['9'] ?? 0, 2)]);
             fputcsv($handle, ['AH5', '13.5%', number_format($goods['13.5'] ?? 0, 2)]);
-            fputcsv($handle, ['R1', '23%', number_format($goods['23'] ?? 0, 2)]);
-            fputcsv($handle, ['Z3', 'T1 Total', number_format($goodsTotal, 2)]);
+            fputcsv($handle, ['G5', 'FlatFarm', '0.00']);
+            fputcsv($handle, ['R1', 'Std Rate', number_format($goods['23'] ?? 0, 2)]);
+            fputcsv($handle, ['Z3', 'Total', number_format($goodsTotal, 2)]);
             fputcsv($handle, []);
 
-            // T2 Other Deductible
-            fputcsv($handle, ['OTHER DEDUCTIBLE GOODS & SERVICES (T2)']);
-            fputcsv($handle, ['ROS Box', 'VAT Rate', 'Net Amount']);
-            fputcsv($handle, ['J2', '0%', number_format($service['0'] ?? 0, 2)]);
+            // Section 4: Other Deductible Goods & Services (Not for Resale)
+            fputcsv($handle, ['SECTION 4: OTHER DEDUCTIBLE GOODS & SERVICES (NOT FOR RESALE)']);
+            fputcsv($handle, ['ROS Box', 'Description', 'Net Amount']);
+            fputcsv($handle, ['E6', 'Exempt', '0.00']);
+            fputcsv($handle, ['J2', '0% Home', number_format($service['0'] ?? 0, 2)]);
+            fputcsv($handle, ['H6', '4.8%', '0.00']);
             fputcsv($handle, ['BH6', '9%', number_format($service['9'] ?? 0, 2)]);
             fputcsv($handle, ['AH6', '13.5%', number_format($service['13.5'] ?? 0, 2)]);
-            fputcsv($handle, ['R2', '23%', number_format($service['23'] ?? 0, 2)]);
-            fputcsv($handle, ['Z4', 'T2 Total', number_format($serviceTotal, 2)]);
+            fputcsv($handle, ['G6', 'FlatFarm', '0.00']);
+            fputcsv($handle, ['R2', 'Std Rate', number_format($service['23'] ?? 0, 2)]);
+            fputcsv($handle, ['Z5', 'Total', number_format($serviceTotal, 2)]);
+            fputcsv($handle, ['PA4', 'Postponed Accounting', number_format($postponedAccounting, 2)]);
             fputcsv($handle, []);
-
-            // EU Acquisitions
-            if ($euAcquisitionsTotal > 0 || $nonEuAcquisitionsTotal > 0) {
-                fputcsv($handle, ['EU / NON-EU ACQUISITIONS (already included in T1/T2)']);
-                fputcsv($handle, ['ROS Box', 'Rate', 'Net Amount']);
-                if ($euAcquisitionsTotal > 0) {
-                    $euBoxes = ['0' => 'ES1', '9' => 'ES2', '13.5' => 'ES3', '23' => 'ES4'];
-                    foreach ($euBoxes as $rate => $box) {
-                        if (($euAcquisitions[$rate] ?? 0) > 0) {
-                            fputcsv($handle, [$box, "{$rate}% EU", number_format($euAcquisitions[$rate], 2)]);
-                        }
-                    }
-                    fputcsv($handle, ['', 'EU Total', number_format($euAcquisitionsTotal, 2)]);
-                }
-                if ($nonEuAcquisitionsTotal > 0) {
-                    $nonEuBoxes = ['0' => 'PA1', '9' => 'PA2', '13.5' => 'PA2', '23' => 'PA3'];
-                    foreach (['0', '9', '13.5', '23'] as $rate) {
-                        if (($nonEuAcquisitions[$rate] ?? 0) > 0) {
-                            fputcsv($handle, [$nonEuBoxes[$rate], "{$rate}% Non-EU", number_format($nonEuAcquisitions[$rate], 2)]);
-                        }
-                    }
-                    fputcsv($handle, ['', 'Non-EU Total', number_format($nonEuAcquisitionsTotal, 2)]);
-                    if ($postponedAccounting > 0) {
-                        fputcsv($handle, ['', 'Postponed Accounting', number_format($postponedAccounting, 2)]);
-                    }
-                }
-                fputcsv($handle, []);
-            }
 
             // Excluded
             fputcsv($handle, ['EXCLUDED FROM RTD']);
@@ -299,7 +341,7 @@ class RtdSubmissionController extends Controller
             fputcsv($handle, ['INVOICE RECONCILIATION (Informational)']);
             fputcsv($handle, ['Note: Difference is expected - invoice totals include VAT and non-deductible charges excluded from RTD figures']);
             fputcsv($handle, ['T1 Goods (Z3)', number_format($goodsTotal, 2)]);
-            fputcsv($handle, ['T2 Other (Z4)', number_format($serviceTotal, 2)]);
+            fputcsv($handle, ['T2 Other (Z5)', number_format($serviceTotal, 2)]);
             fputcsv($handle, ['Excluded', number_format($excludedTotal, 2)]);
             $breakdownSum = round($goodsTotal + $serviceTotal + $excludedTotal, 2);
             fputcsv($handle, ['RTD Breakdown Total', number_format($breakdownSum, 2)]);

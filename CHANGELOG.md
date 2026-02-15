@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RTD Section 1 (Sales) Populated from VAT3 Returns** (2026-02-13)
+  - Section 1 "Goods and/or Services" now shows actual net sales by VAT rate, aggregated from VAT3 returns for the submission period
+  - Maps VAT rates to ROS boxes: D1 (0% Home), BC5 (9%), AC5 (13.5%), P1 (Std Rate 23%), Z1 (Total)
+  - Primary source: `VatReturn.sales_vat_data` snapshots; fallback to `sales_accounting_daily` for historical returns
+  - Sales data persisted in `totals_snapshot` for audit consistency
+  - CSV export includes real sales figures
+  - **Files Modified**: `RtdSubmission` model, `RtdSubmissionController`, `report.blade.php`
+
+### Changed
+
+- **RTD Submission Report: Aligned to ROS Layout** (2026-02-13)
+  - Restructured report to mirror Revenue Online Service (ROS) RTD form exactly — same section order, headings, box codes, and VAT rate sequence
+  - 4 ROS sections: Section 1 (Sales), Section 2 (Acquisitions from EU/Non-EU), Section 3 (Goods for Resale), Section 4 (Other Deductible)
+  - Added placeholder rows for untracked VAT rates (Exempt, 4.8%, FlatFarm) shown as 0.00
+  - Combined EU and Non-EU acquisitions into single Section 2 with correct ROS box codes (E4, D2, C6, BC6, AC6, B6, P2, Z2)
+  - Fixed T2 total box code from Z4 to Z5 per ROS specification
+  - Added Postponed Accounting rows (PA2 in Section 2, PA4 in Section 4)
+  - CSV export updated to match new structure
+  - **Files Modified**: `report.blade.php`, `RtdSubmissionController`
+
+### Added
+
 - **RTD Submission: Import Newly Frozen Invoices** (2026-02-13)
   - Draft submissions can now import invoices frozen after the submission was created
   - Collapsible panel on submission detail page shows count of available frozen invoices

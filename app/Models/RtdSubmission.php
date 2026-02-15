@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 class RtdSubmission extends Model
 {
@@ -60,6 +61,95 @@ class RtdSubmission extends Model
     public function scopeSubmitted($query)
     {
         return $query->where('status', 'submitted');
+    }
+
+    /**
+     * Aggregate net sales by VAT rate from VAT returns within this submission's period.
+     * Primary source: VatReturn.sales_vat_data (persisted VAT3 figures).
+     * Fallback: sales_accounting_daily table for returns without sales_vat_data.
+     */
+    private function aggregateSalesFromVatReturns(): array
+    {
+        $sales = ['0' => 0, '9' => 0, '13.5' => 0, '23' => 0];
+        $usedFallback = false;
+
+        // Map VAT rate to snapshot key — use string keys to avoid PHP float truncation
+        $rateToKey = [
+            '0' => '0', '0.0' => '0', '0.0000' => '0',
+            '0.09' => '9', '0.0900' => '9',
+            '0.135' => '13.5', '0.1350' => '13.5',
+            '0.23' => '23', '0.2300' => '23',
+        ];
+
+        // Find all VAT returns whose period falls within the RTD submission period
+        $vatReturns = VatReturn::where('period_start', '>=', $this->period_start)
+            ->where('period_end', '<=', $this->period_end)
+            ->get();
+
+        foreach ($vatReturns as $vatReturn) {
+            $salesVatData = $vatReturn->sales_vat_data;
+
+            if ($salesVatData && ! empty($salesVatData['by_rate'])) {
+                // Primary: use persisted VAT3 sales data
+                foreach ($salesVatData['by_rate'] as $rateData) {
+                    // Handle both keyed objects and array items
+                    $vatRate = is_object($rateData)
+                        ? $rateData->vat_rate
+                        : ($rateData['vat_rate'] ?? null);
+                    $totalNet = is_object($rateData)
+                        ? $rateData->total_net
+                        : ($rateData['total_net'] ?? 0);
+
+                    if ($vatRate === null) {
+                        continue;
+                    }
+
+                    // Map decimal rate to snapshot key (string lookup avoids float truncation)
+                    $key = $rateToKey[(string) $vatRate] ?? null;
+
+                    if ($key !== null) {
+                        $sales[$key] += (float) $totalNet;
+                    }
+                }
+            } else {
+                // Fallback: query sales_accounting_daily for this period
+                $usedFallback = true;
+                $periodSales = DB::table('sales_accounting_daily')
+                    ->select(
+                        'vat_rate',
+                        DB::raw('SUM(net_amount) as total_net')
+                    )
+                    ->whereBetween('sale_date', [
+                        $vatReturn->period_start->format('Y-m-d'),
+                        $vatReturn->period_end->format('Y-m-d'),
+                    ])
+                    ->groupBy('vat_rate')
+                    ->get();
+
+                foreach ($periodSales as $row) {
+                    $key = $rateToKey[(string) $row->vat_rate] ?? null;
+
+                    if ($key !== null) {
+                        $sales[$key] += (float) $row->total_net;
+                    }
+                }
+            }
+        }
+
+        // Round all values
+        foreach ($sales as $key => $value) {
+            $sales[$key] = round($value, 2);
+        }
+
+        $salesTotal = round(array_sum($sales), 2);
+        $source = $vatReturns->isEmpty() ? 'none' : ($usedFallback ? 'mixed' : 'vat_returns');
+
+        return [
+            'sales' => $sales,
+            'sales_total' => $salesTotal,
+            'sales_source' => $source,
+            'vat_returns_count' => $vatReturns->count(),
+        ];
     }
 
     /**
@@ -146,6 +236,9 @@ class RtdSubmission extends Model
         $euAcquisitionsTotal = round(array_sum($euAcquisitions), 2);
         $nonEuAcquisitionsTotal = round(array_sum($nonEuAcquisitions), 2);
 
+        // Aggregate sales data from VAT returns for ROS Section 1
+        $salesData = $this->aggregateSalesFromVatReturns();
+
         $this->totals_snapshot = [
             'goods' => $goods,
             'service' => $service,
@@ -158,6 +251,10 @@ class RtdSubmission extends Model
             'non_eu_acquisitions' => $nonEuAcquisitions,
             'non_eu_acquisitions_total' => $nonEuAcquisitionsTotal,
             'postponed_accounting' => round($postponedAccounting, 2),
+            'sales' => $salesData['sales'],
+            'sales_total' => $salesData['sales_total'],
+            'sales_source' => $salesData['sales_source'],
+            'vat_returns_count' => $salesData['vat_returns_count'],
         ];
         $this->save();
     }

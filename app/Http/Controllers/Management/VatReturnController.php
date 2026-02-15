@@ -165,8 +165,6 @@ class VatReturnController extends Controller
 
         if ($hasAggregatedData) {
             // Use optimized pre-aggregated data
-            // Include ALL payment types for VAT calculation (including paperin/vouchers)
-            // as VAT on vouchers still needs to be paid to Revenue
             $salesData = DB::table('sales_accounting_daily')
                 ->select(
                     DB::raw('SUM(net_amount) as total_net'),
@@ -178,22 +176,36 @@ class VatReturnController extends Controller
                 ->groupBy('vat_rate')
                 ->get();
 
+            // Calculate paperin (gift voucher redemption) total to prevent double-counting.
+            // Vouchers are counted as revenue when sold; when redeemed (paperin), the gross
+            // amount must be deducted from net/gross totals. VAT is unaffected since the
+            // original voucher sale is at 0% VAT.
+            $paperinTotal = (float) DB::table('sales_accounting_daily')
+                ->where('payment_type', 'paperin')
+                ->whereBetween('sale_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                ->sum('gross_amount');
+
             $totals = [
-                'total_net' => $salesData->sum('total_net'),
+                'total_net' => $salesData->sum('total_net') - $paperinTotal,
                 'total_vat' => $salesData->sum('total_vat'),
-                'total_gross' => $salesData->sum('total_gross'),
+                'total_gross' => $salesData->sum('total_gross') - $paperinTotal,
                 'by_rate' => $salesData->keyBy(fn ($item) => (string) $item->vat_rate),
                 'data_source' => 'optimized',
+                'paperin_adjustment' => $paperinTotal,
             ];
+
+            // Deduct paperin from the 0% rate entry (matching sales accounting behavior)
+            if ($paperinTotal > 0 && isset($totals['by_rate']['0'])) {
+                $totals['by_rate']['0']->total_net -= $paperinTotal;
+                $totals['by_rate']['0']->total_gross -= $paperinTotal;
+            }
         } else {
             // Fall back to real-time POS query
             $formattedStartDate = $startDate->format('Y m d');
             $formattedEndDate = $endDate->format('Y m d');
 
-            // Include ALL sales for VAT calculation (including paperin/vouchers)
-            // as VAT on vouchers still needs to be paid to Revenue
             $salesQuery = "
-                SELECT 
+                SELECT
                     TAXES.RATE as vat_rate,
                     SUM(TICKETLINES.PRICE * TICKETLINES.UNITS) AS total_net,
                     SUM(TICKETLINES.PRICE * TICKETLINES.UNITS * TAXES.RATE) AS total_vat
@@ -211,15 +223,41 @@ class VatReturnController extends Controller
             $salesData = DB::connection('pos')
                 ->select($salesQuery, [$formattedStartDate, $formattedEndDate]);
 
+            // Calculate paperin (gift voucher redemption) total from POS
+            $paperinQuery = "
+                SELECT COALESCE(SUM(TICKETLINES.PRICE * TICKETLINES.UNITS * (1 + TAXES.RATE)), 0) AS total_gross
+                FROM TICKETLINES
+                JOIN TICKETS ON TICKETLINES.TICKET = TICKETS.ID
+                JOIN RECEIPTS ON TICKETS.ID = RECEIPTS.ID
+                JOIN PAYMENTS ON RECEIPTS.ID = PAYMENTS.RECEIPT
+                JOIN TAXES ON TICKETLINES.TAXID = TAXES.ID
+                LEFT JOIN CUSTOMERS ON TICKETS.CUSTOMER = CUSTOMERS.ID
+                WHERE DATE_FORMAT(RECEIPTS.DATENEW, '%Y %m %d') BETWEEN ? AND ?
+                AND PAYMENTS.PAYMENT = 'paperin'
+                AND (CUSTOMERS.NAME IS NULL OR CUSTOMERS.NAME NOT IN ('Kitchen', 'Coffee'))
+            ";
+
+            $paperinResult = DB::connection('pos')
+                ->select($paperinQuery, [$formattedStartDate, $formattedEndDate]);
+            $paperinTotal = (float) ($paperinResult[0]->total_gross ?? 0);
+
             $totalNet = collect($salesData)->sum('total_net');
             $totalVat = collect($salesData)->sum('total_vat');
 
+            $byRate = collect($salesData)->keyBy(fn ($item) => (string) $item->vat_rate);
+
+            // Deduct paperin from the 0% rate entry (matching sales accounting behavior)
+            if ($paperinTotal > 0 && isset($byRate['0'])) {
+                $byRate['0']->total_net -= $paperinTotal;
+            }
+
             $totals = [
-                'total_net' => $totalNet,
+                'total_net' => $totalNet - $paperinTotal,
                 'total_vat' => $totalVat,
-                'total_gross' => $totalNet + $totalVat,
-                'by_rate' => collect($salesData)->keyBy(fn ($item) => (string) $item->vat_rate),
+                'total_gross' => ($totalNet + $totalVat) - $paperinTotal,
+                'by_rate' => $byRate,
                 'data_source' => 'real-time',
+                'paperin_adjustment' => $paperinTotal,
             ];
         }
 
@@ -277,6 +315,7 @@ class VatReturnController extends Controller
                 'total_vat' => $salesData['total_vat'],
                 'total_gross' => $salesData['total_gross'],
                 'data_source' => $salesData['data_source'],
+                'paperin_adjustment' => $salesData['paperin_adjustment'] ?? 0,
                 'by_rate' => collect($salesData['by_rate'])->map(fn ($item) => [
                     'vat_rate' => is_object($item) ? $item->vat_rate : ($item['vat_rate'] ?? null),
                     'total_net' => is_object($item) ? ($item->total_net ?? 0) : ($item['total_net'] ?? 0),
@@ -340,7 +379,25 @@ class VatReturnController extends Controller
         $euTotalAmount = $vatReturn->eu_total_amount > 0 ? $vatReturn->eu_total_amount : $euInvoices->sum('subtotal');
 
         // Build ROS fields from persisted sales data
+        // For draft returns missing the paperin adjustment, recalculate from live data
         $salesData = $vatReturn->sales_vat_data;
+        if ($salesData && ! isset($salesData['paperin_adjustment']) && $vatReturn->canBeModified()) {
+            $salesData = $this->getSalesVatData($vatReturn->period_start, $vatReturn->period_end);
+            $salesVatData = [
+                'total_net' => $salesData['total_net'],
+                'total_vat' => $salesData['total_vat'],
+                'total_gross' => $salesData['total_gross'],
+                'data_source' => $salesData['data_source'],
+                'paperin_adjustment' => $salesData['paperin_adjustment'] ?? 0,
+                'by_rate' => collect($salesData['by_rate'])->map(fn ($item) => [
+                    'vat_rate' => is_object($item) ? $item->vat_rate : ($item['vat_rate'] ?? null),
+                    'total_net' => is_object($item) ? ($item->total_net ?? 0) : ($item['total_net'] ?? 0),
+                    'total_vat' => is_object($item) ? ($item->total_vat ?? 0) : ($item['total_vat'] ?? 0),
+                ])->values()->toArray(),
+            ];
+            $vatReturn->update(['sales_vat_data' => $salesVatData]);
+            $salesData = $salesVatData;
+        }
         $rosFields = null;
         if ($salesData) {
             $vatOnSales = $salesData['total_vat'] ?? 0;

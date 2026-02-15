@@ -15,7 +15,7 @@
             .print-container h2 { font-size: 14px; }
             .ros-box { border: 2px solid black !important; padding: 2px 6px !important; font-weight: bold; }
             .rate-dot { display: none !important; }
-            .text-green-400, .text-yellow-400, .text-teal-400, .text-blue-400 { color: black !important; }
+            .text-green-400, .text-yellow-400, .text-teal-400, .text-blue-400, .text-purple-400 { color: black !important; }
         }
         .ros-box {
             display: inline-block;
@@ -32,6 +32,7 @@
         .ros-box-yellow { border-color: #eab308; color: #facc15; background: rgba(234,179,8,0.08); }
         .ros-box-blue   { border-color: #3b82f6; color: #60a5fa; background: rgba(59,130,246,0.08); }
         .ros-box-gray   { border-color: #6b7280; color: #9ca3af; background: rgba(107,114,128,0.08); }
+        .ros-box-purple { border-color: #a855f7; color: #c084fc; background: rgba(168,85,247,0.08); }
     </style>
 
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 print-container">
@@ -103,13 +104,23 @@
         </div>
 
         {{-- ============================================================ --}}
-        {{-- SECTION 1: GOODS FOR RESALE (T1) — ROS Boxes                --}}
+        {{-- ROS SECTION 1: GOODS AND/OR SERVICES (SALES)                --}}
         {{-- ============================================================ --}}
         <div class="bg-gray-800 rounded-lg p-6 mb-6 print-section">
             <h2 class="text-lg font-bold text-gray-100 mb-1">
-                <span class="text-green-400">T1</span> &mdash; Goods for Resale
+                <span class="text-purple-400">Section 1</span> &mdash; Goods and/or Services
             </h2>
-            <p class="text-gray-500 text-xs mb-4">Net purchases of goods bought for resale, excluding VAT. Enter these values into the corresponding ROS boxes.</p>
+            <p class="text-gray-500 text-xs mb-4">
+                &euro; Values Excluding VAT
+                @if($vatReturnsCount > 0)
+                    &mdash; Aggregated from {{ $vatReturnsCount }} VAT3 return{{ $vatReturnsCount > 1 ? 's' : '' }} for this period
+                    @if($salesSource === 'mixed')
+                        <span class="text-yellow-500">(some periods used fallback data)</span>
+                    @endif
+                @else
+                    &mdash; <span class="text-yellow-500">No VAT3 returns found for this period</span>
+                @endif
+            </p>
 
             <table class="w-full">
                 <thead>
@@ -121,48 +132,178 @@
                 </thead>
                 <tbody class="divide-y divide-gray-700">
                     <tr>
+                        <td class="py-3"><span class="ros-box ros-box-purple">E3</span></td>
+                        <td class="py-3 text-gray-200">Exempt</td>
+                        <td class="py-3 text-right text-gray-500 font-mono text-lg">0.00</td>
+                    </tr>
+                    <tr>
+                        <td class="py-3"><span class="ros-box ros-box-purple">D4</span></td>
+                        <td class="py-3 text-gray-200">0% Exp</td>
+                        <td class="py-3 text-right text-gray-500 font-mono text-lg">0.00</td>
+                    </tr>
+                    <tr>
+                        <td class="py-3"><span class="ros-box ros-box-purple">D1</span></td>
+                        <td class="py-3 text-gray-200">0% Home</td>
+                        <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($sales['0'] ?? 0, 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="py-3"><span class="ros-box ros-box-purple">C5</span></td>
+                        <td class="py-3 text-gray-200">4.8%</td>
+                        <td class="py-3 text-right text-gray-500 font-mono text-lg">0.00</td>
+                    </tr>
+                    <tr>
+                        <td class="py-3"><span class="ros-box ros-box-purple">BC5</span></td>
+                        <td class="py-3 text-gray-200">9%</td>
+                        <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($sales['9'] ?? 0, 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="py-3"><span class="ros-box ros-box-purple">AC5</span></td>
+                        <td class="py-3 text-gray-200">13.5%</td>
+                        <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($sales['13.5'] ?? 0, 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="py-3"><span class="ros-box ros-box-purple">B5</span></td>
+                        <td class="py-3 text-gray-200">FlatFarm</td>
+                        <td class="py-3 text-right text-gray-500 font-mono text-lg">0.00</td>
+                    </tr>
+                    <tr>
+                        <td class="py-3"><span class="ros-box ros-box-purple">P1</span></td>
+                        <td class="py-3 text-gray-200">Std Rate</td>
+                        <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($sales['23'] ?? 0, 2) }}</td>
+                    </tr>
+                    <tr class="border-t-2 border-gray-600">
+                        <td class="py-3"><span class="ros-box ros-box-purple">Z1</span></td>
+                        <td class="py-3 font-bold text-gray-200">Total</td>
+                        <td class="py-3 text-right text-purple-400 font-mono text-xl font-bold">{{ number_format($salesTotal, 2) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        {{-- ============================================================ --}}
+        {{-- ROS SECTION 2: ACQUISITIONS FROM THE EU AND NON-EU          --}}
+        {{-- ============================================================ --}}
+        <div class="bg-gray-800 rounded-lg p-6 mb-6 print-section">
+            <h2 class="text-lg font-bold text-gray-100 mb-1">
+                <span class="text-blue-400">Section 2</span> &mdash; Acquisitions from the EU and Non-EU
+            </h2>
+            <p class="text-gray-500 text-xs mb-4">&euro; Values Excluding VAT</p>
+
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b border-gray-700">
+                        <th class="text-left text-gray-400 pb-2 py-2 w-16">ROS Box</th>
+                        <th class="text-left text-gray-400 pb-2 py-2">Description</th>
+                        <th class="text-right text-gray-400 pb-2 py-2 w-40">Net Amount (&euro;)</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700">
+                    <tr>
+                        <td class="py-3"><span class="ros-box ros-box-blue">E4</span></td>
+                        <td class="py-3 text-gray-200">Exempt</td>
+                        <td class="py-3 text-right text-gray-500 font-mono text-lg">0.00</td>
+                    </tr>
+                    <tr>
+                        <td class="py-3"><span class="ros-box ros-box-blue">D2</span></td>
+                        <td class="py-3 text-gray-200">0% Home</td>
+                        <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($combinedAcquisitions['0'] ?? 0, 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="py-3"><span class="ros-box ros-box-blue">C6</span></td>
+                        <td class="py-3 text-gray-200">4.8%</td>
+                        <td class="py-3 text-right text-gray-500 font-mono text-lg">0.00</td>
+                    </tr>
+                    <tr>
+                        <td class="py-3"><span class="ros-box ros-box-blue">BC6</span></td>
+                        <td class="py-3 text-gray-200">9%</td>
+                        <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($combinedAcquisitions['9'] ?? 0, 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="py-3"><span class="ros-box ros-box-blue">AC6</span></td>
+                        <td class="py-3 text-gray-200">13.5%</td>
+                        <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($combinedAcquisitions['13.5'] ?? 0, 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="py-3"><span class="ros-box ros-box-blue">B6</span></td>
+                        <td class="py-3 text-gray-200">FlatFarm</td>
+                        <td class="py-3 text-right text-gray-500 font-mono text-lg">0.00</td>
+                    </tr>
+                    <tr>
+                        <td class="py-3"><span class="ros-box ros-box-blue">P2</span></td>
+                        <td class="py-3 text-gray-200">Std Rate</td>
+                        <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($combinedAcquisitions['23'] ?? 0, 2) }}</td>
+                    </tr>
+                    <tr class="border-t-2 border-gray-600">
+                        <td class="py-3"><span class="ros-box ros-box-blue">Z2</span></td>
+                        <td class="py-3 font-bold text-gray-200">Total</td>
+                        <td class="py-3 text-right text-blue-400 font-mono text-xl font-bold">{{ number_format($combinedAcquisitionsTotal, 2) }}</td>
+                    </tr>
+                    <tr class="border-t border-gray-700">
+                        <td class="py-3"><span class="ros-box ros-box-blue">PA2</span></td>
+                        <td class="py-3 text-gray-200">Postponed Accounting</td>
+                        <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($postponedAccounting, 2) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p class="text-yellow-500 text-xs mt-3 font-semibold">Figures already included in T1/T2 totals below. Shown for ROS cross-reference only.</p>
+        </div>
+
+        {{-- ============================================================ --}}
+        {{-- ROS SECTION 3: GOODS OR SERVICES PURCHASED FOR RESALE       --}}
+        {{-- ============================================================ --}}
+        <div class="bg-gray-800 rounded-lg p-6 mb-6 print-section">
+            <h2 class="text-lg font-bold text-gray-100 mb-1">
+                <span class="text-green-400">Section 3</span> &mdash; Goods or Services Purchased for Resale
+            </h2>
+            <p class="text-gray-500 text-xs mb-4">&euro; Values Excluding VAT</p>
+
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b border-gray-700">
+                        <th class="text-left text-gray-400 pb-2 py-2 w-16">ROS Box</th>
+                        <th class="text-left text-gray-400 pb-2 py-2">Description</th>
+                        <th class="text-right text-gray-400 pb-2 py-2 w-40">Net Amount (&euro;)</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700">
+                    <tr>
+                        <td class="py-3"><span class="ros-box ros-box-green">E5</span></td>
+                        <td class="py-3 text-gray-200">Exempt</td>
+                        <td class="py-3 text-right text-gray-500 font-mono text-lg">0.00</td>
+                    </tr>
+                    <tr>
                         <td class="py-3"><span class="ros-box ros-box-green">J1</span></td>
-                        <td class="py-3 text-gray-200">
-                            <span class="inline-flex items-center">
-                                <span class="w-2.5 h-2.5 rounded-full bg-purple-500 mr-2 rate-dot"></span>
-                                0% &mdash; Zero-rated goods for resale
-                            </span>
-                        </td>
+                        <td class="py-3 text-gray-200">0% Home</td>
                         <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($goods['0'] ?? 0, 2) }}</td>
                     </tr>
                     <tr>
+                        <td class="py-3"><span class="ros-box ros-box-green">H5</span></td>
+                        <td class="py-3 text-gray-200">4.8%</td>
+                        <td class="py-3 text-right text-gray-500 font-mono text-lg">0.00</td>
+                    </tr>
+                    <tr>
                         <td class="py-3"><span class="ros-box ros-box-green">BH5</span></td>
-                        <td class="py-3 text-gray-200">
-                            <span class="inline-flex items-center">
-                                <span class="w-2.5 h-2.5 rounded-full bg-blue-500 mr-2 rate-dot"></span>
-                                9% &mdash; Reduced-rate goods for resale
-                            </span>
-                        </td>
+                        <td class="py-3 text-gray-200">9%</td>
                         <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($goods['9'] ?? 0, 2) }}</td>
                     </tr>
                     <tr>
                         <td class="py-3"><span class="ros-box ros-box-green">AH5</span></td>
-                        <td class="py-3 text-gray-200">
-                            <span class="inline-flex items-center">
-                                <span class="w-2.5 h-2.5 rounded-full bg-yellow-500 mr-2 rate-dot"></span>
-                                13.5% &mdash; Second reduced-rate goods for resale
-                            </span>
-                        </td>
+                        <td class="py-3 text-gray-200">13.5%</td>
                         <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($goods['13.5'] ?? 0, 2) }}</td>
                     </tr>
                     <tr>
+                        <td class="py-3"><span class="ros-box ros-box-green">G5</span></td>
+                        <td class="py-3 text-gray-200">FlatFarm</td>
+                        <td class="py-3 text-right text-gray-500 font-mono text-lg">0.00</td>
+                    </tr>
+                    <tr>
                         <td class="py-3"><span class="ros-box ros-box-green">R1</span></td>
-                        <td class="py-3 text-gray-200">
-                            <span class="inline-flex items-center">
-                                <span class="w-2.5 h-2.5 rounded-full bg-green-500 mr-2 rate-dot"></span>
-                                23% &mdash; Standard-rate goods for resale
-                            </span>
-                        </td>
+                        <td class="py-3 text-gray-200">Std Rate</td>
                         <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($goods['23'] ?? 0, 2) }}</td>
                     </tr>
                     <tr class="border-t-2 border-gray-600">
                         <td class="py-3"><span class="ros-box ros-box-green">Z3</span></td>
-                        <td class="py-3 font-bold text-gray-200">Total goods for resale</td>
+                        <td class="py-3 font-bold text-gray-200">Total</td>
                         <td class="py-3 text-right text-green-400 font-mono text-xl font-bold">{{ number_format($goodsTotal, 2) }}</td>
                     </tr>
                 </tbody>
@@ -170,13 +311,13 @@
         </div>
 
         {{-- ============================================================ --}}
-        {{-- SECTION 2: OTHER DEDUCTIBLE GOODS & SERVICES (T2)            --}}
+        {{-- ROS SECTION 4: OTHER DEDUCTIBLE GOODS & SERVICES            --}}
         {{-- ============================================================ --}}
         <div class="bg-gray-800 rounded-lg p-6 mb-6 print-section">
             <h2 class="text-lg font-bold text-gray-100 mb-1">
-                <span class="text-yellow-400">T2</span> &mdash; Other Deductible Goods &amp; Services (Not for Resale)
+                <span class="text-yellow-400">Section 4</span> &mdash; Other Deductible Goods &amp; Services (Not for Resale)
             </h2>
-            <p class="text-gray-500 text-xs mb-4">Service and overhead purchases — input credit only. Not goods bought for resale.</p>
+            <p class="text-gray-500 text-xs mb-4">&euro; Values Excluding VAT</p>
 
             <table class="w-full">
                 <thead>
@@ -188,135 +329,52 @@
                 </thead>
                 <tbody class="divide-y divide-gray-700">
                     <tr>
+                        <td class="py-3"><span class="ros-box ros-box-yellow">E6</span></td>
+                        <td class="py-3 text-gray-200">Exempt</td>
+                        <td class="py-3 text-right text-gray-500 font-mono text-lg">0.00</td>
+                    </tr>
+                    <tr>
                         <td class="py-3"><span class="ros-box ros-box-yellow">J2</span></td>
-                        <td class="py-3 text-gray-200">0% &mdash; Zero-rated other goods/services</td>
+                        <td class="py-3 text-gray-200">0% Home</td>
                         <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($service['0'] ?? 0, 2) }}</td>
                     </tr>
                     <tr>
+                        <td class="py-3"><span class="ros-box ros-box-yellow">H6</span></td>
+                        <td class="py-3 text-gray-200">4.8%</td>
+                        <td class="py-3 text-right text-gray-500 font-mono text-lg">0.00</td>
+                    </tr>
+                    <tr>
                         <td class="py-3"><span class="ros-box ros-box-yellow">BH6</span></td>
-                        <td class="py-3 text-gray-200">9% &mdash; Reduced-rate other goods/services</td>
+                        <td class="py-3 text-gray-200">9%</td>
                         <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($service['9'] ?? 0, 2) }}</td>
                     </tr>
                     <tr>
                         <td class="py-3"><span class="ros-box ros-box-yellow">AH6</span></td>
-                        <td class="py-3 text-gray-200">13.5% &mdash; Second reduced-rate other goods/services</td>
+                        <td class="py-3 text-gray-200">13.5%</td>
                         <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($service['13.5'] ?? 0, 2) }}</td>
                     </tr>
                     <tr>
+                        <td class="py-3"><span class="ros-box ros-box-yellow">G6</span></td>
+                        <td class="py-3 text-gray-200">FlatFarm</td>
+                        <td class="py-3 text-right text-gray-500 font-mono text-lg">0.00</td>
+                    </tr>
+                    <tr>
                         <td class="py-3"><span class="ros-box ros-box-yellow">R2</span></td>
-                        <td class="py-3 text-gray-200">23% &mdash; Standard-rate other goods/services</td>
+                        <td class="py-3 text-gray-200">Std Rate</td>
                         <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($service['23'] ?? 0, 2) }}</td>
                     </tr>
                     <tr class="border-t-2 border-gray-600">
-                        <td class="py-3"><span class="ros-box ros-box-yellow">Z4</span></td>
-                        <td class="py-3 font-bold text-gray-200">Total other deductible goods &amp; services</td>
+                        <td class="py-3"><span class="ros-box ros-box-yellow">Z5</span></td>
+                        <td class="py-3 font-bold text-gray-200">Total</td>
                         <td class="py-3 text-right text-yellow-400 font-mono text-xl font-bold">{{ number_format($serviceTotal, 2) }}</td>
+                    </tr>
+                    <tr class="border-t border-gray-700">
+                        <td class="py-3"><span class="ros-box ros-box-yellow">PA4</span></td>
+                        <td class="py-3 text-gray-200">Postponed Accounting</td>
+                        <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($postponedAccounting, 2) }}</td>
                     </tr>
                 </tbody>
             </table>
-        </div>
-
-        {{-- ============================================================ --}}
-        {{-- SECTION 3: EU / NON-EU ACQUISITIONS SUMMARY                  --}}
-        {{-- ============================================================ --}}
-        @php
-            $hasEu = $euAcquisitionsTotal > 0;
-            $hasNonEu = $nonEuAcquisitionsTotal > 0;
-            $hasAcquisitions = $hasEu || $hasNonEu;
-        @endphp
-        <div class="bg-gray-800 rounded-lg p-6 mb-6 print-section">
-            <h2 class="text-lg font-bold text-gray-100 mb-1">
-                <span class="text-blue-400">EU / Non-EU Acquisitions</span>
-            </h2>
-            <p class="text-gray-500 text-xs mb-4">
-                Intra-community and third-country acquisitions at Irish equivalent VAT rates.
-                <span class="text-yellow-500 font-semibold">Figures already included in T1/T2 above</span> &mdash; shown here for ROS cross-reference only.
-            </p>
-
-            @if(!$hasAcquisitions)
-                <div class="text-center py-6 text-gray-500">
-                    <p>No EU or non-EU acquisitions in this submission.</p>
-                    <p class="text-xs mt-1">All invoices are from domestic (Irish) suppliers.</p>
-                </div>
-            @else
-                {{-- EU Acquisitions --}}
-                @if($hasEu)
-                <div class="mb-6">
-                    <h3 class="text-sm font-semibold text-blue-400 mb-3 uppercase tracking-wide">Intra-EU Acquisitions</h3>
-                    <table class="w-full">
-                        <thead>
-                            <tr class="border-b border-gray-700">
-                                <th class="text-left text-gray-400 pb-2 py-2 w-16">ROS Box</th>
-                                <th class="text-left text-gray-400 pb-2 py-2">Irish Equivalent Rate</th>
-                                <th class="text-right text-gray-400 pb-2 py-2 w-40">Net Amount (&euro;)</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-700">
-                            @php
-                                $euBoxes = ['0' => 'ES1', '9' => 'ES2', '13.5' => 'ES3', '23' => 'ES4'];
-                                $rateLabels = ['0' => '0% (Zero)', '9' => '9% (Reduced)', '13.5' => '13.5% (Second Reduced)', '23' => '23% (Standard)'];
-                            @endphp
-                            @foreach($euBoxes as $rate => $box)
-                                @if(($euAcquisitions[$rate] ?? 0) > 0)
-                                <tr>
-                                    <td class="py-3"><span class="ros-box ros-box-blue">{{ $box }}</span></td>
-                                    <td class="py-3 text-gray-200">{{ $rateLabels[$rate] }}</td>
-                                    <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($euAcquisitions[$rate], 2) }}</td>
-                                </tr>
-                                @endif
-                            @endforeach
-                            <tr class="border-t-2 border-gray-600">
-                                <td class="py-3"></td>
-                                <td class="py-3 font-bold text-gray-200">Total EU acquisitions</td>
-                                <td class="py-3 text-right text-blue-400 font-mono text-lg font-bold">{{ number_format($euAcquisitionsTotal, 2) }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                @endif
-
-                {{-- Non-EU Acquisitions --}}
-                @if($hasNonEu)
-                <div>
-                    <h3 class="text-sm font-semibold text-gray-400 mb-3 uppercase tracking-wide">Non-EU / Third Country Imports</h3>
-                    <table class="w-full">
-                        <thead>
-                            <tr class="border-b border-gray-700">
-                                <th class="text-left text-gray-400 pb-2 py-2 w-16">ROS Box</th>
-                                <th class="text-left text-gray-400 pb-2 py-2">Irish Equivalent Rate</th>
-                                <th class="text-right text-gray-400 pb-2 py-2 w-40">Net Amount (&euro;)</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-700">
-                            @php
-                                $nonEuBoxes = ['0' => 'PA1', '9' => 'PA2', '13.5' => 'PA2', '23' => 'PA3'];
-                            @endphp
-                            @foreach(['0', '9', '13.5', '23'] as $rate)
-                                @if(($nonEuAcquisitions[$rate] ?? 0) > 0)
-                                <tr>
-                                    <td class="py-3"><span class="ros-box ros-box-gray">{{ $nonEuBoxes[$rate] }}</span></td>
-                                    <td class="py-3 text-gray-200">{{ $rateLabels[$rate] }}</td>
-                                    <td class="py-3 text-right text-white font-mono text-lg">{{ number_format($nonEuAcquisitions[$rate], 2) }}</td>
-                                </tr>
-                                @endif
-                            @endforeach
-                            <tr class="border-t-2 border-gray-600">
-                                <td class="py-3"></td>
-                                <td class="py-3 font-bold text-gray-200">Total non-EU imports</td>
-                                <td class="py-3 text-right text-gray-300 font-mono text-lg font-bold">{{ number_format($nonEuAcquisitionsTotal, 2) }}</td>
-                            </tr>
-                            @if($postponedAccounting > 0)
-                            <tr>
-                                <td class="py-3"></td>
-                                <td class="py-3 text-gray-300 text-sm italic">of which: Postponed Accounting (PA)</td>
-                                <td class="py-3 text-right text-gray-400 font-mono">{{ number_format($postponedAccounting, 2) }}</td>
-                            </tr>
-                            @endif
-                        </tbody>
-                    </table>
-                </div>
-                @endif
-            @endif
         </div>
 
         {{-- ============================================================ --}}
@@ -388,7 +446,7 @@
                         <td class="py-2 text-right text-green-400 font-mono">{{ number_format($goodsTotal, 2) }}</td>
                     </tr>
                     <tr>
-                        <td class="py-2 text-gray-300">T2 Other Deductible <span class="ros-box ros-box-yellow text-xs ml-1">Z4</span></td>
+                        <td class="py-2 text-gray-300">T2 Other Deductible <span class="ros-box ros-box-yellow text-xs ml-1">Z5</span></td>
                         <td class="py-2 text-right text-yellow-400 font-mono">{{ number_format($serviceTotal, 2) }}</td>
                     </tr>
                     <tr>
