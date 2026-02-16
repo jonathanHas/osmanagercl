@@ -1186,95 +1186,155 @@
             }
         }
 
+        function createProgressBar(container) {
+            container.innerHTML = `
+                <div class="mt-4">
+                    <div class="flex justify-between text-sm text-gray-600 mb-1">
+                        <span class="acct-progress-label">Importing...</span>
+                        <span class="acct-progress-pct">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                        <div class="acct-progress-fill bg-indigo-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1 acct-progress-detail"></div>
+                </div>
+            `;
+            const fill = container.querySelector('.acct-progress-fill');
+            const label = container.querySelector('.acct-progress-label');
+            const pct = container.querySelector('.acct-progress-pct');
+            const detail = container.querySelector('.acct-progress-detail');
+            return {
+                update(current, total, dateStr) {
+                    const percent = Math.round((current / total) * 100);
+                    fill.style.width = percent + '%';
+                    pct.textContent = percent + '%';
+                    label.textContent = `Importing ${current} of ${total}...`;
+                    if (dateStr) detail.textContent = dateStr;
+                },
+                finish(imported, failed) {
+                    fill.style.width = '100%';
+                    fill.classList.remove('bg-indigo-600');
+                    fill.classList.add(failed > 0 ? 'bg-yellow-500' : 'bg-green-500');
+                    pct.textContent = '100%';
+                    label.textContent = failed > 0
+                        ? `Done: ${imported} imported, ${failed} failed`
+                        : `Done: ${imported} days imported`;
+                    detail.textContent = '';
+                }
+            };
+        }
+
+        function getDaysInRange(startStr, endStr) {
+            const days = [];
+            const current = new Date(startStr);
+            const end = new Date(endStr);
+            while (current <= end) {
+                days.push(current.toISOString().slice(0, 10));
+                current.setDate(current.getDate() + 1);
+            }
+            return days;
+        }
+
+        async function importAcctDayRequest(date, force = false) {
+            const formData = new FormData();
+            formData.append('start_date', date);
+            formData.append('end_date', date);
+            if (force) formData.append('force', '1');
+
+            const response = await fetch('{{ route('sales-import.accounting-import') }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json',
+                },
+                body: formData
+            });
+            return response.json();
+        }
+
         async function importAllAcctMissing(button) {
-            const originalText = button.textContent;
-            button.textContent = 'Importing...';
             button.disabled = true;
+            button.classList.add('hidden');
 
             const missingDays = Array.from(document.querySelectorAll('#acct-missing-days-list > div:not(.border-t) .font-medium'))
                 .map(el => el.textContent);
 
+            // Insert progress bar after the button's parent
+            const progressContainer = document.createElement('div');
+            button.parentElement.insertBefore(progressContainer, button);
+            const progress = createProgressBar(progressContainer);
+
             let imported = 0;
             let failed = 0;
 
-            for (const date of missingDays) {
+            for (let i = 0; i < missingDays.length; i++) {
+                const date = missingDays[i];
                 try {
-                    const formData = new FormData();
-                    formData.append('start_date', date);
-                    formData.append('end_date', date);
-
-                    const response = await fetch('{{ route('sales-import.accounting-import') }}', {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                            'Accept': 'application/json',
-                        },
-                        body: formData
-                    });
-
-                    const data = await response.json();
-
+                    const data = await importAcctDayRequest(date);
                     if (data.success) {
                         imported++;
-                        button.textContent = `Importing... (${imported}/${missingDays.length})`;
-                    } else {
-                        failed++;
-                    }
-                } catch (error) {
-                    failed++;
-                }
+                        // Mark the row button as done
+                        const rowBtn = document.querySelector(`#acct-missing-days-list button[onclick*="${date}"]`);
+                        if (rowBtn) {
+                            rowBtn.textContent = 'Done';
+                            rowBtn.className = 'bg-green-600 text-white px-3 py-1 text-sm rounded cursor-default';
+                            rowBtn.onclick = null;
+                        }
+                    } else { failed++; }
+                } catch (error) { failed++; }
+                progress.update(i + 1, missingDays.length, date);
             }
 
+            progress.finish(imported, failed);
             showNotification(`Accounting import complete: ${imported} succeeded, ${failed} failed`);
-            button.textContent = 'All Done';
-            button.className = 'w-full bg-green-600 text-white px-4 py-2 rounded-md cursor-default';
-            button.onclick = null;
 
             setTimeout(() => {
                 document.getElementById('acct-gap-finder-form').dispatchEvent(new Event('submit'));
-            }, 1000);
+            }, 2000);
         }
 
-        // Accounting Import Form
+        // Accounting Import Form — day-by-day with progress bar
         document.getElementById('acct-import-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const button = e.target.querySelector('button[type="submit"]');
-            const hideLoading = showLoading(button);
+            const force = e.target.querySelector('input[name="force"]').checked;
+            const startDate = e.target.querySelector('input[name="start_date"]').value;
+            const endDate = e.target.querySelector('input[name="end_date"]').value;
+            const days = getDaysInRange(startDate, endDate);
 
-            const formData = new FormData(e.target);
-
-            try {
-                const response = await fetch('{{ route('sales-import.accounting-import') }}', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                        'Accept': 'application/json',
-                    },
-                    body: formData
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    const resultsDiv = document.getElementById('acct-import-results');
-                    const dataDiv = document.getElementById('acct-import-data');
-                    resultsDiv.classList.remove('hidden');
-                    dataDiv.innerHTML = `
-                        <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4">
-                            <p class="font-medium">Import completed in ${data.data.execution_time}s</p>
-                            <p class="text-sm mt-1">${data.data.days_processed} days processed, ${data.data.records_in_range} records in range${data.data.force ? ' (forced re-import)' : ''}</p>
-                        </div>
-                    `;
-                    showNotification(`Accounting import completed! ${data.data.days_processed} days, ${data.data.records_in_range} records`);
-                    setTimeout(() => location.reload(), 2000);
-                } else {
-                    showNotification(data.message, 'error');
-                }
-            } catch (error) {
-                showNotification('Accounting import failed: ' + error.message, 'error');
-            } finally {
-                hideLoading();
+            if (days.length === 0) {
+                showNotification('Invalid date range', 'error');
+                return;
             }
+
+            button.disabled = true;
+            button.textContent = 'Importing...';
+
+            const resultsDiv = document.getElementById('acct-import-results');
+            const dataDiv = document.getElementById('acct-import-data');
+            resultsDiv.classList.remove('hidden');
+            const progress = createProgressBar(dataDiv);
+
+            let imported = 0;
+            let failed = 0;
+            const startTime = performance.now();
+
+            for (let i = 0; i < days.length; i++) {
+                try {
+                    const data = await importAcctDayRequest(days[i], force);
+                    if (data.success) { imported++; } else { failed++; }
+                } catch (error) { failed++; }
+                progress.update(i + 1, days.length, days[i]);
+            }
+
+            const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
+            progress.finish(imported, failed);
+
+            showNotification(`Accounting import completed! ${imported} days in ${elapsed}s`);
+            button.textContent = 'Import (skip existing)';
+            button.disabled = false;
+
+            setTimeout(() => location.reload(), 3000);
         });
 
         // Daily Totals Form
