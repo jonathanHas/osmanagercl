@@ -446,6 +446,25 @@ class RtdSubmissionController extends Controller
     }
 
     /**
+     * Delete a draft submission and unlink its invoices.
+     */
+    public function destroy(RtdSubmission $submission)
+    {
+        if (! $submission->isDraft()) {
+            return back()->with('error', 'Only draft submissions can be deleted.');
+        }
+
+        // Unlink all associated invoices so they become available again
+        Invoice::where('rtd_submission_id', $submission->id)
+            ->update(['rtd_submission_id' => null]);
+
+        $submission->delete();
+
+        return redirect()->route('rtd.submissions.index')
+            ->with('success', 'Draft submission deleted and invoices released.');
+    }
+
+    /**
      * Remove an invoice from a draft submission.
      */
     public function removeInvoice(RtdSubmission $submission, Invoice $invoice)

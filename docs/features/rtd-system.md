@@ -54,6 +54,7 @@ Submissions track which frozen invoices were included in each RTD filing with Re
 - The next submission automatically shows invoices not yet linked to any previous submission
 - Submissions store a snapshot of VAT breakdown totals (T1 goods, T2 service, excluded) at creation time
 - Draft submissions allow adding and removing invoices; submitted ones are read-only
+- **Paperin Adjustment** (FIX 2026-02-16): Sales figures deduct paperin (gift voucher redemption) gross from 0% net to prevent double-counting revenue. Applied consistently across all three data source tiers (persisted VAT data, `sales_accounting_daily` fallback, and direct fallback)
 
 **Adding Invoices to Draft Submissions (NEW! 2026-02-13):**
 
@@ -528,6 +529,8 @@ To efficiently resolve issues:
 | Component | Path |
 |-----------|------|
 | RTD Controller | `app/Http/Controllers/RtdController.php` |
+| RTD Submission Model | `app/Models/RtdSubmission.php` |
+| RTD Submission Controller | `app/Http/Controllers/RtdSubmissionController.php` |
 | RTD Service | `app/Services/RtdResolutionService.php` |
 | Fallback Controller | `app/Http/Controllers/RtdFallbackController.php` |
 | Fallback Model | `app/Models/RtdVatFallback.php` |

@@ -108,11 +108,19 @@
                                 <td class="px-4 py-3 text-gray-300 font-mono text-sm">
                                     {{ $submission->reference_number ?? '-' }}
                                 </td>
-                                <td class="px-4 py-3 text-center">
+                                <td class="px-4 py-3 text-center flex items-center justify-center gap-2">
                                     <a href="{{ route('rtd.submissions.show', $submission) }}"
                                        class="text-blue-400 hover:text-blue-300 text-sm">
                                         View
                                     </a>
+                                    @if($submission->isDraft())
+                                        <form action="{{ route('rtd.submissions.destroy', $submission) }}" method="POST"
+                                              onsubmit="return confirm('Delete this draft submission? Its invoices will be released back for new submissions.')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="text-red-400 hover:text-red-300 text-sm">Delete</button>
+                                        </form>
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach

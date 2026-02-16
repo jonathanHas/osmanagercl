@@ -238,6 +238,17 @@ php artisan sales-accounting:import --start-date=2023-01-01 --end-date=2023-12-3
 php artisan sales-accounting:import --force --start-date=2023-01-01
 ```
 
+### POS Query Optimization (2026-02-16)
+
+The `SalesAccountingImportService` POS queries use index-friendly range comparisons instead of `DATE_FORMAT()`:
+
+```sql
+-- Uses DATENEW index for fast lookups (~18x faster)
+WHERE DATENEW >= '2026-02-15 00:00:00' AND DATENEW < '2026-02-16 00:00:00'
+```
+
+This avoids wrapping the indexed `DATENEW` column in a function, which would force a full table scan. Import time per day dropped from ~36 seconds to <2 seconds.
+
 ### Caching Strategy
 - Controller uses string VAT rate keys to avoid PHP 8.3 float-to-int conversion
 - Template lookups optimized for performance

@@ -137,6 +137,19 @@ class RtdSubmission extends Model
                         $sales[$key] += (float) $row->total_net;
                     }
                 }
+
+                // Deduct paperin (gift voucher redemption) gross from 0% to prevent double-counting
+                $paperinGross = (float) DB::table('sales_accounting_daily')
+                    ->where('payment_type', 'paperin')
+                    ->whereBetween('sale_date', [
+                        $vatReturn->period_start->format('Y-m-d'),
+                        $vatReturn->period_end->format('Y-m-d'),
+                    ])
+                    ->sum('gross_amount');
+
+                if ($paperinGross > 0) {
+                    $sales['0'] -= $paperinGross;
+                }
             }
         }
 
@@ -148,7 +161,6 @@ class RtdSubmission extends Model
                     $this->period_start->format('Y-m-d'),
                     $this->period_end->format('Y-m-d'),
                 ])
-                ->where('payment_type', '!=', 'paperin')
                 ->groupBy('vat_rate')
                 ->get();
 
@@ -159,6 +171,20 @@ class RtdSubmission extends Model
                         $sales[$key] += (float) $row->total_net;
                     }
                 }
+
+                // Deduct paperin (gift voucher redemption) gross from 0% to prevent double-counting
+                $paperinGross = (float) DB::table('sales_accounting_daily')
+                    ->where('payment_type', 'paperin')
+                    ->whereBetween('sale_date', [
+                        $this->period_start->format('Y-m-d'),
+                        $this->period_end->format('Y-m-d'),
+                    ])
+                    ->sum('gross_amount');
+
+                if ($paperinGross > 0) {
+                    $sales['0'] -= $paperinGross;
+                }
+
                 $usedFallback = true;
             }
         }

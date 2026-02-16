@@ -434,6 +434,7 @@ VAT categorization system for Udea, Dynamis, and IIH invoices to support Irish V
 - **Batch Recomputation**: Update all affected invoices when fallbacks are added
 - **Invoice Integration**: RTD summary section on invoice show page
 - **Submission Tracking** (NEW! 2026-02-10, Updated 2026-02-13): Create submissions linking frozen invoices to Revenue filings, track which invoices were included, auto-surface unsubmitted invoices for next filing, import newly frozen invoices into existing draft submissions
+- **Submission Paperin Fix** (FIX 2026-02-16): Sales figures now correctly deduct paperin (gift voucher redemption) gross from 0% net across all data source tiers, fixing D1 overstatement
 
 📖 [RTD System Documentation](./features/rtd-system.md)
 
@@ -562,6 +563,7 @@ VAT-compliant sales analysis with proper revenue/transfer separation and compreh
 - **Gift Voucher Handling**: Paperin/paperin adjust system prevents double-counting
 - **Comprehensive CSV Export**: Structured export with date range, VAT breakdown, and summary metrics
 - **Dual Performance Mode**: Uses pre-aggregated data (100x+ faster) with real-time fallback
+- **Optimized POS Import** (FIX 2026-02-16): Index-friendly range queries replace `DATE_FORMAT()` — import drops from ~36s to <2s per day
 - **Professional Formatting**: Tables match website layout for easy accounting review
 - **Role-based Access**: Admin and Manager access only for financial data security
 

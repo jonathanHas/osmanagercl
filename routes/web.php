@@ -185,6 +185,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/submissions/{submission}/recalculate', [\App\Http\Controllers\RtdSubmissionController::class, 'recalculate'])->name('submissions.recalculate');
         Route::post('/submissions/{submission}/add-invoices', [\App\Http\Controllers\RtdSubmissionController::class, 'addInvoices'])->name('submissions.add-invoices');
         Route::delete('/submissions/{submission}/invoices/{invoice}', [\App\Http\Controllers\RtdSubmissionController::class, 'removeInvoice'])->name('submissions.remove-invoice');
+        Route::delete('/submissions/{submission}', [\App\Http\Controllers\RtdSubmissionController::class, 'destroy'])->name('submissions.destroy');
 
         Route::post('/{invoice}/parse', [\App\Http\Controllers\RtdController::class, 'parse'])->name('parse');
         Route::post('/{invoice}/force-parse', [\App\Http\Controllers\RtdController::class, 'forceParse'])->name('force-parse');

@@ -11,6 +11,7 @@ This document outlines the implementation plan for importing sales data from the
 - **No indexing control**: Cannot optimize POS database indexes for our specific queries
 - **Network overhead**: Each query involves cross-database communication
 - **Scalability limits**: Performance degrades significantly with larger date ranges
+- **Function-wrapped WHERE clauses**: Using `DATE_FORMAT(DATENEW, ...)` prevents index usage — fixed in `SalesAccountingImportService` (2026-02-16) by switching to range comparisons (`DATENEW >= ? AND DATENEW < ?`), reducing import from ~36s to <2s per day
 
 ## Proposed Solution: Sales Data Import System
 

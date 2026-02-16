@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **RTD Submission: Paperin adjustment missing from sales figures** (2026-02-16)
+  - Paperin (gift voucher redemption) gross amount was not being deducted from 0% sales in Tier 2 (sales_accounting_daily fallback) and Tier 3 (no VAT returns) code paths
+  - Caused D1 (0% Home) to be overstated by the paperin gross total (e.g., €921.61)
+  - Now correctly deducts paperin gross from 0% net in all code paths, matching `VatReturnController::getSalesVatData()` logic
+  - **File Modified**: `app/Models/RtdSubmission.php`
+
 ### Added
 
 - **RTD Section 1 (Sales) Populated from VAT3 Returns** (2026-02-13)
@@ -47,6 +55,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Files Created**: `RtdSubmission` model, `RtdSubmissionController`, 3 Blade views, 2 migrations
 
 ### Fixed
+
+- **Sales Accounting Import - POS Query Performance** (2026-02-16)
+  - **Bug**: Importing accounting data took ~36 seconds per day (~72s for 2 days) due to full table scans
+  - **Root Cause**: `DATE_FORMAT(DATENEW, '%Y %m %d') = ?` wraps the indexed column in a function, preventing MySQL from using the index on `DATENEW`
+  - **Fix**: Replaced with range comparisons `DATENEW >= ? AND DATENEW < ?` using day start/end timestamps in both `importMainSalesData()` and `importStockTransferData()`
+  - **Expected Result**: Import time drops from ~36s to <2s per day
+  - **File Modified**: `app/Services/SalesAccountingImportService.php`
 
 - **Udea Parser - Credit Note / Negative Total Support** (2026-02-12)
   - **Bug**: Udea credit notes (e.g., returned crates) have negative totals like `Total including vat EUR -3873,20`, but the parser regex `[\d.,]+` didn't match the negative sign, causing total to be `None` and all amounts to be 0
