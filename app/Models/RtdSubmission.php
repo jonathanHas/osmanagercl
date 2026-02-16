@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\SalesAccountingImportService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -70,6 +71,9 @@ class RtdSubmission extends Model
      */
     private function aggregateSalesFromVatReturns(): array
     {
+        // Ensure sales_accounting_daily is populated for the submission period
+        app(SalesAccountingImportService::class)->ensureDataExists($this->period_start, $this->period_end);
+
         $sales = ['0' => 0, '9' => 0, '13.5' => 0, '23' => 0];
         $usedFallback = false;
 
@@ -136,13 +140,38 @@ class RtdSubmission extends Model
             }
         }
 
+        // If no VAT returns found, fall back to sales_accounting_daily directly
+        if ($vatReturns->isEmpty()) {
+            $directSales = DB::table('sales_accounting_daily')
+                ->select('vat_rate', DB::raw('SUM(net_amount) as total_net'))
+                ->whereBetween('sale_date', [
+                    $this->period_start->format('Y-m-d'),
+                    $this->period_end->format('Y-m-d'),
+                ])
+                ->where('payment_type', '!=', 'paperin')
+                ->groupBy('vat_rate')
+                ->get();
+
+            if ($directSales->isNotEmpty()) {
+                foreach ($directSales as $row) {
+                    $key = $rateToKey[(string) $row->vat_rate] ?? null;
+                    if ($key !== null) {
+                        $sales[$key] += (float) $row->total_net;
+                    }
+                }
+                $usedFallback = true;
+            }
+        }
+
         // Round all values
         foreach ($sales as $key => $value) {
             $sales[$key] = round($value, 2);
         }
 
         $salesTotal = round(array_sum($sales), 2);
-        $source = $vatReturns->isEmpty() ? 'none' : ($usedFallback ? 'mixed' : 'vat_returns');
+        $source = $vatReturns->isEmpty()
+            ? ($usedFallback ? 'sales_accounting_daily' : 'none')
+            : ($usedFallback ? 'mixed' : 'vat_returns');
 
         return [
             'sales' => $sales,

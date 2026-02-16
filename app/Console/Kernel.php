@@ -26,6 +26,12 @@ class Kernel extends ConsoleKernel
             ->onOneServer()
             ->withoutOverlapping(60);
 
+        // Import sales accounting data (payment type + VAT rate breakdown) for reports
+        $schedule->command('sales-accounting:import --days=7')
+            ->dailyAt('06:10')
+            ->onOneServer()
+            ->withoutOverlapping(30);
+
         // Populate POS daily summaries for financial dashboard (runs after sales import)
         $schedule->command('pos:populate-daily-summaries --last-days=7')
             ->dailyAt('06:15')

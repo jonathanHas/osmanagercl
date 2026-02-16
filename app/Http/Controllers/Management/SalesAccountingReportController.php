@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Management;
 
 use App\Http\Controllers\Controller;
+use App\Services\SalesAccountingImportService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -50,6 +51,9 @@ class SalesAccountingReportController extends Controller
      */
     private function generateSalesAccountingReport($startDate, $endDate)
     {
+        // Auto-import missing data from POS on demand
+        app(SalesAccountingImportService::class)->ensureDataExists($startDate, $endDate);
+
         // Check if we have pre-aggregated data for this date range
         $hasAggregatedData = $this->hasAggregatedData($startDate, $endDate);
 

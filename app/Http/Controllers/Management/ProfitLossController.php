@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Management;
 
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
+use App\Services\SalesAccountingImportService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -58,6 +59,9 @@ class ProfitLossController extends Controller
 
     private function getRevenueData($startDate, $endDate)
     {
+        // Auto-import missing data from POS on demand
+        app(SalesAccountingImportService::class)->ensureDataExists($startDate, $endDate);
+
         // Check if we have pre-aggregated data for better performance
         $hasAggregatedData = DB::table('sales_accounting_daily')
             ->whereBetween('sale_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
