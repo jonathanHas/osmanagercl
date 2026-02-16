@@ -75,7 +75,8 @@ class SalesAccountingImportService
      */
     public function importMainSalesData(Carbon $date): array
     {
-        $formattedDate = $date->format('Y m d');
+        $dayStart = $date->format('Y-m-d 00:00:00');
+        $dayEnd = $date->copy()->addDay()->format('Y-m-d 00:00:00');
 
         $salesData = DB::connection('pos')->select("
             SELECT
@@ -89,10 +90,10 @@ class SalesAccountingImportService
             JOIN PAYMENTS ON RECEIPTS.ID = PAYMENTS.RECEIPT
             JOIN TAXES ON TICKETLINES.TAXID = TAXES.ID
             LEFT JOIN CUSTOMERS ON TICKETS.CUSTOMER = CUSTOMERS.ID
-            WHERE DATE_FORMAT(DATENEW, '%Y %m %d') = ?
+            WHERE DATENEW >= ? AND DATENEW < ?
             AND (CUSTOMERS.NAME IS NULL OR CUSTOMERS.NAME NOT IN ('Kitchen', 'Coffee'))
             GROUP BY PAYMENTS.PAYMENT, TAXES.RATE
-        ", [$formattedDate]);
+        ", [$dayStart, $dayEnd]);
 
         $inserted = 0;
         $updated = 0;
@@ -130,7 +131,8 @@ class SalesAccountingImportService
      */
     public function importStockTransferData(Carbon $date): array
     {
-        $formattedDate = $date->format('Y m d');
+        $dayStart = $date->format('Y-m-d 00:00:00');
+        $dayEnd = $date->copy()->addDay()->format('Y-m-d 00:00:00');
 
         $transferData = DB::connection('pos')->select("
             SELECT
@@ -144,10 +146,10 @@ class SalesAccountingImportService
             JOIN RECEIPTS ON TICKETS.ID = RECEIPTS.ID
             JOIN TAXES ON TICKETLINES.TAXID = TAXES.ID
             JOIN CUSTOMERS ON TICKETS.CUSTOMER = CUSTOMERS.ID
-            WHERE DATE_FORMAT(DATENEW, '%Y %m %d') = ?
+            WHERE DATENEW >= ? AND DATENEW < ?
             AND CUSTOMERS.NAME IN ('Kitchen', 'Coffee')
             GROUP BY CUSTOMERS.NAME, TAXES.RATE
-        ", [$formattedDate]);
+        ", [$dayStart, $dayEnd]);
 
         $inserted = 0;
         $updated = 0;
