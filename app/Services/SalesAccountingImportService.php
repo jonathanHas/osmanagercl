@@ -13,6 +13,16 @@ class SalesAccountingImportService
      */
     public function ensureDataExists(Carbon $startDate, Carbon $endDate): void
     {
+        // Never import today — the day isn't complete yet, and partial data
+        // would be treated as "existing" and skipped on future runs.
+        $yesterday = Carbon::yesterday();
+        if ($endDate->gt($yesterday)) {
+            $endDate = $yesterday;
+        }
+        if ($startDate->gt($endDate)) {
+            return;
+        }
+
         $start = $startDate->format('Y-m-d');
         $end = $endDate->format('Y-m-d');
 

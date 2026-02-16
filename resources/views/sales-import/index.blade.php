@@ -249,6 +249,142 @@
                 </div>
             </div>
 
+            <!-- Accounting Data Section -->
+            <div class="bg-white shadow rounded-lg mb-8">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Accounting Data</h3>
+                    <p class="text-sm text-gray-600 mt-1">Manage sales_accounting_daily and stock_transfer_daily (used by VAT returns, Sales Accounting, P&L, RTD)</p>
+                </div>
+
+                <!-- Status Cards -->
+                <div class="p-6 border-b border-gray-200">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-indigo-50 rounded-lg p-4">
+                            <div class="text-sm font-medium text-indigo-700">sales_accounting_daily</div>
+                            <div class="text-2xl font-bold text-indigo-600 mt-1">{{ number_format($accountingStats->record_count) }}</div>
+                            <div class="text-xs text-indigo-500 mt-1">
+                                {{ $accountingStats->day_count }} days
+                                @if($accountingStats->earliest)
+                                    | {{ \Carbon\Carbon::parse($accountingStats->earliest)->format('M j, Y') }} - {{ \Carbon\Carbon::parse($accountingStats->latest)->format('M j, Y') }}
+                                @endif
+                            </div>
+                        </div>
+                        <div class="bg-teal-50 rounded-lg p-4">
+                            <div class="text-sm font-medium text-teal-700">stock_transfer_daily</div>
+                            <div class="text-2xl font-bold text-teal-600 mt-1">{{ number_format($transferStats->record_count) }}</div>
+                            <div class="text-xs text-teal-500 mt-1">
+                                {{ $transferStats->day_count }} days
+                                @if($transferStats->earliest)
+                                    | {{ \Carbon\Carbon::parse($transferStats->earliest)->format('M j, Y') }} - {{ \Carbon\Carbon::parse($transferStats->latest)->format('M j, Y') }}
+                                @endif
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <div class="text-sm font-medium text-gray-700">Coverage Status</div>
+                            @php
+                                $yesterday = \Carbon\Carbon::yesterday()->format('Y-m-d');
+                                $latestAccounting = $accountingStats->latest ? \Carbon\Carbon::parse($accountingStats->latest)->format('Y-m-d') : null;
+                                $isUpToDate = $latestAccounting === $yesterday;
+                            @endphp
+                            <div class="text-2xl font-bold {{ $isUpToDate ? 'text-green-600' : 'text-orange-600' }} mt-1">
+                                {{ $isUpToDate ? 'Up to date' : 'Behind' }}
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">
+                                Latest: {{ $latestAccounting ? \Carbon\Carbon::parse($latestAccounting)->format('M j') : 'None' }}
+                                | Yesterday: {{ \Carbon\Carbon::yesterday()->format('M j') }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="border-b border-gray-200">
+                    <nav class="-mb-px flex" aria-label="Tabs">
+                        <button class="acct-tab active w-1/2 py-4 px-1 text-center border-b-2 border-indigo-500 font-medium text-sm text-indigo-600" data-tab="acct-gap-finder">
+                            Gap Finder
+                            <span class="block text-xs text-gray-500 font-normal">Find missing days</span>
+                        </button>
+                        <button class="acct-tab w-1/2 py-4 px-1 text-center border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300" data-tab="acct-import">
+                            Import Controls
+                            <span class="block text-xs text-gray-500 font-normal">Import date range</span>
+                        </button>
+                    </nav>
+                </div>
+
+                <div class="p-6">
+                    <!-- Accounting Gap Finder Tab -->
+                    <div id="tab-acct-gap-finder" class="acct-tab-content">
+                        <form id="acct-gap-finder-form" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Start Date</label>
+                                    <input type="date" name="start_date"
+                                           value="{{ $accountingStats->earliest ? \Carbon\Carbon::parse($accountingStats->earliest)->format('Y-m-d') : now()->subMonths(3)->format('Y-m-d') }}"
+                                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">End Date</label>
+                                    <input type="date" name="end_date"
+                                           value="{{ now()->format('Y-m-d') }}"
+                                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                </div>
+                                <div class="flex items-end">
+                                    <button type="submit" class="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                        Find Missing Days
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+
+                        <!-- Accounting Gap Finder Results -->
+                        <div id="acct-gap-results" class="hidden mt-6">
+                            <div id="acct-gap-summary" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4"></div>
+                            <div id="acct-gap-status" class="mb-4"></div>
+                            <div id="acct-gap-missing" class="hidden">
+                                <h4 class="text-md font-medium text-red-700 mb-3">Missing Days in sales_accounting_daily</h4>
+                                <div id="acct-missing-days-list" class="space-y-2 max-h-64 overflow-y-auto"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Accounting Import Tab -->
+                    <div id="tab-acct-import" class="acct-tab-content hidden">
+                        <form id="acct-import-form" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Start Date</label>
+                                    <input type="date" name="start_date"
+                                           value="{{ now()->subDays(1)->format('Y-m-d') }}"
+                                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">End Date</label>
+                                    <input type="date" name="end_date"
+                                           value="{{ now()->subDays(1)->format('Y-m-d') }}"
+                                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                </div>
+                                <div class="flex items-end gap-2">
+                                    <button type="submit" class="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                        Import (skip existing)
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <label class="flex items-center gap-2 text-sm text-gray-600">
+                                    <input type="checkbox" name="force" value="1" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                    Force re-import (delete &amp; re-import existing days)
+                                </label>
+                            </div>
+                        </form>
+
+                        <!-- Accounting Import Results -->
+                        <div id="acct-import-results" class="hidden mt-6">
+                            <div id="acct-import-data"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Action Panels -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
                 
@@ -886,6 +1022,260 @@
 
             loadImportLogs();
         }
+
+        // Accounting Data Tabs
+        document.querySelectorAll('.acct-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.acct-tab').forEach(t => {
+                    t.classList.remove('active', 'border-indigo-500', 'text-indigo-600');
+                    t.classList.add('border-transparent', 'text-gray-500');
+                });
+                tab.classList.add('active', 'border-indigo-500', 'text-indigo-600');
+                tab.classList.remove('border-transparent', 'text-gray-500');
+
+                document.querySelectorAll('.acct-tab-content').forEach(content => {
+                    content.classList.add('hidden');
+                });
+                document.getElementById('tab-' + tab.dataset.tab).classList.remove('hidden');
+            });
+        });
+
+        // Accounting Gap Finder Form
+        document.getElementById('acct-gap-finder-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const button = e.target.querySelector('button[type="submit"]');
+            const hideLoading = showLoading(button);
+
+            const formData = new FormData(e.target);
+
+            try {
+                const response = await fetch('{{ route('sales-import.accounting-gaps') }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                    },
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    displayAcctGapResults(result.data);
+                    showNotification(`Scan completed in ${result.data.execution_time_seconds}s - ${result.data.missing_count} missing days found`);
+                } else {
+                    showNotification(result.message, 'error');
+                }
+            } catch (error) {
+                showNotification('Accounting gap finder failed: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        });
+
+        function displayAcctGapResults(data) {
+            const resultsDiv = document.getElementById('acct-gap-results');
+            const summaryDiv = document.getElementById('acct-gap-summary');
+            const statusDiv = document.getElementById('acct-gap-status');
+            const missingDiv = document.getElementById('acct-gap-missing');
+            const missingList = document.getElementById('acct-missing-days-list');
+
+            resultsDiv.classList.remove('hidden');
+
+            summaryDiv.innerHTML = `
+                <div class="bg-blue-50 rounded-lg p-4 text-center">
+                    <div class="text-2xl font-bold text-blue-600">${data.pos_count}</div>
+                    <div class="text-sm text-blue-700">Days in POS</div>
+                </div>
+                <div class="bg-indigo-50 rounded-lg p-4 text-center">
+                    <div class="text-2xl font-bold text-indigo-600">${data.imported_count}</div>
+                    <div class="text-sm text-indigo-700">Sales Accounting</div>
+                </div>
+                <div class="bg-teal-50 rounded-lg p-4 text-center">
+                    <div class="text-2xl font-bold text-teal-600">${data.transfer_imported_count}</div>
+                    <div class="text-sm text-teal-700">Stock Transfers</div>
+                </div>
+                <div class="bg-${data.missing_count > 0 ? 'red' : 'green'}-50 rounded-lg p-4 text-center">
+                    <div class="text-2xl font-bold text-${data.missing_count > 0 ? 'red' : 'green'}-600">${data.missing_count}</div>
+                    <div class="text-sm text-${data.missing_count > 0 ? 'red' : 'green'}-700">Missing Days</div>
+                </div>
+            `;
+
+            if (data.status === 'complete') {
+                statusDiv.innerHTML = `
+                    <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4">
+                        <p class="font-medium">All Clear! No missing days found in accounting data.</p>
+                        <p class="text-sm mt-1">Both sales_accounting_daily and stock_transfer_daily are complete for the selected period.</p>
+                    </div>
+                `;
+                missingDiv.classList.add('hidden');
+            } else {
+                statusDiv.innerHTML = `
+                    <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4">
+                        <p class="font-medium">Gaps Found! ${data.missing_count} day(s) missing from sales_accounting_daily.</p>
+                        <p class="text-sm mt-1">Click "Import" next to each day, or use "Import All" to fill gaps.</p>
+                    </div>
+                `;
+
+                missingDiv.classList.remove('hidden');
+                missingList.innerHTML = '';
+
+                data.missing_days.forEach(date => {
+                    const dayDiv = document.createElement('div');
+                    dayDiv.className = 'flex items-center justify-between bg-red-50 rounded-lg p-3';
+                    dayDiv.innerHTML = `
+                        <div>
+                            <span class="font-medium text-red-700">${date}</span>
+                            <span class="text-sm text-red-600 ml-2">(${new Date(date).toLocaleDateString('en-IE', { weekday: 'long' })})</span>
+                        </div>
+                        <button onclick="importAcctDay('${date}', this)" class="bg-indigo-600 text-white px-3 py-1 text-sm rounded hover:bg-indigo-700">
+                            Import
+                        </button>
+                    `;
+                    missingList.appendChild(dayDiv);
+                });
+
+                if (data.missing_days.length > 1) {
+                    const importAllDiv = document.createElement('div');
+                    importAllDiv.className = 'mt-4 pt-4 border-t border-gray-200';
+                    importAllDiv.innerHTML = `
+                        <button onclick="importAllAcctMissing(this)" class="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
+                            Import All ${data.missing_days.length} Missing Days
+                        </button>
+                    `;
+                    missingList.appendChild(importAllDiv);
+                }
+            }
+        }
+
+        async function importAcctDay(date, button) {
+            const originalText = button.textContent;
+            button.textContent = 'Importing...';
+            button.disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('start_date', date);
+                formData.append('end_date', date);
+
+                const response = await fetch('{{ route('sales-import.accounting-import') }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                    },
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showNotification(`Imported ${date}: ${data.data.records_in_range} records`);
+                    button.textContent = 'Done';
+                    button.className = 'bg-green-600 text-white px-3 py-1 text-sm rounded cursor-default';
+                    button.onclick = null;
+                } else {
+                    showNotification(`Failed to import ${date}: ${data.message}`, 'error');
+                    button.textContent = originalText;
+                    button.disabled = false;
+                }
+            } catch (error) {
+                showNotification(`Failed to import ${date}: ${error.message}`, 'error');
+                button.textContent = originalText;
+                button.disabled = false;
+            }
+        }
+
+        async function importAllAcctMissing(button) {
+            const originalText = button.textContent;
+            button.textContent = 'Importing...';
+            button.disabled = true;
+
+            const missingDays = Array.from(document.querySelectorAll('#acct-missing-days-list > div:not(.border-t) .font-medium'))
+                .map(el => el.textContent);
+
+            let imported = 0;
+            let failed = 0;
+
+            for (const date of missingDays) {
+                try {
+                    const formData = new FormData();
+                    formData.append('start_date', date);
+                    formData.append('end_date', date);
+
+                    const response = await fetch('{{ route('sales-import.accounting-import') }}', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'Accept': 'application/json',
+                        },
+                        body: formData
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        imported++;
+                        button.textContent = `Importing... (${imported}/${missingDays.length})`;
+                    } else {
+                        failed++;
+                    }
+                } catch (error) {
+                    failed++;
+                }
+            }
+
+            showNotification(`Accounting import complete: ${imported} succeeded, ${failed} failed`);
+            button.textContent = 'All Done';
+            button.className = 'w-full bg-green-600 text-white px-4 py-2 rounded-md cursor-default';
+            button.onclick = null;
+
+            setTimeout(() => {
+                document.getElementById('acct-gap-finder-form').dispatchEvent(new Event('submit'));
+            }, 1000);
+        }
+
+        // Accounting Import Form
+        document.getElementById('acct-import-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const button = e.target.querySelector('button[type="submit"]');
+            const hideLoading = showLoading(button);
+
+            const formData = new FormData(e.target);
+
+            try {
+                const response = await fetch('{{ route('sales-import.accounting-import') }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                    },
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    const resultsDiv = document.getElementById('acct-import-results');
+                    const dataDiv = document.getElementById('acct-import-data');
+                    resultsDiv.classList.remove('hidden');
+                    dataDiv.innerHTML = `
+                        <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4">
+                            <p class="font-medium">Import completed in ${data.data.execution_time}s</p>
+                            <p class="text-sm mt-1">${data.data.days_processed} days processed, ${data.data.records_in_range} records in range${data.data.force ? ' (forced re-import)' : ''}</p>
+                        </div>
+                    `;
+                    showNotification(`Accounting import completed! ${data.data.days_processed} days, ${data.data.records_in_range} records`);
+                    setTimeout(() => location.reload(), 2000);
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            } catch (error) {
+                showNotification('Accounting import failed: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        });
 
         // Daily Totals Form
         document.getElementById('daily-totals-form').addEventListener('submit', async (e) => {

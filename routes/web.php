@@ -507,6 +507,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/category-validation', [SalesImportController::class, 'getCategoryValidation'])->name('category-validation');
         Route::post('/find-gaps', [SalesImportController::class, 'findGaps'])->name('find-gaps');
         Route::post('/find-daily-discrepancies', [SalesImportController::class, 'findDailyDiscrepancies'])->name('find-daily-discrepancies');
+
+        // Accounting data routes (sales_accounting_daily + stock_transfer_daily)
+        Route::post('/accounting-import', [SalesImportController::class, 'runAccountingImport'])->name('accounting-import');
+        Route::post('/accounting-gaps', [SalesImportController::class, 'findAccountingGaps'])->name('accounting-gaps');
     });
 
     // Udea scraping test routes

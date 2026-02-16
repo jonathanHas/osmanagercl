@@ -6,6 +6,7 @@ use App\Models\SalesDailySummary;
 use App\Models\SalesImportLog;
 use App\Models\SalesMonthlySummary;
 use App\Repositories\OptimizedSalesRepository;
+use App\Services\SalesAccountingImportService;
 use App\Services\SalesImportService;
 use App\Services\SalesValidationService;
 use Carbon\Carbon;
@@ -21,14 +22,18 @@ class SalesImportController extends Controller
 
     protected $validationService;
 
+    protected $accountingImportService;
+
     public function __construct(
         OptimizedSalesRepository $optimizedRepository,
         SalesImportService $importService,
-        SalesValidationService $validationService
+        SalesValidationService $validationService,
+        SalesAccountingImportService $accountingImportService
     ) {
         $this->optimizedRepository = $optimizedRepository;
         $this->importService = $importService;
         $this->validationService = $validationService;
+        $this->accountingImportService = $accountingImportService;
     }
 
     /**
@@ -63,13 +68,24 @@ class SalesImportController extends Controller
             $performanceData['execution_time_ms'] = round((microtime(true) - $startTime) * 1000, 2);
         }
 
+        // Accounting data stats
+        $accountingStats = DB::table('sales_accounting_daily')
+            ->selectRaw('COUNT(*) as record_count, MIN(sale_date) as earliest, MAX(sale_date) as latest, COUNT(DISTINCT sale_date) as day_count')
+            ->first();
+
+        $transferStats = DB::table('stock_transfer_daily')
+            ->selectRaw('COUNT(*) as record_count, MIN(transfer_date) as earliest, MAX(transfer_date) as latest, COUNT(DISTINCT transfer_date) as day_count')
+            ->first();
+
         return view('sales-import.index', compact(
             'recentImports',
             'dailyRecordCount',
             'monthlyRecordCount',
             'latestImport',
             'dateRange',
-            'performanceData'
+            'performanceData',
+            'accountingStats',
+            'transferStats'
         ));
     }
 
@@ -472,6 +488,144 @@ class SalesImportController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Daily discrepancy check failed: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Run accounting data import (sales_accounting_daily + stock_transfer_daily)
+     */
+    public function runAccountingImport(Request $request)
+    {
+        $request->validate([
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+            'force' => 'nullable|boolean',
+        ]);
+
+        try {
+            $startDate = Carbon::parse($request->start_date);
+            $endDate = Carbon::parse($request->end_date);
+            $force = (bool) $request->get('force', false);
+
+            $startTime = microtime(true);
+            $totalInserted = 0;
+            $totalUpdated = 0;
+            $daysProcessed = 0;
+
+            if ($force) {
+                $current = $startDate->copy();
+                while ($current->lte($endDate)) {
+                    $result = $this->accountingImportService->forceImportDay($current);
+                    $totalInserted += $result['inserted'];
+                    $totalUpdated += $result['updated'];
+                    $daysProcessed++;
+                    $current->addDay();
+                }
+            } else {
+                // ensureDataExists skips already-imported days
+                $this->accountingImportService->ensureDataExists($startDate, $endDate);
+
+                // Count what was imported by checking records in range
+                $totalInserted = DB::table('sales_accounting_daily')
+                    ->whereBetween('sale_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                    ->count();
+                $totalInserted += DB::table('stock_transfer_daily')
+                    ->whereBetween('transfer_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                    ->count();
+
+                $daysProcessed = DB::table('sales_accounting_daily')
+                    ->whereBetween('sale_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                    ->distinct()
+                    ->count('sale_date');
+            }
+
+            $executionTime = round(microtime(true) - $startTime, 2);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Accounting import completed successfully!',
+                'data' => [
+                    'records_in_range' => $totalInserted,
+                    'days_processed' => $daysProcessed,
+                    'execution_time' => $executionTime,
+                    'force' => $force,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Accounting import failed: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Find gaps in sales_accounting_daily by comparing with POS dates
+     */
+    public function findAccountingGaps(Request $request)
+    {
+        $request->validate([
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+        ]);
+
+        try {
+            $startDate = Carbon::parse($request->start_date);
+            $endDate = Carbon::parse($request->end_date);
+            $startTime = microtime(true);
+
+            $start = $startDate->format('Y-m-d');
+            $end = $endDate->format('Y-m-d');
+
+            // Get dates that have data in POS (excluding Kitchen/Coffee for main sales)
+            $posDates = collect(DB::connection('pos')->select("
+                SELECT DISTINCT DATE_FORMAT(DATENEW, '%Y-%m-%d') as sale_date
+                FROM RECEIPTS
+                WHERE DATENEW >= ? AND DATENEW < DATE_ADD(?, INTERVAL 1 DAY)
+                ORDER BY sale_date
+            ", [$start, $end]))->pluck('sale_date')->toArray();
+
+            // Get dates already in sales_accounting_daily
+            $importedDates = DB::table('sales_accounting_daily')
+                ->whereBetween('sale_date', [$start, $end])
+                ->distinct()
+                ->pluck('sale_date')
+                ->map(fn ($d) => Carbon::parse($d)->format('Y-m-d'))
+                ->toArray();
+
+            // Get dates in stock_transfer_daily
+            $transferDates = DB::table('stock_transfer_daily')
+                ->whereBetween('transfer_date', [$start, $end])
+                ->distinct()
+                ->pluck('transfer_date')
+                ->map(fn ($d) => Carbon::parse($d)->format('Y-m-d'))
+                ->toArray();
+
+            // Missing = in POS but not in sales_accounting_daily
+            $missingDays = array_values(array_diff($posDates, $importedDates));
+            $missingTransferDays = array_values(array_diff($posDates, $transferDates));
+
+            $executionTime = round(microtime(true) - $startTime, 2);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'pos_count' => count($posDates),
+                    'imported_count' => count($importedDates),
+                    'transfer_imported_count' => count($transferDates),
+                    'missing_count' => count($missingDays),
+                    'missing_transfer_count' => count($missingTransferDays),
+                    'missing_days' => $missingDays,
+                    'missing_transfer_days' => $missingTransferDays,
+                    'execution_time_seconds' => $executionTime,
+                    'status' => count($missingDays) === 0 ? 'complete' : 'gaps_found',
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Accounting gap finder failed: '.$e->getMessage(),
             ], 500);
         }
     }
