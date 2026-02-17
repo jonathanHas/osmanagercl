@@ -117,8 +117,10 @@ class RtdSubmission extends Model
                     }
                 }
 
-                // If this VAT return pre-dates the paperin fix, apply the deduction now
-                if (! isset($salesVatData['paperin_adjustment'])) {
+                // Deduct paperin (gift voucher) gross from 0% — by_rate stores pre-deduction figures
+                if (isset($salesVatData['paperin_adjustment'])) {
+                    $paperinGross = (float) $salesVatData['paperin_adjustment'];
+                } else {
                     $paperinGross = (float) DB::table('sales_accounting_daily')
                         ->where('payment_type', 'paperin')
                         ->whereBetween('sale_date', [
@@ -126,10 +128,10 @@ class RtdSubmission extends Model
                             $vatReturn->period_end->format('Y-m-d'),
                         ])
                         ->sum('gross_amount');
+                }
 
-                    if ($paperinGross > 0) {
-                        $sales['0'] -= $paperinGross;
-                    }
+                if ($paperinGross > 0) {
+                    $sales['0'] -= $paperinGross;
                 }
             } else {
                 // Fallback: query sales_accounting_daily for this period
