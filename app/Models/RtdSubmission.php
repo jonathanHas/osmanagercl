@@ -116,6 +116,21 @@ class RtdSubmission extends Model
                         $sales[$key] += (float) $totalNet;
                     }
                 }
+
+                // If this VAT return pre-dates the paperin fix, apply the deduction now
+                if (! isset($salesVatData['paperin_adjustment'])) {
+                    $paperinGross = (float) DB::table('sales_accounting_daily')
+                        ->where('payment_type', 'paperin')
+                        ->whereBetween('sale_date', [
+                            $vatReturn->period_start->format('Y-m-d'),
+                            $vatReturn->period_end->format('Y-m-d'),
+                        ])
+                        ->sum('gross_amount');
+
+                    if ($paperinGross > 0) {
+                        $sales['0'] -= $paperinGross;
+                    }
+                }
             } else {
                 // Fallback: query sales_accounting_daily for this period
                 $usedFallback = true;

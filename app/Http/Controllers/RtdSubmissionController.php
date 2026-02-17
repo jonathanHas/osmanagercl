@@ -6,7 +6,6 @@ use App\Models\Invoice;
 use App\Models\RtdSubmission;
 use App\Models\VatReturn;
 use App\Services\SalesAccountingImportService;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -253,7 +252,7 @@ class RtdSubmissionController extends Controller
         $date = $submission->submitted_date ? $submission->submitted_date->format('d/m/Y') : $submission->created_at->format('d/m/Y');
         $reference = $submission->reference_number ?? 'N/A';
 
-        $filename = 'RTD-' . $submission->period_start->format('Y') . '-submission-' . $submission->id . '.csv';
+        $filename = 'RTD-'.$submission->period_start->format('Y').'-submission-'.$submission->id.'.csv';
 
         return new StreamedResponse(function () use ($submission, $goods, $service, $excluded, $excludedTotal, $goodsTotal, $serviceTotal, $euAcquisitions, $euAcquisitionsTotal, $nonEuAcquisitions, $nonEuAcquisitionsTotal, $postponedAccounting, $sales, $salesTotal, $periodStart, $periodEnd, $status, $date, $reference) {
             $handle = fopen('php://output', 'w');
@@ -557,6 +556,25 @@ class RtdSubmissionController extends Controller
                     if ($key !== null) {
                         $detail['sales_by_rate'][$key] += (float) $totalNet;
                         $aggregatedSales[$key] += (float) $totalNet;
+                    }
+                }
+
+                // If this VAT return pre-dates the paperin fix, apply the deduction now
+                $detail['has_paperin_adjustment'] = isset($salesVatData['paperin_adjustment']);
+                if (! isset($salesVatData['paperin_adjustment'])) {
+                    $paperinGross = (float) DB::table('sales_accounting_daily')
+                        ->where('payment_type', 'paperin')
+                        ->whereBetween('sale_date', [
+                            $vatReturn->period_start->format('Y-m-d'),
+                            $vatReturn->period_end->format('Y-m-d'),
+                        ])
+                        ->sum('gross_amount');
+
+                    $detail['paperin_gross'] = $paperinGross;
+                    $detail['paperin_retrofix'] = true;
+                    if ($paperinGross > 0) {
+                        $detail['sales_by_rate']['0'] -= $paperinGross;
+                        $aggregatedSales['0'] -= $paperinGross;
                     }
                 }
             } else {
