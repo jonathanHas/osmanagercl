@@ -4,7 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Invoice;
 use App\Models\RtdSubmission;
+use App\Models\VatReturn;
+use App\Services\SalesAccountingImportService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RtdSubmissionController extends Controller
@@ -487,6 +491,235 @@ class RtdSubmissionController extends Controller
             'message' => 'Invoice removed from submission.',
             'invoice_count' => $submission->invoices()->count(),
             'totals_snapshot' => $submission->totals_snapshot,
+        ]);
+    }
+
+    /**
+     * Debug diagnostic page for Section 1 sales data calculation.
+     * Replays the aggregateSalesFromVatReturns() logic with full transparency.
+     */
+    public function debugSales(RtdSubmission $submission)
+    {
+        $periodStart = $submission->period_start;
+        $periodEnd = $submission->period_end;
+
+        // Ensure sales_accounting_daily is populated
+        app(SalesAccountingImportService::class)->ensureDataExists($periodStart, $periodEnd);
+
+        // VAT rate mapping (same as RtdSubmission::aggregateSalesFromVatReturns)
+        $rateToKey = [
+            '0' => '0', '0.0' => '0', '0.0000' => '0',
+            '0.09' => '9', '0.0900' => '9',
+            '0.135' => '13.5', '0.1350' => '13.5',
+            '0.23' => '23', '0.2300' => '23',
+        ];
+        $defaultRates = ['0' => 0, '9' => 0, '13.5' => 0, '23' => 0];
+
+        // 1. Find VAT returns in period
+        $vatReturns = VatReturn::where('period_start', '>=', $periodStart)
+            ->where('period_end', '<=', $periodEnd)
+            ->orderBy('period_start')
+            ->get();
+
+        // 2. Process each VAT return (replay Tier 1 / Tier 2 logic)
+        $vatReturnDetails = [];
+        $aggregatedSales = $defaultRates;
+
+        foreach ($vatReturns as $vatReturn) {
+            $detail = [
+                'id' => $vatReturn->id,
+                'return_period' => $vatReturn->return_period,
+                'period_start' => $vatReturn->period_start->format('Y-m-d'),
+                'period_end' => $vatReturn->period_end->format('Y-m-d'),
+                'status' => $vatReturn->status,
+                'has_sales_vat_data' => ! empty($vatReturn->sales_vat_data),
+                'has_by_rate' => ! empty($vatReturn->sales_vat_data['by_rate'] ?? null),
+                'tier_used' => null,
+                'sales_by_rate' => $defaultRates,
+                'paperin_gross' => 0,
+                'raw_sales_vat_data' => $vatReturn->sales_vat_data,
+            ];
+
+            $salesVatData = $vatReturn->sales_vat_data;
+
+            if ($salesVatData && ! empty($salesVatData['by_rate'])) {
+                // Tier 1: persisted VAT3 data
+                $detail['tier_used'] = 1;
+                foreach ($salesVatData['by_rate'] as $rateData) {
+                    $vatRate = is_array($rateData) ? ($rateData['vat_rate'] ?? null) : (is_object($rateData) ? $rateData->vat_rate : null);
+                    $totalNet = is_array($rateData) ? ($rateData['total_net'] ?? 0) : (is_object($rateData) ? ($rateData->total_net ?? 0) : 0);
+
+                    if ($vatRate === null) {
+                        continue;
+                    }
+
+                    $key = $rateToKey[(string) $vatRate] ?? null;
+                    if ($key !== null) {
+                        $detail['sales_by_rate'][$key] += (float) $totalNet;
+                        $aggregatedSales[$key] += (float) $totalNet;
+                    }
+                }
+            } else {
+                // Tier 2: fallback to sales_accounting_daily for this VAT return's period
+                $detail['tier_used'] = 2;
+                $periodSales = DB::table('sales_accounting_daily')
+                    ->select('vat_rate', DB::raw('SUM(net_amount) as total_net'))
+                    ->whereBetween('sale_date', [
+                        $vatReturn->period_start->format('Y-m-d'),
+                        $vatReturn->period_end->format('Y-m-d'),
+                    ])
+                    ->groupBy('vat_rate')
+                    ->get();
+
+                foreach ($periodSales as $row) {
+                    $key = $rateToKey[(string) $row->vat_rate] ?? null;
+                    if ($key !== null) {
+                        $detail['sales_by_rate'][$key] += (float) $row->total_net;
+                        $aggregatedSales[$key] += (float) $row->total_net;
+                    }
+                }
+
+                $paperinGross = (float) DB::table('sales_accounting_daily')
+                    ->where('payment_type', 'paperin')
+                    ->whereBetween('sale_date', [
+                        $vatReturn->period_start->format('Y-m-d'),
+                        $vatReturn->period_end->format('Y-m-d'),
+                    ])
+                    ->sum('gross_amount');
+
+                $detail['paperin_gross'] = $paperinGross;
+                if ($paperinGross > 0) {
+                    $detail['sales_by_rate']['0'] -= $paperinGross;
+                    $aggregatedSales['0'] -= $paperinGross;
+                }
+            }
+
+            $vatReturnDetails[] = $detail;
+        }
+
+        // 3. Detect coverage gaps
+        $coveredRanges = $vatReturns->map(fn ($vr) => [
+            'start' => $vr->period_start,
+            'end' => $vr->period_end,
+        ])->sortBy('start')->values();
+
+        $gaps = [];
+        $cursor = $periodStart->copy();
+
+        foreach ($coveredRanges as $range) {
+            if ($cursor->lt($range['start'])) {
+                $gaps[] = [
+                    'start' => $cursor->format('Y-m-d'),
+                    'end' => $range['start']->copy()->subDay()->format('Y-m-d'),
+                ];
+            }
+            if ($range['end']->gte($cursor)) {
+                $cursor = $range['end']->copy()->addDay();
+            }
+        }
+
+        if ($cursor->lte($periodEnd)) {
+            $gaps[] = [
+                'start' => $cursor->format('Y-m-d'),
+                'end' => $periodEnd->format('Y-m-d'),
+            ];
+        }
+
+        // 4. Calculate what each gap would contribute from sales_accounting_daily
+        $gapDetails = [];
+        foreach ($gaps as $gap) {
+            $gapSales = DB::table('sales_accounting_daily')
+                ->select('vat_rate', DB::raw('SUM(net_amount) as total_net'))
+                ->whereBetween('sale_date', [$gap['start'], $gap['end']])
+                ->groupBy('vat_rate')
+                ->get();
+
+            $gapRates = $defaultRates;
+            foreach ($gapSales as $row) {
+                $key = $rateToKey[(string) $row->vat_rate] ?? null;
+                if ($key !== null) {
+                    $gapRates[$key] += (float) $row->total_net;
+                }
+            }
+
+            $paperinGross = (float) DB::table('sales_accounting_daily')
+                ->where('payment_type', 'paperin')
+                ->whereBetween('sale_date', [$gap['start'], $gap['end']])
+                ->sum('gross_amount');
+
+            if ($paperinGross > 0) {
+                $gapRates['0'] -= $paperinGross;
+            }
+
+            $gapDetails[] = [
+                'start' => $gap['start'],
+                'end' => $gap['end'],
+                'sales_by_rate' => $gapRates,
+                'paperin_gross' => $paperinGross,
+                'total' => round(array_sum($gapRates), 2),
+            ];
+        }
+
+        // 5. Reference: full-period sales_accounting_daily query (what sales accounting report uses)
+        $referenceSales = $defaultRates;
+        $refData = DB::table('sales_accounting_daily')
+            ->select('vat_rate', DB::raw('SUM(net_amount) as total_net'))
+            ->whereBetween('sale_date', [$periodStart->format('Y-m-d'), $periodEnd->format('Y-m-d')])
+            ->groupBy('vat_rate')
+            ->get();
+
+        foreach ($refData as $row) {
+            $key = $rateToKey[(string) $row->vat_rate] ?? null;
+            if ($key !== null) {
+                $referenceSales[$key] += (float) $row->total_net;
+            }
+        }
+
+        $refPaperin = (float) DB::table('sales_accounting_daily')
+            ->where('payment_type', 'paperin')
+            ->whereBetween('sale_date', [$periodStart->format('Y-m-d'), $periodEnd->format('Y-m-d')])
+            ->sum('gross_amount');
+
+        if ($refPaperin > 0) {
+            $referenceSales['0'] -= $refPaperin;
+        }
+
+        // Round everything
+        foreach ($referenceSales as $k => $v) {
+            $referenceSales[$k] = round($v, 2);
+        }
+        foreach ($aggregatedSales as $k => $v) {
+            $aggregatedSales[$k] = round($v, 2);
+        }
+
+        // 6. Current snapshot values
+        $snapshotSales = $submission->totals_snapshot['sales'] ?? $defaultRates;
+        $snapshotSource = $submission->totals_snapshot['sales_source'] ?? 'unknown';
+        $snapshotVatCount = $submission->totals_snapshot['vat_returns_count'] ?? 0;
+
+        // 7. What the "fixed" total would be (aggregated + gaps)
+        $fixedSales = $aggregatedSales;
+        foreach ($gapDetails as $gap) {
+            foreach ($gap['sales_by_rate'] as $rate => $amount) {
+                $fixedSales[$rate] = round(($fixedSales[$rate] ?? 0) + $amount, 2);
+            }
+        }
+
+        return view('rtd.submissions.debug-sales', [
+            'submission' => $submission,
+            'periodStart' => $periodStart,
+            'periodEnd' => $periodEnd,
+            'vatReturns' => $vatReturnDetails,
+            'vatReturnCount' => $vatReturns->count(),
+            'aggregatedSales' => $aggregatedSales,
+            'gaps' => $gapDetails,
+            'hasGaps' => ! empty($gapDetails),
+            'referenceSales' => $referenceSales,
+            'referencePaperin' => $refPaperin,
+            'snapshotSales' => $snapshotSales,
+            'snapshotSource' => $snapshotSource,
+            'snapshotVatCount' => $snapshotVatCount,
+            'fixedSales' => $fixedSales,
         ]);
     }
 }

@@ -181,6 +181,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/submissions/{submission}', [\App\Http\Controllers\RtdSubmissionController::class, 'show'])->name('submissions.show');
         Route::get('/submissions/{submission}/report', [\App\Http\Controllers\RtdSubmissionController::class, 'report'])->name('submissions.report');
         Route::get('/submissions/{submission}/export-csv', [\App\Http\Controllers\RtdSubmissionController::class, 'exportCsv'])->name('submissions.export-csv');
+        Route::get('/submissions/{submission}/debug-sales', [\App\Http\Controllers\RtdSubmissionController::class, 'debugSales'])->name('submissions.debug-sales');
         Route::post('/submissions/{submission}/submit', [\App\Http\Controllers\RtdSubmissionController::class, 'markSubmitted'])->name('submissions.submit');
         Route::post('/submissions/{submission}/recalculate', [\App\Http\Controllers\RtdSubmissionController::class, 'recalculate'])->name('submissions.recalculate');
         Route::post('/submissions/{submission}/add-invoices', [\App\Http\Controllers\RtdSubmissionController::class, 'addInvoices'])->name('submissions.add-invoices');

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\SalesAccountingImportService;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -153,6 +154,41 @@ class RtdSubmission extends Model
             }
         }
 
+        // Fill coverage gaps: date ranges within the RTD period not covered by any VAT return
+        if ($vatReturns->isNotEmpty()) {
+            $coveredRanges = $vatReturns->map(fn ($vr) => [
+                'start' => $vr->period_start,
+                'end' => $vr->period_end,
+            ])->sortBy('start')->values();
+
+            $gaps = $this->findDateGaps($this->period_start, $this->period_end, $coveredRanges);
+
+            foreach ($gaps as $gap) {
+                $usedFallback = true;
+                $gapSales = DB::table('sales_accounting_daily')
+                    ->select('vat_rate', DB::raw('SUM(net_amount) as total_net'))
+                    ->whereBetween('sale_date', [$gap['start'], $gap['end']])
+                    ->groupBy('vat_rate')
+                    ->get();
+
+                foreach ($gapSales as $row) {
+                    $key = $rateToKey[(string) $row->vat_rate] ?? null;
+                    if ($key !== null) {
+                        $sales[$key] += (float) $row->total_net;
+                    }
+                }
+
+                $paperinGross = (float) DB::table('sales_accounting_daily')
+                    ->where('payment_type', 'paperin')
+                    ->whereBetween('sale_date', [$gap['start'], $gap['end']])
+                    ->sum('gross_amount');
+
+                if ($paperinGross > 0) {
+                    $sales['0'] -= $paperinGross;
+                }
+            }
+        }
+
         // If no VAT returns found, fall back to sales_accounting_daily directly
         if ($vatReturns->isEmpty()) {
             $directSales = DB::table('sales_accounting_daily')
@@ -205,6 +241,37 @@ class RtdSubmission extends Model
             'sales_source' => $source,
             'vat_returns_count' => $vatReturns->count(),
         ];
+    }
+
+    /**
+     * Find date gaps within [periodStart, periodEnd] not covered by any of the sorted covered ranges.
+     * Returns array of ['start' => 'Y-m-d', 'end' => 'Y-m-d'] for each gap.
+     */
+    private function findDateGaps(Carbon $periodStart, Carbon $periodEnd, $coveredRanges): array
+    {
+        $gaps = [];
+        $cursor = $periodStart->copy();
+
+        foreach ($coveredRanges as $range) {
+            if ($cursor->lt($range['start'])) {
+                $gaps[] = [
+                    'start' => $cursor->format('Y-m-d'),
+                    'end' => $range['start']->copy()->subDay()->format('Y-m-d'),
+                ];
+            }
+            if ($range['end']->gte($cursor)) {
+                $cursor = $range['end']->copy()->addDay();
+            }
+        }
+
+        if ($cursor->lte($periodEnd)) {
+            $gaps[] = [
+                'start' => $cursor->format('Y-m-d'),
+                'end' => $periodEnd->format('Y-m-d'),
+            ];
+        }
+
+        return $gaps;
     }
 
     /**
