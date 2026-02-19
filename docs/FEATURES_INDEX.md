@@ -434,7 +434,7 @@ VAT categorization system for Udea, Dynamis, and IIH invoices to support Irish V
 - **Batch Recomputation**: Update all affected invoices when fallbacks are added
 - **Invoice Integration**: RTD summary section on invoice show page
 - **Submission Tracking** (NEW! 2026-02-10, Updated 2026-02-13): Create submissions linking frozen invoices to Revenue filings, track which invoices were included, auto-surface unsubmitted invoices for next filing, import newly frozen invoices into existing draft submissions
-- **Submission Paperin Fix** (FIX 2026-02-16): Sales figures now correctly deduct paperin (gift voucher redemption) gross from 0% net across all data source tiers, fixing D1 overstatement
+- **Submission Paperin Fix** (FIX 2026-02-16, Updated 2026-02-17): Sales figures now correctly deduct paperin (gift voucher redemption) gross from 0% net across all data source tiers including Tier 1 (`by_rate` stores pre-deduction figures), fixing D1 overstatement
 
 📖 [RTD System Documentation](./features/rtd-system.md)
 

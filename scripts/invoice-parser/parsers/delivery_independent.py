@@ -237,6 +237,39 @@ class DeliveryIndependentParser:
 
         return totals
 
+    def _cross_validate_items(self, text: str, parsed_items: List[Dict], result: Dict) -> None:
+        """Cross-validate parsed items against raw PDF text.
+
+        Scans the PDF text for product code patterns and compares against
+        the codes actually parsed. Reports any codes found in the PDF
+        but missing from the parsed output as warnings.
+        """
+        # Extract all potential product codes from the raw PDF text
+        # IIH codes are typically 4-6 digits followed by A or B (products) or D (DRS deposits)
+        code_pattern = re.compile(r'^(\d{4,6}[ABD]?)\s+', re.MULTILINE)
+        pdf_codes = set(m.group(1) for m in code_pattern.finditer(text))
+
+        parsed_codes = set(item['code'] for item in parsed_items)
+
+        # Find codes in PDF but not parsed
+        missing_codes = pdf_codes - parsed_codes
+
+        if missing_codes:
+            # Look up the full line for each missing code to provide context
+            for code in sorted(missing_codes):
+                # Find the line in the PDF text
+                line_pattern = re.compile(rf'^{re.escape(code)}\s+(.+)$', re.MULTILINE)
+                line_match = line_pattern.search(text)
+                context = line_match.group(1).strip()[:60] if line_match else "unknown"
+
+                result["warnings"].append(
+                    f"Item {code} found in PDF text but missing from parsed output: {context}"
+                )
+                self.log(f"Missing item: {code} - {context}", "WARNING")
+
+            result["metadata"]["missing_codes"] = sorted(missing_codes)
+            result["metadata"]["missing_code_count"] = len(missing_codes)
+
     def parse_invoice(self, pdf_path: str) -> Dict[str, Any]:
         """
         Parse a delivery invoice PDF and return structured data.
@@ -280,13 +313,18 @@ class DeliveryIndependentParser:
                 })
                 return result
 
-            # Keywords to skip
+            # Keywords to skip (non-product lines)
+            # NOTE: Use whole words carefully — "Nett" was previously matching "Nettle" products
             skip_terms = [
                 "Invoice", "Deliver To", "Order Ref", "Tax Code", "Regular Price", "Offer Price",
                 "Page", "Notes:", "EMAIL:", "Total:", "Account No:", "TEL:", "FAX:",
                 "VAT Reg No.", "All goods remain the property",
                 "Tax Code Rate Taxable Tax DRS Totals", "Gross Total", "Customer Ref:",
-                "Subtotal", "Carriage", "Nett", "Product Brand Description"
+                "Subtotal", "Carriage", "Product Brand Description"
+            ]
+            # Patterns that need word-boundary matching (to avoid matching substrings in product names)
+            skip_patterns = [
+                re.compile(r'\bNett\b'),  # "Nett" total line, but not "Nettle"
             ]
 
             # Regex patterns (from strict to relaxed)
@@ -327,6 +365,9 @@ class DeliveryIndependentParser:
 
                 # Skip known non-product lines
                 if any(skip_term in line for skip_term in skip_terms):
+                    self.stats['skipped_lines'] += 1
+                    continue
+                if any(pat.search(line) for pat in skip_patterns):
                     self.stats['skipped_lines'] += 1
                     continue
 
@@ -450,6 +491,9 @@ class DeliveryIndependentParser:
 
             result["totals"]["totals_match"] = products_match and grand_match
             result["totals"]["discrepancy"] = round(discrepancy, 2) if discrepancy is not None else None
+
+            # Cross-validate: check for item codes in PDF text that weren't parsed
+            self._cross_validate_items(text, items, result)
 
             result["success"] = len(items) > 0
             result["metadata"]["stats"] = self.stats

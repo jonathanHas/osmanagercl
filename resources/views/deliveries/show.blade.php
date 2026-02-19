@@ -296,15 +296,70 @@
                         <svg class="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
                         </svg>
-                        <div>
+                        <div class="w-full">
                             <h4 class="text-sm font-semibold text-red-800 dark:text-red-200 mb-1">Parsing Discrepancy Detected</h4>
                             <p class="text-sm text-red-700 dark:text-red-300">
-                                The parsed items total (€{{ number_format($delivery->calculated_total ?? 0, 2) }})
-                                does not match the invoice stated total (€{{ number_format($delivery->invoice_stated_total ?? 0, 2) }}).
+                                The parsed items total (&euro;{{ number_format($delivery->calculated_total ?? 0, 2) }})
+                                does not match the invoice stated total (&euro;{{ number_format($delivery->invoice_stated_total ?? 0, 2) }}).
                                 @if($delivery->total_discrepancy)
-                                    <span class="font-semibold">Difference: €{{ number_format($delivery->total_discrepancy, 2) }}</span>
+                                    <span class="font-semibold">Difference: &euro;{{ number_format($delivery->total_discrepancy, 2) }}</span>
                                 @endif
                             </p>
+
+                            {{-- Per-document breakdown when multiple documents have parsing metadata --}}
+                            @php
+                                $docsWithMetadata = $delivery->documents->filter(fn($doc) =>
+                                    $doc->parsing_metadata && isset($doc->parsing_metadata['grand_stated'])
+                                );
+                            @endphp
+                            @if($docsWithMetadata->count() > 1)
+                                <div class="mt-3 border-t border-red-200 dark:border-red-700 pt-2">
+                                    <p class="text-xs font-semibold text-red-700 dark:text-red-300 mb-1">Per-document breakdown:</p>
+                                    <div class="space-y-1">
+                                        @foreach($docsWithMetadata as $doc)
+                                            @php
+                                                $meta = $doc->parsing_metadata;
+                                                $docMatch = $meta['totals_match'] ?? true;
+                                                $docDiscrepancy = $meta['discrepancy'] ?? 0;
+                                                $docStated = $meta['grand_stated'] ?? null;
+                                                $docCalculated = $meta['grand_calculated'] ?? null;
+                                            @endphp
+                                            <div class="flex items-center gap-2 text-xs {{ $docMatch ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-300' }}">
+                                                @if($docMatch)
+                                                    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                                    </svg>
+                                                @else
+                                                    <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                                                    </svg>
+                                                @endif
+                                                <span class="font-medium">{{ $doc->original_filename }}:</span>
+                                                @if($docStated !== null)
+                                                    <span>
+                                                        Stated &euro;{{ number_format($docStated, 2) }}
+                                                        vs Parsed &euro;{{ number_format($docCalculated ?? 0, 2) }}
+                                                        @if(!$docMatch && $docDiscrepancy)
+                                                            <span class="font-semibold">(diff: &euro;{{ number_format($docDiscrepancy, 2) }})</span>
+                                                        @endif
+                                                    </span>
+                                                @else
+                                                    <span>No stated total available</span>
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @elseif($docsWithMetadata->count() === 1)
+                                @php
+                                    $doc = $docsWithMetadata->first();
+                                    $meta = $doc->parsing_metadata;
+                                @endphp
+                                <p class="text-xs text-red-600 dark:text-red-400 mt-1">
+                                    Document: <span class="font-medium">{{ $doc->original_filename }}</span>
+                                </p>
+                            @endif
+
                             <p class="text-xs text-red-600 dark:text-red-400 mt-1">
                                 Some items may not have been parsed correctly. Review the delivery items for completeness.
                             </p>

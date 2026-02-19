@@ -9,7 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **RTD Submission: Paperin adjustment missing from sales figures** (2026-02-16)
+- **RTD Submission: Paperin deduction missing from Tier 1 sales figures** (2026-02-17)
+  - `VatReturn.sales_vat_data['by_rate']` stores 0% net **before** paperin deduction — the `paperin_adjustment` key records the amount but `by_rate` is never adjusted
+  - Tier 1 (persisted VAT data) was trusting `by_rate` figures blindly, inflating 0% by the paperin gross (e.g., €2,077.10)
+  - Now deducts paperin from 0% for all Tier 1 returns: uses stored `paperin_adjustment` value when present, queries `sales_accounting_daily` for older returns without it
+  - Debug page also updated to show paperin source (stored vs queried) for each Tier 1 VAT return
+  - **Files Modified**: `app/Models/RtdSubmission.php`, `app/Http/Controllers/RtdSubmissionController.php`
+
+- **RTD Submission: Paperin adjustment missing from Tier 2/3 sales figures** (2026-02-16)
   - Paperin (gift voucher redemption) gross amount was not being deducted from 0% sales in Tier 2 (sales_accounting_daily fallback) and Tier 3 (no VAT returns) code paths
   - Caused D1 (0% Home) to be overstated by the paperin gross total (e.g., €921.61)
   - Now correctly deducts paperin gross from 0% net in all code paths, matching `VatReturnController::getSalesVatData()` logic

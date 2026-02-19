@@ -14,6 +14,34 @@
             </div>
         </div>
 
+        {{-- Search Bar --}}
+        <div class="mb-6">
+            <form method="GET" action="{{ route('rtd-fallbacks.index') }}" class="flex gap-2">
+                <div class="flex-1">
+                    <input type="text"
+                           name="search"
+                           value="{{ $search ?? '' }}"
+                           placeholder="Search by article code, supplier name, or description..."
+                           class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                </div>
+                <button type="submit"
+                        class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded">
+                    Search
+                </button>
+                @if($search ?? false)
+                    <a href="{{ route('rtd-fallbacks.index') }}"
+                       class="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded">
+                        Clear
+                    </a>
+                @endif
+            </form>
+            @if($search ?? false)
+                <p class="text-gray-400 text-sm mt-2">
+                    Showing results for: <span class="text-white font-medium">{{ $search }}</span>
+                </p>
+            @endif
+        </div>
+
         {{-- Flash Messages --}}
         @if(session('success'))
             <div class="bg-green-600 text-white px-4 py-3 rounded mb-6">

@@ -487,14 +487,56 @@ class DeliveryController extends Controller
                 );
             }
 
+            // For single-file parses, build a synthetic file_results entry
+            // so the document save loop can store metadata consistently
+            if (! isset($result['file_results']) && isset($result['data']['totals'])) {
+                $t = $result['data']['totals'];
+                $result['file_results'] = [[
+                    'item_count' => $t['line_count'] ?? count($items),
+                    'products_total' => $t['products_total'] ?? $t['total_value'] ?? 0,
+                    'barrels_total' => $t['barrels_total'] ?? 0,
+                    'total_value' => $t['total_value'] ?? 0,
+                    'products_stated' => $t['products_stated'] ?? null,
+                    'barrels_stated' => $t['barrels_stated'] ?? null,
+                    'grand_stated' => $t['grand_stated'] ?? null,
+                    'products_calculated' => $t['products_calculated'] ?? null,
+                    'barrels_calculated' => $t['barrels_calculated'] ?? null,
+                    'grand_calculated' => $t['grand_calculated'] ?? null,
+                    'totals_match' => $t['totals_match'] ?? true,
+                    'discrepancy' => $t['discrepancy'] ?? null,
+                ]];
+            }
+
             // Save PDF documents before deleting temp files
+            $fileResults = $result['file_results'] ?? [];
             foreach ($storedPaths as $index => $path) {
                 if (file_exists($path)) {
+                    // Build per-file parsing metadata from file_results (matched by index)
+                    $fileParsingMetadata = null;
+                    if (isset($fileResults[$index])) {
+                        $fr = $fileResults[$index];
+                        $fileParsingMetadata = [
+                            'item_count' => $fr['item_count'] ?? null,
+                            'products_total' => $fr['products_total'] ?? null,
+                            'barrels_total' => $fr['barrels_total'] ?? null,
+                            'total_value' => $fr['total_value'] ?? null,
+                            'products_stated' => $fr['products_stated'] ?? null,
+                            'barrels_stated' => $fr['barrels_stated'] ?? null,
+                            'grand_stated' => $fr['grand_stated'] ?? null,
+                            'products_calculated' => $fr['products_calculated'] ?? null,
+                            'barrels_calculated' => $fr['barrels_calculated'] ?? null,
+                            'grand_calculated' => $fr['grand_calculated'] ?? null,
+                            'totals_match' => $fr['totals_match'] ?? true,
+                            'discrepancy' => $fr['discrepancy'] ?? null,
+                        ];
+                    }
+
                     $this->saveDeliveryDocument(
                         $delivery,
                         $path,
                         $originalFilenames[$index],
-                        'invoice_pdf'
+                        'invoice_pdf',
+                        $fileParsingMetadata
                     );
                 }
             }
@@ -587,7 +629,8 @@ class DeliveryController extends Controller
         Delivery $delivery,
         string $tempFilePath,
         string $originalFilename,
-        string $documentType = 'invoice_pdf'
+        string $documentType = 'invoice_pdf',
+        ?array $parsingMetadata = null
     ): DeliveryDocument {
         $storedFilename = DeliveryDocument::generateStoredFilename($originalFilename);
         $filePath = DeliveryDocument::generateFilePath($delivery->id, $storedFilename);
@@ -623,6 +666,7 @@ class DeliveryController extends Controller
             'document_type' => $documentType,
             'is_primary' => $delivery->documents()->count() === 0,
             'uploaded_by' => auth()->id(),
+            'parsing_metadata' => $parsingMetadata,
         ]);
     }
 

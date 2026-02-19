@@ -54,7 +54,7 @@ Submissions track which frozen invoices were included in each RTD filing with Re
 - The next submission automatically shows invoices not yet linked to any previous submission
 - Submissions store a snapshot of VAT breakdown totals (T1 goods, T2 service, excluded) at creation time
 - Draft submissions allow adding and removing invoices; submitted ones are read-only
-- **Paperin Adjustment** (FIX 2026-02-16): Sales figures deduct paperin (gift voucher redemption) gross from 0% net to prevent double-counting revenue. Applied consistently across all three data source tiers (persisted VAT data, `sales_accounting_daily` fallback, and direct fallback)
+- **Paperin Adjustment** (FIX 2026-02-16, Updated 2026-02-17): Sales figures deduct paperin (gift voucher redemption) gross from 0% net to prevent double-counting revenue. Applied consistently across all three data source tiers. For Tier 1 (persisted VAT data), `by_rate` stores pre-deduction figures so paperin is always deducted — using the stored `paperin_adjustment` value when present, or querying `sales_accounting_daily` for older returns without it
 
 **Adding Invoices to Draft Submissions (NEW! 2026-02-13):**
 

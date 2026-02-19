@@ -480,13 +480,20 @@ class RtdResolutionService
         $breakdown = [
             // T1 goods for resale: always zero for service suppliers
             'goods_for_resale' => ['0' => 0, '9' => 0, '13.5' => 0, '23' => 0],
-            // All service amounts go into excluded (not contributing to T1)
+            // T2 service overhead: broken down by VAT rate for RtdSubmission
+            'service_overhead' => [
+                '0' => $serviceByVat['0'],
+                '9' => $serviceByVat['9'],
+                '13.5' => $serviceByVat['13.5'],
+                '23' => $serviceByVat['23'],
+            ],
+            // Excluded items (VAT only for service suppliers, no double-counting)
             'excluded' => [
                 'freight' => 0,
                 'deposits' => 0,
                 'drs' => 0,
                 'vat' => $vatAmount,
-                'service_overhead' => round($serviceTotal, 2),
+                'service_overhead' => 0, // Not excluded - it's in service_overhead field above
             ],
             'unresolved' => ['count' => 0, 'net_total' => 0],
             'stats' => [

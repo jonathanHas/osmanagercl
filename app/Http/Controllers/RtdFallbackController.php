@@ -12,13 +12,25 @@ class RtdFallbackController extends Controller
     /**
      * List all fallback entries.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $fallbacks = RtdVatFallback::with(['creator', 'supplier'])
-            ->orderBy('article_code')
-            ->paginate(50);
+        $search = $request->get('search');
 
-        return view('rtd-fallbacks.index', compact('fallbacks'));
+        $fallbacks = RtdVatFallback::with(['creator', 'supplier'])
+            ->when($search, function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('article_code', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%")
+                        ->orWhereHas('supplier', function ($sq) use ($search) {
+                            $sq->where('name', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->orderBy('article_code')
+            ->paginate(50)
+            ->appends(['search' => $search]);
+
+        return view('rtd-fallbacks.index', compact('fallbacks', 'search'));
     }
 
     /**
