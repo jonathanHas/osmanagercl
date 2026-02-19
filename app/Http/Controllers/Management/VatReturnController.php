@@ -193,7 +193,7 @@ class VatReturnController extends Controller
                 'total_net' => $salesData->sum('total_net') - $paperinTotal,
                 'total_vat' => $salesData->sum('total_vat'),
                 'total_gross' => $salesData->sum('total_gross') - $paperinTotal,
-                'by_rate' => $salesData->keyBy(fn ($item) => (string) $item->vat_rate),
+                'by_rate' => $salesData->keyBy(fn ($item) => (string) (float) $item->vat_rate),
                 'data_source' => 'optimized',
                 'paperin_adjustment' => $paperinTotal,
             ];
@@ -248,7 +248,7 @@ class VatReturnController extends Controller
             $totalNet = collect($salesData)->sum('total_net');
             $totalVat = collect($salesData)->sum('total_vat');
 
-            $byRate = collect($salesData)->keyBy(fn ($item) => (string) $item->vat_rate);
+            $byRate = collect($salesData)->keyBy(fn ($item) => (string) (float) $item->vat_rate);
 
             // Deduct paperin from the 0% rate entry (matching sales accounting behavior)
             if ($paperinTotal > 0 && isset($byRate['0'])) {
@@ -385,7 +385,10 @@ class VatReturnController extends Controller
         // Build ROS fields from persisted sales data
         // For draft returns missing the paperin adjustment, recalculate from live data
         $salesData = $vatReturn->sales_vat_data;
-        if ($salesData && ! isset($salesData['paperin_adjustment']) && $vatReturn->canBeModified()) {
+        $byRateNetSum = collect($salesData['by_rate'] ?? [])->sum('total_net');
+        $needsRecalc = ! isset($salesData['paperin_adjustment'])
+            || abs($byRateNetSum - ($salesData['total_net'] ?? 0)) > 0.01;
+        if ($salesData && $needsRecalc && $vatReturn->canBeModified()) {
             $salesData = $this->getSalesVatData($vatReturn->period_start, $vatReturn->period_end);
             $salesVatData = [
                 'total_net' => $salesData['total_net'],
