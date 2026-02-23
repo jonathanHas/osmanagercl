@@ -247,6 +247,9 @@ When an invoice is assigned to a VAT return, deletion is protected to prevent st
 - **Fixed 2026-02-10**: Was caused by PHP truncating float array keys to integers in `keyBy('vat_rate')`. All rates (0, 0.09, 0.135, 0.23) collapsed to key `0`, showing only the last rate's data labeled as "0.0%". Fix: cast vat_rate to string before keying.
 - If this recurs, check `getSalesVatData()` in `VatReturnController` — ensure `keyBy` uses string cast.
 
+**Paperin Adjustment Missing from 0% Rate Row**
+- **Fixed 2026-02-19**: The 0.0% row showed unadjusted figures while the TOTAL was correct. Caused by SQLite returning `decimal(8,4)` values as strings (e.g., `"0.0000"`), making `isset($totals['by_rate']['0'])` fail silently. Fix: normalize `keyBy` with `(string) (float)` double-cast. The `show()` method now also detects stale stored data (by_rate sum != total_net) and recalculates automatically.
+
 **VAT Figures Don't Match**
 - Check if using same data source (optimized vs real-time)
 - Verify date ranges match exactly

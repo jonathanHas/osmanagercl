@@ -218,6 +218,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/suppliers/{supplier}/refresh-analytics', [\App\Http\Controllers\AccountingSuppliersController::class, 'refreshAnalytics'])->name('suppliers.refresh-analytics');
     Route::post('/suppliers/{supplier}/toggle-status', [\App\Http\Controllers\AccountingSuppliersController::class, 'toggleStatus'])->name('suppliers.toggle-status');
     Route::post('/suppliers/{supplier}/update-vat-classification', [\App\Http\Controllers\AccountingSuppliersController::class, 'updateVatClassification'])->name('suppliers.update-vat-classification');
+    Route::post('/suppliers/{supplier}/update-rtd-classification', [\App\Http\Controllers\AccountingSuppliersController::class, 'updateRtdClassification'])->name('suppliers.update-rtd-classification');
     Route::get('/suppliers/outstanding-report', [\App\Http\Controllers\SupplierOutstandingController::class, 'index'])->name('suppliers.outstanding-report');
     Route::get('/suppliers/outstanding-report/export', [\App\Http\Controllers\SupplierOutstandingController::class, 'exportCsv'])->name('suppliers.outstanding-report.export');
     Route::get('/suppliers/payments', [\App\Http\Controllers\SupplierPaymentsController::class, 'index'])->name('suppliers.payments');
@@ -708,6 +709,10 @@ Route::middleware('auth')->group(function () {
             Route::get('/', [\App\Http\Controllers\Management\VatDashboardController::class, 'index'])->name('index');
             Route::get('/history', [\App\Http\Controllers\Management\VatDashboardController::class, 'history'])->name('history');
         });
+
+        // VAT on Purchases Report
+        Route::get('/vat-purchases', [\App\Http\Controllers\Management\VatPurchasesController::class, 'index'])
+            ->name('vat-purchases.index');
 
         // VAT Returns Management
         Route::prefix('vat-returns')->name('vat-returns.')->group(function () {

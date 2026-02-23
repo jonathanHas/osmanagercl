@@ -167,6 +167,7 @@
                                     </a>
                                 </th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">VAT</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">RTD</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Contact</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                                     <a href="{{ request()->fullUrlWithQuery(['sort' => 'total_spent', 'direction' => $sortBy === 'total_spent' && $sortDirection === 'asc' ? 'desc' : 'asc']) }}" 
@@ -260,14 +261,21 @@
                                                 <option value="postponed_import" {{ $supplier->vat_treatment === 'postponed_import' ? 'selected' : '' }}>Import</option>
                                                 <option value="outside_scope_or_exempt" {{ $supplier->vat_treatment === 'outside_scope_or_exempt' ? 'selected' : '' }}>N/A</option>
                                             </select>
-                                            {{-- Purchase Use selector --}}
-                                            <select class="vat-select use-select text-xs bg-gray-700 border-gray-600 text-gray-300 rounded px-1 py-0.5 w-20"
-                                                    data-field="default_purchase_use" title="Purchase Use (T1/T2)">
-                                                <option value="resale" {{ ($supplier->default_purchase_use ?? 'resale') === 'resale' ? 'selected' : '' }}>T1</option>
-                                                <option value="overhead" {{ $supplier->default_purchase_use === 'overhead' ? 'selected' : '' }}>T2</option>
-                                                <option value="mixed" {{ $supplier->default_purchase_use === 'mixed' ? 'selected' : '' }}>Mix</option>
-                                            </select>
                                         </div>
+                                    </td>
+                                    {{-- RTD Classification Column --}}
+                                    <td class="px-2 py-2 whitespace-nowrap rtd-cell" data-supplier-id="{{ $supplier->id }}">
+                                        <select class="rtd-select text-xs bg-gray-700 border-gray-600 rounded px-1 py-0.5 w-20
+                                            @if($supplier->rtd_classification === 'goods_simple') text-green-400
+                                            @elseif($supplier->rtd_classification === 'goods_parser') text-blue-400
+                                            @elseif($supplier->rtd_classification === 'service_overhead') text-yellow-400
+                                            @else text-gray-400 @endif"
+                                                data-field="rtd_classification" title="RTD Classification">
+                                            <option value="not_applicable" {{ ($supplier->rtd_classification ?? 'not_applicable') === 'not_applicable' ? 'selected' : '' }}>N/A</option>
+                                            <option value="goods_simple" {{ $supplier->rtd_classification === 'goods_simple' ? 'selected' : '' }}>Simple</option>
+                                            <option value="goods_parser" {{ $supplier->rtd_classification === 'goods_parser' ? 'selected' : '' }}>Parser</option>
+                                            <option value="service_overhead" {{ $supplier->rtd_classification === 'service_overhead' ? 'selected' : '' }}>Service</option>
+                                        </select>
                                     </td>
                                     <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-300">
                                         @if($supplier->contact_person)
@@ -458,6 +466,52 @@
                     .catch(error => {
                         console.error('Error:', error);
                         showNotification(error.message || 'Failed to update VAT classification', 'error');
+                    })
+                    .finally(() => {
+                        this.classList.remove('opacity-50');
+                        this.disabled = false;
+                    });
+                });
+            });
+
+            // Handle RTD classification inline editing
+            document.querySelectorAll('.rtd-select').forEach(select => {
+                select.addEventListener('change', function() {
+                    const cell = this.closest('.rtd-cell');
+                    const supplierId = cell.dataset.supplierId;
+                    const value = this.value;
+
+                    this.classList.add('opacity-50');
+                    this.disabled = true;
+
+                    fetch(`/suppliers/${supplierId}/update-rtd-classification`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                        },
+                        body: JSON.stringify({ rtd_classification: value })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Update color class
+                            this.classList.remove('text-green-400', 'text-blue-400', 'text-yellow-400', 'text-gray-400');
+                            const classification = data.supplier.rtd_classification;
+                            if (classification === 'goods_simple') this.classList.add('text-green-400');
+                            else if (classification === 'goods_parser') this.classList.add('text-blue-400');
+                            else if (classification === 'service_overhead') this.classList.add('text-yellow-400');
+                            else this.classList.add('text-gray-400');
+
+                            showNotification(data.message, 'success');
+                        } else {
+                            throw new Error(data.message || 'Failed to update');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showNotification(error.message || 'Failed to update RTD classification', 'error');
                     })
                     .finally(() => {
                         this.classList.remove('opacity-50');

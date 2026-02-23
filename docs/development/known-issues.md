@@ -283,6 +283,40 @@ If the Sales VAT Breakdown table shows only one row with a "0.0%" label but has 
 
 ---
 
+### Paperin Adjustment Missing from 0% Rate Row in VAT Return
+**Status:** Fixed 2026-02-19
+
+#### Problem
+The Sales VAT Breakdown on the VAT return page showed the 0.0% row with unadjusted net/gross figures (e.g., €138,399.44 instead of €136,322.34). The TOTAL row was correct, and the paperin adjustment footnote appeared, but the adjustment was not reflected in the individual 0% rate row.
+
+#### Root Cause
+A second `keyBy` gotcha — related to but distinct from the 2026-02-10 fix above. The `vat_rate` column in `sales_accounting_daily` is `decimal(8,4)`. SQLite returns this via PDO as a string like `"0.0000"`. The existing `(string)` cast preserved this verbatim, producing key `"0.0000"`. The paperin adjustment then checked `isset($totals['by_rate']['0'])`, which failed silently because the actual key was `"0.0000"`, not `"0"`.
+
+```php
+// BROKEN: (string) preserves SQLite's decimal format
+$salesData->keyBy(fn ($item) => (string) $item->vat_rate);
+// Key: "0.0000" — isset(['0']) fails
+
+// FIXED: (float) normalizes first, then (string) gives clean key
+$salesData->keyBy(fn ($item) => (string) (float) $item->vat_rate);
+// Key: "0" — isset(['0']) succeeds
+```
+
+#### Solution
+1. Normalize `keyBy` with `(string) (float)` double-cast in both optimized and real-time paths
+2. Broadened `show()` recalculation condition to detect stale stored data (by_rate net sum != total_net) and auto-fix on next view
+
+#### Files Modified
+- `app/Http/Controllers/Management/VatReturnController.php`
+
+#### How to Detect
+If the 0.0% row net + paperin adjustment = what the 0.0% row should show, or if the sum of by_rate rows doesn't match the TOTAL row, this issue is occurring.
+
+#### General Lesson
+**When using `keyBy` with database decimal values, always normalize with `(string) (float)` cast.** A plain `(string)` cast is not sufficient — SQLite (and potentially other databases) may return decimal values with trailing zeros that don't match expected key strings.
+
+---
+
 ## Invoice Parsing Issues
 
 ### Delivery Invoice Total Parsed Incorrectly (UK/US Number Format)

@@ -222,13 +222,15 @@ External supplier connectivity for images, pricing, and product data.
 
 ### Delivery Verification
 Comprehensive delivery processing with barcode scanning and PDF invoice parsing.
-- **Parsing Totals Verification** (NEW! 2026-01-29): Detects missing items by comparing parsed totals against PDF-stated totals
+- **Parsing Totals Verification** (NEW! 2026-01-29, enhanced 2026-02-19): Detects missing items by comparing parsed totals against PDF-stated totals
   - Extracts "Total to deliver", "Total barrels delivered", "Total including vat" from Udea PDFs
   - Extracts "Gross Total", "Subtotal", "Nett" from Independent PDFs
   - €0.50 tolerance for rounding differences
   - Totals verification table in upload preview with match/mismatch indicators
   - Persistent discrepancy tracking in database for audit trail
   - Warning banner on delivery show page when discrepancy detected
+  - Per-document breakdown for multi-PDF deliveries showing which file has the mismatch (2026-02-19)
+  - Post-parse cross-validation: compares item codes in PDF text vs parsed output, warns on missing codes (2026-02-19)
 - **Delivery Document Storage** (NEW! 2026-01-27): Permanent storage and viewing of delivery documents
   - PDF and CSV files preserved permanently after upload
   - Document viewer with clean minimal interface in popup window

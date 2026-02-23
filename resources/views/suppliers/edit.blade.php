@@ -386,22 +386,6 @@
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-400 mb-1">Default Purchase Use</label>
-                            <select name="default_purchase_use"
-                                    class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md @error('default_purchase_use') border-red-500 @enderror">
-                                @foreach($purchaseUses as $value => $label)
-                                    <option value="{{ $value }}" {{ old('default_purchase_use', $supplier->default_purchase_use ?? 'resale') === $value ? 'selected' : '' }}>
-                                        {{ $label }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            <p class="text-xs text-gray-500 mt-1">T1 (resale) or T2 (overhead) on RTD</p>
-                            @error('default_purchase_use')
-                                <p class="text-red-400 text-xs mt-1">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                        <div>
                             <label class="block text-sm font-medium text-gray-400 mb-1">RTD Classification</label>
                             <select name="rtd_classification"
                                     class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md @error('rtd_classification') border-red-500 @enderror">

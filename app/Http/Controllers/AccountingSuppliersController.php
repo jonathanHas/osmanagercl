@@ -177,7 +177,6 @@ class AccountingSuppliersController extends Controller
         $statuses = ['active', 'inactive', 'suspended', 'archived'];
         $paymentMethods = ['bacs', 'cheque', 'card', 'cash', 'other'];
         $vatTreatments = AccountingSupplier::VAT_TREATMENTS;
-        $purchaseUses = AccountingSupplier::PURCHASE_USES;
         $rtdClassifications = AccountingSupplier::RTD_CLASSIFICATIONS;
         $countryCodes = $this->getCountryCodes();
 
@@ -186,7 +185,6 @@ class AccountingSuppliersController extends Controller
             'statuses',
             'paymentMethods',
             'vatTreatments',
-            'purchaseUses',
             'rtdClassifications',
             'countryCodes'
         ));
@@ -225,7 +223,6 @@ class AccountingSuppliersController extends Controller
             // VAT classification fields
             'country_code' => 'nullable|string|size:2',
             'vat_treatment' => 'nullable|in:irish_vat,eu_goods_zero_rated,eu_reverse_charge_services,postponed_import,outside_scope_or_exempt',
-            'default_purchase_use' => 'nullable|in:resale,overhead,mixed',
             // RTD classification
             'rtd_classification' => 'nullable|in:goods_simple,goods_parser,service_overhead,not_applicable',
         ]);
@@ -334,7 +331,6 @@ class AccountingSuppliersController extends Controller
         $statuses = ['active', 'inactive', 'suspended', 'archived'];
         $paymentMethods = ['bacs', 'cheque', 'card', 'cash', 'other'];
         $vatTreatments = AccountingSupplier::VAT_TREATMENTS;
-        $purchaseUses = AccountingSupplier::PURCHASE_USES;
         $rtdClassifications = AccountingSupplier::RTD_CLASSIFICATIONS;
         $countryCodes = $this->getCountryCodes();
 
@@ -344,7 +340,6 @@ class AccountingSuppliersController extends Controller
             'statuses',
             'paymentMethods',
             'vatTreatments',
-            'purchaseUses',
             'rtdClassifications',
             'countryCodes'
         ));
@@ -383,7 +378,6 @@ class AccountingSuppliersController extends Controller
             // VAT classification fields
             'country_code' => 'nullable|string|size:2',
             'vat_treatment' => 'nullable|in:irish_vat,eu_goods_zero_rated,eu_reverse_charge_services,postponed_import,outside_scope_or_exempt',
-            'default_purchase_use' => 'nullable|in:resale,overhead,mixed',
             // RTD classification
             'rtd_classification' => 'nullable|in:goods_simple,goods_parser,service_overhead,not_applicable',
         ]);
@@ -584,7 +578,6 @@ class AccountingSuppliersController extends Controller
         $validated = $request->validate([
             'country_code' => 'nullable|string|size:2',
             'vat_treatment' => 'nullable|in:irish_vat,eu_goods_zero_rated,eu_reverse_charge_services,postponed_import,outside_scope_or_exempt',
-            'default_purchase_use' => 'nullable|in:resale,overhead,mixed',
         ]);
 
         try {
@@ -612,7 +605,6 @@ class AccountingSuppliersController extends Controller
                     'id' => $supplier->id,
                     'country_code' => $supplier->country_code,
                     'vat_treatment' => $supplier->vat_treatment,
-                    'default_purchase_use' => $supplier->default_purchase_use,
                     'is_eu_supplier' => $supplier->is_eu_supplier,
                 ],
             ]);
@@ -626,6 +618,47 @@ class AccountingSuppliersController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update VAT classification. Please try again.',
+            ], 422);
+        }
+    }
+
+    /**
+     * Update RTD classification field via AJAX.
+     */
+    public function updateRtdClassification(Request $request, AccountingSupplier $supplier)
+    {
+        $validated = $request->validate([
+            'rtd_classification' => 'required|in:goods_simple,goods_parser,service_overhead,not_applicable',
+        ]);
+
+        try {
+            $validated['updated_by'] = Auth::id();
+            $supplier->update($validated);
+
+            Log::info('Supplier RTD classification updated', [
+                'supplier_id' => $supplier->id,
+                'supplier_name' => $supplier->name,
+                'rtd_classification' => $validated['rtd_classification'],
+                'updated_by' => Auth::id(),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => "RTD classification updated for '{$supplier->name}'.",
+                'supplier' => [
+                    'id' => $supplier->id,
+                    'rtd_classification' => $supplier->rtd_classification,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to update supplier RTD classification', [
+                'supplier_id' => $supplier->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update RTD classification. Please try again.',
             ], 422);
         }
     }

@@ -17,7 +17,6 @@ class AccountingSupplier extends Model
         'country_code',
         'is_eu_supplier',
         'vat_treatment',
-        'default_purchase_use',
         'phone',
         'email',
         'website',
@@ -373,15 +372,6 @@ class AccountingSupplier extends Model
         'eu_reverse_charge_services' => 'EU Services - Reverse Charge',
         'postponed_import' => 'Postponed Import VAT',
         'outside_scope_or_exempt' => 'Outside Scope / Exempt',
-    ];
-
-    /**
-     * Purchase use options with display labels.
-     */
-    public const PURCHASE_USES = [
-        'resale' => 'Resale (T1)',
-        'overhead' => 'Overhead (T2)',
-        'mixed' => 'Mixed Use',
     ];
 
     /**

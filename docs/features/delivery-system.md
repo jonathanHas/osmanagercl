@@ -610,6 +610,8 @@ If mismatch detected:
 **Show Page (show.blade.php)**:
 - Red warning banner displays when `has_discrepancy` is true
 - Shows stated vs calculated totals and discrepancy amount
+- **Per-document breakdown** (2026-02-19): For multi-PDF deliveries, shows each document's filename with stated vs parsed total and a green checkmark (match) or red X with difference amount (mismatch)
+- Single-document deliveries show the document filename for clarity
 
 #### Database Schema
 
@@ -640,10 +642,16 @@ New field in `delivery_documents` table:
 | `create.blade.php` | Totals verification section in preview |
 | `show.blade.php` | Discrepancy warning banner |
 
+#### Post-Parse Cross-Validation (2026-02-19)
+
+The IIH parser now performs a second pass after parsing: it scans the raw PDF text for all product codes (pattern: `^\d{4,6}[ABD]?\s+`) and compares them against the codes actually parsed. Any codes found in the PDF but missing from the parsed output are reported as warnings with the product description for context. This acts as a safety net for cases where the parser's skip terms or regex patterns inadvertently filter out valid product lines.
+
 #### Benefits
 
 - ✅ **Silent Failures Detected**: Missing items no longer go unnoticed
-- ✅ **Audit Trail**: Discrepancy data persisted in database
+- ✅ **Cross-Validation**: Item codes in PDF text compared against parsed output
+- ✅ **Per-Document Feedback**: Multi-PDF deliveries show which file has the discrepancy
+- ✅ **Audit Trail**: Per-file parsing metadata persisted in `DeliveryDocument.parsing_metadata`
 - ✅ **Visual Warnings**: Clear UI indicators when issues detected
 - ✅ **Per-File Verification**: Each PDF in multi-file upload verified separately
 - ✅ **Tolerance Handling**: €0.50 tolerance prevents false positives from rounding

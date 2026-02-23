@@ -7,7 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **VAT on Purchases report page** (2026-02-23)
+  - New report under Revenue sidebar showing purchase invoice VAT broken down by rate (0%, 9%, 13.5%, 23%)
+  - Splits invoices into Retail (T1), Non-Retail (T2), and Unclassified based on supplier RTD classification
+  - Summary cards, VAT rate breakdown table, and collapsible invoice detail list
+  - Date range selector defaulting to current month
+  - **Files Created**: `VatPurchasesController.php`, `management/vat-purchases/index.blade.php`
+
+- **Suppliers: Inline RTD Classification dropdown on index page** (2026-02-22)
+  - New color-coded dropdown in the suppliers table for quickly assigning RTD classification (Simple/Parser/Service/N/A)
+  - AJAX-powered inline editing matching the existing VAT Treatment pattern
+  - **Files Modified**: `index.blade.php`, `AccountingSuppliersController.php`, `web.php`
+
+### Changed
+
+- **Suppliers: Removed redundant "Default Purchase Use" field** (2026-02-22)
+  - The `default_purchase_use` field (resale/overhead/mixed) was never used in any business logic — RTD Classification fully supersedes it
+  - Removed from supplier create, edit, and index pages, controller validation, and model
+  - Dropped the column and its index via migration
+  - **Files Modified**: `AccountingSupplier.php`, `AccountingSuppliersController.php`, `edit.blade.php`, `create.blade.php`, `index.blade.php`
+
 ### Fixed
+
+- **Delivery Parser: "Nett" skip term matching "Nettle" product names** (2026-02-19)
+  - IIH parser skipped all products containing "Nettle" (e.g., Heath and Heather Nettle, Urtekram Nettle Shampoo) because the skip term `"Nett"` matched as a substring of `"Nettle"`
+  - Caused €23.91 discrepancy on Invoice(54).pdf (2 items × €18.05 + €5.86 silently dropped)
+  - Fix: replaced plain substring match with regex word-boundary `\bNett\b` so footer "Nett" lines are still skipped but "Nettle" product names are not
+  - Added post-parse cross-validation: compares item codes found in raw PDF text against parsed output, warns on any missing codes
+  - **File Modified**: `scripts/invoice-parser/parsers/delivery_independent.py`
+
+- **Delivery Discrepancy: Per-document feedback for multi-PDF deliveries** (2026-02-19)
+  - When multiple PDFs are uploaded, the discrepancy warning now shows which specific document has the mismatch
+  - Stores per-file parsing metadata (stated vs calculated totals, match status) in `DeliveryDocument.parsing_metadata`
+  - Single-document deliveries show the document filename; multi-document deliveries show a per-document breakdown with checkmark/X indicators
+  - **Files Modified**: `app/Http/Controllers/DeliveryController.php`, `resources/views/deliveries/show.blade.php`
+
+- **VAT Return: Paperin adjustment not applied to 0% rate row in Sales VAT Breakdown** (2026-02-19)
+  - The 0.0% row showed unadjusted net/gross figures (e.g., €138,399.44 instead of €136,322.34) while the TOTAL row was correct
+  - Root cause: SQLite returns `decimal(8,4)` values as strings like `"0.0000"`, but `keyBy` checked for key `"0"` — the key mismatch silently skipped the paperin deduction for the 0% row
+  - Fix: normalize `keyBy` with `(string) (float)` cast to ensure consistent keys; also broadened `show()` recalculation to detect and fix already-stored returns with stale by_rate data
+  - **File Modified**: `app/Http/Controllers/Management/VatReturnController.php`
 
 - **RTD Submission: Paperin deduction missing from Tier 1 sales figures** (2026-02-17)
   - `VatReturn.sales_vat_data['by_rate']` stores 0% net **before** paperin deduction — the `paperin_adjustment` key records the amount but `by_rate` is never adjusted
