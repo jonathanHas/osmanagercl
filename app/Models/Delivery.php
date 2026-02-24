@@ -24,6 +24,7 @@ class Delivery extends Model
         // Totals verification fields
         'invoice_stated_total',
         'calculated_total',
+        'freight_charge',
         'total_discrepancy',
         'has_discrepancy',
     ];
@@ -37,6 +38,7 @@ class Delivery extends Model
         // Totals verification casts
         'invoice_stated_total' => 'decimal:2',
         'calculated_total' => 'decimal:2',
+        'freight_charge' => 'decimal:2',
         'total_discrepancy' => 'decimal:2',
         'has_discrepancy' => 'boolean',
     ];

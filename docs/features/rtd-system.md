@@ -333,6 +333,37 @@ Allows re-parsing any invoice with the latest RTD parser, bypassing normal valid
 |--------|-------|--------|
 | POST | `/rtd/{invoice}/force-parse` | Force parse invoice PDF |
 
+### Unfreeze Mode (NEW! 2026-02-23)
+
+Allows unfreezing frozen invoices so they can be recomputed with corrected supplier RTD classifications.
+
+**Purpose:**
+- Correct invoices frozen with the wrong supplier RTD classification
+- Bulk unfreeze multiple invoices at once for reclassification
+- Reset invoices back to "needs_computation" status
+
+**How to Use:**
+1. Click the **gear icon** in the filter/actions bar
+2. Enable **"Unfreeze Mode"** toggle
+3. Blue banner appears: "Unfreeze Mode Active"
+4. **"Unfreeze"** buttons appear on all frozen invoices
+5. Click **"Unfreeze"** on individual invoices, or use **"Unfreeze All Visible"** for bulk action
+6. Fix the supplier RTD classification on `/suppliers` if needed
+7. Click **"Compute"** to recalculate RTD with the corrected classification
+8. Click **"Freeze"** to lock the corrected breakdown
+
+**Safety:**
+- Invoices in submitted RTD submissions **cannot** be unfrozen (blocked with error message)
+- Invoices in draft submissions can be unfrozen
+- State persisted in localStorage across browser sessions
+
+**Routes:**
+
+| Method | Route | Action |
+|--------|-------|--------|
+| POST | `/rtd/{invoice}/unfreeze` | Unfreeze single invoice |
+| POST | `/rtd/unfreeze-visible` | Bulk unfreeze multiple invoices |
+
 ### Detail Row Reconciliation Layout (NEW! 2026-02)
 
 The expandable detail row uses a 4-column layout showing how amounts reconcile:
@@ -428,6 +459,8 @@ To efficiently resolve issues:
 | POST | `/rtd/{invoice}/force-parse` | Force parse invoice PDF (bypasses checks) |
 | POST | `/rtd/{invoice}/compute` | Compute invoice RTD |
 | POST | `/rtd/{invoice}/accept` | Freeze invoice RTD |
+| POST | `/rtd/{invoice}/unfreeze` | Unfreeze frozen invoice |
+| POST | `/rtd/unfreeze-visible` | Bulk unfreeze visible invoices |
 | POST | `/rtd/recompute-all` | Recompute all with issues |
 | GET | `/rtd-fallbacks` | List all fallbacks |
 | GET | `/rtd-fallbacks/unresolved` | Show unresolved items |
@@ -445,6 +478,7 @@ To efficiently resolve issues:
 | `computeRtd($invoice)` | Calculate full RTD breakdown |
 | `resolveArticleCode($code, $supplier)` | Resolve single article code (returns `is_non_retail` for fallback source) |
 | `freezeRtd($invoice, $userId)` | Create immutable snapshot |
+| `unfreezeRtd($invoice)` | Reset frozen invoice to needs_computation (blocks submitted submissions) |
 | `getSourceUploadFile($invoice)` | Get parsed data file |
 | `parseMonetaryValue($value)` | Convert EU/US number formats |
 
@@ -544,8 +578,24 @@ To efficiently resolve issues:
 | Fallback Views | `resources/views/rtd-fallbacks/` |
 | Migrations | `database/migrations/2026_01_31_*.php` |
 
+## Supplier RTD Classification
+
+Each supplier has an `rtd_classification` field that controls how their invoices are processed:
+
+| Classification | Label | RTD Treatment |
+|---------------|-------|---------------|
+| `goods_simple` | Goods - Simple VAT | T1: Uses invoice VAT fields directly |
+| `goods_parser` | Goods - Dedicated Parser | T1: Uses Udea/Dynamis/IIH parser |
+| `service_overhead` | Service/Overhead | T2: Routes all amounts to service overhead |
+| `not_applicable` | Not Applicable | Not tracked in RTD |
+
+**Inline Editing (NEW! 2026-02-22):** Suppliers can be classified directly from the `/suppliers` index page via a color-coded dropdown (green=Simple, blue=Parser, yellow=Service, gray=N/A). Changes save instantly via AJAX.
+
+**VAT on Purchases Report:** The `/management/vat-purchases` page uses supplier RTD classification to split purchase invoices into Retail (T1: goods_simple + goods_parser) vs Non-Retail (T2: service_overhead) for VAT analysis.
+
 ## Related Documentation
 
 - [Invoice Parser Integration](./invoice-parser-integration.md)
 - [Udea Invoice Parser](./udea-invoice-parser.md)
 - [VAT Returns](./vat-returns.md)
+- [VAT on Purchases](../features/vat-returns.md#vat-on-purchases) (uses RTD classification for purchase VAT analysis)

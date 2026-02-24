@@ -192,6 +192,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/{invoice}/force-parse', [\App\Http\Controllers\RtdController::class, 'forceParse'])->name('force-parse');
         Route::post('/{invoice}/compute', [\App\Http\Controllers\RtdController::class, 'compute'])->name('compute');
         Route::post('/{invoice}/accept', [\App\Http\Controllers\RtdController::class, 'accept'])->name('accept');
+        Route::post('/{invoice}/unfreeze', [\App\Http\Controllers\RtdController::class, 'unfreeze'])->name('unfreeze');
+        Route::post('/unfreeze-visible', [\App\Http\Controllers\RtdController::class, 'unfreezeVisible'])->name('unfreeze-visible');
         Route::post('/{invoice}/manual-assign', [\App\Http\Controllers\RtdController::class, 'manualAssign'])->name('manual-assign');
         Route::post('/recompute-all', [\App\Http\Controllers\RtdController::class, 'recomputeAll'])->name('recompute-all');
     });
@@ -416,6 +418,8 @@ Route::middleware('auth')->group(function () {
         Route::patch('/scan-item', [DeliveryLegacyController::class, 'updateScannedQuantity'])->name('update-quantity');
         Route::patch('/update-case-units', [DeliveryLegacyController::class, 'updateCaseUnits'])->name('update-case-units');
         Route::post('/complete', [DeliveryLegacyController::class, 'completeDelivery'])->name('complete');
+        Route::post('/merge-sessions', [DeliveryLegacyController::class, 'mergeSessions'])->name('merge-sessions');
+        Route::patch('/change-supplier', [DeliveryLegacyController::class, 'changeSupplier'])->name('change-supplier');
     });
 
     // Order Management mockup routes (for UI testing)

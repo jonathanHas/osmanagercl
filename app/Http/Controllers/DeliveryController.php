@@ -360,6 +360,7 @@ class DeliveryController extends Controller
                 'items' => $items,
                 'totals' => $totals,
                 'barrels' => $result['data']['barrels'] ?? ['items' => [], 'total' => 0],
+                'costs' => $result['data']['costs'] ?? ['items' => [], 'total' => 0],
                 'warnings' => $warnings,
                 'confidence' => $confidence,
                 'supplier_detected' => $result['metadata']['supplier_detected'] ?? 'Unknown',
@@ -495,12 +496,14 @@ class DeliveryController extends Controller
                     'item_count' => $t['line_count'] ?? count($items),
                     'products_total' => $t['products_total'] ?? $t['total_value'] ?? 0,
                     'barrels_total' => $t['barrels_total'] ?? 0,
+                    'costs_total' => $t['costs_total'] ?? 0,
                     'total_value' => $t['total_value'] ?? 0,
                     'products_stated' => $t['products_stated'] ?? null,
                     'barrels_stated' => $t['barrels_stated'] ?? null,
                     'grand_stated' => $t['grand_stated'] ?? null,
                     'products_calculated' => $t['products_calculated'] ?? null,
                     'barrels_calculated' => $t['barrels_calculated'] ?? null,
+                    'costs_calculated' => $t['costs_calculated'] ?? 0,
                     'grand_calculated' => $t['grand_calculated'] ?? null,
                     'totals_match' => $t['totals_match'] ?? true,
                     'discrepancy' => $t['discrepancy'] ?? null,
@@ -519,12 +522,14 @@ class DeliveryController extends Controller
                             'item_count' => $fr['item_count'] ?? null,
                             'products_total' => $fr['products_total'] ?? null,
                             'barrels_total' => $fr['barrels_total'] ?? null,
+                            'costs_total' => $fr['costs_total'] ?? 0,
                             'total_value' => $fr['total_value'] ?? null,
                             'products_stated' => $fr['products_stated'] ?? null,
                             'barrels_stated' => $fr['barrels_stated'] ?? null,
                             'grand_stated' => $fr['grand_stated'] ?? null,
                             'products_calculated' => $fr['products_calculated'] ?? null,
                             'barrels_calculated' => $fr['barrels_calculated'] ?? null,
+                            'costs_calculated' => $fr['costs_calculated'] ?? 0,
                             'grand_calculated' => $fr['grand_calculated'] ?? null,
                             'totals_match' => $fr['totals_match'] ?? true,
                             'discrepancy' => $fr['discrepancy'] ?? null,
@@ -561,10 +566,11 @@ class DeliveryController extends Controller
                 $successMsg .= ' ('.count($warnings).' warnings - check items)';
             }
 
-            // Flash import summary with barrels breakdown
+            // Flash import summary with barrels and costs breakdown
             session()->flash('import_summary', [
                 'products_total' => $totals['products_total'] ?? $totals['total_value'],
                 'barrels_total' => $totals['barrels_total'] ?? 0,
+                'costs_total' => $totals['costs_total'] ?? 0,
                 'grand_total' => $totals['total_value'],
                 'barrel_items' => $barrels['items'] ?? [],
             ]);

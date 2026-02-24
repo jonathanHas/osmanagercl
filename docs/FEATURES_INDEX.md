@@ -285,6 +285,8 @@ Complete supplier management with seamless POS integration and auto-code generat
 - **Auto-Generated Codes**: Automatic supplier codes (SUP-0001, SUP-0002) with manual override option
 - **POS Integration**: Optional checkbox to create suppliers in both Laravel and POS databases simultaneously
 - **Cross-Database Sync**: Creates entries in both accounting (port 3306) and POS (port 3307) databases
+- **Inline RTD Classification** (NEW! 2026-02-22): Color-coded dropdown on suppliers index for quick RTD classification assignment (Simple/Parser/Service/N/A) with AJAX save
+- **Inline VAT Treatment**: Country and VAT treatment dropdowns on suppliers index with AJAX save
 - **Smart Validation**: Default payment terms (30 days) and comprehensive error handling
 - **User Feedback**: Loading states, success/error messages, and detailed validation errors
 - **Edit Integration**: Link existing suppliers to POS or update POS names when changed
@@ -423,6 +425,7 @@ VAT categorization system for Udea, Dynamis, and IIH invoices to support Irish V
 - **IIH Flexible Rate Matching** (NEW!): Handles non-standard VAT rates in IIH invoices (e.g., 22.50% → 23%)
 - **IIH DRS Exclusion**: Deposit Return Scheme amounts excluded from 0% goods for resale
 - **Force Reparse Mode**: Settings toggle to re-parse any invoice with latest RTD parser, bypassing validation
+- **Unfreeze Mode** (NEW! 2026-02-23): Settings toggle to unfreeze frozen invoices for recomputation; includes per-row and bulk "Unfreeze All Visible" actions; blocks invoices in submitted submissions
 - **Article Code Resolution**: Maps supplier codes to products via SupplierLink, EAN barcodes, or manual fallbacks
 - **AJAX-Powered Actions**: Parse, Compute, Freeze operations preserve scroll position with per-row loading indicators
 - **PDF Quick View**: View invoice PDF in popup window directly from RTD dashboard
@@ -513,6 +516,15 @@ Comprehensive card transaction reconciliation with myPOS integration and intelli
 - **CSV Export**: Download reconciliation results with full transaction details
 
 📖 [Card Transaction Reconciliation Documentation](./features/card-reconciliation.md)
+
+### VAT on Purchases Report (NEW! 2026-02-23)
+Purchase invoice VAT analysis split by Retail (T1) vs Non-Retail (T2) classification.
+- **Date Range Selection**: View any date range, defaulting to current month
+- **RTD-Based Classification**: Invoices split by supplier RTD classification — Retail (goods_simple + goods_parser), Non-Retail (service_overhead), Unclassified (not_applicable)
+- **Summary Cards**: Three cards showing total net, VAT, and invoice count per classification
+- **VAT Rate Breakdown Table**: Net and VAT by rate (0%, 9%, 13.5%, 23%) for each classification with grand totals
+- **Invoice Detail Table**: Collapsible list of all invoices with date, supplier, RTD badge, and amounts
+- **Navigation**: Sidebar → Revenue → VAT on Purchases
 
 ### VAT Returns Management System
 Complete Irish Revenue Online Service (ROS) VAT returns with automated calculations.

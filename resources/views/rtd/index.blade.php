@@ -136,6 +136,24 @@
             </div>
         </div>
 
+        {{-- Unfreeze Mode Banner --}}
+        <div id="unfreeze-banner" class="hidden bg-blue-900/50 border border-blue-500 text-blue-300 px-4 py-3 rounded mb-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/>
+                    </svg>
+                    <span class="font-semibold">Unfreeze Mode Active</span>
+                    <span class="ml-2 text-sm">- Click "Unfreeze" on frozen invoices to reset them for recomputation</span>
+                </div>
+                <button onclick="toggleUnfreezeMode()" class="text-blue-300 hover:text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
         {{-- Filters and Actions --}}
         <div class="bg-gray-800 rounded-lg p-4 mb-4 flex flex-wrap items-center justify-between gap-4">
             <form action="{{ route('rtd.index') }}" method="GET" class="flex items-center gap-4">
@@ -226,19 +244,40 @@
                          x-transition:leave-start="transform opacity-100 scale-100"
                          x-transition:leave-end="transform opacity-0 scale-95"
                          class="absolute right-0 mt-2 w-64 rounded-lg bg-gray-700 shadow-lg ring-1 ring-black ring-opacity-5 z-50">
-                        <div class="p-4">
-                            <label class="flex items-center cursor-pointer">
-                                <input type="checkbox" id="force-reparse-toggle"
-                                       onchange="toggleForceReparseMode()"
-                                       class="form-checkbox h-5 w-5 text-orange-500 rounded border-gray-500 bg-gray-600 focus:ring-orange-500">
-                                <span class="ml-3 text-white text-sm">Force Reparse Mode</span>
-                            </label>
-                            <p class="mt-2 text-xs text-gray-400">
-                                When enabled, shows a "Reparse" button on all invoices to re-parse with the latest RTD parser.
-                            </p>
+                        <div class="p-4 space-y-4">
+                            <div>
+                                <label class="flex items-center cursor-pointer">
+                                    <input type="checkbox" id="force-reparse-toggle"
+                                           onchange="toggleForceReparseMode()"
+                                           class="form-checkbox h-5 w-5 text-orange-500 rounded border-gray-500 bg-gray-600 focus:ring-orange-500">
+                                    <span class="ml-3 text-white text-sm">Force Reparse Mode</span>
+                                </label>
+                                <p class="mt-1 text-xs text-gray-400">
+                                    Shows a "Reparse" button on all invoices to re-parse with the latest RTD parser.
+                                </p>
+                            </div>
+                            <div class="border-t border-gray-600 pt-3">
+                                <label class="flex items-center cursor-pointer">
+                                    <input type="checkbox" id="unfreeze-toggle"
+                                           onchange="toggleUnfreezeMode()"
+                                           class="form-checkbox h-5 w-5 text-blue-500 rounded border-gray-500 bg-gray-600 focus:ring-blue-500">
+                                    <span class="ml-3 text-white text-sm">Unfreeze Mode</span>
+                                </label>
+                                <p class="mt-1 text-xs text-gray-400">
+                                    Shows "Unfreeze" buttons on frozen invoices to reset them for recomputation.
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
+
+                <button type="button" id="unfreeze-all-btn" onclick="unfreezeAllVisible()"
+                        class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded inline-flex items-center hidden">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/>
+                    </svg>
+                    <span>Unfreeze All Visible (<span id="unfreeze-all-count">0</span>)</span>
+                </button>
 
                 <button type="button" id="freeze-all-btn" onclick="freezeAllBalanced()"
                         class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded inline-flex items-center hidden">
@@ -424,6 +463,14 @@
                                                     class="force-reparse-btn hidden bg-orange-600 hover:bg-orange-700 text-white text-xs px-3 py-1 rounded"
                                                     title="Force reparse with latest RTD parser">
                                                 Reparse
+                                            </button>
+                                        @endif
+                                        {{-- Unfreeze button (hidden by default, shown in unfreeze mode) --}}
+                                        @if($invoice->rtd_status === 'frozen')
+                                            <button type="button" onclick="rtdAction({{ $invoice->id }}, 'unfreeze', 'Unfreezing')"
+                                                    class="unfreeze-btn hidden bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded"
+                                                    title="Unfreeze to allow recomputation">
+                                                Unfreeze
                                             </button>
                                         @endif
                                         {{-- Action buttons --}}
@@ -791,6 +838,8 @@
     <script>
         // Force Reparse Mode state
         let forceReparseMode = localStorage.getItem('rtd_force_reparse_mode') === 'true';
+        // Unfreeze Mode state
+        let unfreezeMode = localStorage.getItem('rtd_unfreeze_mode') === 'true';
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
@@ -798,7 +847,12 @@
             if (toggle) {
                 toggle.checked = forceReparseMode;
             }
+            const unfreezeToggle = document.getElementById('unfreeze-toggle');
+            if (unfreezeToggle) {
+                unfreezeToggle.checked = unfreezeMode;
+            }
             updateForceReparseUI();
+            updateUnfreezeUI();
             updateFreezeAllButton();
             updateComputeAllButton();
         });
@@ -824,6 +878,86 @@
                 banner.classList.add('hidden');
                 buttons.forEach(btn => btn.classList.add('hidden'));
             }
+        }
+
+        function toggleUnfreezeMode() {
+            unfreezeMode = !unfreezeMode;
+            localStorage.setItem('rtd_unfreeze_mode', unfreezeMode);
+            const toggle = document.getElementById('unfreeze-toggle');
+            if (toggle) {
+                toggle.checked = unfreezeMode;
+            }
+            updateUnfreezeUI();
+        }
+
+        function updateUnfreezeUI() {
+            const banner = document.getElementById('unfreeze-banner');
+            const buttons = document.querySelectorAll('.unfreeze-btn');
+            const bulkBtn = document.getElementById('unfreeze-all-btn');
+
+            if (unfreezeMode) {
+                banner.classList.remove('hidden');
+                buttons.forEach(btn => btn.classList.remove('hidden'));
+                // Count visible frozen invoices for bulk button
+                const frozenRows = document.querySelectorAll('[data-is-frozen="true"]');
+                const count = frozenRows.length;
+                document.getElementById('unfreeze-all-count').textContent = count;
+                if (count > 0) {
+                    bulkBtn.classList.remove('hidden');
+                } else {
+                    bulkBtn.classList.add('hidden');
+                }
+            } else {
+                banner.classList.add('hidden');
+                buttons.forEach(btn => btn.classList.add('hidden'));
+                bulkBtn.classList.add('hidden');
+            }
+        }
+
+        function unfreezeAllVisible() {
+            const frozenRows = document.querySelectorAll('[data-is-frozen="true"]');
+            const invoiceIds = [];
+            frozenRows.forEach(row => {
+                const id = row.id ? row.id.replace('actions-', '') : null;
+                if (id) invoiceIds.push(parseInt(id));
+            });
+
+            if (invoiceIds.length === 0) {
+                showFlashMessage('No frozen invoices found on this page.', 'warning');
+                return;
+            }
+
+            if (!confirm(`Unfreeze ${invoiceIds.length} frozen invoice(s)? They will need to be recomputed and re-frozen.`)) {
+                return;
+            }
+
+            const btn = document.getElementById('unfreeze-all-btn');
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+
+            fetch('/rtd/unfreeze-visible', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ invoice_ids: invoiceIds })
+            })
+            .then(response => response.json())
+            .then(data => {
+                showFlashMessage(data.message, 'success');
+                // Reload the page to reflect changes
+                setTimeout(() => window.location.reload(), 1000);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showFlashMessage('Failed to unfreeze invoices.', 'error');
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50');
+            });
         }
 
         function toggleExpand(invoiceId) {
@@ -890,6 +1024,9 @@
                     break;
                 case 'accept':
                     url = `/rtd/${invoiceId}/accept`;
+                    break;
+                case 'unfreeze':
+                    url = `/rtd/${invoiceId}/unfreeze`;
                     break;
                 default:
                     console.error('Unknown action:', action);
@@ -1218,6 +1355,12 @@
             // Update action buttons based on new status
             buttons.innerHTML = getActionButtonsHtml(invoiceId, data);
 
+            // Update data-is-frozen on the actions div
+            const actionsDiv = document.getElementById('actions-' + invoiceId);
+            if (actionsDiv) {
+                actionsDiv.dataset.isFrozen = data.is_frozen ? 'true' : 'false';
+            }
+
             // Update data-status and data-balanced attributes on the row
             if (row && data.new_status) {
                 row.dataset.status = data.new_status;
@@ -1244,6 +1387,7 @@
             updateFreezeAllButton();
             updateComputeAllButton();
             updateForceReparseUI();
+            updateUnfreezeUI();
         }
 
         // Update the expandable detail row content

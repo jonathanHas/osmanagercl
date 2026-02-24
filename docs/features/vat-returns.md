@@ -278,10 +278,44 @@ Planned improvements:
 ## Related Documentation
 
 - [VAT Dashboard System](./vat-dashboard.md)
+- [VAT on Purchases Report](#vat-on-purchases-report) — Purchase VAT analysis by RTD classification
 - [Sales Accounting Report](./sales-accounting-report.md)
 - [OSAccounts Integration](./osaccounts-integration.md)
 - [Performance Optimization Guide](../development/performance-optimization-guide.md)
 - [Invoice Management](./invoice-management.md)
+- [RTD System](./rtd-system.md) — Supplier RTD classifications that drive Retail/Non-Retail split
+
+## VAT on Purchases Report
+
+**Navigation:** Sidebar → Revenue → VAT on Purchases
+
+**URL:** `/management/vat-purchases`
+
+A dedicated report page showing purchase invoice VAT broken down by rate and split into Retail vs Non-Retail based on supplier RTD classification.
+
+### Classification Mapping
+
+| Supplier RTD Classification | Report Category | RTD Reference |
+|---|---|---|
+| `goods_simple`, `goods_parser` | **Retail (T1)** | Goods for resale |
+| `service_overhead` | **Non-Retail (T2)** | Service/overhead expenses |
+| `not_applicable` or unlinked | **Unclassified** | Needs RTD classification |
+
+### Features
+- **Date Range Selection**: Any date range, defaults to current month
+- **Summary Cards**: Net + VAT totals and invoice count per category (green/yellow/gray)
+- **VAT Rate Breakdown Table**: Net and VAT for 0%, 9%, 13.5%, 23% across all three categories
+- **Invoice Detail Table**: Collapsible list with color-coded RTD classification badges
+
+### Data Source
+Uses invoice-level VAT fields (`zero_net/vat`, `second_reduced_net/vat`, `reduced_net/vat`, `standard_net/vat`) grouped by the linked supplier's `rtd_classification`. Works for all invoices regardless of RTD processing status.
+
+### File Locations
+| Component | Path |
+|-----------|------|
+| Controller | `app/Http/Controllers/Management/VatPurchasesController.php` |
+| View | `resources/views/management/vat-purchases/index.blade.php` |
+| Route | `management.vat-purchases.index` |
 
 ## Technical Implementation
 

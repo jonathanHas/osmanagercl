@@ -148,6 +148,12 @@
                                 <p class="text-lg font-semibold text-amber-600 dark:text-amber-400">€{{ number_format($summary['barrels_total'], 2) }}</p>
                             </div>
                         @endif
+                        @if(($summary['costs_total'] ?? 0) > 0)
+                            <div>
+                                <span class="text-sm text-gray-600 dark:text-gray-400">Freight/Transport</span>
+                                <p class="text-lg font-semibold text-indigo-600 dark:text-indigo-400">€{{ number_format($summary['costs_total'], 2) }}</p>
+                            </div>
+                        @endif
                         <div>
                             <span class="text-sm text-gray-600 dark:text-gray-400">Grand Total</span>
                             <p class="text-lg font-bold text-gray-900 dark:text-gray-100">€{{ number_format($summary['grand_total'], 2) }}</p>
@@ -285,6 +291,19 @@
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+            @endif
+
+            {{-- Freight/Transport Charge (from database) --}}
+            @if($delivery->freight_charge > 0)
+                <div class="mb-4 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-lg px-4 py-3">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/>
+                        </svg>
+                        <span class="font-semibold text-indigo-800 dark:text-indigo-200">Freight/Transport:</span>
+                        <span class="font-bold text-indigo-900 dark:text-indigo-100">&euro;{{ number_format($delivery->freight_charge, 2) }}</span>
                     </div>
                 </div>
             @endif

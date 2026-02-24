@@ -495,6 +495,61 @@ class RtdController extends Controller
     }
 
     /**
+     * Unfreeze a frozen RTD invoice so it can be recomputed.
+     */
+    public function unfreeze(Invoice $invoice)
+    {
+        if ($invoice->rtd_status !== 'frozen') {
+            return $this->rtdResponse(false, 'Invoice is not frozen.', $invoice);
+        }
+
+        if ($this->rtdService->unfreezeRtd($invoice)) {
+            $invoice->refresh();
+
+            return $this->rtdResponse(true, "RTD for #{$invoice->invoice_number} unfrozen — ready for recomputation.", $invoice);
+        }
+
+        return $this->rtdResponse(false, "Cannot unfreeze — invoice is in a submitted RTD submission.", $invoice);
+    }
+
+    /**
+     * Bulk unfreeze multiple visible frozen invoices.
+     */
+    public function unfreezeVisible(\Illuminate\Http\Request $request)
+    {
+        $validated = $request->validate([
+            'invoice_ids' => 'required|array',
+            'invoice_ids.*' => 'integer|exists:invoices,id',
+        ]);
+
+        $success = 0;
+        $blocked = 0;
+
+        foreach ($validated['invoice_ids'] as $id) {
+            $invoice = Invoice::find($id);
+            if ($invoice && $invoice->rtd_status === 'frozen') {
+                if ($this->rtdService->unfreezeRtd($invoice)) {
+                    $success++;
+                } else {
+                    $blocked++;
+                }
+            }
+        }
+
+        $message = "{$success} invoice(s) unfrozen.";
+        if ($blocked > 0) {
+            $message .= " {$blocked} blocked (in submitted submissions).";
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'unfrozen_count' => $success,
+            'blocked_count' => $blocked,
+        ]);
+    }
+
+    /**
      * Manually assign RTD breakdown for an invoice.
      * Accepts individual field values for the full breakdown.
      */

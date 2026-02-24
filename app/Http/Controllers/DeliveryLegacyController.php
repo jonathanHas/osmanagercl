@@ -495,6 +495,108 @@ class DeliveryLegacyController extends Controller
     }
 
     /**
+     * Merge two scan sessions into one.
+     */
+    public function mergeSessions(Request $request)
+    {
+        $validated = $request->validate([
+            'sourceSessionId' => 'required|string',
+            'targetSessionId' => 'required|string|different:sourceSessionId',
+        ]);
+
+        $sourceId = $validated['sourceSessionId'];
+        $targetId = $validated['targetSessionId'];
+
+        // Verify both sessions exist and are pending
+        $source = DB::connection('pos')->table('deliveriesScan')->where('ID', $sourceId)->first();
+        $target = DB::connection('pos')->table('deliveriesScan')->where('ID', $targetId)->first();
+
+        if (! $source || ! $target) {
+            return redirect()->route('delivery-legacy.index')->with('error', 'One or both sessions not found.');
+        }
+
+        if ($source->status != 0 || $target->status != 0) {
+            return redirect()->route('delivery-legacy.index')->with('error', 'Only pending sessions can be merged.');
+        }
+
+        DB::connection('pos')->transaction(function () use ($sourceId, $targetId) {
+            // Get all items from source session
+            $sourceItems = DB::connection('pos')->table('deliveriesScanItems')
+                ->where('delID', $sourceId)
+                ->get();
+
+            foreach ($sourceItems as $item) {
+                // Check if target already has this barcode
+                $existing = DB::connection('pos')->table('deliveriesScanItems')
+                    ->where('delID', $targetId)
+                    ->where('barcode', $item->barcode)
+                    ->first();
+
+                if ($existing) {
+                    // Sum quantities
+                    DB::connection('pos')->table('deliveriesScanItems')
+                        ->where('delID', $targetId)
+                        ->where('barcode', $item->barcode)
+                        ->update(['quantity' => $existing->quantity + $item->quantity]);
+                } else {
+                    // Move item to target session
+                    DB::connection('pos')->table('deliveriesScanItems')
+                        ->where('ID', $item->ID)
+                        ->update(['delID' => $targetId]);
+                }
+            }
+
+            // Delete any remaining source items (those that were summed, not moved)
+            DB::connection('pos')->table('deliveriesScanItems')
+                ->where('delID', $sourceId)
+                ->delete();
+
+            // Delete the source session
+            DB::connection('pos')->table('deliveriesScan')
+                ->where('ID', $sourceId)
+                ->delete();
+        });
+
+        return redirect()->route('delivery-legacy.index')
+            ->with('success', 'Sessions merged successfully. Source session has been removed.');
+    }
+
+    /**
+     * Change the supplier on a scan session.
+     */
+    public function changeSupplier(Request $request)
+    {
+        $validated = $request->validate([
+            'sessionId' => 'required|string',
+            'newSupplierID' => 'required|string',
+        ]);
+
+        $session = DB::connection('pos')->table('deliveriesScan')
+            ->where('ID', $validated['sessionId'])
+            ->first();
+
+        if (! $session) {
+            return redirect()->route('delivery-legacy.index')->with('error', 'Session not found.');
+        }
+
+        if ($session->status != 0) {
+            return redirect()->route('delivery-legacy.index')->with('error', 'Only pending sessions can have their supplier changed.');
+        }
+
+        DB::connection('pos')->table('deliveriesScan')
+            ->where('ID', $validated['sessionId'])
+            ->update(['supID' => $validated['newSupplierID']]);
+
+        // Get supplier name for message
+        $supplier = DB::connection('pos')->table('suppliers')
+            ->where('SupplierID', $validated['newSupplierID'])
+            ->first();
+
+        return redirect()->route('delivery-legacy.index')
+            ->with('success', 'Supplier changed to '.($supplier->Supplier ?? 'Unknown').'.');
+    }
+
+    /**
      * Create a new delivery scan session.
      */
     public function createSession(Request $request)

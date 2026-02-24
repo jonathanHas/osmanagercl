@@ -425,6 +425,90 @@ class DeliveryUdeaParser:
 
         return result
 
+    def _parse_costs_section(self, text: str) -> Dict[str, Any]:
+        """Extract costs/freight charges from the delivery invoice.
+
+        Udea delivery PDFs may have a Costs section after the Barrels section
+        containing freight/transport charges. The format is:
+
+            Costs
+            Cost code  Amount  Description  Price    VAT  Total
+            1          Freight              293,55   ...  293,55
+            Total Costs                                  293,55
+
+        Returns:
+            {
+                'items': [
+                    {'code': '1', 'description': 'Freight', 'total': 293.55},
+                    ...
+                ],
+                'total': 293.55
+            }
+        """
+        result: Dict[str, Any] = {'items': [], 'total': 0.0}
+
+        # Find the costs section - starts at "Cost code" or standalone "Costs" after barrels
+        costs_start = text.find('Cost code')
+        if costs_start == -1:
+            # Try finding a standalone "Costs" line (not part of "Total Costs")
+            for match in re.finditer(r'(?<!\w)Costs(?!\w)', text):
+                # Make sure this isn't "Total Costs"
+                preceding = text[max(0, match.start() - 10):match.start()]
+                if 'Total' not in preceding:
+                    costs_start = match.start()
+                    break
+
+        if costs_start == -1:
+            return result
+
+        # Extract text from costs section to end of document or next major section
+        costs_text = text[costs_start:]
+
+        # Limit to relevant section - stop at totals footer
+        for end_marker in ['Total excluding vat', 'Total including vat', 'Total to deliver']:
+            end_pos = costs_text.find(end_marker)
+            if end_pos != -1:
+                costs_text = costs_text[:end_pos]
+                break
+
+        # Parse individual cost lines
+        # Pattern: code number + Freight/Vracht/Transport keyword + price amounts
+        cost_line_pattern = re.compile(
+            r'(\d+)\s+(?:Freight|Vracht|Transport)\s+.*?(\d+[.,]\d{2})\s*$',
+            re.MULTILINE | re.IGNORECASE
+        )
+
+        for match in cost_line_pattern.finditer(costs_text):
+            code = match.group(1)
+            total = float(self._clean_number_string(match.group(2)))
+            result['items'].append({
+                'code': code,
+                'description': 'Freight',
+                'total': total,
+            })
+            self.log(f"Parsed cost line: code={code}, total={total}", "DEBUG")
+
+        # Extract "Total Costs" amount as validation/fallback
+        total_costs_match = re.search(r'Total\s+Costs\s+(\d+[.,]\d{2})', costs_text, re.IGNORECASE)
+        if total_costs_match:
+            result['total'] = float(self._clean_number_string(total_costs_match.group(1)))
+            self.log(f"Found Total Costs: {result['total']}", "DEBUG")
+
+            # If we didn't find individual cost lines, create one from the total
+            if not result['items'] and result['total'] > 0:
+                result['items'].append({
+                    'code': '1',
+                    'description': 'Freight/Transport',
+                    'total': result['total'],
+                })
+        elif result['items']:
+            # Calculate total from parsed items
+            result['total'] = round(sum(item['total'] for item in result['items']), 2)
+
+        self.log(f"Parsed {len(result['items'])} cost items, total: {result['total']}", "DEBUG")
+
+        return result
+
     def _extract_invoice_totals(self, text: str) -> Dict[str, Optional[float]]:
         """Extract the invoice's stated totals from footer section.
 
@@ -668,12 +752,17 @@ class DeliveryUdeaParser:
             barrels = self._parse_barrels_section(text)
             result["barrels"] = barrels
 
+            # Parse costs section (freight/transport charges)
+            costs = self._parse_costs_section(text)
+            result["costs"] = costs
+
             # Set results
             result["items"] = items
             result["totals"]["line_count"] = len(items)
             result["totals"]["products_total"] = round(total_value, 2)
             result["totals"]["barrels_total"] = barrels['total']
-            result["totals"]["total_value"] = round(total_value + barrels['total'], 2)
+            result["totals"]["costs_total"] = costs['total']
+            result["totals"]["total_value"] = round(total_value + barrels['total'] + costs['total'], 2)
 
             # Extract stated totals from PDF footer and compare
             stated = self._extract_invoice_totals(text)
@@ -687,7 +776,8 @@ class DeliveryUdeaParser:
             # Store calculated totals explicitly
             result["totals"]["products_calculated"] = round(total_value, 2)
             result["totals"]["barrels_calculated"] = barrels['total']
-            result["totals"]["grand_calculated"] = round(total_value + barrels['total'], 2)
+            result["totals"]["costs_calculated"] = costs['total']
+            result["totals"]["grand_calculated"] = round(total_value + barrels['total'] + costs['total'], 2)
 
             # Compare calculated vs stated totals
             products_match = True
@@ -715,7 +805,7 @@ class DeliveryUdeaParser:
                     )
 
             if stated['grand_stated'] is not None:
-                calculated_grand = total_value + barrels['total']
+                calculated_grand = total_value + barrels['total'] + costs['total']
                 discrepancy = abs(calculated_grand - stated['grand_stated'])
                 grand_match = discrepancy <= tolerance
                 if not grand_match:

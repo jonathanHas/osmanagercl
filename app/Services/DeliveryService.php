@@ -49,6 +49,10 @@ class DeliveryService
             $calculatedTotal = $totals['grand_calculated'] ?? null;
             $discrepancy = $totals['discrepancy'] ?? null;
             $hasDiscrepancy = isset($totals['totals_match']) ? ! $totals['totals_match'] : false;
+            $freightCharge = $totals['costs_total'] ?? null;
+            if ($freightCharge !== null && (float) $freightCharge == 0) {
+                $freightCharge = null;
+            }
 
             // Create delivery header
             $delivery = Delivery::create([
@@ -65,6 +69,7 @@ class DeliveryService
                 // Totals verification
                 'invoice_stated_total' => $invoiceStatedTotal,
                 'calculated_total' => $calculatedTotal,
+                'freight_charge' => $freightCharge,
                 'total_discrepancy' => $discrepancy,
                 'has_discrepancy' => $hasDiscrepancy,
             ]);

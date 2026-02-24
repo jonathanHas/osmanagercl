@@ -120,6 +120,7 @@ class DeliveryParsingService
         $detectedSupplier = null;
         $allBarrelItems = [];
         $totalBarrelsValue = 0.0;
+        $totalCostsValue = 0.0;
 
         foreach ($pdfPaths as $pdfPath) {
             $filename = basename($pdfPath);
@@ -129,6 +130,7 @@ class DeliveryParsingService
 
                 $itemCount = count($result['data']['items'] ?? []);
                 $barrelsTotal = $result['data']['totals']['barrels_total'] ?? 0;
+                $costsTotal = $result['data']['totals']['costs_total'] ?? 0;
                 $productsTotal = $result['data']['totals']['products_total'] ?? $result['data']['totals']['total_value'] ?? 0;
 
                 // Extract totals verification data from parser
@@ -142,7 +144,8 @@ class DeliveryParsingService
                     'item_count' => $itemCount,
                     'products_total' => $productsTotal,
                     'barrels_total' => $barrelsTotal,
-                    'total_value' => $productsTotal + $barrelsTotal,
+                    'costs_total' => $costsTotal,
+                    'total_value' => $productsTotal + $barrelsTotal + $costsTotal,
                     // Stated totals from PDF
                     'products_stated' => $totals['products_stated'] ?? null,
                     'barrels_stated' => $totals['barrels_stated'] ?? null,
@@ -150,7 +153,8 @@ class DeliveryParsingService
                     // Calculated totals (sum of parsed items)
                     'products_calculated' => $totals['products_calculated'] ?? $productsTotal,
                     'barrels_calculated' => $totals['barrels_calculated'] ?? $barrelsTotal,
-                    'grand_calculated' => $totals['grand_calculated'] ?? ($productsTotal + $barrelsTotal),
+                    'costs_calculated' => $totals['costs_calculated'] ?? $costsTotal,
+                    'grand_calculated' => $totals['grand_calculated'] ?? ($productsTotal + $barrelsTotal + $costsTotal),
                     // Verification
                     'totals_match' => $totalsMatch,
                     'discrepancy' => $discrepancy,
@@ -173,6 +177,9 @@ class DeliveryParsingService
                         $allBarrelItems[] = $barrelItem;
                     }
                     $totalBarrelsValue += $barrels['total'];
+
+                    // Accumulate costs (freight/transport charges)
+                    $totalCostsValue += $result['data']['costs']['total'] ?? 0;
 
                     // Track validation stats
                     $stats = $result['metadata']['stats'] ?? [];
@@ -259,11 +266,16 @@ class DeliveryParsingService
                     'items' => $allBarrelItems,
                     'total' => round($totalBarrelsValue, 2),
                 ],
+                'costs' => [
+                    'items' => [],
+                    'total' => round($totalCostsValue, 2),
+                ],
                 'totals' => [
                     'line_count' => count($allItems),
                     'products_total' => round($totalValue, 2),
                     'barrels_total' => round($totalBarrelsValue, 2),
-                    'total_value' => round($totalValue + $totalBarrelsValue, 2),
+                    'costs_total' => round($totalCostsValue, 2),
+                    'total_value' => round($totalValue + $totalBarrelsValue + $totalCostsValue, 2),
                     // Stated totals from PDF (aggregated)
                     'products_stated' => $hasStatedTotals ? round($totalStatedProducts, 2) : null,
                     'barrels_stated' => $totalStatedBarrels > 0 ? round($totalStatedBarrels, 2) : null,
@@ -271,7 +283,8 @@ class DeliveryParsingService
                     // Calculated totals
                     'products_calculated' => round($totalValue, 2),
                     'barrels_calculated' => round($totalBarrelsValue, 2),
-                    'grand_calculated' => round($totalValue + $totalBarrelsValue, 2),
+                    'costs_calculated' => round($totalCostsValue, 2),
+                    'grand_calculated' => round($totalValue + $totalBarrelsValue + $totalCostsValue, 2),
                     // Verification
                     'totals_match' => $allTotalsMatch,
                     'discrepancy' => round($totalDiscrepancy, 2),

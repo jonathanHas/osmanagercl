@@ -138,14 +138,27 @@
             </div>
 
             <!-- Recent Scan Sessions -->
-            <div class="mt-6 bg-white overflow-hidden shadow-sm sm:rounded-lg">
+            <div class="mt-6 bg-white overflow-hidden shadow-sm sm:rounded-lg" x-data="sessionManager()">
                 <div class="p-6">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Recent Scan Sessions</h3>
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-medium text-gray-900">Recent Scan Sessions</h3>
+                        <button type="button"
+                            x-show="selectedSessions.length === 2"
+                            x-cloak
+                            @click="showMergeDialog = true"
+                            class="inline-flex items-center px-3 py-1.5 bg-amber-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-amber-700 transition">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                            </svg>
+                            Merge Selected Sessions
+                        </button>
+                    </div>
 
                     <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
+                                    <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">Merge</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Session ID</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
@@ -158,14 +171,61 @@
                                 @forelse($scanSessions as $session)
                                     @php
                                         $itemCount = $scanItemCounts[$session->ID] ?? 0;
+                                        $isPending = $session->status == 0;
                                     @endphp
                                     <tr>
+                                        <td class="px-3 py-4 whitespace-nowrap text-sm">
+                                            @if($isPending)
+                                                <input type="checkbox"
+                                                    value="{{ $session->ID }}"
+                                                    @change="toggleSession('{{ $session->ID }}', '{{ $session->supID }}', '{{ addslashes($session->Supplier ?? 'Unknown') }}')"
+                                                    :checked="selectedSessions.includes('{{ $session->ID }}')"
+                                                    :disabled="selectedSessions.length >= 2 && !selectedSessions.includes('{{ $session->ID }}')"
+                                                    class="rounded border-gray-300 text-amber-600 focus:ring-amber-500">
+                                            @endif
+                                        </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                            #{{ $session->ID }}
+                                            #{{ Str::limit($session->ID, 8, '...') }}
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {{ $session->Supplier ?? 'Unknown' }}
-                                            <span class="text-gray-400 text-xs">(ID: {{ $session->supID }})</span>
+                                            <div x-data="{ editing: false }" class="flex items-center gap-1">
+                                                <span x-show="!editing">
+                                                    {{ $session->Supplier ?? 'Unknown' }}
+                                                    <span class="text-gray-400 text-xs">(ID: {{ $session->supID }})</span>
+                                                </span>
+                                                @if($isPending)
+                                                    <button x-show="!editing" @click="editing = true" class="text-gray-400 hover:text-indigo-600 ml-1" title="Change supplier">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                                        </svg>
+                                                    </button>
+                                                    <form x-show="editing" x-cloak @click.away="editing = false"
+                                                        action="{{ route('delivery-legacy.change-supplier') }}" method="POST"
+                                                        @submit="return confirm('Change supplier from {{ addslashes($session->Supplier ?? 'Unknown') }} to ' + $el.querySelector('select').selectedOptions[0].text + '?')"
+                                                        class="flex items-center gap-1">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <input type="hidden" name="sessionId" value="{{ $session->ID }}">
+                                                        <select name="newSupplierID" required class="text-xs rounded border-gray-300 py-1 pr-6">
+                                                            @foreach($suppliers as $supplier)
+                                                                <option value="{{ $supplier->SupplierID }}" @selected($supplier->SupplierID == $session->supID)>
+                                                                    {{ $supplier->Supplier }}
+                                                                </option>
+                                                            @endforeach
+                                                        </select>
+                                                        <button type="submit" class="text-green-600 hover:text-green-800" title="Save">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                                            </svg>
+                                                        </button>
+                                                        <button type="button" @click="editing = false" class="text-gray-400 hover:text-gray-600" title="Cancel">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                            </svg>
+                                                        </button>
+                                                    </form>
+                                                @endif
+                                            </div>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {{ $session->dateUpload }}
@@ -176,17 +236,17 @@
                                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                                             @if($session->status)
                                                 <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
-                                                    {{ $session->status }}
+                                                    Completed
                                                 </span>
                                             @else
-                                                <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-600">
-                                                    -
+                                                <span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">
+                                                    Pending
                                                 </span>
                                             @endif
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                                             <button type="button"
-                                                onclick="selectSession({{ $session->ID }}, '{{ $session->supID }}')"
+                                                onclick="selectSession('{{ $session->ID }}', '{{ $session->supID }}')"
                                                 class="text-indigo-600 hover:text-indigo-900 mr-3">
                                                 Select
                                             </button>
@@ -198,13 +258,56 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                                        <td colspan="7" class="px-6 py-4 text-center text-gray-500">
                                             No scan sessions found
                                         </td>
                                     </tr>
                                 @endforelse
                             </tbody>
                         </table>
+                    </div>
+
+                    <p class="mt-2 text-xs text-gray-500" x-show="selectedSessions.length > 0 && selectedSessions.length < 2">
+                        Select one more pending session to merge.
+                    </p>
+                </div>
+
+                {{-- Merge Sessions Dialog --}}
+                <div x-show="showMergeDialog" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @keydown.escape.window="showMergeDialog = false">
+                    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6" @click.away="showMergeDialog = false">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Merge Sessions</h3>
+                        <p class="text-sm text-gray-600 mb-4">Which session do you want to <strong>keep</strong>? The other session's items will be merged into it, and the other session will be deleted.</p>
+
+                        <template x-if="differentSuppliers">
+                            <div class="mb-4 bg-amber-50 border border-amber-200 text-amber-800 px-3 py-2 rounded text-sm">
+                                These sessions have different suppliers. The kept session's supplier will be used.
+                            </div>
+                        </template>
+
+                        <div class="space-y-2 mb-4">
+                            <template x-for="s in sessionDetails" :key="s.id">
+                                <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50" :class="keepSessionId === s.id ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200'">
+                                    <input type="radio" name="keepSession" :value="s.id" x-model="keepSessionId" class="text-indigo-600 focus:ring-indigo-500">
+                                    <span class="ml-3 text-sm">
+                                        <span class="font-medium" x-text="'#' + s.id.substring(0, 8) + '...'"></span>
+                                        <span class="text-gray-500" x-text="' - ' + s.supplier"></span>
+                                    </span>
+                                </label>
+                            </template>
+                        </div>
+
+                        <div class="flex justify-end gap-3">
+                            <button @click="showMergeDialog = false" class="px-4 py-2 text-sm text-gray-700 hover:text-gray-900">Cancel</button>
+                            <form action="{{ route('delivery-legacy.merge-sessions') }}" method="POST">
+                                @csrf
+                                <input type="hidden" name="sourceSessionId" :value="sourceSessionId">
+                                <input type="hidden" name="targetSessionId" :value="keepSessionId">
+                                <button type="submit" :disabled="!keepSessionId"
+                                    class="px-4 py-2 bg-amber-600 text-white text-sm font-semibold rounded-md hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    Merge Sessions
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -216,6 +319,36 @@
         function selectSession(sessionId, supplierId) {
             document.getElementById('delID').value = sessionId;
             document.getElementById('supplierID').value = supplierId;
+        }
+
+        function sessionManager() {
+            return {
+                selectedSessions: [],
+                sessionDetails: [],
+                showMergeDialog: false,
+                keepSessionId: '',
+
+                get differentSuppliers() {
+                    if (this.sessionDetails.length < 2) return false;
+                    return this.sessionDetails[0].supID !== this.sessionDetails[1].supID;
+                },
+
+                get sourceSessionId() {
+                    return this.selectedSessions.find(id => id !== this.keepSessionId) || '';
+                },
+
+                toggleSession(id, supID, supplier) {
+                    const idx = this.selectedSessions.indexOf(id);
+                    if (idx > -1) {
+                        this.selectedSessions.splice(idx, 1);
+                        this.sessionDetails = this.sessionDetails.filter(s => s.id !== id);
+                    } else if (this.selectedSessions.length < 2) {
+                        this.selectedSessions.push(id);
+                        this.sessionDetails.push({ id, supID, supplier });
+                    }
+                    this.keepSessionId = '';
+                }
+            };
         }
 
         // Filter scan sessions by supplier when supplier is selected

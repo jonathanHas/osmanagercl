@@ -146,7 +146,8 @@ def process_delivery_pdf(file_path: str, supplier_hint: str = None, verbose: boo
                 'supplier': result['supplier'],
                 'items': result['items'],
                 'totals': result['totals'],
-                'barrels': result.get('barrels', {'items': [], 'total': 0})
+                'barrels': result.get('barrels', {'items': [], 'total': 0}),
+                'costs': result.get('costs', {'items': [], 'total': 0})
             }
 
             # Calculate confidence based on validation results

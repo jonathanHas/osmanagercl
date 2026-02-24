@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **RTD: Unfreeze Mode for correcting frozen invoices** (2026-02-23)
+  - New "Unfreeze Mode" toggle in the RTD settings cog panel
+  - Per-row "Unfreeze" button on frozen invoices resets them to "needs_computation" for recomputation
+  - "Unfreeze All Visible" bulk button unfreezes all frozen invoices on the current page
+  - Safety: blocks unfreezing invoices in submitted RTD submissions
+  - **Files Modified**: `RtdController.php`, `rtd/index.blade.php`, `web.php`
+
 - **VAT on Purchases report page** (2026-02-23)
   - New report under Revenue sidebar showing purchase invoice VAT broken down by rate (0%, 9%, 13.5%, 23%)
   - Splits invoices into Retail (T1), Non-Retail (T2), and Unclassified based on supplier RTD classification
