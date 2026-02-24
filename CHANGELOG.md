@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Delivery Legacy: Merge Sessions & Change Supplier** (2026-02-24)
+  - Merge two pending scan sessions: overlapping barcodes have quantities summed, unique items are moved
+  - Source session is deleted after merge; target session's supplier is preserved
+  - Change supplier on any pending session via inline edit icon with dropdown
+  - Checkboxes on pending session rows with "Merge Selected Sessions" button (appears when exactly 2 selected)
+  - Modal dialog to choose which session to keep, with different-supplier warning
+  - Completed sessions cannot be merged or have supplier changed
+  - **Files Modified**: `DeliveryLegacyController.php`, `delivery-legacy/index.blade.php`, `web.php`
+
 - **RTD: Unfreeze Mode for correcting frozen invoices** (2026-02-23)
   - New "Unfreeze Mode" toggle in the RTD settings cog panel
   - Per-row "Unfreeze" button on frozen invoices resets them to "needs_computation" for recomputation

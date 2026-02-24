@@ -717,6 +717,8 @@ Route::middleware('auth')->group(function () {
         // VAT on Purchases Report
         Route::get('/vat-purchases', [\App\Http\Controllers\Management\VatPurchasesController::class, 'index'])
             ->name('vat-purchases.index');
+        Route::get('/vat-purchases/export', [\App\Http\Controllers\Management\VatPurchasesController::class, 'export'])
+            ->name('vat-purchases.export');
 
         // VAT Returns Management
         Route::prefix('vat-returns')->name('vat-returns.')->group(function () {

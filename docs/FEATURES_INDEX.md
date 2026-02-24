@@ -241,6 +241,14 @@ Comprehensive delivery processing with barcode scanning and PDF invoice parsing.
   - Supplier selection with one-click session creation
   - UUID-based session IDs
   - Immediate redirect to match page for new session
+- **Merge Sessions** (NEW! 2026-02-24): Combine two pending scan sessions into one
+  - Checkbox selection on pending sessions, merge button when exactly 2 selected
+  - Modal dialog to choose which session to keep; other is merged in and deleted
+  - Overlapping barcodes have quantities summed; unique items are moved
+  - Different-supplier warning (kept session's supplier is preserved)
+- **Change Supplier** (NEW! 2026-02-24): Update supplier on a pending scan session
+  - Inline edit icon next to supplier name with dropdown and confirm dialog
+  - Only available for pending (not completed) sessions
 - **Weight-Based Product Support** (NEW! 2026-01-27): Full support for products sold by weight (kg/g)
   - Automatic detection of weight-based products from Udea PDFs
   - Stores weight_per_unit, weight_unit, total_weight in database

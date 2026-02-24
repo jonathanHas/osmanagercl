@@ -2162,9 +2162,57 @@ public function createSession(Request $request)
 
 ---
 
-**Last Updated**: 2026-01-29
+### 2026-02-24 - Merge Sessions & Change Supplier
+
+#### Combine Duplicate Scan Sessions and Fix Wrong Supplier
+
+**Enhancement**: Added two session management features to the `/delivery-legacy` index page to handle common workflow issues where staff create duplicate or mis-assigned scan sessions.
+
+**New Features Implemented**:
+
+1. **Merge Sessions**:
+   - Checkboxes on pending session rows (disabled for completed sessions)
+   - "Merge Selected Sessions" button appears when exactly 2 sessions are checked
+   - Modal dialog asks which session to **keep** (the other becomes the source)
+   - Merge logic (in a database transaction):
+     - Overlapping barcodes: quantities are summed on the target session
+     - Unique barcodes: items are moved to the target session
+     - Source session items and record are deleted
+   - Different-supplier warning shown when the two sessions have different suppliers
+   - Kept session's supplier is always preserved
+
+2. **Change Supplier**:
+   - Pencil edit icon next to supplier name on pending session rows
+   - Click to expand inline dropdown with all suppliers
+   - Confirm dialog: "Change supplier from X to Y?"
+   - Only available for pending sessions (status = 0)
+
+**Routes**:
+```
+POST /delivery-legacy/merge-sessions
+PATCH /delivery-legacy/change-supplier
+```
+
+**Controller Methods** (`DeliveryLegacyController.php`):
+- `mergeSessions()` - Validates both sessions exist and are pending, merges items in transaction, deletes source
+- `changeSupplier()` - Validates session is pending, updates `supID` on `deliveriesScan`
+
+**Files Modified**:
+- `app/Http/Controllers/DeliveryLegacyController.php` - Added `mergeSessions()` and `changeSupplier()` methods
+- `routes/web.php` - Added 2 new routes
+- `resources/views/delivery-legacy/index.blade.php` - Added checkboxes, merge button/modal, inline supplier edit with Alpine.js
+
+#### Impact & Benefits
+- ✅ **No More Re-scanning**: Staff can merge duplicate sessions instead of starting over
+- ✅ **Quick Supplier Fix**: Correct wrong supplier without recreating the session
+- ✅ **Data Integrity**: Merge runs in a transaction; quantities are properly summed
+- ✅ **Safety Guards**: Only pending sessions can be merged or changed; completed sessions are locked
+
+---
+
+**Last Updated**: 2026-02-24
 **System Status**: ✅ Fully Operational
 **Test Coverage**: Manual testing completed
 **Performance**: Tested with 292-item deliveries
-**Recent Enhancement**: Delivery parsing totals verification, delivery document storage, create legacy scan session, product images in delivery-legacy, barcode exists highlighting, OOS handling, auto supplier detection, clickable case badges
-**New Features**: Delivery parsing totals verification, delivery document storage & viewing, create legacy scan session, product images in delivery-legacy, barcode exists highlighting, PDF delivery parsing (Independent & UDEA), multi-PDF upload, price comparison matrix, bulk cost updates, quick price editing, professional table sorting, enhanced product navigation, inline cost editing, sync to legacy, case unit editing, pending item quantity entry, stock update & completion, stock verification preview, extra items stock column, OOS section, auto supplier detection, clickable case badges
+**Recent Enhancement**: Merge sessions & change supplier, delivery parsing totals verification, delivery document storage, create legacy scan session, product images in delivery-legacy, barcode exists highlighting, OOS handling, auto supplier detection, clickable case badges
+**New Features**: Merge sessions & change supplier, delivery parsing totals verification, delivery document storage & viewing, create legacy scan session, product images in delivery-legacy, barcode exists highlighting, PDF delivery parsing (Independent & UDEA), multi-PDF upload, price comparison matrix, bulk cost updates, quick price editing, professional table sorting, enhanced product navigation, inline cost editing, sync to legacy, case unit editing, pending item quantity entry, stock update & completion, stock verification preview, extra items stock column, OOS section, auto supplier detection, clickable case badges
