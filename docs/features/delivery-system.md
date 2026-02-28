@@ -490,6 +490,41 @@ POST /deliveries/parse-pdf    // Preview PDF(s) - accepts pdf_file[] array
 POST /deliveries/store-pdf    // Create delivery from PDF(s)
 ```
 
+### Manual Resolution of Unparsed Lines
+
+When the PDF parser can't parse certain lines (garbled text from PDF extraction), they are persisted to the delivery's `unparsed_lines` JSON column and displayed on the delivery show page with an interactive resolution interface.
+
+#### User Flow
+1. Upload PDF → parser reports unparsed lines → stored in `deliveries.unparsed_lines`
+2. On delivery show page, each unparsed line shows raw content with **Resolve** and **Dismiss** buttons
+3. Clicking **Resolve** expands an inline form and auto-fetches product data by supplier code
+4. User reviews/adjusts pre-filled fields and clicks **Add Item** → delivery item created, line removed
+5. Manually added item totals are tracked and reflected in the parsing discrepancy section
+
+#### Auto-Lookup Chain
+The supplier code lookup (`GET /deliveries/{delivery}/lookup-supplier-code/{code}`) cascades through:
+1. `SupplierLink` for the delivery's supplier (exact match)
+2. `SupplierLink` for any supplier (cross-supplier fallback)
+3. Most recent `DeliveryItem` with the same supplier code (past delivery fallback)
+
+Returns: `product_name`, `barcode`, `unit_cost`, `tax_rate`, `units_per_case`
+
+#### Database Fields
+- `deliveries.unparsed_lines` (JSON, nullable) - Array of `{filename, line_num, content}`
+- `deliveries.manually_added_total` (decimal, default 0) - Running total of items added via resolution
+
+#### Routes
+```php
+GET  /deliveries/{delivery}/lookup-supplier-code/{code}  // Product auto-lookup
+DELETE /deliveries/{delivery}/unparsed-lines/{index}      // Remove/dismiss a line
+POST /deliveries/{delivery}/items                         // Create delivery item
+```
+
+#### Key Files
+- `app/Http/Controllers/DeliveryController.php` - `lookupSupplierCode()`, `resolveUnparsedLine()`
+- `app/Services/DeliveryService.php` - `findProductBySupplierCode()` (public), `createDeliveryItem()`
+- `resources/views/deliveries/show.blade.php` - Alpine.js `unparsedLinesManager` component
+
 ### Configuration
 
 #### Python Environment

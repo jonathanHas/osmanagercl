@@ -222,6 +222,12 @@ External supplier connectivity for images, pricing, and product data.
 
 ### Delivery Verification
 Comprehensive delivery processing with barcode scanning and PDF invoice parsing.
+- **Manual Resolution of Unparsed Lines** (NEW! 2026-02-28): Manually create delivery items from lines the PDF parser couldn't parse
+  - Unparsed lines persisted to database (survive page refresh)
+  - Interactive inline form with auto-lookup by supplier code (pre-fills description, cost, VAT, case size, barcode)
+  - Fallback lookup: exact supplier → any supplier → past delivery items
+  - Manually added totals reflected in parsing discrepancy section with remaining difference calculation
+  - Dismiss option for lines that don't need resolution
 - **Parsing Totals Verification** (NEW! 2026-01-29, enhanced 2026-02-19): Detects missing items by comparing parsed totals against PDF-stated totals
   - Extracts "Total to deliver", "Total barrels delivered", "Total including vat" from Udea PDFs
   - Extracts "Gross Total", "Subtotal", "Nett" from Independent PDFs
@@ -559,6 +565,18 @@ Comprehensive VAT return management dashboard with proactive deadline alerts.
 - **Role-based Access**: Protected for Admin and Manager roles only
 
 📖 [VAT Dashboard Documentation](./features/vat-dashboard.md)
+
+### Wages Management (NEW! 2026-02-28)
+Payroll import and P&L integration for employee wage tracking.
+- **XLS Import**: Upload "Gross to Net Total By Week Number" exports from payroll software
+- **Auto-Detect Layout**: Handles different file format years with dynamic column detection
+- **Upsert Logic**: Re-importing updates existing entries (matched on year + week number)
+- **Full Breakdown**: Gross Pay, Tax, USC+Levy, PRSI(EE), LPT, Net Pay, PRSI(ER), Employer Cost per week
+- **Year Filtering**: Tab-based year selector with bulk delete per year
+- **P&L Integration**: Automatically included in Profit & Loss cost breakdown (Gross Pay + Employer PRSI)
+- **Date Range Queries**: Week-based overlap matching for accurate period reporting
+- **Previous Period Comparison**: Wages included in P&L period-over-period comparison
+- Navigation: Sidebar → Wages
 
 ### OSAccounts Integration System
 Complete invoice and supplier data migration from legacy OSAccounts system.

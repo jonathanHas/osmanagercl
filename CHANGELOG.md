@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Manual Resolution of Unparsed Delivery Lines** (2026-02-28)
+  - When PDF parser can't parse a line, it's now persisted to the delivery (survives page refresh)
+  - Interactive inline form on delivery show page to manually create delivery items from unparsed lines
+  - Auto-lookup by supplier code: pre-fills description, unit cost, VAT rate, units/case, and barcode from product database
+  - Fallback lookup chain: exact supplier match → any supplier → past delivery items
+  - Barcode-based product matching prevents false "New Product" flags
+  - Manually added items tracked in parsing discrepancy section with updated totals and remaining difference
+  - "Dismiss" option to remove unparsed lines without creating items
+  - **Files Created**: `add_unparsed_lines_to_deliveries_table` migration, `add_manually_added_total_to_deliveries_table` migration
+  - **Files Modified**: `DeliveryController.php`, `DeliveryService.php`, `Delivery.php`, `deliveries/show.blade.php`, `web.php`, `api.php`
+
+### Fixed
+
+- **"Undefined array key filename" on single-file delivery upload** (2026-02-28)
+  - Single-file PDF uploads now include `filename` key in unmatched lines session data, matching multi-file behaviour
+  - **File Modified**: `DeliveryController.php`
+
+- **Wages Management & P&L Integration** (2026-02-28)
+  - New `/management/wages` page to import payroll "Gross to Net Total By Week Number" XLS/XLSX exports
+  - Auto-detects column layout across different file format years (2025 vs 2026 column shifts)
+  - Upserts weekly entries (year + week number) so re-importing updates existing data
+  - Year filter tabs, totals row, individual and bulk year delete
+  - P&L page automatically includes wages (Gross Pay + Employer PRSI) in cost breakdown and profit calculation
+  - Previous period comparison now includes wages in cost totals
+  - **Files Created**: `WageController.php`, `WageImportService.php`, `WageEntry.php`, `wages/index.blade.php`, `create_wage_entries_table` migration
+  - **Files Modified**: `ProfitLossController.php`, `profit-loss/index.blade.php`, `web.php`, `admin.blade.php`
+
 - **Delivery Legacy: Merge Sessions & Change Supplier** (2026-02-24)
   - Merge two pending scan sessions: overlapping barcodes have quantities summed, unique items are moved
   - Source session is deleted after merge; target session's supplier is preserved

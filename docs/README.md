@@ -39,6 +39,7 @@ Detailed documentation for each major feature. See **[Features Index](./FEATURES
 - [VAT Dashboard](./features/vat-dashboard.md) - VAT return management
 - [Invoice Bulk Upload](./features/invoice-bulk-upload-system.md) - Multi-file invoice upload
 - [Cash Reconciliation](./features/cash-reconciliation.md) - End-of-day cash management
+- Wages Management - Payroll import with P&L integration
 
 **Analytics & Reporting**
 - [Sales Data Import](./features/sales-data-import.md) - Lightning-fast sales analytics

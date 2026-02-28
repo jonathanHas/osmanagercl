@@ -21,6 +21,17 @@ This guide provides all the commands and procedures you need to get started with
 - SQLite (or MySQL/PostgreSQL)
 - Git
 
+### Required PHP Extensions
+
+These extensions are needed for full functionality (XLS/XLSX parsing via PhpSpreadsheet, image handling, etc.):
+
+```bash
+# Adjust php version number to match your installation (check with: php -v)
+sudo apt install php-gd php-zip php-xml php-mbstring
+```
+
+> **Note:** `dom`, `simplexml`, `xmlreader`, `xmlwriter` are bundled with `php-xml`. `iconv`, `ctype`, `fileinfo` are bundled with base PHP. Verify all required extensions are loaded with: `php -m | grep -iE 'gd|zip|xml|mbstring|dom|fileinfo'`
+
 ### First Time Setup
 
 ```bash

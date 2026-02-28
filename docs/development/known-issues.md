@@ -123,6 +123,28 @@ Use the Price Sync Management tool at `/fruit-veg/price-sync` to identify and fi
 
 ## File Upload & Permissions Issues
 
+### XLS Upload Rejected Despite Correct File Type
+**Status:** Fixed 2026-02-28
+
+#### Problem
+Uploading `.xls` files (e.g., payroll reports) fails with "The file field must be a file of type: xls, xlsx" even though the file is a valid XLS.
+
+#### Root Cause
+Laravel's `mimes:xls,xlsx` validation uses PHP's `fileinfo` extension to detect the MIME type, then maps it back to a file extension. Old-style `.xls` files use the OLE2 compound document format, which `fileinfo` detects as `application/x-ole-storage` instead of `application/vnd.ms-excel`. This MIME type doesn't map to `xls`, so the validation fails.
+
+#### Solution
+Use `mimetypes:` validation instead of `mimes:` and include all known MIME types for Excel files:
+```php
+'file' => 'required|file|mimetypes:application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream,application/x-ole-storage',
+```
+
+#### How to Detect
+Check the actual MIME type with: `file --mime-type yourfile.xls`. If it returns `application/x-ole-storage`, the `mimes:xls` rule will reject it.
+
+**Files Modified**: `WageController.php`
+
+---
+
 ### PDF Upload Validation Failures
 **Status:** Fixed 2025-09-04
 
@@ -357,6 +379,29 @@ if ',' in value and '.' in value:
 
 #### How to Detect
 Check delivery records for large discrepancies between `invoice_stated_total` and `calculated_total` where the stated total is suspiciously small (e.g., 1.98 vs 1978.38).
+
+---
+
+### Undefined Array Key "filename" on Single-File Delivery Upload
+**Status:** Fixed 2026-02-28
+
+#### Problem
+Uploading a single PDF (e.g., Udea frozen delivery) that produced unparsed lines caused `Undefined array key "filename"` error on the delivery show page at `show.blade.php:246`.
+
+#### Root Cause
+The multi-file upload path in `DeliveryParsingService::parseMultipleDeliveryPdfs()` added the `filename` key to each unmatched line entry, but the single-file path in `DeliveryController::storePdf()` passed the raw parser output directly — which only contained `line_num` and `content`.
+
+#### Solution
+Added `filename` key to each unmatched line entry in the single-file path, mirroring the multi-file behaviour:
+```php
+$unmatchedLines = array_map(fn ($line) => array_merge(
+    ['filename' => $originalFilenames[0] ?? 'unknown'],
+    $line
+), $unmatchedLines);
+```
+
+#### Files Modified
+- `app/Http/Controllers/DeliveryController.php` (~line 582)
 
 ---
 
