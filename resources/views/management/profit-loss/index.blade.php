@@ -218,6 +218,18 @@
                             <span class="text-gray-500 dark:text-gray-400">Gross Pay</span>
                             <span class="text-gray-600 dark:text-gray-400">€{{ number_format($wageData['gross_pay'], 2) }}</span>
                         </div>
+                        @if(($wageData['taxable_adds'] ?? 0) > 0)
+                        <div class="flex justify-between">
+                            <span class="text-gray-500 dark:text-gray-400">Taxable Adds</span>
+                            <span class="text-gray-600 dark:text-gray-400">€{{ number_format($wageData['taxable_adds'], 2) }}</span>
+                        </div>
+                        @endif
+                        @if(($wageData['non_tax_adds'] ?? 0) > 0)
+                        <div class="flex justify-between">
+                            <span class="text-gray-500 dark:text-gray-400">Non-Tax Adds</span>
+                            <span class="text-gray-600 dark:text-gray-400">€{{ number_format($wageData['non_tax_adds'], 2) }}</span>
+                        </div>
+                        @endif
                         <div class="flex justify-between">
                             <span class="text-gray-500 dark:text-gray-400">Employer PRSI</span>
                             <span class="text-gray-600 dark:text-gray-400">€{{ number_format($wageData['prsi_er'], 2) }}</span>

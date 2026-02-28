@@ -369,18 +369,24 @@ class ProfitLossController extends Controller
         $wages = WageEntry::forDateRange($startDate, $endDate)
             ->selectRaw('
                 SUM(gross_pay) as total_gross_pay,
+                SUM(taxable_adds) as total_taxable_adds,
+                SUM(non_tax_adds) as total_non_tax_adds,
                 SUM(prsi_er) as total_prsi_er,
                 COUNT(*) as weeks_count
             ')
             ->first();
 
         $grossPay = $wages->total_gross_pay ?? 0;
+        $taxableAdds = $wages->total_taxable_adds ?? 0;
+        $nonTaxAdds = $wages->total_non_tax_adds ?? 0;
         $prsiEr = $wages->total_prsi_er ?? 0;
 
         return [
             'gross_pay' => $grossPay,
+            'taxable_adds' => $taxableAdds,
+            'non_tax_adds' => $nonTaxAdds,
             'prsi_er' => $prsiEr,
-            'total_employer_cost' => $grossPay + $prsiEr,
+            'total_employer_cost' => $grossPay + $taxableAdds + $nonTaxAdds + $prsiEr,
             'weeks_count' => $wages->weeks_count ?? 0,
         ];
     }

@@ -43,11 +43,11 @@ class WageEntry extends Model
     ];
 
     /**
-     * Total employer cost = gross pay + employer PRSI
+     * Total employer cost = gross pay + taxable adds + non-tax adds + employer PRSI
      */
     public function getTotalEmployerCostAttribute(): float
     {
-        return $this->gross_pay + $this->prsi_er;
+        return $this->gross_pay + $this->taxable_adds + $this->non_tax_adds + $this->prsi_er;
     }
 
     /**

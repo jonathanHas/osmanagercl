@@ -38,28 +38,69 @@
             </form>
         </div>
 
-        <!-- Year Filter -->
+        <!-- Date Range Filter -->
         @if($years->count() > 0)
-        <div class="mb-6 flex flex-wrap items-center gap-2">
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Year:</span>
-            @foreach($years as $year)
-                <a href="{{ route('management.wages.index', ['year' => $year]) }}"
-                   class="px-4 py-2 rounded-md text-sm font-medium {{ (string)$selectedYear === (string)$year ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600' }}">
-                    {{ $year }}
+        <div class="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+            <form method="GET" class="flex flex-wrap items-end gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">From</label>
+                    <input type="date" name="start_date" value="{{ $startDate }}"
+                           class="rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">To</label>
+                    <input type="date" name="end_date" value="{{ $endDate }}"
+                           class="rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm">
+                </div>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium">
+                    Filter
+                </button>
+                <a href="{{ route('management.wages.index') }}" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium">
+                    Reset
                 </a>
-            @endforeach
 
-            <!-- Delete Year -->
-            @if($selectedYear)
+                <!-- Year quick filters -->
+                <div class="flex items-center gap-2 ml-auto">
+                    <span class="text-sm text-gray-500 dark:text-gray-400">Year:</span>
+                    @foreach($years as $year)
+                        <a href="{{ route('management.wages.index', ['year' => $year]) }}"
+                           class="px-3 py-1.5 rounded-md text-sm font-medium {{ $filterMode === 'year' && (string)$selectedYear === (string)$year ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600' }}">
+                            {{ $year }}
+                        </a>
+                    @endforeach
+                </div>
+            </form>
+        </div>
+
+        <!-- Active filter info -->
+        @if($filterMode === 'date_range')
+        <div class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-800 dark:text-blue-200">
+            Showing {{ $entries->count() }} weeks from {{ \Carbon\Carbon::parse($startDate)->format('d M Y') }} to {{ \Carbon\Carbon::parse($endDate)->format('d M Y') }}
+        </div>
+        @endif
+        @endif
+
+        <!-- Chart -->
+        @if($entries->count() > 1)
+        <div class="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Weekly Wages</h3>
+            <div style="height: 300px;">
+                <canvas id="wagesChart"></canvas>
+            </div>
+        </div>
+        @endif
+
+        <!-- Delete Year -->
+        @if($filterMode === 'year' && $selectedYear && $entries->count() > 0)
+        <div class="mb-4 flex justify-end">
             <form action="{{ route('management.wages.destroy-year', ['year' => $selectedYear]) }}" method="POST"
-                  onsubmit="return confirm('Delete ALL wage entries for {{ $selectedYear }}? This cannot be undone.')" class="ml-auto">
+                  onsubmit="return confirm('Delete ALL wage entries for {{ $selectedYear }}? This cannot be undone.')">
                 @csrf
                 @method('DELETE')
                 <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm font-medium">
                     Delete All {{ $selectedYear }}
                 </button>
             </form>
-            @endif
         </div>
         @endif
 
@@ -88,7 +129,7 @@
                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                             <td class="px-4 py-3 text-sm text-gray-900 dark:text-white font-medium">{{ $entry->week_number }}</td>
                             <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                                {{ $entry->week_start_date->format('d M') }} - {{ $entry->week_end_date->format('d M') }}
+                                {{ $entry->week_start_date->format('d M') }} - {{ $entry->week_end_date->format('d M Y') }}
                             </td>
                             <td class="px-4 py-3 text-sm text-gray-900 dark:text-white text-right">&euro;{{ number_format($entry->gross_pay, 2) }}</td>
                             <td class="px-4 py-3 text-sm text-gray-900 dark:text-white text-right">&euro;{{ number_format($entry->tax, 2) }}</td>
@@ -116,7 +157,7 @@
                     <!-- Totals Row -->
                     <tfoot class="bg-gray-100 dark:bg-gray-900 font-semibold">
                         <tr>
-                            <td class="px-4 py-3 text-sm text-gray-900 dark:text-white" colspan="2">Totals</td>
+                            <td class="px-4 py-3 text-sm text-gray-900 dark:text-white" colspan="2">Totals ({{ $entries->count() }} weeks)</td>
                             <td class="px-4 py-3 text-sm text-gray-900 dark:text-white text-right">&euro;{{ number_format($totals['gross_pay'], 2) }}</td>
                             <td class="px-4 py-3 text-sm text-gray-900 dark:text-white text-right">&euro;{{ number_format($totals['tax'], 2) }}</td>
                             <td class="px-4 py-3 text-sm text-gray-900 dark:text-white text-right">&euro;{{ number_format($totals['usc_levy'], 2) }}</td>
@@ -141,4 +182,86 @@
         </div>
         @endif
     </div>
+
+    @if($entries->count() > 1)
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const chartData = @json($chartData);
+            const isDark = document.documentElement.classList.contains('dark');
+            const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+            const textColor = isDark ? '#9ca3af' : '#6b7280';
+
+            const ctx = document.getElementById('wagesChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: chartData.map(d => d.label),
+                    datasets: [
+                        {
+                            label: 'Gross Pay',
+                            data: chartData.map(d => d.gross_pay),
+                            backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                            borderColor: 'rgb(59, 130, 246)',
+                            borderWidth: 1,
+                            stack: 'cost',
+                        },
+                        {
+                            label: 'Employer PRSI',
+                            data: chartData.map(d => d.prsi_er),
+                            backgroundColor: 'rgba(249, 115, 22, 0.7)',
+                            borderColor: 'rgb(249, 115, 22)',
+                            borderWidth: 1,
+                            stack: 'cost',
+                        },
+                        {
+                            label: 'Net Pay',
+                            data: chartData.map(d => d.net_pay),
+                            type: 'line',
+                            borderColor: 'rgb(34, 197, 94)',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            borderWidth: 2,
+                            pointRadius: 2,
+                            tension: 0.3,
+                            fill: false,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': \u20AC' + context.parsed.y.toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                                }
+                            }
+                        },
+                        legend: {
+                            labels: { color: textColor }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: textColor, maxRotation: 45 },
+                            grid: { color: gridColor }
+                        },
+                        y: {
+                            ticks: {
+                                color: textColor,
+                                callback: function(value) { return '\u20AC' + value.toLocaleString(); }
+                            },
+                            grid: { color: gridColor }
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+    @endif
 </x-admin-layout>
