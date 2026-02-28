@@ -62,19 +62,16 @@ class ProfitLossController extends Controller
         // Auto-import missing data from POS on demand
         app(SalesAccountingImportService::class)->ensureDataExists($startDate, $endDate);
 
-        // Check if we have pre-aggregated data for better performance
-        $hasAggregatedData = DB::table('sales_accounting_daily')
-            ->whereBetween('sale_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
-            ->exists();
-
-        if ($hasAggregatedData) {
-            // Use pre-aggregated data (100x faster)
-            return $this->getAggregatedRevenueData($startDate, $endDate);
+        // Try pre-aggregated data first (100x faster, no separate EXISTS check)
+        $aggregatedData = $this->getAggregatedRevenueData($startDate, $endDate);
+        if ($aggregatedData['total_revenue'] !== null) {
+            return $aggregatedData;
         }
 
         // Fall back to real-time POS queries - matching sales-accounting methodology exactly
-        $formattedStartDate = $startDate->format('Y m d');
-        $formattedEndDate = $endDate->format('Y m d');
+        // Use sargable datetime range (allows index usage on DATENEW)
+        $rangeStart = $startDate->copy()->startOfDay()->format('Y-m-d H:i:s');
+        $rangeEnd = $endDate->copy()->addDay()->startOfDay()->format('Y-m-d H:i:s');
 
         // Use TICKETLINES approach (same as sales-accounting) for accurate calculations
         $mainSalesQuery = "
@@ -85,12 +82,12 @@ class ProfitLossController extends Controller
             JOIN PAYMENTS ON RECEIPTS.ID = PAYMENTS.RECEIPT
             JOIN TAXES ON TICKETLINES.TAXID = TAXES.ID
             LEFT JOIN CUSTOMERS ON TICKETS.CUSTOMER = CUSTOMERS.ID
-            WHERE DATE_FORMAT(DATENEW, '%Y %m %d') BETWEEN ? AND ?
+            WHERE DATENEW >= ? AND DATENEW < ?
             AND (CUSTOMERS.NAME IS NULL OR CUSTOMERS.NAME NOT IN ('Kitchen', 'Coffee'))
             GROUP BY PAYMENTS.PAYMENT, TAXES.RATE
         ";
 
-        $mainSales = DB::connection('pos')->select($mainSalesQuery, [$formattedStartDate, $formattedEndDate]);
+        $mainSales = DB::connection('pos')->select($mainSalesQuery, [$rangeStart, $rangeEnd]);
 
         // Process the results to calculate totals and VAT breakdown
         $paymentTotals = [
@@ -142,12 +139,13 @@ class ProfitLossController extends Controller
         // Apply paperin adjustment (gift vouchers should not be counted as revenue)
         $adjustedNetRevenue = $totalNetSales - $paperinGrossTotal;
 
-        // Get transaction count separately
+        // Get transaction count separately (using sargable datetime range)
         $transactionCount = DB::connection('pos')
             ->table('RECEIPTS as r')
             ->leftJoin('TICKETS as t', 'r.ID', '=', 't.ID')
             ->leftJoin('CUSTOMERS as c', 't.CUSTOMER', '=', 'c.ID')
-            ->whereBetween('r.DATENEW', [$startDate, $endDate])
+            ->where('r.DATENEW', '>=', $rangeStart)
+            ->where('r.DATENEW', '<', $rangeEnd)
             ->where(function ($query) {
                 $query->whereNull('c.NAME')
                     ->orWhereNotIn('c.NAME', ['Kitchen', 'Coffee']);
@@ -206,7 +204,12 @@ class ProfitLossController extends Controller
             ')
             ->first();
 
-        $netRevenue = $salesData->total_net_sales ?? 0;
+        // Return null-revenue signal when no aggregated data exists (triggers POS fallback)
+        if ($salesData->total_net_sales === null) {
+            return ['total_revenue' => null];
+        }
+
+        $netRevenue = $salesData->total_net_sales;
         $vatOnSales = $salesData->total_vat_on_sales ?? 0;
         $grossRevenue = $salesData->gross_revenue ?? 0;
 
@@ -238,7 +241,7 @@ class ProfitLossController extends Controller
 
     private function getCostData($startDate, $endDate)
     {
-        // Get invoice costs by payment status - using VAT-exclusive amounts (subtotal)
+        // Single query for all invoice data + paid VAT breakdown (saves 1 query)
         $invoiceData = Invoice::dateRange($startDate, $endDate)
             ->selectRaw('
                 SUM(subtotal) as total_invoiced_net,
@@ -248,26 +251,17 @@ class ProfitLossController extends Controller
                 SUM(CASE WHEN payment_status = "paid" THEN vat_amount ELSE 0 END) as paid_invoices_vat,
                 SUM(CASE WHEN payment_status = "pending" THEN subtotal ELSE 0 END) as pending_invoices_net,
                 SUM(CASE WHEN payment_status = "overdue" THEN subtotal ELSE 0 END) as overdue_invoices_net,
-                COUNT(*) as invoice_count
-            ')
-            ->first();
-
-        // Get VAT breakdown for paid invoices
-        $vatBreakdown = Invoice::dateRange($startDate, $endDate)
-            ->paid()
-            ->selectRaw('
-                SUM(subtotal) as total_net,
-                SUM(vat_amount) as total_vat,
-                SUM(standard_net) as standard_net,
-                SUM(standard_vat) as standard_vat,
-                SUM(reduced_net) as reduced_net,
-                SUM(reduced_vat) as reduced_vat,
-                SUM(zero_net) as zero_net
+                COUNT(*) as invoice_count,
+                SUM(CASE WHEN payment_status = "paid" THEN standard_net ELSE 0 END) as paid_standard_net,
+                SUM(CASE WHEN payment_status = "paid" THEN standard_vat ELSE 0 END) as paid_standard_vat,
+                SUM(CASE WHEN payment_status = "paid" THEN reduced_net ELSE 0 END) as paid_reduced_net,
+                SUM(CASE WHEN payment_status = "paid" THEN reduced_vat ELSE 0 END) as paid_reduced_vat,
+                SUM(CASE WHEN payment_status = "paid" THEN zero_net ELSE 0 END) as paid_zero_net
             ')
             ->first();
 
         return [
-            'total_costs' => $invoiceData->paid_invoices_net ?? 0, // Use net amount for P&L
+            'total_costs' => $invoiceData->paid_invoices_net ?? 0,
             'total_costs_vat' => $invoiceData->paid_invoices_vat ?? 0,
             'total_invoiced_net' => $invoiceData->total_invoiced_net ?? 0,
             'total_invoiced_gross' => $invoiceData->total_invoiced_gross ?? 0,
@@ -276,13 +270,13 @@ class ProfitLossController extends Controller
             'overdue_invoices_net' => $invoiceData->overdue_invoices_net ?? 0,
             'invoice_count' => $invoiceData->invoice_count ?? 0,
             'vat_breakdown' => [
-                'total_net' => $vatBreakdown->total_net ?? 0,
-                'total_vat' => $vatBreakdown->total_vat ?? 0,
-                'standard_net' => $vatBreakdown->standard_net ?? 0,
-                'standard_vat' => $vatBreakdown->standard_vat ?? 0,
-                'reduced_net' => $vatBreakdown->reduced_net ?? 0,
-                'reduced_vat' => $vatBreakdown->reduced_vat ?? 0,
-                'zero_net' => $vatBreakdown->zero_net ?? 0,
+                'total_net' => $invoiceData->paid_invoices_net ?? 0,
+                'total_vat' => $invoiceData->paid_invoices_vat ?? 0,
+                'standard_net' => $invoiceData->paid_standard_net ?? 0,
+                'standard_vat' => $invoiceData->paid_standard_vat ?? 0,
+                'reduced_net' => $invoiceData->paid_reduced_net ?? 0,
+                'reduced_vat' => $invoiceData->paid_reduced_vat ?? 0,
+                'zero_net' => $invoiceData->paid_zero_net ?? 0,
             ],
         ];
     }
@@ -300,44 +294,52 @@ class ProfitLossController extends Controller
         $previousStart = $startDate->copy()->subDays($periodLength);
         $previousEnd = $endDate->copy()->subDays($periodLength);
 
-        // Previous period revenue - using same methodology as current period
-        $formattedPrevStart = $previousStart->format('Y m d');
-        $formattedPrevEnd = $previousEnd->format('Y m d');
+        // Ensure aggregated data exists for previous period, then use fast path
+        app(SalesAccountingImportService::class)->ensureDataExists($previousStart, $previousEnd);
+        $prevRevenueData = $this->getAggregatedRevenueData($previousStart, $previousEnd);
 
-        $prevSalesQuery = "
-            SELECT TAXES.RATE, SUM(PRICE * UNITS) AS Net, PAYMENTS.PAYMENT
-            FROM TICKETLINES
-            JOIN TICKETS ON TICKETLINES.TICKET = TICKETS.ID
-            JOIN RECEIPTS ON TICKETS.ID = RECEIPTS.ID
-            JOIN PAYMENTS ON RECEIPTS.ID = PAYMENTS.RECEIPT
-            JOIN TAXES ON TICKETLINES.TAXID = TAXES.ID
-            LEFT JOIN CUSTOMERS ON TICKETS.CUSTOMER = CUSTOMERS.ID
-            WHERE DATE_FORMAT(DATENEW, '%Y %m %d') BETWEEN ? AND ?
-            AND (CUSTOMERS.NAME IS NULL OR CUSTOMERS.NAME NOT IN ('Kitchen', 'Coffee'))
-            GROUP BY PAYMENTS.PAYMENT, TAXES.RATE
-        ";
+        if ($prevRevenueData['total_revenue'] !== null) {
+            $previousRevenue = $prevRevenueData['total_revenue'];
+        } else {
+            // POS fallback only if no aggregated data (sargable datetime range)
+            $rangeStart = $previousStart->copy()->startOfDay()->format('Y-m-d H:i:s');
+            $rangeEnd = $previousEnd->copy()->addDay()->startOfDay()->format('Y-m-d H:i:s');
 
-        $prevSales = DB::connection('pos')->select($prevSalesQuery, [$formattedPrevStart, $formattedPrevEnd]);
+            $prevSalesQuery = "
+                SELECT TAXES.RATE, SUM(PRICE * UNITS) AS Net, PAYMENTS.PAYMENT
+                FROM TICKETLINES
+                JOIN TICKETS ON TICKETLINES.TICKET = TICKETS.ID
+                JOIN RECEIPTS ON TICKETS.ID = RECEIPTS.ID
+                JOIN PAYMENTS ON RECEIPTS.ID = PAYMENTS.RECEIPT
+                JOIN TAXES ON TICKETLINES.TAXID = TAXES.ID
+                LEFT JOIN CUSTOMERS ON TICKETS.CUSTOMER = CUSTOMERS.ID
+                WHERE DATENEW >= ? AND DATENEW < ?
+                AND (CUSTOMERS.NAME IS NULL OR CUSTOMERS.NAME NOT IN ('Kitchen', 'Coffee'))
+                GROUP BY PAYMENTS.PAYMENT, TAXES.RATE
+            ";
 
-        $prevTotalNet = 0;
-        $prevPaperinGross = 0;
+            $prevSales = DB::connection('pos')->select($prevSalesQuery, [$rangeStart, $rangeEnd]);
 
-        foreach ($prevSales as $sale) {
-            $net = $sale->Net ?? 0;
-            $vat = $net * $sale->RATE;
-            $prevTotalNet += $net;
+            $prevTotalNet = 0;
+            $prevPaperinGross = 0;
 
-            if (strtolower($sale->PAYMENT) === 'paperin') {
-                $prevPaperinGross += ($net + $vat);
+            foreach ($prevSales as $sale) {
+                $net = $sale->Net ?? 0;
+                $vat = $net * $sale->RATE;
+                $prevTotalNet += $net;
+
+                if (strtolower($sale->PAYMENT) === 'paperin') {
+                    $prevPaperinGross += ($net + $vat);
+                }
             }
-        }
 
-        $previousRevenue = $prevTotalNet - $prevPaperinGross;
+            $previousRevenue = $prevTotalNet - $prevPaperinGross;
+        }
 
         // Previous period costs - VAT exclusive
         $previousCosts = Invoice::dateRange($previousStart, $previousEnd)
             ->paid()
-            ->sum('subtotal'); // Use subtotal instead of total_amount
+            ->sum('subtotal');
 
         $previousSupplierPayments = DB::table('cash_reconciliation_payments')
             ->whereBetween('created_at', [$previousStart, $previousEnd])
