@@ -74,7 +74,7 @@
                     €{{ number_format($totalCosts, 2) }}
                 </p>
                 <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Invoices + Cash Payments
+                    Invoices + Cash Payments + Wages
                 </p>
                 <p class="text-xs text-gray-500 dark:text-gray-500 mt-1">
                     VAT: €{{ number_format($costData['total_costs_vat'] ?? 0, 2) }}
@@ -208,6 +208,26 @@
                         <span class="text-gray-700 dark:text-gray-300">Cash Supplier Payments</span>
                         <span class="font-medium text-gray-900 dark:text-white">€{{ number_format($supplierPayments, 2) }}</span>
                     </div>
+                    @if($wageData['total_employer_cost'] > 0)
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-700 dark:text-gray-300">Wages (Employer Cost)</span>
+                        <span class="font-medium text-gray-900 dark:text-white">€{{ number_format($wageData['total_employer_cost'], 2) }}</span>
+                    </div>
+                    <div class="ml-4 space-y-1 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-500 dark:text-gray-400">Gross Pay</span>
+                            <span class="text-gray-600 dark:text-gray-400">€{{ number_format($wageData['gross_pay'], 2) }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500 dark:text-gray-400">Employer PRSI</span>
+                            <span class="text-gray-600 dark:text-gray-400">€{{ number_format($wageData['prsi_er'], 2) }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500 dark:text-gray-400">Weeks covered</span>
+                            <span class="text-gray-600 dark:text-gray-400">{{ $wageData['weeks_count'] }}</span>
+                        </div>
+                    </div>
+                    @endif
                     <hr class="border-gray-200 dark:border-gray-700">
                     <div class="flex justify-between items-center font-semibold">
                         <span class="text-gray-900 dark:text-white">Total Costs (Ex. VAT)</span>

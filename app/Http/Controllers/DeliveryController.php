@@ -578,10 +578,19 @@ class DeliveryController extends Controller
             // Flash unmatched lines for user review
             $unmatchedLines = $result['metadata']['unmatched_lines'] ?? [];
             if (! empty($unmatchedLines)) {
+                // Add filename to each entry (parser only provides line_num + content)
+                $unmatchedLines = array_map(fn ($line) => array_merge(
+                    ['filename' => $originalFilenames[0] ?? 'unknown'],
+                    $line
+                ), $unmatchedLines);
+
                 session()->flash('import_warnings', [
                     'unmatched_count' => count($unmatchedLines),
                     'unmatched_lines' => $unmatchedLines,
                 ]);
+
+                // Persist to delivery model so they survive page refresh
+                $delivery->update(['unparsed_lines' => $unmatchedLines]);
             }
 
             return redirect()
@@ -1462,5 +1471,94 @@ class DeliveryController extends Controller
         } catch (\Exception $e) {
             return back()->withErrors(['sync' => 'Failed to sync to legacy: '.$e->getMessage()]);
         }
+    }
+
+    /**
+     * Remove an unparsed line from a delivery (after manual resolution or dismissal).
+     */
+    public function resolveUnparsedLine(Request $request, Delivery $delivery, int $index): JsonResponse
+    {
+        $lines = $delivery->unparsed_lines ?? [];
+
+        if (! isset($lines[$index])) {
+            return response()->json(['success' => false, 'message' => 'Line not found'], 404);
+        }
+
+        array_splice($lines, $index, 1);
+
+        $updates = ['unparsed_lines' => empty($lines) ? null : $lines];
+
+        // Track the cost of manually added items for discrepancy display
+        $addedCost = (float) $request->input('added_cost', 0);
+        if ($addedCost > 0) {
+            $updates['manually_added_total'] = ($delivery->manually_added_total ?? 0) + $addedCost;
+        }
+
+        $delivery->update($updates);
+
+        return response()->json([
+            'success' => true,
+            'remaining_count' => count($lines),
+        ]);
+    }
+
+    /**
+     * Look up product data by supplier code for auto-populating unparsed line forms.
+     */
+    public function lookupSupplierCode(Delivery $delivery, string $code): JsonResponse
+    {
+        // Try product lookup via SupplierLink
+        $supplierLink = \App\Models\SupplierLink::where('SupplierID', $delivery->supplier_id)
+            ->where('SupplierCode', $code)
+            ->first();
+
+        if ($supplierLink && $supplierLink->product) {
+            $product = $supplierLink->product;
+
+            return response()->json([
+                'found' => true,
+                'source' => 'product_database',
+                'product_name' => $product->NAME,
+                'barcode' => $product->CODE,
+                'unit_cost' => (float) ($supplierLink->Cost ?? $product->PRICEBUY ?? 0),
+                'tax_rate' => $product->getVatRate(),
+                'units_per_case' => (int) ($supplierLink->CaseUnits ?? 1),
+            ]);
+        }
+
+        // Fallback: try any supplier with this code (in case delivery has wrong supplier)
+        $anyLink = \App\Models\SupplierLink::where('SupplierCode', $code)->first();
+        if ($anyLink && $anyLink->product) {
+            $product = $anyLink->product;
+
+            return response()->json([
+                'found' => true,
+                'source' => 'other_supplier',
+                'product_name' => $product->NAME,
+                'barcode' => $product->CODE,
+                'unit_cost' => (float) ($anyLink->Cost ?? $product->PRICEBUY ?? 0),
+                'tax_rate' => $product->getVatRate(),
+                'units_per_case' => (int) ($anyLink->CaseUnits ?? 1),
+            ]);
+        }
+
+        // Fallback: check past delivery items with this supplier code
+        $pastItem = DeliveryItem::where('supplier_code', $code)
+            ->latest()
+            ->first();
+
+        if ($pastItem) {
+            return response()->json([
+                'found' => true,
+                'source' => 'past_delivery',
+                'product_name' => $pastItem->description,
+                'barcode' => $pastItem->barcode,
+                'unit_cost' => (float) $pastItem->unit_cost,
+                'tax_rate' => (float) ($pastItem->tax_rate ?? 0),
+                'units_per_case' => (int) ($pastItem->units_per_case ?? 1),
+            ]);
+        }
+
+        return response()->json(['found' => false]);
     }
 }

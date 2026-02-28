@@ -233,21 +233,269 @@
                 </div>
             @endif
 
-            {{-- Parsing Warnings (shown after PDF import with unparsed lines) --}}
-            @if(session('import_warnings'))
-                <div class="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                    <h4 class="font-semibold text-yellow-800 dark:text-yellow-200">Parsing Warnings</h4>
-                    <p class="text-yellow-700 dark:text-yellow-300 text-sm">
-                        {{ session('import_warnings.unmatched_count') }} lines could not be parsed:
+            {{-- Unparsed Lines - Interactive Resolution --}}
+            @php $unparsedLines = $delivery->unparsed_lines ?? []; @endphp
+            @if(count($unparsedLines) > 0)
+                <div class="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg"
+                     x-data="unparsedLinesManager({{ $delivery->id }}, {{ json_encode($unparsedLines) }})">
+                    <div class="flex items-center justify-between mb-2">
+                        <h4 class="font-semibold text-yellow-800 dark:text-yellow-200">Unparsed Lines</h4>
+                        <span class="text-xs text-yellow-600 dark:text-yellow-400" x-text="lines.length + ' remaining'"></span>
+                    </div>
+                    <p class="text-yellow-700 dark:text-yellow-300 text-sm mb-3">
+                        These lines could not be parsed automatically. You can manually add them as delivery items or dismiss them.
                     </p>
-                    <ul class="mt-2 text-xs font-mono bg-white dark:bg-gray-800 p-2 rounded max-h-32 overflow-y-auto">
-                        @foreach(session('import_warnings.unmatched_lines') as $line)
-                            <li class="py-0.5 truncate" title="{{ $line['content'] }}">
-                                [{{ $line['filename'] }}] L{{ $line['line_num'] }}: {{ Str::limit($line['content'], 80) }}
-                            </li>
-                        @endforeach
-                    </ul>
+
+                    <template x-for="(line, idx) in lines" :key="idx">
+                        <div class="mb-3 bg-white dark:bg-gray-800 rounded-lg border border-yellow-200 dark:border-yellow-700 overflow-hidden">
+                            {{-- Collapsed: raw line + action buttons --}}
+                            <div class="flex items-center justify-between px-3 py-2">
+                                <div class="flex-1 min-w-0 mr-3">
+                                    <span class="text-xs text-gray-500 dark:text-gray-400" x-text="'[' + line.filename + '] L' + line.line_num + ':'"></span>
+                                    <span class="text-xs font-mono text-gray-700 dark:text-gray-300 truncate block" x-text="line.content"></span>
+                                </div>
+                                <div class="flex gap-2 shrink-0">
+                                    <button @click="toggleForm(idx)"
+                                            x-show="expandedIdx !== idx"
+                                            class="px-3 py-1 text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800 rounded transition-colors">
+                                        Resolve
+                                    </button>
+                                    <button @click="toggleForm(idx)"
+                                            x-show="expandedIdx === idx"
+                                            class="px-3 py-1 text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600 rounded transition-colors">
+                                        Cancel
+                                    </button>
+                                    <button @click="dismissLine(idx)"
+                                            :disabled="submitting"
+                                            class="px-3 py-1 text-xs font-medium bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-red-900 dark:hover:text-red-300 rounded transition-colors">
+                                        Dismiss
+                                    </button>
+                                </div>
+                            </div>
+
+                            {{-- Expanded: inline form --}}
+                            <div x-show="expandedIdx === idx" x-collapse class="border-t border-yellow-200 dark:border-yellow-700 px-3 py-3 bg-yellow-25 dark:bg-gray-750">
+                                {{-- Lookup status indicator --}}
+                                <div x-show="loading" class="text-xs text-blue-600 dark:text-blue-400 mb-2">
+                                    Looking up supplier code...
+                                </div>
+                                <div x-show="!loading && lookupStatus === 'found'" class="text-xs text-green-600 dark:text-green-400 mb-2">
+                                    Auto-filled from <span x-text="lookupSource"></span> — review and adjust if needed.
+                                </div>
+                                <div x-show="!loading && lookupStatus === 'not_found'" class="text-xs text-orange-600 dark:text-orange-400 mb-2">
+                                    Product not found in database — enter details manually.
+                                </div>
+                                <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Supplier Code</label>
+                                        <input type="text" x-model="form.supplier_code"
+                                               class="w-full text-sm border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                    </div>
+                                    <div class="col-span-2">
+                                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Description</label>
+                                        <input type="text" x-model="form.description"
+                                               class="w-full text-sm border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Quantity</label>
+                                        <input type="number" x-model="form.ordered_quantity" min="1"
+                                               class="w-full text-sm border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Unit Cost (&euro;)</label>
+                                        <input type="number" x-model="form.unit_cost" step="0.01" min="0"
+                                               class="w-full text-sm border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">VAT Rate</label>
+                                        <select x-model="form.tax_rate"
+                                                class="w-full text-sm border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                            <option value="0">0%</option>
+                                            <option value="0.09">9%</option>
+                                            <option value="0.135">13.5%</option>
+                                            <option value="0.23">23%</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Units/Case</label>
+                                        <input type="number" x-model="form.units_per_case" min="1"
+                                               class="w-full text-sm border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between mt-3">
+                                    <p x-show="formError" class="text-xs text-red-600 dark:text-red-400" x-text="formError"></p>
+                                    <div class="flex gap-2 ml-auto">
+                                        <span x-show="form.ordered_quantity && form.unit_cost" class="text-xs text-gray-500 dark:text-gray-400 self-center mr-2"
+                                              x-text="'Total: &euro;' + (form.ordered_quantity * form.unit_cost).toFixed(2)"></span>
+                                        <button @click="submitItem(idx)"
+                                                :disabled="submitting"
+                                                class="px-4 py-1.5 text-xs font-medium bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 rounded-md transition-colors">
+                                            <span x-show="!submitting">Add Item</span>
+                                            <span x-show="submitting">Saving...</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+
+                    <div x-show="lines.length === 0" class="text-sm text-green-600 dark:text-green-400 font-medium">
+                        All unparsed lines have been resolved.
+                    </div>
                 </div>
+
+                <script>
+                    function unparsedLinesManager(deliveryId, initialLines) {
+                        return {
+                            lines: initialLines,
+                            expandedIdx: null,
+                            submitting: false,
+                            loading: false,
+                            lookupStatus: '', // 'found', 'not_found', or ''
+                            lookupSource: '',
+                            formError: '',
+                            form: {
+                                supplier_code: '',
+                                description: '',
+                                barcode: '',
+                                ordered_quantity: 1,
+                                unit_cost: '',
+                                tax_rate: '0.09',
+                                units_per_case: 1,
+                            },
+
+                            toggleForm(idx) {
+                                if (this.expandedIdx === idx) {
+                                    this.expandedIdx = null;
+                                    return;
+                                }
+                                this.expandedIdx = idx;
+                                this.formError = '';
+                                this.lookupStatus = '';
+                                this.lookupSource = '';
+                                // Pre-populate from raw content
+                                const content = this.lines[idx].content;
+                                const codeMatch = content.match(/^(\d+)/);
+                                this.form.supplier_code = codeMatch ? codeMatch[1] : '';
+                                this.form.description = codeMatch ? content.substring(codeMatch[0].length).trim() : content;
+                                this.form.ordered_quantity = 1;
+                                this.form.unit_cost = '';
+                                this.form.tax_rate = '0.09';
+                                this.form.units_per_case = 1;
+
+                                // Auto-lookup by supplier code (fire-and-forget, updates form when ready)
+                                if (this.form.supplier_code) {
+                                    this.lookupCode(this.form.supplier_code);
+                                }
+                            },
+
+                            async lookupCode(code) {
+                                this.loading = true;
+                                this.lookupStatus = '';
+                                try {
+                                    const res = await fetch(`/deliveries/${deliveryId}/lookup-supplier-code/${code}`, {
+                                        credentials: 'same-origin',
+                                        headers: {
+                                            'Accept': 'application/json',
+                                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                        },
+                                    });
+                                    if (!res.ok) {
+                                        console.error('Lookup failed:', res.status, res.statusText);
+                                        this.lookupStatus = 'not_found';
+                                        return;
+                                    }
+                                    const data = await res.json();
+                                    if (data.found) {
+                                        this.form.description = data.product_name;
+                                        this.form.barcode = data.barcode || '';
+                                        this.form.unit_cost = data.unit_cost || '';
+                                        this.form.tax_rate = String(data.tax_rate ?? '0.09');
+                                        this.form.units_per_case = data.units_per_case || 1;
+                                        this.lookupStatus = 'found';
+                                        const sources = { product_database: 'product database', other_supplier: 'product database', past_delivery: 'past delivery' };
+                                        this.lookupSource = sources[data.source] || data.source;
+                                    } else {
+                                        this.lookupStatus = 'not_found';
+                                    }
+                                } catch (e) {
+                                    console.error('Lookup error:', e);
+                                    this.lookupStatus = 'not_found';
+                                } finally {
+                                    this.loading = false;
+                                }
+                            },
+
+                            async submitItem(idx) {
+                                if (!this.form.supplier_code || !this.form.description || !this.form.unit_cost) {
+                                    this.formError = 'Supplier code, description, and unit cost are required.';
+                                    return;
+                                }
+                                this.submitting = true;
+                                this.formError = '';
+                                try {
+                                    // Create the delivery item
+                                    const res = await fetch(`/deliveries/${deliveryId}/items`, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'Accept': 'application/json',
+                                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                        },
+                                        body: JSON.stringify({
+                                            supplier_code: this.form.supplier_code,
+                                            description: this.form.description,
+                                            barcode: this.form.barcode || null,
+                                            ordered_quantity: parseInt(this.form.ordered_quantity),
+                                            unit_cost: parseFloat(this.form.unit_cost),
+                                            units_per_case: parseInt(this.form.units_per_case) || 1,
+                                        }),
+                                    });
+                                    const data = await res.json();
+                                    if (!data.success) throw new Error(data.message || 'Failed to create item');
+
+                                    // Remove the unparsed line and track added cost
+                                    const totalCost = parseInt(this.form.ordered_quantity) * parseFloat(this.form.unit_cost);
+                                    await this.removeLine(idx, totalCost);
+                                    // Reload to show new item in the table
+                                    window.location.reload();
+                                } catch (e) {
+                                    this.formError = e.message;
+                                } finally {
+                                    this.submitting = false;
+                                }
+                            },
+
+                            async dismissLine(idx) {
+                                if (!confirm('Dismiss this line? It won\'t be added as a delivery item.')) return;
+                                this.submitting = true;
+                                await this.removeLine(idx);
+                                this.submitting = false;
+                            },
+
+                            async removeLine(idx, addedCost = 0) {
+                                try {
+                                    const opts = {
+                                        method: 'DELETE',
+                                        headers: {
+                                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                        },
+                                    };
+                                    if (addedCost > 0) {
+                                        opts.headers['Content-Type'] = 'application/json';
+                                        opts.body = JSON.stringify({ added_cost: addedCost });
+                                    }
+                                    await fetch(`/deliveries/${deliveryId}/unparsed-lines/${idx}`, opts);
+                                    this.lines.splice(idx, 1);
+                                    if (this.expandedIdx === idx) this.expandedIdx = null;
+                                    else if (this.expandedIdx > idx) this.expandedIdx--;
+                                } catch (e) {
+                                    console.error('Failed to remove line:', e);
+                                }
+                            },
+                        };
+                    }
+                </script>
             @endif
 
             {{-- Permanent Barrel Deposits Section (from database) - Collapsible --}}
@@ -379,9 +627,28 @@
                                 </p>
                             @endif
 
-                            <p class="text-xs text-red-600 dark:text-red-400 mt-1">
-                                Some items may not have been parsed correctly. Review the delivery items for completeness.
-                            </p>
+                            @php
+                                $manuallyAddedTotal = (float) ($delivery->manually_added_total ?? 0);
+                                $updatedTotal = ($delivery->calculated_total ?? 0) + $manuallyAddedTotal;
+                                $remainingDiscrepancy = ($delivery->invoice_stated_total ?? 0) - $updatedTotal;
+                            @endphp
+                            @if($manuallyAddedTotal > 0)
+                                <div class="mt-2 border-t border-red-200 dark:border-red-700 pt-2">
+                                    <p class="text-sm text-red-700 dark:text-red-300">
+                                        Manually added items: <span class="font-semibold">+&euro;{{ number_format($manuallyAddedTotal, 2) }}</span>
+                                        &mdash; Updated total: <span class="font-semibold">&euro;{{ number_format($updatedTotal, 2) }}</span>
+                                        @if(abs($remainingDiscrepancy) > 0.01)
+                                            &mdash; Remaining difference: <span class="font-semibold">&euro;{{ number_format($remainingDiscrepancy, 2) }}</span>
+                                        @else
+                                            &mdash; <span class="text-green-700 dark:text-green-400 font-semibold">Discrepancy resolved</span>
+                                        @endif
+                                    </p>
+                                </div>
+                            @else
+                                <p class="text-xs text-red-600 dark:text-red-400 mt-1">
+                                    Some items may not have been parsed correctly. Review the delivery items for completeness.
+                                </p>
+                            @endif
                         </div>
                     </div>
                 </div>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Management;
 
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
+use App\Models\WageEntry;
 use App\Services\SalesAccountingImportService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -34,9 +35,12 @@ class ProfitLossController extends Controller
         // Get cash payments to suppliers
         $supplierPayments = $this->getSupplierPayments($carbonStart, $carbonEnd);
 
+        // Get wage data
+        $wageData = $this->getWageData($carbonStart, $carbonEnd);
+
         // Calculate profit/loss
         $totalRevenue = $revenueData['total_revenue'];
-        $totalCosts = $costData['total_costs'] + $supplierPayments;
+        $totalCosts = $costData['total_costs'] + $supplierPayments + $wageData['total_employer_cost'];
         $profitLoss = $totalRevenue - $totalCosts;
         $marginPercent = $totalRevenue > 0 ? ($profitLoss / $totalRevenue) * 100 : 0;
 
@@ -49,6 +53,7 @@ class ProfitLossController extends Controller
             'revenueData',
             'costData',
             'supplierPayments',
+            'wageData',
             'totalRevenue',
             'totalCosts',
             'profitLoss',
@@ -345,7 +350,9 @@ class ProfitLossController extends Controller
             ->whereBetween('created_at', [$previousStart, $previousEnd])
             ->sum('amount');
 
-        $previousTotalCosts = $previousCosts + $previousSupplierPayments;
+        $previousWages = $this->getWageData($previousStart, $previousEnd)['total_employer_cost'];
+
+        $previousTotalCosts = $previousCosts + $previousSupplierPayments + $previousWages;
         $previousProfit = $previousRevenue - $previousTotalCosts;
 
         return [
@@ -354,6 +361,27 @@ class ProfitLossController extends Controller
             'profit' => $previousProfit,
             'start_date' => $previousStart->format('Y-m-d'),
             'end_date' => $previousEnd->format('Y-m-d'),
+        ];
+    }
+
+    private function getWageData($startDate, $endDate): array
+    {
+        $wages = WageEntry::forDateRange($startDate, $endDate)
+            ->selectRaw('
+                SUM(gross_pay) as total_gross_pay,
+                SUM(prsi_er) as total_prsi_er,
+                COUNT(*) as weeks_count
+            ')
+            ->first();
+
+        $grossPay = $wages->total_gross_pay ?? 0;
+        $prsiEr = $wages->total_prsi_er ?? 0;
+
+        return [
+            'gross_pay' => $grossPay,
+            'prsi_er' => $prsiEr,
+            'total_employer_cost' => $grossPay + $prsiEr,
+            'weeks_count' => $wages->weeks_count ?? 0,
         ];
     }
 }

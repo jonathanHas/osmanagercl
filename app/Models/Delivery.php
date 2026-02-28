@@ -20,12 +20,14 @@ class Delivery extends Model
         'total_expected',
         'total_received',
         'import_data',
+        'unparsed_lines',
         'notes',
         // Totals verification fields
         'invoice_stated_total',
         'calculated_total',
         'freight_charge',
         'total_discrepancy',
+        'manually_added_total',
         'has_discrepancy',
     ];
 
@@ -34,12 +36,14 @@ class Delivery extends Model
         'total_expected' => 'decimal:2',
         'total_received' => 'decimal:2',
         'import_data' => 'array',
+        'unparsed_lines' => 'array',
         'include_in_order_stock' => 'boolean',
         // Totals verification casts
         'invoice_stated_total' => 'decimal:2',
         'calculated_total' => 'decimal:2',
         'freight_charge' => 'decimal:2',
         'total_discrepancy' => 'decimal:2',
+        'manually_added_total' => 'decimal:2',
         'has_discrepancy' => 'boolean',
     ];
 

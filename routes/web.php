@@ -392,6 +392,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/deliveries/{delivery}/export-discrepancies', [DeliveryController::class, 'exportDiscrepancies'])->name('deliveries.export-discrepancies');
     Route::post('/deliveries/{delivery}/update-costs', [DeliveryController::class, 'updateCosts'])->name('deliveries.update-costs');
     Route::post('/deliveries/{delivery}/sync-legacy', [DeliveryController::class, 'syncToLegacy'])->name('deliveries.sync-legacy');
+    Route::get('/deliveries/{delivery}/lookup-supplier-code/{code}', [DeliveryController::class, 'lookupSupplierCode'])->name('deliveries.lookup-supplier-code');
+    Route::delete('/deliveries/{delivery}/unparsed-lines/{index}', [DeliveryController::class, 'resolveUnparsedLine'])->name('deliveries.resolve-unparsed-line');
+    Route::post('/deliveries/{delivery}/items', [DeliveryController::class, 'createDeliveryItem'])->name('deliveries.create-item');
     Route::post('/delivery-items/{item}/refresh-barcode', [DeliveryController::class, 'refreshBarcode'])->name('delivery-items.refresh-barcode');
 
     // Delivery Documents
@@ -707,6 +710,16 @@ Route::middleware('auth')->group(function () {
         // Profit & Loss
         Route::get('/profit-loss', [\App\Http\Controllers\Management\ProfitLossController::class, 'index'])
             ->name('profit-loss.index');
+
+        // Wages Management
+        Route::get('/wages', [\App\Http\Controllers\Management\WageController::class, 'index'])
+            ->name('wages.index');
+        Route::post('/wages/upload', [\App\Http\Controllers\Management\WageController::class, 'upload'])
+            ->name('wages.upload');
+        Route::delete('/wages/year/{year}', [\App\Http\Controllers\Management\WageController::class, 'destroyYear'])
+            ->name('wages.destroy-year');
+        Route::delete('/wages/{wageEntry}', [\App\Http\Controllers\Management\WageController::class, 'destroy'])
+            ->name('wages.destroy');
 
         // VAT Dashboard
         Route::prefix('vat-dashboard')->name('vat-dashboard.')->group(function () {

@@ -615,7 +615,7 @@ class DeliveryService
     /**
      * Find product by supplier code
      */
-    private function findProductBySupplierCode(string $code, int $supplierId): ?Product
+    public function findProductBySupplierCode(string $code, int $supplierId): ?Product
     {
         $supplierLink = SupplierLink::where('SupplierID', $supplierId)
             ->where('SupplierCode', $code)
@@ -935,6 +935,11 @@ class DeliveryService
     {
         // Try to find existing product by supplier code
         $product = $this->findProductBySupplierCode($delivery->supplier_id, $itemData['supplier_code']);
+
+        // Fallback: find by barcode if provided
+        if (! $product && ! empty($itemData['barcode'])) {
+            $product = Product::where('CODE', $itemData['barcode'])->first();
+        }
 
         // Calculate total cost
         $totalCost = $itemData['ordered_quantity'] * $itemData['unit_cost'];
