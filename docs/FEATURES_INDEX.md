@@ -399,12 +399,15 @@ Interactive review interface with inline editing and approval workflow.
 ### Invoice Bulk Upload System
 Modern multi-file invoice upload system with drag-and-drop interface.
 - **Drag-and-Drop Interface**: Upload up to 50 files simultaneously
+- **Client-Side Image Compression** (NEW! 2026-03-06): Auto-compresses JPG/PNG images before upload (e.g. 3.3MB → 250KB) to avoid PHP upload limits
 - **Multi-Format Support**: PDF, JPG, PNG, TIFF, **DOC, DOCX, XLS, XLSX** documents
 - **Automatic PDF Repair**: Detects and fixes corrupted PDFs (e.g., Klee Paper invoices) during upload
 - **Document Processing**: Microsoft Office formats supported with LibreOffice conversion
 - **Real-Time Progress**: Individual file upload progress tracking
 - **Batch Management**: Unique batch IDs for tracking uploads
 - **File Preview**: Review uploaded files before processing with file-type-specific icons
+- **Parsed Data Summary** (Updated 2026-03-06): Preview shows total, supplier, and invoice date for each parsed file
+- **Edit Form Pre-Population** (Updated 2026-03-06): Supplier dropdown, invoice date, and VAT breakdown auto-filled from parsed data
 - **Retry Functionality**: Re-process failed files after parser improvements
 - **Configurable Limits**: Customizable file count and size limits
 - **Recent History**: View and manage recent upload batches

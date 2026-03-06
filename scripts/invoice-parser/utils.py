@@ -4,6 +4,7 @@ import csv
 import os
 import pdfplumber
 import xlrd
+import pandas as pd
 import logging # Import logging for better debug/info messages
 
 # Configure logging
@@ -119,6 +120,23 @@ def extract_data_from_xls(filename):
         return ""
     except Exception as e:
         logging.error(f"An unexpected error occurred while processing XLS file {filename}: {e}")
+        return ""
+
+def extract_data_from_ods(filename):
+    """
+    Extracts all text data from an ODS file using pandas + odfpy.
+    Returns tab-separated text matching the XLS extraction format.
+    """
+    logging.info(f"Reading ODS: {filename}")
+    try:
+        df = pd.read_excel(filename, engine='odf', header=None, dtype=str)
+        all_text = ""
+        for _, row in df.iterrows():
+            text_line = "\t".join(str(cell) if pd.notna(cell) else "" for cell in row)
+            all_text += text_line + "\n"
+        return all_text
+    except Exception as e:
+        logging.error(f"Error reading ODS file {filename}: {e}")
         return ""
 
 def extract_text_from_image(image_path):

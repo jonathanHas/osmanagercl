@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Client-side image compression for invoice bulk upload** (2026-03-06)
+  - Images (JPG, PNG) are now automatically compressed in the browser before upload using Canvas API
+  - Scales images down to max 2000px on longest side, JPEG quality 0.7
+  - Solves issue where large phone photos (3MB+) exceeded PHP's 2MB `upload_max_filesize` limit
+  - Shows compression progress ("Compressing...") and result ("3.3MB → 250KB") in the file list
+  - Upload button disabled while compression is in progress
+  - Non-image files (PDF, DOC, XLS, etc.) pass through unchanged
+  - No new dependencies — uses native browser Canvas API
+  - **File Modified**: `resources/views/invoices/bulk-upload.blade.php`
+
+### Fixed
+
+- **Ardú Bakery invoice parser date extraction** (2026-03-06)
+  - Updated date regex to handle `20 Feb 2026` text-month format (was only matching `dd/mm/yy`)
+  - Old `dd/mm/yy` format kept as fallback for backwards compatibility
+  - **File Modified**: `scripts/invoice-parser/parsers/ardu.py`
+
+- **Bulk upload preview: invoice date display and edit form pre-population** (2026-03-06)
+  - Added parsed invoice date to the summary line alongside total and supplier
+  - Fixed date input in edit form: Carbon date now formatted as `Y-m-d` for HTML date picker (was outputting datetime string the browser ignored)
+  - Fixed supplier dropdown pre-selection: added JS initializer to ensure dropdown reflects parsed supplier reliably
+  - **File Modified**: `resources/views/invoices/bulk-upload-preview.blade.php`
+
+### Added
+
 - **Manual Resolution of Unparsed Delivery Lines** (2026-02-28)
   - When PDF parser can't parse a line, it's now persisted to the delivery (survives page refresh)
   - Interactive inline form on delivery show page to manually create delivery items from unparsed lines

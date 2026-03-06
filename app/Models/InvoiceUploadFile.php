@@ -118,6 +118,7 @@ class InvoiceUploadFile extends Model
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'application/vnd.ms-excel',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.oasis.opendocument.spreadsheet',
         ];
 
         return in_array($this->mime_type, $viewableMimes);
@@ -158,6 +159,7 @@ class InvoiceUploadFile extends Model
         return in_array($this->mime_type, [
             'application/vnd.ms-excel',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.oasis.opendocument.spreadsheet',
         ]);
     }
 

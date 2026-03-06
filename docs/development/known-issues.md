@@ -382,6 +382,44 @@ Check delivery records for large discrepancies between `invoice_stated_total` an
 
 ---
 
+### Ardú Bakery Invoice Date Not Parsed
+**Status:** Fixed 2026-03-06
+
+#### Problem
+Ardú Bakery invoices use the date format `20 Feb 2026` (day month-name year), but the parser regex only matched `dd/mm/yy` numeric format. Invoice date was returned as "Not found", leaving the `parsed_invoice_date` field empty.
+
+#### Root Cause
+The date regex `r'Invoice Date\s+(\d{2}/\d{2}/\d{2})'` only matched slash-separated numeric dates. Ardú changed their invoice format to use text month names.
+
+#### Solution
+Updated parser to first try text-month format (`dd Mon yyyy`), falling back to `dd/mm/yy` for backwards compatibility.
+
+#### Files Modified
+- `scripts/invoice-parser/parsers/ardu.py`
+
+---
+
+### Bulk Upload Preview: Edit Form Not Pre-Populating Supplier and Date
+**Status:** Fixed 2026-03-06
+
+#### Problem
+On the bulk upload preview page, the Edit/Enter Data form showed parsed VAT amounts correctly but the supplier dropdown and invoice date field were empty despite being parsed.
+
+#### Root Cause
+Two issues:
+1. **Invoice date**: The `parsed_invoice_date` field is cast as a Carbon `date` in the model. When used directly in a `<input type="date">` value attribute, Carbon outputs `Y-m-d H:i:s` datetime format, but HTML date inputs require `Y-m-d` only.
+2. **Supplier dropdown**: The `selected` attribute was rendered correctly in HTML but some browsers didn't reliably apply it on `<select>` elements inside initially-hidden table rows.
+
+#### Solution
+1. Explicitly format the date as `Y-m-d` using `Carbon::parse()->format('Y-m-d')` for the date input
+2. Added inline JS to set the dropdown value after render as a reliable fallback
+3. Also added invoice date to the parsed summary line (shows alongside total and supplier)
+
+#### Files Modified
+- `resources/views/invoices/bulk-upload-preview.blade.php`
+
+---
+
 ### Undefined Array Key "filename" on Single-File Delivery Upload
 **Status:** Fixed 2026-02-28
 

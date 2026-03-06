@@ -17,11 +17,21 @@ The Invoice Bulk Upload System allows users to upload multiple invoice files sim
 - **Recent Uploads History**: View and manage recent batch uploads
 - **Temporary Storage**: Secure temporary file storage before processing
 
+### Client-Side Image Compression
+
+Large image files (e.g. phone photos over 2MB) are automatically compressed in the browser before upload:
+- **Automatic**: JPG and PNG images are resized and compressed using the Canvas API
+- **Max Dimension**: Scaled down to 2000px on the longest side (sufficient for invoice readability)
+- **JPEG Quality**: 0.7 (good balance of quality vs size)
+- **UI Feedback**: Shows "Compressing..." during processing, then displays original and compressed size (e.g. "3.3MB → 250KB")
+- **Smart**: Only replaces the file if compression actually reduces size; non-image files pass through unchanged
+- **No Dependencies**: Uses native browser Canvas API only
+
 ### Supported File Types
 
 - **PDF documents**: PDF (directly viewable in browser, with automatic repair for corrupted files)
-- **Images**: JPG, JPEG, PNG (directly viewable in browser)
-- **Scanned documents**: TIFF, TIF (download only)
+- **Images**: JPG, JPEG, PNG (directly viewable in browser, auto-compressed on upload)
+- **Scanned documents**: TIFF, TIF (download only, not compressed — Canvas API limitation)
 - **Microsoft Word documents**: DOC, DOCX (viewable via PDF conversion)
 - **Microsoft Excel spreadsheets**: XLS, XLSX (viewable via PDF conversion)
 
@@ -141,6 +151,8 @@ Tracks individual files within a batch:
 
 5. **Preview & Process**
    - Review uploaded files in preview page
+   - Parsed summary shows total amount, supplier name, and invoice date
+   - Edit/Enter Data form pre-populates supplier, date, and VAT breakdown from parsed data
    - Start processing (Python parser - Phase 2)
    - Or cancel batch if needed
 
@@ -222,6 +234,7 @@ The system handles various error scenarios:
 
 ## Performance Considerations
 
+- **Client-side image compression**: Large images compressed before upload, reducing bandwidth and avoiding PHP upload limits
 - **Chunked uploads**: Support for large files (if enabled)
 - **Async processing**: Files queued for background parsing
 - **Database indexing**: Optimized queries on batch_id, status
@@ -244,7 +257,9 @@ The system handles various error scenarios:
    - Ensure migration `add_uploaded_status_to_invoice_bulk_uploads_table` is run
    
 2. **Files not uploading**
-   - Check `php.ini` settings: `upload_max_filesize`, `post_max_size`
+   - For images over 2MB: client-side compression should handle this automatically
+   - If compression fails, check browser console for Canvas API errors
+   - For non-image files: check `php.ini` settings: `upload_max_filesize`, `post_max_size`
    - Verify storage permissions on `storage/app/temp/invoices`
 
 3. **Timeout on large batches**

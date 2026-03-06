@@ -482,6 +482,9 @@
                                                 <label class="block text-sm font-medium text-gray-300 mb-2">
                                                     Supplier <span class="text-red-400">*</span>
                                                 </label>
+                                                @php
+                                                    $matchedSupplier = $file->supplier_detected ?? ($file->parsed_data['supplier_name'] ?? '');
+                                                @endphp
                                                 <select name="supplier_name"
                                                         id="supplier_dropdown_{{ $file->id }}"
                                                         class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:border-blue-500 focus:outline-none"
@@ -490,11 +493,16 @@
                                                     <option value="">-- Select Supplier or Type New --</option>
                                                     @foreach($suppliers as $supplier)
                                                         <option value="{{ $supplier->name }}"
-                                                                {{ ($file->supplier_detected == $supplier->name || ($file->parsed_data['supplier_name'] ?? '') == $supplier->name) ? 'selected' : '' }}>
+                                                                @selected($matchedSupplier === $supplier->name)>
                                                             {{ $supplier->name }}
                                                         </option>
                                                     @endforeach
                                                 </select>
+                                                @if($matchedSupplier)
+                                                <script>
+                                                    document.getElementById('supplier_dropdown_{{ $file->id }}').value = @json($matchedSupplier);
+                                                </script>
+                                                @endif
                                                 <p class="text-xs text-gray-400 mt-1">Or type a new supplier name directly</p>
                                                 @php
                                                     // Only pre-populate custom field if supplier is not in dropdown

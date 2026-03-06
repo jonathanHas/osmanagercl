@@ -16,7 +16,7 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import utilities and parsers
-from utils import extract_text, extract_data_from_xls, extract_text_from_image
+from utils import extract_text, extract_data_from_xls, extract_data_from_ods, extract_text_from_image
 from parse_doc_file import parse_doc_file
 from parsers import (
     dynamis, three, digitalocean, imbibe, openai, linode, jetbrains, independent,
@@ -91,6 +91,8 @@ def detect_supplier(text):
         return mentons, "Menton's Organic Farm"
     elif "KILBEGGAN ORGANIC FOODS" in upper_text or "KILBEGGAN" in upper_text:
         return kilbeggan, "Kilbeggan"
+    elif "LOUGH BOORA" in upper_text:
+        return loughboora, "Lough Boora"
     else:
         return default_parser, "Unknown"
 
@@ -201,6 +203,11 @@ def process_invoice(file_path):
             text = extract_data_from_xls(file_path)
             response['metadata']['parsing_method'] = 'xls'
 
+        elif file_path.lower().endswith('.ods'):
+            logging.info(f"Processing ODS: {filename}")
+            text = extract_data_from_ods(file_path)
+            response['metadata']['parsing_method'] = 'ods'
+
         elif file_path.lower().endswith(('.jpg', '.jpeg', '.png', '.tiff', '.tif')):
             logging.info(f"Processing Image: {filename}")
             text, extraction_method = extract_text_from_image(file_path)
@@ -225,9 +232,13 @@ def process_invoice(file_path):
         parser, supplier_name = detect_supplier(text)
         response['metadata']['supplier_detected'] = supplier_name
         
-        # Special handling for XLS files (Loughboora)
-        if file_path.lower().endswith('.xls') and supplier_name != "Loughboora":
-            # For XLS files, use loughboora parser with full file path
+        # Special handling for spreadsheet files (Lough Boora)
+        if file_path.lower().endswith('.xls') and supplier_name == "Lough Boora":
+            parsed_data = loughboora.parse_xls(text, file_path)
+        elif file_path.lower().endswith('.ods') and supplier_name == "Lough Boora":
+            parsed_data = loughboora.parse_ods(text, file_path)
+        elif file_path.lower().endswith('.xls'):
+            # Legacy fallback: unknown XLS files default to loughboora
             parsed_data = loughboora.parse_xls(text, file_path)
         else:
             parsed_data = parser.parse_invoice(text, file_path)

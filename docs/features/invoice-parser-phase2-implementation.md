@@ -169,7 +169,7 @@ The system includes specific parsers for:
   - Garryhinch Wood Exotics
   - Mossfield Organic Farm
   - Breadelicious
-  - Ardu Artisan Bakery
+  - Ardu Artisan Bakery (date parsing updated 2026-03-06: supports `dd Mon yyyy` format)
   - Coolnagrower
   - Merry Mill
   - Oldyard Organics

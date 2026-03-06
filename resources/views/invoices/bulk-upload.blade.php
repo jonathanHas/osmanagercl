@@ -87,7 +87,9 @@
                                     <div class="flex-1 min-w-0">
                                         <p class="text-gray-200 text-sm font-medium truncate" x-text="file.name"></p>
                                         <p class="text-gray-400 text-xs">
-                                            <span x-text="formatFileSize(file.size)"></span>
+                                            <span x-show="file.compressing" class="text-yellow-400">Compressing...</span>
+                                            <span x-show="!file.compressing && file.compressed" class="text-green-400" x-text="formatFileSize(file.originalSize) + ' → ' + formatFileSize(file.size)"></span>
+                                            <span x-show="!file.compressing && !file.compressed" x-text="formatFileSize(file.size)"></span>
                                             <span x-show="file.error" class="text-red-400 ml-2" x-text="file.error"></span>
                                         </p>
                                     </div>
@@ -129,8 +131,8 @@
                             <label for="file-input" class="inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded cursor-pointer">
                                 Add More Files
                             </label>
-                            <button @click="uploadFiles()" 
-                                    :disabled="isUploading || files.length === 0"
+                            <button @click="uploadFiles()"
+                                    :disabled="isUploading || files.length === 0 || files.some(f => f.compressing)"
                                     class="inline-flex items-center px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded">
                                 <svg x-show="!isUploading" class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
@@ -223,70 +225,134 @@
                 maxFiles: {{ $maxFiles }},
                 maxSizeMB: {{ $maxFileSize }},
                 allowedExtensions: @json($allowedExtensions),
-                
+                maxImageDimension: 2000,
+                imageQuality: 0.7,
+
                 get hasFiles() {
                     return this.files.length > 0;
                 },
-                
+
                 get totalSize() {
                     return this.files.reduce((sum, file) => sum + file.size, 0);
                 },
-                
+
                 handleDrop(event) {
                     this.isDragging = false;
                     const droppedFiles = Array.from(event.dataTransfer.files);
                     this.addFiles(droppedFiles);
                 },
-                
+
                 handleFileSelect(event) {
                     const selectedFiles = Array.from(event.target.files);
                     this.addFiles(selectedFiles);
                     event.target.value = ''; // Reset input
                 },
-                
+
+                compressImage(file, entryIndex) {
+                    const maxDim = this.maxImageDimension;
+                    const quality = this.imageQuality;
+                    const maxSizeMB = this.maxSizeMB;
+                    const self = this;
+
+                    const img = document.createElement('img');
+                    const url = URL.createObjectURL(file);
+
+                    img.onload = function() {
+                        URL.revokeObjectURL(url);
+
+                        let w = img.naturalWidth;
+                        let h = img.naturalHeight;
+
+                        if (w > maxDim || h > maxDim) {
+                            if (w > h) {
+                                h = Math.round(h * (maxDim / w));
+                                w = maxDim;
+                            } else {
+                                w = Math.round(w * (maxDim / h));
+                                h = maxDim;
+                            }
+                        }
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = w;
+                        canvas.height = h;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, w, h);
+
+                        canvas.toBlob(function(blob) {
+                            if (blob && blob.size < file.size) {
+                                const compressed = new File([blob], file.name, {
+                                    type: 'image/jpeg',
+                                    lastModified: file.lastModified,
+                                });
+                                self.files[entryIndex].file = compressed;
+                                self.files[entryIndex].size = compressed.size;
+                                self.files[entryIndex].type = compressed.type;
+                                self.files[entryIndex].compressed = true;
+                            }
+                            self.files[entryIndex].compressing = false;
+                        }, 'image/jpeg', quality);
+                    };
+
+                    img.onerror = function() {
+                        URL.revokeObjectURL(url);
+                        self.files[entryIndex].compressing = false;
+                    };
+
+                    img.src = url;
+                },
+
                 addFiles(newFiles) {
                     this.errors = [];
                     this.successMessage = '';
-                    
+
                     // Check total file count
                     if (this.files.length + newFiles.length > this.maxFiles) {
                         this.errors.push(`You can only upload ${this.maxFiles} files at once. You have ${this.files.length} files selected.`);
                         return;
                     }
-                    
+
                     // Validate and add each file
-                    newFiles.forEach(file => {
+                    for (const file of newFiles) {
                         // Check file extension
                         const ext = file.name.split('.').pop().toLowerCase();
                         if (!this.allowedExtensions.includes(ext)) {
                             this.errors.push(`${file.name}: Invalid file type. Only ${this.allowedExtensions.join(', ').toUpperCase()} files are allowed.`);
-                            return;
+                            continue;
                         }
-                        
-                        // Check file size
-                        if (file.size > this.maxSizeMB * 1024 * 1024) {
-                            this.errors.push(`${file.name}: File is too large. Maximum size is ${this.maxSizeMB}MB.`);
-                            return;
-                        }
-                        
+
                         // Check for duplicates
-                        if (this.files.some(f => f.name === file.name && f.size === file.size)) {
+                        if (this.files.some(f => f.name === file.name)) {
                             this.errors.push(`${file.name}: File already added.`);
-                            return;
+                            continue;
                         }
-                        
-                        // Add file with metadata
-                        this.files.push({
+
+                        const isImage = file.type.startsWith('image/');
+                        const entry = {
                             file: file,
                             name: file.name,
                             size: file.size,
+                            originalSize: isImage ? file.size : null,
                             type: file.type,
                             progress: 0,
                             uploading: false,
                             uploaded: false,
+                            compressed: false,
+                            compressing: isImage,
                             error: null
-                        });
-                    });
+                        };
+                        this.files.push(entry);
+
+                        // Compress images client-side (pass index so callback mutates via self.files[i])
+                        if (isImage) {
+                            this.compressImage(file, this.files.length - 1);
+                        }
+
+                        // Check file size for non-images
+                        if (!isImage && file.size > this.maxSizeMB * 1024 * 1024) {
+                            entry.error = `File is too large (${this.formatFileSize(file.size)}). Maximum size is ${this.maxSizeMB}MB.`;
+                        }
+                    }
                 },
                 
                 removeFile(index) {

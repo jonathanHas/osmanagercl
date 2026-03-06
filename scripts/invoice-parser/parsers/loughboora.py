@@ -51,3 +51,49 @@ def parse_xls(text, filename):
 
     print(f"[DEBUG] Parsed XLS Data: {parsed_data}", file=sys.stderr)
     return parsed_data
+
+
+def parse_ods(text, filename):
+    """Parse Lough Boora ODS invoice from extracted text."""
+    print(f"[DEBUG] Parsing Lough Boora ODS invoice: {filename}", file=sys.stderr)
+
+    # === Extract subtotal and total from text using regex
+    subtotal_match = re.search(r'SubTotal\s+([\d.]+)', text)
+    total_match = re.search(r'TOTAL\s+([\d.]+)', text)
+
+    subtotal = subtotal_match.group(1) if subtotal_match else "0.00"
+    total = total_match.group(1) if total_match else subtotal
+
+    # === Extract date from ODS text
+    # Pandas outputs dates as "2026-03-02 00:00:00" or "02/03/2026"
+    invoice_date = "Not found"
+    date_match = re.search(r'Date\s+(\d{4}-\d{2}-\d{2})\s', text)
+    if date_match:
+        # Convert YYYY-MM-DD to DD/MM/YYYY
+        y, m, d = date_match.group(1).split('-')
+        invoice_date = f"{d}/{m}/{y}"
+    else:
+        date_match2 = re.search(r'Date\s+(\d{2}/\d{2}/\d{4})', text)
+        if date_match2:
+            invoice_date = date_match2.group(1)
+        else:
+            date_match3 = re.search(r'Date\s+(\d{2}/\d{2}/\d{2})', text)
+            if date_match3:
+                d, m, y = date_match3.group(1).split('/')
+                invoice_date = f"{d}/{m}/20{y}"
+    print(f"[DEBUG] Invoice Date: {invoice_date}", file=sys.stderr)
+
+    parsed_data = {
+        "Filename": filename,
+        "Supplier": "Lough Boora",
+        "Invoice Date": invoice_date,
+        "Tax Free": True,
+        "Credit Note": False,
+        "VAT 0%": total,
+        "VAT 9%": "0.00",
+        "VAT 13.5%": "0.00",
+        "VAT 23%": "0.00"
+    }
+
+    print(f"[DEBUG] Parsed ODS Data: {parsed_data}", file=sys.stderr)
+    return parsed_data
