@@ -12,12 +12,14 @@ use App\Models\VegLabelPrintBatch;
 use App\Models\VegPrintQueue;
 use App\Repositories\OptimizedSalesRepository;
 use App\Repositories\SalesRepository;
+use App\Services\SalesDataSyncService;
 use App\Services\TillVisibilityService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Intervention\Image\Drivers\Gd\Driver as GdDriver;
 use Intervention\Image\ImageManager;
 
@@ -38,14 +40,17 @@ class FruitVegController extends Controller
      */
     protected TillVisibilityService $tillVisibilityService;
 
+    protected SalesDataSyncService $salesDataSyncService;
+
     /**
      * Create a new controller instance.
      */
-    public function __construct(SalesRepository $salesRepository, OptimizedSalesRepository $optimizedSalesRepository, TillVisibilityService $tillVisibilityService)
+    public function __construct(SalesRepository $salesRepository, OptimizedSalesRepository $optimizedSalesRepository, TillVisibilityService $tillVisibilityService, SalesDataSyncService $salesDataSyncService)
     {
         $this->salesRepository = $salesRepository;
         $this->optimizedSalesRepository = $optimizedSalesRepository;
         $this->tillVisibilityService = $tillVisibilityService;
+        $this->salesDataSyncService = $salesDataSyncService;
     }
 
     /**
@@ -1807,6 +1812,25 @@ class FruitVegController extends Controller
         $coverageDays = (int) $validated['coverage_days'];
         $periodDays = $startDate->diffInDays($endDate) + 1;
 
+        // Ensure sales data is fresh before generating order
+        try {
+            $importLog = $this->salesDataSyncService->ensureDailySummariesAreFresh();
+
+            if ($importLog !== null) {
+                session()->flash('info', sprintf(
+                    'Sales data imported for %s through %s.',
+                    optional($importLog->start_date)->format('M j, Y'),
+                    optional($importLog->end_date)->format('M j, Y')
+                ));
+            }
+        } catch (\Throwable $exception) {
+            Log::warning('Automatic sales import failed prior to F&V order generation', [
+                'error' => $exception->getMessage(),
+            ]);
+
+            session()->flash('warning', 'We could not refresh sales data automatically; using the most recent import instead.');
+        }
+
         // Get sales data grouped by product
         $salesData = DB::table('sales_daily_summary')
             ->whereIn('category_id', ['SUB1', 'SUB2', 'SUB3'])
@@ -1820,7 +1844,7 @@ class FruitVegController extends Controller
                 SUM(total_revenue) as total_revenue
             ')
             ->groupBy('product_id', 'product_code', 'product_name', 'category_id')
-            ->orderByDesc('total_units')
+            ->orderBy('product_name')
             ->get();
 
         // Get weekly breakdown for charts

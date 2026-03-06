@@ -31,7 +31,8 @@ class SalesDataSyncService
                 return null;
             }
 
-            $startDate = $latestSummaryDate->copy()->addDay();
+            // Re-import the latest day too, in case it was only partially imported
+            $startDate = $latestSummaryDate->copy();
         } else {
             // Fall back to enough history for the upcoming order window
             $startDate = Carbon::now()->copy()->subWeeks($salesHistoryWeeks)->startOfWeek();
