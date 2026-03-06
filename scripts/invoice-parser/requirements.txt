@@ -17,6 +17,9 @@ openpyxl==3.1.5
 # Document Processing
 python-docx==1.2.0
 
+# ODS/OpenDocument Processing
+odfpy==1.4.1
+
 # Data Processing
 pandas==2.2.3
 numpy==2.2.4

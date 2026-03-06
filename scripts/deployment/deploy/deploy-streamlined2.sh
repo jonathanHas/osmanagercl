@@ -319,6 +319,13 @@ main() {
         unset DEPLOY_BUILD_VERSION
         echo "Build version set to ${BUILD_HASH}"
 
+        echo "🐍 Installing Python parser dependencies..."
+        cd scripts/invoice-parser
+        if [ -d "venv" ]; then
+            venv/bin/pip install -r requirements.txt --quiet
+        fi
+        cd $PROD_PATH
+
         echo "🔐 Setting file permissions..."
         sudo chown -R www-data:www-data .
         sudo chmod -R 755 .
