@@ -16,7 +16,7 @@ class SalesDataSyncService
      *
      * @return SalesImportLog|null Returns the import log when an import runs, null when no work was required.
      */
-    public function ensureDailySummariesAreFresh(int $salesHistoryWeeks = 8): ?SalesImportLog
+    public function ensureDailySummariesAreFresh(int $salesHistoryWeeks = 8, ?callable $onProgress = null): ?SalesImportLog
     {
         $salesHistoryWeeks = max(1, min(26, $salesHistoryWeeks));
         $targetEndDate = Carbon::yesterday();
@@ -40,6 +40,10 @@ class SalesDataSyncService
 
         if ($startDate->greaterThan($targetEndDate)) {
             return null;
+        }
+
+        if ($onProgress) {
+            $onProgress('importing_sales', 'Importing sales data ('.$startDate->format('M j').' - '.$targetEndDate->format('M j').')...', 10);
         }
 
         $log = $this->salesImportService->importDailySales($startDate->copy(), $targetEndDate->copy());

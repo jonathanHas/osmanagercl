@@ -362,4 +362,9 @@
             @endif
         </div>
     </div>
+
+    <x-order-progress-overlay
+        :stream-url="route('orders.generate-stream')"
+        form-selector="form[action='{{ route('orders.store') }}']"
+    />
 </x-admin-layout>

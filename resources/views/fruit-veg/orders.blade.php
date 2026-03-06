@@ -100,4 +100,9 @@
             </div>
         </div>
     </div>
+
+    <x-order-progress-overlay
+        :stream-url="route('fruit-veg.orders.generate-stream')"
+        form-selector="form[action='{{ route('fruit-veg.orders.generate') }}']"
+    />
 </x-admin-layout>

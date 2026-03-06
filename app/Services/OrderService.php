@@ -29,7 +29,7 @@ class OrderService
     /**
      * Generate order suggestions for a supplier.
      */
-    public function generateOrderSuggestions(string $supplierId, Carbon $orderDate, array $options = []): OrderSession
+    public function generateOrderSuggestions(string $supplierId, Carbon $orderDate, array $options = [], ?callable $onProgress = null): OrderSession
     {
         $coverageDays = max(1, (int) ($options['coverage_days'] ?? 7));
         $coverageWeeks = ($options['coverage_weeks'] ?? null) !== null
@@ -63,7 +63,7 @@ class OrderService
             'category_overrides' => $categoryOverrides,
             'christmas_comparison_enabled' => $orderSession->christmas_comparison_enabled,
             'christmas_window_config' => $orderSession->christmas_window_config,
-        ]);
+        ], $onProgress);
     }
 
     /**
@@ -172,7 +172,7 @@ class OrderService
      *
      * @param  array<string, mixed>  $options
      */
-    protected function buildOrderItemsForSession(OrderSession $orderSession, array $options): OrderSession
+    protected function buildOrderItemsForSession(OrderSession $orderSession, array $options, ?callable $onProgress = null): OrderSession
     {
         $coverageDays = (int) ($options['coverage_days'] ?? 7);
         $coverageWeeks = (float) ($options['coverage_weeks'] ?? ($coverageDays / 7));
@@ -203,6 +203,10 @@ class OrderService
         }
         $targetProductIds = array_values(array_unique(array_filter($targetProductIds, static fn ($id) => ! empty($id))));
 
+        if ($onProgress) {
+            $onProgress('fetching_products', 'Loading supplier products...', 20);
+        }
+
         $productFetchStart = microtime(true);
         $products = $this->getSupplierProducts(
             $orderSession->supplier_id,
@@ -211,6 +215,10 @@ class OrderService
             $targetProductIds
         );
         \Log::info('Order generation: getSupplierProducts took '.round((microtime(true) - $productFetchStart) * 1000).'ms for '.$products->count().' products');
+
+        if ($onProgress) {
+            $onProgress('fetching_sales_data', 'Fetching sales statistics for '.$products->count().' products...', 35);
+        }
 
         // ============================================================================
         // BULK PRE-FETCHING: Fetch all data upfront to eliminate N+1 queries
@@ -299,6 +307,10 @@ class OrderService
         \Log::info('Order generation: Last sale dates fetched in '.round((microtime(true) - $t6) * 1000).'ms');
 
         \Log::info('Order generation: Total bulk pre-fetch time: '.round((microtime(true) - $startTime) * 1000).'ms');
+
+        if ($onProgress) {
+            $onProgress('calculating_suggestions', 'Calculating order suggestions...', 60);
+        }
 
         $loopStartTime = microtime(true);
         $orderItems = [];
@@ -389,6 +401,10 @@ class OrderService
 
         \Log::info('Order generation: Loop processing time: '.round((microtime(true) - $loopStartTime) * 1000).'ms');
         \Log::info('Order generation: Total time: '.round((microtime(true) - $startTime) * 1000).'ms');
+
+        if ($onProgress) {
+            $onProgress('saving_order', 'Saving order...', 85);
+        }
 
         $orderSession->updateTotals();
 

@@ -295,6 +295,7 @@ Route::middleware('auth')->group(function () {
         // F&V Order Generation
         Route::get('/orders', [FruitVegController::class, 'orders'])->name('orders');
         Route::post('/orders', [FruitVegController::class, 'generateOrder'])->name('orders.generate');
+        Route::post('/orders/generate-stream', [FruitVegController::class, 'generateOrderWithProgress'])->name('orders.generate-stream');
     });
 
     // Coffee routes
@@ -439,6 +440,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/orders/mockup/vico-live', [OrderController::class, 'mockupVicoLive'])->name('orders.mockup.vico-live');
 
     // Order Management routes
+    Route::post('/orders/generate-stream', [OrderController::class, 'storeWithProgress'])->name('orders.generate-stream');
     Route::resource('orders', OrderController::class);
     Route::post('/orders/{order}/complete', [OrderController::class, 'complete'])->name('orders.complete');
     Route::post('/orders/{order}/duplicate', [OrderController::class, 'duplicate'])->name('orders.duplicate');

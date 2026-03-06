@@ -16,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OrderController extends Controller
 {
@@ -144,6 +145,141 @@ class OrderController extends Controller
 
         return redirect()->route('orders.show', $orderSession)
             ->with('success', 'Order suggestions generated successfully.');
+    }
+
+    /**
+     * Generate a new order session with SSE progress feedback.
+     */
+    public function storeWithProgress(Request $request): StreamedResponse
+    {
+        $request->validate([
+            'supplier_id' => 'required|exists:App\Models\Supplier,SupplierID',
+            'order_date' => 'required|date|after_or_equal:today',
+            'coverage_end_date' => 'required|date',
+            'sales_history_weeks' => 'nullable|integer|min:1|max:26',
+            'category_overrides' => 'nullable|array',
+            'category_overrides.*.coverage_end_date' => 'nullable|date|after_or_equal:order_date',
+            'christmas_comparison_enabled' => 'nullable|boolean',
+            'christmas_start_date' => 'nullable|required_if:christmas_comparison_enabled,true|date',
+            'christmas_end_date' => 'nullable|required_if:christmas_comparison_enabled,true|date|after_or_equal:christmas_start_date',
+            'comparison_years' => 'nullable|array',
+            'comparison_years.*' => 'integer|min:2020|max:'.date('Y'),
+        ]);
+
+        return new StreamedResponse(function () use ($request) {
+            try {
+                set_time_limit(300);
+
+                $orderDate = Carbon::parse($request->order_date);
+                $coverageEndDate = Carbon::parse($request->coverage_end_date);
+
+                if ($coverageEndDate->lessThan($orderDate)) {
+                    $this->sendStreamEvent('error', message: 'Coverage end must be on or after the delivery date.');
+
+                    return;
+                }
+
+                $specialGroups = SpecialOrderCategories::forSupplier((string) $request->supplier_id);
+                $rawOverrides = $request->input('category_overrides', []);
+                $categoryOverrides = $this->normaliseCategoryOverrides($rawOverrides, $specialGroups, $orderDate);
+
+                $coverageDays = $orderDate->diffInDays($coverageEndDate) + 1;
+                $salesHistoryWeeks = (int) $request->input('sales_history_weeks', 8);
+
+                $christmasEnabled = $request->boolean('christmas_comparison_enabled', false);
+                $christmasConfig = null;
+
+                if ($christmasEnabled && $request->filled(['christmas_start_date', 'christmas_end_date', 'comparison_years'])) {
+                    $christmasConfig = [
+                        'comparison_years' => array_map('intval', $request->input('comparison_years', [])),
+                        'date_range' => [
+                            'start' => $request->input('christmas_start_date'),
+                            'end' => $request->input('christmas_end_date'),
+                        ],
+                        'calculation_mode' => 'max',
+                    ];
+                }
+
+                $progressCallback = function (string $step, string $message, int $progress) {
+                    $this->sendStreamEvent('progress', $step, $message, $progress);
+                };
+
+                $this->sendStreamEvent('progress', 'importing_sales', 'Checking sales data freshness...', 5);
+
+                try {
+                    $importLog = $this->salesDataSyncService->ensureDailySummariesAreFresh($salesHistoryWeeks, $progressCallback);
+
+                    if ($importLog !== null) {
+                        session()->flash('info', sprintf(
+                            'Sales data imported for %s through %s.',
+                            optional($importLog->start_date)->format('M j, Y'),
+                            optional($importLog->end_date)->format('M j, Y')
+                        ));
+                    }
+                } catch (\Throwable $exception) {
+                    Log::warning('Automatic sales import failed prior to order generation', [
+                        'error' => $exception->getMessage(),
+                    ]);
+                    session()->flash('warning', 'We could not refresh sales data automatically; using the most recent import instead.');
+                }
+
+                $orderSession = $this->orderService->generateOrderSuggestions(
+                    $request->supplier_id,
+                    $orderDate,
+                    [
+                        'coverage_days' => $coverageDays,
+                        'coverage_ends_on' => $coverageEndDate,
+                        'sales_history_weeks' => $salesHistoryWeeks,
+                        'category_overrides' => $categoryOverrides,
+                        'category_groups' => $specialGroups,
+                        'christmas_comparison_enabled' => $christmasEnabled,
+                        'christmas_window_config' => $christmasConfig,
+                    ],
+                    $progressCallback
+                );
+
+                $this->sendStreamEvent('complete', redirect_url: route('orders.show', $orderSession), message: 'Order generated successfully!');
+            } catch (\Throwable $exception) {
+                Log::error('Order generation failed during streaming', [
+                    'error' => $exception->getMessage(),
+                    'trace' => $exception->getTraceAsString(),
+                ]);
+                $this->sendStreamEvent('error', message: 'Order generation failed: '.$exception->getMessage());
+            }
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'Connection' => 'keep-alive',
+            'X-Accel-Buffering' => 'no',
+        ]);
+    }
+
+    /**
+     * Send an SSE event.
+     */
+    private function sendStreamEvent(string $type, ?string $step = null, ?string $message = null, ?int $progress = null, ?string $redirect_url = null): void
+    {
+        $data = ['type' => $type];
+
+        if ($step !== null) {
+            $data['step'] = $step;
+        }
+        if ($message !== null) {
+            $data['message'] = $message;
+        }
+        if ($progress !== null) {
+            $data['progress'] = $progress;
+        }
+        if ($redirect_url !== null) {
+            $data['redirect_url'] = $redirect_url;
+        }
+
+        echo 'data: '.json_encode($data)."\n\n";
+
+        if (ob_get_level()) {
+            ob_flush();
+        }
+        flush();
     }
 
     /**

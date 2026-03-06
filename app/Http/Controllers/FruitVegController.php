@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Intervention\Image\Drivers\Gd\Driver as GdDriver;
 use Intervention\Image\ImageManager;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FruitVegController extends Controller
 {
@@ -1952,5 +1953,209 @@ class FruitVegController extends Controller
             'salesPeriod',
             'coverageDays'
         ));
+    }
+
+    /**
+     * Generate F&V order with SSE progress feedback.
+     */
+    public function generateOrderWithProgress(Request $request): StreamedResponse
+    {
+        $validated = $request->validate([
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+            'coverage_days' => 'required|integer|min:1|max:30',
+        ]);
+
+        return new StreamedResponse(function () use ($validated) {
+            $startDate = Carbon::parse($validated['start_date']);
+            $endDate = Carbon::parse($validated['end_date']);
+            $coverageDays = (int) $validated['coverage_days'];
+            $periodDays = $startDate->diffInDays($endDate) + 1;
+
+            $this->sendFvStreamEvent('progress', 'importing_sales', 'Checking sales data freshness...', 5);
+
+            try {
+                $importLog = $this->salesDataSyncService->ensureDailySummariesAreFresh(8, function (string $step, string $message, int $progress) {
+                    $this->sendFvStreamEvent('progress', $step, $message, $progress);
+                });
+
+                if ($importLog !== null) {
+                    session()->flash('info', sprintf(
+                        'Sales data imported for %s through %s.',
+                        optional($importLog->start_date)->format('M j, Y'),
+                        optional($importLog->end_date)->format('M j, Y')
+                    ));
+                }
+            } catch (\Throwable $exception) {
+                Log::warning('Automatic sales import failed prior to F&V order generation', [
+                    'error' => $exception->getMessage(),
+                ]);
+                session()->flash('warning', 'We could not refresh sales data automatically; using the most recent import instead.');
+            }
+
+            $this->sendFvStreamEvent('progress', 'querying_sales', 'Querying sales history...', 25);
+
+            try {
+                $salesData = DB::table('sales_daily_summary')
+                    ->whereIn('category_id', ['SUB1', 'SUB2', 'SUB3'])
+                    ->whereBetween('sale_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                    ->selectRaw('
+                        product_id,
+                        product_code,
+                        product_name,
+                        category_id,
+                        SUM(total_units) as total_units,
+                        SUM(total_revenue) as total_revenue
+                    ')
+                    ->groupBy('product_id', 'product_code', 'product_name', 'category_id')
+                    ->orderBy('product_name')
+                    ->get();
+
+                $weeklySales = DB::table('sales_daily_summary')
+                    ->whereIn('category_id', ['SUB1', 'SUB2', 'SUB3'])
+                    ->whereBetween('sale_date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')])
+                    ->selectRaw('
+                        product_code,
+                        YEARWEEK(sale_date, 1) as year_week,
+                        SUM(total_units) as week_units
+                    ')
+                    ->groupBy('product_code', 'year_week')
+                    ->orderBy('year_week')
+                    ->get()
+                    ->groupBy('product_code');
+
+                $weekLabels = [];
+                $currentWeek = $startDate->copy()->startOfWeek();
+                while ($currentWeek <= $endDate) {
+                    $weekLabels[$currentWeek->format('oW')] = $currentWeek->format('M j');
+                    $currentWeek->addWeek();
+                }
+
+                $this->sendFvStreamEvent('progress', 'processing_products', 'Processing '.$salesData->count().' products...', 55);
+
+                $fruitProducts = collect();
+                $vegetableProducts = collect();
+                $barcodedProducts = collect();
+
+                foreach ($salesData as $sale) {
+                    $product = Product::with('vegDetails.country')
+                        ->where('CODE', $sale->product_code)
+                        ->first();
+
+                    if (! $product) {
+                        continue;
+                    }
+
+                    $totalUnits = (float) $sale->total_units;
+                    $periodWeeks = max($periodDays / 7, 1);
+                    $avgWeekly = $totalUnits / $periodWeeks;
+                    $coverageWeeks = $coverageDays / 7;
+                    $suggestedQty = ceil($avgWeekly * $coverageWeeks);
+
+                    $productWeekly = $weeklySales->get($sale->product_code, collect());
+                    $weekUnits = [];
+                    $weekLabelsForProduct = [];
+
+                    foreach ($weekLabels as $yearWeek => $label) {
+                        $weekData = $productWeekly->firstWhere('year_week', $yearWeek);
+                        $weekUnits[] = $weekData ? (float) $weekData->week_units : 0;
+                        $weekLabelsForProduct[] = $label;
+                    }
+
+                    $peakWeekly = count($weekUnits) > 0 ? max($weekUnits) : $avgWeekly;
+
+                    $item = [
+                        'product' => $product,
+                        'sales_data' => [
+                            'total_units' => $totalUnits,
+                            'total_revenue' => (float) $sale->total_revenue,
+                            'avg_weekly' => round($avgWeekly, 1),
+                            'peak_weekly' => round($peakWeekly, 1),
+                            'suggested_qty' => $suggestedQty,
+                            'week_labels' => $weekLabelsForProduct,
+                            'week_units' => $weekUnits,
+                        ],
+                    ];
+
+                    match ($sale->category_id) {
+                        'SUB1' => $fruitProducts->push($item),
+                        'SUB2' => $vegetableProducts->push($item),
+                        'SUB3' => $barcodedProducts->push($item),
+                        default => null,
+                    };
+                }
+
+                $sortFn = fn ($a, $b) => $b['sales_data']['total_units'] <=> $a['sales_data']['total_units'];
+
+                $fruitProducts = $fruitProducts->sort($sortFn)->values();
+                $vegetableProducts = $vegetableProducts->sort($sortFn)->values();
+                $barcodedProducts = $barcodedProducts->sort($sortFn)->values();
+
+                $statistics = [
+                    'total_products' => $fruitProducts->count() + $vegetableProducts->count() + $barcodedProducts->count(),
+                ];
+
+                $salesPeriod = [
+                    'start' => $startDate,
+                    'end' => $endDate,
+                    'days' => $periodDays,
+                ];
+
+                $this->sendFvStreamEvent('progress', 'rendering', 'Preparing results...', 90);
+
+                $html = view('fruit-veg.orders-review', compact(
+                    'fruitProducts',
+                    'vegetableProducts',
+                    'barcodedProducts',
+                    'statistics',
+                    'salesPeriod',
+                    'coverageDays'
+                ))->render();
+
+                $this->sendFvStreamEvent('complete', message: 'Order generated successfully!', html: $html);
+            } catch (\Throwable $exception) {
+                Log::error('F&V order generation failed during streaming', [
+                    'error' => $exception->getMessage(),
+                    'trace' => $exception->getTraceAsString(),
+                ]);
+                $this->sendFvStreamEvent('error', message: 'Order generation failed: '.$exception->getMessage());
+            }
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'Connection' => 'keep-alive',
+            'X-Accel-Buffering' => 'no',
+        ]);
+    }
+
+    /**
+     * Send an SSE event for F&V order generation.
+     */
+    private function sendFvStreamEvent(string $type, ?string $step = null, ?string $message = null, ?int $progress = null, ?string $redirect_url = null, ?string $html = null): void
+    {
+        $data = ['type' => $type];
+
+        if ($step !== null) {
+            $data['step'] = $step;
+        }
+        if ($message !== null) {
+            $data['message'] = $message;
+        }
+        if ($progress !== null) {
+            $data['progress'] = $progress;
+        }
+        if ($redirect_url !== null) {
+            $data['redirect_url'] = $redirect_url;
+        }
+        if ($html !== null) {
+            $data['html'] = $html;
+        }
+
+        echo 'data: '.json_encode($data)."\n\n";
+
+        if (ob_get_level()) {
+            ob_flush();
+        }
+        flush();
     }
 }
