@@ -233,6 +233,9 @@
                                             @if($file->supplier_detected)
                                                 <span class="ml-2">| {{ $file->supplier_detected }}</span>
                                             @endif
+                                            @if($file->parsed_invoice_date)
+                                                <span class="ml-2">| {{ \Carbon\Carbon::parse($file->parsed_invoice_date)->format('d/m/Y') }}</span>
+                                            @endif
                                         </div>
                                         @if($file->parsed_vat_data)
                                             @php
@@ -527,7 +530,7 @@
                                                 <label class="block text-sm font-medium text-gray-300 mb-2">Invoice Date</label>
                                                 <input type="date"
                                                        name="invoice_date"
-                                                       value="{{ $file->parsed_invoice_date ?? ($file->parsed_data['invoice_date'] ?? '') }}"
+                                                       value="{{ $file->parsed_invoice_date ? \Carbon\Carbon::parse($file->parsed_invoice_date)->format('Y-m-d') : ($file->parsed_data['invoice_date'] ?? '') }}"
                                                        class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:border-blue-500 focus:outline-none">
                                             </div>
 
