@@ -157,11 +157,13 @@ class DeliveryLegacyController extends Controller
                     delivery.caseUnits as invoiceCaseUnits,
                     b.barcode as scannedBarcode,
                     b.scanned,
-                    PRODUCTS.ID as productID
+                    PRODUCTS.ID as productID,
+                    CATEGORIES.NAME as categoryName
                 FROM delivery
                 LEFT JOIN supplier_link ON delivery.supCode = supplier_link.SupplierCode
                     AND supplier_link.SupplierID = ?
                 LEFT JOIN PRODUCTS ON supplier_link.Barcode = PRODUCTS.CODE
+                LEFT JOIN CATEGORIES ON PRODUCTS.CATEGORY = CATEGORIES.ID
                 LEFT JOIN TAXES ON PRODUCTS.TAXCAT = TAXES.ID
                 LEFT JOIN STOCKCURRENT ON PRODUCTS.ID = STOCKCURRENT.PRODUCT
                 LEFT JOIN (
@@ -172,7 +174,7 @@ class DeliveryLegacyController extends Controller
                 ) b ON b.barcode = supplier_link.Barcode
                 WHERE supplier_link.SupplierID = ?
                 GROUP BY prodName, supCode, supplier_link.Barcode, rrPrice, PRICEBUY, PRICESELL,
-                         RATE, delivery.caseUnits, supplier_link.CaseUnits, b.barcode, b.scanned, UNITS, PRODUCTS.ID
+                         RATE, delivery.caseUnits, supplier_link.CaseUnits, b.barcode, b.scanned, UNITS, PRODUCTS.ID, CATEGORIES.NAME
                 ORDER BY scanned DESC, margin ASC';
 
         $results = DB::connection('pos')->select($sql, [$supplierId, $deliveryId, $supplierId]);
@@ -196,9 +198,11 @@ class DeliveryLegacyController extends Controller
                     sl.SupplierCode,
                     sl.CaseUnits,
                     PRODUCTS.ID as productID,
-                    STOCKCURRENT.UNITS
+                    STOCKCURRENT.UNITS,
+                    CATEGORIES.NAME as categoryName
                 FROM deliveriesScanItems
                 LEFT JOIN PRODUCTS ON PRODUCTS.CODE = deliveriesScanItems.barcode
+                LEFT JOIN CATEGORIES ON PRODUCTS.CATEGORY = CATEGORIES.ID
                 LEFT JOIN TAXES ON PRODUCTS.TAXCAT = TAXES.ID
                 LEFT JOIN STOCKCURRENT ON PRODUCTS.ID = STOCKCURRENT.PRODUCT
                 LEFT JOIN supplier_link sl ON sl.Barcode = deliveriesScanItems.barcode
@@ -213,7 +217,7 @@ class DeliveryLegacyController extends Controller
                     AND supplier_link.Barcode IS NOT NULL
                     GROUP BY supplier_link.Barcode
                 )
-                GROUP BY deliveriesScanItems.barcode, PRODUCTS.NAME, PRODUCTS.PRICESELL, TAXES.RATE, sl.SupplierCode, sl.CaseUnits, PRODUCTS.ID, STOCKCURRENT.UNITS
+                GROUP BY deliveriesScanItems.barcode, PRODUCTS.NAME, PRODUCTS.PRICESELL, TAXES.RATE, sl.SupplierCode, sl.CaseUnits, PRODUCTS.ID, STOCKCURRENT.UNITS, CATEGORIES.NAME
                 ORDER BY PRODUCTS.NAME';
 
         $results = DB::connection('pos')->select($sql, [$supplierId, $deliveryId, $supplierId, $supplierId]);

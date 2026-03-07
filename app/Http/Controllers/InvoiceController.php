@@ -53,6 +53,13 @@ class InvoiceController extends Controller
             $query->where('invoice_date', '<=', $toDate);
         }
 
+        if ($request->filled('paid_from_date')) {
+            $query->where('payment_date', '>=', $request->paid_from_date);
+        }
+        if ($request->filled('paid_to_date')) {
+            $query->where('payment_date', '<=', $request->paid_to_date);
+        }
+
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
@@ -126,6 +133,12 @@ class InvoiceController extends Controller
         $statsQuery->where('invoice_date', '>=', $fromDate);
         if ($toDate) {
             $statsQuery->where('invoice_date', '<=', $toDate);
+        }
+        if ($request->filled('paid_from_date')) {
+            $statsQuery->where('payment_date', '>=', $request->paid_from_date);
+        }
+        if ($request->filled('paid_to_date')) {
+            $statsQuery->where('payment_date', '<=', $request->paid_to_date);
         }
         if ($request->filled('search')) {
             $search = $request->search;

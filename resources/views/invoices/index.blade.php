@@ -91,59 +91,86 @@
 
         {{-- Filters --}}
         <div class="bg-gray-800 rounded-lg p-4 mb-6">
-            <form method="GET" action="{{ route('invoices.index') }}" class="grid grid-cols-1 md:grid-cols-6 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-1">Supplier</label>
-                    <select name="supplier_id" class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md">
-                        <option value="">All Suppliers</option>
-                        @foreach($suppliers as $id => $name)
-                            <option value="{{ $id }}" {{ request('supplier_id') == $id ? 'selected' : '' }}>
-                                {{ $name }}
-                            </option>
-                        @endforeach
-                    </select>
+            <form method="GET" action="{{ route('invoices.index') }}">
+                <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Supplier</label>
+                        <select name="supplier_id" class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md">
+                            <option value="">All Suppliers</option>
+                            @foreach($suppliers as $id => $name)
+                                <option value="{{ $id }}" {{ request('supplier_id') == $id ? 'selected' : '' }}>
+                                    {{ $name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Status</label>
+                        <select name="payment_status" class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md">
+                            <option value="">All Status</option>
+                            <option value="unpaid" {{ request('payment_status') == 'unpaid' ? 'selected' : '' }}>All Unpaid</option>
+                            <option value="pending" {{ request('payment_status') == 'pending' ? 'selected' : '' }}>Pending</option>
+                            <option value="overdue" {{ request('payment_status') == 'overdue' ? 'selected' : '' }}>Overdue</option>
+                            <option value="paid" {{ request('payment_status') == 'paid' ? 'selected' : '' }}>Paid</option>
+                            <option value="partial" {{ request('payment_status') == 'partial' ? 'selected' : '' }}>Partial</option>
+                            <option value="cancelled" {{ request('payment_status') == 'cancelled' ? 'selected' : '' }}>Cancelled</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">From Date</label>
+                        <input type="date" name="from_date" value="{{ request('from_date', now()->subMonths(3)->format('Y-m-d')) }}"
+                               class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">To Date</label>
+                        <input type="date" name="to_date" value="{{ request('to_date') }}"
+                               class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-1">Search</label>
+                        <input type="text" name="search" value="{{ request('search') }}"
+                               placeholder="Invoice #, supplier..."
+                               class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md">
+                    </div>
+                    <div class="flex items-end space-x-2">
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                            Filter
+                        </button>
+                        <a href="{{ route('invoices.index') }}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                            Clear
+                        </a>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-1">Status</label>
-                    <select name="payment_status" class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md">
-                        <option value="">All Status</option>
-                        <option value="unpaid" {{ request('payment_status') == 'unpaid' ? 'selected' : '' }}>All Unpaid</option>
-                        <option value="pending" {{ request('payment_status') == 'pending' ? 'selected' : '' }}>Pending</option>
-                        <option value="overdue" {{ request('payment_status') == 'overdue' ? 'selected' : '' }}>Overdue</option>
-                        <option value="paid" {{ request('payment_status') == 'paid' ? 'selected' : '' }}>Paid</option>
-                        <option value="partial" {{ request('payment_status') == 'partial' ? 'selected' : '' }}>Partial</option>
-                        <option value="cancelled" {{ request('payment_status') == 'cancelled' ? 'selected' : '' }}>Cancelled</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-1">From Date</label>
-                    <input type="date" name="from_date" value="{{ request('from_date', now()->subMonths(3)->format('Y-m-d')) }}"
-                           class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-1">To Date</label>
-                    <input type="date" name="to_date" value="{{ request('to_date') }}" 
-                           class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-1">Search</label>
-                    <input type="text" name="search" value="{{ request('search') }}" 
-                           placeholder="Invoice #, supplier..." 
-                           class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md">
-                </div>
-                <div class="flex items-end space-x-2">
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                        Filter
+
+                {{-- Payment Date Filter (collapsible) --}}
+                <div x-data="{ open: {{ request()->hasAny(['paid_from_date', 'paid_to_date']) ? 'true' : 'false' }} }" class="mt-3">
+                    <button @click="open = !open" type="button" class="flex items-center text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors">
+                        <svg :class="open ? 'rotate-90' : ''" class="w-4 h-4 mr-1 transition-transform" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                        </svg>
+                        Payment Date Filter
+                        @if(request()->hasAny(['paid_from_date', 'paid_to_date']))
+                            <span class="ml-2 text-xs text-blue-400">(active)</span>
+                        @endif
                     </button>
-                    <a href="{{ route('invoices.index') }}" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
-                        Clear
-                    </a>
+                    <div x-show="open" x-collapse class="mt-2 grid grid-cols-1 md:grid-cols-6 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">Paid From</label>
+                            <input type="date" name="paid_from_date" value="{{ request('paid_from_date') }}"
+                                   class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-1">Paid To</label>
+                            <input type="date" name="paid_to_date" value="{{ request('paid_to_date') }}"
+                                   class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md">
+                        </div>
+                    </div>
                 </div>
             </form>
         </div>
 
         {{-- Filtered Statistics Cards (show only when filters are applied) --}}
-        @if(request()->hasAny(['supplier_id', 'payment_status', 'from_date', 'to_date', 'search']))
+        @if(request()->hasAny(['supplier_id', 'payment_status', 'from_date', 'to_date', 'search', 'paid_from_date', 'paid_to_date']))
         <div class="bg-gray-800 rounded-lg p-4 mb-6">
             <h3 class="text-lg font-semibold text-gray-200 mb-4">Filtered Results Summary</h3>
             

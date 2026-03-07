@@ -212,10 +212,38 @@
                             Verified Only ({{ $financials['verifiedCount'] }})
                         </button>
                     </div>
-                    <label class="ml-auto flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" x-model="showDetails" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                        <span class="text-sm text-gray-700">Show Details</span>
-                    </label>
+                    <div class="ml-auto flex items-center gap-4">
+                        <div class="relative flex items-center gap-2">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" x-model="showCategories" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                <span class="text-sm text-gray-700">Categories</span>
+                            </label>
+                            <div x-show="showCategories" x-cloak class="relative" @click.outside="categoryDropdownOpen = false">
+                                <button @click="categoryDropdownOpen = !categoryDropdownOpen"
+                                        class="inline-flex items-center gap-1 px-2 py-1 text-xs border border-gray-300 rounded-md bg-white hover:bg-gray-50 text-gray-700">
+                                    <span x-text="selectedCategories.length === allCategories.length ? 'All' : selectedCategories.length + ' selected'"></span>
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                </button>
+                                <div x-show="categoryDropdownOpen" x-cloak
+                                     class="absolute right-0 mt-1 w-56 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                                    <div class="p-2 border-b border-gray-100 flex gap-2">
+                                        <button @click="selectedCategories = [...allCategories]" class="text-xs text-indigo-600 hover:text-indigo-800">All</button>
+                                        <button @click="selectedCategories = []" class="text-xs text-red-600 hover:text-red-800">None</button>
+                                    </div>
+                                    <template x-for="cat in allCategories" :key="cat">
+                                        <label class="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer text-sm">
+                                            <input type="checkbox" :value="cat" x-model="selectedCategories" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                            <span x-text="cat" class="truncate"></span>
+                                        </label>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" x-model="showDetails" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <span class="text-sm text-gray-700">Show Details</span>
+                        </label>
+                    </div>
                 </div>
             </div>
 
@@ -255,6 +283,16 @@
                 });
 
                 $pendingItems = collect($matchedItems)->filter(fn($item) => $item->scanned === null && ($item->myOrder ?? 0) > 0);
+
+                // Collect all unique categories for the filter dropdown
+                $allCategories = collect($matchedItems)
+                    ->pluck('categoryName')
+                    ->merge(collect($scannedNotOnInvoice)->pluck('categoryName'))
+                    ->filter()
+                    ->unique()
+                    ->sort()
+                    ->values()
+                    ->all();
             @endphp
 
             <!-- Critical Issues Section -->
@@ -321,7 +359,7 @@
                                             $impact = $diff * $cost;
                                             $hasCaseUnitChange = $item->invoiceCaseUnits != $item->CaseUnits;
                                         @endphp
-                                        <tr class="bg-red-50">
+                                        <tr class="bg-red-50" x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
                                             <td class="px-2 py-2">
                                                 @php
                                                     $tempProduct = (object)[
@@ -344,6 +382,7 @@
                                                     <span class="font-medium text-gray-900">{{ $item->prodName }}</span>
                                                 @endif
                                                 <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                                <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                             </td>
                                             <td class="px-3 py-2 text-center font-medium">{{ $unitsDelivered }}</td>
                                             <td class="px-3 py-2 text-center text-gray-600">{{ $item->invoiceCaseUnits ?? '-' }}</td>
@@ -522,7 +561,7 @@
                                             $issues = [];
                                             if ($hasMarginIssue) $issues[] = 'Low margin';
                                         @endphp
-                                        <tr class="bg-yellow-50">
+                                        <tr class="bg-yellow-50" x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
                                             <td class="px-2 py-2">
                                                 @php
                                                     $tempProduct = (object)[
@@ -545,6 +584,7 @@
                                                     <span class="font-medium text-gray-900">{{ $item->prodName }}</span>
                                                 @endif
                                                 <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                                <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                             </td>
                                             <td class="px-3 py-2 text-center font-medium">{{ $unitsDelivered }}</td>
                                             <td class="px-3 py-2 text-center text-gray-600">{{ $item->invoiceCaseUnits ?? '-' }}</td>
@@ -720,7 +760,7 @@
                                             $value = $cost * $unitsDelivered;
                                             $hasCaseUnitChange = $item->invoiceCaseUnits != $item->CaseUnits;
                                         @endphp
-                                        <tr class="hover:bg-green-50">
+                                        <tr class="hover:bg-green-50" x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
                                             <td class="px-2 py-2">
                                                 @php
                                                     $tempProduct = (object)[
@@ -743,6 +783,7 @@
                                                     <span class="font-medium text-gray-900">{{ $item->prodName }}</span>
                                                 @endif
                                                 <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                                <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                             </td>
                                             <td class="px-3 py-2 text-center font-medium text-green-600">{{ $unitsDelivered }}</td>
                                             <td class="px-3 py-2 text-center text-gray-600">{{ $item->invoiceCaseUnits ?? '-' }}</td>
@@ -871,7 +912,7 @@
                                     @php
                                         $hasCaseUnitChange = $item->invoiceCaseUnits != $item->CaseUnits;
                                     @endphp
-                                    <tr class="hover:bg-orange-50">
+                                    <tr class="hover:bg-orange-50" x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
                                         <td class="px-2 py-2">
                                             @php
                                                 $tempProduct = (object)[
@@ -894,6 +935,7 @@
                                                 <span class="font-medium text-gray-900">{{ $item->prodName }}</span>
                                             @endif
                                             <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                            <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                         </td>
                                         <td class="px-3 py-2 text-center {{ $hasCaseUnitChange ? 'bg-orange-100' : '' }}">
                                             {{ $item->invoiceCaseUnits ?? 1 }}
@@ -970,6 +1012,7 @@
                                             $value = $cost * $unitsDelivered;
                                         @endphp
                                         <tr class="hover:bg-gray-50"
+                                            x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')"
                                             x-data="{ editing: false, qty: null, originalQty: null, saving: false, canEdit: {{ $isCompleted ? 'false' : 'true' }} }">
                                             <td class="px-2 py-2">
                                                 @php
@@ -993,6 +1036,7 @@
                                                     <span class="font-medium text-gray-900">{{ $item->prodName }}</span>
                                                 @endif
                                                 <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                                <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                             </td>
                                             <td class="px-3 py-2 text-sm text-gray-600 font-mono">{{ $item->Barcode }}</td>
                                             <td class="px-3 py-2 text-center font-medium">
@@ -1103,7 +1147,7 @@
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
                                     @foreach($scannedNotOnInvoice as $item)
-                                        <tr class="bg-orange-50">
+                                        <tr class="bg-orange-50" x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
                                             <td class="px-2 py-2">
                                                 @php
                                                     $tempProduct = (object)[
@@ -1122,6 +1166,7 @@
                                                 @if($item->SupplierCode)
                                                     <span class="text-xs text-gray-500 block">{{ $item->SupplierCode }}</span>
                                                 @endif
+                                                <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                             </td>
                                             <td class="px-3 py-2">
                                                 @if($item->productID)
@@ -1311,6 +1356,10 @@
             return {
                 filter: 'all',
                 showDetails: false,
+                showCategories: false,
+                categoryDropdownOpen: false,
+                allCategories: @js($allCategories),
+                selectedCategories: @js($allCategories),
                 isCompleted: {{ $isCompleted ? 'true' : 'false' }},
                 sectionsOpen: {
                     critical: true,
@@ -1327,6 +1376,10 @@
                 init() {
                     // Store reference to this instance for child components
                     window.deliveryMatchInstance = this;
+                },
+                categoryVisible(cat) {
+                    if (!this.showCategories || !cat) return true;
+                    return this.selectedCategories.includes(cat);
                 },
                 async saveScannedQty(barcode, newQty, onSuccess) {
                     try {
