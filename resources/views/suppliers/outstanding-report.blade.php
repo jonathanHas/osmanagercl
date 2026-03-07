@@ -194,6 +194,9 @@
                                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                     Payment Status
                                                 </th>
+                                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Notes
+                                                </th>
                                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                     Actions
                                                 </th>
@@ -262,6 +265,15 @@
                                                             </div>
                                                         @endif
                                                     </td>
+                                                    <td class="px-4 py-3" x-data="{ editing: false, notes: {{ json_encode($invoice->notes ?? '') }}, newNote: '' }">
+                                                        <div x-show="!editing" @click="editing = true" class="cursor-pointer min-w-[60px] min-h-[20px]">
+                                                            <span x-text="notes || '—'" class="text-xs text-gray-500 whitespace-pre-line"></span>
+                                                        </div>
+                                                        <div x-show="editing" x-cloak>
+                                                            <div x-show="notes" class="text-xs text-gray-400 mb-1 whitespace-pre-line" x-text="notes"></div>
+                                                            <textarea x-model="newNote" placeholder="Add note..." @click.away="if(newNote.trim()){fetch('/invoices/{{ $invoice->id }}/notes', { method: 'PATCH', headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content}, body: JSON.stringify({notes: newNote.trim()}) }).then(r => r.json()).then(d => { notes = d.notes; newNote = ''; editing = false; })} else { editing = false; }" @keydown.escape="newNote = ''; editing = false" rows="2" class="text-xs w-full rounded border-gray-300 focus:border-blue-500 focus:ring-blue-500"></textarea>
+                                                        </div>
+                                                    </td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                         <a href="{{ route('invoices.show', $invoice) }}"
                                                            class="{{ $isOutstanding ? 'text-blue-600 hover:text-blue-900' : 'text-green-700 hover:text-green-900' }}">
@@ -279,7 +291,7 @@
                                                 <td class="px-6 py-3 text-sm font-bold text-gray-900">
                                                     €{{ number_format($supplierGroup['total_amount'], 2) }}
                                                 </td>
-                                                <td colspan="2"></td>
+                                                <td colspan="3"></td>
                                             </tr>
                                         </tfoot>
                                     </table>
@@ -408,8 +420,15 @@
                                class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
                     </div>
                     
+                    <details class="mb-6">
+                        <summary class="text-sm font-medium text-gray-700 cursor-pointer hover:text-gray-900">Add Notes (Optional)</summary>
+                        <textarea name="notes" id="payment_notes" rows="3"
+                                  placeholder="Any additional notes about this payment..."
+                                  class="mt-2 w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    </details>
+
                     <div class="flex justify-end space-x-3">
-                        <button type="button" id="cancel-payment" 
+                        <button type="button" id="cancel-payment"
                                 class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
                             Cancel
                         </button>
@@ -617,7 +636,13 @@
             }
             
             function hidePaymentModal() {
-                if (paymentModal) paymentModal.classList.add('hidden');
+                if (paymentModal) {
+                    paymentModal.classList.add('hidden');
+                    const notesField = document.getElementById('payment_notes');
+                    if (notesField) notesField.value = '';
+                    const notesDetails = notesField?.closest('details');
+                    if (notesDetails) notesDetails.removeAttribute('open');
+                }
             }
             
             function updateModalSupplierBreakdown() {

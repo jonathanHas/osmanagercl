@@ -370,8 +370,11 @@
                                 @endif
                             </a>
                         </th>
+                        <th class="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider" style="width: 120px;">
+                            Notes
+                        </th>
                         <th class="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider" style="width: 80px;">
-                            <a href="{{ route('invoices.index', array_merge(request()->all(), ['sort' => 'subtotal', 'direction' => $sortField === 'subtotal' && $sortDirection === 'asc' ? 'desc' : 'asc'])) }}" 
+                            <a href="{{ route('invoices.index', array_merge(request()->all(), ['sort' => 'subtotal', 'direction' => $sortField === 'subtotal' && $sortDirection === 'asc' ? 'desc' : 'asc'])) }}"
                                class="flex items-center justify-end space-x-1 hover:text-gray-200">
                                 <span>Net</span>
                                 @if($sortField === 'subtotal')
@@ -514,6 +517,15 @@
                                     @endif
                                 </div>
                             </td>
+                            <td class="px-3 py-3" x-data="{ editing: false, notes: {{ json_encode($invoice->notes ?? '') }}, newNote: '' }">
+                                <div x-show="!editing" @click="editing = true" class="cursor-pointer min-w-[60px] min-h-[20px]">
+                                    <span x-text="notes || '—'" class="text-xs text-gray-500 whitespace-pre-line"></span>
+                                </div>
+                                <div x-show="editing" x-cloak>
+                                    <div x-show="notes" class="text-xs text-gray-400 mb-1 whitespace-pre-line" x-text="notes"></div>
+                                    <textarea x-model="newNote" placeholder="Add note..." @click.away="if(newNote.trim()){fetch('/invoices/{{ $invoice->id }}/notes', { method: 'PATCH', headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content}, body: JSON.stringify({notes: newNote.trim()}) }).then(r => r.json()).then(d => { notes = d.notes; newNote = ''; editing = false; })} else { editing = false; }" @keydown.escape="newNote = ''; editing = false" rows="2" class="text-xs w-full rounded bg-gray-700 border-gray-600 text-gray-100 focus:border-blue-500 focus:ring-blue-500"></textarea>
+                                </div>
+                            </td>
                             <td class="px-3 py-3 whitespace-nowrap text-right text-gray-300 text-sm">
                                 €{{ number_format($invoice->subtotal, 2) }}
                             </td>
@@ -543,7 +555,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="px-3 py-12 text-center text-gray-500">
+                            <td colspan="10" class="px-3 py-12 text-center text-gray-500">
                                 No invoices found. <a href="{{ route('invoices.create') }}" class="text-blue-400 hover:text-blue-300">Create your first invoice</a>
                             </td>
                         </tr>
@@ -602,11 +614,18 @@
                     
                     <div class="mb-6">
                         <label class="block text-sm font-medium text-gray-400 mb-1">Payment Reference (Optional)</label>
-                        <input type="text" name="payment_reference" id="payment_reference" 
+                        <input type="text" name="payment_reference" id="payment_reference"
                                placeholder="e.g., Transfer confirmation number, cheque number..."
                                class="w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md">
                     </div>
-                    
+
+                    <details class="mb-6">
+                        <summary class="text-sm font-medium text-gray-400 cursor-pointer hover:text-gray-300">Notes (Optional)</summary>
+                        <textarea name="notes" id="payment_notes" rows="3"
+                                  placeholder="Add any notes about this payment..."
+                                  class="mt-2 w-full bg-gray-700 border-gray-600 text-gray-100 rounded-md text-sm"></textarea>
+                    </details>
+
                     <div class="flex justify-end space-x-3">
                         <button type="button" id="cancel-payment" 
                                 class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
@@ -821,6 +840,10 @@
             
             function hidePaymentModal() {
                 paymentModal.classList.add('hidden');
+                const notesField = document.getElementById('payment_notes');
+                if (notesField) notesField.value = '';
+                const notesDetails = notesField?.closest('details');
+                if (notesDetails) notesDetails.removeAttribute('open');
             }
             
             function updateModalSupplierBreakdown() {

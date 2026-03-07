@@ -614,6 +614,7 @@ class InvoiceController extends Controller
             'payment_date' => 'required|date',
             'payment_method' => 'nullable|string|max:50',
             'payment_reference' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:1000',
         ]);
 
         $invoice->update([
@@ -621,6 +622,7 @@ class InvoiceController extends Controller
             'payment_date' => $validated['payment_date'],
             'payment_method' => $validated['payment_method'],
             'payment_reference' => $validated['payment_reference'],
+            'notes' => $validated['notes'] ?? null,
             'updated_by' => auth()->id(),
         ]);
 
@@ -638,6 +640,7 @@ class InvoiceController extends Controller
             'payment_date' => 'required|date',
             'payment_method' => 'nullable|string|max:50',
             'payment_reference' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:1000',
         ]);
 
         try {
@@ -649,11 +652,24 @@ class InvoiceController extends Controller
             foreach ($invoices as $invoice) {
                 // Only update if not already paid
                 if ($invoice->payment_status !== 'paid') {
+                    $newText = trim($validated['notes'] ?? '');
+                    $existing = trim($invoice->notes ?? '');
+
+                    if ($newText === '') {
+                        $finalNotes = $existing ?: null;
+                    } elseif ($existing === '') {
+                        $finalNotes = $newText;
+                    } else {
+                        $timestamp = now()->format('d/m/Y H:i');
+                        $finalNotes = $existing."\n[{$timestamp}] ".$newText;
+                    }
+
                     $invoice->update([
                         'payment_status' => 'paid',
                         'payment_date' => $validated['payment_date'],
                         'payment_method' => $validated['payment_method'],
                         'payment_reference' => $validated['payment_reference'],
+                        'notes' => $finalNotes,
                         'updated_by' => auth()->id(),
                     ]);
                     $updatedCount++;
@@ -696,6 +712,30 @@ class InvoiceController extends Controller
         } catch (\Exception $e) {
             return back()->with('error', 'Failed to mark invoice as unpaid: '.$e->getMessage());
         }
+    }
+
+    public function updateNotes(Request $request, Invoice $invoice)
+    {
+        $validated = $request->validate([
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        $newText = trim($validated['notes'] ?? '');
+        $existing = trim($invoice->notes ?? '');
+
+        if ($newText === '') {
+            // Don't clear existing notes
+            $finalNotes = $existing;
+        } elseif ($existing === '') {
+            $finalNotes = $newText;
+        } else {
+            $timestamp = now()->format('d/m/Y H:i');
+            $finalNotes = $existing."\n[{$timestamp}] ".$newText;
+        }
+
+        $invoice->update(['notes' => $finalNotes]);
+
+        return response()->json(['success' => true, 'notes' => $invoice->notes]);
     }
 
     /**

@@ -1225,6 +1225,13 @@ async function updateProductCost(productId, newCost, productName) {
    - Adds additional columns: VAT, Barcode, Cost, Sell, Margin
    - Provides full data when needed for investigation
 
+7. **Category Filter** (via "Categories" toggle, added 2026-03-07):
+   - Shows product category name (from POS CATEGORIES table) under each item
+   - Multi-select dropdown to filter items by category
+   - Quick "All" / "None" buttons for fast selection
+   - Filtering applies across all sections (critical, warnings, verified, OOS, pending, extra)
+   - Items with no category always remain visible
+
 7. **Action Buttons** (UI only - future functionality):
    - Verify button for confirming items
    - Flag button for marking items for review

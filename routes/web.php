@@ -147,6 +147,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/{batchId}/file/{fileId}/parse-udea', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'parseUdeaInvoice'])->name('parse-udea');
     });
 
+    Route::patch('/invoices/{invoice}/notes', [\App\Http\Controllers\InvoiceController::class, 'updateNotes'])->name('invoices.update-notes');
     Route::post('/invoices/bulk-mark-paid', [\App\Http\Controllers\InvoiceController::class, 'bulkMarkPaid'])->name('invoices.bulk-mark-paid');
     Route::patch('/invoices/{invoice}/mark-unpaid', [\App\Http\Controllers\InvoiceController::class, 'markUnpaid'])->name('invoices.mark-unpaid');
 

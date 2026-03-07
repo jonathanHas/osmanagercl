@@ -279,6 +279,7 @@ Comprehensive delivery processing with barcode scanning and PDF invoice parsing.
 - **Sync to Legacy** (NEW! 2026-01-19): One-click sync from `/deliveries` to POS `delivery` table for invoice matching with scanned items
 - **Delivery Legacy Page** (NEW! 2026-01-18): Redesigned invoice match interface with financial dashboard, issues-first layout, collapsible sections, and quick filters for faster verification
 - **Product Images in Legacy** (NEW! 2026-01-26): Product image thumbnails in all tables with hover preview using fixed positioning
+- **Category Filter** (NEW! 2026-03-07): Toggle category names on items and filter by category with multi-select dropdown
 
 📖 [Delivery System Documentation](./features/delivery-system.md)
 

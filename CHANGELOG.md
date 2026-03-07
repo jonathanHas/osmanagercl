@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Category filter for delivery legacy match page** (2026-03-07)
+  - "Categories" checkbox next to "Show Details" displays product category names under each item
+  - When enabled, a dropdown appears with all unique categories from the delivery
+  - Multi-select checkboxes to filter items by category with "All" / "None" quick buttons
+  - Filtering applies across all sections (critical, warnings, verified, OOS, pending, extra items)
+  - Items with no category are always shown
+  - **Files Modified**: `app/Http/Controllers/DeliveryLegacyController.php`, `resources/views/delivery-legacy/match.blade.php`
+
 - **Client-side image compression for invoice bulk upload** (2026-03-06)
   - Images (JPG, PNG) are now automatically compressed in the browser before upload using Canvas API
   - Scales images down to max 2000px on longest side, JPEG quality 0.7
