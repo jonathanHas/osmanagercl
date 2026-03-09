@@ -529,7 +529,25 @@ class LabelAreaController extends Controller
      */
     public function cameraTest(): View
     {
-        return view('labels.camera-test');
+        $images = collect();
+        $disk = Storage::disk('public');
+
+        if ($disk->exists('labels')) {
+            $files = $disk->files('labels');
+            $images = collect($files)
+                ->filter(fn ($file) => preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $file))
+                ->sortByDesc(fn ($file) => $disk->lastModified($file))
+                ->map(fn ($file) => [
+                    'path' => $file,
+                    'url' => asset('storage/'.$file),
+                    'name' => basename($file),
+                    'size' => round($disk->size($file) / 1024),
+                    'date' => date('M j, Y H:i', $disk->lastModified($file)),
+                ])
+                ->values();
+        }
+
+        return view('labels.camera-test', compact('images'));
     }
 
     /**

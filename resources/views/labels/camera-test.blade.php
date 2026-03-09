@@ -65,6 +65,28 @@
                     </div>
                 </form>
             </div>
+
+            {{-- Uploaded Images Gallery --}}
+            @if ($images->count() > 0)
+                <div class="mt-6 bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
+                    <h3 class="font-semibold text-lg text-gray-800 mb-4">Uploaded Images ({{ $images->count() }})</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        @foreach ($images as $image)
+                            <div class="relative group">
+                                <a href="{{ $image['url'] }}" target="_blank">
+                                    <img src="{{ $image['url'] }}" alt="{{ $image['name'] }}" class="w-full h-32 object-cover rounded shadow">
+                                </a>
+                                <div class="mt-1 text-xs text-gray-500 truncate">{{ $image['name'] }}</div>
+                                <div class="text-xs text-gray-400">{{ $image['size'] }} KB &middot; {{ $image['date'] }}</div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @else
+                <div class="mt-6 bg-white overflow-hidden shadow-sm sm:rounded-lg p-6 text-center text-gray-400">
+                    No images uploaded yet.
+                </div>
+            @endif
         </div>
     </div>
 
