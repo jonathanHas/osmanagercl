@@ -29,28 +29,59 @@
                 </div>
             @endif
 
+            {{-- Debug Panel --}}
+            <div class="mb-4 p-4 bg-yellow-50 border border-yellow-300 rounded text-left text-xs font-mono">
+                <h3 class="font-bold text-sm mb-2 text-yellow-800">Debug Info</h3>
+                <div id="debug-log" class="space-y-1 text-yellow-900"></div>
+            </div>
+
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
                 <form id="camera-form" action="{{ route('labels.camera-upload') }}" method="POST" enctype="multipart/form-data">
                     @csrf
                     <div class="text-center space-y-6">
                         <p class="text-gray-600">Snap a photo of a product label using your camera.</p>
 
-                        {{-- Take Photo: label wraps the real file input so the tap goes directly to the input --}}
-                        <label class="w-full inline-flex justify-center items-center px-6 py-4 bg-indigo-600 border border-transparent rounded-md font-semibold text-white active:bg-indigo-700 cursor-pointer">
-                            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><circle cx="12" cy="13" r="3" stroke-width="2"/></svg>
-                            Take Photo
-                            <input type="file" id="camera-input" name="label_image" accept="image/*" capture="environment" class="hidden">
-                        </label>
-
-                        {{-- Or pick from gallery --}}
-                        <div>
-                            <span class="text-gray-400 text-sm">or</span>
+                        {{-- Test 1: capture="environment" (rear camera) --}}
+                        <div class="border-2 border-blue-200 rounded-lg p-4 bg-blue-50">
+                            <p class="text-xs text-blue-600 mb-2 font-mono">Test 1: input[capture="environment"]</p>
+                            <label class="w-full inline-flex justify-center items-center px-6 py-4 bg-indigo-600 rounded-md font-semibold text-white active:bg-indigo-700 cursor-pointer">
+                                Rear Camera
+                                <input type="file" name="label_image" accept="image/*" capture="environment" class="hidden" data-test="1-rear">
+                            </label>
                         </div>
 
-                        <label class="w-full inline-flex justify-center items-center px-4 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-700 active:bg-gray-200 cursor-pointer">
-                            Choose from Gallery
-                            <input type="file" id="gallery-input" accept="image/*" class="hidden">
-                        </label>
+                        {{-- Test 2: capture="user" (front camera) --}}
+                        <div class="border-2 border-green-200 rounded-lg p-4 bg-green-50">
+                            <p class="text-xs text-green-600 mb-2 font-mono">Test 2: input[capture="user"]</p>
+                            <label class="w-full inline-flex justify-center items-center px-6 py-4 bg-green-600 rounded-md font-semibold text-white active:bg-green-700 cursor-pointer">
+                                Front Camera
+                                <input type="file" name="label_image" accept="image/*" capture="user" class="hidden" data-test="2-front">
+                            </label>
+                        </div>
+
+                        {{-- Test 3: capture (no value) --}}
+                        <div class="border-2 border-purple-200 rounded-lg p-4 bg-purple-50">
+                            <p class="text-xs text-purple-600 mb-2 font-mono">Test 3: input[capture] (no value)</p>
+                            <label class="w-full inline-flex justify-center items-center px-6 py-4 bg-purple-600 rounded-md font-semibold text-white active:bg-purple-700 cursor-pointer">
+                                Camera (default)
+                                <input type="file" name="label_image" accept="image/*" capture class="hidden" data-test="3-default">
+                            </label>
+                        </div>
+
+                        {{-- Test 4: accept="image/*" only, no capture --}}
+                        <div class="border-2 border-orange-200 rounded-lg p-4 bg-orange-50">
+                            <p class="text-xs text-orange-600 mb-2 font-mono">Test 4: accept="image/*" (no capture)</p>
+                            <label class="w-full inline-flex justify-center items-center px-6 py-4 bg-orange-600 rounded-md font-semibold text-white active:bg-orange-700 cursor-pointer">
+                                Image Picker (no capture)
+                                <input type="file" name="label_image" accept="image/*" class="hidden" data-test="4-nocapture">
+                            </label>
+                        </div>
+
+                        {{-- Test 5: Visible native input (not hidden) --}}
+                        <div class="border-2 border-red-200 rounded-lg p-4 bg-red-50">
+                            <p class="text-xs text-red-600 mb-2 font-mono">Test 5: Visible native input[capture="environment"]</p>
+                            <input type="file" name="label_image" accept="image/*" capture="environment" class="block w-full text-sm" data-test="5-visible">
+                        </div>
 
                         {{-- Preview of captured/selected image --}}
                         <div id="preview-container" class="hidden">
@@ -69,39 +100,82 @@
     </div>
 
     <script>
-        const cameraInput = document.getElementById('camera-input');
-        const galleryInput = document.getElementById('gallery-input');
+        const debugLog = document.getElementById('debug-log');
         const preview = document.getElementById('image-preview');
         const previewContainer = document.getElementById('preview-container');
         const filenameDisplay = document.getElementById('filename-display');
         const btnUpload = document.getElementById('btn-upload');
 
-        function showPreview(file, input) {
-            if (!file) return;
-
-            // If picked via gallery, copy to the camera input (which is the form's named input)
-            if (input === galleryInput) {
-                const dt = new DataTransfer();
-                dt.items.add(file);
-                cameraInput.files = dt.files;
-            }
-
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                preview.src = event.target.result;
-                previewContainer.classList.remove('hidden');
-                filenameDisplay.textContent = file.name + ' (' + (file.size / 1024).toFixed(0) + ' KB)';
-                btnUpload.disabled = false;
-            };
-            reader.readAsDataURL(file);
+        function log(msg) {
+            const line = document.createElement('div');
+            const time = new Date().toLocaleTimeString();
+            line.textContent = '[' + time + '] ' + msg;
+            debugLog.appendChild(line);
+            debugLog.scrollTop = debugLog.scrollHeight;
         }
 
-        cameraInput.addEventListener('change', function(e) {
-            showPreview(e.target.files[0], cameraInput);
-        });
+        // Environment info
+        log('userAgent: ' + navigator.userAgent);
+        log('platform: ' + navigator.platform);
+        log('protocol: ' + window.location.protocol);
+        log('secure context: ' + window.isSecureContext);
+        log('mediaDevices available: ' + !!(navigator.mediaDevices));
+        log('getUserMedia available: ' + !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia));
 
-        galleryInput.addEventListener('change', function(e) {
-            showPreview(e.target.files[0], galleryInput);
+        // Check for touch support (mobile indicator)
+        log('touch support: ' + ('ontouchstart' in window));
+        log('max touch points: ' + navigator.maxTouchPoints);
+
+        // Enumerate cameras if possible
+        if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+            navigator.mediaDevices.enumerateDevices().then(function(devices) {
+                const cameras = devices.filter(d => d.kind === 'videoinput');
+                log('video devices found: ' + cameras.length);
+                cameras.forEach(function(cam, i) {
+                    log('  cam[' + i + ']: ' + (cam.label || 'no label') + ' (id: ' + cam.deviceId.substring(0, 8) + '...)');
+                });
+            }).catch(function(err) {
+                log('enumerateDevices error: ' + err.message);
+            });
+        } else {
+            log('enumerateDevices: not available');
+        }
+
+        // Listen on all file inputs
+        document.querySelectorAll('input[type="file"]').forEach(function(input) {
+            const testId = input.getAttribute('data-test') || 'unknown';
+
+            input.addEventListener('click', function() {
+                log('CLICK on test ' + testId + ' | capture="' + (input.getAttribute('capture') || 'none') + '" | accept="' + (input.getAttribute('accept') || 'none') + '"');
+            });
+
+            input.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    log('FILE from test ' + testId + ': ' + file.name + ' | type: ' + file.type + ' | size: ' + (file.size/1024).toFixed(0) + 'KB');
+
+                    // Show preview
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        preview.src = event.target.result;
+                        previewContainer.classList.remove('hidden');
+                        filenameDisplay.textContent = 'From test ' + testId + ': ' + file.name + ' (' + (file.size/1024).toFixed(0) + ' KB)';
+                        btnUpload.disabled = false;
+                    };
+                    reader.readAsDataURL(file);
+
+                    // Copy file to the first input (the form submission one)
+                    if (testId !== '1-rear') {
+                        const mainInput = document.querySelector('input[data-test="1-rear"]');
+                        const dt = new DataTransfer();
+                        dt.items.add(file);
+                        mainInput.files = dt.files;
+                        log('Copied file to main input for form submission');
+                    }
+                } else {
+                    log('CANCEL on test ' + testId + ' (no file selected)');
+                }
+            });
         });
     </script>
 </x-admin-layout>
