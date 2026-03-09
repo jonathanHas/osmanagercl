@@ -7,6 +7,7 @@ use App\Models\LabelTemplate;
 use App\Models\Product;
 use App\Services\LabelService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class LabelAreaController extends Controller
@@ -521,5 +522,31 @@ class LabelAreaController extends Controller
                 'message' => 'Failed to add product to labels queue: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Display the camera test page.
+     */
+    public function cameraTest(): View
+    {
+        return view('labels.camera-test');
+    }
+
+    /**
+     * Handle photo upload from camera test page.
+     */
+    public function uploadPhoto(Request $request)
+    {
+        $request->validate([
+            'label_image' => 'required|image|max:10240',
+        ]);
+
+        if ($request->hasFile('label_image')) {
+            $path = $request->file('label_image')->store('labels', 'public');
+
+            return back()->with('success', 'Photo captured and saved to: '.$path);
+        }
+
+        return back()->with('error', 'No photo was captured.');
     }
 }

@@ -256,6 +256,10 @@ Route::middleware('auth')->group(function () {
     Route::post('/labels/lookup-barcode', [LabelAreaController::class, 'lookupBarcode'])->name('labels.lookup-barcode');
     Route::post('/labels/scan', [LabelAreaController::class, 'processBarcodeScan'])->name('labels.scan');
 
+    // Camera test page
+    Route::get('/labels/camera-test', [LabelAreaController::class, 'cameraTest'])->name('labels.camera-test');
+    Route::post('/labels/camera-upload', [LabelAreaController::class, 'uploadPhoto'])->name('labels.camera-upload');
+
     // Fruit & Veg routes
     Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
         Route::get('/', [FruitVegController::class, 'index'])->name('index');
