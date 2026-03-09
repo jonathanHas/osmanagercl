@@ -102,24 +102,36 @@
         const cameraError = document.getElementById('camera-error');
 
         let stream = null;
+        const hasGetUserMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 
-        // Open camera
-        btnOpenCamera.addEventListener('click', async function() {
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
-                });
-                video.srcObject = stream;
-                cameraContainer.classList.remove('hidden');
-                btnOpenCamera.classList.add('hidden');
-                btnChooseFile.classList.add('hidden');
-                previewContainer.classList.add('hidden');
-                cameraError.classList.add('hidden');
-            } catch (err) {
-                cameraError.textContent = 'Could not access camera: ' + err.message;
-                cameraError.classList.remove('hidden');
-            }
-        });
+        // If getUserMedia not available (no HTTPS), hide "Open Camera" and show
+        // the file input directly — on mobile, capture="environment" still opens the camera
+        if (!hasGetUserMedia) {
+            btnOpenCamera.textContent = 'Take Photo';
+            btnOpenCamera.addEventListener('click', function() {
+                fileInput.setAttribute('capture', 'environment');
+                fileInput.click();
+            });
+        } else {
+            // Open live camera viewfinder
+            btnOpenCamera.addEventListener('click', async function() {
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+                    });
+                    video.srcObject = stream;
+                    cameraContainer.classList.remove('hidden');
+                    btnOpenCamera.classList.add('hidden');
+                    btnChooseFile.classList.add('hidden');
+                    previewContainer.classList.add('hidden');
+                    cameraError.classList.add('hidden');
+                } catch (err) {
+                    // Fallback: open file input with capture instead
+                    fileInput.setAttribute('capture', 'environment');
+                    fileInput.click();
+                }
+            });
+        }
 
         // Capture photo from stream
         btnCapture.addEventListener('click', function() {
@@ -128,19 +140,16 @@
             canvas.getContext('2d').drawImage(video, 0, 0);
 
             canvas.toBlob(function(blob) {
-                // Create a File from the blob and set it on the file input
                 const file = new File([blob], 'camera-capture.jpg', { type: 'image/jpeg' });
                 const dt = new DataTransfer();
                 dt.items.add(file);
                 fileInput.files = dt.files;
 
-                // Show preview
                 preview.src = canvas.toDataURL('image/jpeg');
                 previewContainer.classList.remove('hidden');
                 cameraContainer.classList.add('hidden');
                 btnUpload.disabled = false;
 
-                // Stop the camera stream
                 stopCamera();
             }, 'image/jpeg', 0.9);
         });
@@ -152,16 +161,15 @@
             fileInput.value = '';
             btnOpenCamera.classList.remove('hidden');
             btnChooseFile.classList.remove('hidden');
-            btnOpenCamera.click();
         });
 
-        // Choose file fallback
+        // Choose file fallback (no capture — picks from gallery/files)
         btnChooseFile.addEventListener('click', function() {
             fileInput.removeAttribute('capture');
             fileInput.click();
         });
 
-        // File input change (from Choose File)
+        // File input change (from Take Photo or Choose File)
         fileInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
@@ -185,7 +193,6 @@
             }
         }
 
-        // Clean up on page leave
         window.addEventListener('beforeunload', stopCamera);
     </script>
 </x-admin-layout>
