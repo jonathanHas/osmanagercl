@@ -929,7 +929,7 @@ class LabelAreaController extends Controller
 
             $data = json_decode($text, true);
 
-            if (! $data || ! isset($data['product_name'])) {
+            if (! $data || ! array_key_exists('product_name', $data)) {
                 return back()->with('error', 'Gemini returned invalid JSON: '.$text);
             }
 
