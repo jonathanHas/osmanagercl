@@ -44,4 +44,10 @@ return [
         'cache_ttl' => env('UDEA_CACHE_TTL', 3600),
     ],
 
+    'zebra' => [
+        'host' => env('ZEBRA_PRINTER_HOST', '10.42.1.71'),
+        'port' => env('ZEBRA_PRINTER_PORT', '631'),
+        'name' => env('ZEBRA_PRINTER_NAME', 'ZTC-GX430t'),
+    ],
+
 ];

@@ -6,6 +6,9 @@ use App\Models\LabelLog;
 use App\Models\LabelTemplate;
 use App\Models\Product;
 use App\Services\LabelService;
+use Gemini\Data\Blob;
+use Gemini\Enums\MimeType;
+use Gemini\Laravel\Facades\Gemini;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -551,7 +554,7 @@ class LabelAreaController extends Controller
     }
 
     /**
-     * Handle photo upload from camera test page.
+     * Handle photo upload from camera test page and translate via Gemini.
      */
     public function uploadPhoto(Request $request)
     {
@@ -559,12 +562,259 @@ class LabelAreaController extends Controller
             'label_image' => 'required|image|max:10240',
         ]);
 
-        if ($request->hasFile('label_image')) {
-            $path = $request->file('label_image')->store('labels', 'public');
-
-            return back()->with('success', 'Photo captured and saved to: '.$path);
+        if (! $request->hasFile('label_image')) {
+            return back()->with('error', 'No photo was captured.');
         }
 
-        return back()->with('error', 'No photo was captured.');
+        $path = $request->file('label_image')->store('labels', 'public');
+
+        try {
+            // Resize image to reduce Gemini API payload (1.7MB → ~100-200KB)
+            $fullPath = Storage::disk('public')->path($path);
+            $img = imagecreatefromjpeg($fullPath) ?: imagecreatefrompng($fullPath);
+            $origW = imagesx($img);
+            $origH = imagesy($img);
+            $maxDim = 1200;
+
+            if (max($origW, $origH) > $maxDim) {
+                $scale = $maxDim / max($origW, $origH);
+                $newW = (int) ($origW * $scale);
+                $newH = (int) ($origH * $scale);
+                $resized = imagecreatetruecolor($newW, $newH);
+                imagecopyresampled($resized, $img, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
+                imagedestroy($img);
+                $img = $resized;
+            }
+
+            ob_start();
+            imagejpeg($img, null, 80);
+            $imageData = base64_encode(ob_get_clean());
+            imagedestroy($img);
+
+            $prompt = "Analyze this food label photo. You are a ZPL expert for 300dpi Zebra printers.\n"
+                ."Label dimensions: 50mm wide x 76mm high (600 x 900 dots).\n\n"
+                ."STRICT OUTPUT RULES:\n"
+                ."1. NO PROSE: Return ONLY raw ZPL code.\n"
+                ."2. CANVAS: Use ^PW900 and ^LL600 (Landscape Orientation).\n"
+                ."3. ORIENTATION: Add ^FWB immediately after ^LL600 to rotate all fields 90 degrees.\n"
+                ."4. COORDINATES (Adjusted for Landscape):\n"
+                ."   - Name: ^FO800,20 (Since it's rotated, X is now the long side)\n"
+                ."   - Ingredients: ^FO700,20\n"
+                ."   - Nutrition: ^FO400,20\n"
+                ."   - Storage/Weight: ^FO100,20\n"
+                ."5. FORMATTING:\n"
+                ."   - For Name: Use ^A0B,40,40 and ^FB560,2,,C.\n"
+                ."   - For Ingredients: Use ^A0B,28,28 and ^FB560,12,,L.\n"
+                ."   - TRANSLATE EVERYTHING TO ENGLISH.\n"
+                ."   - BOLD allergens by using CAPITAL LETTERS within the text (standard Zebra fonts don't support inline bolding easily, so CAPS is the safest way to satisfy HSE for clear emphasis).\n"
+                ."6. NUTRITION: Format as a simple list. Use ^A0B,24,24.\n\n"
+                ."Example structure:\n"
+                ."^XA\n"
+                ."^PW900\n"
+                ."^LL600\n"
+                ."^FWB\n"
+                ."^FO800,20^A0B,40,40^FB560,2,,C^FDSUN-DRIED TOMATOES IN OIL^FS\n"
+                ."...\n"
+                ."^XZ";
+
+            $result = Gemini::generativeModel(model: 'gemini-2.5-flash')
+                ->generateContent([
+                    $prompt,
+                    new Blob(
+                        mimeType: MimeType::IMAGE_JPEG,
+                        data: $imageData,
+                    ),
+                ]);
+
+            $zpl = $result->text();
+
+            // Strip markdown code fencing if Gemini wraps it
+            $zpl = preg_replace('/^```(?:zpl|ZPL)?\s*\n?/m', '', $zpl);
+            $zpl = preg_replace('/\n?```\s*$/m', '', $zpl);
+            $zpl = trim($zpl);
+
+            return view('labels.review', [
+                'original_image' => asset('storage/'.$path),
+                'zpl' => $zpl,
+                'image_path' => $path,
+            ]);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Gemini API error: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Send a test print to the Zebra printer.
+     */
+    public function testPrint(Request $request)
+    {
+        $mode = $request->input('mode', 'hardcoded');
+        $results = [];
+
+        // Collect debug info
+        $results['debug'] = [
+            'php_user' => trim(shell_exec('whoami 2>&1') ?? ''),
+            'lp_path' => trim(shell_exec('which lp 2>&1') ?? ''),
+            'lpstat' => trim(shell_exec('lpstat -r 2>&1') ?? ''),
+            'env_host' => config('services.zebra.host'),
+            'env_port' => config('services.zebra.port'),
+            'env_name' => config('services.zebra.name'),
+        ];
+
+        if ($mode === 'hardcoded') {
+            // Exact replica of the working shell command
+            $command = 'echo "^XA^FO50,50^A0N,50,50^FDREMOTE SUCCESS^FS^XZ" | lp -h 10.42.1.71:631/version=1.1 -d ZTC-GX430t -o raw 2>&1';
+        } elseif ($mode === 'config') {
+            // Using .env config values
+            $host = config('services.zebra.host', '10.42.1.71');
+            $port = config('services.zebra.port', '631');
+            $printer = config('services.zebra.name', 'ZTC-GX430t');
+            $command = "echo \"^XA^FO50,50^A0N,50,50^FDCONFIG TEST^FS^XZ\" | lp -h {$host}:{$port}/version=1.1 -d {$printer} -o raw 2>&1";
+        } elseif ($mode === 'escaped') {
+            // Using escapeshellarg
+            $host = config('services.zebra.host', '10.42.1.71');
+            $port = config('services.zebra.port', '631');
+            $printer = config('services.zebra.name', 'ZTC-GX430t');
+            $zpl = '^XA^FO50,50^A0N,50,50^FDESCAPED TEST^FS^XZ';
+            $command = sprintf(
+                'echo %s | lp -h %s:%s/version=1.1 -d %s -o raw 2>&1',
+                escapeshellarg($zpl),
+                escapeshellarg($host),
+                escapeshellarg($port),
+                escapeshellarg($printer)
+            );
+        } elseif ($mode === 'lpstat') {
+            // Just list available printers
+            $command = 'lpstat -p -d 2>&1';
+        } elseif ($mode === 'network') {
+            // Test network connectivity to printer
+            $host = config('services.zebra.host', '10.42.1.71');
+            $command = "nc -z -w3 {$host} 631 2>&1 && echo 'PORT 631 OPEN' || echo 'PORT 631 CLOSED'";
+        } else {
+            $command = 'echo "unknown mode"';
+        }
+
+        $results['mode'] = $mode;
+        $results['command'] = $command;
+        $results['output'] = trim(shell_exec($command) ?? 'No output');
+        $results['success'] = str_contains($results['output'], 'request id')
+            || str_contains($results['output'], 'OPEN')
+            || ($mode === 'lpstat');
+
+        return response()->json($results);
+    }
+
+    /**
+     * Save ZPL code alongside its source image.
+     */
+    public function saveZpl(Request $request)
+    {
+        $request->validate([
+            'zpl' => 'required|string',
+            'image_path' => 'required|string',
+        ]);
+
+        $imagePath = $request->input('image_path');
+        $zplPath = preg_replace('/\.(jpg|jpeg|png|gif|webp)$/i', '.zpl', $imagePath);
+
+        Storage::disk('public')->put($zplPath, $request->input('zpl'));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'ZPL saved to '.$zplPath,
+        ]);
+    }
+
+
+
+    /**
+     * Print ZPL code to the Zebra printer.
+     */
+    public function printZpl(Request $request)
+    {
+        $request->validate([
+            'zpl' => 'required|string',
+        ]);
+
+        $zpl = $request->input('zpl');
+
+        // Write ZPL to a temp file to avoid shell escaping issues
+        $tmpFile = tempnam(sys_get_temp_dir(), 'zpl_');
+        file_put_contents($tmpFile, $zpl);
+
+        $command = "lp -h 10.42.1.71:631/version=1.1 -d ZTC-GX430t -o raw {$tmpFile} 2>&1";
+        $output = shell_exec($command);
+
+        unlink($tmpFile);
+
+        $success = $output && str_contains($output, 'request id');
+
+        return response()->json([
+            'success' => $success,
+            'message' => $success ? 'Print job sent' : 'Print failed',
+            'output' => trim($output ?? 'No output'),
+        ], $success ? 200 : 500);
+    }
+
+    /**
+     * Show saved label translations with their images and ZPL files.
+     */
+    public function labelHistory(): View
+    {
+        $disk = Storage::disk('public');
+        $labels = collect();
+
+        if ($disk->exists('labels')) {
+            $zplFiles = collect($disk->files('labels'))
+                ->filter(fn ($file) => str_ends_with($file, '.zpl'));
+
+            $labels = $zplFiles->map(function ($zplFile) use ($disk) {
+                $baseName = preg_replace('/\.zpl$/', '', basename($zplFile));
+
+                // Find matching image
+                $imageFile = collect($disk->files('labels'))
+                    ->first(fn ($f) => preg_match('/^labels\/'.preg_quote($baseName, '/').'\\.(jpg|jpeg|png|gif|webp)$/i', $f));
+
+                return [
+                    'zpl_path' => $zplFile,
+                    'zpl_url' => asset('storage/'.$zplFile),
+                    'image_url' => $imageFile ? asset('storage/'.$imageFile) : null,
+                    'name' => $baseName,
+                    'date' => date('M j, Y H:i', $disk->lastModified($zplFile)),
+                    'zpl_size' => round($disk->size($zplFile) / 1024, 1),
+                ];
+            })
+                ->sortByDesc(fn ($item) => $item['date'])
+                ->values();
+        }
+
+        return view('labels.history', compact('labels'));
+    }
+
+    /**
+     * Edit a previously saved label translation.
+     */
+    public function editLabel(string $name): View
+    {
+        $disk = Storage::disk('public');
+        $zplPath = 'labels/'.$name.'.zpl';
+
+        if (! $disk->exists($zplPath)) {
+            abort(404, 'ZPL file not found.');
+        }
+
+        $zpl = $disk->get($zplPath);
+
+        // Find matching image
+        $imageFile = collect($disk->files('labels'))
+            ->first(fn ($f) => preg_match('/^labels\/'.preg_quote($name, '/').'\\.(jpg|jpeg|png|gif|webp)$/i', $f));
+
+        $imagePath = $imageFile ?? '';
+
+        return view('labels.review', [
+            'original_image' => $imageFile ? asset('storage/'.$imageFile) : null,
+            'zpl' => $zpl,
+            'image_path' => $imagePath,
+        ]);
     }
 }

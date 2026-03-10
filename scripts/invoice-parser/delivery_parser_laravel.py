@@ -23,6 +23,7 @@ from utils import extract_text
 # Import delivery parsers
 from parsers.delivery_independent import parse_delivery_pdf as parse_independent
 from parsers.delivery_udea import parse_delivery_pdf as parse_udea
+from parsers.delivery_natural_medicine import parse_delivery_pdf as parse_natural_medicine
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -43,9 +44,8 @@ def detect_supplier(text: str) -> tuple:
     if "UDEA B.V." in upper_text or "WWW.UDEA.NL" in upper_text or "UDEA" in upper_text:
         return parse_udea, "Udea"
 
-    # TODO: Add more supplier parsers
-    # elif "THE NATURAL MEDICINE COMPANY" in upper_text:
-    #     return parse_tnmc_delivery, "Natural Medicine"
+    if "THE NATURAL MEDICINE COMPANY" in upper_text or "NATURALMEDICINE.IE" in upper_text:
+        return parse_natural_medicine, "Natural Medicine"
 
     # Default to None - unsupported supplier
     return None, "Unknown"
@@ -114,7 +114,7 @@ def process_delivery_pdf(file_path: str, supplier_hint: str = None, verbose: boo
             supplier_parsers = {
                 'independent': (parse_independent, 'Independent'),
                 'udea': (parse_udea, 'Udea'),
-                # 'natural_medicine': (parse_tnmc_delivery, 'Natural Medicine'),
+                'natural_medicine': (parse_natural_medicine, 'Natural Medicine'),
             }
             parser_info = supplier_parsers.get(supplier_hint.lower())
             if parser_info:

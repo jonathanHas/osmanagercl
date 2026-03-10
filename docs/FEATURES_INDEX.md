@@ -92,6 +92,16 @@ Complete label printing system with integrated barcode scanning for quick produc
 
 📖 [Label System Documentation](./features/label-system.md)
 
+### Label Translation System (NEW! 2026-03-09)
+AI-powered label translation for imported products using phone camera capture and Zebra thermal printing.
+- **Camera Capture**: Snap photos of foreign-language labels directly from mobile Chrome
+- **AI Translation**: Google Gemini 2.5 Flash translates labels and generates ZPL printer code
+- **Allergen Highlighting**: 14 EU allergens emphasised in CAPS for HSE compliance
+- **Zebra Printing**: Direct print to networked Zebra GX430t via CUPS/IPP
+- **Image Optimization**: Auto-resize to 1200px before API call for fast processing
+
+📖 [Label Translation System Documentation](./features/label-translation-system.md)
+
 ### Pricing Management
 Advanced pricing with VAT calculations and supplier comparison.
 - **Enhanced Price Editor Modal**: Inline cost price editing with real-time margin updates

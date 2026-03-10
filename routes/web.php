@@ -259,6 +259,11 @@ Route::middleware('auth')->group(function () {
     // Camera test page
     Route::get('/labels/camera-test', [LabelAreaController::class, 'cameraTest'])->name('labels.camera-test');
     Route::post('/labels/camera-upload', [LabelAreaController::class, 'uploadPhoto'])->name('labels.camera-upload');
+    Route::post('/labels/test-print', [LabelAreaController::class, 'testPrint'])->name('labels.test-print');
+    Route::post('/labels/save-zpl', [LabelAreaController::class, 'saveZpl'])->name('labels.save-zpl');
+    Route::post('/labels/print-zpl', [LabelAreaController::class, 'printZpl'])->name('labels.print-zpl');
+    Route::get('/labels/translation-history', [LabelAreaController::class, 'labelHistory'])->name('labels.translation-history');
+    Route::get('/labels/translation-history/{name}/edit', [LabelAreaController::class, 'editLabel'])->name('labels.edit-label');
 
     // Fruit & Veg routes
     Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {

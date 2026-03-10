@@ -1,8 +1,14 @@
 <x-admin-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            Camera Test - Snap Product Label
-        </h2>
+        <div class="flex items-center justify-between">
+            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+                Snap Product Label
+            </h2>
+            <a href="{{ route('labels.translation-history') }}"
+               class="inline-flex items-center px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-200 transition">
+                View History
+            </a>
+        </div>
     </x-slot>
 
     <div class="py-6">

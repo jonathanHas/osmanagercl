@@ -10,6 +10,7 @@ The label system provides automated label generation and printing capabilities w
 - Print queue management with re-queuing functionality
 - Event-based tracking of label requirements
 - A4 sheet optimization for bulk printing
+- **AI-powered translation** for imported product labels — see [Label Translation System](./label-translation-system.md)
 
 ## Features
 

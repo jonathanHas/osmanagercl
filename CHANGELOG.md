@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **AI-powered label translation system** (2026-03-09)
+  - Snap photos of foreign-language product labels using phone camera (Chrome on Android)
+  - Google Gemini 2.5 Flash translates label text to English and generates ZPL II printer code
+  - 14 EU allergens highlighted in CAPS for HSE compliance
+  - Direct printing to networked Zebra GX430t thermal printer via CUPS/IPP
+  - Label size: 50mm x 76mm at 300dpi with product name, ingredients, nutrition, and storage info
+  - Uploaded images auto-resized to 1200px before API call to reduce latency
+  - Gallery of previously uploaded label images on capture page
+  - Printer debug panel with connectivity and configuration tests
+  - **New Package**: `google-gemini-php/laravel` for Gemini API integration
+  - **Files Modified**: `LabelAreaController.php`, `routes/web.php`, `config/services.php`, `config/gemini.php`
+  - **New Views**: `labels/camera-test.blade.php`, `labels/review.blade.php`
+
 - **Category filter for delivery legacy match page** (2026-03-07)
   - "Categories" checkbox next to "Show Details" displays product category names under each item
   - When enabled, a dropdown appears with all unique categories from the delivery
