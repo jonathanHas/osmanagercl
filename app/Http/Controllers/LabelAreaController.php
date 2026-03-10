@@ -900,12 +900,15 @@ class LabelAreaController extends Controller
                 ."ALLERGENS: Format the ingredients string with EU allergens in ALL CAPS. "
                 ."The 14 EU allergens: Cereals (GLUTEN), CRUSTACEANS, EGGS, FISH, PEANUTS, "
                 ."SOYBEANS, MILK, NUTS, CELERY, MUSTARD, SESAME, SULPHITES, LUPIN, MOLLUSCS.\n\n"
+                ."ANNOTATIONS: Preserve asterisk annotations (*, **) on ingredients and include "
+                ."their explanations at the end of the ingredients string. "
+                ."Example: 'tomatoes** 65%, olive oil*, salt. *from organic farming. **from biodynamic agriculture.'\n\n"
                 ."JSON STRUCTURE: Return only the JSON object with keys: "
                 ."product_name, ingredients, nutrition_inline, storage, address, origin.\n"
                 ."Do NOT include net_weight — it is already on the packaging.\n\n"
                 ."Example output:\n"
                 .'{"product_name":"Sun-Dried Tomatoes in Oil",'
-                .'"ingredients":"Sun-dried tomatoes 60%, sunflower oil, SULPHITES (as preservative), salt, garlic, oregano",'
+                .'"ingredients":"Sun-dried tomatoes** 60%, sunflower oil*, SULPHITES (as preservative), salt, garlic, oregano. *from organic farming. **from organic and biodynamic agriculture.",'
                 .'"nutrition_inline":"Energy 245kcal | Fat 18g | Sat 2.1g | Carbs 12g | Sugar 8g | Protein 5g | Salt 1.2g",'
                 .'"storage":"Store in a cool, dry place. Once opened, refrigerate and use within 3 days.",'
                 .'"address":"Via Roma 12, 80100 Naples, Italy",'
@@ -1025,7 +1028,7 @@ class LabelAreaController extends Controller
 
         // Ingredients
         if (! empty($data['ingredients'])) {
-            $lines = $this->estimateLines($data['ingredients'], $bodyFont, $fieldWidth, $dims['ingredientLines']);
+            $lines = $this->estimateLines('Ingredients: '.$data['ingredients'], $bodyFont, $fieldWidth, $dims['ingredientLines']);
             $y += $bodyFont * $lines + $gap;
         }
 
@@ -1080,8 +1083,8 @@ class LabelAreaController extends Controller
 
         // Ingredients
         if (! empty($data['ingredients'])) {
-            $lines = $this->estimateLines($data['ingredients'], $bodyFontSize, $fieldWidth, $ingredientLines);
-            $zpl .= "^FO{$margin},{$y}^A0N,{$bodyFontSize},{$bodyFontSize}^FB{$fieldWidth},{$ingredientLines},0,L^FD".$data['ingredients']."^FS";
+            $lines = $this->estimateLines('Ingredients: '.$data['ingredients'], $bodyFontSize, $fieldWidth, $ingredientLines);
+            $zpl .= "^FO{$margin},{$y}^A0N,{$bodyFontSize},{$bodyFontSize}^FB{$fieldWidth},{$ingredientLines},0,L^FDIngredients: ".$data['ingredients']."^FS";
             $y += $bodyFontSize * $lines + $gap;
         }
 

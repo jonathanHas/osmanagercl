@@ -259,6 +259,9 @@ Route::middleware('auth')->group(function () {
     // Label translation - debug
     Route::get('/labels/zpl-debug', fn () => view('labels.zpl-debug'))->name('labels.zpl-debug');
 
+    // Barcode scanner test page
+    Route::get('/labels/barcode-scan-test', fn () => view('labels.barcode-scan-test'))->name('labels.barcode-scan-test');
+
     // Label translation - v1 (Gemini generates raw ZPL)
     Route::get('/labels/camera-test', [LabelAreaController::class, 'cameraTest'])->name('labels.camera-test');
     Route::post('/labels/camera-upload', [LabelAreaController::class, 'uploadPhoto'])->name('labels.camera-upload');

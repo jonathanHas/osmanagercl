@@ -94,15 +94,41 @@
                 </div>
             </div>
 
-            {{-- Extracted Data (only from v2 flow) --}}
+            {{-- Editable Label Data (only from v2 flow) --}}
             @if (!empty($label_data))
-                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6" x-data="{ open: false }">
-                    <button @click="open = !open" class="flex items-center justify-between w-full text-left">
-                        <h3 class="font-semibold text-lg text-gray-800">Extracted Data (JSON)</h3>
-                        <svg class="w-5 h-5 text-gray-500 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                    </button>
-                    <div x-show="open" x-collapse class="mt-3">
-                        <pre class="p-3 bg-gray-900 text-yellow-300 text-xs rounded overflow-x-auto max-h-48 overflow-y-auto font-mono">{{ json_encode($label_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
+                    <h3 class="font-semibold text-lg text-gray-800 mb-3">Label Data</h3>
+                    <div class="space-y-3" id="label-data-form">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Product Name</label>
+                            <input type="text" name="product_name" value="{{ $label_data['product_name'] ?? '' }}" class="w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="e.g. Sun-Dried Tomatoes in Oil">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Ingredients</label>
+                            <textarea name="ingredients" rows="4" class="w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="e.g. Tomatoes** 60%, olive oil*, salt. *organic. **biodynamic.">{{ $label_data['ingredients'] ?? '' }}</textarea>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Nutrition (inline)</label>
+                            <textarea name="nutrition_inline" rows="2" class="w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="e.g. Energy 245kcal | Fat 18g | Sat 2.1g | Carbs 12g | Sugar 8g | Protein 5g | Salt 1.2g">{{ $label_data['nutrition_inline'] ?? '' }}</textarea>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Storage</label>
+                            <input type="text" name="storage" value="{{ $label_data['storage'] ?? '' }}" class="w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="e.g. Once opened, refrigerate and use within 3 days.">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">Address</label>
+                                <input type="text" name="address" value="{{ $label_data['address'] ?? '' }}" class="w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="e.g. Via Roma 12, Naples, Italy">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">Origin</label>
+                                <input type="text" name="origin" value="{{ $label_data['origin'] ?? '' }}" class="w-full rounded-md border-gray-300 text-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="e.g. Italy">
+                            </div>
+                        </div>
+                        <button type="button" id="btn-regenerate-from-form"
+                            class="w-full inline-flex justify-center items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md text-sm font-semibold text-white hover:bg-indigo-500 transition">
+                            Regenerate Label
+                        </button>
                     </div>
                 </div>
             @endif
@@ -145,8 +171,8 @@
         const refreshBtn = document.getElementById('btn-refresh-preview');
         const resultDiv = document.getElementById('action-result');
 
-        // Label data from v2 flow (if available)
-        const labelData = @json($label_data ?? null);
+        // Label data from v2 flow (if available) — mutable for form edits
+        let labelData = @json($label_data ?? null);
         let currentSize = '{{ $label_size ?? "large" }}';
         let currentFontScale = {{ $font_scale ?? 1.0 }};
 
@@ -286,6 +312,23 @@
                 regenerate();
             });
         });
+
+        // Regenerate from editable form
+        const regenerateFormBtn = document.getElementById('btn-regenerate-from-form');
+        if (regenerateFormBtn) {
+            regenerateFormBtn.addEventListener('click', function() {
+                const form = document.getElementById('label-data-form');
+                const fields = ['product_name', 'ingredients', 'nutrition_inline', 'storage', 'address', 'origin'];
+                const newData = {};
+                fields.forEach(field => {
+                    const el = form.querySelector(`[name="${field}"]`);
+                    const val = el ? el.value.trim() : '';
+                    newData[field] = val || null;
+                });
+                labelData = newData;
+                regenerate();
+            });
+        }
 
         function showResult(success, message) {
             resultDiv.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700');
