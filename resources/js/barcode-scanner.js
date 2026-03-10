@@ -1,17 +1,18 @@
 /**
  * Barcode Scanner module - wrapper around html5-qrcode
  *
- * Usage:
- * 1. ES module import: import(...).then(m => m.startScanner(...))
- * 2. Global fallback: window.BarcodeScanner.startScanner(...)
+ * Supports two modes:
+ * 1. scanFile(file) — decode barcode from a captured photo (works over HTTP)
+ * 2. startScanner() — live camera stream (requires HTTPS)
+ *
+ * Global: window.BarcodeScanner
  */
 import { Html5Qrcode } from 'html5-qrcode';
 
 let scanner = null;
 
 const SUPPORTED_FORMATS = [
-    0,  // QR_CODE (for testing)
-    1,  // AZTEC
+    0,  // QR_CODE
     2,  // CODABAR
     3,  // CODE_39
     4,  // CODE_93
@@ -23,7 +24,26 @@ const SUPPORTED_FORMATS = [
 ];
 
 /**
- * Start the barcode scanner.
+ * Scan a barcode from an image file (File or Blob).
+ * Works over HTTP — no camera stream needed.
+ * @param {File} file - Image file to scan
+ * @returns {Promise<{text: string, format: string}>}
+ */
+export async function scanFile(file) {
+    const tempScanner = new Html5Qrcode('barcode-scanner-temp');
+    try {
+        const result = await tempScanner.scanFileV2(file, /* showImage */ false);
+        return {
+            text: result.decodedText,
+            format: result.result?.format?.formatName || 'unknown',
+        };
+    } finally {
+        tempScanner.clear();
+    }
+}
+
+/**
+ * Start live camera scanner (requires HTTPS).
  * @param {string} elementId - ID of the container div
  * @param {function} onSuccess - Callback with (decodedText, decodedResult)
  * @param {function} onError - Optional error callback
@@ -36,15 +56,9 @@ export async function startScanner(elementId, onSuccess, onError = null) {
 
     scanner = new Html5Qrcode(elementId);
 
-    const config = {
-        fps: 10,
-        qrbox: { width: 300, height: 150 },
-        formatsToSupport: SUPPORTED_FORMATS,
-    };
-
     await scanner.start(
         { facingMode: 'environment' },
-        config,
+        { fps: 10, qrbox: { width: 300, height: 150 }, formatsToSupport: SUPPORTED_FORMATS },
         (decodedText, decodedResult) => {
             if (onSuccess) onSuccess(decodedText, decodedResult);
         },
@@ -55,28 +69,20 @@ export async function startScanner(elementId, onSuccess, onError = null) {
 }
 
 /**
- * Stop the barcode scanner.
+ * Stop the live camera scanner.
  * @returns {Promise<void>}
  */
 export async function stopScanner() {
     if (scanner) {
-        try {
-            await scanner.stop();
-        } catch (e) {
-            // Scanner may already be stopped
-        }
+        try { await scanner.stop(); } catch (e) {}
         scanner.clear();
         scanner = null;
     }
 }
 
-/**
- * Check if scanner is currently running.
- * @returns {boolean}
- */
 export function isRunning() {
     return scanner !== null && scanner.isScanning;
 }
 
-// Register on window as fallback for when Vite strips ES exports in production
-window.BarcodeScanner = { startScanner, stopScanner, isRunning };
+// Register on window for production compatibility
+window.BarcodeScanner = { scanFile, startScanner, stopScanner, isRunning };

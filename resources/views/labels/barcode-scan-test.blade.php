@@ -4,24 +4,40 @@
     </x-slot>
 
     <div class="py-6">
-        <div class="max-w-2xl mx-auto sm:px-6 lg:px-8 space-y-6">
+        <div class="max-w-md mx-auto sm:px-6 lg:px-8 space-y-6">
 
-            {{-- Scanner Controls --}}
+            {{-- Hidden temp element for html5-qrcode file scanning --}}
+            <div id="barcode-scanner-temp" class="hidden"></div>
+
+            {{-- Scan Barcode (capture photo) --}}
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                <div class="flex gap-3 mb-4">
-                    <button id="startBtn" onclick="toggleScanner()"
-                        class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition">
-                        Start Scanner
-                    </button>
-                </div>
+                <div class="text-center space-y-4">
+                    <p class="text-gray-600 text-sm">Take a photo of a product barcode to look it up.</p>
 
-                {{-- Camera scanner area --}}
-                <div id="scanner-container" class="hidden">
-                    <div id="scanner" class="w-full"></div>
-                </div>
+                    {{-- Camera capture button --}}
+                    <label class="w-full inline-flex justify-center items-center px-6 py-4 bg-indigo-600 border border-transparent rounded-md font-semibold text-white active:bg-indigo-700 cursor-pointer">
+                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                            <circle cx="12" cy="13" r="3" stroke-width="2"/>
+                        </svg>
+                        Scan Barcode
+                        <input type="file" accept="image/*" capture="environment" class="hidden" id="camera-input">
+                    </label>
 
-                {{-- Status --}}
-                <p id="scannerStatus" class="text-sm text-gray-500 mt-2">Scanner stopped</p>
+                    {{-- Gallery fallback --}}
+                    <label class="w-full inline-flex justify-center items-center px-4 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-700 active:bg-gray-200 cursor-pointer">
+                        Choose from Gallery
+                        <input type="file" accept="image/*" class="hidden" id="gallery-input">
+                    </label>
+
+                    {{-- Preview --}}
+                    <div id="preview-container" class="hidden">
+                        <img id="image-preview" class="mx-auto max-h-48 rounded shadow" alt="Preview">
+                    </div>
+
+                    {{-- Status --}}
+                    <p id="scannerStatus" class="text-sm text-gray-500"></p>
+                </div>
             </div>
 
             {{-- Manual Input --}}
@@ -54,58 +70,49 @@
     @vite(['resources/js/barcode-scanner.js'])
 
     <script>
-        let scannerRunning = false;
+        const cameraInput = document.getElementById('camera-input');
+        const galleryInput = document.getElementById('gallery-input');
+        const preview = document.getElementById('image-preview');
+        const previewContainer = document.getElementById('preview-container');
+        const status = document.getElementById('scannerStatus');
 
-        async function toggleScanner() {
-            const btn = document.getElementById('startBtn');
-            const container = document.getElementById('scanner-container');
-            const status = document.getElementById('scannerStatus');
+        async function handlePhoto(file) {
+            if (!file) return;
 
-            if (scannerRunning) {
-                await window.BarcodeScanner.stopScanner();
-                scannerRunning = false;
-                btn.textContent = 'Start Scanner';
-                btn.classList.replace('bg-red-600', 'bg-indigo-600');
-                btn.classList.replace('hover:bg-red-700', 'hover:bg-indigo-700');
-                container.classList.add('hidden');
-                status.textContent = 'Scanner stopped';
-            } else {
-                container.classList.remove('hidden');
-                status.textContent = 'Starting camera...';
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                preview.src = e.target.result;
+                previewContainer.classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+
+            // Decode barcode from image
+            status.textContent = 'Scanning image for barcode...';
+            try {
+                const result = await window.BarcodeScanner.scanFile(file);
+                status.textContent = 'Found: ' + result.text + ' (' + result.format + ')';
+
+                // Beep
                 try {
-                    await window.BarcodeScanner.startScanner('scanner', onBarcodeDetected);
-                    scannerRunning = true;
-                    btn.textContent = 'Stop Scanner';
-                    btn.classList.replace('bg-indigo-600', 'bg-red-600');
-                    btn.classList.replace('hover:bg-indigo-700', 'hover:bg-red-700');
-                    status.textContent = 'Scanning... point camera at a barcode';
-                } catch (err) {
-                    const msg = (err && err.message) ? err.message : JSON.stringify(err);
-                    console.error('Scanner error:', err);
-                    status.textContent = 'Error: ' + msg;
-                    status.innerHTML += '<br><span class="text-xs text-gray-400">Camera requires HTTPS or localhost. Check browser console for details.</span>';
-                    container.classList.add('hidden');
-                }
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = ctx.createOscillator();
+                    osc.frequency.value = 1000;
+                    osc.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.1);
+                } catch (e) {}
+
+                lookupBarcode(result.text);
+            } catch (err) {
+                const msg = (err && err.message) ? err.message : JSON.stringify(err);
+                console.error('Barcode scan error:', err);
+                status.textContent = 'No barcode found in image. Try again with a clearer photo.';
             }
         }
 
-        function onBarcodeDetected(decodedText, decodedResult) {
-            // Play a short beep
-            try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = ctx.createOscillator();
-                osc.frequency.value = 1000;
-                osc.connect(ctx.destination);
-                osc.start();
-                osc.stop(ctx.currentTime + 0.1);
-            } catch (e) {}
-
-            const format = decodedResult?.result?.format?.formatName || 'unknown';
-            document.getElementById('scannerStatus').textContent =
-                `Detected: ${decodedText} (${format})`;
-
-            lookupBarcode(decodedText);
-        }
+        cameraInput.addEventListener('change', (e) => handlePhoto(e.target.files[0]));
+        galleryInput.addEventListener('change', (e) => handlePhoto(e.target.files[0]));
 
         async function lookupBarcode(barcode) {
             if (!barcode || !barcode.trim()) return;
@@ -114,7 +121,7 @@
             const resultCard = document.getElementById('resultCard');
             const resultContent = document.getElementById('resultContent');
             resultCard.classList.remove('hidden');
-            resultContent.innerHTML = '<p class="text-gray-500">Looking up ' + barcode + '...</p>';
+            resultContent.innerHTML = '<p class="text-gray-500">Looking up ' + escapeHtml(barcode) + '...</p>';
 
             try {
                 const response = await fetch('{{ route("labels.lookup-barcode") }}', {
