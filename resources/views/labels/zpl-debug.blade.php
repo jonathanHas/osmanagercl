@@ -40,50 +40,35 @@
             write('   renderToBase64: ' + typeof mod.renderToBase64);
             write('   renderToImg: ' + typeof mod.renderToImg);
 
-            if (mod.default) {
-                write('   default export type: ' + typeof mod.default);
-                if (typeof mod.default === 'object') {
-                    write('   default export keys: ' + Object.keys(mod.default).join(', '));
-                }
+            // Check window global fallback
+            write('\n3. Checking window.ZplPreview global...');
+            write('   window.ZplPreview: ' + typeof window.ZplPreview);
+            if (window.ZplPreview) {
+                write('   window.ZplPreview keys: ' + Object.keys(window.ZplPreview).join(', '));
+                write('   renderToBase64: ' + typeof window.ZplPreview.renderToBase64);
+                write('   renderToImg: ' + typeof window.ZplPreview.renderToImg);
             }
 
-            // Test with simple ZPL
-            const testZpl = '^XA^FO50,50^A0N,40,40^FDHello World^FS^XZ';
-            write('\n3. Testing renderToBase64 with simple ZPL...');
+            // Pick the best renderer
+            const renderer = (typeof mod.renderToBase64 === 'function') ? mod : window.ZplPreview;
+            write('\n4. Using renderer: ' + (renderer === mod ? 'ES module exports' : 'window.ZplPreview'));
 
-            if (typeof mod.renderToBase64 === 'function') {
-                const base64 = await mod.renderToBase64(testZpl, 76, 50, 12);
+            if (!renderer || typeof renderer.renderToBase64 !== 'function') {
+                write('   ERROR: No working renderer found!');
+            } else {
+                // Test with simple ZPL
+                const testZpl = '^XA^FO50,50^A0N,40,40^FDHello World^FS^XZ';
+                write('\n5. Testing renderToBase64 with simple ZPL...');
+                const base64 = await renderer.renderToBase64(testZpl, 76, 50, 12);
                 write('   Success! Base64 length: ' + base64.length);
                 previewImg.src = 'data:image/png;base64,' + base64;
                 previewContainer.classList.remove('hidden');
-            } else {
-                write('   ERROR: renderToBase64 is not a function');
 
-                // Try alternative access patterns
-                write('\n4. Trying alternative access patterns...');
-
-                if (mod.default && typeof mod.default.renderToBase64 === 'function') {
-                    write('   Found at mod.default.renderToBase64');
-                }
-
-                // Inspect all properties deeply
-                for (const [key, val] of Object.entries(mod)) {
-                    write('   mod.' + key + ' = ' + typeof val);
-                    if (typeof val === 'object' && val !== null) {
-                        for (const [k2, v2] of Object.entries(val)) {
-                            write('     .' + k2 + ' = ' + typeof v2);
-                        }
-                    }
-                }
-            }
-
-            if (typeof mod.renderToImg === 'function') {
-                write('\n5. Testing renderToImg...');
-                await mod.renderToImg(testZpl, previewImg, 76, 50, 12);
+                write('\n6. Testing renderToImg...');
+                await renderer.renderToImg(testZpl, previewImg, 76, 50, 12);
                 write('   renderToImg succeeded.');
-                previewContainer.classList.remove('hidden');
-            } else {
-                write('\n5. renderToImg is NOT a function');
+
+                write('\n✅ ALL TESTS PASSED - renderer is working!');
             }
 
         } catch (err) {

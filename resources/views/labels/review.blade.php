@@ -170,6 +170,15 @@
             return (zplEditor && zplEditor.value) || zplDisplay.textContent;
         }
 
+        // Load ZPL renderer (ES module import with window global fallback)
+        async function getZplRenderer() {
+            // Try ES module import first, fall back to window global
+            const mod = await import('{{ Vite::asset("resources/js/zpl-preview.js") }}');
+            if (typeof mod.renderToBase64 === 'function') return mod;
+            if (window.ZplPreview) return window.ZplPreview;
+            throw new Error('ZPL renderer not available');
+        }
+
         // Render preview using local WASM renderer
         async function renderPreview(zpl) {
             previewLoading.classList.remove('hidden');
@@ -177,9 +186,9 @@
             previewImg.classList.add('hidden');
 
             try {
-                const { renderToImg } = await import('{{ Vite::asset("resources/js/zpl-preview.js") }}');
+                const renderer = await getZplRenderer();
                 const dims = getCurrentDims();
-                await renderToImg(zpl, previewImg, dims.w, dims.h);
+                await renderer.renderToImg(zpl, previewImg, dims.w, dims.h);
                 previewImg.classList.remove('hidden');
                 previewLoading.classList.add('hidden');
             } catch (err) {

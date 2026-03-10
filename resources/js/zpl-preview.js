@@ -1,6 +1,11 @@
 /**
  * ZPL Preview module - lazy-loaded wrapper around zpl-renderer-js
- * Usage: import('/path/to/zpl-preview.js').then(m => m.renderZpl(zplCode, img))
+ *
+ * Works in two modes:
+ * 1. ES module import: import(...).then(m => m.renderToBase64(...))
+ * 2. Global fallback: window.ZplPreview.renderToBase64(...)
+ *
+ * Vite production builds may strip ES exports, so we also register on window.
  */
 import { zplToBase64Async } from 'zpl-renderer-js';
 
@@ -23,3 +28,6 @@ export async function renderToImg(zpl, imgElement, widthMm = DEFAULT_WIDTH_MM, h
     const base64 = await renderToBase64(zpl, widthMm, heightMm, dpmm);
     imgElement.src = 'data:image/png;base64,' + base64;
 }
+
+// Register on window as fallback for when Vite strips ES exports in production
+window.ZplPreview = { renderToBase64, renderToImg };

@@ -133,7 +133,9 @@
 
         async function getRenderer() {
             if (!zplRenderer) {
-                zplRenderer = await import('{{ Vite::asset("resources/js/zpl-preview.js") }}');
+                const mod = await import('{{ Vite::asset("resources/js/zpl-preview.js") }}');
+                zplRenderer = (typeof mod.renderToBase64 === 'function') ? mod : window.ZplPreview;
+                if (!zplRenderer) throw new Error('ZPL renderer not available');
             }
             return zplRenderer;
         }
@@ -169,6 +171,16 @@
             small: { w: 56, h: 31 },
         };
 
+        // ZPL renderer loader with window global fallback
+        let _zplRenderer = null;
+        async function getZplRenderer() {
+            if (_zplRenderer) return _zplRenderer;
+            const mod = await import('{{ Vite::asset("resources/js/zpl-preview.js") }}');
+            _zplRenderer = (typeof mod.renderToBase64 === 'function') ? mod : window.ZplPreview;
+            if (!_zplRenderer) throw new Error('ZPL renderer not available');
+            return _zplRenderer;
+        }
+
         document.addEventListener('alpine:init', () => {
             // Extend each card with methods
             Alpine.directive('init', () => {});
@@ -188,9 +200,9 @@
                         const zpl = await zplResponse.text();
                         component.zplContent = zpl;
 
-                        const zplRendererMod = await import('{{ Vite::asset("resources/js/zpl-preview.js") }}');
+                        const renderer = await getZplRenderer();
                         const dims = labelDims[component.currentSize] || labelDims.large;
-                        const base64 = await zplRendererMod.renderToBase64(zpl, dims.w, dims.h);
+                        const base64 = await renderer.renderToBase64(zpl, dims.w, dims.h);
                         component.previewSrc = 'data:image/png;base64,' + base64;
                         component.previewLoaded = true;
                     } catch (err) {
@@ -227,9 +239,9 @@
 
                             // Re-render preview if already loaded
                             if (component.previewLoaded) {
-                                const zplRendererMod = await import('{{ Vite::asset("resources/js/zpl-preview.js") }}');
+                                const renderer = await getZplRenderer();
                                 const dims = labelDims[component.currentSize] || labelDims.large;
-                                const base64 = await zplRendererMod.renderToBase64(data.zpl, dims.w, dims.h);
+                                const base64 = await renderer.renderToBase64(data.zpl, dims.w, dims.h);
                                 component.previewSrc = 'data:image/png;base64,' + base64;
                             }
                         }

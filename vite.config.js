@@ -8,6 +8,14 @@ export default defineConfig({
             refresh: true,
         }),
     ],
+    build: {
+        rollupOptions: {
+            output: {
+                // Preserve ES module exports (needed for dynamic import of zpl-preview)
+                format: 'es',
+            },
+        },
+    },
     server: {
         host: '127.0.0.1', // Force IPv4 instead of IPv6
         cors: true,
