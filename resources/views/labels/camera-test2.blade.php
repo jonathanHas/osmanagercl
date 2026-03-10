@@ -2,10 +2,10 @@
     <x-slot name="header">
         <div class="flex items-center justify-between">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                Snap Product Label (v1)
+                Snap Product Label (v2)
             </h2>
             <div class="flex gap-2">
-                <a href="{{ route('labels.camera-test2') }}" class="px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-200 transition">v2 (JSON)</a>
+                <a href="{{ route('labels.camera-test') }}" class="px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-200 transition">v1 (Raw ZPL)</a>
                 <a href="{{ route('labels.translation-history') }}" class="px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-200 transition">History</a>
             </div>
         </div>
@@ -36,12 +36,30 @@
             @endif
 
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                <form action="{{ route('labels.camera-upload') }}" method="POST" enctype="multipart/form-data">
+                <form action="{{ route('labels.camera-upload2') }}" method="POST" enctype="multipart/form-data">
                     @csrf
                     <div class="text-center space-y-6">
-                        <p class="text-gray-600">Snap a photo of a product label using your camera.</p>
+                        <p class="text-gray-600">Snap a photo of a product label. Gemini extracts the data, Laravel generates the ZPL.</p>
 
-                        {{-- Take Photo (opens rear camera on mobile Chrome) --}}
+                        {{-- Label Size Selection --}}
+                        <div class="flex justify-center gap-3">
+                            <label class="flex items-center gap-2 px-4 py-2 rounded-md border-2 cursor-pointer transition"
+                                   :class="labelSize === 'large' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200'"
+                                   x-data x-on:click="$refs.sizeLarge.checked = true; labelSize = 'large'">
+                                <input type="radio" name="label_size" value="large" checked class="hidden" x-ref="sizeLarge">
+                                <span class="text-sm font-medium">Large</span>
+                                <span class="text-xs text-gray-400">76x50mm</span>
+                            </label>
+                            <label class="flex items-center gap-2 px-4 py-2 rounded-md border-2 cursor-pointer transition"
+                                   :class="labelSize === 'small' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200'"
+                                   x-data x-on:click="$refs.sizeSmall.checked = true; labelSize = 'small'">
+                                <input type="radio" name="label_size" value="small" class="hidden" x-ref="sizeSmall">
+                                <span class="text-sm font-medium">Small</span>
+                                <span class="text-xs text-gray-400">56x30mm</span>
+                            </label>
+                        </div>
+
+                        {{-- Take Photo --}}
                         <label class="w-full inline-flex justify-center items-center px-6 py-4 bg-indigo-600 border border-transparent rounded-md font-semibold text-white active:bg-indigo-700 cursor-pointer">
                             <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><circle cx="12" cy="13" r="3" stroke-width="2"/></svg>
                             Take Photo
@@ -67,36 +85,19 @@
                             Upload & Process
                         </button>
 
-                        <p class="text-xs text-gray-400">Best with Chrome on Android. Firefox does not support direct camera capture.</p>
+                        <p class="text-xs text-gray-400">Gemini extracts label data as JSON, then Laravel generates the ZPL layout.</p>
                     </div>
                 </form>
             </div>
-
-            {{-- Uploaded Images Gallery --}}
-            @if ($images->count() > 0)
-                <div class="mt-6 bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                    <h3 class="font-semibold text-lg text-gray-800 mb-4">Uploaded Images ({{ $images->count() }})</h3>
-                    <div class="grid grid-cols-2 gap-3">
-                        @foreach ($images as $image)
-                            <div class="relative group">
-                                <a href="{{ $image['url'] }}" target="_blank">
-                                    <img src="{{ $image['url'] }}" alt="{{ $image['name'] }}" class="w-full h-32 object-cover rounded shadow">
-                                </a>
-                                <div class="mt-1 text-xs text-gray-500 truncate">{{ $image['name'] }}</div>
-                                <div class="text-xs text-gray-400">{{ $image['size'] }} KB &middot; {{ $image['date'] }}</div>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-            @else
-                <div class="mt-6 bg-white overflow-hidden shadow-sm sm:rounded-lg p-6 text-center text-gray-400">
-                    No images uploaded yet.
-                </div>
-            @endif
         </div>
     </div>
 
     <script>
+        // Alpine.js label size state
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('labelSizeSelector', () => ({ labelSize: 'large' }));
+        });
+
         const cameraInput = document.getElementById('camera-input');
         const galleryInput = document.getElementById('gallery-input');
         const preview = document.getElementById('image-preview');

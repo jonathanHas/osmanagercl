@@ -712,12 +712,19 @@ class LabelAreaController extends Controller
         $request->validate([
             'zpl' => 'required|string',
             'image_path' => 'required|string',
+            'label_data' => 'nullable|array',
         ]);
 
         $imagePath = $request->input('image_path');
         $zplPath = preg_replace('/\.(jpg|jpeg|png|gif|webp)$/i', '.zpl', $imagePath);
 
         Storage::disk('public')->put($zplPath, $request->input('zpl'));
+
+        // Save JSON data alongside for re-generation support
+        if ($request->has('label_data')) {
+            $jsonPath = preg_replace('/\.(jpg|jpeg|png|gif|webp)$/i', '.json', $imagePath);
+            Storage::disk('public')->put($jsonPath, json_encode($request->input('label_data'), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        }
 
         return response()->json([
             'success' => true,
@@ -771,17 +778,25 @@ class LabelAreaController extends Controller
             $labels = $zplFiles->map(function ($zplFile) use ($disk) {
                 $baseName = preg_replace('/\.zpl$/', '', basename($zplFile));
 
-                // Find matching image
+                // Find matching image and JSON data
                 $imageFile = collect($disk->files('labels'))
                     ->first(fn ($f) => preg_match('/^labels\/'.preg_quote($baseName, '/').'\\.(jpg|jpeg|png|gif|webp)$/i', $f));
+
+                $jsonPath = 'labels/'.$baseName.'.json';
+                $labelData = null;
+                if ($disk->exists($jsonPath)) {
+                    $labelData = json_decode($disk->get($jsonPath), true);
+                }
 
                 return [
                     'zpl_path' => $zplFile,
                     'zpl_url' => asset('storage/'.$zplFile),
                     'image_url' => $imageFile ? asset('storage/'.$imageFile) : null,
+                    'image_path' => $imageFile ?? '',
                     'name' => $baseName,
                     'date' => date('M j, Y H:i', $disk->lastModified($zplFile)),
                     'zpl_size' => round($disk->size($zplFile) / 1024, 1),
+                    'label_data' => $labelData,
                 ];
             })
                 ->sortByDesc(fn ($item) => $item['date'])
@@ -811,10 +826,318 @@ class LabelAreaController extends Controller
 
         $imagePath = $imageFile ?? '';
 
+        // Load JSON data if saved (enables size/font controls)
+        $jsonPath = 'labels/'.$name.'.json';
+        $labelData = null;
+        if ($disk->exists($jsonPath)) {
+            $labelData = json_decode($disk->get($jsonPath), true);
+        }
+
         return view('labels.review', [
             'original_image' => $imageFile ? asset('storage/'.$imageFile) : null,
             'zpl' => $zpl,
             'image_path' => $imagePath,
+            'label_data' => $labelData,
+            'label_size' => 'large',
+            'font_scale' => 2.0,
+        ]);
+    }
+
+    /**
+     * Camera test 2 - JSON-based label translation with Laravel ZPL generation.
+     */
+    public function cameraTest2(): View
+    {
+        return view('labels.camera-test2');
+    }
+
+    /**
+     * Handle photo upload for camera-test2, get JSON from Gemini, generate ZPL server-side.
+     */
+    public function uploadPhoto2(Request $request)
+    {
+        $request->validate([
+            'label_image' => 'required|image|max:10240',
+            'label_size' => 'required|in:small,large',
+        ]);
+
+        if (! $request->hasFile('label_image')) {
+            return back()->with('error', 'No photo was captured.');
+        }
+
+        $path = $request->file('label_image')->store('labels', 'public');
+        $labelSize = $request->input('label_size', 'large');
+
+        try {
+            // Resize image to reduce Gemini API payload
+            $fullPath = Storage::disk('public')->path($path);
+            $img = imagecreatefromjpeg($fullPath) ?: imagecreatefrompng($fullPath);
+            $origW = imagesx($img);
+            $origH = imagesy($img);
+            $maxDim = 1200;
+
+            if (max($origW, $origH) > $maxDim) {
+                $scale = $maxDim / max($origW, $origH);
+                $newW = (int) ($origW * $scale);
+                $newH = (int) ($origH * $scale);
+                $resized = imagecreatetruecolor($newW, $newH);
+                imagecopyresampled($resized, $img, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
+                imagedestroy($img);
+                $img = $resized;
+            }
+
+            ob_start();
+            imagejpeg($img, null, 80);
+            $imageData = base64_encode(ob_get_clean());
+            imagedestroy($img);
+
+            $prompt = "Extract data from this food label into JSON.\n\n"
+                ."Translate to English.\n\n"
+                ."STRICT VERBATIM: Only include information physically present on the label.\n\n"
+                ."CONDITIONAL FIELDS: For fields like address, origin, or nutrition_inline, "
+                ."if the information is NOT present on the label, set the value to null. "
+                ."Do not guess or use external knowledge.\n\n"
+                ."ALLERGENS: Format the ingredients string with EU allergens in ALL CAPS. "
+                ."The 14 EU allergens: Cereals (GLUTEN), CRUSTACEANS, EGGS, FISH, PEANUTS, "
+                ."SOYBEANS, MILK, NUTS, CELERY, MUSTARD, SESAME, SULPHITES, LUPIN, MOLLUSCS.\n\n"
+                ."JSON STRUCTURE: Return only the JSON object with keys: "
+                ."product_name, ingredients, nutrition_inline, storage, address, origin.\n"
+                ."Do NOT include net_weight — it is already on the packaging.\n\n"
+                ."Example output:\n"
+                .'{"product_name":"Sun-Dried Tomatoes in Oil",'
+                .'"ingredients":"Sun-dried tomatoes 60%, sunflower oil, SULPHITES (as preservative), salt, garlic, oregano",'
+                .'"nutrition_inline":"Energy 245kcal | Fat 18g | Sat 2.1g | Carbs 12g | Sugar 8g | Protein 5g | Salt 1.2g",'
+                .'"storage":"Store in a cool, dry place. Once opened, refrigerate and use within 3 days.",'
+                .'"address":"Via Roma 12, 80100 Naples, Italy",'
+                .'"origin":null}';
+
+            $result = Gemini::generativeModel(model: 'gemini-2.5-flash')
+                ->generateContent([
+                    $prompt,
+                    new Blob(
+                        mimeType: MimeType::IMAGE_JPEG,
+                        data: $imageData,
+                    ),
+                ]);
+
+            $text = $result->text();
+
+            // Strip markdown code fencing if Gemini wraps it
+            $text = preg_replace('/^```(?:json)?\s*\n?/m', '', $text);
+            $text = preg_replace('/\n?```\s*$/m', '', $text);
+            $text = trim($text);
+
+            $data = json_decode($text, true);
+
+            if (! $data || ! isset($data['product_name'])) {
+                return back()->with('error', 'Gemini returned invalid JSON: '.$text);
+            }
+
+            // Default to max fit — auto-clamps to largest scale that fits
+            [$zpl, $effectiveScale] = $this->generateZplWithScale($data, $labelSize, 2.0);
+
+            return view('labels.review', [
+                'original_image' => asset('storage/'.$path),
+                'zpl' => $zpl,
+                'image_path' => $path,
+                'label_data' => $data,
+                'label_size' => $labelSize,
+                'font_scale' => $effectiveScale,
+            ]);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Gemini API error: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Generate ZPL code from structured label data.
+     */
+    public function generateZpl(array $data, string $labelSize = 'large', float $fontScale = 1.0): string
+    {
+        [$zpl] = $this->generateZplWithScale($data, $labelSize, $fontScale);
+
+        return $zpl;
+    }
+
+    /**
+     * Generate ZPL and return [zpl_string, effective_scale].
+     */
+    public function generateZplWithScale(array $data, string $labelSize = 'large', float $fontScale = 1.0): array
+    {
+        $dims = $this->getLabelDimensions($labelSize);
+
+        // Auto-fit: if content overflows at requested scale, reduce until it fits
+        $scale = $fontScale;
+        while ($scale >= 0.5) {
+            $totalHeight = $this->calculateContentHeight($data, $dims, $scale);
+            if ($totalHeight <= $dims['height']) {
+                break;
+            }
+            $scale -= 0.05;
+        }
+        $scale = round($scale, 2);
+
+        return [$this->buildZpl($data, $dims, $scale), $scale];
+    }
+
+    private function getLabelDimensions(string $labelSize): array
+    {
+        if ($labelSize === 'small') {
+            return [
+                'width' => 673, 'height' => 366,
+                'nameFont' => 30, 'bodyFont' => 20, 'smallFont' => 18,
+                'ingredientLines' => 6, 'gap' => 10, 'startY' => 20, 'margin' => 30,
+            ];
+        }
+
+        return [
+            'width' => 900, 'height' => 600,
+            'nameFont' => 40, 'bodyFont' => 28, 'smallFont' => 22,
+            'ingredientLines' => 8, 'gap' => 12, 'startY' => 25, 'margin' => 40,
+        ];
+    }
+
+    /**
+     * Estimate how many ^FB lines a text string needs at a given font/field width.
+     */
+    private function estimateLines(string $text, int $fontSize, int $fieldWidth, int $maxLines): int
+    {
+        // Average character width is ~60% of font size for Zebra default font
+        $charsPerLine = max(1, (int) floor($fieldWidth / ($fontSize * 0.6)));
+        $needed = (int) ceil(mb_strlen($text) / $charsPerLine);
+
+        return min($needed, $maxLines);
+    }
+
+    private function calculateContentHeight(array $data, array $dims, float $scale): int
+    {
+        $nameFont = (int) round($dims['nameFont'] * $scale);
+        $bodyFont = (int) round($dims['bodyFont'] * $scale);
+        $smallFont = (int) round($dims['smallFont'] * $scale);
+        $gap = $dims['gap'];
+        $fieldWidth = $dims['width'] - ($dims['margin'] * 2);
+
+        $y = $dims['startY'];
+
+        // Name
+        $nameLines = $this->estimateLines($data['product_name'] ?? '', $nameFont, $fieldWidth, 2);
+        $y += $nameFont * $nameLines + $gap;
+
+        // Ingredients
+        if (! empty($data['ingredients'])) {
+            $lines = $this->estimateLines($data['ingredients'], $bodyFont, $fieldWidth, $dims['ingredientLines']);
+            $y += $bodyFont * $lines + $gap;
+        }
+
+        // Nutrition
+        if (! empty($data['nutrition_inline'])) {
+            $lines = $this->estimateLines($data['nutrition_inline'], $smallFont, $fieldWidth, 3);
+            $y += $smallFont * $lines + $gap;
+        }
+
+        // Storage
+        if (! empty($data['storage'])) {
+            $lines = $this->estimateLines($data['storage'], $smallFont, $fieldWidth, 2);
+            $y += $smallFont * $lines + $gap;
+        }
+
+        // Origin
+        if (! empty($data['origin'])) {
+            $y += $smallFont + $gap;
+        }
+
+        // Address
+        if (! empty($data['address'])) {
+            $lines = $this->estimateLines($data['address'], $smallFont, $fieldWidth, 2);
+            $y += $smallFont * $lines + $gap;
+        }
+
+        return $y;
+    }
+
+    private function buildZpl(array $data, array $dims, float $scale): string
+    {
+        $nameFontSize = (int) round($dims['nameFont'] * $scale);
+        $bodyFontSize = (int) round($dims['bodyFont'] * $scale);
+        $smallFontSize = (int) round($dims['smallFont'] * $scale);
+        $ingredientLines = $dims['ingredientLines'];
+        $gap = $dims['gap'];
+
+        $width = $dims['width'];
+        $height = $dims['height'];
+        $margin = $dims['margin'];
+        $fieldWidth = $width - ($margin * 2);
+        $y = $dims['startY'];
+
+        $zpl = '^XA';
+        $zpl .= "^PW{$width}^LL{$height}";
+        $zpl .= '^CI28';
+
+        // Product Name (centered)
+        $nameLines = $this->estimateLines($data['product_name'] ?? '', $nameFontSize, $fieldWidth, 2);
+        $zpl .= "^FO{$margin},{$y}^A0N,{$nameFontSize},{$nameFontSize}^FB{$fieldWidth},2,0,C^FD".($data['product_name'] ?? '')."^FS";
+        $y += $nameFontSize * $nameLines + $gap;
+
+        // Ingredients
+        if (! empty($data['ingredients'])) {
+            $lines = $this->estimateLines($data['ingredients'], $bodyFontSize, $fieldWidth, $ingredientLines);
+            $zpl .= "^FO{$margin},{$y}^A0N,{$bodyFontSize},{$bodyFontSize}^FB{$fieldWidth},{$ingredientLines},0,L^FD".$data['ingredients']."^FS";
+            $y += $bodyFontSize * $lines + $gap;
+        }
+
+        // Nutrition
+        if (! empty($data['nutrition_inline'])) {
+            $lines = $this->estimateLines($data['nutrition_inline'], $smallFontSize, $fieldWidth, 3);
+            $zpl .= "^FO{$margin},{$y}^A0N,{$smallFontSize},{$smallFontSize}^FB{$fieldWidth},3,0,L^FD".$data['nutrition_inline']."^FS";
+            $y += $smallFontSize * $lines + $gap;
+        }
+
+        // Storage
+        if (! empty($data['storage'])) {
+            $lines = $this->estimateLines($data['storage'], $smallFontSize, $fieldWidth, 2);
+            $zpl .= "^FO{$margin},{$y}^A0N,{$smallFontSize},{$smallFontSize}^FB{$fieldWidth},2,0,L^FD".$data['storage']."^FS";
+            $y += $smallFontSize * $lines + $gap;
+        }
+
+        // Origin
+        if (! empty($data['origin'])) {
+            $zpl .= "^FO{$margin},{$y}^A0N,{$smallFontSize},{$smallFontSize}^FDOrigin: ".$data['origin']."^FS";
+            $y += $smallFontSize + $gap;
+        }
+
+        // Address
+        if (! empty($data['address'])) {
+            $lines = $this->estimateLines($data['address'], $smallFontSize, $fieldWidth, 2);
+            $zpl .= "^FO{$margin},{$y}^A0N,{$smallFontSize},{$smallFontSize}^FB{$fieldWidth},2,0,L^FD".$data['address']."^FS";
+            $y += $smallFontSize * $lines + $gap;
+        }
+
+        $zpl .= '^XZ';
+
+        return $zpl;
+    }
+
+    /**
+     * Regenerate ZPL from saved JSON data with a different label size or font scale.
+     */
+    public function regenerateZpl(Request $request)
+    {
+        $request->validate([
+            'label_data' => 'required|array',
+            'label_size' => 'required|in:small,large',
+            'font_scale' => 'nullable|numeric|min:0.5|max:2.0',
+            'image_path' => 'nullable|string',
+        ]);
+
+        $data = $request->input('label_data');
+        $labelSize = $request->input('label_size');
+        $fontScale = (float) $request->input('font_scale', 1.0);
+        [$zpl, $effectiveScale] = $this->generateZplWithScale($data, $labelSize, $fontScale);
+
+        return response()->json([
+            'success' => true,
+            'zpl' => $zpl,
+            'font_scale' => $effectiveScale,
         ]);
     }
 }

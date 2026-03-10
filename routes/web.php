@@ -256,9 +256,16 @@ Route::middleware('auth')->group(function () {
     Route::post('/labels/lookup-barcode', [LabelAreaController::class, 'lookupBarcode'])->name('labels.lookup-barcode');
     Route::post('/labels/scan', [LabelAreaController::class, 'processBarcodeScan'])->name('labels.scan');
 
-    // Camera test page
+    // Label translation - v1 (Gemini generates raw ZPL)
     Route::get('/labels/camera-test', [LabelAreaController::class, 'cameraTest'])->name('labels.camera-test');
     Route::post('/labels/camera-upload', [LabelAreaController::class, 'uploadPhoto'])->name('labels.camera-upload');
+
+    // Label translation - v2 (Gemini returns JSON, Laravel generates ZPL)
+    Route::get('/labels/camera-test2', [LabelAreaController::class, 'cameraTest2'])->name('labels.camera-test2');
+    Route::post('/labels/camera-upload2', [LabelAreaController::class, 'uploadPhoto2'])->name('labels.camera-upload2');
+    Route::post('/labels/regenerate-zpl', [LabelAreaController::class, 'regenerateZpl'])->name('labels.regenerate-zpl');
+
+    // Label translation - shared
     Route::post('/labels/test-print', [LabelAreaController::class, 'testPrint'])->name('labels.test-print');
     Route::post('/labels/save-zpl', [LabelAreaController::class, 'saveZpl'])->name('labels.save-zpl');
     Route::post('/labels/print-zpl', [LabelAreaController::class, 'printZpl'])->name('labels.print-zpl');
