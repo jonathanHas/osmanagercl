@@ -80,7 +80,10 @@
                     btn.classList.replace('hover:bg-indigo-700', 'hover:bg-red-700');
                     status.textContent = 'Scanning... point camera at a barcode';
                 } catch (err) {
-                    status.textContent = 'Error: ' + err.message;
+                    const msg = (err && err.message) ? err.message : JSON.stringify(err);
+                    console.error('Scanner error:', err);
+                    status.textContent = 'Error: ' + msg;
+                    status.innerHTML += '<br><span class="text-xs text-gray-400">Camera requires HTTPS or localhost. Check browser console for details.</span>';
                     container.classList.add('hidden');
                 }
             }
