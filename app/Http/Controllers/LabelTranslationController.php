@@ -143,15 +143,20 @@ class LabelTranslationController extends Controller
                 .'their explanations at the end of the ingredients string. '
                 ."Example: 'tomatoes** 65%, olive oil*, salt. *from organic farming. **from biodynamic agriculture.'\n\n"
                 .'JSON STRUCTURE: Return only the JSON object with keys: '
-                ."product_name, ingredients, nutrition_inline, storage, address, origin.\n"
+                ."product_name, ingredients, nutrition_inline, storage, address, origin, original_text.\n"
                 ."Do NOT include net_weight — it is already on the packaging.\n\n"
+                ."ORIGINAL TEXT: Include the original (untranslated) text from the label in the 'original_text' field. "
+                ."This should be the raw text as it appears on the label, in the original language, "
+                ."so the user can verify the translation is correct. Include product name, ingredients, "
+                ."and any other text visible on the label.\n\n"
                 ."Example output:\n"
                 .'{"product_name":"Sun-Dried Tomatoes in Oil",'
                 .'"ingredients":"Sun-dried tomatoes** 60%, sunflower oil*, SULPHITES (as preservative), salt, garlic, oregano. *from organic farming. **from organic and biodynamic agriculture.",'
                 .'"nutrition_inline":"Energy 245kcal | Fat 18g | Sat 2.1g | Carbs 12g | Sugar 8g | Protein 5g | Salt 1.2g",'
                 .'"storage":"Store in a cool, dry place. Once opened, refrigerate and use within 3 days.",'
                 .'"address":"Via Roma 12, 80100 Naples, Italy",'
-                .'"origin":null}';
+                .'"origin":null,'
+                .'"original_text":"Pomodori Secchi sott\'olio. Ingredienti: pomodori secchi** 60%, olio di girasole*, SOLFITI (come conservante), sale, aglio, origano. *da agricoltura biologica. **da agricoltura biologica e biodinamica."}';
 
             // Build content array with prompt + all image blobs
             $contents = [$prompt];

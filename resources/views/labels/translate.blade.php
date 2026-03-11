@@ -227,12 +227,21 @@
                 {{-- Review Content --}}
                 <template x-if="labelData && !processing && !processingError">
                     <div class="space-y-4">
-                        {{-- Original Photos --}}
+                        {{-- Product / Barcode reference --}}
+                        <div x-show="barcode || product" class="flex items-center gap-2 px-4 text-xs text-gray-400">
+                            <span x-show="product" x-text="product?.name"></span>
+                            <span x-show="product && barcode">&middot;</span>
+                            <span x-show="barcode" class="font-mono" x-text="barcode"></span>
+                        </div>
+
+                        {{-- Original Photos (clickable, open in new window) --}}
                         <div x-show="originalPhotos.length > 0" class="bg-white shadow-sm sm:rounded-lg p-4">
-                            <p class="text-xs font-medium text-gray-500 mb-2">Original Photos</p>
+                            <p class="text-xs font-medium text-gray-500 mb-2">Original Photos <span class="text-gray-400">(tap to enlarge)</span></p>
                             <div class="flex gap-2 overflow-x-auto pb-1">
                                 <template x-for="(photo, idx) in originalPhotos" :key="idx">
-                                    <img :src="photo.startsWith('data:') ? photo : '/storage/' + photo" class="h-24 rounded-lg border shadow-sm flex-shrink-0">
+                                    <a href="#" @click.prevent="window.open(photo.startsWith('data:') ? photo : '/storage/' + photo, 'photo_' + idx, 'width=800,height=600,scrollbars=yes,resizable=yes')" class="flex-shrink-0 cursor-pointer">
+                                        <img :src="photo.startsWith('data:') ? photo : '/storage/' + photo" class="h-24 rounded-lg border shadow-sm hover:ring-2 hover:ring-indigo-400 transition">
+                                    </a>
                                 </template>
                             </div>
                         </div>
@@ -271,6 +280,17 @@
                                     <button @click="adjustFontScale(10)" class="px-2 py-0.5 bg-gray-200 rounded text-xs font-bold text-gray-700 hover:bg-gray-300">A+</button>
                                     <span class="text-xs text-gray-500 w-12 text-right" x-text="fontScale + '%'"></span>
                                 </div>
+                            </div>
+                        </div>
+
+                        {{-- Original Text (for verification) --}}
+                        <div x-show="labelData.original_text" class="bg-amber-50 border border-amber-200 sm:rounded-lg p-4" x-data="{ showOriginal: false }">
+                            <button @click="showOriginal = !showOriginal" class="flex items-center justify-between w-full text-left">
+                                <p class="text-xs font-medium text-amber-700">Original Label Text (for checking translation)</p>
+                                <svg class="w-4 h-4 text-amber-500 transition-transform" :class="showOriginal && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            <div x-show="showOriginal" x-collapse>
+                                <p class="mt-2 text-sm text-amber-900 whitespace-pre-wrap leading-relaxed" x-text="labelData.original_text"></p>
                             </div>
                         </div>
 
@@ -447,7 +467,7 @@
                 scannerVisible: false,
                 scannerStatus: 'Ready to scan',
                 manualBarcode: '',
-                barcode: '',
+                barcode: editTranslation?.product_code || '',
                 product: null,
                 lookupError: '',
                 lookupLoading: false,
