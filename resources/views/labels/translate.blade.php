@@ -42,7 +42,7 @@
                         <span x-text="scannerRunning ? 'Stop Scanner' : 'Start Scanner'"></span>
                     </button>
 
-                    <div id="scanner-container" x-show="scannerRunning" class="rounded-lg overflow-hidden">
+                    <div id="scanner-container" x-show="scannerVisible" class="rounded-lg overflow-hidden">
                         <div id="scanner" class="w-full"></div>
                     </div>
 
@@ -444,6 +444,7 @@
 
                 // Scanner
                 scannerRunning: false,
+                scannerVisible: false,
                 scannerStatus: 'Ready to scan',
                 manualBarcode: '',
                 barcode: '',
@@ -496,14 +497,22 @@
                     if (this.scannerRunning) {
                         await window.BarcodeScanner.stopScanner();
                         this.scannerRunning = false;
+                        this.scannerVisible = false;
                         this.scannerStatus = 'Scanner stopped';
                     } else {
+                        // Show the container FIRST so html5-qrcode can measure it
+                        this.scannerVisible = true;
                         this.scannerStatus = 'Starting camera...';
+
+                        // Wait one tick for Alpine to render the container
+                        await this.$nextTick();
+
                         try {
                             await window.BarcodeScanner.startScanner('scanner', (text, result) => this.onBarcodeDetected(text, result));
                             this.scannerRunning = true;
                             this.scannerStatus = 'Scanning... point camera at barcode';
                         } catch (err) {
+                            this.scannerVisible = false;
                             this.scannerStatus = 'Camera error: ' + (err?.message || JSON.stringify(err));
                         }
                     }
@@ -529,6 +538,7 @@
                     if (this.scannerRunning) {
                         await window.BarcodeScanner.stopScanner();
                         this.scannerRunning = false;
+                        this.scannerVisible = false;
                     }
                 },
 
