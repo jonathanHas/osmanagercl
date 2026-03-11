@@ -269,6 +269,7 @@ Route::middleware('auth')->group(function () {
     // Label translation - v2 (Gemini returns JSON, Laravel generates ZPL)
     Route::get('/labels/camera-test2', [LabelAreaController::class, 'cameraTest2'])->name('labels.camera-test2');
     Route::post('/labels/camera-upload2', [LabelAreaController::class, 'uploadPhoto2'])->name('labels.camera-upload2');
+    Route::get('/labels/camera-upload2', fn () => redirect()->route('labels.camera-test2'))->name('labels.camera-upload2-redirect');
     Route::post('/labels/regenerate-zpl', [LabelAreaController::class, 'regenerateZpl'])->name('labels.regenerate-zpl');
 
     // Label translation - shared
