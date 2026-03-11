@@ -133,12 +133,47 @@
                 const data = await response.json();
 
                 if (data.success) {
+                    const p = data.product;
                     resultContent.innerHTML = `
                         <div class="border border-green-200 bg-green-50 rounded-lg p-4">
-                            <p class="text-green-800 font-semibold text-lg">${escapeHtml(data.product.name)}</p>
-                            <div class="mt-2 space-y-1 text-sm text-green-700">
-                                <p><span class="font-medium">Code:</span> ${escapeHtml(data.product.code)}</p>
-                                <p><span class="font-medium">Price:</span> ${escapeHtml(data.product.formatted_price)}</p>
+                            <p class="text-green-800 font-semibold text-lg">${escapeHtml(p.name)}</p>
+                            <div class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                                <div>
+                                    <span class="text-gray-500">Barcode</span>
+                                    <p class="font-mono font-medium text-gray-900">${escapeHtml(p.code)}</p>
+                                </div>
+                                <div>
+                                    <span class="text-gray-500">Sell Price (inc VAT)</span>
+                                    <p class="font-semibold text-gray-900">${escapeHtml(p.formatted_price)}</p>
+                                </div>
+                                <div>
+                                    <span class="text-gray-500">Net Price</span>
+                                    <p class="text-gray-900">€${escapeHtml(p.price_net)}</p>
+                                </div>
+                                <div>
+                                    <span class="text-gray-500">Buy Price</span>
+                                    <p class="text-gray-900">€${escapeHtml(p.price_buy)}</p>
+                                </div>
+                                <div>
+                                    <span class="text-gray-500">VAT Rate</span>
+                                    <p class="text-gray-900">${escapeHtml(p.vat_rate)}</p>
+                                </div>
+                                <div>
+                                    <span class="text-gray-500">Category</span>
+                                    <p class="text-gray-900">${escapeHtml(p.category)}</p>
+                                </div>
+                                <div>
+                                    <span class="text-gray-500">Stock</span>
+                                    <p class="font-medium ${p.stock > 0 ? 'text-green-700' : 'text-red-600'}">${p.stock}</p>
+                                </div>
+                                ${p.supplier ? `<div>
+                                    <span class="text-gray-500">Supplier</span>
+                                    <p class="text-gray-900">${escapeHtml(p.supplier)}</p>
+                                </div>` : ''}
+                                ${p.reference ? `<div class="col-span-2">
+                                    <span class="text-gray-500">Reference</span>
+                                    <p class="text-gray-900">${escapeHtml(p.reference)}</p>
+                                </div>` : ''}
                             </div>
                         </div>
                     `;

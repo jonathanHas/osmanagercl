@@ -468,13 +468,22 @@ class LabelAreaController extends Controller
         $product = Product::where('CODE', $barcode)->first();
 
         if ($product) {
+            // Eager load relationships for product info
+            $product->load(['category', 'tax', 'stockCurrent', 'supplierLink.supplier']);
+
             return response()->json([
                 'success' => true,
                 'product' => [
                     'code' => $product->CODE,
                     'name' => $product->NAME,
-                    'price' => $product->PRICESELL,
+                    'price_net' => number_format($product->PRICESELL, 2),
+                    'price_buy' => number_format($product->PRICEBUY, 2),
                     'formatted_price' => $product->getFormattedPriceWithVatAttribute(),
+                    'vat_rate' => $product->getFormattedVatRateAttribute(),
+                    'category' => $product->category_name,
+                    'stock' => $product->getCurrentStock(),
+                    'supplier' => $product->supplierLink?->supplier?->Supplier ?? null,
+                    'reference' => $product->REFERENCE,
                 ],
             ]);
         } else {

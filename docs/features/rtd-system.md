@@ -12,6 +12,7 @@ The RTD system processes supplier invoices (Udea and Dynamis) to extract and cat
 - **Udea** - Dutch organic wholesaler (article code → SupplierLink resolution)
 - **Dynamis** - French organic produce supplier (EAN barcode → Product resolution)
 - **Independent Irish Health Foods (IIH)** - Irish health food distributor (VAT summary → direct categorization, DRS excluded)
+- **The Natural Medicine Company** - Irish health & beauty distributor (delivery parsing with per-line VAT rates)
 
 **Key Features:**
 - Dedicated RTD Management page with summary statistics and filtering

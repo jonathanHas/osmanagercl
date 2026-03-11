@@ -407,6 +407,18 @@ The system supports direct parsing of supplier delivery invoice PDFs, eliminatin
   - VAT rate calculation from Tax/Value fields
   - Price validation (Qty × Price × SKU verification)
 
+#### The Natural Medicine Company (NEW! 2026-03-10)
+- **Detection**: Automatically detected via "THE NATURAL MEDICINE COMPANY" or "NATURALMEDICINE.IE" text in PDF
+- **Parser**: `scripts/invoice-parser/parsers/delivery_natural_medicine.py`
+- **Output Format**: JSON with per-item quantities and prices
+- **Features**:
+  - Stock code, description, RRP, quantity, trade price, discount %, total, VAT rate extraction
+  - Multi-line product description handling (wrapped text rejoined automatically)
+  - Multi-page invoice support (repeated headers skipped)
+  - Line total validation (qty × trade price)
+  - SUB-TOTAL and GRAND TOTAL cross-validation
+  - All Irish VAT rates supported (0%, 13.5%, 23%)
+
 #### UDEA B.V.
 - **Detection**: Automatically detected via "UDEA B.V.", "WWW.UDEA.NL", or "UDEA" text in PDF
 - **Parser**: `scripts/invoice-parser/parsers/delivery_udea.py`
@@ -590,6 +602,7 @@ The delivery parsing system now extracts and verifies invoice totals from PDFs t
 1. **Total Extraction**: Python parsers extract stated totals from PDF footer sections:
    - **UDEA**: "Total to deliver" (products), "Total barrels delivered", "Total excluding/including vat"
    - **Independent**: "Gross Total", "Subtotal", "Nett"
+   - **Natural Medicine**: "SUB-TOTAL", "GRAND TOTAL"
 
 2. **Comparison**: The system compares:
    - `calculated_total` = Sum of all parsed line items

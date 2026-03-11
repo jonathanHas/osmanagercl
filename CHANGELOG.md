@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Natural Medicine Company delivery parser** (2026-03-10)
+  - New Python PDF parser for The Natural Medicine Company invoices
+  - Extracts all product line items: stock code, description, RRP, quantity, trade price, discount, total, VAT rate
+  - Handles multi-line product descriptions that wrap across PDF lines
+  - Handles multi-page invoices with repeated headers
+  - Validates line totals (qty × trade price) and cross-checks against invoice SUB-TOTAL
+  - Supports all Irish VAT rates (0%, 13.5%, 23%)
+  - Auto-detected from PDF text ("The Natural Medicine Company" / "naturalmedicine.ie")
+  - **New File**: `scripts/invoice-parser/parsers/delivery_natural_medicine.py`
+  - **Modified**: `scripts/invoice-parser/delivery_parser_laravel.py` (supplier detection + dispatch)
+
+- **Barcode scanner test page with live camera scanning** (2026-03-10)
+  - Live camera barcode scanner at `/labels/barcode-scan-test` using `html5-qrcode` library
+  - Supports EAN-13, EAN-8, UPC-A, UPC-E, Code-128 barcode formats
+  - Real-time camera feed scans barcodes continuously (requires HTTPS)
+  - Auto-lookup against POS product database showing name, code, and price
+  - Manual barcode input fallback for typed/pasted codes
+  - Scan history list tracks all lookups in current session
+  - Audio beep feedback on successful barcode detection
+  - **New Package**: `html5-qrcode` for browser-based barcode scanning
+  - **New Files**: `resources/js/barcode-scanner.js`, `resources/views/labels/barcode-scan-test.blade.php`
+  - **HTTPS Setup**: Self-signed certificate configuration for Apache to enable camera API on mobile
+
 - **AI-powered label translation system** (2026-03-09)
   - Snap photos of foreign-language product labels using phone camera (Chrome on Android)
   - Google Gemini 2.5 Flash translates label text to English and generates ZPL II printer code

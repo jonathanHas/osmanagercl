@@ -92,6 +92,15 @@ Complete label printing system with integrated barcode scanning for quick produc
 
 📖 [Label System Documentation](./features/label-system.md)
 
+### Barcode Scanner (NEW! 2026-03-10)
+Live camera barcode scanning for product lookup on mobile devices.
+- **Live Camera Feed**: Real-time barcode detection using phone camera via `html5-qrcode`
+- **Multi-Format Support**: EAN-13, EAN-8, UPC-A, UPC-E, Code-128
+- **Product Lookup**: Scanned barcodes auto-lookup against POS database showing name, code, price
+- **Manual Input**: Text field fallback for typed/pasted barcodes
+- **Scan History**: Session-based log of all scanned barcodes and results
+- **HTTPS Required**: Uses camera API which requires secure context on mobile
+
 ### Label Translation System (NEW! 2026-03-09)
 AI-powered label translation for imported products using phone camera capture and Zebra thermal printing.
 - **Camera Capture**: Snap photos of foreign-language labels directly from mobile Chrome
@@ -280,6 +289,7 @@ Comprehensive delivery processing with barcode scanning and PDF invoice parsing.
 - **PDF Delivery Parsing** (NEW! 2026-01-23): Parse supplier PDF invoices directly
   - Independent Irish Health Foods: Case/unit breakdown, RSP extraction, VAT calculation
   - UDEA B.V.: European number formatting, weight-based products, three-tier regex matching
+  - The Natural Medicine Company (NEW! 2026-03-10): Stock code, RRP, trade price, discount %, multi-line descriptions, multi-page support
   - Automatic supplier detection from PDF text
   - Python-based parsing with pdfplumber
 - **Multi-PDF Upload** (NEW! 2026-01-23): Combine multiple PDFs into single delivery
