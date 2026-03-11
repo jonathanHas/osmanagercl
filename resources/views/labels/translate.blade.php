@@ -656,9 +656,33 @@
                 },
 
                 addFileToPhotos(file) {
+                    const maxDim = 1600;
+                    const quality = 0.85;
+
                     const reader = new FileReader();
                     reader.onload = (e) => {
-                        this.photos.push({ file, preview: e.target.result });
+                        const img = new Image();
+                        img.onload = () => {
+                            // Skip resize if already small enough
+                            if (img.width <= maxDim && img.height <= maxDim) {
+                                this.photos.push({ file, preview: e.target.result });
+                                return;
+                            }
+
+                            const scale = maxDim / Math.max(img.width, img.height);
+                            const canvas = document.createElement('canvas');
+                            canvas.width = Math.round(img.width * scale);
+                            canvas.height = Math.round(img.height * scale);
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                            canvas.toBlob((blob) => {
+                                const resizedFile = new File([blob], file.name, { type: 'image/jpeg' });
+                                const preview = canvas.toDataURL('image/jpeg', quality);
+                                this.photos.push({ file: resizedFile, preview });
+                            }, 'image/jpeg', quality);
+                        };
+                        img.src = e.target.result;
                     };
                     reader.readAsDataURL(file);
                 },

@@ -75,7 +75,7 @@ class LabelTranslationController extends Controller
     {
         $request->validate([
             'label_images' => 'required|array|min:1|max:5',
-            'label_images.*' => 'required|image|max:10240',
+            'label_images.*' => 'required|image|max:5120',
             'label_size' => 'required|in:'.$this->zplGenerator->getValidSizeKeys(),
             'product_code' => 'nullable|string|max:255',
             'product_id' => 'nullable|string|max:255',
