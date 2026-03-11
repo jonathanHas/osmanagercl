@@ -6,6 +6,7 @@ use App\Models\LabelLog;
 use App\Models\LabelTemplate;
 use App\Models\Product;
 use App\Services\LabelService;
+use App\Services\ZplGeneratorService;
 use Gemini\Data\Blob;
 use Gemini\Enums\MimeType;
 use Gemini\Laravel\Facades\Gemini;
@@ -15,17 +16,14 @@ use Illuminate\View\View;
 
 class LabelAreaController extends Controller
 {
-    /**
-     * The label service instance.
-     */
     protected LabelService $labelService;
 
-    /**
-     * Create a new controller instance.
-     */
-    public function __construct(LabelService $labelService)
+    protected ZplGeneratorService $zplGenerator;
+
+    public function __construct(LabelService $labelService, ZplGeneratorService $zplGenerator)
     {
         $this->labelService = $labelService;
+        $this->zplGenerator = $zplGenerator;
     }
 
     /**
@@ -474,6 +472,7 @@ class LabelAreaController extends Controller
             return response()->json([
                 'success' => true,
                 'product' => [
+                    'id' => $product->ID,
                     'code' => $product->CODE,
                     'name' => $product->NAME,
                     'price_net' => number_format($product->PRICESELL, 2),
@@ -484,6 +483,7 @@ class LabelAreaController extends Controller
                     'stock' => $product->getCurrentStock(),
                     'supplier' => $product->supplierLink?->supplier?->Supplier ?? null,
                     'reference' => $product->REFERENCE,
+                    'case_units' => $product->supplierLink?->CaseUnits ?? null,
                 ],
             ]);
         } else {
@@ -624,7 +624,7 @@ class LabelAreaController extends Controller
                 ."^FWB\n"
                 ."^FO800,20^A0B,40,40^FB560,2,,C^FDSUN-DRIED TOMATOES IN OIL^FS\n"
                 ."...\n"
-                ."^XZ";
+                .'^XZ';
 
             $result = Gemini::generativeModel(model: 'gemini-2.5-flash')
                 ->generateContent([
@@ -740,8 +740,6 @@ class LabelAreaController extends Controller
             'message' => 'ZPL saved to '.$zplPath,
         ]);
     }
-
-
 
     /**
      * Print ZPL code to the Zebra printer.
@@ -867,7 +865,7 @@ class LabelAreaController extends Controller
     {
         $request->validate([
             'label_image' => 'required|image|max:10240',
-            'label_size' => 'required|in:small,large',
+            'label_size' => 'required|in:'.$this->zplGenerator->getValidSizeKeys(),
         ]);
 
         if (! $request->hasFile('label_image')) {
@@ -903,16 +901,16 @@ class LabelAreaController extends Controller
             $prompt = "Extract data from this food label into JSON.\n\n"
                 ."Translate to English.\n\n"
                 ."STRICT VERBATIM: Only include information physically present on the label.\n\n"
-                ."CONDITIONAL FIELDS: For fields like address, origin, or nutrition_inline, "
-                ."if the information is NOT present on the label, set the value to null. "
+                .'CONDITIONAL FIELDS: For fields like address, origin, or nutrition_inline, '
+                .'if the information is NOT present on the label, set the value to null. '
                 ."Do not guess or use external knowledge.\n\n"
-                ."ALLERGENS: Format the ingredients string with EU allergens in ALL CAPS. "
-                ."The 14 EU allergens: Cereals (GLUTEN), CRUSTACEANS, EGGS, FISH, PEANUTS, "
+                .'ALLERGENS: Format the ingredients string with EU allergens in ALL CAPS. '
+                .'The 14 EU allergens: Cereals (GLUTEN), CRUSTACEANS, EGGS, FISH, PEANUTS, '
                 ."SOYBEANS, MILK, NUTS, CELERY, MUSTARD, SESAME, SULPHITES, LUPIN, MOLLUSCS.\n\n"
-                ."ANNOTATIONS: Preserve asterisk annotations (*, **) on ingredients and include "
-                ."their explanations at the end of the ingredients string. "
+                .'ANNOTATIONS: Preserve asterisk annotations (*, **) on ingredients and include '
+                .'their explanations at the end of the ingredients string. '
                 ."Example: 'tomatoes** 65%, olive oil*, salt. *from organic farming. **from biodynamic agriculture.'\n\n"
-                ."JSON STRUCTURE: Return only the JSON object with keys: "
+                .'JSON STRUCTURE: Return only the JSON object with keys: '
                 ."product_name, ingredients, nutrition_inline, storage, address, origin.\n"
                 ."Do NOT include net_weight — it is already on the packaging.\n\n"
                 ."Example output:\n"
@@ -962,171 +960,19 @@ class LabelAreaController extends Controller
     }
 
     /**
-     * Generate ZPL code from structured label data.
+     * Generate ZPL code from structured label data (delegates to ZplGeneratorService).
      */
     public function generateZpl(array $data, string $labelSize = 'large', float $fontScale = 1.0): string
     {
-        [$zpl] = $this->generateZplWithScale($data, $labelSize, $fontScale);
-
-        return $zpl;
+        return $this->zplGenerator->generateZpl($data, $labelSize, $fontScale);
     }
 
     /**
-     * Generate ZPL and return [zpl_string, effective_scale].
+     * Generate ZPL and return [zpl_string, effective_scale] (delegates to ZplGeneratorService).
      */
     public function generateZplWithScale(array $data, string $labelSize = 'large', float $fontScale = 1.0): array
     {
-        $dims = $this->getLabelDimensions($labelSize);
-
-        // Auto-fit: if content overflows at requested scale, reduce until it fits
-        $scale = $fontScale;
-        while ($scale >= 0.5) {
-            $totalHeight = $this->calculateContentHeight($data, $dims, $scale);
-            if ($totalHeight <= $dims['height']) {
-                break;
-            }
-            $scale -= 0.05;
-        }
-        $scale = round($scale, 2);
-
-        return [$this->buildZpl($data, $dims, $scale), $scale];
-    }
-
-    private function getLabelDimensions(string $labelSize): array
-    {
-        if ($labelSize === 'small') {
-            return [
-                'width' => 673, 'height' => 366,
-                'nameFont' => 30, 'bodyFont' => 20, 'smallFont' => 18,
-                'ingredientLines' => 6, 'gap' => 10, 'startY' => 20, 'margin' => 30,
-            ];
-        }
-
-        return [
-            'width' => 900, 'height' => 600,
-            'nameFont' => 40, 'bodyFont' => 28, 'smallFont' => 22,
-            'ingredientLines' => 8, 'gap' => 12, 'startY' => 25, 'margin' => 40,
-        ];
-    }
-
-    /**
-     * Estimate how many ^FB lines a text string needs at a given font/field width.
-     */
-    private function estimateLines(string $text, int $fontSize, int $fieldWidth, int $maxLines): int
-    {
-        // Average character width is ~60% of font size for Zebra default font
-        $charsPerLine = max(1, (int) floor($fieldWidth / ($fontSize * 0.6)));
-        $needed = (int) ceil(mb_strlen($text) / $charsPerLine);
-
-        return min($needed, $maxLines);
-    }
-
-    private function calculateContentHeight(array $data, array $dims, float $scale): int
-    {
-        $nameFont = (int) round($dims['nameFont'] * $scale);
-        $bodyFont = (int) round($dims['bodyFont'] * $scale);
-        $smallFont = (int) round($dims['smallFont'] * $scale);
-        $gap = $dims['gap'];
-        $fieldWidth = $dims['width'] - ($dims['margin'] * 2);
-
-        $y = $dims['startY'];
-
-        // Name
-        $nameLines = $this->estimateLines($data['product_name'] ?? '', $nameFont, $fieldWidth, 2);
-        $y += $nameFont * $nameLines + $gap;
-
-        // Ingredients
-        if (! empty($data['ingredients'])) {
-            $lines = $this->estimateLines('Ingredients: '.$data['ingredients'], $bodyFont, $fieldWidth, $dims['ingredientLines']);
-            $y += $bodyFont * $lines + $gap;
-        }
-
-        // Nutrition
-        if (! empty($data['nutrition_inline'])) {
-            $lines = $this->estimateLines($data['nutrition_inline'], $smallFont, $fieldWidth, 3);
-            $y += $smallFont * $lines + $gap;
-        }
-
-        // Storage
-        if (! empty($data['storage'])) {
-            $lines = $this->estimateLines($data['storage'], $smallFont, $fieldWidth, 2);
-            $y += $smallFont * $lines + $gap;
-        }
-
-        // Origin
-        if (! empty($data['origin'])) {
-            $y += $smallFont + $gap;
-        }
-
-        // Address
-        if (! empty($data['address'])) {
-            $lines = $this->estimateLines($data['address'], $smallFont, $fieldWidth, 2);
-            $y += $smallFont * $lines + $gap;
-        }
-
-        return $y;
-    }
-
-    private function buildZpl(array $data, array $dims, float $scale): string
-    {
-        $nameFontSize = (int) round($dims['nameFont'] * $scale);
-        $bodyFontSize = (int) round($dims['bodyFont'] * $scale);
-        $smallFontSize = (int) round($dims['smallFont'] * $scale);
-        $ingredientLines = $dims['ingredientLines'];
-        $gap = $dims['gap'];
-
-        $width = $dims['width'];
-        $height = $dims['height'];
-        $margin = $dims['margin'];
-        $fieldWidth = $width - ($margin * 2);
-        $y = $dims['startY'];
-
-        $zpl = '^XA';
-        $zpl .= "^PW{$width}^LL{$height}";
-        $zpl .= '^CI28';
-
-        // Product Name (centered)
-        $nameLines = $this->estimateLines($data['product_name'] ?? '', $nameFontSize, $fieldWidth, 2);
-        $zpl .= "^FO{$margin},{$y}^A0N,{$nameFontSize},{$nameFontSize}^FB{$fieldWidth},2,0,C^FD".($data['product_name'] ?? '')."^FS";
-        $y += $nameFontSize * $nameLines + $gap;
-
-        // Ingredients
-        if (! empty($data['ingredients'])) {
-            $lines = $this->estimateLines('Ingredients: '.$data['ingredients'], $bodyFontSize, $fieldWidth, $ingredientLines);
-            $zpl .= "^FO{$margin},{$y}^A0N,{$bodyFontSize},{$bodyFontSize}^FB{$fieldWidth},{$ingredientLines},0,L^FDIngredients: ".$data['ingredients']."^FS";
-            $y += $bodyFontSize * $lines + $gap;
-        }
-
-        // Nutrition
-        if (! empty($data['nutrition_inline'])) {
-            $lines = $this->estimateLines($data['nutrition_inline'], $smallFontSize, $fieldWidth, 3);
-            $zpl .= "^FO{$margin},{$y}^A0N,{$smallFontSize},{$smallFontSize}^FB{$fieldWidth},3,0,L^FD".$data['nutrition_inline']."^FS";
-            $y += $smallFontSize * $lines + $gap;
-        }
-
-        // Storage
-        if (! empty($data['storage'])) {
-            $lines = $this->estimateLines($data['storage'], $smallFontSize, $fieldWidth, 2);
-            $zpl .= "^FO{$margin},{$y}^A0N,{$smallFontSize},{$smallFontSize}^FB{$fieldWidth},2,0,L^FD".$data['storage']."^FS";
-            $y += $smallFontSize * $lines + $gap;
-        }
-
-        // Origin
-        if (! empty($data['origin'])) {
-            $zpl .= "^FO{$margin},{$y}^A0N,{$smallFontSize},{$smallFontSize}^FDOrigin: ".$data['origin']."^FS";
-            $y += $smallFontSize + $gap;
-        }
-
-        // Address
-        if (! empty($data['address'])) {
-            $lines = $this->estimateLines($data['address'], $smallFontSize, $fieldWidth, 2);
-            $zpl .= "^FO{$margin},{$y}^A0N,{$smallFontSize},{$smallFontSize}^FB{$fieldWidth},2,0,L^FD".$data['address']."^FS";
-            $y += $smallFontSize * $lines + $gap;
-        }
-
-        $zpl .= '^XZ';
-
-        return $zpl;
+        return $this->zplGenerator->generateZplWithScale($data, $labelSize, $fontScale);
     }
 
     /**
@@ -1136,7 +982,7 @@ class LabelAreaController extends Controller
     {
         $request->validate([
             'label_data' => 'required|array',
-            'label_size' => 'required|in:small,large',
+            'label_size' => 'required|in:'.$this->zplGenerator->getValidSizeKeys(),
             'font_scale' => 'nullable|numeric|min:0.5|max:2.0',
             'image_path' => 'nullable|string',
         ]);

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Product extends Model
@@ -464,6 +465,14 @@ class Product extends Model
     public function orderSettings(): HasOne
     {
         return $this->hasOne(ProductOrderSetting::class, 'product_id', 'ID');
+    }
+
+    /**
+     * Get label translations for this product from the Laravel database.
+     */
+    public function translations(): HasMany
+    {
+        return $this->hasMany(ProductTranslation::class, 'product_code', 'CODE');
     }
 
     /**

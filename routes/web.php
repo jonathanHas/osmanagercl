@@ -15,6 +15,7 @@ use App\Http\Controllers\KitchenController;
 use App\Http\Controllers\KitchenIngredientProfileController;
 use App\Http\Controllers\KitchenProductController;
 use App\Http\Controllers\LabelAreaController;
+use App\Http\Controllers\LabelTranslationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
@@ -278,6 +279,14 @@ Route::middleware('auth')->group(function () {
     Route::post('/labels/print-zpl', [LabelAreaController::class, 'printZpl'])->name('labels.print-zpl');
     Route::get('/labels/translation-history', [LabelAreaController::class, 'labelHistory'])->name('labels.translation-history');
     Route::get('/labels/translation-history/{name}/edit', [LabelAreaController::class, 'editLabel'])->name('labels.edit-label');
+
+    // Label Translation - unified workflow
+    Route::get('/labels/translate', [LabelTranslationController::class, 'index'])->name('labels.translate');
+    Route::post('/labels/translate/check', [LabelTranslationController::class, 'checkExisting'])->name('labels.translate.check');
+    Route::post('/labels/translate/upload', [LabelTranslationController::class, 'upload'])->name('labels.translate.upload');
+    Route::post('/labels/translate/save', [LabelTranslationController::class, 'save'])->name('labels.translate.save');
+    Route::get('/labels/translate/history', [LabelTranslationController::class, 'history'])->name('labels.translate.history');
+    Route::get('/labels/translate/{translation}', [LabelTranslationController::class, 'show'])->name('labels.translate.show');
 
     // Fruit & Veg routes
     Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
