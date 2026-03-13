@@ -53,9 +53,26 @@
         </div>
     </x-slot>
 
-    <div class="py-6" x-data="managementSystem()" @update-country="handleCountryUpdate($event)" @update-unit="handleUnitUpdate($event)" @update-class="handleClassUpdate($event)">
+    {{-- Loading placeholder shown until Alpine initializes --}}
+    <div x-data="{ ready: false }" x-init="$nextTick(() => ready = true)">
+        <div x-show="!ready" class="py-6">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="bg-white rounded-lg shadow-sm p-8">
+                    <div class="flex items-center justify-center gap-3 text-gray-400">
+                        <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        <span class="text-sm">Loading products...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="py-6" x-data="managementSystem()" x-cloak @update-country="handleCountryUpdate($event)" @update-unit="handleUnitUpdate($event)" @update-class="handleClassUpdate($event)">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            
+
             <!-- Quick Search Widget -->
             <div class="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg shadow-sm mb-4 p-4" x-data="quickSearchWidget()">
                 <div class="flex items-center gap-4">
@@ -250,6 +267,9 @@
                                 <th class="w-20 px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Available
                                 </th>
+                                <th class="w-16 px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Print
+                                </th>
                                 <th class="w-24 px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Labels
                                 </th>
@@ -257,7 +277,7 @@
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
                             <template x-for="product in (products || [])" :key="product.CODE">
-                                <tr :class="{ 'bg-gray-50': selectedProducts.includes(product.CODE) }">
+                                <tr :class="{ 'bg-gray-50': selectedProducts.includes(product.CODE), 'opacity-40': recentlyToggledOff.includes(product.CODE) }">
                                     <!-- Checkbox -->
                                     <td class="px-3 py-4">
                                         <input type="checkbox" 
@@ -572,6 +592,19 @@
                                         </button>
                                     </td>
                                     
+                                    <!-- Print Zebra Label -->
+                                    <td class="px-2 py-4 text-center">
+                                        <button x-show="product.zebra_label"
+                                                @click="openPrintModal(product)"
+                                                class="relative p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition"
+                                                title="Print label">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                                            </svg>
+                                            <span x-show="product.zebra_label?.mismatches" class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-amber-500 rounded-full"></span>
+                                        </button>
+                                    </td>
+
                                     <!-- Labels Actions -->
                                     <td class="px-4 py-4 text-center">
                                         <div class="flex flex-col items-center gap-1">
@@ -616,7 +649,7 @@
                     <!-- Mobile Products -->
                     <div x-show="products.length > 0" class="space-y-4">
                         <template x-for="product in (products || [])" :key="product.CODE">
-                            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 space-y-4" :class="{ 'bg-gray-50': selectedProducts.includes(product.CODE) }">
+                            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 space-y-4" :class="{ 'bg-gray-50': selectedProducts.includes(product.CODE), 'opacity-40': recentlyToggledOff.includes(product.CODE) }">
                                 
                                 <!-- Header: Checkbox, Image, Product Name -->
                                 <div class="flex items-start space-x-3">
@@ -934,6 +967,16 @@
 
                                     <!-- Labels Actions -->
                                     <div class="flex flex-col items-end space-y-1">
+                                        <!-- Print Zebra Label -->
+                                        <button x-show="product.zebra_label"
+                                                @click="openPrintModal(product)"
+                                                class="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-1">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                                            </svg>
+                                            Print Label
+                                        </button>
+
                                         <!-- Print Queue Indicator -->
                                         <div x-show="product.in_print_queue" class="flex items-center gap-1 text-xs text-amber-600">
                                             <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -941,7 +984,7 @@
                                             </svg>
                                             Queued for Print
                                         </div>
-                                        
+
                                         <!-- Add/Remove Button -->
                                         <button x-show="!product.in_print_queue"
                                                 @click="addToLabels(product.CODE)"
@@ -969,15 +1012,86 @@
                     </div>
                 </div>
                 
-                <!-- Load More Button -->
-                <div x-show="hasMore && !searching" class="border-t border-gray-200 px-6 py-4 text-center">
-                    <button @click="loadMore()" 
-                            :disabled="loading"
-                            class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-50">
-                        <span x-show="!loading">Load More Products</span>
-                        <span x-show="loading">Loading...</span>
-                    </button>
+            {{-- Print Label Modal --}}
+            <div x-show="printModal.open" x-cloak
+                 class="fixed inset-0 z-50 overflow-y-auto"
+                 @keydown.escape.window="printModal.open = false">
+                <div class="flex items-center justify-center min-h-screen px-4">
+                    <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="printModal.open = false"></div>
+                    <div class="relative bg-white rounded-lg shadow-xl max-w-sm w-full p-6" @click.stop>
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">Print Label</h3>
+
+                        <div class="space-y-3 text-sm">
+                            <div>
+                                <span class="text-gray-500">Product:</span>
+                                <span class="font-medium text-gray-900 ml-1" x-text="printModal.productName"></span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">Label:</span>
+                                <span class="text-gray-900 ml-1" x-text="printModal.labelName"></span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">Size:</span>
+                                <span class="text-gray-900 ml-1" x-text="printModal.labelSize"></span>
+                            </div>
+
+                            {{-- Mismatches --}}
+                            <template x-if="printModal.mismatches?.price">
+                                <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <div class="text-xs font-medium text-amber-800">Price mismatch</div>
+                                            <div class="text-xs text-amber-700 mt-0.5">
+                                                Label: <span class="font-mono font-medium" x-text="'€' + printModal.mismatches.price.label_value"></span>
+                                                &rarr; DB: <span class="font-mono font-medium" x-text="'€' + printModal.mismatches.price.db_value"></span>
+                                            </div>
+                                        </div>
+                                        <button @click="fixMismatch('price')" :disabled="printModal.fixing"
+                                                class="px-2 py-1 bg-amber-600 text-white rounded text-xs font-medium hover:bg-amber-500 transition disabled:opacity-50">
+                                            Update
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                            <template x-if="printModal.mismatches?.country">
+                                <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <div class="text-xs font-medium text-amber-800">Country mismatch</div>
+                                            <div class="text-xs text-amber-700 mt-0.5">
+                                                Label: <span class="font-medium" x-text="printModal.mismatches.country.label_value"></span>
+                                                &rarr; DB: <span class="font-medium" x-text="printModal.mismatches.country.db_value"></span>
+                                            </div>
+                                        </div>
+                                        <button @click="fixMismatch('country')" :disabled="printModal.fixing"
+                                                class="px-2 py-1 bg-amber-600 text-white rounded text-xs font-medium hover:bg-amber-500 transition disabled:opacity-50">
+                                            Update
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <div class="pt-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Number of labels</label>
+                                <input type="number" x-model.number="printModal.copies" min="1" max="99"
+                                       class="w-24 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm text-center">
+                            </div>
+                        </div>
+
+                        <div class="mt-5 flex items-center gap-3">
+                            <button @click="sendPrint()" :disabled="printModal.printing"
+                                    class="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-500 transition disabled:opacity-50">
+                                <span x-text="printModal.printing ? 'Printing...' : 'Print'"></span>
+                            </button>
+                            <button @click="printModal.open = false" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-200 transition">
+                                Cancel
+                            </button>
+                            <p x-show="printModal.message" :class="printModal.success ? 'text-green-600' : 'text-red-600'" class="text-xs" x-text="printModal.message"></p>
+                        </div>
+                    </div>
                 </div>
+            </div>
+
             </div>
         </div>
     </div>
@@ -988,15 +1102,27 @@
             return {
                 products: {!! json_encode($products ?? []) !!},
                 selectedProducts: [],
+                recentlyToggledOff: [],
                 selectAll: false,
                 searchTerm: '',
                 categoryFilter: 'all',
-                availabilityFilter: 'all',
+                availabilityFilter: 'available',
                 searching: false,
-                hasMore: true,
-                loading: false,
-                offset: 0,
-                limit: 50,
+                printModal: {
+                    open: false,
+                    labelId: null,
+                    labelName: '',
+                    labelSize: '',
+                    productName: '',
+                    productCode: '',
+                    copies: 1,
+                    printing: false,
+                    fixing: false,
+                    message: '',
+                    success: false,
+                    mismatches: null,
+                    fields: [],
+                },
                 
                 init() {
                     // Restore saved filters from localStorage
@@ -1012,10 +1138,11 @@
                             this.products[existingProductIndex].is_available = isAvailable;
                             this.products[existingProductIndex].is_visible_on_till = isAvailable;
                             
-                            // Remove from table if it no longer matches filters
-                            if (!this.productMatchesFilters(this.products[existingProductIndex])) {
-                                this.products.splice(existingProductIndex, 1);
-                                this.showNotification(`${productData.NAME} removed from table (doesn't match current filters)`, 'info');
+                            // Grey out instead of removing if it no longer matches filters
+                            if (!isAvailable && !this.recentlyToggledOff.includes(this.products[existingProductIndex].CODE)) {
+                                this.recentlyToggledOff.push(this.products[existingProductIndex].CODE);
+                            } else if (isAvailable) {
+                                this.recentlyToggledOff = this.recentlyToggledOff.filter(c => c !== this.products[existingProductIndex].CODE);
                             }
                         } else if (isAvailable && productData) {
                             // Add new product to the table if it matches current filters
@@ -1043,7 +1170,7 @@
                             const filters = JSON.parse(savedFilters);
                             this.searchTerm = filters.searchTerm || '';
                             this.categoryFilter = filters.categoryFilter || 'all';
-                            this.availabilityFilter = filters.availabilityFilter || 'all';
+                            this.availabilityFilter = filters.availabilityFilter || 'available';
                             
                             // Perform search with restored filters if any are set
                             if (this.searchTerm || this.categoryFilter !== 'all' || this.availabilityFilter !== 'all') {
@@ -1075,20 +1202,17 @@
                 
                 async performSearch() {
                     this.searching = true;
-                    this.offset = 0; // Reset pagination on new search
-                    
+
                     // Save current filters to localStorage
                     this.saveFilters();
-                    
+
                     try {
                         const params = new URLSearchParams({
                             search: this.searchTerm,
                             category: this.categoryFilter,
                             availability: this.availabilityFilter,
-                            limit: this.limit,
-                            offset: this.offset
                         });
-                        
+
                         const response = await fetch('{{ route('fruit-veg.manage') }}?' + params, {
                             headers: {
                                 'Accept': 'application/json',
@@ -1096,10 +1220,10 @@
                             }
                         });
                         const data = await response.json();
-                        
+
                         this.products = data.products || [];
-                        this.hasMore = data.hasMore || false;
                         this.selectedProducts = [];
+                        this.recentlyToggledOff = [];
                         this.selectAll = false;
                     } catch (error) {
                         console.error('Search error:', error);
@@ -1170,6 +1294,15 @@
                                 product.is_available = isAvailable;
                                 product.is_visible_on_till = isAvailable;
                             }
+
+                            // Track toggled-off products so they stay visible but greyed out
+                            if (!isAvailable) {
+                                if (!this.recentlyToggledOff.includes(productCode)) {
+                                    this.recentlyToggledOff.push(productCode);
+                                }
+                            } else {
+                                this.recentlyToggledOff = this.recentlyToggledOff.filter(c => c !== productCode);
+                            }
                             
                             // Dispatch event to notify other components
                             window.dispatchEvent(new CustomEvent('productAvailabilityChanged', {
@@ -1208,17 +1341,24 @@
                         });
                         
                         if (response.ok) {
-                            // Update local state
-                            this.selectedProducts.forEach(code => {
+                            // Update local state and track toggled-off products
+                            const updatedCodes = [...this.selectedProducts];
+                            updatedCodes.forEach(code => {
                                 const product = this.products.find(p => p.CODE === code);
                                 if (product) {
                                     product.is_available = isAvailable;
+                                    product.is_visible_on_till = isAvailable;
+                                }
+                                if (!isAvailable && !this.recentlyToggledOff.includes(code)) {
+                                    this.recentlyToggledOff.push(code);
+                                } else if (isAvailable) {
+                                    this.recentlyToggledOff = this.recentlyToggledOff.filter(c => c !== code);
                                 }
                             });
-                            
+
+                            this.showNotification('Updated ' + updatedCodes.length + ' products successfully!', 'success');
                             this.selectedProducts = [];
                             this.selectAll = false;
-                            this.showNotification('Updated ' + this.selectedProducts.length + ' products successfully!', 'success');
                         } else {
                             this.showNotification('Failed to update till visibility', 'error');
                         }
@@ -1372,43 +1512,99 @@
                     }
                 },
                 
-                async loadMore() {
-                    if (this.loading || !this.hasMore) return;
-                    
-                    this.loading = true;
-                    this.offset += this.limit;
-                    
-                    try {
-                        const params = new URLSearchParams({
-                            search: this.searchTerm,
-                            category: this.categoryFilter,
-                            availability: this.availabilityFilter,
-                            limit: this.limit,
-                            offset: this.offset
-                        });
-                        
-                        const response = await fetch('{{ route('fruit-veg.manage') }}?' + params, {
-                            headers: {
-                                'Accept': 'application/json',
-                                'X-Requested-With': 'XMLHttpRequest'
-                            }
-                        });
-                        const data = await response.json();
-                        
-                        // Append new products to existing list
-                        this.products = [...this.products, ...(data.products || [])];
-                        this.hasMore = data.hasMore || false;
-                        
-                    } catch (error) {
-                        console.error('Load more error:', error);
-                        this.showNotification('Failed to load more products', 'error');
-                        // Reset offset on error
-                        this.offset -= this.limit;
-                    } finally {
-                        this.loading = false;
-                    }
+                openPrintModal(product) {
+                    const label = product.zebra_label;
+                    if (!label) return;
+                    this.printModal = {
+                        open: true,
+                        labelId: label.id,
+                        labelName: label.name,
+                        labelSize: (label.width_mm || '?') + 'mm × ' + (label.height_mm || '?') + 'mm',
+                        productName: product.NAME,
+                        productCode: product.CODE,
+                        copies: label.default_copies || 1,
+                        printing: false,
+                        fixing: false,
+                        message: '',
+                        success: false,
+                        mismatches: label.mismatches ? JSON.parse(JSON.stringify(label.mismatches)) : null,
+                        fields: label.fields ? [...label.fields] : [],
+                    };
                 },
-                
+
+                async sendPrint() {
+                    if (this.printModal.printing) return;
+                    this.printModal.printing = true;
+                    this.printModal.message = '';
+                    try {
+                        const res = await fetch('/labels/zebra/manage/' + this.printModal.labelId + '/print', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json',
+                            },
+                            body: JSON.stringify({ copies: this.printModal.copies }),
+                        });
+                        const data = await res.json();
+                        this.printModal.message = data.success ? data.message : ('Failed: ' + (data.output || data.message));
+                        this.printModal.success = data.success;
+                        if (data.success) {
+                            setTimeout(() => { this.printModal.open = false; }, 1500);
+                        }
+                    } catch (err) {
+                        this.printModal.message = 'Failed: ' + err.message;
+                        this.printModal.success = false;
+                    }
+                    this.printModal.printing = false;
+                },
+
+                async fixMismatch(type) {
+                    const mismatch = this.printModal.mismatches?.[type];
+                    if (!mismatch || this.printModal.fixing) return;
+                    this.printModal.fixing = true;
+
+                    // Build fields array with the fix applied
+                    const fields = [...this.printModal.fields];
+                    fields[mismatch.field_index] = mismatch.new_field;
+
+                    try {
+                        const res = await fetch('/labels/zebra/manage/' + this.printModal.labelId + '/fields', {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json',
+                            },
+                            body: JSON.stringify({ fields }),
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            // Update local state — remove the fixed mismatch
+                            delete this.printModal.mismatches[type];
+                            if (Object.keys(this.printModal.mismatches).length === 0) {
+                                this.printModal.mismatches = null;
+                            }
+                            // Update fields to reflect saved state
+                            this.printModal.fields = data.fields;
+
+                            // Also update the product's zebra_label in the products array
+                            const product = this.products.find(p => p.CODE === this.printModal.productCode);
+                            if (product?.zebra_label) {
+                                product.zebra_label.fields = data.fields;
+                                if (this.printModal.mismatches) {
+                                    product.zebra_label.mismatches = JSON.parse(JSON.stringify(this.printModal.mismatches));
+                                } else {
+                                    product.zebra_label.mismatches = null;
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        // silently fail
+                    }
+                    this.printModal.fixing = false;
+                },
+
                 async addToLabels(productCode) {
                     try {
                         const response = await fetch('{{ route('fruit-veg.labels.add') }}', {

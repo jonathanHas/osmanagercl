@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Country;
 use App\Models\LabelLog;
 use App\Models\LabelTemplate;
 use App\Models\Product;
+use App\Models\ProductTranslation;
+use App\Models\ZebraLabel;
 use App\Services\LabelService;
+use App\Services\TillVisibilityService;
 use App\Services\ZplGeneratorService;
 use Gemini\Data\Blob;
 use Gemini\Enums\MimeType;
@@ -20,16 +24,112 @@ class LabelAreaController extends Controller
 
     protected ZplGeneratorService $zplGenerator;
 
-    public function __construct(LabelService $labelService, ZplGeneratorService $zplGenerator)
+    protected TillVisibilityService $tillVisibilityService;
+
+    public function __construct(LabelService $labelService, ZplGeneratorService $zplGenerator, TillVisibilityService $tillVisibilityService)
     {
         $this->labelService = $labelService;
         $this->zplGenerator = $zplGenerator;
+        $this->tillVisibilityService = $tillVisibilityService;
     }
 
     /**
-     * Display the label area dashboard.
+     * Label hub landing page.
      */
-    public function index(Request $request): View
+    public function hub(Request $request): View
+    {
+        $zebraLabelCount = ZebraLabel::active()->whereNotNull('product_code')->count();
+        $translationCount = ProductTranslation::count();
+        $labelCounts = $this->getLabelCountsByEventType();
+        $needsLabelsCount = array_sum($labelCounts);
+
+        return view('labels.hub', compact('zebraLabelCount', 'translationCount', 'needsLabelsCount'));
+    }
+
+    /**
+     * Zebra labels page — products on till with saved labels.
+     */
+    public function zebra(Request $request): View
+    {
+        $search = $request->input('search');
+
+        $zebraLabelsQuery = ZebraLabel::active()->whereNotNull('product_code');
+
+        if ($search) {
+            $zebraLabelsQuery->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('product_code', 'like', "%{$search}%");
+            });
+        }
+
+        $allZebraLabels = $zebraLabelsQuery->get();
+
+        $countryNames = Country::pluck('name')->toArray();
+        $zebraLabels = [];
+        $otherLabels = [];
+
+        foreach ($allZebraLabels as $label) {
+            $product = $label->product;
+            if (! $product) {
+                continue;
+            }
+
+            $isOnTill = $this->tillVisibilityService->isVisibleOnTill($product->ID);
+
+            $fields = ZebraLabel::extractTextFields($label->zpl_content);
+            $mismatches = [];
+
+            $priceField = ZebraLabel::findPriceField($fields);
+            if ($priceField) {
+                $dbPrice = (float) $product->getGrossPrice();
+                if (abs($priceField[1] - $dbPrice) > 0.005) {
+                    $mismatches['price'] = [
+                        'field_index' => $priceField[0],
+                        'label_value' => number_format($priceField[1], 2),
+                        'db_value' => number_format($dbPrice, 2),
+                        'new_field' => '\\15' . number_format($dbPrice, 2),
+                    ];
+                }
+            }
+
+            $product->load('vegDetails.country');
+            $countryField = ZebraLabel::findCountryField($fields, $countryNames);
+            $dbCountry = $product->vegDetails?->country?->name;
+            if ($countryField && $dbCountry && $countryField[1] !== $dbCountry) {
+                $mismatches['country'] = [
+                    'field_index' => $countryField[0],
+                    'label_value' => $countryField[1],
+                    'db_value' => $dbCountry,
+                    'new_field' => $dbCountry,
+                ];
+            }
+
+            $labelData = [
+                'id' => $label->id,
+                'name' => $label->name,
+                'product_name' => $product->NAME,
+                'product_code' => $label->product_code,
+                'width_mm' => $label->label_width_mm,
+                'height_mm' => $label->label_height_mm,
+                'default_copies' => $label->default_copies ?? 1,
+                'mismatches' => $mismatches ?: null,
+                'fields' => $fields,
+            ];
+
+            if ($isOnTill) {
+                $zebraLabels[] = $labelData;
+            } else {
+                $otherLabels[] = $labelData;
+            }
+        }
+
+        return view('labels.zebra', compact('zebraLabels', 'otherLabels', 'search'));
+    }
+
+    /**
+     * Shelf labels dashboard (products needing labels, A4 print queue).
+     */
+    public function shelfLabels(Request $request): View
     {
         // Get filter parameters from request
         $filters = $request->input('filters', []); // Array of event types to show

@@ -7,7 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Photo upload failing for multiple images on mobile** (2026-03-11)
+  - Phone photos (3-5MB) exceeded PHP's `upload_max_filesize` (2M), causing silent upload failures
+  - Added client-side image resize in browser before upload (max 1600px, JPEG 85% quality)
+  - Photos now compress to ~200-500KB, well within PHP limits and faster to upload on mobile
+  - Lowered server-side validation from 10MB to 5MB per image (resized images are under 1MB)
+  - **Modified**: `resources/views/labels/translate.blade.php` (canvas resize in `addFileToPhotos()`)
+  - **Modified**: `app/Http/Controllers/LabelTranslationController.php` (validation limit)
+
 ### Added
+
+- **Zebra Label Storage & Printing** (2026-03-12)
+  - Upload ZebraDesigner .prn/.zpl exports and store in database for direct printing
+  - Auto-extract barcode and product link from ZPL content
+  - Editable label fields — modify product name, price, weight, origin, class, etc. before printing
+  - ZPL hex decode/encode for display (e.g., `\15` → `€` for Euro symbol)
+  - Print quantity parsed from ZPL `^PQ` command, modifiable per-print
+  - Live ZPL preview via zpl-renderer-js (note: `~DG` embedded graphics may not render perfectly in preview)
+  - Reuses existing CUPS printer infrastructure (Zebra GX430t via `lp` command)
+  - **New Files**: `app/Models/ZebraLabel.php`, `app/Http/Controllers/ZebraLabelController.php`, `resources/views/zebra-labels/` (index, create, show), `database/migrations/2026_03_12_000000_create_zebra_labels_table.php`
+  - **Modified**: `routes/web.php`
+
+- **Test Pages Hub & Documentation** (2026-03-12)
+  - Central test page index at `/tests/hub` linking to all dev/test pages
+  - Test registry documentation at `docs/test.md` listing all test routes with cleanup instructions
+  - **New Files**: `resources/views/tests/hub.blade.php`, `docs/test.md`
+  - **Modified**: `routes/web.php`
 
 - **Natural Medicine Company delivery parser** (2026-03-10)
   - New Python PDF parser for The Natural Medicine Company invoices

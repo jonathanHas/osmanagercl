@@ -3,6 +3,7 @@
 This document tracks known issues that have been identified and resolved in the OSManager CL application. Understanding these past issues helps prevent similar problems in the future.
 
 **Quick Navigation:**
+- [Label & Printing Issues](#label--printing-issues)
 - [Frontend Issues](#frontend-issues)
 - [Database & Transaction Issues](#database--transaction-issues)
 - [File Upload & Permissions Issues](#file-upload--permissions-issues)
@@ -10,6 +11,28 @@ This document tracks known issues that have been identified and resolved in the 
 - [Validation Issues](#validation-issues)
 - [VAT & Tax Issues](#vat--tax-issues)
 - [Invoice Parsing Issues](#invoice-parsing-issues)
+
+---
+
+## Label & Printing Issues
+
+### ZPL Preview Imperfect for ZebraDesigner Exports
+**Status:** Known limitation (2026-03-12)
+
+#### Problem
+Labels exported from ZebraDesigner as .prn files contain `~DG` (Download Graphics) commands for embedded images/logos. The `zpl-renderer-js` browser-based preview renderer does not fully support `~DG` commands, so previews may look different from the actual printed label.
+
+#### Workaround
+The preview is close enough to be recognisable. The actual print on the Zebra printer renders `~DG` graphics correctly. Use "Test Print" to verify the label before bulk printing.
+
+### ZPL Hex Codes in Label Fields
+**Status:** Handled (2026-03-12)
+
+#### Problem
+ZebraDesigner uses `^FH\` hex escape mode where characters like `€` are stored as `\15`. Displaying raw ZPL field values shows `\152.10` instead of `€2.10`.
+
+#### Solution
+Added automatic hex decode/encode in the Zebra Label Storage UI. Common currency symbols (`€` = `\15`, `£` = `\06`, `$` = `\04`) are decoded for display and re-encoded when printing.
 
 ---
 
@@ -122,6 +145,26 @@ Use the Price Sync Management tool at `/fruit-veg/price-sync` to identify and fi
 ---
 
 ## File Upload & Permissions Issues
+
+### Label Translation Photo Upload Failing on Mobile
+**Status:** Fixed 2026-03-11
+
+#### Problem
+Multiple phone photos (3-5MB each) failed to upload for label translation, with "failed to upload" validation errors.
+
+#### Root Cause
+PHP's default `upload_max_filesize` is 2M and `post_max_size` is 8M. Phone camera photos exceed these limits, so PHP rejects the upload before Laravel even sees the request.
+
+#### Solution
+Added client-side image resize using HTML5 canvas before upload:
+- Max dimension: 1600px (maintains quality for label text)
+- Output: JPEG at 85% quality (~200-500KB per photo)
+- Server already resizes to 1200px for Gemini API, so no quality loss
+- Also lowered server validation from `max:10240` to `max:5120`
+
+**Files Modified**: `resources/views/labels/translate.blade.php`, `app/Http/Controllers/LabelTranslationController.php`
+
+---
 
 ### XLS Upload Rejected Despite Correct File Type
 **Status:** Fixed 2026-02-28

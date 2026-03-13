@@ -107,9 +107,18 @@ AI-powered label translation for imported products using phone camera capture an
 - **AI Translation**: Google Gemini 2.5 Flash translates labels and generates ZPL printer code
 - **Allergen Highlighting**: 14 EU allergens emphasised in CAPS for HSE compliance
 - **Zebra Printing**: Direct print to networked Zebra GX430t via CUPS/IPP
-- **Image Optimization**: Auto-resize to 1200px before API call for fast processing
+- **Image Optimization**: Client-side resize to 1600px before upload (JPEG 85%), plus server-side resize to 1200px before API call
 
 📖 [Label Translation System Documentation](./features/label-translation-system.md)
+
+### Zebra Label Storage (NEW! 2026-03-12)
+Store and print ZebraDesigner label exports (.prn/.zpl) directly from the web app.
+- **Upload & Store**: Upload .prn/.zpl files or paste ZPL code, stored in database with barcode and product link
+- **Editable Fields**: Modify product name, price, weight, origin, class, and other text fields before printing
+- **ZPL Hex Support**: Automatic decode/encode of ZPL hex codes (€, £, $) for human-readable display
+- **Smart Print Quantity**: Parses `^PQ` from ZPL, modifiable per-print without repeating graphics
+- **Live Preview**: Client-side ZPL rendering with "Update Preview" for field changes
+- **Direct Printing**: Sends to Zebra GX430t via existing CUPS infrastructure
 
 ### Pricing Management
 Advanced pricing with VAT calculations and supplier comparison.

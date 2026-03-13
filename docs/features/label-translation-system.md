@@ -24,7 +24,8 @@ The label translation system enables staff to quickly create English-language re
 - **14 EU allergens** highlighted using CAPITAL LETTERS (HSE compliant emphasis):
   Cereals (Gluten), Crustaceans, Eggs, Fish, Peanuts, Soybeans, Milk, Nuts, Celery, Mustard, Sesame, Sulphites, Lupin, Molluscs
 - Label content includes: Product Name, Ingredients (wrapped text), Nutrition Table, Storage & Net Weight
-- Images are resized to max 1200px before sending to reduce API latency
+- Images are resized client-side to max 1600px (JPEG 85%) before upload, solving PHP upload size limits for phone photos (3-5MB)
+- Server further resizes to max 1200px (JPEG 80%) before sending to Gemini to reduce API latency
 
 ### Zebra Printer Integration
 - Direct printing via `lp` command to networked Zebra printer over CUPS/IPP
@@ -79,12 +80,13 @@ ZEBRA_PRINTER_NAME=ZTC-GX430t
 - CUPS (`lp` command) — Printer communication
 
 ### Image Processing Pipeline
-1. Phone captures image (~1.7MB)
-2. Stored to `storage/app/public/labels/`
-3. Resized to max 1200px, JPEG quality 80% (~100-200KB)
-4. Base64 encoded and sent to Gemini
-5. ZPL response stripped of markdown fencing
-6. ZPL displayed on review page and sent to printer via temp file + `lp`
+1. Phone captures image (~3-5MB)
+2. **Client-side resize**: Browser canvas scales to max 1600px, outputs JPEG at 85% quality (~200-500KB)
+3. Resized image uploaded and stored to `storage/app/public/labels/`
+4. **Server-side resize**: PHP GD scales to max 1200px, JPEG quality 80% (~100-200KB)
+5. Base64 encoded and sent to Gemini
+6. ZPL response stripped of markdown fencing
+7. ZPL displayed on review page and sent to printer via temp file + `lp`
 
 ## Usage
 
@@ -93,3 +95,9 @@ ZEBRA_PRINTER_NAME=ZTC-GX430t
 3. Tap **Upload & Process** — wait for Gemini to generate the ZPL
 4. Review the generated ZPL code on the review page
 5. Tap **Print to Zebra** to send the label to the printer
+
+## Related Features
+
+- **[Label System](./label-system.md)** — F&V label printing and queue management
+- **Zebra Label Storage** (`/zebra-labels`) — Upload and print ZebraDesigner .prn exports with editable fields. See [Features Index](../FEATURES_INDEX.md#zebra-label-storage-new-2026-03-12) for details.
+- **[Test Pages Registry](../test.md)** — All label-related test pages and cleanup instructions

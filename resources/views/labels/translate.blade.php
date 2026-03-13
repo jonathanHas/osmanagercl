@@ -7,6 +7,9 @@
     </x-slot>
 
     <div class="py-6">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 mb-4">
+            @include('labels._nav', ['current' => 'translate'])
+        </div>
         <div class="max-w-lg mx-auto sm:px-6 lg:px-8" x-data="labelTranslator()" x-cloak>
 
             {{-- Step Indicator --}}

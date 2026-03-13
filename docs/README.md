@@ -24,6 +24,8 @@ Detailed documentation for each major feature. See **[Features Index](./FEATURES
 - [Categories Management](./features/categories-management.md) - Universal category management
 - [Product Management](./features/product-management.md) - Product catalog operations
 - [Label System](./features/label-system.md) - Label printing and queue management
+- [Label Translation System](./features/label-translation-system.md) - AI-powered foreign label translation
+- [Test Pages Registry](./test.md) - All test/debug pages with cleanup instructions
 - [Pricing System](./features/pricing-system.md) - Advanced pricing with VAT
 
 **Supplier & Delivery**

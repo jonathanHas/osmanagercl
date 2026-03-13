@@ -16,6 +16,7 @@ use App\Http\Controllers\KitchenIngredientProfileController;
 use App\Http\Controllers\KitchenProductController;
 use App\Http\Controllers\LabelAreaController;
 use App\Http\Controllers\LabelTranslationController;
+use App\Http\Controllers\ZebraLabelController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
@@ -239,7 +240,9 @@ Route::middleware('auth')->group(function () {
     });
 
     // Label area routes
-    Route::get('/labels', [LabelAreaController::class, 'index'])->name('labels.index');
+    Route::get('/labels', [LabelAreaController::class, 'hub'])->name('labels.index');
+    Route::get('/labels/zebra', [LabelAreaController::class, 'zebra'])->name('labels.zebra');
+    Route::get('/labels/shelf-labels', [LabelAreaController::class, 'shelfLabels'])->name('labels.shelf-labels');
     Route::post('/labels/print-a4', [LabelAreaController::class, 'printA4'])->name('labels.print-a4');
     Route::get('/labels/preview-a4', [LabelAreaController::class, 'previewA4'])->name('labels.preview-a4');
     Route::get('/labels/preview/{productId}', [LabelAreaController::class, 'previewLabel'])->name('labels.preview');
@@ -287,6 +290,19 @@ Route::middleware('auth')->group(function () {
     Route::post('/labels/translate/save', [LabelTranslationController::class, 'save'])->name('labels.translate.save');
     Route::get('/labels/translate/history', [LabelTranslationController::class, 'history'])->name('labels.translate.history');
     Route::get('/labels/translate/{translation}', [LabelTranslationController::class, 'show'])->name('labels.translate.show');
+
+    // Zebra Label Storage (ZebraDesigner .prn exports)
+    Route::prefix('labels/zebra/manage')->name('zebra-labels.')->group(function () {
+        Route::get('/', [ZebraLabelController::class, 'index'])->name('index');
+        Route::get('/create', [ZebraLabelController::class, 'create'])->name('create');
+        Route::post('/lookup-product', [ZebraLabelController::class, 'lookupProduct'])->name('lookup-product');
+        Route::post('/', [ZebraLabelController::class, 'store'])->name('store');
+        Route::get('/{zebraLabel}', [ZebraLabelController::class, 'show'])->name('show');
+        Route::delete('/{zebraLabel}', [ZebraLabelController::class, 'destroy'])->name('destroy');
+        Route::post('/{zebraLabel}/print', [ZebraLabelController::class, 'print'])->name('print');
+        Route::patch('/{zebraLabel}/copies', [ZebraLabelController::class, 'updateCopies'])->name('update-copies');
+        Route::patch('/{zebraLabel}/fields', [ZebraLabelController::class, 'updateFields'])->name('update-fields');
+    });
 
     // Fruit & Veg routes
     Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
@@ -569,6 +585,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/authentication-test', [\App\Http\Controllers\AuthenticationTestController::class, 'testAuthentication'])->name('authentication-test');
         Route::get('/language-flag-test', [\App\Http\Controllers\LanguageFlagTestController::class, 'testLanguageFlag'])->name('language-flag-test');
         Route::get('/specific-product-test', [\App\Http\Controllers\SpecificProductTestController::class, 'testSpecificProduct'])->name('specific-product-test');
+
+        // Test hub - central index of all test pages
+        Route::get('/hub', fn () => view('tests.hub'))->name('hub');
 
         // Phase 2 component testing
         Route::get('/phase2-components', function () {

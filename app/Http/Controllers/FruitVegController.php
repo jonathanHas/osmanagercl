@@ -10,6 +10,7 @@ use App\Models\VegClass;
 use App\Models\VegDetails;
 use App\Models\VegLabelPrintBatch;
 use App\Models\VegPrintQueue;
+use App\Models\ZebraLabel;
 use App\Repositories\OptimizedSalesRepository;
 use App\Repositories\SalesRepository;
 use App\Services\SalesDataSyncService;
@@ -287,18 +288,15 @@ class FruitVegController extends Controller
     public function manage(Request $request)
     {
         // Get products with till visibility status (original behavior - search within filters)
+        $availability = $request->availability ?? 'available';
         $filters = [
             'search' => $request->search,
             'category' => $request->category,
-            'visibility' => $request->availability === 'available' ? 'visible' :
-                          ($request->availability === 'unavailable' ? 'hidden' : 'all'),
+            'visibility' => $availability === 'available' ? 'visible' :
+                          ($availability === 'unavailable' ? 'hidden' : 'all'),
         ];
 
-        // Pagination parameters
-        $limit = $request->get('limit', 50); // Default 50 products per page
-        $offset = $request->get('offset', 0);
-
-        $products = $this->tillVisibilityService->getProductsWithVisibility('fruit_veg', $filters, $limit, $offset);
+        $products = $this->tillVisibilityService->getProductsWithVisibility('fruit_veg', $filters);
 
         // Batch load all price records to avoid N+1 queries
         $productCodes = $products->pluck('CODE')->toArray();
@@ -318,22 +316,72 @@ class FruitVegController extends Controller
             $product->is_available = $product->is_visible_on_till; // Maintain compatibility
         });
 
+        // Batch load zebra labels for products that have them
+        $zebraLabels = ZebraLabel::active()
+            ->whereIn('product_code', $productCodes)
+            ->get()
+            ->keyBy('product_code');
+
+        $countryNames = Country::pluck('name')->toArray();
+
+        // Load relationships before mismatch detection (need country names)
+        $products->load('vegDetails.country', 'vegDetails.vegUnit', 'vegDetails.vegClass');
+
+        $products->each(function ($product) use ($zebraLabels, $countryNames) {
+            $label = $zebraLabels->get($product->CODE);
+            if (! $label) {
+                $product->zebra_label = null;
+
+                return;
+            }
+
+            $fields = ZebraLabel::extractTextFields($label->zpl_content);
+            $mismatches = [];
+
+            // Check price mismatch
+            $priceField = ZebraLabel::findPriceField($fields);
+            if ($priceField) {
+                $dbPrice = (float) $product->current_price;
+                if (abs($priceField[1] - $dbPrice) > 0.005) {
+                    $mismatches['price'] = [
+                        'field_index' => $priceField[0],
+                        'label_value' => number_format($priceField[1], 2),
+                        'db_value' => number_format($dbPrice, 2),
+                        'new_field' => '\\15' . number_format($dbPrice, 2),
+                    ];
+                }
+            }
+
+            // Check country mismatch
+            $countryField = ZebraLabel::findCountryField($fields, $countryNames);
+            $dbCountry = $product->vegDetails?->country?->name;
+            if ($countryField && $dbCountry && $countryField[1] !== $dbCountry) {
+                $mismatches['country'] = [
+                    'field_index' => $countryField[0],
+                    'label_value' => $countryField[1],
+                    'db_value' => $dbCountry,
+                    'new_field' => $dbCountry,
+                ];
+            }
+
+            $product->zebra_label = [
+                'id' => $label->id,
+                'name' => $label->name,
+                'width_mm' => $label->label_width_mm,
+                'height_mm' => $label->label_height_mm,
+                'default_copies' => $label->default_copies ?? 1,
+                'mismatches' => $mismatches ?: null,
+                'fields' => $fields,
+            ];
+        });
+
         // For AJAX requests, return JSON
         if ($request->wantsJson()) {
-            // Make sure relationships are loaded for AJAX responses too
-            $products->load('vegDetails.country', 'vegDetails.vegUnit', 'vegDetails.vegClass');
-
-            // Check if there are more products by trying to get one more
-            $hasMore = $this->tillVisibilityService->getProductsWithVisibility('fruit_veg', $filters, 1, $offset + $limit)->count() > 0;
 
             return response()->json([
                 'products' => $products->values(),
-                'hasMore' => $hasMore,
             ]);
         }
-
-        // Make sure relationships are loaded for the view
-        $products->load('vegDetails.country', 'vegDetails.vegUnit', 'vegDetails.vegClass');
 
         return view('fruit-veg.manage', compact('products'));
     }
@@ -878,6 +926,60 @@ class FruitVegController extends Controller
             $product->is_available = $product->is_visible_on_till; // Maintain compatibility
 
             return $product;
+        });
+
+        // Attach zebra label data (same as manage())
+        $zebraLabels = ZebraLabel::active()
+            ->whereIn('product_code', $productCodes)
+            ->get()
+            ->keyBy('product_code');
+
+        $countryNames = Country::pluck('name')->toArray();
+
+        $products->each(function ($product) use ($zebraLabels, $countryNames) {
+            $label = $zebraLabels->get($product->CODE);
+            if (! $label) {
+                $product->zebra_label = null;
+
+                return;
+            }
+
+            $fields = ZebraLabel::extractTextFields($label->zpl_content);
+            $mismatches = [];
+
+            $priceField = ZebraLabel::findPriceField($fields);
+            if ($priceField) {
+                $dbPrice = (float) $product->current_price;
+                if (abs($priceField[1] - $dbPrice) > 0.005) {
+                    $mismatches['price'] = [
+                        'field_index' => $priceField[0],
+                        'label_value' => number_format($priceField[1], 2),
+                        'db_value' => number_format($dbPrice, 2),
+                        'new_field' => '\\15' . number_format($dbPrice, 2),
+                    ];
+                }
+            }
+
+            $countryField = ZebraLabel::findCountryField($fields, $countryNames);
+            $dbCountry = $product->veg_details?->country?->name;
+            if ($countryField && $dbCountry && $countryField[1] !== $dbCountry) {
+                $mismatches['country'] = [
+                    'field_index' => $countryField[0],
+                    'label_value' => $countryField[1],
+                    'db_value' => $dbCountry,
+                    'new_field' => $dbCountry,
+                ];
+            }
+
+            $product->zebra_label = [
+                'id' => $label->id,
+                'name' => $label->name,
+                'width_mm' => $label->label_width_mm,
+                'height_mm' => $label->label_height_mm,
+                'default_copies' => $label->default_copies ?? 1,
+                'mismatches' => $mismatches ?: null,
+                'fields' => $fields,
+            ];
         });
 
         return response()->json([

@@ -13,6 +13,7 @@
 
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
+        <style>[x-cloak] { display: none !important; }</style>
         
         <!-- Livewire Styles are auto-injected when inject_assets is true in config/livewire.php -->
     </head>
