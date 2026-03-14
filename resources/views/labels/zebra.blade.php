@@ -156,6 +156,57 @@
                 </template>
             </div>
 
+            {{-- Standalone Labels (no barcode) --}}
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 mt-6">
+                <div class="p-5 border-b border-gray-200">
+                    <h3 class="text-base font-semibold text-gray-900">Standalone Labels</h3>
+                    <p class="text-xs text-gray-500 mt-0.5">Labels not linked to a product barcode</p>
+                </div>
+
+                <template x-if="standAloneLabels.length > 0">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Label</th>
+                                    <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Size</th>
+                                    <th class="w-20 px-4 py-2.5 text-center text-xs font-medium text-gray-500 uppercase">Print</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                <template x-for="label in standAloneLabels" :key="label.id">
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-4 py-3">
+                                            <a :href="'/labels/zebra/manage/' + label.id" class="text-sm font-medium text-blue-600 hover:text-blue-800" x-text="label.name"></a>
+                                        </td>
+                                        <td class="px-4 py-3 text-sm text-gray-600">
+                                            <span x-text="(label.width_mm || '?') + ' × ' + (label.height_mm || '?') + 'mm'"></span>
+                                        </td>
+                                        <td class="px-4 py-3 text-center">
+                                            <button @click="openPrintModal(label)"
+                                                    class="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                                                </svg>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </template>
+                <template x-if="standAloneLabels.length === 0">
+                    <div class="p-8 text-center text-gray-400 text-sm">
+                        @if ($search)
+                            No standalone labels found matching "{{ $search }}".
+                        @else
+                            No standalone labels uploaded.
+                        @endif
+                    </div>
+                </template>
+            </div>
+
             {{-- Print Modal --}}
             <div x-show="printModal.open" x-cloak
                  class="fixed inset-0 z-50 overflow-y-auto"
@@ -166,7 +217,7 @@
                         <h3 class="text-lg font-medium text-gray-900 mb-4">Print Label</h3>
 
                         <div class="space-y-3 text-sm">
-                            <div>
+                            <div x-show="printModal.productName">
                                 <span class="text-gray-500">Product:</span>
                                 <span class="font-medium text-gray-900 ml-1" x-text="printModal.productName"></span>
                             </div>
@@ -246,6 +297,7 @@
             return {
                 labels: @json($zebraLabels),
                 otherLabels: @json($otherLabels),
+                standAloneLabels: @json($standAloneLabels),
                 printModal: {
                     open: false,
                     labelId: null,
@@ -325,7 +377,8 @@
 
                             // Update the label in whichever list it belongs to
                             const label = this.labels.find(l => l.id === this.printModal.labelId)
-                                || this.otherLabels.find(l => l.id === this.printModal.labelId);
+                                || this.otherLabels.find(l => l.id === this.printModal.labelId)
+                                || this.standAloneLabels.find(l => l.id === this.printModal.labelId);
                             if (label) {
                                 label.fields = data.fields;
                                 label.mismatches = this.printModal.mismatches

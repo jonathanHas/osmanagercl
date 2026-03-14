@@ -228,6 +228,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/suppliers/outstanding-report/export', [\App\Http\Controllers\SupplierOutstandingController::class, 'exportCsv'])->name('suppliers.outstanding-report.export');
     Route::get('/suppliers/payments', [\App\Http\Controllers\SupplierPaymentsController::class, 'index'])->name('suppliers.payments');
     Route::get('/suppliers/payments/export', [\App\Http\Controllers\SupplierPaymentsController::class, 'exportCsv'])->name('suppliers.payments.export');
+    Route::get('/suppliers/organic-trust-report', [\App\Http\Controllers\OrganicTrustReportController::class, 'index'])->name('suppliers.organic-trust-report');
+    Route::get('/suppliers/organic-trust-report/export', [\App\Http\Controllers\OrganicTrustReportController::class, 'exportCsv'])->name('suppliers.organic-trust-report.export');
+    Route::post('/suppliers/{supplier}/toggle-organic', [\App\Http\Controllers\OrganicTrustReportController::class, 'toggleOrganic'])->name('suppliers.toggle-organic');
     Route::resource('suppliers', \App\Http\Controllers\AccountingSuppliersController::class);
 
     // Order Manager routes

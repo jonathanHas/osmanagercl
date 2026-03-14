@@ -64,6 +64,22 @@ class LabelAreaController extends Controller
 
         $allZebraLabels = $zebraLabelsQuery->get();
 
+        $standAloneQuery = ZebraLabel::active()->whereNull('product_code');
+        if ($search) {
+            $standAloneQuery->where('name', 'like', "%{$search}%");
+        }
+        $standAloneLabels = $standAloneQuery->get()->map(fn ($label) => [
+            'id' => $label->id,
+            'name' => $label->name,
+            'product_name' => null,
+            'product_code' => null,
+            'width_mm' => $label->label_width_mm,
+            'height_mm' => $label->label_height_mm,
+            'default_copies' => $label->default_copies ?? 1,
+            'mismatches' => null,
+            'fields' => ZebraLabel::extractTextFields($label->zpl_content),
+        ])->values()->toArray();
+
         $countryNames = Country::pluck('name')->toArray();
         $zebraLabels = [];
         $otherLabels = [];
@@ -123,7 +139,7 @@ class LabelAreaController extends Controller
             }
         }
 
-        return view('labels.zebra', compact('zebraLabels', 'otherLabels', 'search'));
+        return view('labels.zebra', compact('zebraLabels', 'otherLabels', 'standAloneLabels', 'search'));
     }
 
     /**

@@ -57,6 +57,7 @@ class AccountingSupplier extends Model
         'created_by',
         'updated_by',
         'rtd_classification',
+        'is_organic',
     ];
 
     protected $casts = [
@@ -76,6 +77,7 @@ class AccountingSupplier extends Model
         'tags' => 'json',
         'created_by' => 'integer',
         'updated_by' => 'integer',
+        'is_organic' => 'boolean',
     ];
 
     /**

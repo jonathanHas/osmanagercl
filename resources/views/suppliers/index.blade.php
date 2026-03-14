@@ -19,6 +19,10 @@
                    class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm">
                     <i class="fas fa-money-bill-wave mr-2"></i>Payments
                 </a>
+                <a href="{{ route('suppliers.organic-trust-report') }}"
+                   class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded text-sm">
+                    <i class="fas fa-leaf mr-2"></i>Organic Trust
+                </a>
                 <a href="{{ route('invoices.index') }}" 
                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded text-sm">
                     <i class="fas fa-file-invoice mr-2"></i>View Invoices
