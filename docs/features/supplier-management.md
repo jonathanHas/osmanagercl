@@ -355,6 +355,55 @@ Route::get('/suppliers/payments/export', [SupplierPaymentsController::class, 'ex
 
 ---
 
+## Organic Trust Supplier Report
+
+### Overview
+The Organic Trust Supplier Report (`/suppliers/organic-trust-report`) generates the data needed for Field 13 ("Bought In Organic Ingredients/Products") of the annual Organic Trust return form. Added on 2026-03-14.
+
+### Features
+
+#### Date Range Selection
+- Start and end date pickers, defaulting to the current calendar year
+- Shows only product-type suppliers with invoice spend > 0 in the selected period
+
+#### Organic Toggle
+- Each supplier row has an Alpine.js toggle switch to mark/unmark as organic
+- The `is_organic` flag is persisted on the `accounting_suppliers` table
+- Toggles via AJAX (no page reload) so users can quickly classify multiple suppliers
+- Once set, the organic status persists across future reports
+
+#### Summary Statistics
+- **Total Suppliers**: Count of product suppliers with spend in period
+- **Total Spend**: Sum of all supplier invoices (incl. VAT)
+- **Organic Suppliers**: Count of suppliers marked organic
+- **Organic Spend**: Sum of organic-only supplier invoices
+
+#### CSV Export
+Two export options:
+- **Export All**: Downloads all product suppliers with spend, includes organic status column
+- **Export Organic Only**: Downloads only organic-marked suppliers — ready to upload for the return
+
+CSV columns: Supplier Name, Total Amount (incl. VAT), Invoice Count, Organic (Yes/No)
+
+### Navigation
+Access via the green **"Organic Trust"** button in the suppliers index page header.
+
+### Routes
+```php
+Route::get('/suppliers/organic-trust-report', [OrganicTrustReportController::class, 'index'])
+    ->name('suppliers.organic-trust-report');
+Route::get('/suppliers/organic-trust-report/export', [OrganicTrustReportController::class, 'exportCsv'])
+    ->name('suppliers.organic-trust-report.export');
+Route::post('/suppliers/{supplier}/toggle-organic', [OrganicTrustReportController::class, 'toggleOrganic'])
+    ->name('suppliers.toggle-organic');
+```
+
+### Database
+- **Migration**: `2026_03_14_000000_add_is_organic_to_accounting_suppliers_table`
+- **Column**: `is_organic` (boolean, default false) on `accounting_suppliers`
+
+---
+
 ## Future Enhancements
 
 1. **Bulk Import**: CSV/Excel import for multiple suppliers

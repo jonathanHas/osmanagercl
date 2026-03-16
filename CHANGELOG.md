@@ -19,6 +19,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Organic Trust Supplier Report** (2026-03-14)
+  - New report at `/suppliers/organic-trust-report` for Organic Trust annual return (Field 13: Bought In Organic Ingredients/Products)
+  - Date range selection shows all product suppliers with invoice spend totals (incl. VAT)
+  - Toggle switches to mark/unmark suppliers as organic (persists across reports via `is_organic` flag)
+  - Summary stats: total suppliers, total spend, organic supplier count, organic spend
+  - Dual CSV export: "Export All" for review, "Export Organic Only" for the return form
+  - Navigation button added to suppliers index page
+  - **New**: `app/Http/Controllers/OrganicTrustReportController.php`, `resources/views/suppliers/organic-trust-report.blade.php`
+  - **Modified**: `app/Models/AccountingSupplier.php` (added `is_organic`), `routes/web.php`, `resources/views/suppliers/index.blade.php`
+  - **Migration**: `add_is_organic_to_accounting_suppliers_table`
+
+- **Standalone zebra labels visible on main labels page** (2026-03-14)
+  - Labels without a barcode/product link now appear in a "Standalone Labels" section on `/labels/zebra`
+  - Previously these were only visible on the manage page (`/labels/zebra/manage`)
+  - Users can print standalone labels directly from the main page like any other label
+  - **Modified**: `app/Http/Controllers/LabelAreaController.php`, `resources/views/labels/zebra.blade.php`
+
 - **Zebra Label Storage & Printing** (2026-03-12)
   - Upload ZebraDesigner .prn/.zpl exports and store in database for direct printing
   - Auto-extract barcode and product link from ZPL content

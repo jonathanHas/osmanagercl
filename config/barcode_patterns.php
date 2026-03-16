@@ -70,6 +70,14 @@ return [
             'description' => 'lunch products use the 4000s numbering sequence',
         ],
 
+        // Cheese - Uses 5000s range
+        '032' => [
+            'name' => 'Cheese',
+            'ranges' => [[5000, 5999]],
+            'priority' => 'increment',
+            'description' => 'Cheese products use the 5000s numbering sequence',
+        ],
+
     ],
 
     /*

@@ -119,6 +119,7 @@ Store and print ZebraDesigner label exports (.prn/.zpl) directly from the web ap
 - **Smart Print Quantity**: Parses `^PQ` from ZPL, modifiable per-print without repeating graphics
 - **Live Preview**: Client-side ZPL rendering with "Update Preview" for field changes
 - **Direct Printing**: Sends to Zebra GX430t via existing CUPS infrastructure
+- **Standalone Labels**: Labels without a barcode appear in their own section on the main zebra page for easy printing
 
 ### Pricing Management
 Advanced pricing with VAT calculations and supplier comparison.
@@ -336,6 +337,16 @@ Complete supplier management with seamless POS integration and auto-code generat
 - **Edit Integration**: Link existing suppliers to POS or update POS names when changed
 - **Transaction Safety**: All operations wrapped in database transactions for data integrity
 - **Role-based Access**: Protected routes with appropriate permissions
+
+📖 [Supplier Management Documentation](./features/supplier-management.md)
+
+### Organic Trust Supplier Report (NEW! 2026-03-14)
+Report for the Organic Trust annual return form (Field 13: Bought In Organic Ingredients/Products).
+- **Date Range Selection**: View product supplier spend for any period (defaults to current year)
+- **Organic Toggle**: Mark/unmark suppliers as organic with persistent toggle switches (AJAX, no page reload)
+- **Summary Statistics**: Total suppliers, total spend, organic supplier count, organic spend total
+- **Dual CSV Export**: "Export All" for review, "Export Organic Only" for the Organic Trust return
+- **Navigation**: Accessible via green "Organic Trust" button on suppliers index
 
 📖 [Supplier Management Documentation](./features/supplier-management.md)
 
