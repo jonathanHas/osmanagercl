@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Image Upload on Product Create Page** (2026-03-16)
+  - File picker with client-side preview on the create product form
+  - Uses same Intervention Image resize (128x128) as the edit page
+  - Optional — image failure does not block product creation
+  - **Modified**: `resources/views/products/create.blade.php` (multipart form, image card, preview JS)
+  - **Modified**: `app/Http/Controllers/ProductController.php` (`store()` image handling)
+  - **Modified**: `app/Http/Requests/StoreProductRequest.php` (image validation rule)
+
 - **Organic Trust Supplier Report** (2026-03-14)
   - New report at `/suppliers/organic-trust-report` for Organic Trust annual return (Field 13: Bought In Organic Ingredients/Products)
   - Date range selection shows all product suppliers with invoice spend totals (incl. VAT)

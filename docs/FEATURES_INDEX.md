@@ -78,6 +78,7 @@ Comprehensive product catalog management with inline editing capabilities and re
 - **Validation & Error Handling**: Robust form validation with user-friendly error messages
 - **Lazy-Loaded Sales Data** (NEW! 2026-01-22): Product detail page sales history loads asynchronously for instant page rendering
 - **Detailed Sales History Modal** (NEW! 2026-01-22): Interactive drill-down from weekly → daily → transaction level views
+- **Image Upload at Creation** (NEW! 2026-03-16): Upload product image during creation with client-side preview, eliminating the extra edit step
 
 📖 [Product Management Documentation](./features/product-management.md)
 

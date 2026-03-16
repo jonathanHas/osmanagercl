@@ -35,7 +35,7 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <x-alert type="error" :messages="$errors->all()" />
 
-            <form action="{{ route('products.store') }}" method="POST">
+            <form action="{{ route('products.store') }}" method="POST" enctype="multipart/form-data">
                 @csrf
 
                 @if($deliveryItemId)
@@ -416,7 +416,47 @@
                         </div>
 
                     </div>
-                    
+
+                    <!-- Image Upload Section -->
+                    <div class="xl:col-span-2">
+                        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+                            <div class="border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center">
+                                    <svg class="w-5 h-5 mr-2 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
+                                    </svg>
+                                    Product Image
+                                    <span class="ml-2 text-sm font-normal text-gray-500">(Optional)</span>
+                                </h3>
+                            </div>
+
+                            <div class="flex items-start space-x-6">
+                                <div class="flex-1">
+                                    <input type="file"
+                                           id="image"
+                                           name="image"
+                                           accept="image/jpeg,image/png,image/gif"
+                                           class="block w-full text-sm text-gray-500 dark:text-gray-400
+                                                  file:mr-4 file:py-2 file:px-4
+                                                  file:rounded-md file:border-0
+                                                  file:text-sm file:font-semibold
+                                                  file:bg-indigo-50 file:text-indigo-700
+                                                  dark:file:bg-indigo-900 dark:file:text-indigo-300
+                                                  hover:file:bg-indigo-100 dark:hover:file:bg-indigo-800
+                                                  cursor-pointer"
+                                           onchange="previewCreateImage(this)">
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Max 2MB. JPEG, PNG, or GIF.</p>
+                                    @error('image')
+                                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                                <div id="image-preview-container" class="hidden">
+                                    <img id="image-preview" class="w-32 h-32 object-contain rounded-lg border border-gray-200 dark:border-gray-600" alt="Preview">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Right Column -->
                     <div class="space-y-6">
                         <!-- Pricing & Tax Section -->
@@ -1945,6 +1985,22 @@
                 closeOverrideModal();
             }
         });
+
+        // Image preview for create form
+        function previewCreateImage(input) {
+            const container = document.getElementById('image-preview-container');
+            const preview = document.getElementById('image-preview');
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    container.classList.remove('hidden');
+                };
+                reader.readAsDataURL(input.files[0]);
+            } else {
+                container.classList.add('hidden');
+            }
+        }
     </script>
     
     <!-- Image Modal -->

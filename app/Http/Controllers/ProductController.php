@@ -1393,6 +1393,38 @@ class ProductController extends Controller
                         ]);
                     }
                 }
+
+                // Upload product image if provided
+                if ($request->hasFile('image')) {
+                    try {
+                        $imageFile = $request->file('image');
+                        $imageManager = new ImageManager(new GdDriver);
+                        $image = $imageManager->read($imageFile->getRealPath());
+
+                        $image->resize(128, 128, function ($constraint) {
+                            $constraint->aspectRatio();
+                            $constraint->upsize();
+                        });
+
+                        $encodedImage = $image->encodeByExtension($this->determineImageExtension($imageFile));
+                        $imageData = $encodedImage->toString();
+
+                        DB::connection('pos')->table('PRODUCTS')
+                            ->where('ID', $product->ID)
+                            ->update(['IMAGE' => $imageData]);
+
+                        \Log::info('Product image uploaded during creation', [
+                            'product_id' => $product->ID,
+                            'product_code' => $product->CODE,
+                            'image_size_bytes' => strlen($imageData),
+                        ]);
+                    } catch (\Exception $e) {
+                        \Log::warning('Failed to upload product image during creation', [
+                            'product_id' => $product->ID,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
             });
 
             // Determine redirect route with context

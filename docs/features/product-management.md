@@ -1207,6 +1207,9 @@ Product images are stored as binary data in the POS database `PRODUCTS.IMAGE` fi
 - **Resize Dimensions**: 128x128 pixels (maintains aspect ratio)
 - **Storage**: Binary blob in POS database
 - **Display Size**: 128x128 pixels in product edit page
+- **Available on**: Both create and edit pages (create page added 2026-03-16)
+  - Create page: file picker with client-side preview, processed inside the store transaction
+  - Edit page: separate AJAX upload with current image display
 
 #### Image Processing
 - Images are automatically resized to fit within 128x128 pixels while maintaining aspect ratio

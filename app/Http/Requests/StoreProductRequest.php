@@ -62,6 +62,9 @@ class StoreProductRequest extends FormRequest
             // Display Settings
             'display_name' => 'nullable|string|max:255',
             'show_on_till' => 'boolean',
+
+            // Product Image
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ];
     }
 

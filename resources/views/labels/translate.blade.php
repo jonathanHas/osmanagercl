@@ -227,8 +227,34 @@
                     </div>
                 </template>
 
+                {{-- Save Success Panel --}}
+                <template x-if="saved && !processing">
+                    <div class="bg-white shadow-sm sm:rounded-lg p-6 space-y-5">
+                        <div class="text-center space-y-2">
+                            <div class="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                            </div>
+                            <p class="text-green-700 font-semibold text-lg">Translation saved!</p>
+                            <p class="text-gray-600 text-sm" x-text="labelData?.product_name || ''"></p>
+                            <p x-show="barcode" class="text-gray-400 text-xs font-mono" x-text="barcode"></p>
+                        </div>
+
+                        <div class="flex flex-col gap-2">
+                            <button @click="resetAll()" class="w-full px-4 py-3 bg-indigo-600 text-white rounded-md text-sm font-semibold hover:bg-indigo-700 transition">
+                                Scan New Product
+                            </button>
+                            <a href="{{ route('labels.translate.history') }}" class="w-full px-4 py-2.5 bg-green-600 text-white rounded-md text-sm font-semibold hover:bg-green-700 transition text-center">
+                                View in History
+                            </a>
+                            <button @click="saved = false" class="w-full px-4 py-2 text-gray-500 text-sm hover:text-gray-700 transition">
+                                &larr; Continue Editing
+                            </button>
+                        </div>
+                    </div>
+                </template>
+
                 {{-- Review Content --}}
-                <template x-if="labelData && !processing && !processingError">
+                <template x-if="labelData && !processing && !processingError && !saved">
                     <div class="space-y-4">
                         {{-- Product / Barcode reference --}}
                         <div x-show="barcode || product" class="flex items-center gap-2 px-4 text-xs text-gray-400">
@@ -501,6 +527,7 @@
                 saving: false,
                 saveMessage: '',
                 saveSuccess: false,
+                saved: false,
 
                 // Print
                 copies: 1,
@@ -799,20 +826,27 @@
                             }),
                         });
                         const data = await res.json();
-                        this.saveMessage = data.message || (data.success ? 'Saved!' : 'Save failed');
                         this.saveSuccess = data.success;
                         if (data.translation_id) this.translationId = data.translation_id;
+                        if (data.success) {
+                            this.saved = true;
+                            this.saveMessage = '';
+                        } else {
+                            this.saveMessage = data.message || 'Save failed';
+                            setTimeout(() => { this.saveMessage = ''; }, 4000);
+                        }
                     } catch (err) {
                         this.saveMessage = 'Save failed: ' + err.message;
                         this.saveSuccess = false;
+                        setTimeout(() => { this.saveMessage = ''; }, 4000);
                     }
                     this.saving = false;
-                    setTimeout(() => { this.saveMessage = ''; }, 4000);
                 },
 
                 async saveAndPrint() {
                     await this.saveTranslation();
                     if (this.saveSuccess) {
+                        this.saved = false;
                         this.step = 5;
                     }
                 },
@@ -866,6 +900,7 @@
                     this.previewError = null;
                     this.saving = false;
                     this.saveMessage = '';
+                    this.saved = false;
                     this.printing = false;
                     this.printMessage = '';
                     this.copies = 1;
