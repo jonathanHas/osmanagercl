@@ -87,9 +87,9 @@ class ZplGeneratorService
         $nameLines = $this->estimateLines($data['product_name'] ?? '', $nameFont, $fieldWidth, 2);
         $y += $nameFont * $nameLines + $gap;
 
-        // Ingredients
+        // Ingredients (uncapped — auto-fit scaling handles overflow)
         if (! empty($data['ingredients'])) {
-            $lines = $this->estimateLines('Ingredients: '.$data['ingredients'], $bodyFont, $fieldWidth, $dims['ingredientLines']);
+            $lines = $this->estimateLines('Ingredients: '.$data['ingredients'], $bodyFont, $fieldWidth, 999);
             $y += $bodyFont * $lines + $gap;
         }
 
@@ -124,7 +124,6 @@ class ZplGeneratorService
         $nameFontSize = (int) round($dims['nameFont'] * $scale);
         $bodyFontSize = (int) round($dims['bodyFont'] * $scale);
         $smallFontSize = (int) round($dims['smallFont'] * $scale);
-        $ingredientLines = $dims['ingredientLines'];
         $gap = $dims['gap'];
 
         $width = $dims['width'];
@@ -142,10 +141,10 @@ class ZplGeneratorService
         $zpl .= "^FO{$margin},{$y}^A0N,{$nameFontSize},{$nameFontSize}^FB{$fieldWidth},2,0,C^FD".($data['product_name'] ?? '').'^FS';
         $y += $nameFontSize * $nameLines + $gap;
 
-        // Ingredients
+        // Ingredients (uncapped lines — auto-fit scaling handles overflow)
         if (! empty($data['ingredients'])) {
-            $lines = $this->estimateLines('Ingredients: '.$data['ingredients'], $bodyFontSize, $fieldWidth, $ingredientLines);
-            $zpl .= "^FO{$margin},{$y}^A0N,{$bodyFontSize},{$bodyFontSize}^FB{$fieldWidth},{$ingredientLines},0,L^FDIngredients: ".$data['ingredients'].'^FS';
+            $lines = $this->estimateLines('Ingredients: '.$data['ingredients'], $bodyFontSize, $fieldWidth, 999);
+            $zpl .= "^FO{$margin},{$y}^A0N,{$bodyFontSize},{$bodyFontSize}^FB{$fieldWidth},{$lines},0,L^FDIngredients: ".$data['ingredients'].'^FS';
             $y += $bodyFontSize * $lines + $gap;
         }
 
