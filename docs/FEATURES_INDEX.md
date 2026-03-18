@@ -109,6 +109,8 @@ AI-powered label translation for imported products using phone camera capture an
 - **Allergen Highlighting**: 14 EU allergens emphasised in CAPS for HSE compliance
 - **Zebra Printing**: Direct print to networked Zebra GX430t via CUPS/IPP
 - **Image Optimization**: Client-side resize to 1600px before upload (JPEG 85%), plus server-side resize to 1200px before API call
+- **ZPL Code Viewer**: Collapsible dropdown to inspect raw ZPL code on the review step
+- **Dynamic Label Layout**: Auto-fit scaling with accurate line estimation prevents text overlap between sections
 
 📖 [Label Translation System Documentation](./features/label-translation-system.md)
 

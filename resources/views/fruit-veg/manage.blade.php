@@ -277,7 +277,7 @@
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
                             <template x-for="product in (products || [])" :key="product.CODE">
-                                <tr :class="{ 'bg-gray-50': selectedProducts.includes(product.CODE), 'opacity-40': recentlyToggledOff.includes(product.CODE) }">
+                                <tr :class="{ 'bg-amber-50 border-l-4 border-l-amber-400': product.in_print_queue, 'bg-gray-50': !product.in_print_queue && selectedProducts.includes(product.CODE), 'opacity-40': recentlyToggledOff.includes(product.CODE) }">
                                     <!-- Checkbox -->
                                     <td class="px-3 py-4">
                                         <input type="checkbox" 
@@ -609,7 +609,7 @@
                                     <td class="px-4 py-4 text-center">
                                         <div class="flex flex-col items-center gap-1">
                                             <!-- Print Queue Indicator -->
-                                            <div x-show="product.in_print_queue" class="flex items-center gap-1 text-xs text-amber-600">
+                                            <div x-show="product.in_print_queue" class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-amber-800 bg-amber-100 rounded-full">
                                                 <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                                                     <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"/>
                                                 </svg>
@@ -619,13 +619,19 @@
                                             <!-- Add/Remove Button -->
                                             <button x-show="!product.in_print_queue"
                                                     @click="addToLabels(product.CODE)"
-                                                    class="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition">
+                                                    class="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition flex items-center gap-1">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                                </svg>
                                                 Add to Labels
                                             </button>
                                             <button x-show="product.in_print_queue"
                                                     @click="removeFromLabels(product.CODE)"
-                                                    class="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition">
-                                                Remove
+                                                    class="px-2 py-1 text-xs bg-amber-600 text-white rounded hover:bg-amber-700 transition flex items-center gap-1">
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                                </svg>
+                                                On List
                                             </button>
                                         </div>
                                     </td>
@@ -649,7 +655,7 @@
                     <!-- Mobile Products -->
                     <div x-show="products.length > 0" class="space-y-4">
                         <template x-for="product in (products || [])" :key="product.CODE">
-                            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 space-y-4" :class="{ 'bg-gray-50': selectedProducts.includes(product.CODE), 'opacity-40': recentlyToggledOff.includes(product.CODE) }">
+                            <div class="rounded-lg shadow-sm border p-4 space-y-4" :class="{ 'bg-amber-50 border-amber-400': product.in_print_queue, 'bg-white border-gray-200': !product.in_print_queue, 'bg-gray-50': !product.in_print_queue && selectedProducts.includes(product.CODE), 'opacity-40': recentlyToggledOff.includes(product.CODE) }">
                                 
                                 <!-- Header: Checkbox, Image, Product Name -->
                                 <div class="flex items-start space-x-3">
@@ -978,7 +984,7 @@
                                         </button>
 
                                         <!-- Print Queue Indicator -->
-                                        <div x-show="product.in_print_queue" class="flex items-center gap-1 text-xs text-amber-600">
+                                        <div x-show="product.in_print_queue" class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-amber-800 bg-amber-100 rounded-full">
                                             <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                                                 <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"/>
                                             </svg>
@@ -988,13 +994,19 @@
                                         <!-- Add/Remove Button -->
                                         <button x-show="!product.in_print_queue"
                                                 @click="addToLabels(product.CODE)"
-                                                class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                                                class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-1">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                            </svg>
                                             Add to Labels
                                         </button>
                                         <button x-show="product.in_print_queue"
                                                 @click="removeFromLabels(product.CODE)"
-                                                class="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
-                                            Remove from Labels
+                                                class="px-4 py-2 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition flex items-center gap-1">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                            </svg>
+                                            On List
                                         </button>
                                     </div>
                                 </div>

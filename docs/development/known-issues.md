@@ -16,6 +16,42 @@ This document tracks known issues that have been identified and resolved in the 
 
 ## Label & Printing Issues
 
+### ZPL Preview Not Loading on Production (VPN/Slow Connections)
+**Status:** Fixed (2026-03-18)
+
+#### Problem
+The label preview on `/labels/translate?edit=` worked in dev but failed silently on production. The ZPL WASM renderer (`zpl-renderer-js`, ~9MB bundle) did not finish downloading within the 2-second polling timeout, especially over VPN connections.
+
+#### Root Cause
+`getZplRenderer()` in `translate.blade.php` polled for `window.ZplPreview` only 20 × 100ms = 2 seconds. In dev, Vite serves from localhost (instant). In production, the 9MB asset exceeded this timeout.
+
+#### Solution
+Increased polling to 150 × 100ms = 15 seconds. The existing "Generating preview..." loading text and `previewError` display already handle the UX.
+
+**Files Modified**: `resources/views/labels/translate.blade.php`
+
+---
+
+### Ingredients/Nutrition Text Overlap on Translated Labels
+**Status:** Fixed (2026-03-18)
+
+#### Problem
+Long ingredients text overlapped with the nutrition line below on the label preview, making both unreadable.
+
+#### Root Cause
+Two issues in `ZplGeneratorService`:
+1. The `^FB` line count for ingredients was capped by `ingredientLines` config (6 for small, 8 for large). The WASM renderer rendered all text beyond the cap, overflowing visually.
+2. The character width ratio (`0.6`) in `estimateLines()` overestimated how wide characters are, causing too many lines to be allocated for other fields and preventing the user from scaling up text size.
+
+#### Solution
+- Removed the ingredient line cap — `^FB` now uses the actual number of lines needed
+- Changed character width ratio from `0.6` to `0.5` to match actual Zebra default font (^A0) rendering
+- Auto-fit scaling in `generateZplWithScale()` still reduces font if total content exceeds label height
+
+**Files Modified**: `app/Services/ZplGeneratorService.php`
+
+---
+
 ### ZPL Preview Imperfect for ZebraDesigner Exports
 **Status:** Known limitation (2026-03-12)
 

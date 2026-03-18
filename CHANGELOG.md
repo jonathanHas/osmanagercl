@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Label preview not loading on production** (2026-03-18)
+  - ZPL preview WASM renderer (9MB) failed to load within the 2-second timeout over VPN/slow connections
+  - Increased `getZplRenderer()` polling timeout from 2s to 15s (150 × 100ms)
+  - **Modified**: `resources/views/labels/translate.blade.php`
+
+- **Ingredients/nutrition text overlap on translated labels** (2026-03-18)
+  - Long ingredients text overflowed its `^FB` line allocation, rendering on top of the nutrition field below
+  - Removed hardcoded line cap from `estimateLines()` for ingredients — now uses actual lines needed
+  - Corrected character width ratio from 0.6 to 0.5 to match Zebra default font rendering
+  - Auto-fit scaling still reduces font size if total content exceeds label height
+  - **Modified**: `app/Services/ZplGeneratorService.php`
+
+### Added
+
+- **ZPL Code viewer on label translate page** (2026-03-18)
+  - Collapsible dropdown showing raw ZPL code on the review step of `/labels/translate?edit=`
+  - Useful for debugging label layout issues
+  - **Modified**: `resources/views/labels/translate.blade.php`
+
 - **Photo upload failing for multiple images on mobile** (2026-03-11)
   - Phone photos (3-5MB) exceeded PHP's `upload_max_filesize` (2M), causing silent upload failures
   - Added client-side image resize in browser before upload (max 1600px, JPEG 85% quality)

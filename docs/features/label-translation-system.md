@@ -27,10 +27,21 @@ The label translation system enables staff to quickly create English-language re
 - Images are resized client-side to max 1600px (JPEG 85%) before upload, solving PHP upload size limits for phone photos (3-5MB)
 - Server further resizes to max 1200px (JPEG 80%) before sending to Gemini to reduce API latency
 
+### ZPL Preview & Code Viewer
+- Client-side ZPL rendering via `zpl-renderer-js` WASM engine (~9MB bundle)
+- Live preview updates when changing label size, font scale, or label data fields
+- **ZPL Code dropdown**: Collapsible viewer on the review step to inspect raw ZPL code for debugging
+- Production-safe loading: 15-second timeout for WASM bundle download over slow/VPN connections
+
+### Dynamic Label Layout
+- **Auto-fit scaling**: If content overflows label height, font scale is automatically reduced until it fits
+- **Accurate line estimation**: Character width ratio of 0.5× font size matches Zebra default scalable font (^A0)
+- **Uncapped ingredients**: Ingredients field uses as many lines as needed (no artificial cap), preventing overlap with nutrition data below
+- **Two label sizes**: Large (76×50mm) and Small (56×30mm), configurable in `config/label-sizes.php`
+
 ### Zebra Printer Integration
 - Direct printing via `lp` command to networked Zebra printer over CUPS/IPP
 - Label size: 50mm x 76mm (600 x 900 dots at 300dpi)
-- ZPL code visible on review page for debugging
 - Test print button for verifying printer connectivity
 
 ## Routes
@@ -66,9 +77,20 @@ ZEBRA_PRINTER_NAME=ZTC-GX430t
 
 **Controller:**
 - `app/Http/Controllers/LabelAreaController.php` — `cameraTest()`, `uploadPhoto()`, `printZpl()`, `testPrint()`
+- `app/Http/Controllers/LabelTranslationController.php` — `index()`, `save()`, `upload()`, `regenerateZpl()`
+
+**Services:**
+- `app/Services/ZplGeneratorService.php` — ZPL generation with auto-fit scaling and dynamic line estimation
+
+**Models:**
+- `app/Models/ProductTranslation.php` — Stored translations with label data, ZPL content, and photos
+
+**Config:**
+- `config/label-sizes.php` — Label dimensions, font sizes, and layout parameters for large/small labels
 
 **Views:**
 - `resources/views/labels/camera-test.blade.php` — Camera capture page with gallery and printer debug
+- `resources/views/labels/translate.blade.php` — Multi-step translation workflow (scan, photos, review, print)
 - `resources/views/labels/review.blade.php` — ZPL review and print page
 
 **Routes:**

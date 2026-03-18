@@ -416,13 +416,35 @@
                         </div>
                     </div>
 
+                    {{-- Label Size + Font Scale --}}
+                    <div class="bg-white shadow-sm sm:rounded-lg p-4 space-y-3">
+                        <div>
+                            <p class="text-xs font-medium text-gray-500 mb-2">Label Size</p>
+                            <div class="flex flex-wrap gap-2">
+                                @foreach($labelSizes as $key => $size)
+                                    <button type="button"
+                                        @click="labelSize = '{{ $key }}'; regenerate()"
+                                        class="flex-1 min-w-0 px-3 py-1.5 rounded-md border-2 text-xs font-medium transition text-center"
+                                        :class="labelSize === '{{ $key }}' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'">
+                                        {{ $size['label'] }}
+                                    </button>
+                                @endforeach
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-xs font-medium text-gray-500 mb-2">Text Size</p>
+                            <div class="flex items-center gap-2">
+                                <button @click="adjustFontScale(-10)" class="px-2 py-0.5 bg-gray-200 rounded text-xs font-bold text-gray-700 hover:bg-gray-300">A-</button>
+                                <input type="range" min="50" max="200" step="10" x-model.number="fontScale"
+                                    @change="regenerate()" class="flex-1 accent-indigo-600 h-1.5">
+                                <button @click="adjustFontScale(10)" class="px-2 py-0.5 bg-gray-200 rounded text-xs font-bold text-gray-700 hover:bg-gray-300">A+</button>
+                                <span class="text-xs text-gray-500 w-12 text-right" x-text="fontScale + '%'"></span>
+                            </div>
+                        </div>
+                    </div>
+
                     {{-- Print Controls --}}
                     <div class="bg-white shadow-sm sm:rounded-lg p-6 space-y-4">
-                        {{-- Label Size Reminder --}}
-                        <div class="p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
-                            <span class="font-medium">Label loaded:</span>
-                            <span x-text="labelSizeConfig[labelSize]?.label || labelSize"></span>
-                        </div>
 
                         {{-- Number of copies --}}
                         <div>
