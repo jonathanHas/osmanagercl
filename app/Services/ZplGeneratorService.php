@@ -66,8 +66,8 @@ class ZplGeneratorService
      */
     public function estimateLines(string $text, int $fontSize, int $fieldWidth, int $maxLines): int
     {
-        // Average character width is ~60% of font size for Zebra default font
-        $charsPerLine = max(1, (int) floor($fieldWidth / ($fontSize * 0.6)));
+        // Average character width is ~50% of font size for Zebra default scalable font (^A0)
+        $charsPerLine = max(1, (int) floor($fieldWidth / ($fontSize * 0.5)));
         $needed = (int) ceil(mb_strlen($text) / $charsPerLine);
 
         return min($needed, $maxLines);
