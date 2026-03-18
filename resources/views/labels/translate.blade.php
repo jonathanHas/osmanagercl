@@ -471,12 +471,12 @@
         let _zplRenderer = null;
         async function getZplRenderer() {
             if (_zplRenderer) return _zplRenderer;
-            // Wait briefly for the vite module to register window.ZplPreview
-            for (let i = 0; i < 20 && !window.ZplPreview; i++) {
+            // 9MB WASM bundle — allow up to 15s on slow/VPN connections
+            for (let i = 0; i < 150 && !window.ZplPreview; i++) {
                 await new Promise(r => setTimeout(r, 100));
             }
             _zplRenderer = window.ZplPreview;
-            if (!_zplRenderer) throw new Error('ZPL renderer not available');
+            if (!_zplRenderer) throw new Error('ZPL renderer not available — try refreshing the page');
             return _zplRenderer;
         }
 
