@@ -289,6 +289,17 @@
                             </div>
                         </div>
 
+                        {{-- ZPL Code (collapsible) --}}
+                        <div class="bg-gray-50 border border-gray-200 sm:rounded-lg p-4" x-data="{ showZpl: false }">
+                            <button @click="showZpl = !showZpl" class="flex items-center justify-between w-full text-left">
+                                <p class="text-xs font-medium text-gray-600">ZPL Code</p>
+                                <svg class="w-4 h-4 text-gray-400 transition-transform" :class="showZpl && 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            </button>
+                            <div x-show="showZpl" x-collapse>
+                                <pre class="mt-2 text-xs text-gray-700 bg-white border border-gray-200 rounded p-3 overflow-x-auto max-h-64 overflow-y-auto whitespace-pre-wrap break-all" x-text="zplContent"></pre>
+                            </div>
+                        </div>
+
                         {{-- Label Size + Font Scale --}}
                         <div class="bg-white shadow-sm sm:rounded-lg p-4 space-y-3">
                             <div>
