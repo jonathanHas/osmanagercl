@@ -2,7 +2,11 @@
     <x-slot name="header">
         <div class="flex items-center justify-between">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">Label Translation</h2>
-            <a href="{{ route('labels.translate.history') }}" class="px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-200 transition">History</a>
+            @if (request()->input('from') === 'zebra')
+                <a href="{{ route('labels.zebra', ['view' => 'translations']) }}" class="px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-200 transition">Back to Translated Labels</a>
+            @else
+                <a href="{{ route('labels.translate.history') }}" class="px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-200 transition">History</a>
+            @endif
         </div>
     </x-slot>
 

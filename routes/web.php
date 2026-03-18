@@ -293,6 +293,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/labels/translate/save', [LabelTranslationController::class, 'save'])->name('labels.translate.save');
     Route::get('/labels/translate/history', [LabelTranslationController::class, 'history'])->name('labels.translate.history');
     Route::get('/labels/translate/{translation}', [LabelTranslationController::class, 'show'])->name('labels.translate.show');
+    Route::post('/labels/translate/{translation}/print', [LabelTranslationController::class, 'print'])->name('labels.translate.print');
 
     // Zebra Label Storage (ZebraDesigner .prn exports)
     Route::prefix('labels/zebra/manage')->name('zebra-labels.')->group(function () {

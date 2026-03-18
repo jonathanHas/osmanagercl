@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Models\ProductTranslation;
+use App\Models\ZebraLabel;
 use App\Services\ZplGeneratorService;
 use Gemini\Data\Blob;
 use Gemini\Enums\MimeType;
@@ -146,8 +147,8 @@ class LabelTranslationController extends Controller
                 ."product_name, ingredients, nutrition_inline, storage, address, origin, original_text.\n"
                 ."Do NOT include net_weight — it is already on the packaging.\n\n"
                 ."ORIGINAL TEXT: Include the original (untranslated) text from the label in the 'original_text' field. "
-                ."This should be the raw text as it appears on the label, in the original language, "
-                ."so the user can verify the translation is correct. Include product name, ingredients, "
+                .'This should be the raw text as it appears on the label, in the original language, '
+                .'so the user can verify the translation is correct. Include product name, ingredients, '
                 ."and any other text visible on the label.\n\n"
                 ."Example output:\n"
                 .'{"product_name":"Sun-Dried Tomatoes in Oil",'
@@ -283,5 +284,43 @@ class LabelTranslationController extends Controller
                 'created_at' => $translation->created_at->format('M j, Y g:ia'),
             ],
         ]);
+    }
+
+    /**
+     * Print a translated label directly to the Zebra printer.
+     */
+    public function print(Request $request, ProductTranslation $translation): JsonResponse
+    {
+        $copies = max(1, min(99, (int) $request->input('copies', 1)));
+
+        $zpl = $translation->zpl_content;
+        if (! $zpl) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No ZPL content for this translation.',
+            ], 422);
+        }
+
+        $zpl = ZebraLabel::setZplQuantity($zpl, $copies);
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'zpl_');
+        file_put_contents($tmpFile, $zpl);
+
+        $host = config('services.zebra.host', '10.42.1.71');
+        $port = config('services.zebra.port', '631');
+        $printer = config('services.zebra.name', 'ZTC-GX430t');
+
+        $command = "lp -h {$host}:{$port}/version=1.1 -d {$printer} -o raw {$tmpFile} 2>&1";
+        $output = shell_exec($command);
+
+        unlink($tmpFile);
+
+        $success = $output && str_contains($output, 'request id');
+
+        return response()->json([
+            'success' => $success,
+            'message' => $success ? "Print job sent ({$copies} ".($copies === 1 ? 'copy' : 'copies').')' : 'Print failed',
+            'output' => trim($output ?? 'No output'),
+        ], $success ? 200 : 500);
     }
 }

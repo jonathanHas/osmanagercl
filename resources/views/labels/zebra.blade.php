@@ -10,202 +10,323 @@
 
             @include('labels._nav', ['current' => 'zebra'])
 
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-                <div class="p-5 border-b border-gray-200">
-                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div>
-                            <h3 class="text-base font-semibold text-gray-900">Products on Till with Labels</h3>
-                            <p class="text-xs text-gray-500 mt-0.5">Labels linked to products currently visible on the till</p>
+            {{-- Sub-tabs: Zebra Labels / Translated Labels --}}
+            <div class="flex items-center gap-1 mb-5 bg-gray-100 rounded-lg p-1 w-fit">
+                <a href="{{ route('labels.zebra') }}"
+                   class="px-4 py-2 rounded-md text-sm font-medium transition {{ $view === 'zebra' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900' }}">
+                    Zebra Labels
+                </a>
+                <a href="{{ route('labels.zebra', ['view' => 'translations']) }}"
+                   class="px-4 py-2 rounded-md text-sm font-medium transition {{ $view === 'translations' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900' }}">
+                    Translated Labels
+                </a>
+            </div>
+
+            @if ($view === 'zebra')
+                {{-- ==================== ZEBRA LABELS VIEW ==================== --}}
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+                    <div class="p-5 border-b border-gray-200">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div>
+                                <h3 class="text-base font-semibold text-gray-900">Products on Till with Labels</h3>
+                                <p class="text-xs text-gray-500 mt-0.5">Labels linked to products currently visible on the till</p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <form method="GET" action="{{ route('labels.zebra') }}" class="relative">
+                                    <input type="text" name="search" value="{{ $search }}" placeholder="Search products..."
+                                           class="w-56 pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                                    <svg class="w-4 h-4 text-gray-400 absolute left-2.5 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                    </svg>
+                                </form>
+                                <a href="{{ route('zebra-labels.index') }}" class="px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-200 transition whitespace-nowrap">
+                                    Manage Labels
+                                </a>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-3">
-                            <form method="GET" action="{{ route('labels.zebra') }}" class="relative">
-                                <input type="text" name="search" value="{{ $search }}" placeholder="Search products..."
-                                       class="w-56 pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                                <svg class="w-4 h-4 text-gray-400 absolute left-2.5 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                                </svg>
-                            </form>
-                            <a href="{{ route('zebra-labels.index') }}" class="px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-200 transition whitespace-nowrap">
-                                Manage Labels
-                            </a>
+                    </div>
+
+                    @if (count($zebraLabels) > 0)
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                                        <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Label</th>
+                                        <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Size</th>
+                                        <th class="px-4 py-2.5 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                                        <th class="w-20 px-4 py-2.5 text-center text-xs font-medium text-gray-500 uppercase">Print</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    <template x-for="label in labels" :key="label.id">
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-4 py-3">
+                                                <div class="text-sm font-medium text-gray-900" x-text="label.product_name"></div>
+                                                <div class="text-xs text-gray-400 font-mono" x-text="label.product_code"></div>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <a :href="'/labels/zebra/manage/' + label.id" class="text-sm text-blue-600 hover:text-blue-800" x-text="label.name"></a>
+                                            </td>
+                                            <td class="px-4 py-3 text-sm text-gray-600">
+                                                <span x-text="(label.width_mm || '?') + ' × ' + (label.height_mm || '?') + 'mm'"></span>
+                                            </td>
+                                            <td class="px-4 py-3 text-center">
+                                                <span x-show="!label.mismatches" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">OK</span>
+                                                <span x-show="label.mismatches" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 cursor-pointer" @click="openPrintModal(label)">
+                                                    <span x-show="label.mismatches?.price && label.mismatches?.country">Price + Country</span>
+                                                    <span x-show="label.mismatches?.price && !label.mismatches?.country">Price</span>
+                                                    <span x-show="!label.mismatches?.price && label.mismatches?.country">Country</span>
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-3 text-center">
+                                                <button @click="openPrintModal(label)"
+                                                        class="relative p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                                                    </svg>
+                                                    <span x-show="label.mismatches" class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-amber-500 rounded-full"></span>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    @else
+                        <div class="p-8 text-center text-gray-400 text-sm">
+                            @if ($search)
+                                No till labels found matching "{{ $search }}".
+                            @else
+                                No zebra labels linked to products currently on till.
+                            @endif
+                        </div>
+                    @endif
+                </div>
+
+                {{-- Other Labels (not on till) --}}
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 mt-6">
+                    <div class="p-5 border-b border-gray-200">
+                        <h3 class="text-base font-semibold text-gray-900">Other Labels</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">Labels linked to products not currently on the till</p>
+                    </div>
+
+                    <template x-if="otherLabels.length > 0">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                                        <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Label</th>
+                                        <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Size</th>
+                                        <th class="px-4 py-2.5 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                                        <th class="w-20 px-4 py-2.5 text-center text-xs font-medium text-gray-500 uppercase">Print</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    <template x-for="label in otherLabels" :key="label.id">
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-4 py-3">
+                                                <div class="text-sm font-medium text-gray-900" x-text="label.product_name"></div>
+                                                <div class="text-xs text-gray-400 font-mono" x-text="label.product_code"></div>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <a :href="'/labels/zebra/manage/' + label.id" class="text-sm text-blue-600 hover:text-blue-800" x-text="label.name"></a>
+                                            </td>
+                                            <td class="px-4 py-3 text-sm text-gray-600">
+                                                <span x-text="(label.width_mm || '?') + ' × ' + (label.height_mm || '?') + 'mm'"></span>
+                                            </td>
+                                            <td class="px-4 py-3 text-center">
+                                                <span x-show="!label.mismatches" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">OK</span>
+                                                <span x-show="label.mismatches" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 cursor-pointer" @click="openPrintModal(label)">
+                                                    <span x-show="label.mismatches?.price && label.mismatches?.country">Price + Country</span>
+                                                    <span x-show="label.mismatches?.price && !label.mismatches?.country">Price</span>
+                                                    <span x-show="!label.mismatches?.price && label.mismatches?.country">Country</span>
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-3 text-center">
+                                                <button @click="openPrintModal(label)"
+                                                        class="relative p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                                                    </svg>
+                                                    <span x-show="label.mismatches" class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-amber-500 rounded-full"></span>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </template>
+                    <template x-if="otherLabels.length === 0">
+                        <div class="p-8 text-center text-gray-400 text-sm">
+                            @if ($search)
+                                No other labels found matching "{{ $search }}".
+                            @else
+                                All labels are linked to products on the till.
+                            @endif
+                        </div>
+                    </template>
+                </div>
+
+                {{-- Standalone Labels (no barcode) --}}
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 mt-6">
+                    <div class="p-5 border-b border-gray-200">
+                        <h3 class="text-base font-semibold text-gray-900">Standalone Labels</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">Labels not linked to a product barcode</p>
+                    </div>
+
+                    <template x-if="standAloneLabels.length > 0">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Label</th>
+                                        <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Size</th>
+                                        <th class="w-20 px-4 py-2.5 text-center text-xs font-medium text-gray-500 uppercase">Print</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200">
+                                    <template x-for="label in standAloneLabels" :key="label.id">
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-4 py-3">
+                                                <a :href="'/labels/zebra/manage/' + label.id" class="text-sm font-medium text-blue-600 hover:text-blue-800" x-text="label.name"></a>
+                                            </td>
+                                            <td class="px-4 py-3 text-sm text-gray-600">
+                                                <span x-text="(label.width_mm || '?') + ' × ' + (label.height_mm || '?') + 'mm'"></span>
+                                            </td>
+                                            <td class="px-4 py-3 text-center">
+                                                <button @click="openPrintModal(label)"
+                                                        class="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                                                    </svg>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </template>
+                    <template x-if="standAloneLabels.length === 0">
+                        <div class="p-8 text-center text-gray-400 text-sm">
+                            @if ($search)
+                                No standalone labels found matching "{{ $search }}".
+                            @else
+                                No standalone labels uploaded.
+                            @endif
+                        </div>
+                    </template>
+                </div>
+
+            @else
+                {{-- ==================== TRANSLATED LABELS VIEW ==================== --}}
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+                    <div class="p-5 border-b border-gray-200">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div>
+                                <h3 class="text-base font-semibold text-gray-900">Translated Labels</h3>
+                                <p class="text-xs text-gray-500 mt-0.5">Product translations grouped by category</p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <form method="GET" action="{{ route('labels.zebra') }}" class="relative">
+                                    <input type="hidden" name="view" value="translations">
+                                    <input type="text" name="search" value="{{ $search }}" placeholder="Search translations..."
+                                           class="w-56 pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                                    <svg class="w-4 h-4 text-gray-400 absolute left-2.5 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                    </svg>
+                                </form>
+                                <a href="{{ route('labels.translate') }}" class="px-3 py-1.5 bg-indigo-600 border border-transparent rounded-md text-xs font-medium text-white hover:bg-indigo-500 transition whitespace-nowrap">
+                                    New Translation
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                @if (count($zebraLabels) > 0)
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                                    <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Label</th>
-                                    <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Size</th>
-                                    <th class="px-4 py-2.5 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-                                    <th class="w-20 px-4 py-2.5 text-center text-xs font-medium text-gray-500 uppercase">Print</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-200">
-                                <template x-for="label in labels" :key="label.id">
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="px-4 py-3">
-                                            <div class="text-sm font-medium text-gray-900" x-text="label.product_name"></div>
-                                            <div class="text-xs text-gray-400 font-mono" x-text="label.product_code"></div>
-                                        </td>
-                                        <td class="px-4 py-3">
-                                            <a :href="'/labels/zebra/manage/' + label.id" class="text-sm text-blue-600 hover:text-blue-800" x-text="label.name"></a>
-                                        </td>
-                                        <td class="px-4 py-3 text-sm text-gray-600">
-                                            <span x-text="(label.width_mm || '?') + ' × ' + (label.height_mm || '?') + 'mm'"></span>
-                                        </td>
-                                        <td class="px-4 py-3 text-center">
-                                            <span x-show="!label.mismatches" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">OK</span>
-                                            <span x-show="label.mismatches" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 cursor-pointer" @click="openPrintModal(label)">
-                                                <span x-show="label.mismatches?.price && label.mismatches?.country">Price + Country</span>
-                                                <span x-show="label.mismatches?.price && !label.mismatches?.country">Price</span>
-                                                <span x-show="!label.mismatches?.price && label.mismatches?.country">Country</span>
-                                            </span>
-                                        </td>
-                                        <td class="px-4 py-3 text-center">
-                                            <button @click="openPrintModal(label)"
-                                                    class="relative p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition">
-                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
-                                                </svg>
-                                                <span x-show="label.mismatches" class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-amber-500 rounded-full"></span>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
+                @if (count($translationsByCategory) > 0)
+                    @foreach ($translationsByCategory as $category => $translations)
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-4">
+                            <div class="p-4 border-b border-gray-200">
+                                <div class="flex items-center gap-2">
+                                    <h4 class="text-sm font-semibold text-gray-900">{{ $category }}</h4>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{ count($translations) }}</span>
+                                </div>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                                            <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Label Size</th>
+                                            <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                            <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">By</th>
+                                            <th class="w-28 px-4 py-2.5 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200">
+                                        @foreach ($translations as $t)
+                                            <tr class="hover:bg-gray-50">
+                                                <td class="px-4 py-3">
+                                                    <div class="flex items-center gap-3">
+                                                        @if ($t['product_code'] && isset($translationProducts[$t['product_code']]))
+                                                            <x-product-image
+                                                                :product="$translationProducts[$t['product_code']]"
+                                                                :supplier-service="$supplierService"
+                                                                size="sm"
+                                                                :hover="true"
+                                                                :fallback="false" />
+                                                        @endif
+                                                        <div>
+                                                            <div class="text-sm font-medium text-gray-900">{{ $t['db_product_name'] ?? $t['product_name'] }}</div>
+                                                            @if ($t['db_product_name'] && $t['db_product_name'] !== $t['product_name'])
+                                                                <div class="text-xs text-gray-400">{{ $t['product_name'] }}</div>
+                                                            @endif
+                                                            @if ($t['product_code'])
+                                                                <div class="text-xs text-gray-400 font-mono">{{ $t['product_code'] }}</div>
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td class="px-4 py-3 text-sm text-gray-600">{{ $t['label_size'] }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-500">{{ $t['created_at'] }}</td>
+                                                <td class="px-4 py-3 text-sm text-gray-500">{{ $t['user_name'] }}</td>
+                                                <td class="px-4 py-3 text-center">
+                                                    <div class="flex items-center justify-center gap-1">
+                                                        <a href="{{ route('labels.translate', ['edit' => $t['id'], 'from' => 'zebra']) }}"
+                                                           class="p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded transition" title="Edit">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                                            </svg>
+                                                        </a>
+                                                        <button @click="openTranslationPrintModal({{ $t['id'] }}, {{ json_encode($t['product_name']) }}, {{ json_encode($t['label_size']) }})"
+                                                                class="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition" title="Print">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    @endforeach
                 @else
-                    <div class="p-8 text-center text-gray-400 text-sm">
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-gray-400 text-sm">
                         @if ($search)
-                            No till labels found matching "{{ $search }}".
+                            No translated labels found matching "{{ $search }}".
                         @else
-                            No zebra labels linked to products currently on till.
+                            No translated labels yet. <a href="{{ route('labels.translate') }}" class="text-indigo-600 hover:underline">Translate a label</a> to get started.
                         @endif
                     </div>
                 @endif
-            </div>
-
-            {{-- Other Labels (not on till) --}}
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200 mt-6">
-                <div class="p-5 border-b border-gray-200">
-                    <h3 class="text-base font-semibold text-gray-900">Other Labels</h3>
-                    <p class="text-xs text-gray-500 mt-0.5">Labels linked to products not currently on the till</p>
-                </div>
-
-                <template x-if="otherLabels.length > 0">
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                                    <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Label</th>
-                                    <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Size</th>
-                                    <th class="px-4 py-2.5 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-                                    <th class="w-20 px-4 py-2.5 text-center text-xs font-medium text-gray-500 uppercase">Print</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-200">
-                                <template x-for="label in otherLabels" :key="label.id">
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="px-4 py-3">
-                                            <div class="text-sm font-medium text-gray-900" x-text="label.product_name"></div>
-                                            <div class="text-xs text-gray-400 font-mono" x-text="label.product_code"></div>
-                                        </td>
-                                        <td class="px-4 py-3">
-                                            <a :href="'/labels/zebra/manage/' + label.id" class="text-sm text-blue-600 hover:text-blue-800" x-text="label.name"></a>
-                                        </td>
-                                        <td class="px-4 py-3 text-sm text-gray-600">
-                                            <span x-text="(label.width_mm || '?') + ' × ' + (label.height_mm || '?') + 'mm'"></span>
-                                        </td>
-                                        <td class="px-4 py-3 text-center">
-                                            <span x-show="!label.mismatches" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">OK</span>
-                                            <span x-show="label.mismatches" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 cursor-pointer" @click="openPrintModal(label)">
-                                                <span x-show="label.mismatches?.price && label.mismatches?.country">Price + Country</span>
-                                                <span x-show="label.mismatches?.price && !label.mismatches?.country">Price</span>
-                                                <span x-show="!label.mismatches?.price && label.mismatches?.country">Country</span>
-                                            </span>
-                                        </td>
-                                        <td class="px-4 py-3 text-center">
-                                            <button @click="openPrintModal(label)"
-                                                    class="relative p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition">
-                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
-                                                </svg>
-                                                <span x-show="label.mismatches" class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-amber-500 rounded-full"></span>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
-                </template>
-                <template x-if="otherLabels.length === 0">
-                    <div class="p-8 text-center text-gray-400 text-sm">
-                        @if ($search)
-                            No other labels found matching "{{ $search }}".
-                        @else
-                            All labels are linked to products on the till.
-                        @endif
-                    </div>
-                </template>
-            </div>
-
-            {{-- Standalone Labels (no barcode) --}}
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200 mt-6">
-                <div class="p-5 border-b border-gray-200">
-                    <h3 class="text-base font-semibold text-gray-900">Standalone Labels</h3>
-                    <p class="text-xs text-gray-500 mt-0.5">Labels not linked to a product barcode</p>
-                </div>
-
-                <template x-if="standAloneLabels.length > 0">
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Label</th>
-                                    <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Size</th>
-                                    <th class="w-20 px-4 py-2.5 text-center text-xs font-medium text-gray-500 uppercase">Print</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-200">
-                                <template x-for="label in standAloneLabels" :key="label.id">
-                                    <tr class="hover:bg-gray-50">
-                                        <td class="px-4 py-3">
-                                            <a :href="'/labels/zebra/manage/' + label.id" class="text-sm font-medium text-blue-600 hover:text-blue-800" x-text="label.name"></a>
-                                        </td>
-                                        <td class="px-4 py-3 text-sm text-gray-600">
-                                            <span x-text="(label.width_mm || '?') + ' × ' + (label.height_mm || '?') + 'mm'"></span>
-                                        </td>
-                                        <td class="px-4 py-3 text-center">
-                                            <button @click="openPrintModal(label)"
-                                                    class="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition">
-                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
-                                                </svg>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
-                </template>
-                <template x-if="standAloneLabels.length === 0">
-                    <div class="p-8 text-center text-gray-400 text-sm">
-                        @if ($search)
-                            No standalone labels found matching "{{ $search }}".
-                        @else
-                            No standalone labels uploaded.
-                        @endif
-                    </div>
-                </template>
-            </div>
+            @endif
 
             {{-- Print Modal --}}
             <div x-show="printModal.open" x-cloak
@@ -221,7 +342,7 @@
                                 <span class="text-gray-500">Product:</span>
                                 <span class="font-medium text-gray-900 ml-1" x-text="printModal.productName"></span>
                             </div>
-                            <div>
+                            <div x-show="printModal.labelName">
                                 <span class="text-gray-500">Label:</span>
                                 <span class="text-gray-900 ml-1" x-text="printModal.labelName"></span>
                             </div>
@@ -230,8 +351,8 @@
                                 <span class="text-gray-900 ml-1" x-text="printModal.labelSize"></span>
                             </div>
 
-                            {{-- Mismatches --}}
-                            <template x-if="printModal.mismatches?.price">
+                            {{-- Mismatches (zebra labels only) --}}
+                            <template x-if="!printModal.isTranslation && printModal.mismatches?.price">
                                 <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                                     <div class="flex items-center justify-between">
                                         <div>
@@ -248,7 +369,7 @@
                                     </div>
                                 </div>
                             </template>
-                            <template x-if="printModal.mismatches?.country">
+                            <template x-if="!printModal.isTranslation && printModal.mismatches?.country">
                                 <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                                     <div class="flex items-center justify-between">
                                         <div>
@@ -311,6 +432,7 @@
                     success: false,
                     mismatches: null,
                     fields: [],
+                    isTranslation: false,
                 },
 
                 openPrintModal(label) {
@@ -327,6 +449,25 @@
                         success: false,
                         mismatches: label.mismatches ? JSON.parse(JSON.stringify(label.mismatches)) : null,
                         fields: label.fields ? [...label.fields] : [],
+                        isTranslation: false,
+                    };
+                },
+
+                openTranslationPrintModal(id, productName, labelSize) {
+                    this.printModal = {
+                        open: true,
+                        labelId: id,
+                        labelName: '',
+                        labelSize: labelSize,
+                        productName: productName,
+                        copies: 1,
+                        printing: false,
+                        fixing: false,
+                        message: '',
+                        success: false,
+                        mismatches: null,
+                        fields: [],
+                        isTranslation: true,
                     };
                 },
 
@@ -334,8 +475,13 @@
                     if (this.printModal.printing) return;
                     this.printModal.printing = true;
                     this.printModal.message = '';
+
+                    const url = this.printModal.isTranslation
+                        ? '/labels/translate/' + this.printModal.labelId + '/print'
+                        : '/labels/zebra/manage/' + this.printModal.labelId + '/print';
+
                     try {
-                        const res = await fetch('/labels/zebra/manage/' + this.printModal.labelId + '/print', {
+                        const res = await fetch(url, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
                             body: JSON.stringify({ copies: this.printModal.copies }),

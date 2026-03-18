@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\ProductTranslation;
 use App\Models\ZebraLabel;
 use App\Services\LabelService;
+use App\Services\SupplierService;
 use App\Services\TillVisibilityService;
 use App\Services\ZplGeneratorService;
 use Gemini\Data\Blob;
@@ -52,94 +53,151 @@ class LabelAreaController extends Controller
     public function zebra(Request $request): View
     {
         $search = $request->input('search');
+        $view = $request->input('view', 'zebra');
 
-        $zebraLabelsQuery = ZebraLabel::active()->whereNotNull('product_code');
-
-        if ($search) {
-            $zebraLabelsQuery->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('product_code', 'like', "%{$search}%");
-            });
-        }
-
-        $allZebraLabels = $zebraLabelsQuery->get();
-
-        $standAloneQuery = ZebraLabel::active()->whereNull('product_code');
-        if ($search) {
-            $standAloneQuery->where('name', 'like', "%{$search}%");
-        }
-        $standAloneLabels = $standAloneQuery->get()->map(fn ($label) => [
-            'id' => $label->id,
-            'name' => $label->name,
-            'product_name' => null,
-            'product_code' => null,
-            'width_mm' => $label->label_width_mm,
-            'height_mm' => $label->label_height_mm,
-            'default_copies' => $label->default_copies ?? 1,
-            'mismatches' => null,
-            'fields' => ZebraLabel::extractTextFields($label->zpl_content),
-        ])->values()->toArray();
-
-        $countryNames = Country::pluck('name')->toArray();
+        // Default empty values
         $zebraLabels = [];
         $otherLabels = [];
+        $standAloneLabels = [];
+        $translationsByCategory = [];
 
-        foreach ($allZebraLabels as $label) {
-            $product = $label->product;
-            if (! $product) {
-                continue;
+        $supplierService = null;
+        if ($view === 'translations') {
+            $supplierService = app(SupplierService::class);
+            [$translationsByCategory, $translationProducts] = $this->loadTranslationsByCategory($search);
+        } else {
+            $zebraLabelsQuery = ZebraLabel::active()->whereNotNull('product_code');
+
+            if ($search) {
+                $zebraLabelsQuery->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('product_code', 'like', "%{$search}%");
+                });
             }
 
-            $isOnTill = $this->tillVisibilityService->isVisibleOnTill($product->ID);
+            $allZebraLabels = $zebraLabelsQuery->get();
 
-            $fields = ZebraLabel::extractTextFields($label->zpl_content);
-            $mismatches = [];
-
-            $priceField = ZebraLabel::findPriceField($fields);
-            if ($priceField) {
-                $dbPrice = (float) $product->getGrossPrice();
-                if (abs($priceField[1] - $dbPrice) > 0.005) {
-                    $mismatches['price'] = [
-                        'field_index' => $priceField[0],
-                        'label_value' => number_format($priceField[1], 2),
-                        'db_value' => number_format($dbPrice, 2),
-                        'new_field' => '\\15' . number_format($dbPrice, 2),
-                    ];
-                }
+            $standAloneQuery = ZebraLabel::active()->whereNull('product_code');
+            if ($search) {
+                $standAloneQuery->where('name', 'like', "%{$search}%");
             }
-
-            $product->load('vegDetails.country');
-            $countryField = ZebraLabel::findCountryField($fields, $countryNames);
-            $dbCountry = $product->vegDetails?->country?->name;
-            if ($countryField && $dbCountry && $countryField[1] !== $dbCountry) {
-                $mismatches['country'] = [
-                    'field_index' => $countryField[0],
-                    'label_value' => $countryField[1],
-                    'db_value' => $dbCountry,
-                    'new_field' => $dbCountry,
-                ];
-            }
-
-            $labelData = [
+            $standAloneLabels = $standAloneQuery->get()->map(fn ($label) => [
                 'id' => $label->id,
                 'name' => $label->name,
-                'product_name' => $product->NAME,
-                'product_code' => $label->product_code,
+                'product_name' => null,
+                'product_code' => null,
                 'width_mm' => $label->label_width_mm,
                 'height_mm' => $label->label_height_mm,
                 'default_copies' => $label->default_copies ?? 1,
-                'mismatches' => $mismatches ?: null,
-                'fields' => $fields,
-            ];
+                'mismatches' => null,
+                'fields' => ZebraLabel::extractTextFields($label->zpl_content),
+            ])->values()->toArray();
 
-            if ($isOnTill) {
-                $zebraLabels[] = $labelData;
-            } else {
-                $otherLabels[] = $labelData;
+            $countryNames = Country::pluck('name')->toArray();
+
+            foreach ($allZebraLabels as $label) {
+                $product = $label->product;
+                if (! $product) {
+                    continue;
+                }
+
+                $isOnTill = $this->tillVisibilityService->isVisibleOnTill($product->ID);
+
+                $fields = ZebraLabel::extractTextFields($label->zpl_content);
+                $mismatches = [];
+
+                $priceField = ZebraLabel::findPriceField($fields);
+                if ($priceField) {
+                    $dbPrice = (float) $product->getGrossPrice();
+                    if (abs($priceField[1] - $dbPrice) > 0.005) {
+                        $mismatches['price'] = [
+                            'field_index' => $priceField[0],
+                            'label_value' => number_format($priceField[1], 2),
+                            'db_value' => number_format($dbPrice, 2),
+                            'new_field' => '\\15'.number_format($dbPrice, 2),
+                        ];
+                    }
+                }
+
+                $product->load('vegDetails.country');
+                $countryField = ZebraLabel::findCountryField($fields, $countryNames);
+                $dbCountry = $product->vegDetails?->country?->name;
+                if ($countryField && $dbCountry && $countryField[1] !== $dbCountry) {
+                    $mismatches['country'] = [
+                        'field_index' => $countryField[0],
+                        'label_value' => $countryField[1],
+                        'db_value' => $dbCountry,
+                        'new_field' => $dbCountry,
+                    ];
+                }
+
+                $labelData = [
+                    'id' => $label->id,
+                    'name' => $label->name,
+                    'product_name' => $product->NAME,
+                    'product_code' => $label->product_code,
+                    'width_mm' => $label->label_width_mm,
+                    'height_mm' => $label->label_height_mm,
+                    'default_copies' => $label->default_copies ?? 1,
+                    'mismatches' => $mismatches ?: null,
+                    'fields' => $fields,
+                ];
+
+                if ($isOnTill) {
+                    $zebraLabels[] = $labelData;
+                } else {
+                    $otherLabels[] = $labelData;
+                }
             }
         }
 
-        return view('labels.zebra', compact('zebraLabels', 'otherLabels', 'standAloneLabels', 'search'));
+        $translationProducts = $translationProducts ?? collect();
+
+        return view('labels.zebra', compact('zebraLabels', 'otherLabels', 'standAloneLabels', 'search', 'view', 'translationsByCategory', 'supplierService', 'translationProducts'));
+    }
+
+    /**
+     * Load translated labels grouped by product category.
+     */
+    private function loadTranslationsByCategory(?string $search): array
+    {
+        $query = ProductTranslation::with('user')->latest();
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('product_code', 'like', "%{$search}%")
+                    ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(label_data, '$.product_name')) LIKE ?", ["%{$search}%"]);
+            });
+        }
+
+        $translations = $query->get();
+
+        // Batch-load products to avoid N+1
+        $productCodes = $translations->pluck('product_code')->filter()->unique()->values()->toArray();
+        $products = Product::with(['category', 'supplierLink'])
+            ->whereIn('CODE', $productCodes)
+            ->get()
+            ->keyBy('CODE');
+
+        $grouped = [];
+        foreach ($translations as $t) {
+            $product = $products->get($t->product_code);
+            $category = $product?->category_name ?? 'Uncategorized';
+
+            $grouped[$category][] = [
+                'id' => $t->id,
+                'product_name' => $t->label_data['product_name'] ?? 'Unknown',
+                'db_product_name' => $product?->NAME,
+                'product_code' => $t->product_code,
+                'label_size' => $t->label_size,
+                'created_at' => $t->created_at->format('M j, Y'),
+                'user_name' => $t->user?->name ?? '',
+            ];
+        }
+
+        ksort($grouped);
+
+        return [$grouped, $products];
     }
 
     /**
