@@ -316,6 +316,13 @@ class FruitVegController extends Controller
             $product->is_available = $product->is_visible_on_till; // Maintain compatibility
         });
 
+        // Get print queue status for all products
+        $printQueueCodes = VegPrintQueue::getQueuedProductCodes();
+
+        $products->each(function ($product) use ($printQueueCodes) {
+            $product->in_print_queue = in_array($product->CODE, $printQueueCodes);
+        });
+
         // Batch load zebra labels for products that have them
         $zebraLabels = ZebraLabel::active()
             ->whereIn('product_code', $productCodes)
