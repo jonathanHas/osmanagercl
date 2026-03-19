@@ -1264,8 +1264,20 @@
                                                 </button>
                                             @endif
                                             
+                                            @if($item->is_new_product && !$item->barcode && $delivery->status !== 'completed')
+                                                <button type="button"
+                                                        onclick="openBarcodeScannerForItem({{ $item->id }}, {{ $delivery->id }})"
+                                                        id="scan-btn-{{ $item->id }}"
+                                                        class="inline-flex items-center px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors duration-200">
+                                                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9V5a2 2 0 012-2h4M15 3h4a2 2 0 012 2v4M21 15v4a2 2 0 01-2 2h-4M9 21H5a2 2 0 01-2-2v-4"/>
+                                                    </svg>
+                                                    Scan Barcode
+                                                </button>
+                                            @endif
+
                                             @if($item->is_new_product && $delivery->status !== 'completed')
-                                                <a href="{{ route('products.create', ['delivery_item' => $item->id]) }}" 
+                                                <a href="{{ route('products.create', ['delivery_item' => $item->id]) }}"
                                                    class="inline-flex items-center px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors duration-200">
                                                     <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
@@ -2358,4 +2370,236 @@
             </div>
         </div>
     </div>
+    <!-- Barcode Scanner Modal (for scanning barcodes on phone) -->
+    <div id="delivery-barcode-scanner-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Scan Barcode</h3>
+                        <button onclick="closeDeliveryBarcodeScanner()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div id="delivery-qr-reader" class="mb-4"></div>
+
+                    <div id="delivery-scanner-status" class="text-center text-sm text-gray-600 dark:text-gray-400 mb-4">
+                        Initializing camera...
+                    </div>
+
+                    <div class="border-t pt-4">
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">Or enter barcode manually:</p>
+                        <div class="flex gap-2">
+                            <input type="text"
+                                   id="delivery-manual-barcode-input"
+                                   placeholder="Enter barcode"
+                                   class="flex-1 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:border-indigo-500 focus:ring-indigo-500">
+                            <button onclick="useManualBarcodeDelivery()"
+                                    class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors duration-200">
+                                Use
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <input type="hidden" id="scan-target-item-id" value="">
+    <input type="hidden" id="scan-target-delivery-id" value="">
+
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script>
+        let deliveryHtml5QrCode = null;
+        let deliveryScannerActive = false;
+
+        function openBarcodeScannerForItem(itemId, deliveryId) {
+            document.getElementById('scan-target-item-id').value = itemId;
+            document.getElementById('scan-target-delivery-id').value = deliveryId;
+
+            const modal = document.getElementById('delivery-barcode-scanner-modal');
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+
+            const statusEl = document.getElementById('delivery-scanner-status');
+            statusEl.textContent = 'Initializing camera...';
+            statusEl.className = 'text-center text-sm text-gray-600 dark:text-gray-400 mb-4';
+
+            document.getElementById('delivery-manual-barcode-input').value = '';
+
+            initializeDeliveryScanner();
+        }
+
+        function closeDeliveryBarcodeScanner() {
+            const modal = document.getElementById('delivery-barcode-scanner-modal');
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+
+            if (deliveryHtml5QrCode && deliveryScannerActive) {
+                deliveryHtml5QrCode.stop().then(() => {
+                    deliveryScannerActive = false;
+                }).catch((err) => {
+                    console.error('Failed to stop scanner', err);
+                });
+            }
+        }
+
+        function initializeDeliveryScanner() {
+            if (deliveryScannerActive) return;
+
+            const statusEl = document.getElementById('delivery-scanner-status');
+            statusEl.textContent = 'Requesting camera permission...';
+
+            deliveryHtml5QrCode = new Html5Qrcode("delivery-qr-reader");
+
+            const config = {
+                fps: 10,
+                qrbox: { width: 250, height: 250 },
+                aspectRatio: 1.0
+            };
+
+            Html5Qrcode.getCameras().then(cameras => {
+                if (cameras && cameras.length) {
+                    let cameraId = cameras[0].id;
+                    for (let camera of cameras) {
+                        if (camera.label && camera.label.toLowerCase().includes('back')) {
+                            cameraId = camera.id;
+                            break;
+                        }
+                    }
+
+                    deliveryHtml5QrCode.start(
+                        cameraId,
+                        config,
+                        (decodedText) => {
+                            onDeliveryScanSuccess(decodedText);
+                        },
+                        () => {}
+                    ).then(() => {
+                        deliveryScannerActive = true;
+                        statusEl.textContent = 'Point camera at barcode';
+                    }).catch((err) => {
+                        console.error('Failed to start scanner', err);
+                        statusEl.textContent = 'Camera access denied or not available';
+                    });
+                }
+            }).catch(err => {
+                console.error('Failed to get cameras', err);
+                statusEl.textContent = 'Camera not available on this device';
+            });
+        }
+
+        function onDeliveryScanSuccess(barcode) {
+            if (navigator.vibrate) {
+                navigator.vibrate(200);
+            }
+
+            const statusEl = document.getElementById('delivery-scanner-status');
+            statusEl.textContent = `Saving barcode: ${barcode}...`;
+            statusEl.classList.add('text-blue-600', 'font-semibold');
+
+            const itemId = document.getElementById('scan-target-item-id').value;
+            const deliveryId = document.getElementById('scan-target-delivery-id').value;
+
+            // Stop scanner immediately to prevent duplicate scans
+            if (deliveryHtml5QrCode && deliveryScannerActive) {
+                deliveryHtml5QrCode.stop().then(() => {
+                    deliveryScannerActive = false;
+                }).catch(() => {});
+            }
+
+            fetch(`/deliveries/${deliveryId}/items/${itemId}/barcode`, {
+                method: 'PATCH',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ barcode: barcode })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update barcode cell
+                    const barcodeCell = document.getElementById(`barcode-cell-${itemId}`);
+                    if (barcodeCell) {
+                        if (data.exists_in_database && data.existing_product) {
+                            barcodeCell.innerHTML = `
+                                <a href="/products/${data.existing_product.id}" target="_blank"
+                                   class="inline-flex items-center gap-1 hover:opacity-80 transition-opacity"
+                                   title="Product exists: ${data.existing_product.name} - Click to view">
+                                    <code class="px-2 py-1 bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 rounded text-xs border border-green-300 dark:border-green-600">
+                                        ${data.barcode}
+                                    </code>
+                                    <span class="w-4 h-4 bg-green-500 text-white rounded-full inline-flex items-center justify-center text-xs flex-shrink-0">✓</span>
+                                </a>
+                            `;
+                        } else {
+                            barcodeCell.innerHTML = `
+                                <code class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">
+                                    ${data.barcode}
+                                </code>
+                            `;
+                        }
+                    }
+
+                    // Remove scan and refresh buttons (barcode is now set)
+                    const scanBtn = document.getElementById(`scan-btn-${itemId}`);
+                    if (scanBtn) scanBtn.remove();
+                    const refreshBtn = document.getElementById(`refresh-btn-${itemId}`);
+                    if (refreshBtn) refreshBtn.remove();
+
+                    statusEl.textContent = `Barcode saved: ${barcode}`;
+                    statusEl.className = 'text-center text-sm text-green-600 font-semibold mb-4';
+
+                    showMessage(data.message || 'Barcode saved successfully!', 'success');
+
+                    setTimeout(() => {
+                        closeDeliveryBarcodeScanner();
+                    }, 1000);
+                } else {
+                    statusEl.textContent = data.message || 'Failed to save barcode';
+                    statusEl.className = 'text-center text-sm text-red-600 font-semibold mb-4';
+                    showMessage(data.message || 'Failed to save barcode', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Save barcode failed:', error);
+                statusEl.textContent = 'Network error - please try again';
+                statusEl.className = 'text-center text-sm text-red-600 font-semibold mb-4';
+                showMessage('Network error occurred', 'error');
+            });
+        }
+
+        function useManualBarcodeDelivery() {
+            const input = document.getElementById('delivery-manual-barcode-input');
+            const barcode = input.value.trim();
+            if (barcode) {
+                onDeliveryScanSuccess(barcode);
+            }
+        }
+
+        // Manual input Enter key support
+        document.addEventListener('DOMContentLoaded', function() {
+            const manualInput = document.getElementById('delivery-manual-barcode-input');
+            if (manualInput) {
+                manualInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        useManualBarcodeDelivery();
+                    }
+                });
+            }
+        });
+
+        // Close scanner modal on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !document.getElementById('delivery-barcode-scanner-modal').classList.contains('hidden')) {
+                closeDeliveryBarcodeScanner();
+            }
+        });
+    </script>
+
 </x-admin-layout>

@@ -39,6 +39,12 @@ The label translation system enables staff to quickly create English-language re
 - **Uncapped ingredients**: Ingredients field uses as many lines as needed (no artificial cap), preventing overlap with nutrition data below
 - **Two label sizes**: Large (76×50mm) and Small (56×30mm), configurable in `config/label-sizes.php`
 
+### Print Step Adjustments
+- **Label size and text scale controls** available directly on the print step (Step 5)
+- When scanning an existing product, users can go straight to print and still adjust label size and font scale
+- Same controls as the review step: label size buttons and A-/A+ text size slider with range 50–200%
+- Changes call `regenerate()` to rebuild ZPL with auto-fit before printing
+
 ### Zebra Printer Integration
 - Direct printing via `lp` command to networked Zebra printer over CUPS/IPP
 - Label size: 50mm x 76mm (600 x 900 dots at 300dpi)

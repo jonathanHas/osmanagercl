@@ -1076,6 +1076,46 @@ class DeliveryController extends Controller
     }
 
     /**
+     * Update a delivery item's barcode (e.g. from phone camera scan)
+     */
+    public function updateItemBarcode(Request $request, Delivery $delivery, DeliveryItem $item): JsonResponse
+    {
+        $request->validate([
+            'barcode' => 'required|string|max:50',
+        ]);
+
+        if (! $item->is_new_product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This item is not a new product',
+            ], 400);
+        }
+
+        if ($item->delivery_id !== $delivery->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Item does not belong to this delivery',
+            ], 403);
+        }
+
+        $item->update(['barcode' => $request->barcode]);
+
+        $existingProduct = Product::where('CODE', $request->barcode)->first();
+
+        return response()->json([
+            'success' => true,
+            'barcode' => $request->barcode,
+            'item_id' => $item->id,
+            'message' => 'Barcode saved successfully',
+            'exists_in_database' => $existingProduct !== null,
+            'existing_product' => $existingProduct ? [
+                'id' => $existingProduct->ID,
+                'name' => $existingProduct->NAME,
+            ] : null,
+        ]);
+    }
+
+    /**
      * Create a new delivery item manually
      */
     public function createDeliveryItem(Request $request, Delivery $delivery): JsonResponse

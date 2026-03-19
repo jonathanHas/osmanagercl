@@ -90,6 +90,7 @@ Complete label printing system with integrated barcode scanning for quick produc
 - **Touch-Free Workflow**: Virtual keyboard suppression and automatic focus management for continuous scanning
 - **Keyboard Toggle** (NEW! 2026-01-24): Toggle button to show/hide virtual keyboard for manual barcode entry when needed
 - **Filter by Add Method**: Select labels by how they were added (New Products, Price Updates, Scanned/Re-queued) with visual indicators and real-time counts
+- **F&V Queue Indicators** (NEW! 2026-03-18): Products on the print list are visually highlighted with amber row background and checkmark badge on the F&V manage page
 
 📖 [Label System Documentation](./features/label-system.md)
 
@@ -111,6 +112,7 @@ AI-powered label translation for imported products using phone camera capture an
 - **Image Optimization**: Client-side resize to 1600px before upload (JPEG 85%), plus server-side resize to 1200px before API call
 - **ZPL Code Viewer**: Collapsible dropdown to inspect raw ZPL code on the review step
 - **Dynamic Label Layout**: Auto-fit scaling with accurate line estimation prevents text overlap between sections
+- **Print Step Adjustments**: Label size and text scale controls available directly on the print step for quick reprints
 
 📖 [Label Translation System Documentation](./features/label-translation-system.md)
 

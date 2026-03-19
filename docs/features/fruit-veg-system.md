@@ -46,6 +46,7 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 - **Compact Information Display**: Price with unit on same line, origin and class combined with proper margins
 - **Print-Optimized**: Navigation buttons hidden during printing with enhanced CSS rules
 - **Print Queue Management**: Tracks products needing new labels
+- **Visual Queue Indicators**: Queued products highlighted with amber row background, "On List" badge with checkmark icon on manage page
 - **Batch Printing**: Print labels for multiple products simultaneously
 
 ### 5. Product Information Management

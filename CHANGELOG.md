@@ -23,6 +23,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **F&V manage page print queue visual indicators** (2026-03-18)
+  - Products already on the label print list now show an amber row highlight and "On List" badge with checkmark icon
+  - "Add to Labels" button shows a + icon; queued products show amber "On List" button with checkmark
+  - Fixed `in_print_queue` not being set on initial page load (only worked after search/filter)
+  - Both desktop table rows and mobile cards highlight when queued
+  - **Modified**: `resources/views/fruit-veg/manage.blade.php` (row highlighting, button icons)
+  - **Modified**: `app/Http/Controllers/FruitVegController.php` (`manage()` now sets `in_print_queue`)
+
+- **Label size & text scale controls on print step** (2026-03-18)
+  - When scanning an existing product and going directly to print, users can now adjust label size and font scale
+  - Same controls as the review/edit step: label size buttons and A-/A+ text size slider
+  - Changes regenerate the ZPL and update the preview before printing
+  - **Modified**: `resources/views/labels/translate.blade.php`
+
 - **ZPL Code viewer on label translate page** (2026-03-18)
   - Collapsible dropdown showing raw ZPL code on the review step of `/labels/translate?edit=`
   - Useful for debugging label layout issues
