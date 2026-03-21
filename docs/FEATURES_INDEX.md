@@ -143,16 +143,17 @@ Comprehensive Coffee Fresh product management with till visibility control.
 
 📖 [Coffee Module Documentation](./features/coffee-module.md)
 
-### F&V Price Sync Management System (NEW! 2025-08-28)
+### F&V Price Sync Management System (NEW! 2025-08-28, Updated 2026-03-19)
 Cross-database price synchronization management with web-based interface.
 - **Discrepancy Detection**: Identifies price mismatches between POS and Laravel databases
+- **Manage Page Mismatch Indicators**: Amber warnings on `/fruit-veg/manage` when history price differs from POS price, with inline quick-sync buttons
 - **Bidirectional Sync**: Choose sync direction (History→POS or POS→History)
-- **Bulk Operations**: Select and sync multiple products simultaneously
+- **Bulk Operations**: Select and sync multiple products simultaneously, or "Sync All" from manage page banner
 - **Statistics Dashboard**: Real-time sync status overview with detailed reporting
 - **Transaction Safety**: Proper cross-database transaction management
 - **Production Interface**: Web-based tool eliminates need for terminal access
 - **Audit Preservation**: Maintains complete price change history during sync
-- **Access**: Available at `/fruit-veg/price-sync` from F&V dashboard
+- **Access**: Available at `/fruit-veg/price-sync` from F&V dashboard, mismatch indicators on `/fruit-veg/manage`
 
 **Critical Fix**: Resolved cross-database transaction issue where Laravel `DB::transaction()` only applied to default connection, causing POS updates to not commit properly. Now uses separate transaction management for each database connection.
 
@@ -256,6 +257,12 @@ External supplier connectivity for images, pricing, and product data.
 
 ### Delivery Verification
 Comprehensive delivery processing with barcode scanning and PDF invoice parsing.
+- **Partial Delivery Detection** (NEW! 2026-03-19): INVOICED column now shows delivered quantity (not ordered), with orange highlighting for partial deliveries and "Ordered: X" sub-detail when quantities differ
+- **Phone Camera Barcode Scanning** (NEW! 2026-03-19): Scan barcodes with phone camera directly on delivery show page
+  - "Scan Barcode" button on new product items without a barcode
+  - Camera scanner modal saves barcode to delivery item without creating a product
+  - Enables scanning barcodes on warehouse floor, then completing product creation on desktop later
+  - Manual barcode entry fallback
 - **Manual Resolution of Unparsed Lines** (NEW! 2026-02-28): Manually create delivery items from lines the PDF parser couldn't parse
   - Unparsed lines persisted to database (survive page refresh)
   - Interactive inline form with auto-lookup by supplier code (pre-fills description, cost, VAT, case size, barcode)
@@ -292,7 +299,7 @@ Comprehensive delivery processing with barcode scanning and PDF invoice parsing.
 - **Weight-Based Product Support** (NEW! 2026-01-27): Full support for products sold by weight (kg/g)
   - Automatic detection of weight-based products from Udea PDFs
   - Stores weight_per_unit, weight_unit, total_weight in database
-  - INVOICED column shows total weight instead of quantity
+  - INVOICED column shows `invoice_delivered_quantity` (total weight for weight-based products)
   - Correct price validation using weight × price
   - Legacy sync uses total_weight for stock verification
   - Decimal input enabled for all scanned quantity fields

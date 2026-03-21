@@ -309,11 +309,23 @@ class FruitVegController extends Controller
                 return $records->sortByDesc('changed_at')->first();
             });
 
-        // Add current prices from batch-loaded data
+        // Add current prices from POS (source of truth) and detect history mismatches
         $products->each(function ($product) use ($priceRecords) {
-            $priceRecord = $priceRecords->get($product->CODE);
-            $product->current_price = $priceRecord ? $priceRecord->new_price : $product->getGrossPrice();
+            $posGrossPrice = $product->getGrossPrice();
+            $product->current_price = $posGrossPrice;
+            $product->price_mismatch = false;
+            $product->history_price = null;
             $product->is_available = $product->is_visible_on_till; // Maintain compatibility
+
+            $priceRecord = $priceRecords->get($product->CODE);
+            if ($priceRecord) {
+                $historyPrice = round((float) $priceRecord->new_price, 2);
+                $posPrice = round((float) $posGrossPrice, 2);
+                if (abs($historyPrice - $posPrice) > 0.01) {
+                    $product->price_mismatch = true;
+                    $product->history_price = $historyPrice;
+                }
+            }
         });
 
         // Get print queue status for all products
@@ -1176,10 +1188,7 @@ class FruitVegController extends Controller
             $imageManager = new ImageManager(new GdDriver);
             $image = $imageManager->read($imageFile->getRealPath());
 
-            $image->resize(64, 64, function ($constraint) {
-                $constraint->aspectRatio();
-                $constraint->upsize();
-            });
+            $image->cover(128, 128);
 
             $encodedImage = $image->encodeByExtension($this->determineImageExtension($imageFile));
             $imageData = $encodedImage->toString();

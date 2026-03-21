@@ -61,10 +61,13 @@ The delivery verification system provides a complete workflow for handling suppl
 - supplier_code (supplier's internal product code)
 - sku, description, units_per_case
 - unit_cost, ordered_quantity, received_quantity
+- invoice_delivered_quantity (integer, default 0) -- Quantity supplier invoiced/delivered
 - total_cost, status
 - product_id (foreign key to PRODUCTS, nullable)
 - is_new_product (boolean)
 - barcode (nullable, retrieved from scraping)
+- case_ordered_quantity, unit_ordered_quantity -- Case/unit breakdown of ordered
+- quantity_type (enum: unit, case, mixed)
 - is_weight_based (boolean, default false) -- Weight-based product flag
 - weight_per_unit (decimal 8,4, nullable) -- Individual item weight (e.g., 0.307 kg)
 - weight_unit (varchar 10, nullable) -- Unit of measurement (kilogram, gram)
@@ -145,7 +148,15 @@ The delivery verification system provides a complete workflow for handling suppl
    - Barcode retrieval via `UdeaScrapingService` for product identification
    - Visual indicators in delivery interfaces
 
-2. **Product Creation Workflow**: Direct integration with product creation system
+2. **Phone Camera Barcode Scanning** (NEW! 2026-03-19): Scan barcodes on the delivery show page
+   - **Access**: "Scan Barcode" button appears for new product items without a barcode
+   - **Camera Scanner**: Opens html5-qrcode modal for phone camera scanning
+   - **Save Only**: Saves barcode to delivery item via AJAX without creating a product
+   - **Route**: `PATCH /deliveries/{delivery}/items/{item}/barcode`
+   - **Manual Fallback**: Type barcode manually if camera unavailable
+   - **Workflow**: Scan barcodes on warehouse floor with phone, complete "Add to POS" on desktop later
+
+3. **Product Creation Workflow**: Direct integration with product creation system
    - **Access**: "Add to POS" buttons appear next to all new product items
    - **Pre-population**: Delivery item data automatically populates the product creation form
    - **Fields**: Name, barcode, cost price, supplier information, units per case
@@ -259,6 +270,7 @@ Route::post('/deliveries/{delivery}/cancel', [DeliveryController::class, 'cancel
 Route::get('/deliveries/{delivery}/export-discrepancies', [DeliveryController::class, 'exportDiscrepancies']);
 Route::post('/delivery-items/{item}/refresh-barcode', [DeliveryController::class, 'refreshBarcode']);
 Route::patch('/deliveries/{delivery}/items/{item}/price', [DeliveryController::class, 'updateItemPrice']);
+Route::patch('/deliveries/{delivery}/items/{item}/barcode', [DeliveryController::class, 'updateItemBarcode']); // Phone camera scan
 Route::post('/deliveries/{delivery}/update-costs', [DeliveryController::class, 'updateCosts']);
 Route::post('/deliveries/{delivery}/sync-legacy', [DeliveryController::class, 'syncToLegacy']);
 
@@ -1715,8 +1727,11 @@ Database stores:
 #### Display
 
 **Delivery Show Page** (`/deliveries/{id}`):
-- INVOICED column shows total weight (0.921) instead of quantity (3)
+- INVOICED column shows `invoice_delivered_quantity` (what the supplier invoiced/delivered)
+- For weight-based products: shows total weight (0.921) instead of quantity
 - Purple badge: "0.307 kilogram × 3 = 0.921 kilogram"
+- When ordered > delivered, shows "Ordered: X" sub-detail in orange
+- Partial deliveries (ordered > delivered > 0) highlighted with orange row background
 
 **Delivery Legacy Match** (`/delivery-legacy/match`):
 - EXPECTED column shows weight with "kg" label
@@ -1790,6 +1805,11 @@ New fields in `delivery_items` table:
 3. **OOS Excluded from Missing Items**:
    - Added `HAVING SUM(delivery.myOrder) > 0` to query
    - Prevents OOS items from appearing in both OOS and Missing sections
+
+4. **Partial Delivery Detection** (2026-03-19):
+   - Items where `ordered_quantity > invoice_delivered_quantity > 0` are highlighted orange
+   - "Partial" count badge in delivery summary alongside "Supplier OOS" badge
+   - "Ordered: X" sub-detail shown in INVOICED column when quantities differ
 
 **Technical Implementation**:
 

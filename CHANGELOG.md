@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Delivery "Invoiced" column showing ordered quantity instead of delivered quantity** (2026-03-19)
+  - INVOICED column now displays `invoice_delivered_quantity` (what the supplier delivered) instead of `ordered_quantity` (what was ordered)
+  - Shows "Ordered: X" sub-detail when ordered differs from delivered for at-a-glance discrepancy visibility
+  - Added orange row highlighting and "Partial" count badge for partial deliveries (ordered > delivered > 0)
+  - Fixed `Received` column diff to compare against invoice delivered quantity, not ordered
+  - Fixed `DeliveryItem` model computed attributes (`quantity_difference`, `value_difference`, `completion_percentage`, `unit_tax_amount`) to use `invoice_delivered_quantity` instead of `ordered_quantity`
+  - **Modified**: `resources/views/deliveries/show.blade.php`, `app/Models/DeliveryItem.php`
+
+- **F&V manage page showing stale prices from price history instead of live POS prices** (2026-03-19)
+  - Manage page now always displays the live POS price (source of truth) instead of preferring `veg_price_history`
+  - Added amber warning banner showing count of products with price mismatches and link to price-sync page
+  - Added inline mismatch indicator on each affected product showing the stale history price
+  - Added quick "Sync" button per product and "Sync All to POS Price" bulk action to resolve mismatches without leaving the page
+  - Editing a price inline automatically clears the mismatch flag
+  - **Modified**: `app/Http/Controllers/FruitVegController.php`, `resources/views/fruit-veg/manage.blade.php`
+
 - **Label preview not loading on production** (2026-03-18)
   - ZPL preview WASM renderer (9MB) failed to load within the 2-second timeout over VPN/slow connections
   - Increased `getZplRenderer()` polling timeout from 2s to 15s (150 × 100ms)
@@ -22,6 +38,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Modified**: `app/Services/ZplGeneratorService.php`
 
 ### Added
+
+- **Phone camera barcode scanning on delivery show page** (2026-03-19)
+  - New "Scan Barcode" button on delivery items that are new products without a barcode
+  - Opens camera scanner modal (html5-qrcode) to scan and save barcode to the delivery item via AJAX
+  - Barcode is saved without creating a product — user can complete "Add to POS" later on desktop
+  - Manual barcode entry fallback in the modal
+  - **Route**: `PATCH /deliveries/{delivery}/items/{item}/barcode`
+  - **Modified**: `routes/web.php`, `app/Http/Controllers/DeliveryController.php`, `resources/views/deliveries/show.blade.php`
 
 - **F&V manage page print queue visual indicators** (2026-03-18)
   - Products already on the label print list now show an amber row highlight and "On List" badge with checkmark icon

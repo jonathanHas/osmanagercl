@@ -320,15 +320,38 @@
                                     </select>
                                 </div>
                             </div>
-                            
+
+                            <!-- Delivery Cost Option -->
+                            <div class="mt-4">
+                                <div class="flex items-center">
+                                    <input type="checkbox"
+                                           id="has_delivery_cost"
+                                           name="has_delivery_cost"
+                                           value="1"
+                                           class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                    <label for="has_delivery_cost" class="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                                        Include delivery cost (15%)
+                                        <span class="block text-xs text-gray-500">For suppliers with delivery charges</span>
+                                    </label>
+                                </div>
+                            </div>
+
                             <!-- Pricing Breakdown -->
                             <div class="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                                 <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Pricing Breakdown</h4>
-                                
+
                                 <div class="space-y-2 text-sm">
                                     <div class="flex justify-between">
                                         <span class="text-gray-600 dark:text-gray-400">Cost Price:</span>
                                         <span id="breakdown-cost" class="font-medium">€0.00</span>
+                                    </div>
+                                    <div class="flex justify-between" id="delivery-cost-row" style="display: none;">
+                                        <span class="text-gray-600 dark:text-gray-400">Delivery Cost (15%):</span>
+                                        <span id="breakdown-delivery" class="font-medium">€0.00</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600 dark:text-gray-400">Total Cost:</span>
+                                        <span id="breakdown-total-cost" class="font-medium">€0.00</span>
                                     </div>
                                     <div class="flex justify-between">
                                         <span class="text-gray-600 dark:text-gray-400">Selling Price (ex VAT):</span>
@@ -633,46 +656,54 @@
         // Pricing breakdown calculation
         function updatePricingBreakdown() {
             console.log('updatePricingBreakdown called');
-            
+
             const costPriceEl = document.getElementById('price_buy');
             const sellPriceEl = document.getElementById('price_sell');
+            const deliveryCostEl = document.getElementById('has_delivery_cost');
             const taxCategoryEl = document.getElementById('tax_category');
-            
-            if (!costPriceEl || !sellPriceEl || !taxCategoryEl) {
-                console.error('Missing form elements:', {costPriceEl, sellPriceEl, taxCategoryEl});
+
+            if (!costPriceEl || !sellPriceEl || !deliveryCostEl || !taxCategoryEl) {
+                console.error('Missing form elements:', {costPriceEl, sellPriceEl, deliveryCostEl, taxCategoryEl});
                 return;
             }
-            
+
             const costPrice = parseFloat(costPriceEl.value) || 0;
             const sellPrice = parseFloat(sellPriceEl.value) || 0;
+            const hasDeliveryCost = deliveryCostEl.checked;
             const taxCategoryId = taxCategoryEl.value;
-            
+
             console.log('Selected tax category ID:', taxCategoryId);
             // Get tax rate from the PHP-provided rates, convert string to float
             const taxRate = taxCategoryId && taxRates[taxCategoryId] !== undefined ? parseFloat(taxRates[taxCategoryId]) : 0.00;
             console.log('Applied tax rate:', taxRate);
-            
+
+            // Calculate delivery cost
+            const deliveryCost = hasDeliveryCost ? costPrice * 0.15 : 0;
+            const totalCost = costPrice + deliveryCost;
+
             // Calculate VAT (selling price is VAT inclusive)
             // Special handling for 0% VAT
             const sellPriceExVat = taxRate === 0 ? sellPrice : sellPrice / (1 + taxRate);
             const vatAmount = taxRate === 0 ? 0 : sellPrice - sellPriceExVat;
-            
+
             console.log('VAT calculation:', {sellPrice, taxRate, sellPriceExVat, vatAmount});
-            
+
             // Calculate profit margin (excluding VAT) - based on selling price, not cost
-            const marginAmount = sellPriceExVat - costPrice;
+            const marginAmount = sellPriceExVat - totalCost;
             const marginPercentage = sellPriceExVat > 0 ? (marginAmount / sellPriceExVat) * 100 : 0;
-            
+
             // Debug logging
             console.log('Pricing breakdown:', {
-                costPrice, sellPrice, taxCategoryId, taxRate,
-                sellPriceExVat, vatAmount,
+                costPrice, sellPrice, hasDeliveryCost, taxCategoryId, taxRate,
+                deliveryCost, totalCost, sellPriceExVat, vatAmount,
                 marginAmount, marginPercentage
             });
-            
+
             // Update breakdown display - check if elements exist
             const elements = {
                 'breakdown-cost': costPrice.toFixed(2),
+                'breakdown-delivery': deliveryCost.toFixed(2),
+                'breakdown-total-cost': totalCost.toFixed(2),
                 'breakdown-selling-ex-vat': sellPriceExVat.toFixed(2),
                 'breakdown-vat': vatAmount.toFixed(2),
                 'breakdown-selling-inc-vat': sellPrice.toFixed(2),
@@ -708,8 +739,14 @@
                     marginPercentageEl.className = 'text-sm text-green-600 dark:text-green-400';
                 }
             }
+
+            // Show/hide delivery cost row
+            const deliveryRow = document.getElementById('delivery-cost-row');
+            if (deliveryRow) {
+                deliveryRow.style.display = hasDeliveryCost ? 'flex' : 'none';
+            }
         }
-        
+
         // Recalculate summary when cost price changes
         const priceBuyEl = document.getElementById('price_buy');
         if (priceBuyEl) {
@@ -732,6 +769,12 @@
             taxCategoryEl.addEventListener('change', function() {
                 updatePricingBreakdown();
             });
+        }
+
+        // Update pricing when delivery cost checkbox changes
+        const hasDeliveryCostEl = document.getElementById('has_delivery_cost');
+        if (hasDeliveryCostEl) {
+            hasDeliveryCostEl.addEventListener('change', updatePricingBreakdown);
         }
 
         // Initialize display name preview (with error handling)

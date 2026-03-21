@@ -216,6 +216,34 @@
                 </div>
             </div>
 
+            <!-- Price Mismatch Warning Banner -->
+            <div x-show="products.filter(p => p.price_mismatch).length > 0"
+                 class="bg-amber-50 border border-amber-200 rounded-lg shadow mb-6 p-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-5 h-5 text-amber-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                        <div>
+                            <p class="text-sm font-medium text-amber-800">
+                                <span x-text="products.filter(p => p.price_mismatch).length"></span> product(s) have prices that differ from the price history
+                            </p>
+                            <p class="text-xs text-amber-600 mt-0.5">Prices may have been changed directly on the till. Review and sync to update the history.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button @click="syncAllMismatches()"
+                                class="px-3 py-1.5 bg-amber-600 text-white text-sm rounded-md hover:bg-amber-700 transition">
+                            Sync All to POS Price
+                        </button>
+                        <a href="{{ route('fruit-veg.price-sync') }}"
+                           class="px-3 py-1.5 bg-white text-amber-700 text-sm rounded-md border border-amber-300 hover:bg-amber-50 transition">
+                            Review Details
+                        </a>
+                    </div>
+                </div>
+            </div>
+
             <!-- Bulk Actions Bar -->
             <div class="bg-white rounded-lg shadow mb-6 p-4" x-show="selectedProducts.length > 0">
                 <div class="flex items-center justify-between">
@@ -336,6 +364,8 @@
                                                         if (response.ok) {
                                                             // Update local state
                                                             product.current_price = this.newPrice;
+                                                            product.price_mismatch = false;
+                                                            product.history_price = null;
                                                             this.originalPrice = this.newPrice;
                                                             this.editing = false;
                                                             
@@ -375,11 +405,21 @@
                                                     €<span x-text="parseFloat(product.current_price).toFixed(2)"></span>
                                                 </span>
                                                 <div class="text-xs text-blue-600 mt-1">Click to edit</div>
+                                                <template x-if="product.price_mismatch">
+                                                    <div class="flex items-center gap-1 mt-1">
+                                                        <svg class="w-3 h-3 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                                        </svg>
+                                                        <span class="text-xs text-amber-600">History: €<span x-text="parseFloat(product.history_price).toFixed(2)"></span></span>
+                                                        <button @click.stop="$dispatch('sync-price', { code: product.CODE })"
+                                                                class="text-xs text-amber-700 underline hover:text-amber-900">Sync</button>
+                                                    </div>
+                                                </template>
                                             </div>
                                             <div x-show="editing" x-cloak class="flex items-center gap-1">
                                                 <span class="text-sm">€</span>
-                                                <input type="number" 
-                                                       x-model="newPrice" 
+                                                <input type="number"
+                                                       x-model="newPrice"
                                                        step="0.01"
                                                        @keyup.enter="savePrice()"
                                                        class="w-16 text-sm border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
@@ -710,9 +750,11 @@
                                                     
                                                     if (response.ok) {
                                                         product.current_price = this.newPrice;
+                                                        product.price_mismatch = false;
+                                                        product.history_price = null;
                                                         this.originalPrice = this.newPrice;
                                                         this.editing = false;
-                                                        
+
                                                         const notification = document.createElement('div');
                                                         notification.className = 'fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white z-50 bg-green-600';
                                                         notification.textContent = 'Price updated successfully!';
@@ -748,11 +790,21 @@
                                                     €<span x-text="parseFloat(product.current_price).toFixed(2)"></span>
                                                 </span>
                                                 <div class="text-xs text-blue-600">Tap to edit</div>
+                                                <template x-if="product.price_mismatch">
+                                                    <div class="flex items-center gap-1 mt-1">
+                                                        <svg class="w-3 h-3 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                                        </svg>
+                                                        <span class="text-xs text-amber-600">History: €<span x-text="parseFloat(product.history_price).toFixed(2)"></span></span>
+                                                        <button @click.stop="$dispatch('sync-price', { code: product.CODE })"
+                                                                class="text-xs text-amber-700 underline hover:text-amber-900">Sync</button>
+                                                    </div>
+                                                </template>
                                             </div>
                                             <div x-show="editing" x-cloak class="flex items-center gap-2">
                                                 <span class="text-base font-semibold">€</span>
-                                                <input type="number" 
-                                                       x-model="newPrice" 
+                                                <input type="number"
+                                                       x-model="newPrice"
                                                        step="0.01"
                                                        @keyup.enter="savePrice()"
                                                        class="w-20 text-base border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
@@ -1173,8 +1225,75 @@
                             }
                         }
                     });
+
+                    // Listen for price sync requests from individual product mismatch buttons
+                    window.addEventListener('sync-price', (event) => {
+                        this.syncProductPrice(event.detail.code);
+                    });
                 },
-                
+
+                async syncProductPrice(productCode) {
+                    try {
+                        const response = await fetch('{{ route("fruit-veg.price-sync.sync") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify({
+                                product_code: productCode,
+                                direction: 'pos_to_history'
+                            })
+                        });
+
+                        if (response.ok) {
+                            const product = this.products.find(p => p.CODE === productCode);
+                            if (product) {
+                                product.price_mismatch = false;
+                                product.history_price = null;
+                            }
+                            this.showNotification('Price history synced to POS price', 'success');
+                        } else {
+                            this.showNotification('Failed to sync price', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error syncing price:', error);
+                        this.showNotification('Error syncing price', 'error');
+                    }
+                },
+
+                async syncAllMismatches() {
+                    const mismatched = this.products.filter(p => p.price_mismatch);
+                    if (mismatched.length === 0) return;
+
+                    try {
+                        const response = await fetch('{{ route("fruit-veg.price-sync.bulk-sync") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify({
+                                product_codes: mismatched.map(p => p.CODE),
+                                direction: 'pos_to_history'
+                            })
+                        });
+
+                        if (response.ok) {
+                            mismatched.forEach(p => {
+                                p.price_mismatch = false;
+                                p.history_price = null;
+                            });
+                            this.showNotification(`${mismatched.length} product(s) synced to POS prices`, 'success');
+                        } else {
+                            this.showNotification('Failed to sync prices', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error syncing prices:', error);
+                        this.showNotification('Error syncing prices', 'error');
+                    }
+                },
+
                 restoreFilters() {
                     const savedFilters = localStorage.getItem('fruitVegManageFilters');
                     if (savedFilters) {
@@ -1399,6 +1518,8 @@
                             const product = this.products.find(p => p.CODE === productCode);
                             if (product) {
                                 product.current_price = newPrice;
+                                product.price_mismatch = false;
+                                product.history_price = null;
                             }
                             this.showNotification('Price updated successfully!', 'success');
                         } else {

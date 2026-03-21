@@ -82,7 +82,7 @@ class DeliveryItem extends Model
 
     public function getQuantityDifferenceAttribute(): int
     {
-        return $this->received_quantity - $this->ordered_quantity;
+        return $this->received_quantity - $this->invoice_delivered_quantity;
     }
 
     public function getValueDifferenceAttribute(): float
@@ -104,11 +104,11 @@ class DeliveryItem extends Model
 
     public function getCompletionPercentageAttribute(): float
     {
-        if ($this->ordered_quantity == 0) {
+        if ($this->invoice_delivered_quantity == 0) {
             return $this->received_quantity > 0 ? 100 : 0;
         }
 
-        return min(100, ($this->received_quantity / $this->ordered_quantity) * 100);
+        return min(100, ($this->received_quantity / $this->invoice_delivered_quantity) * 100);
     }
 
     public function addScan(int $quantity, ?string $scannedBy = null): void
@@ -183,11 +183,11 @@ class DeliveryItem extends Model
      */
     public function getUnitTaxAmountAttribute(): ?float
     {
-        if (is_null($this->tax_amount) || $this->ordered_quantity <= 0) {
+        if (is_null($this->tax_amount) || $this->invoice_delivered_quantity <= 0) {
             return null;
         }
 
-        return $this->tax_amount / $this->ordered_quantity;
+        return $this->tax_amount / $this->invoice_delivered_quantity;
     }
 
     /**

@@ -66,18 +66,25 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 - **Real-time Updates**: Live addition/removal of products with smooth animations
 - **Instant Visibility Changes**: Products appear/disappear immediately based till visibility changes
 
-### 7. Price Sync Management System (NEW! 2025-08-28 🔧)
+### 7. Price Sync Management System (NEW! 2025-08-28 🔧, Updated 2026-03-19)
 - **Cross-Database Discrepancy Detection**: Identifies products where POS and Laravel price history don't match
+- **Manage Page Mismatch Indicators** (2026-03-19): The `/fruit-veg/manage` page now:
+  - Always displays the **live POS price** (source of truth) instead of stale price history
+  - Shows an amber warning banner when any products have price mismatches, with product count and link to price-sync page
+  - Displays inline mismatch indicator per product showing the old history price
+  - Provides quick "Sync" button per product and "Sync All to POS Price" bulk action
+  - Automatically clears mismatch flags when a price is edited inline
 - **Comprehensive Statistics Dashboard**: Shows total F&V products, products with history, and sync status
 - **Price Comparison Analysis**: Side-by-side display of POS vs. price history values with exact differences
 - **Bidirectional Synchronization**:
   - **History → POS**: Updates POS database from price history (recommended for recent changes)
   - **POS → History**: Updates price history from POS database (for correcting historical data)
 - **Individual Product Sync**: Quick sync buttons for single products with real-time feedback
-- **Bulk Operations**: 
+- **Bulk Operations**:
   - Select all/clear selection functionality
   - Bulk sync multiple products with progress reporting
   - Detailed error reporting for failed sync operations
+  - "Sync All to POS Price" from manage page banner
 - **Professional Interface**:
   - Sortable table by price difference magnitude
   - Visual indicators for sync status (✅ synchronized, ❌ out of sync)
@@ -86,7 +93,7 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 - **Production-Ready**: Web-based interface eliminates need for terminal access
 - **Audit Trail Preservation**: All sync operations maintain complete price change history
 - **Transaction Safety**: Proper error handling ensures database integrity
-- **Access**: Available at `/fruit-veg/price-sync` from the F&V dashboard
+- **Access**: Available at `/fruit-veg/price-sync` from the F&V dashboard, mismatch indicators on `/fruit-veg/manage`
 
 ### 8. Order Generation System (NEW! 2026-01-09 🥬)
 Supplier-agnostic order generation based on historical sales data for all F&V products.
