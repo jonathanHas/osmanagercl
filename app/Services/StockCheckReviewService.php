@@ -8,6 +8,7 @@ use App\Models\StockCurrent;
 use App\Models\StockZeroAudit;
 use App\Repositories\ProductRepository;
 use Carbon\Carbon;
+use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -168,6 +169,13 @@ class StockCheckReviewService
 
             $totalValueZeroed += $costValue;
         }
+
+        // Write to POS catSetZero table (backward compatibility with old system)
+        DB::connection('pos')->table('catSetZero')->insert([
+            'ID' => (string) Str::uuid(),
+            'catID' => $categoryId,
+            'dateUpdated' => now(),
+        ]);
 
         // Create the summary audit record
         return StockZeroAudit::create([
