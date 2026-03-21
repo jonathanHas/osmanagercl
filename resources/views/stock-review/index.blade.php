@@ -71,6 +71,142 @@
                 </form>
             </div>
 
+            {{-- Stock Check Scanner --}}
+            <div class="bg-white shadow-sm sm:rounded-lg mb-4 overflow-hidden" x-data="stockChecker()">
+                {{-- Toggle bar --}}
+                <button @click="panelOpen = !panelOpen; if(panelOpen) $nextTick(() => $refs.scanInput.focus())"
+                        class="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
+                        </svg>
+                        <span class="font-medium text-gray-900">Stock Check Scanner</span>
+                        <template x-if="checksCount > 0">
+                            <span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-0.5 rounded-full" x-text="checksCount + ' checked'"></span>
+                        </template>
+                    </div>
+                    <svg class="w-5 h-5 text-gray-400 transition-transform" :class="panelOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+
+                {{-- Scanner panel --}}
+                <div x-show="panelOpen" x-transition x-cloak class="border-t border-gray-200 px-4 py-4">
+                    <div class="max-w-xl mx-auto">
+                        {{-- Barcode input --}}
+                        <div class="flex gap-2 mb-3">
+                            <input type="text"
+                                   x-model="barcode"
+                                   x-ref="scanInput"
+                                   @keydown.enter="processBarcode()"
+                                   placeholder="Scan or type barcode..."
+                                   :inputmode="keyboardEnabled ? 'text' : 'none'"
+                                   autocomplete="off"
+                                   class="flex-1 text-lg py-3 px-4 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:ring-blue-500 touch-manipulation">
+                            {{-- Keyboard toggle --}}
+                            <button @click="keyboardEnabled = !keyboardEnabled; $nextTick(() => $refs.scanInput.focus())"
+                                    class="px-3 py-2 rounded-lg border-2 touch-manipulation"
+                                    :class="keyboardEnabled ? 'bg-blue-100 border-blue-500 text-blue-700' : 'bg-gray-100 border-gray-300 text-gray-500'"
+                                    title="Toggle keyboard">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h18a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V6a1 1 0 011-1zm3 4h2m2 0h2m2 0h2m2 0h2M6 12h2m2 0h2m2 0h2m2 0h2M8 16h8"/>
+                                </svg>
+                            </button>
+                            {{-- Camera toggle --}}
+                            <button @click="toggleCamera()"
+                                    class="px-3 py-2 rounded-lg border-2 touch-manipulation"
+                                    :class="cameraActive ? 'bg-green-100 border-green-500 text-green-700' : 'bg-gray-100 border-gray-300 text-gray-500'"
+                                    title="Use camera to scan">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        {{-- Camera view --}}
+                        <div x-show="cameraVisible" x-transition class="mb-3">
+                            <div id="stock-check-scanner" class="w-full rounded-lg overflow-hidden" style="min-height: 250px;"></div>
+                            <p class="text-xs text-gray-500 mt-1 text-center" x-text="cameraStatus"></p>
+                        </div>
+
+                        {{-- Loading --}}
+                        <div x-show="processing" class="text-center py-4">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                            <p class="text-gray-500 mt-2 text-sm">Looking up product...</p>
+                        </div>
+
+                        {{-- Result --}}
+                        <div x-show="lastResult && !processing" x-transition class="rounded-lg border-2 p-4"
+                             :class="lastResult?.success ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'">
+                            <template x-if="lastResult?.success">
+                                <div>
+                                    <div class="flex items-start gap-3">
+                                        {{-- Product image --}}
+                                        <template x-if="lastResult.product?.image_url">
+                                            <img :src="lastResult.product.image_url" class="w-16 h-16 object-cover rounded border border-gray-200" onerror="this.style.display='none'">
+                                        </template>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="font-semibold text-gray-900 truncate" x-text="lastResult.product?.name"></div>
+                                            <div class="text-sm text-gray-500" x-text="lastResult.product?.code"></div>
+                                            <div class="text-xs text-gray-400" x-text="lastResult.product?.category + (lastResult.product?.supplier ? ' - ' + lastResult.product.supplier : '')"></div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="text-2xl font-bold text-gray-900" x-text="Math.floor(lastResult.stock)"></div>
+                                            <div class="text-xs text-gray-500">in stock</div>
+                                        </div>
+                                    </div>
+
+                                    {{-- Stock count input --}}
+                                    <div class="mt-3 flex items-center gap-2">
+                                        <label class="text-sm text-gray-600 whitespace-nowrap">Update stock:</label>
+                                        <input type="number"
+                                               x-model="stockCount"
+                                               @keydown.enter="updateStockCount()"
+                                               min="0" max="9999" step="1"
+                                               class="w-24 text-center py-1 px-2 rounded border border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                               placeholder="qty">
+                                        <button @click="updateStockCount()"
+                                                class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                                                :disabled="stockCount === '' || stockCount === null">
+                                            Update
+                                        </button>
+                                        <span x-show="stockUpdated" x-transition class="text-green-600 text-sm font-medium">Updated!</span>
+                                    </div>
+
+                                    <div class="mt-2 flex items-center gap-1">
+                                        <svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                                        <span class="text-sm text-green-700" x-text="lastResult.message"></span>
+                                    </div>
+                                </div>
+                            </template>
+                            <template x-if="lastResult && !lastResult.success">
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
+                                    <span class="text-sm text-red-700" x-text="lastResult.message"></span>
+                                </div>
+                            </template>
+                        </div>
+
+                        {{-- Scan history --}}
+                        <template x-if="scanHistory.length > 0">
+                            <div class="mt-3">
+                                <div class="text-xs font-medium text-gray-500 uppercase mb-1">Recent scans</div>
+                                <div class="space-y-1 max-h-32 overflow-y-auto">
+                                    <template x-for="(scan, i) in scanHistory" :key="i">
+                                        <div class="flex items-center justify-between text-sm py-1 px-2 rounded"
+                                             :class="scan.success ? 'bg-green-50' : 'bg-red-50'">
+                                            <span class="truncate" x-text="scan.name || scan.barcode"></span>
+                                            <span class="text-xs text-gray-400 whitespace-nowrap ml-2" x-text="scan.time"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
             @if($reviewData)
                 @php
                     $summary = $reviewData['summary'];
@@ -366,6 +502,166 @@
             @endif
         </div>
     </div>
+
+    <script>
+        function stockChecker() {
+            return {
+                panelOpen: false,
+                barcode: '',
+                keyboardEnabled: false,
+                processing: false,
+                lastResult: null,
+                checksCount: 0,
+                scanHistory: [],
+                stockCount: '',
+                stockUpdated: false,
+                cameraActive: false,
+                cameraVisible: false,
+                cameraStatus: '',
+
+                async toggleCamera() {
+                    if (this.cameraActive) {
+                        await this.stopCamera();
+                        return;
+                    }
+
+                    if (!window.BarcodeScanner) {
+                        this.cameraStatus = 'Camera scanner not available. Make sure you are using HTTPS.';
+                        return;
+                    }
+
+                    this.cameraVisible = true;
+                    this.cameraStatus = 'Starting camera...';
+
+                    await this.$nextTick();
+
+                    try {
+                        await window.BarcodeScanner.startScanner('stock-check-scanner',
+                            (text) => this.onCameraDetected(text),
+                            () => {}
+                        );
+                        this.cameraActive = true;
+                        this.cameraStatus = 'Point camera at barcode...';
+                    } catch (err) {
+                        this.cameraVisible = false;
+                        this.cameraStatus = 'Camera error: ' + (err?.message || String(err));
+                    }
+                },
+
+                async stopCamera() {
+                    if (window.BarcodeScanner) {
+                        await window.BarcodeScanner.stopScanner();
+                    }
+                    this.cameraActive = false;
+                    this.cameraVisible = false;
+                    this.cameraStatus = '';
+                },
+
+                onCameraDetected(text) {
+                    // Beep
+                    try {
+                        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                        const osc = ctx.createOscillator();
+                        osc.frequency.value = 1000;
+                        osc.connect(ctx.destination);
+                        osc.start();
+                        osc.stop(ctx.currentTime + 0.1);
+                    } catch (e) {}
+
+                    this.cameraStatus = 'Detected: ' + text;
+                    this.stopCamera();
+                    this.barcode = text;
+                    this.processBarcode();
+                },
+
+                async processBarcode() {
+                    if (!this.barcode.trim() || this.processing) return;
+
+                    this.processing = true;
+                    this.lastResult = null;
+                    this.stockCount = '';
+                    this.stockUpdated = false;
+
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
+                    try {
+                        const res = await fetch('{{ route("stock-review.stock-check") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken
+                            },
+                            body: JSON.stringify({ barcode: this.barcode.trim() })
+                        });
+
+                        const data = await res.json();
+                        this.lastResult = data;
+
+                        if (data.success) {
+                            this.checksCount++;
+                            this.stockCount = Math.floor(data.stock);
+                            this.scanHistory.unshift({
+                                success: true,
+                                barcode: data.product.code,
+                                name: data.product.name,
+                                time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+                            });
+                        } else {
+                            this.scanHistory.unshift({
+                                success: false,
+                                barcode: this.barcode,
+                                name: data.message || 'Not found',
+                                time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+                            });
+                        }
+
+                        // Keep only last 10 scans
+                        if (this.scanHistory.length > 10) this.scanHistory.pop();
+
+                    } catch (err) {
+                        this.lastResult = { success: false, message: 'Network error - please try again' };
+                    } finally {
+                        this.processing = false;
+                        this.barcode = '';
+                        this.$nextTick(() => this.$refs.scanInput?.focus());
+                    }
+                },
+
+                async updateStockCount() {
+                    if (this.stockCount === '' || this.stockCount === null || !this.lastResult?.product) return;
+
+                    this.stockUpdated = false;
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
+                    try {
+                        const res = await fetch('{{ route("stock-review.stock-check") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken
+                            },
+                            body: JSON.stringify({
+                                barcode: this.lastResult.product.code,
+                                stock_count: parseFloat(this.stockCount)
+                            })
+                        });
+
+                        const data = await res.json();
+                        if (data.success) {
+                            this.lastResult.stock = data.stock;
+                            this.lastResult.message = data.message;
+                            this.stockUpdated = true;
+                            setTimeout(() => this.stockUpdated = false, 2000);
+                        }
+                    } catch (err) {
+                        // silently fail
+                    }
+                }
+            };
+        }
+    </script>
 
     @if($reviewData)
     <script>

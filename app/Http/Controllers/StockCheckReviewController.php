@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\Product;
+use App\Models\StockLastChecked;
 use App\Models\StockZeroAudit;
 use App\Services\StockCheckReviewService;
+use App\Services\SupplierService;
 use Illuminate\Http\Request;
 
 class StockCheckReviewController extends Controller
@@ -87,6 +90,84 @@ class StockCheckReviewController extends Controller
         $salesData = $this->reviewService->getSalesHistory($request->category);
 
         return response()->json($salesData);
+    }
+
+    /**
+     * Stock check a product by barcode - lookup and mark as checked.
+     */
+    public function stockCheck(Request $request)
+    {
+        $request->validate([
+            'barcode' => 'required|string',
+            'stock_count' => 'nullable|numeric|min:0|max:9999.99',
+        ]);
+
+        $product = Product::with(['stockCurrent', 'category', 'supplier'])
+            ->where('CODE', $request->barcode)
+            ->first();
+
+        if (! $product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product not found',
+            ], 404);
+        }
+
+        $currentStock = $product->getCurrentStock();
+
+        // Update the stockLastChecked record (upsert)
+        StockLastChecked::updateOrCreate(
+            ['Barcode' => $product->CODE],
+            ['Date' => now()]
+        );
+
+        // If a stock count was provided, update stock
+        $stockUpdated = false;
+        if ($request->has('stock_count') && $request->stock_count !== null) {
+            $newStock = (float) $request->stock_count;
+            if ($newStock != $currentStock) {
+                \App\Models\StockCurrent::updateOrCreate(
+                    ['PRODUCT' => $product->ID],
+                    ['UNITS' => $newStock, 'LOCATION' => '0', 'ATTRIBUTESETINSTANCE_ID' => null]
+                );
+
+                \App\Models\StockAdjustment::create([
+                    'barcode' => $product->CODE,
+                    'product_id' => $product->ID,
+                    'old_stock' => $currentStock,
+                    'new_stock' => $newStock,
+                    'adjustment' => $newStock - $currentStock,
+                    'user_id' => auth()->id(),
+                    'source' => 'stock_check',
+                ]);
+
+                $stockUpdated = true;
+                $currentStock = $newStock;
+            }
+        }
+
+        // Get image URL
+        $imageUrl = null;
+        if ($product->hasImage()) {
+            $imageUrl = route('products.image', $product->ID);
+        } else {
+            $supplierService = app(SupplierService::class);
+            $imageUrl = $supplierService->getExternalImageUrl($product);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $stockUpdated ? 'Stock checked & updated' : 'Stock checked',
+            'product' => [
+                'name' => $product->NAME,
+                'code' => $product->CODE,
+                'category' => $product->category?->NAME ?? 'Uncategorized',
+                'supplier' => $product->supplier?->Supplier ?? '',
+                'image_url' => $imageUrl,
+            ],
+            'stock' => $currentStock,
+            'stock_updated' => $stockUpdated,
+        ]);
     }
 
     /**

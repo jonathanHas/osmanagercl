@@ -107,6 +107,7 @@ Route::middleware('auth')->group(function () {
 
     // Stock Check Review routes
     Route::get('/stock-review', [StockCheckReviewController::class, 'index'])->name('stock-review.index');
+    Route::post('/stock-review/stock-check', [StockCheckReviewController::class, 'stockCheck'])->name('stock-review.stock-check');
     Route::post('/stock-review/set-to-zero', [StockCheckReviewController::class, 'setToZero'])->name('stock-review.set-to-zero');
     Route::get('/stock-review/sales-data', [StockCheckReviewController::class, 'salesData'])->name('stock-review.sales-data');
     Route::get('/stock-review/audit-log', [StockCheckReviewController::class, 'auditLog'])->name('stock-review.audit-log');
