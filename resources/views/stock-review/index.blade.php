@@ -503,6 +503,8 @@
         </div>
     </div>
 
+    @vite(['resources/js/barcode-scanner.js'])
+
     <script>
         function stockChecker() {
             return {
