@@ -4,9 +4,10 @@
             <h2 class="font-semibold text-lg text-gray-800 leading-tight py-1">
                 Stock Check Review
             </h2>
-            <a href="{{ route('stock-review.audit-log') }}" class="text-sm text-blue-600 hover:text-blue-800">
-                Audit Log
-            </a>
+            <button onclick="document.dispatchEvent(new CustomEvent('toggle-history'))" class="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                History
+            </button>
         </div>
     </x-slot>
 
@@ -192,7 +193,7 @@
                             <div class="border-l-4 {{ $borderColor }}" x-data="{ expanded: false }">
                                 <button @click="expanded = !expanded" class="w-full text-left px-3 py-2.5 flex items-center gap-2">
                                     @if($item->image_url)
-                                        <img src="{{ $item->image_url }}" alt="" class="w-10 h-10 object-cover rounded border border-gray-200 flex-shrink-0 cursor-pointer" loading="lazy" @click.stop="openImage('{{ $item->image_url }}', '{{ addslashes($item->product->NAME) }}')" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <img src="{{ $item->image_url }}" alt="" class="w-10 h-10 object-cover rounded border border-gray-200 flex-shrink-0 cursor-pointer" loading="lazy" data-img-url="{{ $item->image_url }}" data-img-name="{{ $item->product->NAME }}" @click.stop="$dispatch('open-image', { url: $el.dataset.imgUrl, name: $el.dataset.imgName })" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                                         <div class="w-10 h-10 bg-gray-100 rounded border border-gray-200 items-center justify-center flex-shrink-0" style="display:none">
                                             <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                         </div>
@@ -263,7 +264,7 @@
                                     <tr class="{{ $rowClass }} hover:bg-opacity-70">
                                         <td class="px-2 py-2">
                                             @if($item->image_url)
-                                                <div class="relative w-8 h-8 cursor-pointer" x-data="{ show: false, pos: { x: 0, y: 0 } }" @mouseenter="const r=$el.getBoundingClientRect(); pos.x=r.left; pos.y=r.bottom+8; show=true;" @mouseleave="show=false" @click="$event.stopPropagation(); openImage('{{ $item->image_url }}', '{{ addslashes($item->product->NAME) }}')">
+                                                <div class="relative w-8 h-8 cursor-pointer" x-data="{ show: false, pos: { x: 0, y: 0 } }" data-img-url="{{ $item->image_url }}" data-img-name="{{ $item->product->NAME }}" @mouseenter="const r=$el.getBoundingClientRect(); pos.x=r.left; pos.y=r.bottom+8; show=true;" @mouseleave="show=false" @click="$event.stopPropagation(); $dispatch('open-image', { url: $el.dataset.imgUrl, name: $el.dataset.imgName })">
                                                     <img src="{{ $item->image_url }}" alt="" class="w-8 h-8 object-cover rounded border border-gray-200" loading="lazy" onerror="this.style.display='none'">
                                                     <template x-teleport="body">
                                                         <div x-show="show" x-transition.opacity class="fixed z-[99999] pointer-events-none" :style="'left:'+pos.x+'px;top:'+pos.y+'px;'">
@@ -432,7 +433,7 @@
                                 <div>
                                     <div class="flex items-start gap-3">
                                         <template x-if="scanner.lastResult.product?.image_url">
-                                            <img :src="scanner.lastResult.product.image_url" class="w-16 h-16 object-cover rounded border border-gray-600 cursor-pointer" @click="openImage(scanner.lastResult.product.image_url, scanner.lastResult.product.name)" onerror="this.style.display='none'">
+                                            <img :src="scanner.lastResult.product.image_url" class="w-16 h-16 object-cover rounded border border-gray-600 cursor-pointer" @click="$dispatch('open-image', { url: scanner.lastResult.product.image_url, name: scanner.lastResult.product.name })" onerror="this.style.display='none'">
                                         </template>
                                         <div class="flex-1 min-w-0">
                                             <div class="font-semibold text-white leading-tight" x-text="scanner.lastResult.product?.name"></div>
@@ -483,30 +484,178 @@
                     </div>
                 </div>
             </div>
-        {{-- ===== IMAGE LIGHTBOX MODAL ===== --}}
-        <div x-show="imageModal.open" x-transition.opacity
-             class="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-80 p-4"
-             @click="imageModal.open = false" @keydown.escape.window="imageModal.open = false"
-             style="display:none;">
-            <div class="relative max-w-lg w-full" @click.stop>
-                <button @click="imageModal.open = false" class="absolute -top-10 right-0 text-white hover:text-gray-300 touch-manipulation">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-                <img :src="imageModal.url" :alt="imageModal.name" class="w-full h-auto max-h-[80vh] object-contain rounded-lg bg-white">
-                <div x-show="imageModal.name" class="mt-2 text-center text-white text-sm" x-text="imageModal.name"></div>
-            </div>
         </div>
+    </div>
+
+    {{-- ===== IMAGE LIGHTBOX MODAL (independent Alpine component) ===== --}}
+    <div x-data="imageLightbox()" @open-image.window="open($event.detail.url, $event.detail.name)" x-show="showing" x-transition.opacity
+         class="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-80 p-4"
+         @click="showing = false" @keydown.escape.window="showing = false"
+         style="display:none;">
+        <div class="relative max-w-lg w-full" @click.stop>
+            <button @click="showing = false" class="absolute -top-10 right-0 text-white hover:text-gray-300 touch-manipulation">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+            <img :src="url" :alt="name" class="w-full h-auto max-h-[80vh] object-contain rounded-lg bg-white">
+            <div x-show="name" class="mt-2 text-center text-white text-sm" x-text="name"></div>
+        </div>
+    </div>
+
+    {{-- ===== SET TO ZERO HISTORY MODAL (independent Alpine component) ===== --}}
+    <div x-data="zeroHistory()" @toggle-history.document="toggle()" x-show="open" x-transition.opacity
+         class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black bg-opacity-50"
+         @click="open = false" @keydown.escape.window="open = false"
+         style="display:none;">
+        <div class="bg-white rounded-t-xl sm:rounded-lg shadow-xl w-full max-w-2xl mx-0 sm:mx-4 max-h-[85vh] flex flex-col" @click.stop>
+            {{-- Header --}}
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <h3 class="text-lg font-semibold text-gray-900">Set to Zero History</h3>
+                </div>
+                <button @click="open = false" class="text-gray-400 hover:text-gray-600 touch-manipulation">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            {{-- Content --}}
+            <div class="flex-1 overflow-y-auto">
+                {{-- Loading --}}
+                <div x-show="loading" class="py-8 text-center">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                    <p class="text-gray-500 mt-2 text-sm">Loading history...</p>
+                </div>
+
+                {{-- Empty --}}
+                <div x-show="!loading && items.length === 0" class="py-8 text-center text-gray-400">
+                    <p>No set-to-zero records found.</p>
+                </div>
+
+                {{-- History list --}}
+                <div x-show="!loading && items.length > 0" class="divide-y divide-gray-100">
+                    <template x-for="(item, idx) in items" :key="item.id">
+                        <div>
+                            <div class="px-4 py-3 flex items-start gap-3 cursor-pointer hover:bg-gray-50"
+                                 :class="item.product_details ? 'cursor-pointer' : ''"
+                                 @click="item.product_details ? (expanded === item.id ? expanded = null : expanded = item.id) : null">
+                                {{-- Date --}}
+                                <div class="flex-shrink-0 text-center w-12">
+                                    <div class="text-xs text-gray-400" x-text="formatDate(item.date).day"></div>
+                                    <div class="text-sm font-semibold text-gray-700" x-text="formatDate(item.date).month"></div>
+                                    <div class="text-xs text-gray-400" x-text="formatDate(item.date).year"></div>
+                                </div>
+
+                                {{-- Details --}}
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-medium text-sm text-gray-900" x-text="item.category_name"></span>
+                                        <span class="text-xs px-1.5 py-0.5 rounded-full"
+                                              :class="item.source === 'new' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'"
+                                              x-text="item.source === 'new' ? 'New' : 'Legacy'"></span>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-0.5">
+                                        <span x-text="formatDate(item.date).time"></span>
+                                        <template x-if="item.user">
+                                            <span> &middot; <span x-text="item.user"></span></span>
+                                        </template>
+                                    </div>
+                                    <template x-if="item.products_zeroed !== null">
+                                        <div class="text-xs text-gray-500 mt-0.5">
+                                            <span x-text="item.products_zeroed"></span> products zeroed
+                                            <template x-if="item.total_value">
+                                                <span> &middot; &euro;<span x-text="parseFloat(item.total_value).toFixed(2)"></span></span>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+
+                                {{-- Expand icon (only for new records with details) --}}
+                                <template x-if="item.product_details">
+                                    <svg class="w-4 h-4 text-gray-400 flex-shrink-0 mt-1 transition-transform" :class="expanded === item.id ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                </template>
+                            </div>
+
+                            {{-- Expanded product details --}}
+                            <template x-if="item.product_details && expanded === item.id">
+                                <div class="px-4 pb-3 ml-15">
+                                    <div class="bg-gray-50 rounded-md p-2 max-h-40 overflow-y-auto">
+                                        <template x-for="(p, pi) in item.product_details" :key="pi">
+                                            <div class="flex justify-between text-xs py-1 border-b border-gray-100 last:border-0">
+                                                <span class="text-gray-700 truncate mr-2" x-text="p.name"></span>
+                                                <div class="flex gap-3 flex-shrink-0 text-gray-500">
+                                                    <span x-text="parseFloat(p.old_stock).toFixed(1)"></span>
+                                                    <span class="text-red-600" x-text="'€' + parseFloat(p.cost_value).toFixed(2)"></span>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </div>
         </div>
     </div>
 
     @vite(['resources/js/barcode-scanner.js'])
 
     <script>
+        function zeroHistory() {
+            return {
+                open: false,
+                loading: false,
+                items: [],
+                expanded: null,
+
+                async toggle() {
+                    this.open = !this.open;
+                    if (this.open && this.items.length === 0) {
+                        await this.load();
+                    }
+                },
+
+                async load() {
+                    this.loading = true;
+                    try {
+                        const res = await fetch('{{ route("stock-review.history") }}');
+                        this.items = await res.json();
+                    } catch (e) {
+                        this.items = [];
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                formatDate(dateStr) {
+                    const d = new Date(dateStr);
+                    return {
+                        day: d.getDate(),
+                        month: d.toLocaleString('en-GB', { month: 'short' }),
+                        year: d.getFullYear(),
+                        time: d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+                    };
+                }
+            };
+        }
+
+        function imageLightbox() {
+            return {
+                showing: false,
+                url: '',
+                name: '',
+                open(url, name) {
+                    this.url = url;
+                    this.name = name || '';
+                    this.showing = true;
+                }
+            };
+        }
+
         function stockPage() {
             return {
                 filtersOpen: false,
                 scannerOpen: false,
-                imageModal: { open: false, url: '', name: '' },
                 scanner: {
                     barcode: '',
                     keyboardEnabled: false,
@@ -526,9 +675,6 @@
                     this.$nextTick(() => this.$refs.scannerInput?.focus());
                 },
 
-                openImage(url, name) {
-                    this.imageModal = { open: true, url, name: name || '' };
-                },
 
                 closeScanner() {
                     this.stopScannerCamera();

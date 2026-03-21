@@ -9,6 +9,7 @@ use App\Models\StockZeroAudit;
 use App\Services\StockCheckReviewService;
 use App\Services\SupplierService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class StockCheckReviewController extends Controller
 {
@@ -182,5 +183,59 @@ class StockCheckReviewController extends Controller
         return view('stock-review.audit-log', [
             'audits' => $audits,
         ]);
+    }
+
+    /**
+     * Get combined set-to-zero history from old POS + new Laravel systems.
+     */
+    public function history(Request $request)
+    {
+        // Old system records from POS catSetZero table
+        $oldRecords = DB::connection('pos')
+            ->table('catSetZero')
+            ->leftJoin('CATEGORIES', 'catSetZero.catID', '=', 'CATEGORIES.ID')
+            ->select(
+                'catSetZero.ID as id',
+                'catSetZero.catID as category_id',
+                'CATEGORIES.NAME as category_name',
+                'catSetZero.dateUpdated as date'
+            )
+            ->orderByDesc('catSetZero.dateUpdated')
+            ->limit(200)
+            ->get()
+            ->map(fn ($r) => [
+                'id' => $r->id,
+                'date' => $r->date,
+                'category_name' => $r->category_name ?? 'Unknown',
+                'source' => 'old',
+                'products_zeroed' => null,
+                'total_value' => null,
+                'user' => null,
+                'product_details' => null,
+            ]);
+
+        // New system records from Laravel stock_zero_audits table
+        $newRecords = StockZeroAudit::with('user')
+            ->orderByDesc('created_at')
+            ->limit(100)
+            ->get()
+            ->map(fn ($a) => [
+                'id' => 'new_'.$a->id,
+                'date' => $a->created_at->toDateTimeString(),
+                'category_name' => $a->category_name,
+                'source' => 'new',
+                'products_zeroed' => $a->products_zeroed,
+                'total_value' => $a->total_stock_value_zeroed,
+                'user' => $a->user?->name,
+                'product_details' => $a->product_details,
+            ]);
+
+        // Merge and sort by date descending
+        $combined = $oldRecords->concat($newRecords)
+            ->sortByDesc('date')
+            ->values()
+            ->take(100);
+
+        return response()->json($combined);
     }
 }
