@@ -192,7 +192,7 @@
                             <div class="border-l-4 {{ $borderColor }}" x-data="{ expanded: false }">
                                 <button @click="expanded = !expanded" class="w-full text-left px-3 py-2.5 flex items-center gap-2">
                                     @if($item->image_url)
-                                        <img src="{{ $item->image_url }}" alt="" class="w-10 h-10 object-cover rounded border border-gray-200 flex-shrink-0" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <img src="{{ $item->image_url }}" alt="" class="w-10 h-10 object-cover rounded border border-gray-200 flex-shrink-0 cursor-pointer" loading="lazy" @click.stop="openImage('{{ $item->image_url }}', '{{ addslashes($item->product->NAME) }}')" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                                         <div class="w-10 h-10 bg-gray-100 rounded border border-gray-200 items-center justify-center flex-shrink-0" style="display:none">
                                             <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                         </div>
@@ -263,7 +263,7 @@
                                     <tr class="{{ $rowClass }} hover:bg-opacity-70">
                                         <td class="px-2 py-2">
                                             @if($item->image_url)
-                                                <div class="relative w-8 h-8" x-data="{ show: false, pos: { x: 0, y: 0 } }" @mouseenter="const r=$el.getBoundingClientRect(); pos.x=r.left; pos.y=r.bottom+8; show=true;" @mouseleave="show=false">
+                                                <div class="relative w-8 h-8 cursor-pointer" x-data="{ show: false, pos: { x: 0, y: 0 } }" @mouseenter="const r=$el.getBoundingClientRect(); pos.x=r.left; pos.y=r.bottom+8; show=true;" @mouseleave="show=false" @click="$event.stopPropagation(); openImage('{{ $item->image_url }}', '{{ addslashes($item->product->NAME) }}')">
                                                     <img src="{{ $item->image_url }}" alt="" class="w-8 h-8 object-cover rounded border border-gray-200" loading="lazy" onerror="this.style.display='none'">
                                                     <template x-teleport="body">
                                                         <div x-show="show" x-transition.opacity class="fixed z-[99999] pointer-events-none" :style="'left:'+pos.x+'px;top:'+pos.y+'px;'">
@@ -432,7 +432,7 @@
                                 <div>
                                     <div class="flex items-start gap-3">
                                         <template x-if="scanner.lastResult.product?.image_url">
-                                            <img :src="scanner.lastResult.product.image_url" class="w-16 h-16 object-cover rounded border border-gray-600" onerror="this.style.display='none'">
+                                            <img :src="scanner.lastResult.product.image_url" class="w-16 h-16 object-cover rounded border border-gray-600 cursor-pointer" @click="openImage(scanner.lastResult.product.image_url, scanner.lastResult.product.name)" onerror="this.style.display='none'">
                                         </template>
                                         <div class="flex-1 min-w-0">
                                             <div class="font-semibold text-white leading-tight" x-text="scanner.lastResult.product?.name"></div>
@@ -483,6 +483,19 @@
                     </div>
                 </div>
             </div>
+        {{-- ===== IMAGE LIGHTBOX MODAL ===== --}}
+        <div x-show="imageModal.open" x-transition.opacity
+             class="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-80 p-4"
+             @click="imageModal.open = false" @keydown.escape.window="imageModal.open = false"
+             style="display:none;">
+            <div class="relative max-w-lg w-full" @click.stop>
+                <button @click="imageModal.open = false" class="absolute -top-10 right-0 text-white hover:text-gray-300 touch-manipulation">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+                <img :src="imageModal.url" :alt="imageModal.name" class="w-full h-auto max-h-[80vh] object-contain rounded-lg bg-white">
+                <div x-show="imageModal.name" class="mt-2 text-center text-white text-sm" x-text="imageModal.name"></div>
+            </div>
+        </div>
         </div>
     </div>
 
@@ -493,6 +506,7 @@
             return {
                 filtersOpen: false,
                 scannerOpen: false,
+                imageModal: { open: false, url: '', name: '' },
                 scanner: {
                     barcode: '',
                     keyboardEnabled: false,
@@ -510,6 +524,10 @@
                 openScanner() {
                     this.scannerOpen = true;
                     this.$nextTick(() => this.$refs.scannerInput?.focus());
+                },
+
+                openImage(url, name) {
+                    this.imageModal = { open: true, url, name: name || '' };
                 },
 
                 closeScanner() {
