@@ -49,12 +49,17 @@ class StockCheckReviewService
             ];
         });
 
-        // Sort
-        $enriched = match ($sortBy) {
-            'checked_asc' => $enriched->sortBy(fn ($item) => $item->checked_date ?? Carbon::createFromTimestamp(0)),
-            'checked_desc' => $enriched->sortByDesc(fn ($item) => $item->checked_date ?? Carbon::createFromTimestamp(0)),
-            default => $enriched->sortBy(fn ($item) => $item->product->NAME),
-        };
+        // Sort — always group needs-attention items first (danger, warning), then ok, then verified
+        $statusOrder = ['danger' => 0, 'warning' => 1, 'ok' => 2, 'verified' => 3];
+
+        $enriched = $enriched->sortBy([
+            fn ($a, $b) => ($statusOrder[$a->status] ?? 9) <=> ($statusOrder[$b->status] ?? 9),
+            fn ($a, $b) => match ($sortBy) {
+                'checked_asc' => ($a->checked_date ?? Carbon::createFromTimestamp(0)) <=> ($b->checked_date ?? Carbon::createFromTimestamp(0)),
+                'checked_desc' => ($b->checked_date ?? Carbon::createFromTimestamp(0)) <=> ($a->checked_date ?? Carbon::createFromTimestamp(0)),
+                default => strcmp($a->product->NAME, $b->product->NAME),
+            },
+        ]);
 
         $summary = $this->computeSummary($enriched, $refDate);
 
