@@ -22,6 +22,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SalesImportController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\StockCheckReviewController;
 use App\Http\Controllers\StockingController;
 use App\Http\Controllers\TestScraperController;
 use App\Http\Controllers\UdeaDiagnosticsController;
@@ -103,6 +104,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/stocking/lookup', [StockingController::class, 'lookup'])->name('stocking.lookup');
     Route::post('/stocking/update-stock', [StockingController::class, 'updateStock'])->name('stocking.update-stock');
     Route::get('/stocking/logs', [StockingController::class, 'logs'])->name('stocking.logs')->middleware('role:admin');
+
+    // Stock Check Review routes
+    Route::get('/stock-review', [StockCheckReviewController::class, 'index'])->name('stock-review.index');
+    Route::post('/stock-review/set-to-zero', [StockCheckReviewController::class, 'setToZero'])->name('stock-review.set-to-zero');
+    Route::get('/stock-review/sales-data', [StockCheckReviewController::class, 'salesData'])->name('stock-review.sales-data');
+    Route::get('/stock-review/audit-log', [StockCheckReviewController::class, 'auditLog'])->name('stock-review.audit-log');
 
     // Invoice Management routes - specific routes BEFORE resource routes
     Route::get('/invoices/create-simple', [\App\Http\Controllers\InvoiceController::class, 'createSimple'])->name('invoices.create-simple');

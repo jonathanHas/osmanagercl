@@ -221,6 +221,14 @@ class Product extends Model
     }
 
     /**
+     * Get the last stock check record for this product.
+     */
+    public function stockLastChecked()
+    {
+        return $this->hasOne(StockLastChecked::class, 'Barcode', 'CODE');
+    }
+
+    /**
      * Get the veg details for this product.
      */
     public function vegDetails()

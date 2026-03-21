@@ -391,6 +391,20 @@ class ProductRepository
     }
 
     /**
+     * Get products for stock check review (all products in a category with stock/check data).
+     */
+    public function getProductsForStockReview(string $categoryId, bool $stockedOnly = false): Collection
+    {
+        return Product::where('CATEGORY', $categoryId)
+            ->select('PRODUCTS.*')
+            ->addSelect(DB::raw('(CASE WHEN IMAGE IS NOT NULL AND LENGTH(IMAGE) > 0 THEN 1 ELSE 0 END) as has_image'))
+            ->with(['stockCurrent', 'stockLastChecked', 'stocking', 'supplierLink', 'supplier'])
+            ->when($stockedOnly, fn ($q) => $q->stocked())
+            ->orderBy('NAME')
+            ->get();
+    }
+
+    /**
      * Get all suppliers that have products for dropdown filter.
      */
     public function getAllSuppliersWithProducts(
