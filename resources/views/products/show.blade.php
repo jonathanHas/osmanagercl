@@ -1768,7 +1768,7 @@
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                 },
-                body: JSON.stringify({ include_in_stocking: includeInStocking })
+                body: JSON.stringify({ include_in_stocking: includeInStocking, source: 'product_show' })
             })
             .then(response => response.json())
             .then(data => {

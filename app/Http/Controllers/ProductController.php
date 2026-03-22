@@ -1896,6 +1896,7 @@ class ProductController extends Controller
     {
         $request->validate([
             'include_in_stocking' => 'required|boolean',
+            'source' => 'sometimes|string|max:50',
         ]);
 
         $product = $this->productRepository->findById($id);
@@ -1916,6 +1917,14 @@ class ProductController extends Controller
                 \App\Models\Stocking::where('Barcode', $product->CODE)->delete();
                 $message = 'Product removed from stock management';
             }
+
+            \App\Models\DestockAudit::create([
+                'barcode' => $product->CODE,
+                'product_name' => $product->NAME,
+                'action' => $shouldInclude ? 'restock' : 'destock',
+                'user_id' => auth()->id(),
+                'source' => $request->input('source'),
+            ]);
 
             return response()->json([
                 'success' => true,

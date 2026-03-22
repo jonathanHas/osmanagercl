@@ -3671,7 +3671,7 @@
                                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                                 'Accept': 'application/json'
                             },
-                            body: JSON.stringify({ include_in_stocking: !isStocked })
+                            body: JSON.stringify({ include_in_stocking: !isStocked, source: 'order_review_christmas' })
                         });
 
                         const data = await response.json();

@@ -197,6 +197,18 @@ Admin-only page to view and audit all stock adjustments.
 
 📖 [Stocking Documentation](./features/stocking.md#stock-adjustment-logs)
 
+### Stock Check Review (NEW! 2026-03-21)
+Review physical stock checks by category, identify unchecked products, and bulk-zero stale inventory.
+- **Category Review**: Color-coded product list grouped by status — items needing attention shown first
+- **Scanner Modal**: Fullscreen barcode scanner with camera support for performing stock checks
+- **Set to Zero**: Bulk zero unchecked products with confirmation modal and full audit trail
+- **History**: Combined timeline of old and new set-to-zero operations
+- **Product Images**: Click-to-enlarge thumbnails from database and supplier CDNs
+- **Mobile-Optimized**: Collapsible controls, card layout, bottom-sheet modals
+- **Sales Data**: Optional lazy-loaded last 5 months sales per product
+
+📖 [Stock Check Review Documentation](./features/stock-check-review.md)
+
 ---
 
 ## Kitchen Management

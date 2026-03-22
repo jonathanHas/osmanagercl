@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Stock Check Review** (2026-03-21)
+  - New page for reviewing physical stock checks by category, replacing old PHP `stock_by_category_REVIEW2.php`
+  - Products grouped by status: items needing attention (unchecked with stock) shown first
+  - Color-coded rows: red (unchecked with stock), yellow (negative stock), green (zero/safe), white (verified)
+  - Summary dashboard with progress bar, checked count, at-risk value
+  - Product images from database, Udea CDN, and Independent CDN with click-to-enlarge lightbox
+  - Fullscreen scanner modal with barcode input, phone camera scanning (html5-qrcode), and optional stock update
+  - "Set to Zero" with confirmation modal — bulk zeros unchecked products with full audit trail
+  - Set-to-zero history modal combining old POS `catSetZero` records and new Laravel audit records
+  - Sales history toggle (lazy-loaded, last 5 months per product)
+  - Mobile-optimized: collapsible controls, card layout, bottom-sheet modals, touch-friendly buttons
+  - **New**: `app/Models/StockLastChecked.php`, `app/Models/StockZeroAudit.php`, `app/Services/StockCheckReviewService.php`, `app/Http/Controllers/StockCheckReviewController.php`, `resources/views/stock-review/index.blade.php`, `resources/views/stock-review/audit-log.blade.php`
+  - **Modified**: `app/Models/Product.php`, `app/Repositories/ProductRepository.php`, `routes/web.php`, `resources/views/layouts/admin.blade.php`
+  - **Migration**: `create_stock_zero_audits_table`
+
 ### Fixed
 
 - **Delivery "Invoiced" column showing ordered quantity instead of delivered quantity** (2026-03-19)

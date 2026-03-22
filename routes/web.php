@@ -113,6 +113,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/stock-review/history', [StockCheckReviewController::class, 'history'])->name('stock-review.history');
     Route::get('/stock-review/audit-log', [StockCheckReviewController::class, 'auditLog'])->name('stock-review.audit-log');
 
+    // Destock Review routes
+    Route::get('/destock-review', [\App\Http\Controllers\DestockReviewController::class, 'index'])->name('destock-review.index');
+    Route::get('/destock-review/suggestions', [\App\Http\Controllers\DestockReviewController::class, 'suggestions'])->name('destock-review.suggestions');
+
     // Invoice Management routes - specific routes BEFORE resource routes
     Route::get('/invoices/create-simple', [\App\Http\Controllers\InvoiceController::class, 'createSimple'])->name('invoices.create-simple');
     Route::post('/invoices/store-simple', [\App\Http\Controllers\InvoiceController::class, 'storeSimple'])->name('invoices.store-simple');

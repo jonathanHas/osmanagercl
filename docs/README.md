@@ -47,6 +47,10 @@ Detailed documentation for each major feature. See **[Features Index](./FEATURES
 - [Sales Data Import](./features/sales-data-import.md) - Lightning-fast sales analytics
 - [Sales Accounting Report](./features/sales-accounting-report.md) - VAT-compliant sales analysis
 
+**Stock Management**
+- [Stocking Scanner](./features/stocking.md) - Mobile store room scanner
+- [Stock Check Review](./features/stock-check-review.md) - Category stock review and reconciliation
+
 **POS Integration**
 - [POS Integration](./features/pos-integration.md) - uniCenta POS database integration
 - [Coffee KDS System](./features/kds-coffee-system.md) - Real-time Kitchen Display
