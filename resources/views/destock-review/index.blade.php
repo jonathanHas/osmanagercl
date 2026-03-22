@@ -114,6 +114,9 @@
                                             @case('product_show')
                                                 Product Page
                                                 @break
+                                            @case('destock_review')
+                                                Destock Review
+                                                @break
                                             @default
                                                 {{ $audit->source ?? '—' }}
                                         @endswitch
