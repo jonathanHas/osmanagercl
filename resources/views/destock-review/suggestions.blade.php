@@ -24,7 +24,12 @@
             <!-- Filters -->
             <div class="bg-white shadow-sm sm:rounded-lg p-4 mb-4">
                 <form method="GET" action="{{ route('destock-review.suggestions') }}">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4 items-end">
+                        <div class="lg:col-span-2">
+                            <label for="search" class="block text-xs font-medium text-gray-500 uppercase">Search</label>
+                            <input type="text" name="search" id="search" value="{{ request('search') }}" placeholder="Product name or barcode..."
+                                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
                         <div>
                             <label for="days" class="block text-xs font-medium text-gray-500 uppercase">Sales Period</label>
                             <select name="days" id="days"
