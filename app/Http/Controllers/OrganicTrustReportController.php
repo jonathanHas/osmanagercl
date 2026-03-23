@@ -213,7 +213,7 @@ class OrganicTrustReportController extends Controller
 
                 return $supplier;
             })
-            ->filter(fn ($supplier) => $supplier->period_total > 0)
+            ->filter(fn ($supplier) => $supplier->period_total > 0 || $supplier->period_sales > 0)
             ->sortBy('name')
             ->values();
     }
