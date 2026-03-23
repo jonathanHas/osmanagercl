@@ -50,6 +50,7 @@ Detailed documentation for each major feature. See **[Features Index](./FEATURES
 **Stock Management**
 - [Stocking Scanner](./features/stocking.md) - Mobile store room scanner
 - [Stock Check Review](./features/stock-check-review.md) - Category stock review and reconciliation
+- [Destock Review](./features/destock-review.md) - Destock audit trail and restock suggestions
 
 **POS Integration**
 - [POS Integration](./features/pos-integration.md) - uniCenta POS database integration

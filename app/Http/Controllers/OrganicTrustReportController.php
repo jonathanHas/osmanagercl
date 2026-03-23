@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AccountingSupplier;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class OrganicTrustReportController extends Controller
 {
@@ -13,8 +14,11 @@ class OrganicTrustReportController extends Controller
         $startDate = $request->get('start_date', now()->startOfYear()->format('Y-m-d'));
         $endDate = $request->get('end_date', now()->format('Y-m-d'));
 
+        $productTypes = $this->getOption('organic_product_types', AccountingSupplier::ORGANIC_PRODUCT_TYPES);
+        $certBodies = $this->getOption('organic_certification_bodies', AccountingSupplier::ORGANIC_CERTIFICATION_BODIES);
+
         if (! $request->filled('start_date')) {
-            return view('suppliers.organic-trust-report', compact('startDate', 'endDate'));
+            return view('suppliers.organic-trust-report', compact('startDate', 'endDate', 'productTypes', 'certBodies'));
         }
 
         $startDateTime = Carbon::parse($startDate)->startOfDay();
@@ -35,7 +39,9 @@ class OrganicTrustReportController extends Controller
             'totalSpend',
             'organicSpend',
             'supplierCount',
-            'organicCount'
+            'organicCount',
+            'productTypes',
+            'certBodies'
         ));
     }
 
@@ -46,6 +52,22 @@ class OrganicTrustReportController extends Controller
         return response()->json([
             'success' => true,
             'is_organic' => $supplier->is_organic,
+        ]);
+    }
+
+    public function updateOrganicFields(Request $request, AccountingSupplier $supplier)
+    {
+        $validated = $request->validate([
+            'organic_product_type' => 'nullable|string|max:255',
+            'organic_certification_body' => 'nullable|string|max:255',
+        ]);
+
+        $supplier->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'organic_product_type' => $supplier->organic_product_type,
+            'organic_certification_body' => $supplier->organic_certification_body,
         ]);
     }
 
@@ -81,13 +103,15 @@ class OrganicTrustReportController extends Controller
             }
             fputcsv($file, []);
 
-            fputcsv($file, ['Supplier Name', 'Total Amount (incl. VAT)', 'Invoice Count', 'Organic']);
+            fputcsv($file, ['Supplier Name', 'Product Type', 'Certification Body', 'Total Amount (incl. VAT)', 'Invoice Count', 'Organic']);
 
             $totalAmount = 0;
 
             foreach ($suppliers as $supplier) {
                 fputcsv($file, [
                     $supplier->name,
+                    $supplier->organic_product_type ?? '',
+                    $supplier->organic_certification_body ?? '',
                     number_format($supplier->period_total, 2),
                     $supplier->period_invoice_count,
                     $supplier->is_organic ? 'Yes' : 'No',
@@ -105,6 +129,48 @@ class OrganicTrustReportController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    public function updateOptions(Request $request)
+    {
+        $validated = $request->validate([
+            'organic_product_types' => 'nullable|array',
+            'organic_product_types.*' => 'string|max:255',
+            'organic_certification_bodies' => 'nullable|array',
+            'organic_certification_bodies.*' => 'string|max:255',
+        ]);
+
+        if ($request->has('organic_product_types')) {
+            $this->setOption('organic_product_types', array_values(array_filter($validated['organic_product_types'] ?? [])));
+        }
+
+        if ($request->has('organic_certification_bodies')) {
+            $this->setOption('organic_certification_bodies', array_values(array_filter($validated['organic_certification_bodies'] ?? [])));
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    private function getOption(string $key, array $default): array
+    {
+        $row = DB::table('app_settings')->where('key', $key)->first();
+
+        if ($row && $row->value) {
+            $decoded = json_decode($row->value, true);
+            if (is_array($decoded) && count($decoded) > 0) {
+                return $decoded;
+            }
+        }
+
+        return $default;
+    }
+
+    private function setOption(string $key, array $value): void
+    {
+        DB::table('app_settings')->updateOrInsert(
+            ['key' => $key],
+            ['value' => json_encode($value), 'updated_at' => now()]
+        );
     }
 
     private function getSupplierSpend(Carbon $startDateTime, Carbon $endDateTime)

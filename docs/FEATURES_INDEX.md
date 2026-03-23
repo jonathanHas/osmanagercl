@@ -209,6 +209,19 @@ Review physical stock checks by category, identify unchecked products, and bulk-
 
 📖 [Stock Check Review Documentation](./features/stock-check-review.md)
 
+### Destock Review & Audit (NEW! 2026-03-22)
+Audit trail for destock/restock actions with intelligent restock suggestions based on sales data.
+- **Audit Log**: Full history of every destock/restock action with user, timestamp, and source context
+- **Restock Suggestions**: Identifies destocked products with ongoing sales that may need restocking
+- **Supplier Integration**: Filter by supplier, links to Udea/Independent product pages
+- **Sales Analysis**: Configurable period, min units threshold, sort by units/revenue/days/last sale
+- **Product Images**: Thumbnails from supplier CDNs with hover preview
+- **One-Click Restock**: Re-add products to stock management directly from the suggestions page
+- **Sales Chart**: View detailed weekly/daily sales history per product
+- **Search & Filter**: Search by name/barcode, exclude F&V, filter by supplier
+
+📖 [Destock Review Documentation](./features/destock-review.md)
+
 ---
 
 ## Kitchen Management

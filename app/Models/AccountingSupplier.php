@@ -10,6 +10,25 @@ class AccountingSupplier extends Model
 {
     use HasFactory;
 
+    public const ORGANIC_PRODUCT_TYPES = [
+        'Fruit & Vegetables',
+        'Dried Goods & Grocery',
+        'Dairy',
+        'Meat',
+        'Bakery & Bread',
+        'Beverages',
+        'Frozen',
+    ];
+
+    public const ORGANIC_CERTIFICATION_BODIES = [
+        'Organic Trust',
+        'IOFGA',
+        'Soil Association',
+        'OF&G',
+        'Bio Suisse',
+        'Ecocert',
+    ];
+
     protected $fillable = [
         'code',
         'name',
@@ -58,6 +77,8 @@ class AccountingSupplier extends Model
         'updated_by',
         'rtd_classification',
         'is_organic',
+        'organic_product_type',
+        'organic_certification_body',
     ];
 
     protected $casts = [

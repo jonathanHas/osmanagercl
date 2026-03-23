@@ -16,7 +16,6 @@ use App\Http\Controllers\KitchenIngredientProfileController;
 use App\Http\Controllers\KitchenProductController;
 use App\Http\Controllers\LabelAreaController;
 use App\Http\Controllers\LabelTranslationController;
-use App\Http\Controllers\ZebraLabelController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
@@ -27,6 +26,7 @@ use App\Http\Controllers\StockingController;
 use App\Http\Controllers\TestScraperController;
 use App\Http\Controllers\UdeaDiagnosticsController;
 use App\Http\Controllers\UserManagementController;
+use App\Http\Controllers\ZebraLabelController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -244,6 +244,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/suppliers/organic-trust-report', [\App\Http\Controllers\OrganicTrustReportController::class, 'index'])->name('suppliers.organic-trust-report');
     Route::get('/suppliers/organic-trust-report/export', [\App\Http\Controllers\OrganicTrustReportController::class, 'exportCsv'])->name('suppliers.organic-trust-report.export');
     Route::post('/suppliers/{supplier}/toggle-organic', [\App\Http\Controllers\OrganicTrustReportController::class, 'toggleOrganic'])->name('suppliers.toggle-organic');
+    Route::post('/suppliers/{supplier}/update-organic-fields', [\App\Http\Controllers\OrganicTrustReportController::class, 'updateOrganicFields'])->name('suppliers.update-organic-fields');
+    Route::post('/suppliers/organic-trust-report/options', [\App\Http\Controllers\OrganicTrustReportController::class, 'updateOptions'])->name('suppliers.organic-trust-report.options');
     Route::resource('suppliers', \App\Http\Controllers\AccountingSuppliersController::class);
 
     // Order Manager routes

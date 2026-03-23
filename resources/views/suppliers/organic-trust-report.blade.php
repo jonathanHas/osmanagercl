@@ -70,6 +70,116 @@
                 </div>
             </div>
 
+            {{-- Options Management --}}
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6" x-data="{
+                open: false,
+                productTypes: @js($productTypes),
+                certBodies: @js($certBodies),
+                newProductType: '',
+                newCertBody: '',
+                saving: false,
+                saved: false,
+                async save() {
+                    this.saving = true;
+                    await fetch('{{ route('suppliers.organic-trust-report.options') }}', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                        body: JSON.stringify({
+                            organic_product_types: this.productTypes,
+                            organic_certification_bodies: this.certBodies
+                        })
+                    });
+                    this.saving = false;
+                    this.saved = true;
+                    setTimeout(() => this.saved = false, 2000);
+                },
+                addProductType() {
+                    if (this.newProductType.trim() && !this.productTypes.includes(this.newProductType.trim())) {
+                        this.productTypes.push(this.newProductType.trim());
+                        this.newProductType = '';
+                        this.save();
+                    }
+                },
+                addCertBody() {
+                    if (this.newCertBody.trim() && !this.certBodies.includes(this.newCertBody.trim())) {
+                        this.certBodies.push(this.newCertBody.trim());
+                        this.newCertBody = '';
+                        this.save();
+                    }
+                },
+                removeProductType(index) {
+                    this.productTypes.splice(index, 1);
+                    this.save();
+                },
+                removeCertBody(index) {
+                    this.certBodies.splice(index, 1);
+                    this.save();
+                }
+            }">
+                <div class="p-4">
+                    <button @click="open = !open" class="flex items-center text-sm font-medium text-gray-700 hover:text-gray-900">
+                        <i class="fas fa-cog mr-2"></i>
+                        Manage Dropdown Options
+                        <i class="fas fa-chevron-down ml-2 transition-transform duration-200" :class="open && 'rotate-180'"></i>
+                    </button>
+
+                    <div x-show="open" x-collapse class="mt-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {{-- Product Types --}}
+                            <div>
+                                <h4 class="text-sm font-semibold text-gray-800 mb-2">Product Types</h4>
+                                <div class="space-y-1 mb-2">
+                                    <template x-for="(type, index) in productTypes" :key="index">
+                                        <div class="flex items-center justify-between bg-gray-50 rounded px-3 py-1.5 text-sm">
+                                            <span x-text="type"></span>
+                                            <button @click="removeProductType(index)" class="text-red-400 hover:text-red-600 ml-2" title="Remove">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </template>
+                                </div>
+                                <div class="flex gap-2">
+                                    <input type="text" x-model="newProductType" @keydown.enter="addProductType()"
+                                        placeholder="Add product type..."
+                                        class="text-sm border-gray-300 rounded-md py-1.5 px-3 flex-1">
+                                    <button @click="addProductType()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-sm">
+                                        Add
+                                    </button>
+                                </div>
+                            </div>
+
+                            {{-- Certification Bodies --}}
+                            <div>
+                                <h4 class="text-sm font-semibold text-gray-800 mb-2">Certification Bodies</h4>
+                                <div class="space-y-1 mb-2">
+                                    <template x-for="(body, index) in certBodies" :key="index">
+                                        <div class="flex items-center justify-between bg-gray-50 rounded px-3 py-1.5 text-sm">
+                                            <span x-text="body"></span>
+                                            <button @click="removeCertBody(index)" class="text-red-400 hover:text-red-600 ml-2" title="Remove">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </template>
+                                </div>
+                                <div class="flex gap-2">
+                                    <input type="text" x-model="newCertBody" @keydown.enter="addCertBody()"
+                                        placeholder="Add certification body..."
+                                        class="text-sm border-gray-300 rounded-md py-1.5 px-3 flex-1">
+                                    <button @click="addCertBody()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-sm">
+                                        Add
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-3 text-sm">
+                            <span x-show="saving" class="text-gray-500"><i class="fas fa-spinner fa-spin mr-1"></i>Saving...</span>
+                            <span x-show="saved" x-transition class="text-green-600"><i class="fas fa-check mr-1"></i>Saved</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             @if(isset($suppliers))
                 <!-- Summary Stats -->
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
@@ -112,6 +222,12 @@
                                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                 Supplier
                                             </th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Product Type
+                                            </th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Certification Body
+                                            </th>
                                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                 Invoices
                                             </th>
@@ -122,7 +238,25 @@
                                     </thead>
                                     <tbody class="bg-white divide-y divide-gray-200">
                                         @foreach($suppliers as $supplier)
-                                            <tr class="hover:bg-gray-50" x-data="{ organic: {{ $supplier->is_organic ? 'true' : 'false' }} }">
+                                            <tr class="hover:bg-gray-50" x-data="{
+                                                organic: {{ $supplier->is_organic ? 'true' : 'false' }},
+                                                productType: '{{ $supplier->organic_product_type ?? '' }}',
+                                                certBody: '{{ $supplier->organic_certification_body ?? '' }}',
+                                                customProductType: false,
+                                                customCertBody: false,
+                                                customProductTypeValue: '',
+                                                customCertBodyValue: '',
+                                                saveField(field, value) {
+                                                    fetch('{{ route('suppliers.update-organic-fields', $supplier) }}', {
+                                                        method: 'POST',
+                                                        headers: {
+                                                            'Content-Type': 'application/json',
+                                                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                                                        },
+                                                        body: JSON.stringify({ [field]: value })
+                                                    })
+                                                }
+                                            }">
                                                 <td class="px-6 py-4 whitespace-nowrap">
                                                     <button @click="
                                                         fetch('{{ route('suppliers.toggle-organic', $supplier) }}', {
@@ -143,6 +277,64 @@
                                                 </td>
                                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                                     {{ $supplier->name }}
+                                                </td>
+                                                {{-- Product Type --}}
+                                                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                    <template x-if="organic">
+                                                        <div>
+                                                            <template x-if="!customProductType">
+                                                                <select x-model="productType" @change="
+                                                                    if (productType === '__custom__') { customProductType = true; productType = ''; return; }
+                                                                    saveField('organic_product_type', productType)
+                                                                " class="text-sm border-gray-300 rounded-md py-1 px-2 w-44">
+                                                                    <option value="">--</option>
+                                                                    @foreach($productTypes as $type)
+                                                                        <option value="{{ $type }}">{{ $type }}</option>
+                                                                    @endforeach
+                                                                    <option value="__custom__">Other...</option>
+                                                                </select>
+                                                            </template>
+                                                            <template x-if="customProductType">
+                                                                <input type="text" x-model="customProductTypeValue"
+                                                                    @keydown.enter="productType = customProductTypeValue; customProductType = false; saveField('organic_product_type', customProductTypeValue)"
+                                                                    @keydown.escape="customProductType = false; productType = '{{ $supplier->organic_product_type ?? '' }}'"
+                                                                    placeholder="Type & press Enter"
+                                                                    class="text-sm border-gray-300 rounded-md py-1 px-2 w-44" x-ref="customPt" x-init="$nextTick(() => $refs.customPt?.focus())" />
+                                                            </template>
+                                                        </div>
+                                                    </template>
+                                                    <template x-if="!organic">
+                                                        <span class="text-gray-400">--</span>
+                                                    </template>
+                                                </td>
+                                                {{-- Certification Body --}}
+                                                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                    <template x-if="organic">
+                                                        <div>
+                                                            <template x-if="!customCertBody">
+                                                                <select x-model="certBody" @change="
+                                                                    if (certBody === '__custom__') { customCertBody = true; certBody = ''; return; }
+                                                                    saveField('organic_certification_body', certBody)
+                                                                " class="text-sm border-gray-300 rounded-md py-1 px-2 w-44">
+                                                                    <option value="">--</option>
+                                                                    @foreach($certBodies as $body)
+                                                                        <option value="{{ $body }}">{{ $body }}</option>
+                                                                    @endforeach
+                                                                    <option value="__custom__">Other...</option>
+                                                                </select>
+                                                            </template>
+                                                            <template x-if="customCertBody">
+                                                                <input type="text" x-model="customCertBodyValue"
+                                                                    @keydown.enter="certBody = customCertBodyValue; customCertBody = false; saveField('organic_certification_body', customCertBodyValue)"
+                                                                    @keydown.escape="customCertBody = false; certBody = '{{ $supplier->organic_certification_body ?? '' }}'"
+                                                                    placeholder="Type & press Enter"
+                                                                    class="text-sm border-gray-300 rounded-md py-1 px-2 w-44" x-ref="customCb" x-init="$nextTick(() => $refs.customCb?.focus())" />
+                                                            </template>
+                                                        </div>
+                                                    </template>
+                                                    <template x-if="!organic">
+                                                        <span class="text-gray-400">--</span>
+                                                    </template>
                                                 </td>
                                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right">
                                                     {{ $supplier->period_invoice_count }}

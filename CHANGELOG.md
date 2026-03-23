@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Destock Review & Audit System** (2026-03-22)
+  - Audit logging for all destock/restock actions — records who, when, and from where (order review, product page, etc.)
+  - New Destock Review page (`/destock-review`) with two tabs:
+    - **Audit Log**: Filterable history of all destock/restock actions by date, action type, and user
+    - **Restock Suggestions**: Identifies destocked products that still have sales activity, suggesting they may need restocking
+  - Restock Suggestions features:
+    - Configurable sales period (7 days to 1 year) and minimum units threshold
+    - Supplier filter and supplier website links (Udea, Independent) for quick product lookup
+    - Product images from supplier CDNs with hover preview
+    - Exclude Fruit & Vegetables toggle (on by default, as F&V orders don't use stocking)
+    - Sort by units sold, revenue, days with sales, or last sale date
+    - Search by product name or barcode
+    - Sales chart modal for viewing detailed sales history per product
+    - One-click restock button to add products back to stock management
+    - View product link for each suggestion
+  - Sidebar link under STOCK section with warning triangle icon
+  - **New**: `app/Models/DestockAudit.php`, `app/Http/Controllers/DestockReviewController.php`, `resources/views/destock-review/index.blade.php`, `resources/views/destock-review/suggestions.blade.php`
+  - **Modified**: `app/Http/Controllers/ProductController.php`, `resources/views/orders/partials/review-table.blade.php`, `resources/views/orders/partials/review-table-christmas.blade.php`, `resources/views/products/show.blade.php`, `routes/web.php`, `resources/views/layouts/admin.blade.php`
+  - **Migration**: `create_destock_audits_table`
+
 - **Stock Check Review** (2026-03-21)
   - New page for reviewing physical stock checks by category, replacing old PHP `stock_by_category_REVIEW2.php`
   - Products grouped by status: items needing attention (unchecked with stock) shown first
