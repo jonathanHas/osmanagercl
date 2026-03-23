@@ -73,8 +73,8 @@
             {{-- Options Management --}}
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6" x-data="{
                 open: false,
-                productTypes: @js($productTypes),
-                certBodies: @js($certBodies),
+                productTypes: @js($productTypes).sort((a, b) => a.localeCompare(b)),
+                certBodies: @js($certBodies).sort((a, b) => a.localeCompare(b)),
                 newProductType: '',
                 newCertBody: '',
                 saving: false,
@@ -96,6 +96,7 @@
                 addProductType() {
                     if (this.newProductType.trim() && !this.productTypes.includes(this.newProductType.trim())) {
                         this.productTypes.push(this.newProductType.trim());
+                        this.productTypes.sort((a, b) => a.localeCompare(b));
                         this.newProductType = '';
                         this.save();
                     }
@@ -103,6 +104,7 @@
                 addCertBody() {
                     if (this.newCertBody.trim() && !this.certBodies.includes(this.newCertBody.trim())) {
                         this.certBodies.push(this.newCertBody.trim());
+                        this.certBodies.sort((a, b) => a.localeCompare(b));
                         this.newCertBody = '';
                         this.save();
                     }
@@ -183,7 +185,7 @@
                         <h3 class="text-lg font-medium text-gray-900 mb-4">
                             Report: {{ Carbon\Carbon::parse($startDate)->format('F j, Y') }} to {{ Carbon\Carbon::parse($endDate)->format('F j, Y') }}
                         </h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
                             <div class="bg-blue-50 p-4 rounded-lg">
                                 <div class="text-2xl font-bold text-blue-600">{{ $supplierCount }}</div>
                                 <div class="text-sm text-gray-600">Total Suppliers</div>
@@ -192,6 +194,10 @@
                                 <div class="text-2xl font-bold text-gray-700">&euro;{{ number_format($totalSpend, 2) }}</div>
                                 <div class="text-sm text-gray-600">Total Spend</div>
                             </div>
+                            <div class="bg-purple-50 p-4 rounded-lg">
+                                <div class="text-2xl font-bold text-purple-600">&euro;{{ number_format($totalSales, 2) }}</div>
+                                <div class="text-sm text-gray-600">Total Sales</div>
+                            </div>
                             <div class="bg-green-50 p-4 rounded-lg">
                                 <div class="text-2xl font-bold text-green-600">{{ $organicCount }}</div>
                                 <div class="text-sm text-gray-600">Organic Suppliers</div>
@@ -199,6 +205,10 @@
                             <div class="bg-green-50 p-4 rounded-lg">
                                 <div class="text-2xl font-bold text-green-600">&euro;{{ number_format($organicSpend, 2) }}</div>
                                 <div class="text-sm text-gray-600">Organic Spend</div>
+                            </div>
+                            <div class="bg-green-50 p-4 rounded-lg">
+                                <div class="text-2xl font-bold text-green-600">&euro;{{ number_format($organicSales, 2) }}</div>
+                                <div class="text-sm text-gray-600">Organic Sales</div>
                             </div>
                         </div>
                     </div>
@@ -229,6 +239,9 @@
                                             </th>
                                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                 Total Amount (incl. VAT)
+                                            </th>
+                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Sales Revenue
                                             </th>
                                         </tr>
                                     </thead>
@@ -338,6 +351,9 @@
                                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
                                                     &euro;{{ number_format($supplier->period_total, 2) }}
                                                 </td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right {{ $supplier->period_sales > 0 ? 'text-purple-700' : 'text-gray-400' }}">
+                                                    &euro;{{ number_format($supplier->period_sales, 2) }}
+                                                </td>
                                             </tr>
                                         @endforeach
                                     </tbody>
@@ -351,13 +367,14 @@
                         <div class="p-6">
                             <div class="flex justify-between items-center">
                                 <div>
-                                    <h3 class="text-lg font-medium">Total Spend (All Suppliers)</h3>
+                                    <h3 class="text-lg font-medium">Totals (All Suppliers)</h3>
                                     <p class="text-sm text-gray-300">
-                                        {{ $supplierCount }} suppliers | {{ $organicCount }} marked organic (&euro;{{ number_format($organicSpend, 2) }})
+                                        {{ $supplierCount }} suppliers | {{ $organicCount }} marked organic (&euro;{{ number_format($organicSpend, 2) }} spend, &euro;{{ number_format($organicSales, 2) }} sales)
                                     </p>
                                 </div>
-                                <div class="text-3xl font-bold">
-                                    &euro;{{ number_format($totalSpend, 2) }}
+                                <div class="text-right">
+                                    <div class="text-3xl font-bold">&euro;{{ number_format($totalSpend, 2) }} <span class="text-lg text-gray-400">spend</span></div>
+                                    <div class="text-xl font-bold text-purple-300">&euro;{{ number_format($totalSales, 2) }} <span class="text-sm text-gray-400">sales</span></div>
                                 </div>
                             </div>
                         </div>

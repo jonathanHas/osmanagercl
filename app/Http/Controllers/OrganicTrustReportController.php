@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\AccountingSupplier;
+use App\Models\SalesDailySummary;
+use App\Models\SupplierLink;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +17,9 @@ class OrganicTrustReportController extends Controller
         $endDate = $request->get('end_date', now()->format('Y-m-d'));
 
         $productTypes = $this->getOption('organic_product_types', AccountingSupplier::ORGANIC_PRODUCT_TYPES);
+        sort($productTypes);
         $certBodies = $this->getOption('organic_certification_bodies', AccountingSupplier::ORGANIC_CERTIFICATION_BODIES);
+        sort($certBodies);
 
         if (! $request->filled('start_date')) {
             return view('suppliers.organic-trust-report', compact('startDate', 'endDate', 'productTypes', 'certBodies'));
@@ -27,8 +31,10 @@ class OrganicTrustReportController extends Controller
         $suppliers = $this->getSupplierSpend($startDateTime, $endDateTime);
 
         $totalSpend = $suppliers->sum('period_total');
+        $totalSales = $suppliers->sum('period_sales');
         $organicSuppliers = $suppliers->where('is_organic', true);
         $organicSpend = $organicSuppliers->sum('period_total');
+        $organicSales = $organicSuppliers->sum('period_sales');
         $supplierCount = $suppliers->count();
         $organicCount = $organicSuppliers->count();
 
@@ -37,7 +43,9 @@ class OrganicTrustReportController extends Controller
             'endDate',
             'suppliers',
             'totalSpend',
+            'totalSales',
             'organicSpend',
+            'organicSales',
             'supplierCount',
             'organicCount',
             'productTypes',
@@ -103,7 +111,7 @@ class OrganicTrustReportController extends Controller
             }
             fputcsv($file, []);
 
-            fputcsv($file, ['Supplier Name', 'Product Type', 'Certification Body', 'Total Amount (incl. VAT)', 'Invoice Count', 'Organic']);
+            fputcsv($file, ['Supplier Name', 'Product Type', 'Certification Body', 'Total Amount (incl. VAT)', 'Sales Revenue', 'Invoice Count', 'Organic']);
 
             $totalAmount = 0;
 
@@ -113,6 +121,7 @@ class OrganicTrustReportController extends Controller
                     $supplier->organic_product_type ?? '',
                     $supplier->organic_certification_body ?? '',
                     number_format($supplier->period_total, 2),
+                    number_format($supplier->period_sales, 2),
                     $supplier->period_invoice_count,
                     $supplier->is_organic ? 'Yes' : 'No',
                 ]);
@@ -187,6 +196,20 @@ class OrganicTrustReportController extends Controller
 
                 $supplier->period_total = (float) $invoiceStats->total;
                 $supplier->period_invoice_count = (int) $invoiceStats->count;
+
+                // Sales revenue from POS via supplier_link → sales_daily_summary
+                $supplier->period_sales = 0.0;
+                if ($supplier->is_pos_linked && $supplier->external_pos_id) {
+                    $productCodes = SupplierLink::where('SupplierID', $supplier->external_pos_id)
+                        ->pluck('Barcode')
+                        ->toArray();
+
+                    if (! empty($productCodes)) {
+                        $supplier->period_sales = (float) SalesDailySummary::whereIn('product_code', $productCodes)
+                            ->forDateRange($startDateTime, $endDateTime)
+                            ->sum('total_revenue');
+                    }
+                }
 
                 return $supplier;
             })
