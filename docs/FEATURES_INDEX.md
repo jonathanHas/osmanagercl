@@ -377,12 +377,14 @@ Complete supplier management with seamless POS integration and auto-code generat
 
 📖 [Supplier Management Documentation](./features/supplier-management.md)
 
-### Organic Trust Supplier Report (NEW! 2026-03-14)
-Report for the Organic Trust annual return form (Field 13: Bought In Organic Ingredients/Products).
-- **Date Range Selection**: View product supplier spend for any period (defaults to current year)
+### Organic Trust Supplier Report (2026-03-14, enhanced 2026-03-23)
+Comprehensive report for the annual Organic Trust return, covering bought-in organic products and organic product sales.
+- **Date Range Selection**: View product supplier spend and sales for any period (defaults to current year)
 - **Organic Toggle**: Mark/unmark suppliers as organic with persistent toggle switches (AJAX, no page reload)
-- **Summary Statistics**: Total suppliers, total spend, organic supplier count, organic spend total
-- **Dual CSV Export**: "Export All" for review, "Export Organic Only" for the Organic Trust return
+- **Product Type & Certification Body**: Inline dropdowns per supplier with customizable preset options
+- **Sales Revenue**: Per-supplier POS sales data, plus organic sales by category breakdown
+- **Summary Statistics**: Total suppliers, spend, sales, organic supplier count, organic spend, organic sales (all ex. VAT)
+- **Submission-Ready Exports**: "Bought In Organic Products" and "Sales of Organic Products" CSVs
 - **Navigation**: Accessible via green "Organic Trust" button on suppliers index
 
 📖 [Supplier Management Documentation](./features/supplier-management.md)

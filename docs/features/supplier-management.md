@@ -358,13 +358,13 @@ Route::get('/suppliers/payments/export', [SupplierPaymentsController::class, 'ex
 ## Organic Trust Supplier Report
 
 ### Overview
-The Organic Trust Supplier Report (`/suppliers/organic-trust-report`) generates the data needed for Field 13 ("Bought In Organic Ingredients/Products") of the annual Organic Trust return form. Added on 2026-03-14.
+The Organic Trust Supplier Report (`/suppliers/organic-trust-report`) generates the data needed for the annual Organic Trust return form, covering both Field 13 ("Bought In Organic Ingredients/Products") and organic product sales. Added 2026-03-14, enhanced 2026-03-23.
 
 ### Features
 
 #### Date Range Selection
 - Start and end date pickers, defaulting to the current calendar year
-- Shows only product-type suppliers with invoice spend > 0 in the selected period
+- Shows product-type suppliers with invoice spend or POS sales > 0 in the selected period
 
 #### Organic Toggle
 - Each supplier row has an Alpine.js toggle switch to mark/unmark as organic
@@ -372,18 +372,42 @@ The Organic Trust Supplier Report (`/suppliers/organic-trust-report`) generates 
 - Toggles via AJAX (no page reload) so users can quickly classify multiple suppliers
 - Once set, the organic status persists across future reports
 
+#### Organic Certification Fields (2026-03-23)
+- **Product Type**: Inline dropdown per supplier (e.g., Fruit & Vegetables, Dried Goods & Grocery, Dairy, Meat)
+- **Certification Body**: Inline dropdown per supplier (e.g., Organic Trust, IOFGA, Soil Association)
+- Both fields support preset options with "Other..." for custom entries
+- Only visible when supplier is marked organic
+- Save immediately via AJAX
+
+#### Manage Dropdown Options (2026-03-23)
+- Collapsible settings panel to add/remove Product Type and Certification Body options
+- Options stored in `app_settings` table, falling back to model constants as defaults
+- Changes save immediately and are sorted alphabetically
+
+#### Sales Revenue (2026-03-23)
+- Per-supplier sales revenue from POS data (via `supplier_link` → `sales_daily_summary`)
+- Suppliers with sales but no invoices (e.g., Coffee) are included in the report
+- All amounts shown ex. VAT
+
+#### Organic Sales by Category (2026-03-23)
+- Breakdown of organic supplier product sales grouped by POS category
+- Shows category name, units sold, and sales revenue (ex. VAT)
+- Displayed below the supplier table when organic suppliers have sales data
+
 #### Summary Statistics
-- **Total Suppliers**: Count of product suppliers with spend in period
-- **Total Spend**: Sum of all supplier invoices (incl. VAT)
+- **Total Suppliers**: Count of product suppliers with spend or sales in period
+- **Total Spend**: Sum of all supplier invoices (ex. VAT)
+- **Total Sales**: Sum of all supplier product sales (ex. VAT)
 - **Organic Suppliers**: Count of suppliers marked organic
-- **Organic Spend**: Sum of organic-only supplier invoices
+- **Organic Spend**: Sum of organic-only supplier invoices (ex. VAT)
+- **Organic Sales**: Sum of organic-only supplier product sales (ex. VAT)
 
-#### CSV Export
-Two export options:
-- **Export All**: Downloads all product suppliers with spend, includes organic status column
-- **Export Organic Only**: Downloads only organic-marked suppliers — ready to upload for the return
+#### CSV Exports (Organic Trust Submission-Ready)
+Two purpose-built exports:
+- **Bought In Organic Products**: Supplier Name, Product Type, Certification Body, Total Amount (ex. VAT), with total row
+- **Sales of Organic Products**: Category, Units Sold, Sales Revenue (ex. VAT), with total row
 
-CSV columns: Supplier Name, Total Amount (incl. VAT), Invoice Count, Organic (Yes/No)
+Both include date range in the header. Filenames: `Bought In Organic Products YYYY-MM-DD to YYYY-MM-DD.csv` and `Sales of Organic Products YYYY-MM-DD to YYYY-MM-DD.csv`.
 
 ### Navigation
 Access via the green **"Organic Trust"** button in the suppliers index page header.
@@ -392,15 +416,23 @@ Access via the green **"Organic Trust"** button in the suppliers index page head
 ```php
 Route::get('/suppliers/organic-trust-report', [OrganicTrustReportController::class, 'index'])
     ->name('suppliers.organic-trust-report');
-Route::get('/suppliers/organic-trust-report/export', [OrganicTrustReportController::class, 'exportCsv'])
-    ->name('suppliers.organic-trust-report.export');
+Route::get('/suppliers/organic-trust-report/export-bought-in', [OrganicTrustReportController::class, 'exportBoughtIn'])
+    ->name('suppliers.organic-trust-report.export-bought-in');
+Route::get('/suppliers/organic-trust-report/export-sales', [OrganicTrustReportController::class, 'exportSales'])
+    ->name('suppliers.organic-trust-report.export-sales');
 Route::post('/suppliers/{supplier}/toggle-organic', [OrganicTrustReportController::class, 'toggleOrganic'])
     ->name('suppliers.toggle-organic');
+Route::post('/suppliers/{supplier}/update-organic-fields', [OrganicTrustReportController::class, 'updateOrganicFields'])
+    ->name('suppliers.update-organic-fields');
+Route::post('/suppliers/organic-trust-report/options', [OrganicTrustReportController::class, 'updateOptions'])
+    ->name('suppliers.organic-trust-report.options');
 ```
 
 ### Database
-- **Migration**: `2026_03_14_000000_add_is_organic_to_accounting_suppliers_table`
-- **Column**: `is_organic` (boolean, default false) on `accounting_suppliers`
+- **Migration**: `2026_03_14_000000_add_is_organic_to_accounting_suppliers_table` — `is_organic` boolean
+- **Migration**: `2026_03_23_000000_add_organic_fields_to_accounting_suppliers_table` — `organic_product_type`, `organic_certification_body` (nullable strings)
+- **Settings**: `app_settings` table keys `organic_product_types` and `organic_certification_bodies` (JSON arrays)
+- **Sales data**: Cross-database query via `supplier_link` (POS) → `sales_daily_summary` (Laravel)
 
 ---
 

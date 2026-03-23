@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Organic Trust Report Enhancements** (2026-03-23)
+  - Product Type and Certification Body fields per organic supplier (inline editable dropdowns)
+  - Customizable dropdown options via "Manage Dropdown Options" settings panel (stored in `app_settings`)
+  - Per-supplier POS sales revenue (ex. VAT) via `supplier_link` → `sales_daily_summary` cross-database query
+  - Suppliers with sales but no invoices (e.g., Coffee) now included in report
+  - Organic Sales by Category breakdown table (category name, units sold, revenue)
+  - All amounts now shown ex. VAT (invoices use `total_amount - vat_amount`, sales already net)
+  - Summary stats expanded: Total Sales, Organic Sales cards added
+  - Two submission-ready CSV exports replacing previous generic exports:
+    - "Bought In Organic Products" — Supplier Name, Product Type, Certification Body, Total Amount (ex. VAT)
+    - "Sales of Organic Products" — Category, Units Sold, Sales Revenue (ex. VAT)
+  - **New Migration**: `2026_03_23_000000_add_organic_fields_to_accounting_suppliers_table` — adds `organic_product_type` and `organic_certification_body` columns
+  - **Modified**: `OrganicTrustReportController.php`, `organic-trust-report.blade.php`, `AccountingSupplier.php`, `routes/web.php`
+
 - **Destock Review & Audit System** (2026-03-22)
   - Audit logging for all destock/restock actions — records who, when, and from where (order review, product page, etc.)
   - New Destock Review page (`/destock-review`) with two tabs:

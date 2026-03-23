@@ -4,8 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\AccountingSupplier;
 use App\Models\Category;
-use App\Models\SalesDailySummary;
-use App\Models\SupplierLink;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -220,9 +218,70 @@ class OrganicTrustReportController extends Controller
         );
     }
 
+    /**
+     * Query POS sales for given product IDs, excluding Kitchen/Coffee internal transfers.
+     */
+    private function getPOSSales(array $productIds, Carbon $startDateTime, Carbon $endDateTime): object
+    {
+        if (empty($productIds)) {
+            return (object) ['revenue' => 0, 'units' => 0];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($productIds), '?'));
+
+        $result = DB::connection('pos')->select("
+            SELECT
+                COALESCE(SUM(tl.PRICE * ABS(tl.UNITS)), 0) as revenue,
+                COALESCE(SUM(ABS(tl.UNITS)), 0) as units
+            FROM TICKETLINES tl
+            JOIN TICKETS t ON tl.TICKET = t.ID
+            JOIN RECEIPTS r ON t.ID = r.ID
+            LEFT JOIN CUSTOMERS c ON t.CUSTOMER = c.ID
+            WHERE r.DATENEW >= ? AND r.DATENEW < ?
+            AND tl.PRODUCT IN ({$placeholders})
+            AND (c.NAME IS NULL OR c.NAME NOT IN ('Kitchen', 'Coffee'))
+        ", array_merge(
+            [$startDateTime->format('Y-m-d H:i:s'), $endDateTime->format('Y-m-d H:i:s')],
+            $productIds
+        ));
+
+        return $result[0] ?? (object) ['revenue' => 0, 'units' => 0];
+    }
+
+    /**
+     * Query POS sales grouped by category for given product IDs, excluding Kitchen/Coffee.
+     */
+    private function getPOSSalesByCategory(array $productIds, Carbon $startDateTime, Carbon $endDateTime)
+    {
+        if (empty($productIds)) {
+            return collect();
+        }
+
+        $placeholders = implode(',', array_fill(0, count($productIds), '?'));
+
+        return collect(DB::connection('pos')->select("
+            SELECT
+                p.CATEGORY as category_id,
+                SUM(tl.PRICE * ABS(tl.UNITS)) as total_revenue,
+                SUM(ABS(tl.UNITS)) as total_units
+            FROM TICKETLINES tl
+            JOIN TICKETS t ON tl.TICKET = t.ID
+            JOIN RECEIPTS r ON t.ID = r.ID
+            JOIN PRODUCTS p ON tl.PRODUCT = p.ID
+            LEFT JOIN CUSTOMERS c ON t.CUSTOMER = c.ID
+            WHERE r.DATENEW >= ? AND r.DATENEW < ?
+            AND tl.PRODUCT IN ({$placeholders})
+            AND (c.NAME IS NULL OR c.NAME NOT IN ('Kitchen', 'Coffee'))
+            GROUP BY p.CATEGORY
+        ", array_merge(
+            [$startDateTime->format('Y-m-d H:i:s'), $endDateTime->format('Y-m-d H:i:s')],
+            $productIds
+        )));
+    }
+
     private function getOrganicCategorySales($suppliers, Carbon $startDateTime, Carbon $endDateTime)
     {
-        // Get product codes for all organic, POS-linked suppliers
+        // Get product IDs for all organic, POS-linked suppliers
         $organicPosIds = $suppliers
             ->where('is_organic', true)
             ->where('is_pos_linked', true)
@@ -234,20 +293,19 @@ class OrganicTrustReportController extends Controller
             return collect();
         }
 
-        $productCodes = SupplierLink::whereIn('SupplierID', $organicPosIds)
-            ->pluck('Barcode')
+        $productIds = DB::connection('pos')
+            ->table('supplier_link')
+            ->join('PRODUCTS', 'supplier_link.Barcode', '=', 'PRODUCTS.CODE')
+            ->whereIn('supplier_link.SupplierID', $organicPosIds)
+            ->pluck('PRODUCTS.ID')
             ->toArray();
 
-        if (empty($productCodes)) {
+        if (empty($productIds)) {
             return collect();
         }
 
-        // Group sales by category
-        $categorySales = SalesDailySummary::whereIn('product_code', $productCodes)
-            ->forDateRange($startDateTime, $endDateTime)
-            ->selectRaw('category_id, SUM(total_revenue) as total_revenue, SUM(total_units) as total_units')
-            ->groupBy('category_id')
-            ->get();
+        // Group sales by category (excluding Kitchen/Coffee)
+        $categorySales = $this->getPOSSalesByCategory($productIds, $startDateTime, $endDateTime);
 
         if ($categorySales->isEmpty()) {
             return collect();
@@ -279,17 +337,19 @@ class OrganicTrustReportController extends Controller
                 $supplier->period_total = (float) $invoiceStats->total;
                 $supplier->period_invoice_count = (int) $invoiceStats->count;
 
-                // Sales revenue from POS via supplier_link → sales_daily_summary
+                // Sales revenue from POS (excluding Kitchen/Coffee internal transfers)
                 $supplier->period_sales = 0.0;
                 if ($supplier->is_pos_linked && $supplier->external_pos_id) {
-                    $productCodes = SupplierLink::where('SupplierID', $supplier->external_pos_id)
-                        ->pluck('Barcode')
+                    $productIds = DB::connection('pos')
+                        ->table('supplier_link')
+                        ->join('PRODUCTS', 'supplier_link.Barcode', '=', 'PRODUCTS.CODE')
+                        ->where('supplier_link.SupplierID', $supplier->external_pos_id)
+                        ->pluck('PRODUCTS.ID')
                         ->toArray();
 
-                    if (! empty($productCodes)) {
-                        $supplier->period_sales = (float) SalesDailySummary::whereIn('product_code', $productCodes)
-                            ->forDateRange($startDateTime, $endDateTime)
-                            ->sum('total_revenue');
+                    if (! empty($productIds)) {
+                        $sales = $this->getPOSSales($productIds, $startDateTime, $endDateTime);
+                        $supplier->period_sales = (float) $sales->revenue;
                     }
                 }
 
