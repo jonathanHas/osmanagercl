@@ -123,18 +123,16 @@
                         <i class="fas fa-chevron-down ml-2 transition-transform duration-200" :class="open && 'rotate-180'"></i>
                     </button>
 
-                    <div x-show="open" x-collapse class="mt-4">
+                    <div x-show="open" x-transition class="mt-4">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {{-- Product Types --}}
                             <div>
                                 <h4 class="text-sm font-semibold text-gray-800 mb-2">Product Types</h4>
                                 <div class="space-y-1 mb-2">
                                     <template x-for="(type, index) in productTypes" :key="index">
-                                        <div class="flex items-center justify-between bg-gray-50 rounded px-3 py-1.5 text-sm">
+                                        <div class="flex items-center justify-between bg-gray-50 rounded px-3 py-1.5 text-sm group">
                                             <span x-text="type"></span>
-                                            <button @click="removeProductType(index)" class="text-red-400 hover:text-red-600 ml-2" title="Remove">
-                                                <i class="fas fa-times"></i>
-                                            </button>
+                                            <button type="button" @click="removeProductType(index)" class="text-red-500 hover:text-red-700 hover:bg-red-100 rounded px-2 py-0.5 font-bold text-xs">&times;</button>
                                         </div>
                                     </template>
                                 </div>
@@ -153,11 +151,9 @@
                                 <h4 class="text-sm font-semibold text-gray-800 mb-2">Certification Bodies</h4>
                                 <div class="space-y-1 mb-2">
                                     <template x-for="(body, index) in certBodies" :key="index">
-                                        <div class="flex items-center justify-between bg-gray-50 rounded px-3 py-1.5 text-sm">
+                                        <div class="flex items-center justify-between bg-gray-50 rounded px-3 py-1.5 text-sm group">
                                             <span x-text="body"></span>
-                                            <button @click="removeCertBody(index)" class="text-red-400 hover:text-red-600 ml-2" title="Remove">
-                                                <i class="fas fa-times"></i>
-                                            </button>
+                                            <button type="button" @click="removeCertBody(index)" class="text-red-500 hover:text-red-700 hover:bg-red-100 rounded px-2 py-0.5 font-bold text-xs">&times;</button>
                                         </div>
                                     </template>
                                 </div>
