@@ -111,7 +111,7 @@ class OrganicTrustReportController extends Controller
             }
             fputcsv($file, []);
 
-            fputcsv($file, ['Supplier Name', 'Product Type', 'Certification Body', 'Total Amount (incl. VAT)', 'Sales Revenue', 'Invoice Count', 'Organic']);
+            fputcsv($file, ['Supplier Name', 'Product Type', 'Certification Body', 'Total Amount (ex. VAT)', 'Sales Revenue (ex. VAT)', 'Invoice Count', 'Organic']);
 
             $totalAmount = 0;
 
@@ -191,7 +191,7 @@ class OrganicTrustReportController extends Controller
                 $invoiceStats = $supplier->invoices()
                     ->where('payment_status', '!=', 'cancelled')
                     ->whereBetween('invoice_date', [$startDateTime, $endDateTime])
-                    ->selectRaw('COALESCE(SUM(total_amount), 0) as total, COUNT(*) as count')
+                    ->selectRaw('COALESCE(SUM(total_amount - vat_amount), 0) as total, COUNT(*) as count')
                     ->first();
 
                 $supplier->period_total = (float) $invoiceStats->total;
