@@ -242,7 +242,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/suppliers/payments', [\App\Http\Controllers\SupplierPaymentsController::class, 'index'])->name('suppliers.payments');
     Route::get('/suppliers/payments/export', [\App\Http\Controllers\SupplierPaymentsController::class, 'exportCsv'])->name('suppliers.payments.export');
     Route::get('/suppliers/organic-trust-report', [\App\Http\Controllers\OrganicTrustReportController::class, 'index'])->name('suppliers.organic-trust-report');
-    Route::get('/suppliers/organic-trust-report/export', [\App\Http\Controllers\OrganicTrustReportController::class, 'exportCsv'])->name('suppliers.organic-trust-report.export');
+    Route::get('/suppliers/organic-trust-report/export-bought-in', [\App\Http\Controllers\OrganicTrustReportController::class, 'exportBoughtIn'])->name('suppliers.organic-trust-report.export-bought-in');
+    Route::get('/suppliers/organic-trust-report/export-sales', [\App\Http\Controllers\OrganicTrustReportController::class, 'exportSales'])->name('suppliers.organic-trust-report.export-sales');
     Route::post('/suppliers/{supplier}/toggle-organic', [\App\Http\Controllers\OrganicTrustReportController::class, 'toggleOrganic'])->name('suppliers.toggle-organic');
     Route::post('/suppliers/{supplier}/update-organic-fields', [\App\Http\Controllers\OrganicTrustReportController::class, 'updateOrganicFields'])->name('suppliers.update-organic-fields');
     Route::post('/suppliers/organic-trust-report/options', [\App\Http\Controllers\OrganicTrustReportController::class, 'updateOptions'])->name('suppliers.organic-trust-report.options');

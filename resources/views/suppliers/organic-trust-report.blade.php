@@ -6,13 +6,13 @@
             </h2>
             @if(isset($suppliers) && $suppliers->count() > 0)
                 <div class="flex space-x-2">
-                    <a href="{{ route('suppliers.organic-trust-report.export', ['start_date' => $startDate, 'end_date' => $endDate]) }}"
-                       class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                        <i class="fas fa-download mr-2"></i>Export All
-                    </a>
-                    <a href="{{ route('suppliers.organic-trust-report.export', ['start_date' => $startDate, 'end_date' => $endDate, 'organic_only' => 1]) }}"
+                    <a href="{{ route('suppliers.organic-trust-report.export-bought-in', ['start_date' => $startDate, 'end_date' => $endDate]) }}"
                        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                        <i class="fas fa-leaf mr-2"></i>Export Organic Only
+                        <i class="fas fa-download mr-2"></i>Bought In Organic Products
+                    </a>
+                    <a href="{{ route('suppliers.organic-trust-report.export-sales', ['start_date' => $startDate, 'end_date' => $endDate]) }}"
+                       class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                        <i class="fas fa-download mr-2"></i>Sales of Organic Products
                     </a>
                 </div>
             @endif
@@ -361,6 +361,44 @@
                             </div>
                         </div>
                     </div>
+
+                    {{-- Organic Sales by Category --}}
+                    @if(isset($organicCategorySales) && $organicCategorySales->count() > 0)
+                        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mt-6">
+                            <div class="p-6">
+                                <h3 class="text-lg font-medium text-gray-900 mb-4">
+                                    <i class="fas fa-leaf text-green-600 mr-2"></i>Organic Sales by Category
+                                </h3>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-gray-200">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Units Sold</th>
+                                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Sales Revenue (ex. VAT)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="bg-white divide-y divide-gray-200">
+                                            @foreach($organicCategorySales as $catSale)
+                                                <tr class="hover:bg-gray-50">
+                                                    <td class="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{{ $catSale->category_name }}</td>
+                                                    <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-700 text-right">{{ number_format($catSale->total_units, 0) }}</td>
+                                                    <td class="px-6 py-3 whitespace-nowrap text-sm font-medium text-purple-700 text-right">&euro;{{ number_format($catSale->total_revenue, 2) }}</td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                        <tfoot class="bg-gray-50">
+                                            <tr>
+                                                <td class="px-6 py-3 whitespace-nowrap text-sm font-bold text-gray-900">Total</td>
+                                                <td class="px-6 py-3 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{{ number_format($organicCategorySales->sum('total_units'), 0) }}</td>
+                                                <td class="px-6 py-3 whitespace-nowrap text-sm font-bold text-purple-700 text-right">&euro;{{ number_format($organicCategorySales->sum('total_revenue'), 2) }}</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
 
                     <!-- Grand Total -->
                     <div class="bg-gray-900 text-white overflow-hidden shadow-sm sm:rounded-lg mt-6">

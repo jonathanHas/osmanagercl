@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AccountingSupplier;
+use App\Models\Category;
 use App\Models\SalesDailySummary;
 use App\Models\SupplierLink;
 use Carbon\Carbon;
@@ -38,6 +39,8 @@ class OrganicTrustReportController extends Controller
         $supplierCount = $suppliers->count();
         $organicCount = $organicSuppliers->count();
 
+        $organicCategorySales = $this->getOrganicCategorySales($suppliers, $startDateTime, $endDateTime);
+
         return view('suppliers.organic-trust-report', compact(
             'startDate',
             'endDate',
@@ -49,7 +52,8 @@ class OrganicTrustReportController extends Controller
             'supplierCount',
             'organicCount',
             'productTypes',
-            'certBodies'
+            'certBodies',
+            'organicCategorySales'
         ));
     }
 
@@ -79,39 +83,27 @@ class OrganicTrustReportController extends Controller
         ]);
     }
 
-    public function exportCsv(Request $request)
+    public function exportBoughtIn(Request $request)
     {
         $startDate = $request->get('start_date', now()->startOfYear()->format('Y-m-d'));
         $endDate = $request->get('end_date', now()->format('Y-m-d'));
-        $organicOnly = $request->boolean('organic_only');
 
         $startDateTime = Carbon::parse($startDate)->startOfDay();
         $endDateTime = Carbon::parse($endDate)->endOfDay();
 
-        $suppliers = $this->getSupplierSpend($startDateTime, $endDateTime);
+        $suppliers = $this->getSupplierSpend($startDateTime, $endDateTime)
+            ->where('is_organic', true);
 
-        if ($organicOnly) {
-            $suppliers = $suppliers->where('is_organic', true);
-        }
+        $filename = 'Bought In Organic Products '.$startDate.' to '.$endDate.'.csv';
 
-        $filename = 'organic-trust-report-'.$startDate.'-to-'.$endDate.'.csv';
-
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
-        ];
-
-        $callback = function () use ($suppliers, $startDate, $endDate, $organicOnly) {
+        $callback = function () use ($suppliers, $startDate, $endDate) {
             $file = fopen('php://output', 'w');
 
-            fputcsv($file, ['Organic Trust Supplier Report']);
+            fputcsv($file, ['Bought In Organic Products']);
             fputcsv($file, ['Date Range: '.$startDate.' to '.$endDate]);
-            if ($organicOnly) {
-                fputcsv($file, ['Filter: Organic suppliers only']);
-            }
             fputcsv($file, []);
 
-            fputcsv($file, ['Supplier Name', 'Product Type', 'Certification Body', 'Total Amount (ex. VAT)', 'Sales Revenue (ex. VAT)', 'Invoice Count', 'Organic']);
+            fputcsv($file, ['Supplier Name', 'Product Type', 'Certification Body', 'Total Amount (ex. VAT)']);
 
             $totalAmount = 0;
 
@@ -121,23 +113,69 @@ class OrganicTrustReportController extends Controller
                     $supplier->organic_product_type ?? '',
                     $supplier->organic_certification_body ?? '',
                     number_format($supplier->period_total, 2),
-                    number_format($supplier->period_sales, 2),
-                    $supplier->period_invoice_count,
-                    $supplier->is_organic ? 'Yes' : 'No',
                 ]);
 
                 $totalAmount += $supplier->period_total;
             }
 
             fputcsv($file, []);
-            fputcsv($file, ['Summary']);
-            fputcsv($file, ['Total:', '€'.number_format($totalAmount, 2)]);
-            fputcsv($file, ['Supplier Count:', $suppliers->count()]);
+            fputcsv($file, ['Total', '', '', number_format($totalAmount, 2)]);
 
             fclose($file);
         };
 
-        return response()->stream($callback, 200, $headers);
+        return response()->stream($callback, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    public function exportSales(Request $request)
+    {
+        $startDate = $request->get('start_date', now()->startOfYear()->format('Y-m-d'));
+        $endDate = $request->get('end_date', now()->format('Y-m-d'));
+
+        $startDateTime = Carbon::parse($startDate)->startOfDay();
+        $endDateTime = Carbon::parse($endDate)->endOfDay();
+
+        $suppliers = $this->getSupplierSpend($startDateTime, $endDateTime);
+        $categorySales = $this->getOrganicCategorySales($suppliers, $startDateTime, $endDateTime);
+
+        $filename = 'Sales of Organic Products '.$startDate.' to '.$endDate.'.csv';
+
+        $callback = function () use ($categorySales, $startDate, $endDate) {
+            $file = fopen('php://output', 'w');
+
+            fputcsv($file, ['Sales of Organic Products']);
+            fputcsv($file, ['Date Range: '.$startDate.' to '.$endDate]);
+            fputcsv($file, []);
+
+            fputcsv($file, ['Category', 'Units Sold', 'Sales Revenue (ex. VAT)']);
+
+            $totalUnits = 0;
+            $totalRevenue = 0;
+
+            foreach ($categorySales as $catSale) {
+                fputcsv($file, [
+                    $catSale->category_name,
+                    number_format($catSale->total_units, 0),
+                    number_format($catSale->total_revenue, 2),
+                ]);
+
+                $totalUnits += $catSale->total_units;
+                $totalRevenue += $catSale->total_revenue;
+            }
+
+            fputcsv($file, []);
+            fputcsv($file, ['Total', number_format($totalUnits, 0), number_format($totalRevenue, 2)]);
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
     }
 
     public function updateOptions(Request $request)
@@ -180,6 +218,50 @@ class OrganicTrustReportController extends Controller
             ['key' => $key],
             ['value' => json_encode($value), 'updated_at' => now()]
         );
+    }
+
+    private function getOrganicCategorySales($suppliers, Carbon $startDateTime, Carbon $endDateTime)
+    {
+        // Get product codes for all organic, POS-linked suppliers
+        $organicPosIds = $suppliers
+            ->where('is_organic', true)
+            ->where('is_pos_linked', true)
+            ->pluck('external_pos_id')
+            ->filter()
+            ->toArray();
+
+        if (empty($organicPosIds)) {
+            return collect();
+        }
+
+        $productCodes = SupplierLink::whereIn('SupplierID', $organicPosIds)
+            ->pluck('Barcode')
+            ->toArray();
+
+        if (empty($productCodes)) {
+            return collect();
+        }
+
+        // Group sales by category
+        $categorySales = SalesDailySummary::whereIn('product_code', $productCodes)
+            ->forDateRange($startDateTime, $endDateTime)
+            ->selectRaw('category_id, SUM(total_revenue) as total_revenue, SUM(total_units) as total_units')
+            ->groupBy('category_id')
+            ->get();
+
+        if ($categorySales->isEmpty()) {
+            return collect();
+        }
+
+        // Resolve category names from POS database
+        $categoryNames = Category::whereIn('ID', $categorySales->pluck('category_id'))
+            ->pluck('NAME', 'ID');
+
+        return $categorySales->map(function ($row) use ($categoryNames) {
+            $row->category_name = $categoryNames[$row->category_id] ?? 'Unknown ('.$row->category_id.')';
+
+            return $row;
+        })->sortByDesc('total_revenue')->values();
     }
 
     private function getSupplierSpend(Carbon $startDateTime, Carbon $endDateTime)
