@@ -366,9 +366,10 @@
                                                             product.current_price = this.newPrice;
                                                             product.price_mismatch = false;
                                                             product.history_price = null;
+                                                            product.in_print_queue = true;
                                                             this.originalPrice = this.newPrice;
                                                             this.editing = false;
-                                                            
+
                                                             // Show success notification
                                                             const notification = document.createElement('div');
                                                             notification.className = 'fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white z-50 bg-green-600';
@@ -752,6 +753,7 @@
                                                         product.current_price = this.newPrice;
                                                         product.price_mismatch = false;
                                                         product.history_price = null;
+                                                        product.in_print_queue = true;
                                                         this.originalPrice = this.newPrice;
                                                         this.editing = false;
 
@@ -1424,6 +1426,9 @@
                             if (product) {
                                 product.is_available = isAvailable;
                                 product.is_visible_on_till = isAvailable;
+                                if (isAvailable) {
+                                    product.in_print_queue = true;
+                                }
                             }
 
                             // Track toggled-off products so they stay visible but greyed out
@@ -1520,6 +1525,7 @@
                                 product.current_price = newPrice;
                                 product.price_mismatch = false;
                                 product.history_price = null;
+                                product.in_print_queue = true;
                             }
                             this.showNotification('Price updated successfully!', 'success');
                         } else {
@@ -1546,6 +1552,10 @@
                         });
                         
                         if (response.ok) {
+                            const product = this.products.find(p => p.CODE === productCode);
+                            if (product) {
+                                product.in_print_queue = true;
+                            }
                             this.showNotification('Country updated successfully!', 'success');
                             return true;
                         } else {
@@ -1574,6 +1584,10 @@
                         });
                         
                         if (response.ok) {
+                            const product = this.products.find(p => p.CODE === productCode);
+                            if (product) {
+                                product.in_print_queue = true;
+                            }
                             this.showNotification('Unit updated successfully!', 'success');
                             return true;
                         } else {
@@ -1602,6 +1616,10 @@
                         });
                         
                         if (response.ok) {
+                            const product = this.products.find(p => p.CODE === productCode);
+                            if (product) {
+                                product.in_print_queue = true;
+                            }
                             this.showNotification('Class updated successfully!', 'success');
                             return true;
                         } else {
@@ -1634,6 +1652,7 @@
                             const product = this.products.find(p => p.CODE === productCode);
                             if (product) {
                                 product.DISPLAY = display;
+                                product.in_print_queue = true;
                             }
                             this.showNotification('Display name updated successfully!', 'success');
                         } else {
