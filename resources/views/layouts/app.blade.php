@@ -32,5 +32,23 @@
                 {{ $slot }}
             </main>
         </div>
+        {{-- Stale page detector: checks session on page visibility resume --}}
+        <script>
+            document.addEventListener('visibilitychange', function() {
+                if (document.visibilityState === 'visible') {
+                    fetch('{{ route("auth.check") }}', {
+                        credentials: 'same-origin',
+                        headers: { 'Accept': 'application/json' }
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (!data.authenticated) {
+                            window.location.href = '{{ route("login") }}';
+                        }
+                    })
+                    .catch(() => {}); // Network error - don't redirect
+                }
+            });
+        </script>
     </body>
 </html>

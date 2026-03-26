@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **F&V Manage: Print queue icon updates instantly** (2026-03-25)
+  - "Queued"/"On List" badges and amber row highlight now appear immediately after editing a product (price, country, unit, class, display, or toggling availability on), without requiring a page refresh
+
 ### Added
 
 - **Organic Trust Report Enhancements** (2026-03-23)

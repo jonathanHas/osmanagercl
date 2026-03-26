@@ -33,6 +33,11 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// Lightweight session check for stale-page detection (no auth middleware - just checks if logged in)
+Route::get('/auth/check', function () {
+    return response()->json(['authenticated' => auth()->check()]);
+})->name('auth.check');
+
 Route::get('/dashboard', function () {
     $productRepository = new \App\Repositories\ProductRepository;
     $statistics = $productRepository->getStatistics();
