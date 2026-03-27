@@ -35,10 +35,15 @@ return [
             // Supplier IDs in the database for Independent Health Foods
             'supplier_ids' => [37], // Independent supplier ID
 
-            // External image URL template
+            // External image URL templates (tried in order until one loads)
             // {SUPPLIER_CODE} will be replaced with the supplier's product code
             // Note: Independent uses supplier code, not barcode for images
             'image_url' => 'https://iihealthfoods.com/cdn/shop/files/{SUPPLIER_CODE}_1.webp?width=533',
+            'image_url_fallbacks' => [
+                'https://iihealthfoods.com/cdn/shop/files/{SUPPLIER_CODE}_1.png?width=533',
+                'https://iihealthfoods.com/cdn/shop/files/{SUPPLIER_CODE}_1.jpg?width=533',
+                'https://iihealthfoods.com/cdn/shop/products/{SUPPLIER_CODE}_1.jpg?width=533',
+            ],
 
             // Supplier website search URL template
             // {SUPPLIER_CODE} will be replaced with the supplier's product code
@@ -138,6 +143,7 @@ return [
         // Allowed external image domains for Content Security Policy
         'allowed_image_domains' => [
             'cdn.ekoplaza.nl',
+            'iihealthfoods.com',
         ],
 
         // Maximum image size to display (in pixels)

@@ -19,24 +19,24 @@
         'lg' => 'w-16 h-16',
         'xl' => 'w-24 h-24',
     ];
-    
+
     $sizeClass = $sizeClasses[$size] ?? $sizeClasses['md'];
-    
+
     // Build CSS classes
     $imageClasses = $sizeClass . ' object-cover';
-    
+
     if ($rounded) {
         $imageClasses .= ' rounded';
     }
-    
+
     if ($border) {
         $imageClasses .= ' border border-gray-200 dark:border-gray-700';
     }
-    
+
     if ($lazy) {
         $imageClasses .= ' animate-pulse';
     }
-    
+
     // Generate image URL
     $imageUrl = null;
     if ($supplierService && $product) {
@@ -44,7 +44,7 @@
         if ($product instanceof \App\Models\Product) {
             if (method_exists($supplierService, 'getExternalImageUrl')) {
                 $imageUrl = $supplierService->getExternalImageUrl($product);
-            } elseif (method_exists($supplierService, 'hasExternalIntegration') && 
+            } elseif (method_exists($supplierService, 'hasExternalIntegration') &&
                       $supplierService->hasExternalIntegration($product->supplier->SupplierID ?? null)) {
                 $imageUrl = $supplierService->getExternalImageUrl($product);
             }
@@ -58,14 +58,14 @@
             }
         }
     }
-    
+
     // Alternative: try to get image from product directly
     if (!$imageUrl && $product) {
         if (isset($product->image_url)) {
             $imageUrl = $product->image_url;
         }
     }
-    
+
     $productName = $product->NAME ?? ($product->name ?? 'Product');
     $hasImage = !empty($imageUrl);
 @endphp
@@ -100,7 +100,7 @@
                     loading="lazy"
                     onload="this.classList.remove('animate-pulse')"
                 @endif
-                onerror="this.style.display='none'; this.parentElement.style.display='{{ $fallback ? 'block' : 'none' }}'; @if($fallback) this.parentElement.querySelector('.fallback-icon')?.style.display='flex'; @endif"
+                onerror="this.style.display='none'; @if($fallback) this.parentElement.querySelector('.fallback-icon')?.style.display='flex'; @endif"
                 {{ $attributes->except(['product', 'supplierService', 'size', 'fallback', 'lazy', 'rounded', 'border', 'hover', 'hoverSize']) }}
             >
 
@@ -149,7 +149,7 @@
                     loading="lazy"
                     onload="this.classList.remove('animate-pulse')"
                 @endif
-                onerror="this.style.display='none'; this.parentElement.style.display='{{ $fallback ? 'block' : 'none' }}'; @if($fallback) this.parentElement.querySelector('.fallback-icon')?.style.display='flex'; @endif"
+                onerror="this.style.display='none'; @if($fallback) this.parentElement.querySelector('.fallback-icon')?.style.display='flex'; @endif"
                 {{ $attributes->except(['product', 'supplierService', 'size', 'fallback', 'lazy', 'rounded', 'border', 'hover', 'hoverSize']) }}
             >
 

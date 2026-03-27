@@ -165,8 +165,8 @@ class ZebraLabel extends Model
     {
         $fields = [];
 
-        // Find the main label block — the ^XA...^XZ that contains ^FT positioning
-        if (! preg_match('/(\^XA(?:(?!\^XA).)*\^FT(?:(?!\^XA).)*\^XZ)/s', $zpl, $blockMatch)) {
+        // Find the main label block — the ^XA...^XZ that contains ^FT or ^FO positioning
+        if (! preg_match('/(\^XA(?:(?!\^XA).)*\^F[TO](?:(?!\^XA).)*\^XZ)/s', $zpl, $blockMatch)) {
             return $fields;
         }
         $block = $blockMatch[1];
@@ -200,7 +200,7 @@ class ZebraLabel extends Model
     public static function replaceTextFields(string $zpl, array $replacements): string
     {
         // Find the main label block
-        if (! preg_match('/(\^XA(?:(?!\^XA).)*\^FT(?:(?!\^XA).)*\^XZ)/s', $zpl, $blockMatch)) {
+        if (! preg_match('/(\^XA(?:(?!\^XA).)*\^F[TO](?:(?!\^XA).)*\^XZ)/s', $zpl, $blockMatch)) {
             return $zpl;
         }
         $block = $blockMatch[1];

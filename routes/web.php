@@ -472,6 +472,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('/deliveries/{delivery}/unparsed-lines/{index}', [DeliveryController::class, 'resolveUnparsedLine'])->name('deliveries.resolve-unparsed-line');
     Route::post('/deliveries/{delivery}/items', [DeliveryController::class, 'createDeliveryItem'])->name('deliveries.create-item');
     Route::post('/delivery-items/{item}/refresh-barcode', [DeliveryController::class, 'refreshBarcode'])->name('delivery-items.refresh-barcode');
+    Route::get('/deliveries/{delivery}/debug-images', [DeliveryController::class, 'debugImages'])->name('deliveries.debug-images');
+    Route::post('/deliveries/{delivery}/resolve-images', [DeliveryController::class, 'resolveImages'])->name('deliveries.resolve-images');
 
     // Delivery Documents
     Route::get('/deliveries/{delivery}/documents', [DeliveryDocumentController::class, 'index'])->name('deliveries.documents.index');

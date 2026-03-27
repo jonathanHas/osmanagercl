@@ -690,7 +690,7 @@ class DeliveryController extends Controller
      */
     public function show(Delivery $delivery, Request $request)
     {
-        $delivery->load(['supplier', 'items.product.supplier', 'items.product.taxCategory.primaryTax', 'scans', 'documents']);
+        $delivery->load(['supplier', 'items.product.supplier', 'items.product.supplierLink', 'items.product.taxCategory.primaryTax', 'scans', 'documents']);
 
         $summary = $this->deliveryService->getDeliverySummary($delivery->id);
 
@@ -910,7 +910,7 @@ class DeliveryController extends Controller
      */
     public function summary(Delivery $delivery): View
     {
-        $delivery->load(['supplier', 'items.product.supplier', 'scans']);
+        $delivery->load(['supplier', 'items.product.supplier', 'items.product.supplierLink', 'scans']);
         $summary = $this->deliveryService->getDeliverySummary($delivery->id);
 
         return view('deliveries.summary', compact('delivery', 'summary'))->with('supplierService', $this->supplierService);
@@ -1600,5 +1600,151 @@ class DeliveryController extends Controller
         }
 
         return response()->json(['found' => false]);
+    }
+
+    /**
+     * Debug page for delivery product images
+     */
+    public function debugImages(Delivery $delivery): View
+    {
+        $delivery->load(['supplier', 'items.product.supplier', 'items.product.supplierLinks']);
+
+        $debugData = $delivery->items->map(function ($item) use ($delivery) {
+            $product = $item->product;
+            $result = [
+                'item_id' => $item->id,
+                'description' => $item->description,
+                'barcode' => $item->barcode,
+                'is_new_product' => $item->is_new_product,
+                'has_product' => $product !== null,
+                'product_code' => $product?->CODE,
+                'product_name' => $product?->NAME,
+                'supplier_id' => $product?->supplier?->SupplierID,
+                'supplier_name' => $product?->supplier?->Name,
+                'supplier_links' => [],
+                'matching_supplier_link' => null,
+                'image_url' => null,
+                'image_status' => 'no product',
+            ];
+
+            if ($product) {
+                // Show ALL supplier links for this product
+                $allLinks = $product->supplierLinks;
+                $result['supplier_links'] = $allLinks->map(fn ($link) => [
+                    'id' => $link->ID,
+                    'supplier_id' => $link->SupplierID,
+                    'supplier_code' => $link->SupplierCode,
+                    'barcode' => $link->Barcode,
+                ])->toArray();
+
+                // Show which one hasOne returns
+                $defaultLink = $product->supplierLink;
+                $result['default_supplier_link'] = $defaultLink ? [
+                    'id' => $defaultLink->ID,
+                    'supplier_id' => $defaultLink->SupplierID,
+                    'supplier_code' => $defaultLink->SupplierCode,
+                ] : null;
+
+                // Find the link matching this delivery's supplier
+                $deliverySupplierLink = $allLinks->first(fn ($link) => (int) $link->SupplierID === (int) $delivery->supplier_id);
+                $result['matching_supplier_link'] = $deliverySupplierLink ? [
+                    'id' => $deliverySupplierLink->ID,
+                    'supplier_id' => $deliverySupplierLink->SupplierID,
+                    'supplier_code' => $deliverySupplierLink->SupplierCode,
+                ] : null;
+
+                // Get the config for this supplier
+                $config = null;
+                $supplierId = $product->supplier ? (int) $product->supplier->SupplierID : null;
+                if ($supplierId) {
+                    $configReflection = new \ReflectionMethod($this->supplierService, 'getSupplierConfig');
+                    $configReflection->setAccessible(true);
+                    $config = $configReflection->invoke($this->supplierService, $supplierId);
+                }
+                $result['supplier_config'] = $config ? [
+                    'image_url_template' => $config['image_url'] ?? null,
+                    'enabled' => $config['enabled'] ?? false,
+                ] : null;
+
+                // Check cache status
+                $cached = \App\Models\SupplierImageCache::where('supplier_code', $product->supplierLink?->SupplierCode ?? '')
+                    ->where('supplier_id', $supplierId ?? 0)
+                    ->first();
+                $result['cached'] = $cached ? [
+                    'image_url' => $cached->image_url,
+                    'not_found' => $cached->not_found,
+                    'updated_at' => $cached->updated_at?->diffForHumans(),
+                ] : null;
+
+                // Supplier website link
+                $result['supplier_website_link'] = $this->supplierService->getSupplierWebsiteLink($product);
+
+                // Try generating image URL and fallbacks
+                $imageUrl = $this->supplierService->getExternalImageUrl($product);
+                $result['image_url'] = $imageUrl;
+                $result['fallback_urls'] = $this->supplierService->getExternalImageFallbacks($product);
+
+                // Build what URL would look like with the matching supplier link
+                if ($deliverySupplierLink && $config && ! empty($config['image_url'])) {
+                    $code = preg_replace('/[^a-zA-Z0-9_-]/', '', $deliverySupplierLink->SupplierCode ?? '');
+                    $result['corrected_image_url'] = str_replace('{SUPPLIER_CODE}', $code, $config['image_url']);
+                }
+
+                if ($imageUrl) {
+                    $result['image_status'] = 'url generated';
+                } elseif (! $config) {
+                    $result['image_status'] = 'no supplier config';
+                } elseif (! $defaultLink) {
+                    $result['image_status'] = 'no supplier link (hasOne returned null)';
+                } elseif (! $defaultLink->SupplierCode) {
+                    $result['image_status'] = 'supplier link has no SupplierCode';
+                } else {
+                    $result['image_status'] = 'url generation failed - check hasOne returns wrong supplier link?';
+                }
+            }
+
+            return $result;
+        });
+
+        return view('deliveries.debug-images', [
+            'delivery' => $delivery,
+            'debugData' => $debugData,
+            'supplierService' => $this->supplierService,
+        ]);
+    }
+
+    /**
+     * Resolve and cache all product images for a delivery (scrapes supplier website)
+     */
+    public function resolveImages(Delivery $delivery): JsonResponse
+    {
+        $delivery->load(['items.product.supplier', 'items.product.supplierLinks']);
+
+        $results = [];
+        foreach ($delivery->items as $item) {
+            $product = $item->product;
+            if (! $product || ! $product->supplierLink || ! $product->supplierLink->SupplierCode) {
+                continue;
+            }
+
+            $supplierId = (int) ($product->supplier?->SupplierID ?? $delivery->supplier_id);
+            $supplierCode = $product->supplierLink->SupplierCode;
+
+            $imageUrl = $this->supplierService->resolveAndCacheImageUrl($supplierCode, $supplierId);
+
+            $results[] = [
+                'description' => $item->description,
+                'supplier_code' => $supplierCode,
+                'image_url' => $imageUrl,
+                'status' => $imageUrl ? 'found' : 'not_found',
+            ];
+        }
+
+        return response()->json([
+            'resolved' => count($results),
+            'found' => collect($results)->where('status', 'found')->count(),
+            'not_found' => collect($results)->where('status', 'not_found')->count(),
+            'results' => $results,
+        ]);
     }
 }
