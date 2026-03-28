@@ -146,6 +146,9 @@ class LabelTranslationController extends Controller
                 .'JSON STRUCTURE: Return only the JSON object with keys: '
                 ."product_name, ingredients, nutrition_inline, storage, address, origin, original_text.\n"
                 ."Do NOT include net_weight — it is already on the packaging.\n\n"
+                .'NUTRITION: The nutrition_inline field MUST start with the reference quantity header '
+                .'(e.g. "Per 100g:", "Per 100ml:") followed by the values separated by pipes. '
+                ."If the label shows nutrition per serving as well, only include the per 100g/100ml values.\n\n"
                 ."ORIGINAL TEXT: Include the original (untranslated) text from the label in the 'original_text' field. "
                 .'This should be the raw text as it appears on the label, in the original language, '
                 .'so the user can verify the translation is correct. Include product name, ingredients, '
@@ -153,7 +156,7 @@ class LabelTranslationController extends Controller
                 ."Example output:\n"
                 .'{"product_name":"Sun-Dried Tomatoes in Oil",'
                 .'"ingredients":"Sun-dried tomatoes** 60%, sunflower oil*, SULPHITES (as preservative), salt, garlic, oregano. *from organic farming. **from organic and biodynamic agriculture.",'
-                .'"nutrition_inline":"Energy 245kcal | Fat 18g | Sat 2.1g | Carbs 12g | Sugar 8g | Protein 5g | Salt 1.2g",'
+                .'"nutrition_inline":"Per 100g: Energy 245kcal | Fat 18g | Sat 2.1g | Carbs 12g | Sugar 8g | Protein 5g | Salt 1.2g",'
                 .'"storage":"Store in a cool, dry place. Once opened, refrigerate and use within 3 days.",'
                 .'"address":"Via Roma 12, 80100 Naples, Italy",'
                 .'"origin":null,'
