@@ -63,19 +63,40 @@ class ZplGeneratorService
 
     /**
      * Estimate how many ^FB lines a text string needs at a given font/field width.
+     * Simulates ZPL word-wrapping with a safety margin for font width variation.
      */
     public function estimateLines(string $text, int $fontSize, int $fieldWidth, int $maxLines): int
     {
-        // Average character width is ~50% of font size for Zebra default scalable font (^A0)
-        $charsPerLine = max(1, (int) floor($fieldWidth / ($fontSize * 0.5)));
-        $needed = (int) ceil(mb_strlen($text) / $charsPerLine);
+        // Average character width ~50% of font size, with 10% safety margin for variation
+        $charWidth = $fontSize * 0.5;
+        $charsPerLine = max(1, (int) floor(($fieldWidth * 0.9) / $charWidth));
 
-        return min($needed, $maxLines);
+        // Simulate word wrapping (ZPL ^FB wraps at word boundaries)
+        $words = preg_split('/\s+/', trim($text));
+        if (empty($words) || ($words === [''])) {
+            return 1;
+        }
+
+        $lines = 1;
+        $currentLineLength = 0;
+
+        foreach ($words as $word) {
+            $wordLen = mb_strlen($word);
+            if ($currentLineLength === 0) {
+                $currentLineLength = $wordLen;
+            } elseif ($currentLineLength + 1 + $wordLen <= $charsPerLine) {
+                $currentLineLength += 1 + $wordLen;
+            } else {
+                $lines++;
+                $currentLineLength = $wordLen;
+            }
+        }
+
+        return min($lines, $maxLines);
     }
 
     public function calculateContentHeight(array $data, array $dims, float $scale): int
     {
-        $nameFont = (int) round($dims['nameFont'] * $scale);
         $bodyFont = (int) round($dims['bodyFont'] * $scale);
         $smallFont = (int) round($dims['smallFont'] * $scale);
         $gap = $dims['gap'];
@@ -83,9 +104,8 @@ class ZplGeneratorService
 
         $y = $dims['startY'];
 
-        // Name
-        $nameLines = $this->estimateLines($data['product_name'] ?? '', $nameFont, $fieldWidth, 2);
-        $y += $nameFont * $nameLines + $gap;
+        // Name (uses bodyFont, single line to save space)
+        $y += $bodyFont + $gap;
 
         // Ingredients (uncapped — auto-fit scaling handles overflow)
         if (! empty($data['ingredients'])) {
@@ -93,15 +113,15 @@ class ZplGeneratorService
             $y += $bodyFont * $lines + $gap;
         }
 
-        // Nutrition
+        // Nutrition (uncapped)
         if (! empty($data['nutrition_inline'])) {
-            $lines = $this->estimateLines($data['nutrition_inline'], $smallFont, $fieldWidth, 3);
+            $lines = $this->estimateLines($data['nutrition_inline'], $smallFont, $fieldWidth, 999);
             $y += $smallFont * $lines + $gap;
         }
 
-        // Storage
+        // Storage (uncapped)
         if (! empty($data['storage'])) {
-            $lines = $this->estimateLines($data['storage'], $smallFont, $fieldWidth, 2);
+            $lines = $this->estimateLines($data['storage'], $smallFont, $fieldWidth, 999);
             $y += $smallFont * $lines + $gap;
         }
 
@@ -110,9 +130,9 @@ class ZplGeneratorService
             $y += $smallFont + $gap;
         }
 
-        // Address
+        // Address (uncapped)
         if (! empty($data['address'])) {
-            $lines = $this->estimateLines($data['address'], $smallFont, $fieldWidth, 2);
+            $lines = $this->estimateLines($data['address'], $smallFont, $fieldWidth, 999);
             $y += $smallFont * $lines + $gap;
         }
 
@@ -121,7 +141,6 @@ class ZplGeneratorService
 
     public function buildZpl(array $data, array $dims, float $scale): string
     {
-        $nameFontSize = (int) round($dims['nameFont'] * $scale);
         $bodyFontSize = (int) round($dims['bodyFont'] * $scale);
         $smallFontSize = (int) round($dims['smallFont'] * $scale);
         $gap = $dims['gap'];
@@ -136,10 +155,9 @@ class ZplGeneratorService
         $zpl .= "^PW{$width}^LL{$height}";
         $zpl .= '^CI28';
 
-        // Product Name (centered)
-        $nameLines = $this->estimateLines($data['product_name'] ?? '', $nameFontSize, $fieldWidth, 2);
-        $zpl .= "^FO{$margin},{$y}^A0N,{$nameFontSize},{$nameFontSize}^FB{$fieldWidth},2,0,C^FD".($data['product_name'] ?? '').'^FS';
-        $y += $nameFontSize * $nameLines + $gap;
+        // Product Name (centered, bodyFont, single line to maximise content space)
+        $zpl .= "^FO{$margin},{$y}^A0N,{$bodyFontSize},{$bodyFontSize}^FB{$fieldWidth},1,0,C^FD".($data['product_name'] ?? '').'^FS';
+        $y += $bodyFontSize + $gap;
 
         // Ingredients (uncapped lines — auto-fit scaling handles overflow)
         if (! empty($data['ingredients'])) {
@@ -148,17 +166,17 @@ class ZplGeneratorService
             $y += $bodyFontSize * $lines + $gap;
         }
 
-        // Nutrition
+        // Nutrition (uncapped — ^FB maxLines matches estimated lines)
         if (! empty($data['nutrition_inline'])) {
-            $lines = $this->estimateLines($data['nutrition_inline'], $smallFontSize, $fieldWidth, 3);
-            $zpl .= "^FO{$margin},{$y}^A0N,{$smallFontSize},{$smallFontSize}^FB{$fieldWidth},3,0,L^FD".$data['nutrition_inline'].'^FS';
+            $lines = $this->estimateLines($data['nutrition_inline'], $smallFontSize, $fieldWidth, 999);
+            $zpl .= "^FO{$margin},{$y}^A0N,{$smallFontSize},{$smallFontSize}^FB{$fieldWidth},{$lines},0,L^FD".$data['nutrition_inline'].'^FS';
             $y += $smallFontSize * $lines + $gap;
         }
 
-        // Storage
+        // Storage (uncapped)
         if (! empty($data['storage'])) {
-            $lines = $this->estimateLines($data['storage'], $smallFontSize, $fieldWidth, 2);
-            $zpl .= "^FO{$margin},{$y}^A0N,{$smallFontSize},{$smallFontSize}^FB{$fieldWidth},2,0,L^FD".$data['storage'].'^FS';
+            $lines = $this->estimateLines($data['storage'], $smallFontSize, $fieldWidth, 999);
+            $zpl .= "^FO{$margin},{$y}^A0N,{$smallFontSize},{$smallFontSize}^FB{$fieldWidth},{$lines},0,L^FD".$data['storage'].'^FS';
             $y += $smallFontSize * $lines + $gap;
         }
 
@@ -168,10 +186,10 @@ class ZplGeneratorService
             $y += $smallFontSize + $gap;
         }
 
-        // Address
+        // Address (uncapped)
         if (! empty($data['address'])) {
-            $lines = $this->estimateLines($data['address'], $smallFontSize, $fieldWidth, 2);
-            $zpl .= "^FO{$margin},{$y}^A0N,{$smallFontSize},{$smallFontSize}^FB{$fieldWidth},2,0,L^FD".$data['address'].'^FS';
+            $lines = $this->estimateLines($data['address'], $smallFontSize, $fieldWidth, 999);
+            $zpl .= "^FO{$margin},{$y}^A0N,{$smallFontSize},{$smallFontSize}^FB{$fieldWidth},{$lines},0,L^FD".$data['address'].'^FS';
             $y += $smallFontSize * $lines + $gap;
         }
 
