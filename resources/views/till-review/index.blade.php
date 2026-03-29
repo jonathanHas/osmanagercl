@@ -465,7 +465,6 @@
                     };
 
                     this.loadTransactions();
-                    this.loadHourlySalesChart();
                 },
 
                 async loadHourlySalesChart() {
@@ -564,14 +563,15 @@
                     try {
                         await Promise.all([
                             this.loadSummary(),
-                            this.loadTransactionData(),
-                            this.loadHourlySalesChart()
+                            this.loadTransactionData()
                         ]);
                     } catch (error) {
                         console.error('Error loading data:', error);
                         alert('Failed to load data');
                     } finally {
                         this.loading = false;
+                        // Load chart after DOM has settled from loading state change
+                        this.$nextTick(() => { this.loadHourlySalesChart(); });
                     }
                 },
 
