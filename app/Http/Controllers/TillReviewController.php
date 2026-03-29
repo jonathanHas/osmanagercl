@@ -145,6 +145,80 @@ class TillReviewController extends Controller
     }
 
     /**
+     * Get hourly sales data for chart (total sales + coffee sales per hour)
+     */
+    public function getHourlySales(Request $request)
+    {
+        $request->validate([
+            'date' => 'required|date',
+        ]);
+
+        $date = Carbon::parse($request->input('date'));
+        $dateStr = $date->format('Y-m-d');
+
+        // Get coffee product IDs for matching
+        $coffeeProductIds = \App\Models\Product::whereIn('CATEGORY', ['081'])
+            ->pluck('CODE')
+            ->map(fn ($code) => strtolower($code))
+            ->toArray();
+
+        // Get all receipt transactions for this date from cache
+        $transactions = \App\Models\TillReviewCache::where('transaction_date', $dateStr)
+            ->where('transaction_type', 'receipt')
+            ->get();
+
+        // Build hourly data
+        $hourlyData = [];
+        for ($h = 0; $h < 24; $h++) {
+            $hourlyData[str_pad($h, 2, '0', STR_PAD_LEFT)] = [
+                'total' => 0,
+                'coffee' => 0,
+                'count' => 0,
+            ];
+        }
+
+        foreach ($transactions as $transaction) {
+            $data = $transaction->transaction_data;
+            $hour = Carbon::parse($data['transaction_time'])->setTimezone(config('app.timezone'))->format('H');
+            $amount = floatval($data['amount'] ?? 0);
+
+            $hourlyData[$hour]['total'] += $amount;
+            $hourlyData[$hour]['count']++;
+
+            // Calculate coffee sales from line items
+            foreach ($data['lines'] ?? [] as $line) {
+                $productCode = strtolower($line['product_code'] ?? '');
+                if (in_array($productCode, $coffeeProductIds)) {
+                    $hourlyData[$hour]['coffee'] += floatval($line['total'] ?? 0);
+                }
+            }
+        }
+
+        // Format for chart - only include hours with data or business hours (7-22)
+        $labels = [];
+        $totalSales = [];
+        $coffeeSales = [];
+        $transactionCounts = [];
+
+        foreach ($hourlyData as $hour => $data) {
+            $intHour = intval($hour);
+            if ($intHour >= 7 && $intHour <= 22) {
+                $labels[] = $hour.':00';
+                $totalSales[] = round($data['total'], 2);
+                $coffeeSales[] = round($data['coffee'], 2);
+                $transactionCounts[] = $data['count'];
+            }
+        }
+
+        return response()->json([
+            'labels' => $labels,
+            'total_sales' => $totalSales,
+            'coffee_sales' => $coffeeSales,
+            'transaction_counts' => $transactionCounts,
+        ]);
+    }
+
+    /**
      * Refresh cache for a date
      */
     public function refreshCache(Request $request)

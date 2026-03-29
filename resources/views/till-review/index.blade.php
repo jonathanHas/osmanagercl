@@ -92,6 +92,18 @@
                 </div>
             </div>
 
+            <!-- Hourly Sales Chart -->
+            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
+                <div class="p-6">
+                    <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+                        <i class="fas fa-chart-bar mr-2"></i>Hourly Sales
+                    </h3>
+                    <div class="relative" style="height: 300px;">
+                        <canvas id="hourlySalesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
             <!-- Filters -->
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
                 <div class="p-6">
@@ -363,6 +375,7 @@
     </div>
 
     @push('scripts')
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         function tillReview() {
             return {
@@ -370,6 +383,7 @@
                 loading: false,
                 transactions: [],
                 transactionCount: 0,
+                hourlySalesChart: null,
                 summary: {
                     total_sales: {{ $summary->total_sales ?? 0 }},
                     total_transactions: {{ $summary->total_transactions ?? 0 }},
@@ -444,34 +458,115 @@
 
                 init() {
                     console.log('Till Review initialized');
-                    console.log('Page data:', {
-                        selectedDate: this.selectedDate,
-                        summaryFromServer: {
-                            total_sales: {{ $summary->total_sales ?? 0 }},
-                            total_transactions: {{ $summary->total_transactions ?? 0 }},
-                            cash_total: {{ $summary->cash_total ?? 0 }},
-                            card_total: {{ $summary->card_total ?? 0 }}
-                        }
-                    });
-                    
+
                     // Set up global toggle function
                     window.tillReviewToggleDetails = (index) => {
                         this.toggleDetails(this.transactions[index]);
                     };
-                    
+
                     this.loadTransactions();
+                    this.loadHourlySalesChart();
+                },
+
+                async loadHourlySalesChart() {
+                    try {
+                        const params = new URLSearchParams({ date: this.selectedDate });
+                        const response = await fetch(`/till-review/hourly-sales?${params}`, {
+                            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+                        });
+                        const data = await response.json();
+
+                        const ctx = document.getElementById('hourlySalesChart');
+                        if (!ctx) return;
+
+                        const isDark = document.documentElement.classList.contains('dark');
+                        const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+                        const textColor = isDark ? '#d1d5db' : '#374151';
+
+                        if (this.hourlySalesChart) {
+                            this.hourlySalesChart.destroy();
+                        }
+
+                        this.hourlySalesChart = new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: data.labels,
+                                datasets: [
+                                    {
+                                        label: 'Total Sales (€)',
+                                        data: data.total_sales,
+                                        backgroundColor: isDark ? 'rgba(59, 130, 246, 0.6)' : 'rgba(59, 130, 246, 0.5)',
+                                        borderColor: 'rgba(59, 130, 246, 1)',
+                                        borderWidth: 1,
+                                        borderRadius: 4,
+                                        order: 2
+                                    },
+                                    {
+                                        label: 'Coffee Sales (€)',
+                                        data: data.coffee_sales,
+                                        type: 'line',
+                                        borderColor: 'rgba(180, 83, 9, 1)',
+                                        backgroundColor: 'rgba(180, 83, 9, 0.15)',
+                                        borderWidth: 2,
+                                        pointBackgroundColor: 'rgba(180, 83, 9, 1)',
+                                        pointRadius: 4,
+                                        pointHoverRadius: 6,
+                                        fill: true,
+                                        tension: 0.3,
+                                        order: 1
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                interaction: {
+                                    mode: 'index',
+                                    intersect: false
+                                },
+                                plugins: {
+                                    legend: {
+                                        labels: { color: textColor }
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            afterBody: function(tooltipItems) {
+                                                const idx = tooltipItems[0].dataIndex;
+                                                return 'Transactions: ' + data.transaction_counts[idx];
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    x: {
+                                        grid: { color: gridColor },
+                                        ticks: { color: textColor }
+                                    },
+                                    y: {
+                                        beginAtZero: true,
+                                        grid: { color: gridColor },
+                                        ticks: {
+                                            color: textColor,
+                                            callback: function(value) { return '€' + value; }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    } catch (error) {
+                        console.error('Error loading hourly sales chart:', error);
+                    }
                 },
 
                 async loadTransactions() {
                     this.loading = true;
-                    
+
                     try {
-                        // Load both summary and transactions in parallel
-                        const [summaryResponse, transactionsResponse] = await Promise.all([
+                        await Promise.all([
                             this.loadSummary(),
-                            this.loadTransactionData()
+                            this.loadTransactionData(),
+                            this.loadHourlySalesChart()
                         ]);
-                        
                     } catch (error) {
                         console.error('Error loading data:', error);
                         alert('Failed to load data');

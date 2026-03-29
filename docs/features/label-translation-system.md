@@ -23,7 +23,7 @@ The label translation system enables staff to quickly create English-language re
 - All text is translated to English
 - **14 EU allergens** highlighted using CAPITAL LETTERS (HSE compliant emphasis):
   Cereals (Gluten), Crustaceans, Eggs, Fish, Peanuts, Soybeans, Milk, Nuts, Celery, Mustard, Sesame, Sulphites, Lupin, Molluscs
-- Label content includes: Product Name, Ingredients (wrapped text), Nutrition Table, Storage & Net Weight
+- Label content includes: Product Name, Ingredients (wrapped text), Nutrition (with EU-required "Per 100g/100ml" prefix), Storage & Origin
 - Images are resized client-side to max 1600px (JPEG 85%) before upload, solving PHP upload size limits for phone photos (3-5MB)
 - Server further resizes to max 1200px (JPEG 80%) before sending to Gemini to reduce API latency
 
@@ -35,8 +35,10 @@ The label translation system enables staff to quickly create English-language re
 
 ### Dynamic Label Layout
 - **Auto-fit scaling**: If content overflows label height, font scale is automatically reduced until it fits
-- **Accurate line estimation**: Character width ratio of 0.5× font size matches Zebra default scalable font (^A0)
-- **Uncapped ingredients**: Ingredients field uses as many lines as needed (no artificial cap), preventing overlap with nutrition data below
+- **Word-wrap line estimation**: Simulates ZPL word-boundary wrapping with 10% safety margin for accurate Y-position tracking
+- **Consistent `^FB` and Y-advance**: All sections use the same estimated line count for both the ZPL `^FB` maxLines command and the vertical space allocation, preventing overlap
+- **Uncapped sections**: Ingredients, nutrition, storage, and address fields use as many lines as needed (no artificial caps)
+- **Compact product name**: Uses body font (not name font) at 1 line, maximising space for ingredients and nutrition
 - **Two label sizes**: Large (76×50mm) and Small (56×30mm), configurable in `config/label-sizes.php`
 
 ### Print Step Adjustments

@@ -721,6 +721,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [\App\Http\Controllers\TillReviewController::class, 'index'])->name('index');
         Route::get('/summary', [\App\Http\Controllers\TillReviewController::class, 'getSummary'])->name('summary');
         Route::get('/transactions', [\App\Http\Controllers\TillReviewController::class, 'getTransactions'])->name('transactions');
+        Route::get('/hourly-sales', [\App\Http\Controllers\TillReviewController::class, 'getHourlySales'])->name('hourly-sales');
         Route::post('/refresh-cache', [\App\Http\Controllers\TillReviewController::class, 'refreshCache'])->name('refresh-cache');
         Route::get('/export', [\App\Http\Controllers\TillReviewController::class, 'export'])->name('export');
     });

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Label Translation: Smarter layout with no text overlap** (2026-03-28)
+  - Replaced naive character-count line estimation with word-wrap simulation plus 10% safety margin, matching ZPL's actual word-boundary wrapping behaviour
+  - Removed hardcoded `^FB` maxLines caps (nutrition was 3, storage/address were 2) — sections now use actual estimated lines, eliminating the mismatch between rendered lines and Y-position advance that caused overlap
+  - Downsized product name from `nameFont` (40pt/30pt) to `bodyFont` (28pt/20pt), capped at 1 line, freeing vertical space for ingredients/nutrition/storage
+  - Auto-fit scaling now sees true content height and correctly reduces font when needed
+  - Added EU-compliant "Per 100g/100ml" requirement to Gemini nutrition extraction prompt
+  - **Modified**: `app/Services/ZplGeneratorService.php`, `app/Http/Controllers/LabelTranslationController.php`, `app/Http/Controllers/LabelAreaController.php`
+
 - **F&V Manage: Print queue icon updates instantly** (2026-03-25)
   - "Queued"/"On List" badges and amber row highlight now appear immediately after editing a product (price, country, unit, class, display, or toggling availability on), without requiring a page refresh
 

@@ -33,22 +33,25 @@ Increased polling to 150 × 100ms = 15 seconds. The existing "Generating preview
 ---
 
 ### Ingredients/Nutrition Text Overlap on Translated Labels
-**Status:** Fixed (2026-03-18)
+**Status:** Fixed (2026-03-28, supersedes earlier 2026-03-18 fix)
 
 #### Problem
-Long ingredients text overlapped with the nutrition line below on the label preview, making both unreadable.
+Long nutritional data overlapped with storage instructions on translated labels. For example, Horizon White Tahini had nutrition text requiring 4+ lines but capped at 3, with the Y-position advancing by only the estimated 2 lines.
 
 #### Root Cause
-Two issues in `ZplGeneratorService`:
-1. The `^FB` line count for ingredients was capped by `ingredientLines` config (6 for small, 8 for large). The WASM renderer rendered all text beyond the cap, overflowing visually.
-2. The character width ratio (`0.6`) in `estimateLines()` overestimated how wide characters are, causing too many lines to be allocated for other fields and preventing the user from scaling up text size.
+Three issues in `ZplGeneratorService`:
+1. **`^FB` maxLines vs Y-advance mismatch**: Nutrition used `^FB{w},3` (hardcoded 3 lines) but Y advanced by `estimateLines()` result which could be 2 — renderer shows 3 lines in 2 lines of space.
+2. **Inaccurate line estimation**: `estimateLines()` used `fontSize * 0.5` character width with simple division, ignoring that ZPL wraps at word boundaries (less efficient than character wrapping).
+3. **Rigid line caps**: Nutrition hardcapped at 3 lines, storage/address at 2 — no redistribution of available space.
 
 #### Solution
-- Removed the ingredient line cap — `^FB` now uses the actual number of lines needed
-- Changed character width ratio from `0.6` to `0.5` to match actual Zebra default font (^A0) rendering
-- Auto-fit scaling in `generateZplWithScale()` still reduces font if total content exceeds label height
+- **Word-wrap simulation**: `estimateLines()` now simulates ZPL word-boundary wrapping with 10% safety margin
+- **Removed hardcoded caps**: Nutrition, storage, and address `^FB` maxLines now match the estimated line count (consistent Y advance)
+- **Downsized product name**: Uses `bodyFont` (28pt) instead of `nameFont` (40pt), capped at 1 line, freeing vertical space for content
+- **EU nutrition compliance**: Gemini prompt now requires "Per 100g/100ml" prefix on nutrition data
+- Auto-fit scaling sees true content height and correctly reduces font when needed
 
-**Files Modified**: `app/Services/ZplGeneratorService.php`
+**Files Modified**: `app/Services/ZplGeneratorService.php`, `app/Http/Controllers/LabelTranslationController.php`, `app/Http/Controllers/LabelAreaController.php`
 
 ---
 
