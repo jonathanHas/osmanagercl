@@ -23,10 +23,11 @@ class TillTransactionRepository
     {
         $dateStr = $date->format('Y-m-d');
 
-        // Try to get from cache first
-        $cached = $this->getCachedTransactions($dateStr, $filters);
-        if ($cached && $cached->isNotEmpty()) {
-            return $cached;
+        // Check if cache exists for this date (unfiltered check)
+        $cacheExists = TillReviewCache::where('transaction_date', $dateStr)->exists();
+
+        if ($cacheExists) {
+            return $this->getCachedTransactions($dateStr, $filters);
         }
 
         // If not cached, fetch from POS and cache it
