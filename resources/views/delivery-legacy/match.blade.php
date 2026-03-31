@@ -186,9 +186,9 @@
                         </button>
                     </div>
 
-                    {{-- Last submitted result (shown briefly after submit, above history) --}}
+                    {{-- Last submitted result (shown after submit, above history) --}}
                     <div x-show="scanner.lastResult && scanner.step === 'scan'" class="mb-4">
-                        <div class="rounded-lg border-2 p-3"
+                        <div class="rounded-lg border-2 p-4"
                              :class="{
                                  'border-green-500 bg-green-900/30': scanner.lastResult?.matchStatus === 'verified',
                                  'border-yellow-500 bg-yellow-900/30': scanner.lastResult?.matchStatus === 'partial',
@@ -200,19 +200,38 @@
                                 <p class="text-red-400 text-sm" x-text="scanner.lastResult.error"></p>
                             </template>
                             <template x-if="!scanner.lastResult?.error">
-                                <div class="flex items-center justify-between">
-                                    <div class="min-w-0">
-                                        <span class="text-white font-medium truncate block" x-text="scanner.lastResult?.product?.name || 'Unknown'"></span>
-                                        <span class="text-gray-400 text-xs" x-text="'Added ' + scanner.lastResult?.addedQty + ' → Total: ' + scanner.lastResult?.newQuantity"></span>
+                                <div>
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-white font-semibold text-lg truncate mr-2" x-text="scanner.lastResult?.product?.name || 'Unknown'"></span>
+                                        <span class="px-2 py-1 rounded text-xs font-bold uppercase flex-shrink-0"
+                                              :class="{
+                                                  'bg-green-600 text-white': scanner.lastResult?.matchStatus === 'verified',
+                                                  'bg-yellow-600 text-white': scanner.lastResult?.matchStatus === 'partial',
+                                                  'bg-orange-600 text-white': scanner.lastResult?.matchStatus === 'over' || scanner.lastResult?.matchStatus === 'extra',
+                                                  'bg-red-600 text-white': scanner.lastResult?.matchStatus === 'unknown'
+                                              }"
+                                              x-text="{verified:'Match',partial:'Short',over:'Over',extra:'Extra',unknown:'Unknown'}[scanner.lastResult?.matchStatus] || scanner.lastResult?.matchStatus"></span>
                                     </div>
-                                    <span class="px-2 py-1 rounded text-xs font-bold uppercase flex-shrink-0 ml-2"
-                                          :class="{
-                                              'bg-green-600 text-white': scanner.lastResult?.matchStatus === 'verified',
-                                              'bg-yellow-600 text-white': scanner.lastResult?.matchStatus === 'partial',
-                                              'bg-orange-600 text-white': scanner.lastResult?.matchStatus === 'over' || scanner.lastResult?.matchStatus === 'extra',
-                                              'bg-red-600 text-white': scanner.lastResult?.matchStatus === 'unknown'
-                                          }"
-                                          x-text="scanner.lastResult?.matchStatus"></span>
+                                    {{-- Match comparison --}}
+                                    <div class="flex items-center gap-3 text-sm">
+                                        <span class="text-gray-400">Added: <span class="text-white font-bold" x-text="scanner.lastResult?.addedQty"></span></span>
+                                        <span class="text-gray-600">|</span>
+                                        <span class="text-gray-400">Total: <span class="text-white font-bold text-lg" x-text="scanner.lastResult?.newQuantity"></span></span>
+                                        <template x-if="scanner.lastResult?.expectedQty !== null">
+                                            <span class="text-gray-400">
+                                                / <span class="font-bold" :class="scanner.lastResult?.matchStatus === 'verified' ? 'text-green-400' : 'text-yellow-400'" x-text="scanner.lastResult?.expectedQty"></span> expected
+                                            </span>
+                                        </template>
+                                    </div>
+                                    <template x-if="scanner.lastResult?.matchStatus === 'verified'">
+                                        <p class="text-green-400 text-sm mt-1 font-medium">Quantity matches invoice</p>
+                                    </template>
+                                    <template x-if="scanner.lastResult?.matchStatus === 'partial'">
+                                        <p class="text-yellow-400 text-sm mt-1 font-medium" x-text="(scanner.lastResult?.expectedQty - scanner.lastResult?.newQuantity) + ' more needed'"></p>
+                                    </template>
+                                    <template x-if="scanner.lastResult?.matchStatus === 'over'">
+                                        <p class="text-orange-400 text-sm mt-1 font-medium" x-text="(scanner.lastResult?.newQuantity - scanner.lastResult?.expectedQty) + ' over expected'"></p>
+                                    </template>
                                 </div>
                             </template>
                         </div>
@@ -1768,10 +1787,10 @@
                                 product: data.product,
                                 barcode: barcode,
                                 addedQty: qty,
+                                expectedQty: data.expectedQty,
                                 newQuantity: data.newQuantity,
                                 matchStatus: data.matchStatus
                             };
-                            if (data.financials) this.financials = data.financials;
                             this.scanner.scanCount++;
                             this.scannerDirty = true;
 

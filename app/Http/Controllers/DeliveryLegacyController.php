@@ -494,19 +494,6 @@ class DeliveryLegacyController extends Controller
             }
         }
 
-        // Only recalculate financials on actual submit (not lookup)
-        $financials = null;
-        if ($increment > 0) {
-            $matchedItems = $this->getMatchedItems($delID, $supplierID);
-            $scannedNotOnInvoice = $this->getScannedNotOnInvoice($delID, $supplierID);
-            $onInvoiceNotScanned = $this->getOnInvoiceNotScanned($delID, $supplierID);
-
-            $udeaIds = config('suppliers.external_links.udea.supplier_ids', [5, 44, 85]);
-            $isUdea = in_array((int) $supplierID, $udeaIds) || in_array($supplierID, array_map('strval', $udeaIds));
-
-            $financials = $this->calculateFinancials($matchedItems, $scannedNotOnInvoice, $onInvoiceNotScanned, $isUdea);
-        }
-
         return response()->json([
             'success' => true,
             'product' => $product ? [
@@ -519,7 +506,6 @@ class DeliveryLegacyController extends Controller
             'expectedQty' => $expectedQty,
             'newQuantity' => $newQuantity,
             'matchStatus' => $matchStatus,
-            'financials' => $financials,
         ]);
     }
 
