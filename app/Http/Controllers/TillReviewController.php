@@ -64,6 +64,17 @@ class TillReviewController extends Controller
     }
 
     /**
+     * Check cache status for a date (lightweight validation)
+     */
+    public function getCacheStatus(Request $request)
+    {
+        $request->validate(['date' => 'required|date']);
+        $date = Carbon::parse($request->input('date'));
+
+        return response()->json($this->repository->getCacheStatus($date));
+    }
+
+    /**
      * Get summary data via AJAX
      */
     public function getSummary(Request $request)

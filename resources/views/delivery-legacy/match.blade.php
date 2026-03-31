@@ -12,6 +12,13 @@
             </div>
             <div class="flex items-center gap-3">
                 @if(!$isCompleted)
+                    <button type="button" @click="openScanner()"
+                            class="hidden md:inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 gap-2 touch-manipulation">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
+                        </svg>
+                        Scan Items
+                    </button>
                     <form method="POST" action="{{ route('delivery-legacy.complete') }}"
                           onsubmit="return confirm('This will update stock levels for all scanned items and mark this delivery as complete. This action cannot be undone. Continue?')">
                         @csrf
@@ -35,6 +42,183 @@
     </x-slot>
 
     <div class="py-6" x-data="deliveryMatch()" x-ref="deliveryMatchRoot">
+        {{-- Mobile FAB Scan Button --}}
+        @if(!$isCompleted)
+        <button type="button" @click="openScanner()"
+                class="fixed bottom-6 right-6 z-40 md:hidden w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center touch-manipulation hover:bg-blue-700 active:bg-blue-800">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
+            </svg>
+        </button>
+        @endif
+
+        {{-- Scanner Overlay --}}
+        <div x-show="scannerOpen" x-cloak
+             class="fixed inset-0 z-50 bg-gray-900 flex flex-col"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0">
+
+            {{-- Header --}}
+            <div class="bg-gray-800 px-4 py-3 flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <h3 class="text-white font-semibold text-lg">Delivery Scan</h3>
+                    <span x-show="scanner.scanCount > 0"
+                          class="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded-full"
+                          x-text="scanner.scanCount + ' scanned'"></span>
+                </div>
+                <button @click="closeScanner()" class="text-gray-400 hover:text-white p-2 touch-manipulation">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            {{-- Content --}}
+            <div class="flex-1 overflow-y-auto px-4 py-3">
+                <div class="max-w-lg mx-auto">
+
+                    {{-- Barcode Input Row --}}
+                    <div class="flex gap-2 mb-3">
+                        <input type="text"
+                               x-ref="scannerInput"
+                               x-model="scanner.barcode"
+                               @keydown.enter.prevent="handleScan()"
+                               :inputmode="scanner.keyboardEnabled ? 'text' : 'none'"
+                               placeholder="Scan or type barcode..."
+                               class="flex-1 text-lg py-3 px-4 rounded-lg border-2 border-gray-600 bg-gray-800 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-0">
+                        {{-- Keyboard toggle --}}
+                        <button @click="scanner.keyboardEnabled = !scanner.keyboardEnabled; $nextTick(() => $refs.scannerInput.focus())"
+                                :class="scanner.keyboardEnabled ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400'"
+                                class="px-3 py-3 rounded-lg touch-manipulation"
+                                title="Toggle keyboard">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/>
+                            </svg>
+                        </button>
+                        {{-- Camera toggle --}}
+                        <button @click="toggleScannerCamera()"
+                                :class="scanner.cameraActive ? 'bg-red-600 text-white' : 'bg-green-600 text-white'"
+                                class="px-3 py-3 rounded-lg touch-manipulation"
+                                :title="scanner.cameraActive ? 'Stop camera' : 'Start camera'">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    {{-- Camera Viewport --}}
+                    <div x-show="scanner.cameraVisible" class="mb-3">
+                        <div id="delivery-scanner" class="rounded-lg overflow-hidden" style="min-height: 220px;"></div>
+                        <p class="text-gray-400 text-sm text-center mt-1" x-text="scanner.cameraStatus"></p>
+                    </div>
+
+                    {{-- Quantity Selector --}}
+                    <div class="flex items-center justify-center gap-4 mb-4 bg-gray-800 rounded-lg py-3 px-4">
+                        <span class="text-gray-400 text-sm">Qty per scan:</span>
+                        <button @click="adjustIncrement(-1)"
+                                class="w-10 h-10 rounded-full bg-gray-700 text-white text-xl font-bold flex items-center justify-center touch-manipulation hover:bg-gray-600">-</button>
+                        <span class="text-white text-2xl font-bold min-w-[3rem] text-center" x-text="scanner.incrementQty"></span>
+                        <button @click="adjustIncrement(1)"
+                                class="w-10 h-10 rounded-full bg-gray-700 text-white text-xl font-bold flex items-center justify-center touch-manipulation hover:bg-gray-600">+</button>
+                    </div>
+
+                    {{-- Processing Spinner --}}
+                    <div x-show="scanner.processing" class="text-center py-6">
+                        <svg class="animate-spin h-8 w-8 text-blue-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        <p class="text-gray-400 mt-2">Processing scan...</p>
+                    </div>
+
+                    {{-- Last Scan Result --}}
+                    <div x-show="scanner.lastResult && !scanner.processing" class="mb-4">
+                        <div class="rounded-lg border-2 p-4"
+                             :class="{
+                                 'border-green-500 bg-green-900/30': scanner.lastResult?.matchStatus === 'verified',
+                                 'border-yellow-500 bg-yellow-900/30': scanner.lastResult?.matchStatus === 'partial',
+                                 'border-orange-500 bg-orange-900/30': scanner.lastResult?.matchStatus === 'over' || scanner.lastResult?.matchStatus === 'extra',
+                                 'border-red-500 bg-red-900/30': scanner.lastResult?.matchStatus === 'unknown',
+                                 'border-red-600 bg-red-900/40': scanner.lastResult?.error
+                             }">
+                            <template x-if="scanner.lastResult?.error">
+                                <div>
+                                    <p class="text-red-400 font-semibold text-lg">Error</p>
+                                    <p class="text-red-300 text-sm" x-text="scanner.lastResult.error"></p>
+                                </div>
+                            </template>
+                            <template x-if="!scanner.lastResult?.error">
+                                <div>
+                                    {{-- Status badge --}}
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-white font-semibold text-lg truncate mr-2"
+                                              x-text="scanner.lastResult?.product?.name || 'Unknown Product'"></span>
+                                        <span class="px-2 py-1 rounded text-xs font-bold uppercase flex-shrink-0"
+                                              :class="{
+                                                  'bg-green-600 text-white': scanner.lastResult?.matchStatus === 'verified',
+                                                  'bg-yellow-600 text-white': scanner.lastResult?.matchStatus === 'partial',
+                                                  'bg-orange-600 text-white': scanner.lastResult?.matchStatus === 'over',
+                                                  'bg-orange-500 text-white': scanner.lastResult?.matchStatus === 'extra',
+                                                  'bg-red-600 text-white': scanner.lastResult?.matchStatus === 'unknown'
+                                              }"
+                                              x-text="scanner.lastResult?.matchStatus"></span>
+                                    </div>
+                                    {{-- Barcode + supplier code --}}
+                                    <p class="text-gray-400 text-sm mb-2">
+                                        <span x-text="scanner.lastResult?.barcode"></span>
+                                        <template x-if="scanner.lastResult?.product?.supplierCode">
+                                            <span> | <span x-text="scanner.lastResult.product.supplierCode"></span></span>
+                                        </template>
+                                    </p>
+                                    {{-- Quantities --}}
+                                    <div class="flex items-center gap-4">
+                                        <template x-if="scanner.lastResult?.expectedQty !== null">
+                                            <span class="text-gray-300">
+                                                Expected: <span class="text-white font-bold" x-text="scanner.lastResult?.expectedQty"></span>
+                                            </span>
+                                        </template>
+                                        <span class="text-gray-300">
+                                            Scanned: <span class="text-white font-bold text-xl" x-text="scanner.lastResult?.newQuantity"></span>
+                                        </span>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    {{-- Scan History --}}
+                    <div x-show="scanner.history.length > 0">
+                        <h4 class="text-gray-400 text-sm font-semibold mb-2">Recent Scans</h4>
+                        <div class="space-y-1 max-h-48 overflow-y-auto">
+                            <template x-for="(scan, index) in scanner.history" :key="index">
+                                <div class="flex items-center justify-between bg-gray-800 rounded px-3 py-2 text-sm">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <span class="w-2 h-2 rounded-full flex-shrink-0"
+                                              :class="{
+                                                  'bg-green-500': scan.matchStatus === 'verified',
+                                                  'bg-yellow-500': scan.matchStatus === 'partial',
+                                                  'bg-orange-500': scan.matchStatus === 'over' || scan.matchStatus === 'extra',
+                                                  'bg-red-500': scan.matchStatus === 'unknown'
+                                              }"></span>
+                                        <span class="text-white truncate" x-text="scan.name || scan.barcode"></span>
+                                    </div>
+                                    <div class="flex items-center gap-2 flex-shrink-0 ml-2">
+                                        <span class="text-gray-400" x-text="'+' + scan.qty"></span>
+                                        <span class="text-gray-500 text-xs" x-text="scan.time"></span>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
         <div class="max-w-full mx-auto sm:px-6 lg:px-8">
             @if(session('success'))
                 <div class="mb-4 p-4 bg-green-100 border border-green-300 rounded-lg text-green-800">
@@ -1373,9 +1557,165 @@
                 financials: @js($financials),
                 deliveryId: '{{ $deliveryId }}',
                 supplierID: '{{ $supplierId }}',
+                scannerOpen: false,
+                scanner: {
+                    barcode: '',
+                    keyboardEnabled: false,
+                    processing: false,
+                    lastResult: null,
+                    scanCount: 0,
+                    history: [],
+                    cameraActive: false,
+                    cameraVisible: false,
+                    cameraStatus: '',
+                    incrementQty: 1,
+                    lastScannedBarcode: null,
+                    lastScanTime: 0
+                },
+                scannerDirty: false,
                 init() {
                     // Store reference to this instance for child components
                     window.deliveryMatchInstance = this;
+                },
+                openScanner() {
+                    this.scannerOpen = true;
+                    this.$nextTick(() => {
+                        if (this.$refs.scannerInput) this.$refs.scannerInput.focus();
+                    });
+                },
+                closeScanner() {
+                    this.stopScannerCamera();
+                    this.scannerOpen = false;
+                    if (this.scannerDirty) {
+                        location.reload();
+                    }
+                },
+                toggleScannerCamera() {
+                    if (this.scanner.cameraActive) {
+                        this.stopScannerCamera();
+                        return;
+                    }
+                    if (!window.BarcodeScanner) {
+                        this.scanner.cameraStatus = 'Scanner module not loaded. Ensure HTTPS is enabled.';
+                        return;
+                    }
+                    this.scanner.cameraVisible = true;
+                    this.scanner.cameraStatus = 'Starting camera...';
+                    this.$nextTick(() => {
+                        window.BarcodeScanner.startScanner(
+                            'delivery-scanner',
+                            (decodedText) => this.onScannerDetected(decodedText),
+                            (error) => {}
+                        ).then(() => {
+                            this.scanner.cameraActive = true;
+                            this.scanner.cameraStatus = 'Point camera at barcode';
+                        }).catch((err) => {
+                            this.scanner.cameraStatus = 'Camera error: ' + (err.message || err);
+                            this.scanner.cameraActive = false;
+                        });
+                    });
+                },
+                stopScannerCamera() {
+                    if (window.BarcodeScanner && window.BarcodeScanner.isRunning()) {
+                        window.BarcodeScanner.stopScanner().catch(() => {});
+                    }
+                    this.scanner.cameraActive = false;
+                    this.scanner.cameraVisible = false;
+                    this.scanner.cameraStatus = '';
+                },
+                onScannerDetected(text) {
+                    // Beep
+                    try {
+                        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                        const osc = ctx.createOscillator();
+                        osc.type = 'square';
+                        osc.frequency.value = 1000;
+                        osc.connect(ctx.destination);
+                        osc.start();
+                        osc.stop(ctx.currentTime + 0.1);
+                    } catch(e) {}
+                    // Vibrate
+                    if (navigator.vibrate) navigator.vibrate(100);
+
+                    // Duplicate prevention (2s cooldown)
+                    const now = Date.now();
+                    if (text === this.scanner.lastScannedBarcode && now - this.scanner.lastScanTime < 2000) {
+                        return;
+                    }
+                    this.scanner.lastScannedBarcode = text;
+                    this.scanner.lastScanTime = now;
+
+                    // Stop camera and process
+                    this.stopScannerCamera();
+                    this.scanner.barcode = text;
+                    this.handleScan();
+                },
+                async handleScan() {
+                    const barcode = this.scanner.barcode.trim();
+                    if (!barcode || this.scanner.processing) return;
+
+                    this.scanner.processing = true;
+                    this.scanner.lastResult = null;
+
+                    try {
+                        const response = await fetch('{{ route("delivery-legacy.scan-increment") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                delID: this.deliveryId,
+                                barcode: barcode,
+                                quantity: this.scanner.incrementQty,
+                                supplierID: this.supplierID
+                            })
+                        });
+
+                        if (response.status === 419) {
+                            this.scanner.lastResult = { error: 'Session expired. Please close scanner and reload the page.' };
+                            return;
+                        }
+
+                        const data = await response.json();
+                        if (data.success) {
+                            this.scanner.lastResult = {
+                                product: data.product,
+                                barcode: barcode,
+                                expectedQty: data.expectedQty,
+                                newQuantity: data.newQuantity,
+                                matchStatus: data.matchStatus
+                            };
+                            this.financials = data.financials;
+                            this.scanner.scanCount++;
+                            this.scannerDirty = true;
+
+                            // Add to history (newest first)
+                            this.scanner.history.unshift({
+                                barcode: barcode,
+                                name: data.product?.name || 'Unknown',
+                                qty: this.scanner.incrementQty,
+                                matchStatus: data.matchStatus,
+                                time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+                            });
+                            if (this.scanner.history.length > 20) this.scanner.history.pop();
+                        } else {
+                            this.scanner.lastResult = { error: data.message || 'Scan failed' };
+                        }
+                    } catch (error) {
+                        this.scanner.lastResult = { error: 'Network error - scan not saved. Try again.' };
+                    } finally {
+                        this.scanner.processing = false;
+                        this.scanner.barcode = '';
+                        this.scanner.incrementQty = 1;
+                        this.$nextTick(() => {
+                            if (this.$refs.scannerInput) this.$refs.scannerInput.focus();
+                        });
+                    }
+                },
+                adjustIncrement(delta) {
+                    this.scanner.incrementQty = Math.max(1, this.scanner.incrementQty + delta);
                 },
                 categoryVisible(cat) {
                     if (!this.showCategories || !cat) return true;
@@ -1438,4 +1778,8 @@
             };
         }
     </script>
+
+    @push('scripts')
+        @vite(['resources/js/barcode-scanner.js'])
+    @endpush
 </x-admin-layout>

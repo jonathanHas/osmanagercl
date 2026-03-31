@@ -407,6 +407,118 @@ class DeliveryLegacyController extends Controller
     }
 
     /**
+     * Increment the scanned quantity for a barcode (used by camera scanner).
+     * Unlike updateScannedQuantity which replaces, this adds to the existing total.
+     */
+    public function incrementScanQuantity(Request $request)
+    {
+        $validated = $request->validate([
+            'delID' => 'required|string',
+            'barcode' => 'required|string',
+            'quantity' => 'nullable|numeric|min:0.01',
+            'supplierID' => 'required|string',
+        ]);
+
+        $delID = $validated['delID'];
+        $barcode = $validated['barcode'];
+        $increment = $validated['quantity'] ?? 1;
+        $supplierID = $validated['supplierID'];
+
+        // Get current total for this barcode in this session
+        $currentTotal = DeliveryScanItem::where('delID', $delID)
+            ->where('barcode', $barcode)
+            ->sum('quantity');
+
+        $newQuantity = $currentTotal + $increment;
+
+        // Delete and re-insert as consolidated record (same pattern as updateScannedQuantity)
+        DeliveryScanItem::where('delID', $delID)
+            ->where('barcode', $barcode)
+            ->delete();
+
+        DeliveryScanItem::create([
+            'delID' => $delID,
+            'barcode' => $barcode,
+            'quantity' => $newQuantity,
+        ]);
+
+        // Look up product info via supplier_link → PRODUCTS
+        $product = DB::connection('pos')->selectOne(
+            'SELECT
+                PRODUCTS.NAME as name,
+                supplier_link.Barcode,
+                supplier_link.SupplierCode as supplierCode,
+                PRODUCTS.PRICESELL,
+                CATEGORIES.NAME as categoryName,
+                STOCKCURRENT.UNITS as currentStock
+            FROM PRODUCTS
+            LEFT JOIN supplier_link ON supplier_link.Barcode = PRODUCTS.CODE
+                AND supplier_link.SupplierID = ?
+            LEFT JOIN CATEGORIES ON PRODUCTS.CATEGORY = CATEGORIES.ID
+            LEFT JOIN STOCKCURRENT ON PRODUCTS.ID = STOCKCURRENT.PRODUCT
+            WHERE PRODUCTS.CODE = ?',
+            [$supplierID, $barcode]
+        );
+
+        // Check expected quantity from invoice
+        $expectedQty = null;
+        $matchStatus = 'unknown';
+
+        if ($product) {
+            $invoiceRow = DB::connection('pos')->selectOne(
+                'SELECT SUM(myOrder) as myOrder, MIN(cost) as cost, caseUnits
+                FROM delivery
+                INNER JOIN supplier_link ON delivery.supCode = supplier_link.SupplierCode
+                    AND supplier_link.SupplierID = ?
+                WHERE supplier_link.Barcode = ?
+                GROUP BY delivery.supCode, delivery.caseUnits',
+                [$supplierID, $barcode]
+            );
+
+            if ($invoiceRow) {
+                $caseUnits = $invoiceRow->caseUnits ?? 1;
+                $myOrder = $invoiceRow->myOrder ?? 0;
+                $expectedQty = (fmod($myOrder, 1) == 0.0) ? $caseUnits * $myOrder : round($caseUnits * $myOrder);
+
+                if ($newQuantity == $expectedQty) {
+                    $matchStatus = 'verified';
+                } elseif ($newQuantity < $expectedQty) {
+                    $matchStatus = 'partial';
+                } else {
+                    $matchStatus = 'over';
+                }
+            } else {
+                $matchStatus = 'extra';
+            }
+        }
+
+        // Recalculate financials
+        $matchedItems = $this->getMatchedItems($delID, $supplierID);
+        $scannedNotOnInvoice = $this->getScannedNotOnInvoice($delID, $supplierID);
+        $onInvoiceNotScanned = $this->getOnInvoiceNotScanned($delID, $supplierID);
+
+        $udeaIds = config('suppliers.external_links.udea.supplier_ids', [5, 44, 85]);
+        $isUdea = in_array((int) $supplierID, $udeaIds) || in_array($supplierID, array_map('strval', $udeaIds));
+
+        $financials = $this->calculateFinancials($matchedItems, $scannedNotOnInvoice, $onInvoiceNotScanned, $isUdea);
+
+        return response()->json([
+            'success' => true,
+            'product' => $product ? [
+                'name' => $product->name,
+                'barcode' => $barcode,
+                'supplierCode' => $product->supplierCode,
+                'categoryName' => $product->categoryName,
+                'currentStock' => $product->currentStock,
+            ] : null,
+            'expectedQty' => $expectedQty,
+            'newQuantity' => $newQuantity,
+            'matchStatus' => $matchStatus,
+            'financials' => $financials,
+        ]);
+    }
+
+    /**
      * Update the case units for a supplier link record.
      */
     public function updateCaseUnits(Request $request)

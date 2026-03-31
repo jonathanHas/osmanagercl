@@ -554,7 +554,7 @@
                 // Label data
                 labelData: editTranslation?.label_data || null,
                 zplContent: editTranslation?.zpl_content || '',
-                labelSize: editTranslation?.label_size || 'large',
+                labelSize: editTranslation?.label_size || 'small',
                 fontScale: editTranslation ? Math.round(editTranslation.font_scale * 100) : 100,
                 previewSrc: null,
                 previewError: null,

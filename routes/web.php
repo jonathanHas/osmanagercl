@@ -497,6 +497,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/match', [DeliveryLegacyController::class, 'match'])->name('match');
         Route::post('/create-session', [DeliveryLegacyController::class, 'createSession'])->name('create-session');
         Route::patch('/scan-item', [DeliveryLegacyController::class, 'updateScannedQuantity'])->name('update-quantity');
+        Route::post('/scan-increment', [DeliveryLegacyController::class, 'incrementScanQuantity'])->name('scan-increment');
         Route::patch('/update-case-units', [DeliveryLegacyController::class, 'updateCaseUnits'])->name('update-case-units');
         Route::post('/complete', [DeliveryLegacyController::class, 'completeDelivery'])->name('complete');
         Route::post('/merge-sessions', [DeliveryLegacyController::class, 'mergeSessions'])->name('merge-sessions');
@@ -722,6 +723,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/summary', [\App\Http\Controllers\TillReviewController::class, 'getSummary'])->name('summary');
         Route::get('/transactions', [\App\Http\Controllers\TillReviewController::class, 'getTransactions'])->name('transactions');
         Route::get('/hourly-sales', [\App\Http\Controllers\TillReviewController::class, 'getHourlySales'])->name('hourly-sales');
+        Route::get('/cache-status', [\App\Http\Controllers\TillReviewController::class, 'getCacheStatus'])->name('cache-status');
         Route::post('/refresh-cache', [\App\Http\Controllers\TillReviewController::class, 'refreshCache'])->name('refresh-cache');
         Route::get('/export', [\App\Http\Controllers\TillReviewController::class, 'export'])->name('export');
     });

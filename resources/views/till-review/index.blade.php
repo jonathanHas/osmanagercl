@@ -6,36 +6,106 @@
     </x-slot>
 
     <div class="py-6" x-data="tillReview()">
+        <!-- Progress Overlay -->
+        <div x-show="showProgress" x-transition.opacity class="fixed inset-0 z-50">
+            <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"></div>
+            <div class="relative flex items-center justify-center min-h-screen p-4">
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-8">
+                    <div class="text-center mb-6">
+                        <div x-show="!progressDone" class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 mb-3">
+                            <i class="fas fa-circle-notch fa-spin text-xl text-blue-600 dark:text-blue-400"></i>
+                        </div>
+                        <div x-show="progressDone" x-cloak class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 mb-3">
+                            <i class="fas fa-check text-xl text-green-600 dark:text-green-400"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white" x-text="progressTitle"></h3>
+                    </div>
+
+                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-6">
+                        <div class="h-2 rounded-full transition-all duration-500 ease-out"
+                             :class="progressDone ? 'bg-green-500' : 'bg-blue-600'"
+                             :style="'width: ' + progressPercent + '%'"></div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <template x-for="step in progressSteps" :key="step.id">
+                            <div class="flex items-center gap-3">
+                                <template x-if="step.status === 'active'">
+                                    <i class="fas fa-circle-notch fa-spin text-sm text-blue-600 dark:text-blue-400 w-4"></i>
+                                </template>
+                                <template x-if="step.status === 'done'">
+                                    <i class="fas fa-check text-sm text-green-600 dark:text-green-400 w-4"></i>
+                                </template>
+                                <template x-if="step.status === 'warning'">
+                                    <i class="fas fa-exclamation-triangle text-sm text-amber-500 w-4"></i>
+                                </template>
+                                <template x-if="step.status === 'error'">
+                                    <i class="fas fa-times text-sm text-red-600 w-4"></i>
+                                </template>
+                                <span class="text-sm"
+                                      :class="{
+                                          'text-blue-700 dark:text-blue-300 font-medium': step.status === 'active',
+                                          'text-green-700 dark:text-green-300': step.status === 'done',
+                                          'text-amber-700 dark:text-amber-300': step.status === 'warning',
+                                          'text-red-700 dark:text-red-300': step.status === 'error'
+                                      }"
+                                      x-text="step.message"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <!-- Date Selector and Summary Cards -->
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
                 <div class="p-6">
                     <div class="flex flex-wrap items-center justify-between mb-6">
-                        <div class="flex items-center space-x-4">
-                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Date:</label>
-                            <input type="date" 
+                        <div class="flex items-center space-x-2 sm:space-x-3">
+                            <button @@click="changeDate(-1)" :disabled="loading"
+                                    class="p-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 transition disabled:opacity-50"
+                                    title="Previous day">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <input type="date"
                                    x-model="selectedDate"
                                    @@change="loadTransactions()"
                                    value="{{ $selectedDate->format('Y-m-d') }}"
                                    max="{{ now()->format('Y-m-d') }}"
+                                   :disabled="loading"
                                    class="rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 focus:ring-indigo-500">
-                            
-                            <button @@click="refreshCache()"
-                                    class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
-                                <i class="fas fa-sync-alt mr-2"></i>Refresh Cache
+                            <button @@click="changeDate(1)" :disabled="loading || selectedDate >= new Date().toISOString().split('T')[0]"
+                                    class="p-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 transition disabled:opacity-50"
+                                    title="Next day">
+                                <i class="fas fa-chevron-right"></i>
                             </button>
+                            <button @@click="goToToday()" :disabled="loading"
+                                    class="px-3 py-2 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 transition disabled:opacity-50">
+                                Today
+                            </button>
+
+                            <button @@click="refreshCache()" :disabled="loading"
+                                    class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:opacity-50">
+                                <i class="fas fa-sync-alt mr-2" :class="loading && 'fa-spin'"></i>Refresh Cache
+                            </button>
+
+                            <!-- Loading indicator -->
+                            <span x-show="loading" x-transition class="flex items-center text-sm text-blue-600 dark:text-blue-400">
+                                <i class="fas fa-circle-notch fa-spin mr-2"></i>Loading...
+                            </span>
                         </div>
-                        
+
                         <div class="flex space-x-2 mt-4 sm:mt-0">
-                            <button @@click="exportData('csv')"
-                                    class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition">
+                            <button @@click="exportData('csv')" :disabled="loading"
+                                    class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition disabled:opacity-50">
                                 <i class="fas fa-file-csv mr-2"></i>Export CSV
                             </button>
                         </div>
                     </div>
 
                     <!-- Summary Cards -->
-                    <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-4 transition-opacity" :class="loading && 'opacity-50'">
                         <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                             <div class="text-sm text-gray-600 dark:text-gray-400">Total Sales</div>
                             <div class="text-2xl font-bold text-gray-900 dark:text-white">
@@ -100,6 +170,14 @@
                     </h3>
                     <div class="relative" style="height: 300px;">
                         <canvas id="hourlySalesChart"></canvas>
+                        <!-- Chart loading overlay -->
+                        <div x-show="chartLoading" x-transition
+                             class="absolute inset-0 bg-white/70 dark:bg-gray-800/70 flex items-center justify-center rounded">
+                            <div class="text-center">
+                                <i class="fas fa-circle-notch fa-spin text-2xl text-blue-500 mb-2"></i>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Loading chart...</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -381,6 +459,12 @@
             return {
                 selectedDate: '{{ $selectedDate->format('Y-m-d') }}',
                 loading: false,
+                chartLoading: false,
+                showProgress: false,
+                progressDone: false,
+                progressTitle: 'Loading...',
+                progressPercent: 0,
+                progressSteps: [],
                 transactions: [],
                 transactionCount: 0,
                 hourlySalesChart: null,
@@ -457,8 +541,6 @@
                 },
 
                 init() {
-                    console.log('Till Review initialized');
-
                     // Set up global toggle function
                     window.tillReviewToggleDetails = (index) => {
                         this.toggleDetails(this.transactions[index]);
@@ -467,7 +549,45 @@
                     this.loadTransactions();
                 },
 
+                changeDate(days) {
+                    const d = new Date(this.selectedDate);
+                    d.setDate(d.getDate() + days);
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+                    if (d > today) return;
+                    this.selectedDate = d.toISOString().split('T')[0];
+                    this.loadTransactions();
+                },
+
+                goToToday() {
+                    this.selectedDate = new Date().toISOString().split('T')[0];
+                    this.loadTransactions();
+                },
+
+                addStep(id, message, status = 'active') {
+                    const existing = this.progressSteps.find(s => s.id === id);
+                    if (existing) {
+                        existing.message = message;
+                        existing.status = status;
+                    } else {
+                        this.progressSteps.push({ id, message, status });
+                    }
+                },
+
+                completeStep(id, message) {
+                    this.addStep(id, message, 'done');
+                },
+
+                async checkCacheStatus() {
+                    const params = new URLSearchParams({ date: this.selectedDate });
+                    const response = await fetch(`/till-review/cache-status?${params}`, {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+                    });
+                    return await response.json();
+                },
+
                 async loadHourlySalesChart() {
+                    this.chartLoading = true;
                     try {
                         const params = new URLSearchParams({ date: this.selectedDate });
                         const response = await fetch(`/till-review/hourly-sales?${params}`, {
@@ -554,24 +674,74 @@
                         });
                     } catch (error) {
                         console.error('Error loading hourly sales chart:', error);
+                    } finally {
+                        this.chartLoading = false;
                     }
                 },
 
                 async loadTransactions() {
                     this.loading = true;
+                    this.showProgress = true;
+                    this.progressDone = false;
+                    this.progressTitle = 'Loading data...';
+                    this.progressPercent = 0;
+                    this.progressSteps = [];
 
                     try {
+                        // Step 1: Check cache
+                        this.addStep('cache', 'Checking cache...');
+                        this.progressPercent = 10;
+                        const cacheStatus = await this.checkCacheStatus();
+
+                        if (cacheStatus.status === 'valid') {
+                            this.completeStep('cache', `Cache valid — ${cacheStatus.cached} receipts`);
+                        } else if (cacheStatus.status === 'mismatch') {
+                            this.addStep('cache', cacheStatus.message, 'warning');
+                        } else if (cacheStatus.status === 'empty') {
+                            this.addStep('cache', cacheStatus.message, 'warning');
+                        } else {
+                            this.completeStep('cache', cacheStatus.message);
+                        }
+                        this.progressPercent = 25;
+
+                        // Step 2: Load summary + transactions in parallel
+                        this.addStep('summary', 'Loading summary...');
+                        this.addStep('transactions', 'Loading transactions...');
+                        this.progressPercent = 40;
+
                         await Promise.all([
-                            this.loadSummary(),
-                            this.loadTransactionData()
+                            this.loadSummary().then(() => {
+                                this.completeStep('summary', `Summary loaded — €${this.summary.total_sales.toFixed(2)} total`);
+                                this.progressPercent = Math.max(this.progressPercent, 55);
+                            }),
+                            this.loadTransactionData().then(() => {
+                                this.completeStep('transactions', `${this.transactionCount} transactions loaded`);
+                                this.progressPercent = Math.max(this.progressPercent, 70);
+                            })
                         ]);
+
+                        this.progressPercent = 80;
+
+                        // Step 3: Chart
+                        this.addStep('chart', 'Building chart...');
+                        this.loading = false;
+                        await this.$nextTick();
+                        await this.loadHourlySalesChart();
+                        this.completeStep('chart', 'Chart ready');
+                        this.progressPercent = 100;
+
+                        // Done
+                        this.progressDone = true;
+                        this.progressTitle = 'Ready';
+                        setTimeout(() => { this.showProgress = false; }, 600);
+
                     } catch (error) {
                         console.error('Error loading data:', error);
-                        alert('Failed to load data');
+                        this.addStep('error', 'Failed to load data: ' + error.message, 'error');
+                        this.progressTitle = 'Something went wrong';
+                        setTimeout(() => { this.showProgress = false; }, 3000);
                     } finally {
                         this.loading = false;
-                        // Load chart after DOM has settled from loading state change
-                        this.$nextTick(() => { this.loadHourlySalesChart(); });
                     }
                 },
 
@@ -915,8 +1085,16 @@
                     }
 
                     this.loading = true;
-                    
+                    this.showProgress = true;
+                    this.progressDone = false;
+                    this.progressTitle = 'Refreshing cache...';
+                    this.progressPercent = 0;
+                    this.progressSteps = [];
+
                     try {
+                        this.addStep('clear', 'Clearing cache...');
+                        this.progressPercent = 15;
+
                         const response = await fetch('/till-review/refresh-cache', {
                             method: 'POST',
                             headers: {
@@ -927,16 +1105,46 @@
                         });
 
                         const data = await response.json();
-                        
+
                         if (data.success) {
-                            alert(`Cache refreshed successfully. ${data.transaction_count} transactions cached.`);
-                            this.loadTransactions();
+                            this.completeStep('clear', `Cache rebuilt — ${data.transaction_count} transactions`);
+                            this.progressPercent = 40;
+
+                            this.addStep('summary', 'Loading summary...');
+                            this.addStep('transactions', 'Loading transactions...');
+
+                            await Promise.all([
+                                this.loadSummary().then(() => {
+                                    this.completeStep('summary', `Summary loaded — €${this.summary.total_sales.toFixed(2)} total`);
+                                    this.progressPercent = Math.max(this.progressPercent, 60);
+                                }),
+                                this.loadTransactionData().then(() => {
+                                    this.completeStep('transactions', `${this.transactionCount} transactions loaded`);
+                                    this.progressPercent = Math.max(this.progressPercent, 75);
+                                })
+                            ]);
+
+                            this.addStep('chart', 'Building chart...');
+                            this.progressPercent = 85;
+                            this.loading = false;
+                            await this.$nextTick();
+                            await this.loadHourlySalesChart();
+                            this.completeStep('chart', 'Chart ready');
+                            this.progressPercent = 100;
+
+                            this.progressDone = true;
+                            this.progressTitle = 'Cache refreshed';
+                            setTimeout(() => { this.showProgress = false; }, 600);
                         } else {
-                            alert('Failed to refresh cache');
+                            this.addStep('clear', 'Failed to refresh cache', 'error');
+                            this.progressTitle = 'Something went wrong';
+                            setTimeout(() => { this.showProgress = false; }, 3000);
                         }
                     } catch (error) {
                         console.error('Error refreshing cache:', error);
-                        alert('Failed to refresh cache');
+                        this.addStep('error', 'Failed: ' + error.message, 'error');
+                        this.progressTitle = 'Something went wrong';
+                        setTimeout(() => { this.showProgress = false; }, 3000);
                     } finally {
                         this.loading = false;
                     }

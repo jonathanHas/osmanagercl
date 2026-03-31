@@ -23,18 +23,70 @@ class TillTransactionRepository
     {
         $dateStr = $date->format('Y-m-d');
 
-        // Check if cache exists for this date (unfiltered check)
-        $cacheExists = TillReviewCache::where('transaction_date', $dateStr)->exists();
+        // Check cache and validate against POS to catch duplicates
+        $cachedReceiptCount = TillReviewCache::where('transaction_date', $dateStr)
+            ->where('transaction_type', 'receipt')
+            ->count();
 
-        if ($cacheExists) {
-            return $this->getCachedTransactions($dateStr, $filters);
+        if ($cachedReceiptCount > 0) {
+            $posReceiptCount = Receipt::whereDate('DATENEW', $dateStr)->count();
+
+            if ($cachedReceiptCount === $posReceiptCount) {
+                return $this->getCachedTransactions($dateStr, $filters);
+            }
+
+            // Mismatch - clear bad cache and rebuild
+            $this->clearCache($date);
         }
 
-        // If not cached, fetch from POS and cache it
+        // If not cached or cache was invalid, fetch from POS and cache it
         $transactions = $this->fetchFromPOS($date);
         $this->cacheTransactions($transactions, $dateStr);
 
         return $this->applyFilters($transactions, $filters);
+    }
+
+    /**
+     * Check cache validity for a date. Returns status info without rebuilding.
+     */
+    public function getCacheStatus(Carbon $date): array
+    {
+        $dateStr = $date->format('Y-m-d');
+
+        $cachedReceiptCount = TillReviewCache::where('transaction_date', $dateStr)
+            ->where('transaction_type', 'receipt')
+            ->count();
+
+        if ($cachedReceiptCount === 0) {
+            $posReceiptCount = Receipt::whereDate('DATENEW', $dateStr)->count();
+
+            return [
+                'status' => $posReceiptCount > 0 ? 'empty' : 'no_data',
+                'cached' => 0,
+                'pos' => $posReceiptCount,
+                'message' => $posReceiptCount > 0
+                    ? "No cache found — fetching {$posReceiptCount} receipts from POS..."
+                    : 'No transactions found for this date',
+            ];
+        }
+
+        $posReceiptCount = Receipt::whereDate('DATENEW', $dateStr)->count();
+
+        if ($cachedReceiptCount === $posReceiptCount) {
+            return [
+                'status' => 'valid',
+                'cached' => $cachedReceiptCount,
+                'pos' => $posReceiptCount,
+                'message' => "Cache valid — {$cachedReceiptCount} receipts",
+            ];
+        }
+
+        return [
+            'status' => 'mismatch',
+            'cached' => $cachedReceiptCount,
+            'pos' => $posReceiptCount,
+            'message' => "Cache mismatch ({$cachedReceiptCount} cached vs {$posReceiptCount} in POS) — rebuilding...",
+        ];
     }
 
     /**
