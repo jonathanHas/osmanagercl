@@ -415,7 +415,7 @@ class DeliveryLegacyController extends Controller
         $validated = $request->validate([
             'delID' => 'required|string',
             'barcode' => 'required|string',
-            'quantity' => 'nullable|numeric|min:0.01',
+            'quantity' => 'nullable|numeric|min:0',
             'supplierID' => 'required|string',
         ]);
 
@@ -431,16 +431,18 @@ class DeliveryLegacyController extends Controller
 
         $newQuantity = $currentTotal + $increment;
 
-        // Delete and re-insert as consolidated record (same pattern as updateScannedQuantity)
-        DeliveryScanItem::where('delID', $delID)
-            ->where('barcode', $barcode)
-            ->delete();
+        // Only write to DB if actually incrementing (quantity > 0)
+        if ($increment > 0) {
+            DeliveryScanItem::where('delID', $delID)
+                ->where('barcode', $barcode)
+                ->delete();
 
-        DeliveryScanItem::create([
-            'delID' => $delID,
-            'barcode' => $barcode,
-            'quantity' => $newQuantity,
-        ]);
+            DeliveryScanItem::create([
+                'delID' => $delID,
+                'barcode' => $barcode,
+                'quantity' => $newQuantity,
+            ]);
+        }
 
         // Look up product info via supplier_link → PRODUCTS
         $product = DB::connection('pos')->selectOne(
@@ -466,7 +468,7 @@ class DeliveryLegacyController extends Controller
 
         if ($product) {
             $invoiceRow = DB::connection('pos')->selectOne(
-                'SELECT SUM(myOrder) as myOrder, MIN(cost) as cost, caseUnits
+                'SELECT SUM(delivery.myOrder) as myOrder, MIN(delivery.cost) as cost, delivery.caseUnits
                 FROM delivery
                 INNER JOIN supplier_link ON delivery.supCode = supplier_link.SupplierCode
                     AND supplier_link.SupplierID = ?

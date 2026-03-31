@@ -76,63 +76,119 @@
             <div class="flex-1 overflow-y-auto px-4 py-3">
                 <div class="max-w-lg mx-auto">
 
-                    {{-- Barcode Input Row --}}
-                    <div class="flex gap-2 mb-3">
-                        <input type="text"
-                               x-ref="scannerInput"
-                               x-model="scanner.barcode"
-                               @keydown.enter.prevent="handleScan()"
-                               :inputmode="scanner.keyboardEnabled ? 'text' : 'none'"
-                               placeholder="Scan or type barcode..."
-                               class="flex-1 text-lg py-3 px-4 rounded-lg border-2 border-gray-600 bg-gray-800 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-0">
-                        {{-- Keyboard toggle --}}
-                        <button @click="scanner.keyboardEnabled = !scanner.keyboardEnabled; $nextTick(() => $refs.scannerInput.focus())"
-                                :class="scanner.keyboardEnabled ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400'"
-                                class="px-3 py-3 rounded-lg touch-manipulation"
-                                title="Toggle keyboard">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/>
+                    {{-- Step 1: Barcode Input (shown when no product identified yet) --}}
+                    <div x-show="scanner.step === 'scan'">
+                        <div class="flex gap-2 mb-3">
+                            <input type="text"
+                                   x-ref="scannerInput"
+                                   x-model="scanner.barcode"
+                                   @keydown.enter.prevent="lookupBarcode()"
+                                   :inputmode="scanner.keyboardEnabled ? 'text' : 'none'"
+                                   placeholder="Scan or type barcode..."
+                                   class="flex-1 text-lg py-3 px-4 rounded-lg border-2 border-gray-600 bg-gray-800 text-white placeholder-gray-500 focus:border-blue-500 focus:ring-0">
+                            <button @click="scanner.keyboardEnabled = !scanner.keyboardEnabled; $nextTick(() => $refs.scannerInput.focus())"
+                                    :class="scanner.keyboardEnabled ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400'"
+                                    class="px-3 py-3 rounded-lg touch-manipulation"
+                                    title="Toggle keyboard">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/>
+                                </svg>
+                            </button>
+                            <button @click="toggleScannerCamera()"
+                                    :class="scanner.cameraActive ? 'bg-red-600 text-white' : 'bg-green-600 text-white'"
+                                    class="px-3 py-3 rounded-lg touch-manipulation"
+                                    :title="scanner.cameraActive ? 'Stop camera' : 'Start camera'">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        {{-- Camera Viewport --}}
+                        <div x-show="scanner.cameraVisible" class="mb-3">
+                            <div id="delivery-scanner" class="rounded-lg overflow-hidden" style="min-height: 220px;"></div>
+                            <p class="text-gray-400 text-sm text-center mt-1" x-text="scanner.cameraStatus"></p>
+                        </div>
+
+                        {{-- Prompt --}}
+                        <div x-show="!scanner.cameraVisible" class="text-center py-8">
+                            <svg class="w-16 h-16 text-gray-600 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
                             </svg>
+                            <p class="text-gray-400">Tap camera to start scanning<br>or type barcode above</p>
+                        </div>
+                    </div>
+
+                    {{-- Step 2: Product identified — enter quantity --}}
+                    <div x-show="scanner.step === 'quantity'">
+                        {{-- Product info card --}}
+                        <div class="bg-gray-800 rounded-lg p-4 mb-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-white font-semibold text-lg truncate mr-2"
+                                      x-text="scanner.productInfo?.name || 'Unknown Product'"></span>
+                                <button @click="resetScanner()" class="text-gray-400 hover:text-white p-1 touch-manipulation" title="Cancel">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <p class="text-gray-400 text-sm mb-3">
+                                <span x-text="scanner.barcode"></span>
+                                <template x-if="scanner.productInfo?.supplierCode">
+                                    <span> | <span x-text="scanner.productInfo.supplierCode"></span></span>
+                                </template>
+                                <template x-if="scanner.productInfo?.categoryName">
+                                    <span> | <span x-text="scanner.productInfo.categoryName"></span></span>
+                                </template>
+                            </p>
+                            <template x-if="scanner.expectedQty !== null">
+                                <p class="text-gray-300 text-sm">
+                                    Expected: <span class="text-white font-bold" x-text="scanner.expectedQty"></span>
+                                    <template x-if="scanner.currentScanned > 0">
+                                        <span> | Already scanned: <span class="text-blue-400 font-bold" x-text="scanner.currentScanned"></span></span>
+                                    </template>
+                                </p>
+                            </template>
+                        </div>
+
+                        {{-- Quantity input + submit --}}
+                        <div class="mb-4">
+                            <label class="text-gray-400 text-sm mb-2 block">Quantity to add:</label>
+                            <div class="flex gap-2">
+                                <button @click="adjustIncrement(-1)"
+                                        class="w-14 h-14 rounded-lg bg-gray-700 text-white text-2xl font-bold flex items-center justify-center touch-manipulation hover:bg-gray-600 active:bg-gray-500">-</button>
+                                <input type="number"
+                                       x-ref="qtyInput"
+                                       x-model.number="scanner.incrementQty"
+                                       @keydown.enter.prevent="submitScan()"
+                                       inputmode="numeric"
+                                       min="1"
+                                       class="flex-1 text-center text-3xl font-bold py-3 px-4 rounded-lg border-2 border-gray-600 bg-gray-800 text-white focus:border-blue-500 focus:ring-0">
+                                <button @click="adjustIncrement(1)"
+                                        class="w-14 h-14 rounded-lg bg-gray-700 text-white text-2xl font-bold flex items-center justify-center touch-manipulation hover:bg-gray-600 active:bg-gray-500">+</button>
+                            </div>
+                        </div>
+
+                        <button @click="submitScan()"
+                                :disabled="scanner.processing"
+                                class="w-full py-4 rounded-lg text-white font-bold text-lg touch-manipulation transition-colors"
+                                :class="scanner.processing ? 'bg-gray-600 cursor-wait' : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'">
+                            <span x-show="!scanner.processing">
+                                Add <span x-text="scanner.incrementQty"></span> units
+                            </span>
+                            <span x-show="scanner.processing" class="flex items-center justify-center gap-2">
+                                <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                </svg>
+                                Saving...
+                            </span>
                         </button>
-                        {{-- Camera toggle --}}
-                        <button @click="toggleScannerCamera()"
-                                :class="scanner.cameraActive ? 'bg-red-600 text-white' : 'bg-green-600 text-white'"
-                                class="px-3 py-3 rounded-lg touch-manipulation"
-                                :title="scanner.cameraActive ? 'Stop camera' : 'Start camera'">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-                            </svg>
-                        </button>
                     </div>
 
-                    {{-- Camera Viewport --}}
-                    <div x-show="scanner.cameraVisible" class="mb-3">
-                        <div id="delivery-scanner" class="rounded-lg overflow-hidden" style="min-height: 220px;"></div>
-                        <p class="text-gray-400 text-sm text-center mt-1" x-text="scanner.cameraStatus"></p>
-                    </div>
-
-                    {{-- Quantity Selector --}}
-                    <div class="flex items-center justify-center gap-4 mb-4 bg-gray-800 rounded-lg py-3 px-4">
-                        <span class="text-gray-400 text-sm">Qty per scan:</span>
-                        <button @click="adjustIncrement(-1)"
-                                class="w-10 h-10 rounded-full bg-gray-700 text-white text-xl font-bold flex items-center justify-center touch-manipulation hover:bg-gray-600">-</button>
-                        <span class="text-white text-2xl font-bold min-w-[3rem] text-center" x-text="scanner.incrementQty"></span>
-                        <button @click="adjustIncrement(1)"
-                                class="w-10 h-10 rounded-full bg-gray-700 text-white text-xl font-bold flex items-center justify-center touch-manipulation hover:bg-gray-600">+</button>
-                    </div>
-
-                    {{-- Processing Spinner --}}
-                    <div x-show="scanner.processing" class="text-center py-6">
-                        <svg class="animate-spin h-8 w-8 text-blue-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                        </svg>
-                        <p class="text-gray-400 mt-2">Processing scan...</p>
-                    </div>
-
-                    {{-- Last Scan Result --}}
-                    <div x-show="scanner.lastResult && !scanner.processing" class="mb-4">
-                        <div class="rounded-lg border-2 p-4"
+                    {{-- Last submitted result (shown briefly after submit, above history) --}}
+                    <div x-show="scanner.lastResult && scanner.step === 'scan'" class="mb-4">
+                        <div class="rounded-lg border-2 p-3"
                              :class="{
                                  'border-green-500 bg-green-900/30': scanner.lastResult?.matchStatus === 'verified',
                                  'border-yellow-500 bg-yellow-900/30': scanner.lastResult?.matchStatus === 'partial',
@@ -141,52 +197,29 @@
                                  'border-red-600 bg-red-900/40': scanner.lastResult?.error
                              }">
                             <template x-if="scanner.lastResult?.error">
-                                <div>
-                                    <p class="text-red-400 font-semibold text-lg">Error</p>
-                                    <p class="text-red-300 text-sm" x-text="scanner.lastResult.error"></p>
-                                </div>
+                                <p class="text-red-400 text-sm" x-text="scanner.lastResult.error"></p>
                             </template>
                             <template x-if="!scanner.lastResult?.error">
-                                <div>
-                                    {{-- Status badge --}}
-                                    <div class="flex items-center justify-between mb-2">
-                                        <span class="text-white font-semibold text-lg truncate mr-2"
-                                              x-text="scanner.lastResult?.product?.name || 'Unknown Product'"></span>
-                                        <span class="px-2 py-1 rounded text-xs font-bold uppercase flex-shrink-0"
-                                              :class="{
-                                                  'bg-green-600 text-white': scanner.lastResult?.matchStatus === 'verified',
-                                                  'bg-yellow-600 text-white': scanner.lastResult?.matchStatus === 'partial',
-                                                  'bg-orange-600 text-white': scanner.lastResult?.matchStatus === 'over',
-                                                  'bg-orange-500 text-white': scanner.lastResult?.matchStatus === 'extra',
-                                                  'bg-red-600 text-white': scanner.lastResult?.matchStatus === 'unknown'
-                                              }"
-                                              x-text="scanner.lastResult?.matchStatus"></span>
+                                <div class="flex items-center justify-between">
+                                    <div class="min-w-0">
+                                        <span class="text-white font-medium truncate block" x-text="scanner.lastResult?.product?.name || 'Unknown'"></span>
+                                        <span class="text-gray-400 text-xs" x-text="'Added ' + scanner.lastResult?.addedQty + ' → Total: ' + scanner.lastResult?.newQuantity"></span>
                                     </div>
-                                    {{-- Barcode + supplier code --}}
-                                    <p class="text-gray-400 text-sm mb-2">
-                                        <span x-text="scanner.lastResult?.barcode"></span>
-                                        <template x-if="scanner.lastResult?.product?.supplierCode">
-                                            <span> | <span x-text="scanner.lastResult.product.supplierCode"></span></span>
-                                        </template>
-                                    </p>
-                                    {{-- Quantities --}}
-                                    <div class="flex items-center gap-4">
-                                        <template x-if="scanner.lastResult?.expectedQty !== null">
-                                            <span class="text-gray-300">
-                                                Expected: <span class="text-white font-bold" x-text="scanner.lastResult?.expectedQty"></span>
-                                            </span>
-                                        </template>
-                                        <span class="text-gray-300">
-                                            Scanned: <span class="text-white font-bold text-xl" x-text="scanner.lastResult?.newQuantity"></span>
-                                        </span>
-                                    </div>
+                                    <span class="px-2 py-1 rounded text-xs font-bold uppercase flex-shrink-0 ml-2"
+                                          :class="{
+                                              'bg-green-600 text-white': scanner.lastResult?.matchStatus === 'verified',
+                                              'bg-yellow-600 text-white': scanner.lastResult?.matchStatus === 'partial',
+                                              'bg-orange-600 text-white': scanner.lastResult?.matchStatus === 'over' || scanner.lastResult?.matchStatus === 'extra',
+                                              'bg-red-600 text-white': scanner.lastResult?.matchStatus === 'unknown'
+                                          }"
+                                          x-text="scanner.lastResult?.matchStatus"></span>
                                 </div>
                             </template>
                         </div>
                     </div>
 
                     {{-- Scan History --}}
-                    <div x-show="scanner.history.length > 0">
+                    <div x-show="scanner.history.length > 0 && scanner.step === 'scan'">
                         <h4 class="text-gray-400 text-sm font-semibold mb-2">Recent Scans</h4>
                         <div class="space-y-1 max-h-48 overflow-y-auto">
                             <template x-for="(scan, index) in scanner.history" :key="index">
@@ -1554,6 +1587,7 @@
                 supplierID: '{{ $supplierId }}',
                 scannerOpen: false,
                 scanner: {
+                    step: 'scan',       // 'scan' or 'quantity'
                     barcode: '',
                     keyboardEnabled: false,
                     processing: false,
@@ -1565,11 +1599,13 @@
                     cameraStatus: '',
                     incrementQty: 1,
                     lastScannedBarcode: null,
-                    lastScanTime: 0
+                    lastScanTime: 0,
+                    productInfo: null,   // product data from lookup
+                    expectedQty: null,
+                    currentScanned: 0,
                 },
                 scannerDirty: false,
                 init() {
-                    // Store reference to this instance for child components
                     window.deliveryMatchInstance = this;
                 },
                 openScanner() {
@@ -1584,6 +1620,18 @@
                     if (this.scannerDirty) {
                         location.reload();
                     }
+                },
+                resetScanner() {
+                    this.scanner.step = 'scan';
+                    this.scanner.barcode = '';
+                    this.scanner.incrementQty = 1;
+                    this.scanner.productInfo = null;
+                    this.scanner.expectedQty = null;
+                    this.scanner.currentScanned = 0;
+                    this.scanner.processing = false;
+                    this.$nextTick(() => {
+                        if (this.$refs.scannerInput) this.$refs.scannerInput.focus();
+                    });
                 },
                 toggleScannerCamera() {
                     if (this.scanner.cameraActive) {
@@ -1629,7 +1677,6 @@
                         osc.start();
                         osc.stop(ctx.currentTime + 0.1);
                     } catch(e) {}
-                    // Vibrate
                     if (navigator.vibrate) navigator.vibrate(100);
 
                     // Duplicate prevention (2s cooldown)
@@ -1640,18 +1687,16 @@
                     this.scanner.lastScannedBarcode = text;
                     this.scanner.lastScanTime = now;
 
-                    // Stop camera and process
                     this.stopScannerCamera();
                     this.scanner.barcode = text;
-                    this.handleScan();
+                    this.lookupBarcode();
                 },
-                async handleScan() {
+                async lookupBarcode() {
                     const barcode = this.scanner.barcode.trim();
-                    if (!barcode || this.scanner.processing) return;
+                    if (!barcode) return;
 
+                    // Quick product lookup — use quantity=0 to just get info without recording a scan
                     this.scanner.processing = true;
-                    this.scanner.lastResult = null;
-
                     try {
                         const response = await fetch('{{ route("delivery-legacy.scan-increment") }}', {
                             method: 'POST',
@@ -1663,7 +1708,7 @@
                             body: JSON.stringify({
                                 delID: this.deliveryId,
                                 barcode: barcode,
-                                quantity: this.scanner.incrementQty,
+                                quantity: 0,
                                 supplierID: this.supplierID
                             })
                         });
@@ -1675,10 +1720,54 @@
 
                         const data = await response.json();
                         if (data.success) {
+                            this.scanner.productInfo = data.product;
+                            this.scanner.expectedQty = data.expectedQty;
+                            this.scanner.currentScanned = data.newQuantity;
+                            this.scanner.step = 'quantity';
+                            this.scanner.incrementQty = 1;
+                            this.$nextTick(() => {
+                                if (this.$refs.qtyInput) {
+                                    this.$refs.qtyInput.focus();
+                                    this.$refs.qtyInput.select();
+                                }
+                            });
+                        } else {
+                            this.scanner.lastResult = { error: data.message || 'Lookup failed' };
+                        }
+                    } catch (error) {
+                        this.scanner.lastResult = { error: 'Network error. Try again.' };
+                    } finally {
+                        this.scanner.processing = false;
+                    }
+                },
+                async submitScan() {
+                    const barcode = this.scanner.barcode.trim();
+                    const qty = this.scanner.incrementQty;
+                    if (!barcode || qty < 1 || this.scanner.processing) return;
+
+                    this.scanner.processing = true;
+                    try {
+                        const response = await fetch('{{ route("delivery-legacy.scan-increment") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                delID: this.deliveryId,
+                                barcode: barcode,
+                                quantity: qty,
+                                supplierID: this.supplierID
+                            })
+                        });
+
+                        const data = await response.json();
+                        if (data.success) {
                             this.scanner.lastResult = {
                                 product: data.product,
                                 barcode: barcode,
-                                expectedQty: data.expectedQty,
+                                addedQty: qty,
                                 newQuantity: data.newQuantity,
                                 matchStatus: data.matchStatus
                             };
@@ -1686,27 +1775,24 @@
                             this.scanner.scanCount++;
                             this.scannerDirty = true;
 
-                            // Add to history (newest first)
                             this.scanner.history.unshift({
                                 barcode: barcode,
                                 name: data.product?.name || 'Unknown',
-                                qty: this.scanner.incrementQty,
+                                qty: qty,
                                 matchStatus: data.matchStatus,
                                 time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
                             });
                             if (this.scanner.history.length > 20) this.scanner.history.pop();
+
+                            // Back to scan step, ready for next product
+                            this.resetScanner();
                         } else {
-                            this.scanner.lastResult = { error: data.message || 'Scan failed' };
+                            this.scanner.lastResult = { error: data.message || 'Save failed' };
+                            this.scanner.processing = false;
                         }
                     } catch (error) {
                         this.scanner.lastResult = { error: 'Network error - scan not saved. Try again.' };
-                    } finally {
                         this.scanner.processing = false;
-                        this.scanner.barcode = '';
-                        this.scanner.incrementQty = 1;
-                        this.$nextTick(() => {
-                            if (this.$refs.scannerInput) this.$refs.scannerInput.focus();
-                        });
                     }
                 },
                 adjustIncrement(delta) {
