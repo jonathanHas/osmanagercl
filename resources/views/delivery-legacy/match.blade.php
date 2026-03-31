@@ -122,7 +122,10 @@
                     {{-- Step 2: Product identified — enter quantity --}}
                     <div x-show="scanner.step === 'quantity'">
                         {{-- Product info card --}}
-                        <div class="bg-gray-800 rounded-lg p-4 mb-4">
+                        <div class="rounded-lg p-4 mb-4 border-2"
+                             :class="scanner.expectedQty !== null && scanner.currentScanned == scanner.expectedQty
+                                 ? 'bg-green-900/30 border-green-500'
+                                 : 'bg-gray-800 border-gray-700'">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-white font-semibold text-lg truncate mr-2"
                                       x-text="scanner.productInfo?.name || 'Unknown Product'"></span>
@@ -141,12 +144,23 @@
                                     <span> | <span x-text="scanner.productInfo.categoryName"></span></span>
                                 </template>
                             </p>
-                            <template x-if="scanner.expectedQty !== null">
-                                <p class="text-gray-300 text-sm">
-                                    Expected: <span class="text-white font-bold" x-text="scanner.expectedQty"></span>
-                                    <template x-if="scanner.currentScanned > 0">
-                                        <span> | Already scanned: <span class="text-blue-400 font-bold" x-text="scanner.currentScanned"></span></span>
+                            <div class="flex items-center justify-between text-sm">
+                                <div class="flex flex-wrap gap-x-4 gap-y-1">
+                                    <template x-if="scanner.expectedQty !== null">
+                                        <span class="text-gray-300">Expected: <span class="text-white font-bold" x-text="scanner.expectedQty"></span></span>
                                     </template>
+                                    <template x-if="scanner.currentScanned > 0">
+                                        <span class="text-gray-300">Scanned: <span class="text-blue-400 font-bold" x-text="scanner.currentScanned"></span></span>
+                                    </template>
+                                </div>
+                                <template x-if="scanner.productInfo?.currentStock !== null && scanner.productInfo?.currentStock !== undefined">
+                                    <span class="text-gray-500 text-xs bg-gray-700/50 px-2 py-1 rounded">In stock: <span class="text-gray-300 font-medium" x-text="parseFloat(scanner.productInfo.currentStock || 0)"></span></span>
+                                </template>
+                            </div>
+                            <template x-if="scanner.expectedQty !== null && scanner.currentScanned == scanner.expectedQty">
+                                <p class="text-green-400 text-sm mt-2 font-medium flex items-center gap-1">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    Already matches expected quantity
                                 </p>
                             </template>
                         </div>
