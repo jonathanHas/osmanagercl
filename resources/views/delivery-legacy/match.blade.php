@@ -154,18 +154,18 @@
                         {{-- Quantity input + submit --}}
                         <div class="mb-4">
                             <label class="text-gray-400 text-sm mb-2 block">Quantity to add:</label>
-                            <div class="flex gap-2">
+                            <div class="flex gap-3 items-center justify-center">
                                 <button @click="adjustIncrement(-1)"
-                                        class="w-14 h-14 rounded-lg bg-gray-700 text-white text-2xl font-bold flex items-center justify-center touch-manipulation hover:bg-gray-600 active:bg-gray-500">-</button>
+                                        class="w-16 h-16 rounded-xl bg-gray-700 text-white text-3xl font-bold flex items-center justify-center touch-manipulation hover:bg-gray-600 active:bg-gray-500 flex-shrink-0">-</button>
                                 <input type="number"
                                        x-ref="qtyInput"
                                        x-model.number="scanner.incrementQty"
                                        @keydown.enter.prevent="submitScan()"
                                        inputmode="numeric"
                                        min="1"
-                                       class="flex-1 text-center text-3xl font-bold py-3 px-4 rounded-lg border-2 border-gray-600 bg-gray-800 text-white focus:border-blue-500 focus:ring-0">
+                                       class="w-24 text-center text-3xl font-bold py-3 rounded-lg border-2 border-gray-600 bg-gray-800 text-white focus:border-blue-500 focus:ring-0">
                                 <button @click="adjustIncrement(1)"
-                                        class="w-14 h-14 rounded-lg bg-gray-700 text-white text-2xl font-bold flex items-center justify-center touch-manipulation hover:bg-gray-600 active:bg-gray-500">+</button>
+                                        class="w-16 h-16 rounded-xl bg-gray-700 text-white text-3xl font-bold flex items-center justify-center touch-manipulation hover:bg-gray-600 active:bg-gray-500 flex-shrink-0">+</button>
                             </div>
                         </div>
 
