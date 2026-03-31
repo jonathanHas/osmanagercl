@@ -1771,7 +1771,7 @@
                                 newQuantity: data.newQuantity,
                                 matchStatus: data.matchStatus
                             };
-                            this.financials = data.financials;
+                            if (data.financials) this.financials = data.financials;
                             this.scanner.scanCount++;
                             this.scannerDirty = true;
 
