@@ -1,23 +1,24 @@
 <x-admin-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <div>
-                <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+            <div class="min-w-0">
+                <h2 class="font-semibold text-lg sm:text-xl text-gray-800 leading-tight">
                     Delivery Verification
                 </h2>
-                <p class="text-sm text-gray-600 mt-1">
-                    Supplier: <span class="font-medium">{{ $supplier->Supplier ?? 'Unknown' }}</span>
-                    | Scan Session: <span class="font-medium">#{{ $deliveryId }}</span>
+                <p class="text-xs sm:text-sm text-gray-600 mt-0.5">
+                    <span class="font-medium">{{ $supplier->Supplier ?? 'Unknown' }}</span>
+                    <span class="hidden sm:inline"> | Scan Session: <span class="font-medium">#{{ $deliveryId }}</span></span>
                 </p>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 flex-wrap">
                 @if(!$isCompleted)
-                    <button type="button" @click="openScanner()"
-                            class="hidden md:inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 gap-2 touch-manipulation">
+                    <button type="button" onclick="document.dispatchEvent(new CustomEvent('open-scanner'))"
+                            class="inline-flex items-center px-3 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700 gap-1.5 touch-manipulation">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
                         </svg>
-                        Scan Items
+                        <span class="hidden sm:inline">Scan Items</span>
+                        <span class="sm:hidden">Scan</span>
                     </button>
                     <form method="POST" action="{{ route('delivery-legacy.complete') }}"
                           onsubmit="return confirm('This will update stock levels for all scanned items and mark this delivery as complete. This action cannot be undone. Continue?')">
@@ -25,32 +26,26 @@
                         <input type="hidden" name="delID" value="{{ $deliveryId }}">
                         <input type="hidden" name="supplierID" value="{{ $supplierId }}">
                         <button type="submit"
-                                class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700 gap-2">
+                                class="inline-flex items-center px-3 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700 gap-1.5 touch-manipulation">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                             </svg>
-                            Update Stock & Complete
+                            <span class="hidden sm:inline">Update Stock & Complete</span>
+                            <span class="sm:hidden">Complete</span>
                         </button>
                     </form>
                 @endif
                 <a href="{{ route('delivery-legacy.index') }}"
-                   class="inline-flex items-center px-4 py-2 bg-gray-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700">
-                    Back to Selection
+                   class="inline-flex items-center px-3 py-2 bg-gray-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 touch-manipulation">
+                    <span class="hidden sm:inline">Back to Selection</span>
+                    <span class="sm:hidden">Back</span>
                 </a>
             </div>
         </div>
     </x-slot>
 
-    <div class="py-6" x-data="deliveryMatch()" x-ref="deliveryMatchRoot">
-        {{-- Mobile FAB Scan Button --}}
-        @if(!$isCompleted)
-        <button type="button" @click="openScanner()"
-                class="fixed bottom-6 right-6 z-40 md:hidden w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center touch-manipulation hover:bg-blue-700 active:bg-blue-800">
-            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
-            </svg>
-        </button>
-        @endif
+    <div class="py-3 sm:py-6" x-data="deliveryMatch()" x-ref="deliveryMatchRoot"
+         @open-scanner.document="openScanner()">
 
         {{-- Scanner Overlay --}}
         <div x-show="scannerOpen" x-cloak
@@ -219,7 +214,7 @@
             </div>
         </div>
 
-        <div class="max-w-full mx-auto sm:px-6 lg:px-8">
+        <div class="max-w-full mx-auto px-2 sm:px-6 lg:px-8">
             @if(session('success'))
                 <div class="mb-4 p-4 bg-green-100 border border-green-300 rounded-lg text-green-800">
                     {{ session('success') }}
@@ -228,15 +223,15 @@
 
             {{-- Synced Delivery Documents --}}
             @if($syncedDelivery && $syncedDelivery->documents->count() > 0)
-                <div class="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div class="flex items-center justify-between mb-3">
-                        <h3 class="text-lg font-medium text-blue-900 flex items-center">
-                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-1">
+                        <h3 class="text-base sm:text-lg font-medium text-blue-900 flex items-center">
+                            <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                             </svg>
                             Invoice Documents
                         </h3>
-                        <span class="text-sm text-blue-600">
+                        <span class="text-xs sm:text-sm text-blue-600">
                             {{ $syncedDelivery->supplier->Supplier ?? 'Unknown' }} - {{ $syncedDelivery->delivery_date->format('d/m/Y') }}
                         </span>
                     </div>
@@ -320,51 +315,51 @@
             @endif
 
             <!-- Financial Dashboard -->
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-                <div class="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
-                    <div class="text-xs text-gray-500 uppercase tracking-wide">Invoice Total</div>
-                    <div class="text-xl font-bold text-gray-900">&euro;<span x-text="financials.invoiceTotal.toFixed(2)"></span></div>
+            <div class="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4 mb-4 sm:mb-6">
+                <div class="bg-white rounded-lg shadow p-2 sm:p-4 border-l-4 border-blue-500">
+                    <div class="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wide">Invoice</div>
+                    <div class="text-sm sm:text-xl font-bold text-gray-900">&euro;<span x-text="financials.invoiceTotal.toFixed(2)"></span></div>
                 </div>
-                <div class="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
-                    <div class="text-xs text-gray-500 uppercase tracking-wide">Scanned Total</div>
-                    <div class="text-xl font-bold text-gray-900">&euro;<span x-text="financials.scannedTotal.toFixed(2)"></span></div>
+                <div class="bg-white rounded-lg shadow p-2 sm:p-4 border-l-4 border-green-500">
+                    <div class="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wide">Scanned</div>
+                    <div class="text-sm sm:text-xl font-bold text-gray-900">&euro;<span x-text="financials.scannedTotal.toFixed(2)"></span></div>
                 </div>
-                <div class="bg-white rounded-lg shadow p-4 border-l-4" :class="financials.discrepancy > 0 ? 'border-red-500' : 'border-gray-300'">
-                    <div class="text-xs text-gray-500 uppercase tracking-wide">Discrepancy</div>
-                    <div class="text-xl font-bold" :class="financials.discrepancy > 0 ? 'text-red-600' : 'text-gray-900'">&euro;<span x-text="financials.discrepancy.toFixed(2)"></span></div>
+                <div class="bg-white rounded-lg shadow p-2 sm:p-4 border-l-4" :class="financials.discrepancy > 0 ? 'border-red-500' : 'border-gray-300'">
+                    <div class="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wide">Diff</div>
+                    <div class="text-sm sm:text-xl font-bold" :class="financials.discrepancy > 0 ? 'text-red-600' : 'text-gray-900'">&euro;<span x-text="financials.discrepancy.toFixed(2)"></span></div>
                 </div>
-                <div class="bg-white rounded-lg shadow p-4 border-l-4" :class="financials.missingValue > 0 ? 'border-red-500' : 'border-gray-300'">
-                    <div class="text-xs text-gray-500 uppercase tracking-wide">Missing Value</div>
-                    <div class="text-xl font-bold" :class="financials.missingValue > 0 ? 'text-red-600' : 'text-gray-900'">&euro;<span x-text="financials.missingValue.toFixed(2)"></span></div>
+                <div class="bg-white rounded-lg shadow p-2 sm:p-4 border-l-4" :class="financials.missingValue > 0 ? 'border-red-500' : 'border-gray-300'">
+                    <div class="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wide">Missing</div>
+                    <div class="text-sm sm:text-xl font-bold" :class="financials.missingValue > 0 ? 'text-red-600' : 'text-gray-900'">&euro;<span x-text="financials.missingValue.toFixed(2)"></span></div>
                 </div>
-                <div class="bg-white rounded-lg shadow p-4 border-l-4" :class="financials.extraValue > 0 ? 'border-orange-500' : 'border-gray-300'">
-                    <div class="text-xs text-gray-500 uppercase tracking-wide">Extra Items Value</div>
-                    <div class="text-xl font-bold" :class="financials.extraValue > 0 ? 'text-orange-600' : 'text-gray-900'">&euro;<span x-text="financials.extraValue.toFixed(2)"></span></div>
+                <div class="bg-white rounded-lg shadow p-2 sm:p-4 border-l-4" :class="financials.extraValue > 0 ? 'border-orange-500' : 'border-gray-300'">
+                    <div class="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wide">Extra</div>
+                    <div class="text-sm sm:text-xl font-bold" :class="financials.extraValue > 0 ? 'text-orange-600' : 'text-gray-900'">&euro;<span x-text="financials.extraValue.toFixed(2)"></span></div>
                 </div>
-                <div class="bg-white rounded-lg shadow p-4 border-l-4" :class="financials.marginAlerts > 0 ? 'border-yellow-500' : 'border-gray-300'">
-                    <div class="text-xs text-gray-500 uppercase tracking-wide">Margin Alerts</div>
-                    <div class="text-xl font-bold" :class="financials.marginAlerts > 0 ? 'text-yellow-600' : 'text-gray-900'" x-text="financials.marginAlerts"></div>
+                <div class="bg-white rounded-lg shadow p-2 sm:p-4 border-l-4" :class="financials.marginAlerts > 0 ? 'border-yellow-500' : 'border-gray-300'">
+                    <div class="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wide">Margin</div>
+                    <div class="text-sm sm:text-xl font-bold" :class="financials.marginAlerts > 0 ? 'text-yellow-600' : 'text-gray-900'" x-text="financials.marginAlerts"></div>
                 </div>
             </div>
 
             <!-- Progress Bar -->
-            <div class="bg-white rounded-lg shadow p-4 mb-6">
-                <div class="flex justify-between text-sm mb-2">
+            <div class="bg-white rounded-lg shadow p-3 sm:p-4 mb-4 sm:mb-6">
+                <div class="flex flex-col sm:flex-row sm:justify-between text-xs sm:text-sm mb-2 gap-1">
                     <span class="font-medium text-gray-700">Verification Progress</span>
-                    <span class="text-gray-600">
-                        <span class="text-green-600 font-medium" x-text="financials.verifiedCount"></span> verified
-                        <span class="text-gray-400 mx-1">|</span>
-                        <span class="text-red-600 font-medium" x-text="financials.mismatchCount"></span> mismatched
-                        <span class="text-gray-400 mx-1">|</span>
-                        <span class="text-gray-500 font-medium" x-text="financials.pendingCount"></span> pending
+                    <span class="text-gray-600 flex flex-wrap gap-x-1">
+                        <span><span class="text-green-600 font-medium" x-text="financials.verifiedCount"></span> verified</span>
+                        <span class="text-gray-400">|</span>
+                        <span><span class="text-red-600 font-medium" x-text="financials.mismatchCount"></span> mismatch</span>
+                        <span class="text-gray-400">|</span>
+                        <span><span class="text-gray-500 font-medium" x-text="financials.pendingCount"></span> pending</span>
                         <template x-if="financials.oosCount > 0">
                             <span>
-                                <span class="text-gray-400 mx-1">|</span>
+                                <span class="text-gray-400">|</span>
                                 <span class="text-orange-600 font-medium" x-text="financials.oosCount"></span> OOS
                             </span>
                         </template>
-                        <span class="text-gray-400 mx-1">|</span>
-                        <span x-text="financials.totalItems"></span> total
+                        <span class="text-gray-400">|</span>
+                        <span><span x-text="financials.totalItems"></span> total</span>
                     </span>
                 </div>
                 <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
@@ -376,31 +371,31 @@
             </div>
 
             <!-- Quick Filters -->
-            <div class="bg-white rounded-lg shadow p-4 mb-6">
-                <div class="flex flex-wrap items-center gap-4">
-                    <span class="text-sm font-medium text-gray-700">Filter:</span>
-                    <div class="flex gap-2">
+            <div class="bg-white rounded-lg shadow p-3 sm:p-4 mb-4 sm:mb-6">
+                <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-4">
+                    <div class="flex flex-wrap gap-2 items-center">
+                        <span class="text-sm font-medium text-gray-700">Filter:</span>
                         <button @click="filter = 'all'"
                                 :class="filter === 'all' ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'"
-                                class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors">
-                            All Items
+                                class="px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors touch-manipulation">
+                            All
                         </button>
                         <button @click="filter = 'problems'"
                                 :class="filter === 'problems' ? 'bg-red-600 text-white' : 'bg-red-100 text-red-700 hover:bg-red-200'"
-                                class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors">
-                            Problems Only ({{ $financials['mismatchCount'] + count($scannedNotOnInvoice) + count($onInvoiceNotScanned) }})
+                                class="px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors touch-manipulation">
+                            Problems ({{ $financials['mismatchCount'] + count($scannedNotOnInvoice) + count($onInvoiceNotScanned) }})
                         </button>
                         <button @click="filter = 'verified'"
                                 :class="filter === 'verified' ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700 hover:bg-green-200'"
-                                class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors">
-                            Verified Only ({{ $financials['verifiedCount'] }})
+                                class="px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors touch-manipulation">
+                            Verified ({{ $financials['verifiedCount'] }})
                         </button>
                     </div>
-                    <div class="ml-auto flex items-center gap-4">
+                    <div class="sm:ml-auto flex items-center gap-3 sm:gap-4">
                         <div class="relative flex items-center gap-2">
                             <label class="flex items-center gap-2 cursor-pointer">
                                 <input type="checkbox" x-model="showCategories" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                                <span class="text-sm text-gray-700">Categories</span>
+                                <span class="text-xs sm:text-sm text-gray-700">Categories</span>
                             </label>
                             <div x-show="showCategories" x-cloak class="relative" @click.outside="categoryDropdownOpen = false">
                                 <button @click="categoryDropdownOpen = !categoryDropdownOpen"
@@ -425,7 +420,7 @@
                         </div>
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input type="checkbox" x-model="showDetails" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                            <span class="text-sm text-gray-700">Show Details</span>
+                            <span class="text-xs sm:text-sm text-gray-700">Details</span>
                         </label>
                     </div>
                 </div>
@@ -482,13 +477,13 @@
             <!-- Critical Issues Section -->
             <div class="mb-4" x-show="filter === 'all' || filter === 'problems'">
                 <button @click="sectionsOpen.critical = !sectionsOpen.critical"
-                        class="w-full flex justify-between items-center p-4 bg-red-100 hover:bg-red-200 rounded-t-lg transition-colors"
+                        class="w-full flex justify-between items-center p-3 sm:p-4 bg-red-100 hover:bg-red-200 rounded-t-lg transition-colors touch-manipulation"
                         :class="sectionsOpen.critical ? 'rounded-t-lg' : 'rounded-lg'">
-                    <span class="font-medium text-red-800">
-                        <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <span class="font-medium text-red-800 text-sm sm:text-base">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5 inline mr-1 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                         </svg>
-                        Critical Issues - Quantity Mismatches ({{ $criticalItems->count() }})
+                        <span class="hidden sm:inline">Critical Issues - </span>Qty Mismatches ({{ $criticalItems->count() }})
                     </span>
                     <svg :class="sectionsOpen.critical ? 'rotate-180' : ''" class="w-5 h-5 text-red-600 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -684,13 +679,13 @@
             <!-- Warnings Section -->
             <div class="mb-4" x-show="filter === 'all' || filter === 'problems'">
                 <button @click="sectionsOpen.warnings = !sectionsOpen.warnings"
-                        class="w-full flex justify-between items-center p-4 bg-yellow-100 hover:bg-yellow-200 rounded-t-lg transition-colors"
+                        class="w-full flex justify-between items-center p-3 sm:p-4 bg-yellow-100 hover:bg-yellow-200 rounded-t-lg transition-colors touch-manipulation"
                         :class="sectionsOpen.warnings ? 'rounded-t-lg' : 'rounded-lg'">
-                    <span class="font-medium text-yellow-800">
-                        <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <span class="font-medium text-yellow-800 text-sm sm:text-base">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5 inline mr-1 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
-                        Warnings - Margin/Case Unit Issues ({{ $warningItems->count() }})
+                        <span class="hidden sm:inline">Warnings - </span>Margin/Case Issues ({{ $warningItems->count() }})
                     </span>
                     <svg :class="sectionsOpen.warnings ? 'rotate-180' : ''" class="w-5 h-5 text-yellow-600 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -887,13 +882,13 @@
             <!-- Verified Section -->
             <div class="mb-4" x-show="filter === 'all' || filter === 'verified'">
                 <button @click="sectionsOpen.verified = !sectionsOpen.verified"
-                        class="w-full flex justify-between items-center p-4 bg-green-100 hover:bg-green-200 rounded-t-lg transition-colors"
+                        class="w-full flex justify-between items-center p-3 sm:p-4 bg-green-100 hover:bg-green-200 rounded-t-lg transition-colors touch-manipulation"
                         :class="sectionsOpen.verified ? 'rounded-t-lg' : 'rounded-lg'">
-                    <span class="font-medium text-green-800">
-                        <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <span class="font-medium text-green-800 text-sm sm:text-base">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5 inline mr-1 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
-                        Verified Items - Quantities Match ({{ $verifiedItems->count() }})
+                        Verified ({{ $verifiedItems->count() }})
                     </span>
                     <svg :class="sectionsOpen.verified ? 'rotate-180' : ''" class="w-5 h-5 text-green-600 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -1067,13 +1062,13 @@
             @if($oosItems->count() > 0)
             <div class="mb-4" x-show="filter === 'all'">
                 <button @click="sectionsOpen.oos = !sectionsOpen.oos"
-                        class="w-full flex justify-between items-center p-4 bg-orange-100 hover:bg-orange-200 rounded-t-lg transition-colors"
+                        class="w-full flex justify-between items-center p-3 sm:p-4 bg-orange-100 hover:bg-orange-200 rounded-t-lg transition-colors touch-manipulation"
                         :class="sectionsOpen.oos ? 'rounded-t-lg' : 'rounded-lg'">
-                    <span class="font-medium text-orange-800">
-                        <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <span class="font-medium text-orange-800 text-sm sm:text-base">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5 inline mr-1 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
                         </svg>
-                        Out of Stock - Supplier Did Not Deliver ({{ $oosItems->count() }})
+                        OOS <span class="hidden sm:inline">- Not Delivered</span> ({{ $oosItems->count() }})
                     </span>
                     <svg :class="sectionsOpen.oos ? 'rotate-180' : ''" class="w-5 h-5 text-orange-600 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -1140,13 +1135,13 @@
             <!-- Pending Section -->
             <div class="mb-4" x-show="filter === 'all'">
                 <button @click="sectionsOpen.pending = !sectionsOpen.pending"
-                        class="w-full flex justify-between items-center p-4 bg-gray-100 hover:bg-gray-200 rounded-t-lg transition-colors"
+                        class="w-full flex justify-between items-center p-3 sm:p-4 bg-gray-100 hover:bg-gray-200 rounded-t-lg transition-colors touch-manipulation"
                         :class="sectionsOpen.pending ? 'rounded-t-lg' : 'rounded-lg'">
-                    <span class="font-medium text-gray-700">
-                        <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <span class="font-medium text-gray-700 text-sm sm:text-base">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5 inline mr-1 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
-                        Pending - Not Yet Scanned ({{ $pendingItems->count() }})
+                        Pending ({{ $pendingItems->count() }})
                     </span>
                     <svg :class="sectionsOpen.pending ? 'rotate-180' : ''" class="w-5 h-5 text-gray-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -1300,13 +1295,13 @@
             <!-- Extra Items Section (Scanned but NOT on Invoice) -->
             <div class="mb-4" x-show="filter === 'all' || filter === 'problems'">
                 <button @click="sectionsOpen.extra = !sectionsOpen.extra"
-                        class="w-full flex justify-between items-center p-4 bg-orange-100 hover:bg-orange-200 rounded-t-lg transition-colors"
+                        class="w-full flex justify-between items-center p-3 sm:p-4 bg-orange-100 hover:bg-orange-200 rounded-t-lg transition-colors touch-manipulation"
                         :class="sectionsOpen.extra ? 'rounded-t-lg' : 'rounded-lg'">
-                    <span class="font-medium text-orange-800">
-                        <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <span class="font-medium text-orange-800 text-sm sm:text-base">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5 inline mr-1 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
-                        Extra Items - Scanned but NOT on Invoice ({{ count($scannedNotOnInvoice) }})
+                        Extra <span class="hidden sm:inline">- Not on Invoice</span> ({{ count($scannedNotOnInvoice) }})
                     </span>
                     <svg :class="sectionsOpen.extra ? 'rotate-180' : ''" class="w-5 h-5 text-orange-600 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -1423,13 +1418,13 @@
             <!-- Missing Items Section (On Invoice but NOT Scanned) -->
             <div class="mb-4" x-show="filter === 'all' || filter === 'problems'">
                 <button @click="sectionsOpen.missing = !sectionsOpen.missing"
-                        class="w-full flex justify-between items-center p-4 bg-red-100 hover:bg-red-200 rounded-t-lg transition-colors"
+                        class="w-full flex justify-between items-center p-3 sm:p-4 bg-red-100 hover:bg-red-200 rounded-t-lg transition-colors touch-manipulation"
                         :class="sectionsOpen.missing ? 'rounded-t-lg' : 'rounded-lg'">
-                    <span class="font-medium text-red-800">
-                        <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <span class="font-medium text-red-800 text-sm sm:text-base">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5 inline mr-1 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
                         </svg>
-                        Missing Items - On Invoice but NOT Scanned ({{ count($onInvoiceNotScanned) }})
+                        Missing <span class="hidden sm:inline">- Not Scanned</span> ({{ count($onInvoiceNotScanned) }})
                     </span>
                     <svg :class="sectionsOpen.missing ? 'rotate-180' : ''" class="w-5 h-5 text-red-600 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
