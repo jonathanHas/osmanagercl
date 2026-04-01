@@ -576,7 +576,7 @@
                                             $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
                                         @endphp
                                         <div class="flex-shrink-0">
-                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="md" :hover="true" />
+                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="lg" :hover="true" />
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             @if($item->productID)
@@ -624,7 +624,7 @@
                                                 </button>
                                             </form>
                                         </template>
-                                        <span class="ml-auto text-xs text-gray-500">&euro;{{ number_format($value, 2) }}</span>
+                                        <span class="ml-auto text-xs text-gray-500">Stock: {{ floatval($item->UNITS ?? 0) }}</span>
                                     </div>
                                 </div>
                             @endforeach
@@ -808,7 +808,7 @@
                                             $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
                                         @endphp
                                         <div class="flex-shrink-0">
-                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="md" :hover="true" />
+                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="lg" :hover="true" />
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             @if($item->productID)
@@ -864,6 +864,7 @@
                                     <div class="mt-2 flex items-center gap-2">
                                         <button class="text-xs px-3 py-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200 touch-manipulation transition-colors">Verify</button>
                                         <button class="text-xs px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 touch-manipulation transition-colors">Flag</button>
+                                        <span class="ml-auto text-xs text-gray-500">Stock: {{ floatval($item->UNITS ?? 0) }}</span>
                                     </div>
                                 </div>
                             @endforeach
@@ -1093,7 +1094,7 @@
                                             $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
                                         @endphp
                                         <div class="flex-shrink-0">
-                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="md" :hover="true" />
+                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="lg" :hover="true" />
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             @if($item->productID)
@@ -1153,6 +1154,7 @@
                                     <div class="mt-2 flex items-center gap-2">
                                         <button class="text-xs px-3 py-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200 touch-manipulation transition-colors">Verify</button>
                                         <button class="text-xs px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 touch-manipulation transition-colors">Flag</button>
+                                        <span class="ml-auto text-xs text-gray-500">Stock: {{ floatval($item->UNITS ?? 0) }}</span>
                                     </div>
                                 </div>
                             @endforeach
@@ -1378,7 +1380,7 @@
                                             $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
                                         @endphp
                                         <div class="flex-shrink-0">
-                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="md" :hover="true" />
+                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="lg" :hover="true" />
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             @if($item->productID)
@@ -1394,7 +1396,7 @@
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                                 <span class="font-semibold text-sm">{{ $unitsDelivered }}</span>
                                             </div>
-                                            <span class="text-xs text-gray-500">&euro;{{ number_format($value, 2) }}</span>
+                                            <span class="text-xs text-gray-400">Stock: {{ floatval($item->UNITS ?? 0) }}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -1593,7 +1595,7 @@
                                         $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
                                     @endphp
                                     <div class="flex-shrink-0">
-                                        <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="md" :hover="true" />
+                                        <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="lg" :hover="true" />
                                     </div>
                                     <div class="min-w-0 flex-1">
                                         @if($item->productID)
@@ -1701,7 +1703,7 @@
                                             $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
                                         @endphp
                                         <div class="flex-shrink-0">
-                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="md" :hover="true" />
+                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="lg" :hover="true" />
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             <span class="font-medium text-gray-900 text-sm">{{ $item->NAME ?? 'Unknown Product' }}</span>
@@ -1888,7 +1890,7 @@
                                 <div class="p-3 border-l-4 border-red-400">
                                     <div class="flex items-start justify-between gap-2">
                                         <div class="flex-shrink-0">
-                                            <x-product-image :product="null" size="md" />
+                                            <x-product-image :product="null" size="lg" />
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             <span class="font-medium text-gray-900 text-sm">{{ $item->prodName }}</span>
