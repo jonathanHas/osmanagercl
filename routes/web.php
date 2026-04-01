@@ -122,6 +122,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/destock-review', [\App\Http\Controllers\DestockReviewController::class, 'index'])->name('destock-review.index');
     Route::get('/destock-review/suggestions', [\App\Http\Controllers\DestockReviewController::class, 'suggestions'])->name('destock-review.suggestions');
 
+    // Supplier Code Lookup routes
+    Route::get('/supplier-code-lookup', [\App\Http\Controllers\SupplierCodeLookupController::class, 'index'])->name('supplier-code-lookup.index');
+    Route::post('/supplier-code-lookup', [\App\Http\Controllers\SupplierCodeLookupController::class, 'lookup'])->name('supplier-code-lookup.lookup');
+
     // Invoice Management routes - specific routes BEFORE resource routes
     Route::get('/invoices/create-simple', [\App\Http\Controllers\InvoiceController::class, 'createSimple'])->name('invoices.create-simple');
     Route::post('/invoices/store-simple', [\App\Http\Controllers\InvoiceController::class, 'storeSimple'])->name('invoices.store-simple');

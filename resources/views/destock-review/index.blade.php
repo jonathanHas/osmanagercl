@@ -18,6 +18,10 @@
                        class="border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-3 px-1 text-sm font-medium">
                         Restock Suggestions
                     </a>
+                    <a href="{{ route('supplier-code-lookup.index') }}"
+                       class="border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-3 px-1 text-sm font-medium">
+                        Supplier Code Lookup
+                    </a>
                 </nav>
             </div>
 

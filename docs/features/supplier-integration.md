@@ -151,7 +151,7 @@ Dedicated supplier information section showing:
 - **CSV Import**: Process Udea delivery files
 - **Barcode Retrieval**: Automatic extraction for new products
 - **Image Display**: Shows images during scanning workflow
-- **Hover Previews**: Large overlays with product information
+- **Hover Previews**: Large overlays with product information (desktop hover, mobile tap-to-enlarge with close button)
 - **New Product Support**: Images work immediately after barcode retrieval
 - **Automatic Pricing**: UDEA customer prices used when creating products from deliveries
 

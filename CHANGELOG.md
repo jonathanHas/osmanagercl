@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Delivery Legacy: Mobile-Friendly Card Layouts** (2026-04-01)
+  - `/delivery-legacy` index: Recent Scan Sessions now display as compact cards on mobile with touch-friendly Select/View Match buttons, merge checkboxes, and inline supplier editing — no horizontal scrolling required
+  - `/delivery-legacy/match`: All 7 table sections (Pending, Critical, Warnings, Verified, OOS, Extra, Missing) now show mobile card layouts below `md` breakpoint with color-coded left borders, product images, stock levels, and inline quantity editing
+  - Pending section moved to first position so users can immediately check for unscanned items at end of delivery
+  - Product images enlarged in mobile cards (`size="lg"`, 64px) with tap-to-enlarge overlay featuring close button — no more accidentally tapping links behind the preview
+  - Desktop table views completely unchanged
+  - **Modified**: `resources/views/delivery-legacy/index.blade.php`, `resources/views/delivery-legacy/match.blade.php`, `resources/views/components/product-image.blade.php`
+
 ### Fixed
 
 - **Label Translation: Smarter layout with no text overlap** (2026-03-28)

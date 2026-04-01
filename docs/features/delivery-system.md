@@ -311,6 +311,8 @@ Route::middleware('auth')->prefix('deliveries')->group(function () {
 - **Sortable Columns**: Click-to-sort functionality for Product, Status, Margin, and Actions
 - **Visual Feedback**: Active sort indicators and direction arrows
 - **Responsive Layout**: Mobile-friendly design with touch-optimized interactions
+- **Mobile Card Layouts**: Below `md` breakpoint (768px), all tables render as compact cards with color-coded left borders matching section status (red=critical, yellow=warnings, green=verified, orange=extra/OOS, gray=pending). Product images (64px, tap-to-enlarge with close button), stock levels, and inline quantity editing are all accessible without horizontal scrolling. Pending section is displayed first for quick end-of-scan review. Desktop tables remain unchanged.
+- **Session Cards on Index**: Recent Scan Sessions shown as mobile cards with session ID, supplier, date, item count, status badge, and touch-friendly Select/View Match buttons
 
 ### Real-Time Scanning
 - **Mobile Optimized**: Touch-friendly interface for warehouse use

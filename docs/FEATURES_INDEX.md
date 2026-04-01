@@ -345,8 +345,13 @@ Comprehensive delivery processing with barcode scanning and PDF invoice parsing.
   - Item merging with aggregated totals
   - Confidence scoring across files
 - **Sync to Legacy** (NEW! 2026-01-19): One-click sync from `/deliveries` to POS `delivery` table for invoice matching with scanned items
+- **Mobile Card Layouts** (NEW! 2026-04-01): Fully mobile-friendly delivery-legacy pages
+  - Index page: scan sessions as compact cards with touch-friendly action buttons
+  - Match page: all 7 table sections render as color-coded cards on mobile with product images, stock, and inline editing
+  - Pending section displayed first for quick end-of-scan review
+  - Tap-to-enlarge product images with close button overlay
 - **Delivery Legacy Page** (NEW! 2026-01-18): Redesigned invoice match interface with financial dashboard, issues-first layout, collapsible sections, and quick filters for faster verification
-- **Product Images in Legacy** (NEW! 2026-01-26): Product image thumbnails in all tables with hover preview using fixed positioning
+- **Product Images in Legacy** (NEW! 2026-01-26, updated 2026-04-01): Product image thumbnails in all tables with hover preview (desktop) and tap-to-enlarge with close button (mobile)
 - **Category Filter** (NEW! 2026-03-07): Toggle category names on items and filter by category with multi-select dropdown
 
 📖 [Delivery System Documentation](./features/delivery-system.md)
