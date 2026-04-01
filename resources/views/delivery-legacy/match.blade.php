@@ -576,7 +576,7 @@
                                             $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
                                         @endphp
                                         <div class="flex-shrink-0">
-                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="sm" :hover="true" />
+                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="md" :hover="true" />
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             @if($item->productID)
@@ -601,20 +601,10 @@
                                     <div class="mt-2 flex items-center gap-2">
                                         <span class="text-xs text-gray-500 w-16">Delivered:</span>
                                         <template x-if="!editing">
-                                            <div class="flex items-center gap-2">
-                                                <span @click="canEdit && (editing = true, $nextTick(() => $refs.qtyInput?.select()))"
-                                                      :class="canEdit ? 'cursor-pointer hover:bg-blue-100' : ''"
-                                                      class="px-2 py-1 rounded text-sm text-gray-400"
-                                                      x-text="qty !== null ? qty : '-'"></span>
-                                                <button x-show="canEdit"
-                                                        @click="qty = {{ $unitsDelivered }}; editing = true; $nextTick(() => $refs.qtyInput?.focus())"
-                                                        class="text-gray-400 hover:text-blue-600 touch-manipulation p-1"
-                                                        title="Copy expected to delivered">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
-                                                    </svg>
-                                                </button>
-                                            </div>
+                                            <span @click="canEdit && (editing = true, $nextTick(() => $refs.qtyInput?.select()))"
+                                                  :class="canEdit ? 'cursor-pointer hover:bg-blue-100' : ''"
+                                                  class="px-2 py-1 rounded text-sm text-gray-400"
+                                                  x-text="qty !== null ? qty : '-'"></span>
                                         </template>
                                         <template x-if="editing">
                                             <form @submit.prevent="saving = true; window.deliveryMatchInstance.saveScannedQty('{{ $item->Barcode }}', qty || 0, (newQty) => { qty = newQty; originalQty = newQty; editing = false; saving = false; location.reload(); }).catch(() => saving = false)"
@@ -818,7 +808,7 @@
                                             $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
                                         @endphp
                                         <div class="flex-shrink-0">
-                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="sm" :hover="true" />
+                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="md" :hover="true" />
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             @if($item->productID)
@@ -1103,7 +1093,7 @@
                                             $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
                                         @endphp
                                         <div class="flex-shrink-0">
-                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="sm" :hover="true" />
+                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="md" :hover="true" />
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             @if($item->productID)
@@ -1388,7 +1378,7 @@
                                             $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
                                         @endphp
                                         <div class="flex-shrink-0">
-                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="sm" :hover="true" />
+                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="md" :hover="true" />
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             @if($item->productID)
@@ -1603,7 +1593,7 @@
                                         $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
                                     @endphp
                                     <div class="flex-shrink-0">
-                                        <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="sm" :hover="true" />
+                                        <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="md" :hover="true" />
                                     </div>
                                     <div class="min-w-0 flex-1">
                                         @if($item->productID)
@@ -1711,7 +1701,7 @@
                                             $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
                                         @endphp
                                         <div class="flex-shrink-0">
-                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="sm" :hover="true" />
+                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="md" :hover="true" />
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             <span class="font-medium text-gray-900 text-sm">{{ $item->NAME ?? 'Unknown Product' }}</span>
@@ -1898,7 +1888,7 @@
                                 <div class="p-3 border-l-4 border-red-400">
                                     <div class="flex items-start justify-between gap-2">
                                         <div class="flex-shrink-0">
-                                            <x-product-image :product="null" size="sm" />
+                                            <x-product-image :product="null" size="md" />
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             <span class="font-medium text-gray-900 text-sm">{{ $item->prodName }}</span>

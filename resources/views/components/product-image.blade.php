@@ -72,11 +72,12 @@
 
 @if($hasImage)
     @if($hover)
-        {{-- Hover-enabled version with Alpine.js for fixed positioning --}}
+        {{-- Hover/tap-enabled version with Alpine.js --}}
         <div
             class="relative {{ $sizeClass }}"
-            x-data="{ show: false, pos: { x: 0, y: 0 } }"
+            x-data="{ show: false, tapped: false, pos: { x: 0, y: 0 } }"
             @mouseenter="
+                if (tapped) return;
                 const rect = $el.getBoundingClientRect();
                 const spaceBelow = window.innerHeight - rect.bottom;
                 const spaceAbove = rect.top;
@@ -90,7 +91,8 @@
                 }
                 show = true;
             "
-            @mouseleave="show = false"
+            @mouseleave="if (!tapped) show = false"
+            @click.prevent.stop="tapped = true; show = true"
         >
             <img
                 src="{{ $imageUrl }}"
@@ -104,10 +106,10 @@
                 {{ $attributes->except(['product', 'supplierService', 'size', 'fallback', 'lazy', 'rounded', 'border', 'hover', 'hoverSize']) }}
             >
 
-            {{-- Fixed position hover preview - renders over everything --}}
+            {{-- Desktop: positioned hover preview --}}
             <template x-teleport="body">
                 <div
-                    x-show="show"
+                    x-show="show && !tapped"
                     x-transition:enter="transition ease-out duration-150"
                     x-transition:enter-start="opacity-0"
                     x-transition:enter-end="opacity-100"
@@ -127,6 +129,40 @@
                             {{ $productName }}
                         </div>
                     @endif
+                </div>
+            </template>
+
+            {{-- Tap overlay: centered with backdrop and close button --}}
+            <template x-teleport="body">
+                <div
+                    x-show="show && tapped"
+                    x-transition:enter="transition ease-out duration-150"
+                    x-transition:enter-start="opacity-0"
+                    x-transition:enter-end="opacity-100"
+                    x-transition:leave="transition ease-in duration-100"
+                    x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0"
+                    class="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50"
+                    @click.self="show = false; tapped = false"
+                >
+                    <div class="relative max-w-sm mx-4">
+                        <button @click.stop="show = false; tapped = false"
+                                class="absolute -top-3 -right-3 z-10 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center text-gray-600 hover:text-gray-900 touch-manipulation">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                        <img
+                            src="{{ $imageUrl }}"
+                            alt="{{ $productName }}"
+                            class="w-full h-auto max-h-[70vh] object-contain rounded-lg border-2 border-white shadow-2xl bg-white"
+                        >
+                        @if($productName)
+                            <div class="bg-black bg-opacity-75 text-white text-sm p-2.5 rounded-b-lg truncate">
+                                {{ $productName }}
+                            </div>
+                        @endif
+                    </div>
                 </div>
             </template>
 
