@@ -572,6 +572,12 @@
                                      x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')"
                                      x-data="{ editing: false, qty: null, originalQty: null, saving: false, canEdit: {{ $isCompleted ? 'false' : 'true' }} }">
                                     <div class="flex items-start justify-between gap-2">
+                                        @php
+                                            $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
+                                        @endphp
+                                        <div class="flex-shrink-0">
+                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="sm" :hover="true" />
+                                        </div>
                                         <div class="min-w-0 flex-1">
                                             @if($item->productID)
                                                 <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->prodName }}</a>
@@ -808,6 +814,12 @@
                                 <div class="p-3 border-l-4 border-red-400"
                                      x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
                                     <div class="flex items-start justify-between gap-2">
+                                        @php
+                                            $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
+                                        @endphp
+                                        <div class="flex-shrink-0">
+                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="sm" :hover="true" />
+                                        </div>
                                         <div class="min-w-0 flex-1">
                                             @if($item->productID)
                                                 <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->prodName }}</a>
@@ -1087,6 +1099,12 @@
                                 <div class="p-3 border-l-4 border-yellow-400"
                                      x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
                                     <div class="flex items-start justify-between gap-2">
+                                        @php
+                                            $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
+                                        @endphp
+                                        <div class="flex-shrink-0">
+                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="sm" :hover="true" />
+                                        </div>
                                         <div class="min-w-0 flex-1">
                                             @if($item->productID)
                                                 <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->prodName }}</a>
@@ -1366,6 +1384,12 @@
                                 <div class="p-3 border-l-4 border-green-400"
                                      x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
                                     <div class="flex items-start justify-between gap-2">
+                                        @php
+                                            $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
+                                        @endphp
+                                        <div class="flex-shrink-0">
+                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="sm" :hover="true" />
+                                        </div>
                                         <div class="min-w-0 flex-1">
                                             @if($item->productID)
                                                 <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->prodName }}</a>
@@ -1575,6 +1599,12 @@
                             <div class="p-3 border-l-4 border-orange-400"
                                  x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
                                 <div class="flex items-start justify-between gap-2">
+                                    @php
+                                        $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
+                                    @endphp
+                                    <div class="flex-shrink-0">
+                                        <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="sm" :hover="true" />
+                                    </div>
                                     <div class="min-w-0 flex-1">
                                         @if($item->productID)
                                             <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->prodName }}</a>
@@ -1677,6 +1707,12 @@
                                 <div class="p-3 border-l-4 border-orange-400"
                                      x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
                                     <div class="flex items-start justify-between gap-2">
+                                        @php
+                                            $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
+                                        @endphp
+                                        <div class="flex-shrink-0">
+                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="sm" :hover="true" />
+                                        </div>
                                         <div class="min-w-0 flex-1">
                                             <span class="font-medium text-gray-900 text-sm">{{ $item->NAME ?? 'Unknown Product' }}</span>
                                             @if($item->productID)
@@ -1861,6 +1897,9 @@
                                 @endphp
                                 <div class="p-3 border-l-4 border-red-400">
                                     <div class="flex items-start justify-between gap-2">
+                                        <div class="flex-shrink-0">
+                                            <x-product-image :product="null" size="sm" />
+                                        </div>
                                         <div class="min-w-0 flex-1">
                                             <span class="font-medium text-gray-900 text-sm">{{ $item->prodName }}</span>
                                             <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
