@@ -154,7 +154,94 @@
                         </button>
                     </div>
 
-                    <div class="overflow-x-auto">
+                    {{-- Mobile Card Layout --}}
+                    <div class="md:hidden divide-y divide-gray-200">
+                        @forelse($scanSessions as $session)
+                            @php
+                                $itemCount = $scanItemCounts[$session->ID] ?? 0;
+                                $isPending = $session->status == 0;
+                            @endphp
+                            <div class="p-3" x-data="{ editing: false }">
+                                <div class="flex items-start justify-between mb-1.5">
+                                    <div class="flex items-center gap-2">
+                                        @if($isPending)
+                                            <input type="checkbox"
+                                                value="{{ $session->ID }}"
+                                                @change="toggleSession('{{ $session->ID }}', '{{ $session->supID }}', '{{ addslashes($session->Supplier ?? 'Unknown') }}')"
+                                                :checked="selectedSessions.includes('{{ $session->ID }}')"
+                                                :disabled="selectedSessions.length >= 2 && !selectedSessions.includes('{{ $session->ID }}')"
+                                                class="rounded border-gray-300 text-amber-600 focus:ring-amber-500 mt-0.5">
+                                        @endif
+                                        <span class="text-sm font-medium text-gray-900">#{{ Str::limit($session->ID, 8, '...') }}</span>
+                                    </div>
+                                    @if($session->status)
+                                        <span class="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800">Completed</span>
+                                    @else
+                                        <span class="px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800">Pending</span>
+                                    @endif
+                                </div>
+                                <div class="flex items-center justify-between mb-1.5">
+                                    <div class="min-w-0">
+                                        <span x-show="!editing" class="text-sm text-gray-900">
+                                            {{ $session->Supplier ?? 'Unknown' }}
+                                            @if($isPending)
+                                                <button x-show="!editing" @click="editing = true" class="text-gray-400 hover:text-indigo-600 ml-1 inline-block align-middle" title="Change supplier">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                                    </svg>
+                                                </button>
+                                            @endif
+                                        </span>
+                                        @if($isPending)
+                                            <form x-show="editing" x-cloak @click.away="editing = false"
+                                                action="{{ route('delivery-legacy.change-supplier') }}" method="POST"
+                                                @submit="return confirm('Change supplier from {{ addslashes($session->Supplier ?? 'Unknown') }} to ' + $el.querySelector('select').selectedOptions[0].text + '?')"
+                                                class="flex items-center gap-1">
+                                                @csrf
+                                                @method('PATCH')
+                                                <input type="hidden" name="sessionId" value="{{ $session->ID }}">
+                                                <select name="newSupplierID" required class="text-xs rounded border-gray-300 py-1 pr-6 flex-1">
+                                                    @foreach($suppliers as $supplier)
+                                                        <option value="{{ $supplier->SupplierID }}" @selected($supplier->SupplierID == $session->supID)>
+                                                            {{ $supplier->Supplier }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                                <button type="submit" class="text-green-600 hover:text-green-800" title="Save">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                                    </svg>
+                                                </button>
+                                                <button type="button" @click="editing = false" class="text-gray-400 hover:text-gray-600" title="Cancel">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                    </svg>
+                                                </button>
+                                            </form>
+                                        @endif
+                                    </div>
+                                    <span class="text-xs text-gray-500 ml-2 flex-shrink-0">{{ $session->dateUpload }}</span>
+                                </div>
+                                <div class="text-xs text-gray-500 mb-2">{{ $itemCount }} items</div>
+                                <div class="flex gap-2">
+                                    <button type="button"
+                                        onclick="selectSession('{{ $session->ID }}', '{{ $session->supID }}')"
+                                        class="flex-1 py-2 px-3 text-xs font-semibold text-indigo-600 bg-indigo-50 rounded-md hover:bg-indigo-100 touch-manipulation text-center">
+                                        Select
+                                    </button>
+                                    <a href="{{ route('delivery-legacy.match', ['delID' => $session->ID, 'supplierID' => $session->supID]) }}"
+                                       class="flex-1 py-2 px-3 text-xs font-semibold text-green-600 bg-green-50 rounded-md hover:bg-green-100 touch-manipulation text-center">
+                                        View Match
+                                    </a>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="p-4 text-center text-gray-500">No scan sessions found</div>
+                        @endforelse
+                    </div>
+
+                    {{-- Desktop Table --}}
+                    <div class="hidden md:block overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>

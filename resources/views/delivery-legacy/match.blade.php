@@ -540,6 +540,242 @@
                     ->all();
             @endphp
 
+            <!-- Pending Section -->
+            <div class="mb-4" x-show="filter === 'all'">
+                <button @click="sectionsOpen.pending = !sectionsOpen.pending"
+                        class="w-full flex justify-between items-center p-3 sm:p-4 bg-gray-100 hover:bg-gray-200 rounded-t-lg transition-colors touch-manipulation"
+                        :class="sectionsOpen.pending ? 'rounded-t-lg' : 'rounded-lg'">
+                    <span class="font-medium text-gray-700 text-sm sm:text-base">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5 inline mr-1 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Pending ({{ $pendingItems->count() }})
+                    </span>
+                    <svg :class="sectionsOpen.pending ? 'rotate-180' : ''" class="w-5 h-5 text-gray-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div x-show="sectionsOpen.pending" x-collapse class="bg-white border border-gray-200 border-t-0 rounded-b-lg overflow-hidden">
+                    @if($pendingItems->count() > 0)
+                        {{-- Mobile Cards --}}
+                        <div class="md:hidden divide-y divide-gray-200">
+                            @foreach($pendingItems as $item)
+                                @php
+                                    $cost = $item->cost ?? 0;
+                                    $caseUnits = $item->invoiceCaseUnits ?? 1;
+                                    $myOrder = $item->myOrder ?? 0;
+                                    $isWeightBased = fmod($myOrder, 1) != 0.0;
+                                    $unitsDelivered = $isWeightBased ? $myOrder : $caseUnits * $myOrder;
+                                    $value = $cost * $unitsDelivered;
+                                @endphp
+                                <div class="p-3 border-l-4 border-gray-400"
+                                     x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')"
+                                     x-data="{ editing: false, qty: null, originalQty: null, saving: false, canEdit: {{ $isCompleted ? 'false' : 'true' }} }">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div class="min-w-0 flex-1">
+                                            @if($item->productID)
+                                                <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->prodName }}</a>
+                                            @else
+                                                <span class="font-medium text-gray-900 text-sm">{{ $item->prodName }}</span>
+                                            @endif
+                                            <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                            <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
+                                        </div>
+                                        <div class="text-right flex-shrink-0">
+                                            <span class="text-xs text-gray-500">Expected</span>
+                                            <span class="font-semibold text-sm block">
+                                                @if($isWeightBased)
+                                                    {{ number_format($unitsDelivered, 3) }} <span class="text-xs text-purple-600">kg</span>
+                                                @else
+                                                    {{ $unitsDelivered }}
+                                                @endif
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 flex items-center gap-2">
+                                        <span class="text-xs text-gray-500 w-16">Delivered:</span>
+                                        <template x-if="!editing">
+                                            <div class="flex items-center gap-2">
+                                                <span @click="canEdit && (editing = true, $nextTick(() => $refs.qtyInput?.select()))"
+                                                      :class="canEdit ? 'cursor-pointer hover:bg-blue-100' : ''"
+                                                      class="px-2 py-1 rounded text-sm text-gray-400"
+                                                      x-text="qty !== null ? qty : '-'"></span>
+                                                <button x-show="canEdit"
+                                                        @click="qty = {{ $unitsDelivered }}; editing = true; $nextTick(() => $refs.qtyInput?.focus())"
+                                                        class="text-gray-400 hover:text-blue-600 touch-manipulation p-1"
+                                                        title="Copy expected to delivered">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </template>
+                                        <template x-if="editing">
+                                            <form @submit.prevent="saving = true; window.deliveryMatchInstance.saveScannedQty('{{ $item->Barcode }}', qty || 0, (newQty) => { qty = newQty; originalQty = newQty; editing = false; saving = false; location.reload(); }).catch(() => saving = false)"
+                                                  class="flex items-center gap-1">
+                                                <input type="number" x-model="qty" x-ref="qtyInput" min="0" step="0.001"
+                                                       @keydown.escape="qty = originalQty; editing = false"
+                                                       class="w-20 text-center border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-blue-500 focus:border-blue-500">
+                                                <button type="submit" :disabled="saving" class="text-green-600 hover:text-green-800 disabled:opacity-50 p-1 touch-manipulation">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                                    </svg>
+                                                </button>
+                                                <button type="button" @click="qty = originalQty; editing = false" class="text-gray-400 hover:text-gray-600 p-1 touch-manipulation">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                    </svg>
+                                                </button>
+                                            </form>
+                                        </template>
+                                        <span class="ml-auto text-xs text-gray-500">&euro;{{ number_format($value, 2) }}</span>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                        {{-- Desktop Table --}}
+                        <div class="hidden md:block overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-2 py-2 w-12"></th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Barcode</th>
+                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Expected</th>
+                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase w-8"></th>
+                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Delivered</th>
+                                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Value</th>
+                                        <template x-if="showDetails">
+                                            <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">VAT</th>
+                                        </template>
+                                        <template x-if="showDetails">
+                                            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Cost</th>
+                                        </template>
+                                        <template x-if="showDetails">
+                                            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Sell</th>
+                                        </template>
+                                        <template x-if="showDetails">
+                                            <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Margin</th>
+                                        </template>
+                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Stock</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    @foreach($pendingItems as $item)
+                                        @php
+                                            $cost = $item->cost ?? 0;
+                                            $vat = ($item->RATE ?? 0) * 100;
+                                            $sell = ($item->PRICESELL ?? 0) * (1 + ($item->RATE ?? 0));
+                                            $profit = $isUdea ? (($item->PRICESELL ?? 0) - ($cost * 1.15)) : (($item->PRICESELL ?? 0) - $cost);
+                                            $margin = ($item->PRICESELL ?? 0) > 0 ? ($profit / $item->PRICESELL) * 100 : 0;
+                                            $caseUnits = $item->invoiceCaseUnits ?? 1;
+                                            $myOrder = $item->myOrder ?? 0;
+                                            $isWeightBased = fmod($myOrder, 1) != 0.0;
+                                            $unitsDelivered = $isWeightBased ? $myOrder : $caseUnits * $myOrder;
+                                            $value = $cost * $unitsDelivered;
+                                        @endphp
+                                        <tr class="hover:bg-gray-50"
+                                            x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')"
+                                            x-data="{ editing: false, qty: null, originalQty: null, saving: false, canEdit: {{ $isCompleted ? 'false' : 'true' }} }">
+                                            <td class="px-2 py-2">
+                                                @php
+                                                    $tempProduct = (object)[
+                                                        'barcode' => $item->Barcode,
+                                                        'supplier' => (object)['SupplierID' => $supplierId],
+                                                    ];
+                                                @endphp
+                                                <x-product-image
+                                                    :product="$tempProduct"
+                                                    :supplier-service="$supplierService"
+                                                    size="sm"
+                                                    :hover="true" />
+                                            </td>
+                                            <td class="px-3 py-2">
+                                                @if($item->productID)
+                                                    <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium">
+                                                        {{ $item->prodName }}
+                                                    </a>
+                                                @else
+                                                    <span class="font-medium text-gray-900">{{ $item->prodName }}</span>
+                                                @endif
+                                                <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                                <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
+                                            </td>
+                                            <td class="px-3 py-2 text-sm text-gray-600 font-mono">{{ $item->Barcode }}</td>
+                                            <td class="px-3 py-2 text-center font-medium">
+                                                @if($isWeightBased)
+                                                    {{ number_format($unitsDelivered, 3) }}
+                                                    <span class="text-xs text-purple-600 block">kg</span>
+                                                @else
+                                                    {{ $unitsDelivered }}
+                                                @endif
+                                            </td>
+                                            <td class="px-3 py-2 text-center">
+                                                <button x-show="canEdit"
+                                                        @click="qty = {{ $unitsDelivered }}; editing = true; $nextTick(() => $refs.qtyInput?.focus())"
+                                                        class="text-gray-400 hover:text-blue-600 transition-colors"
+                                                        title="Copy expected to delivered">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                                                    </svg>
+                                                </button>
+                                            </td>
+                                            <td class="px-3 py-2 text-center">
+                                                <template x-if="!editing">
+                                                    <span @click="canEdit && (editing = true, $nextTick(() => $refs.qtyInput?.select()))"
+                                                          :class="canEdit ? 'cursor-pointer hover:bg-blue-100' : ''"
+                                                          class="px-2 py-1 rounded inline-flex items-center gap-1 text-gray-400"
+                                                          :title="canEdit ? 'Click to enter delivered quantity' : ''">
+                                                        <span x-text="qty !== null ? qty : '-'"></span>
+                                                        <svg x-show="canEdit" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                                        </svg>
+                                                    </span>
+                                                </template>
+                                                <template x-if="editing">
+                                                    <form @submit.prevent="saving = true; window.deliveryMatchInstance.saveScannedQty('{{ $item->Barcode }}', qty || 0, (newQty) => { qty = newQty; originalQty = newQty; editing = false; saving = false; location.reload(); }).catch(() => saving = false)"
+                                                          class="flex items-center justify-center gap-1">
+                                                        <input type="number" x-model="qty" x-ref="qtyInput" min="0" step="0.001"
+                                                               @keydown.escape="qty = originalQty; editing = false"
+                                                               class="w-20 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-blue-500 focus:border-blue-500">
+                                                        <button type="submit" :disabled="saving" class="text-green-600 hover:text-green-800 disabled:opacity-50">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                                            </svg>
+                                                        </button>
+                                                        <button type="button" @click="qty = originalQty; editing = false" class="text-gray-400 hover:text-gray-600">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                            </svg>
+                                                        </button>
+                                                    </form>
+                                                </template>
+                                            </td>
+                                            <td class="px-3 py-2 text-right text-gray-500">&euro;{{ number_format($value, 2) }}</td>
+                                            <template x-if="showDetails">
+                                                <td class="px-3 py-2 text-center text-gray-500">{{ number_format($vat, 0) }}%</td>
+                                            </template>
+                                            <template x-if="showDetails">
+                                                <td class="px-3 py-2 text-right text-gray-500">&euro;{{ number_format($cost, 2) }}</td>
+                                            </template>
+                                            <template x-if="showDetails">
+                                                <td class="px-3 py-2 text-right text-gray-500">&euro;{{ number_format($sell, 2) }}</td>
+                                            </template>
+                                            <template x-if="showDetails">
+                                                <td class="px-3 py-2 text-center text-gray-500">{{ number_format($margin, 0) }}%</td>
+                                            </template>
+                                            <td class="px-3 py-2 text-center text-gray-500">{{ floatval($item->UNITS ?? 0) }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @else
+                        <p class="p-4 text-gray-500">All items have been scanned.</p>
+                    @endif
+                </div>
+            </div>
+
             <!-- Critical Issues Section -->
             <div class="mb-4" x-show="filter === 'all' || filter === 'problems'">
                 <button @click="sectionsOpen.critical = !sectionsOpen.critical"
@@ -557,7 +793,81 @@
                 </button>
                 <div x-show="sectionsOpen.critical" x-collapse class="bg-white border border-red-200 border-t-0 rounded-b-lg overflow-hidden">
                     @if($criticalItems->count() > 0)
-                        <div class="overflow-x-auto">
+                        {{-- Mobile Cards --}}
+                        <div class="md:hidden divide-y divide-gray-200">
+                            @foreach($criticalItems as $item)
+                                @php
+                                    $cost = $item->cost ?? 0;
+                                    $caseUnits = $item->invoiceCaseUnits ?? 1;
+                                    $myOrder = $item->myOrder ?? 0;
+                                    $unitsDelivered = (fmod($myOrder, 1) != 0.0) ? $myOrder : $caseUnits * $myOrder;
+                                    $diff = ($item->scanned ?? 0) - $unitsDelivered;
+                                    $impact = $diff * $cost;
+                                    $hasCaseUnitChange = $item->invoiceCaseUnits != $item->CaseUnits;
+                                @endphp
+                                <div class="p-3 border-l-4 border-red-400"
+                                     x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div class="min-w-0 flex-1">
+                                            @if($item->productID)
+                                                <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->prodName }}</a>
+                                            @else
+                                                <span class="font-medium text-gray-900 text-sm">{{ $item->prodName }}</span>
+                                            @endif
+                                            <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                            <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
+                                        </div>
+                                        <div class="text-right flex-shrink-0">
+                                            <span class="font-bold text-sm {{ $diff > 0 ? 'text-green-600' : 'text-red-600' }}">{{ $diff > 0 ? '+' : '' }}{{ $diff }}</span>
+                                            <span class="text-xs block {{ $impact > 0 ? 'text-green-600' : 'text-red-600' }}">{{ $impact > 0 ? '+' : '' }}&euro;{{ number_format($impact, 2) }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 flex items-center gap-3 text-sm">
+                                        <span class="text-gray-500">Exp: <span class="font-medium text-gray-900">{{ $unitsDelivered }}</span></span>
+                                        <span class="text-gray-400">|</span>
+                                        <div x-data="{ editing: false, qty: {{ $item->scanned ?? 0 }}, originalQty: {{ $item->scanned ?? 0 }}, saving: false, canEdit: {{ $isCompleted ? 'false' : 'true' }} }" class="flex items-center gap-1">
+                                            <span class="text-gray-500">Scan:</span>
+                                            <template x-if="!editing">
+                                                <span @click="canEdit && (editing = true, $nextTick(() => $refs.qtyInput?.select()))"
+                                                      :class="canEdit ? 'cursor-pointer hover:bg-blue-100' : ''"
+                                                      class="px-1 py-0.5 rounded font-medium text-blue-600"
+                                                      x-text="qty"></span>
+                                            </template>
+                                            <template x-if="editing">
+                                                <form @submit.prevent="saving = true; window.deliveryMatchInstance.saveScannedQty('{{ $item->Barcode }}', qty, (newQty) => { originalQty = newQty; editing = false; saving = false; }).catch(() => saving = false)"
+                                                      class="flex items-center gap-1">
+                                                    <input type="number" x-model="qty" x-ref="qtyInput" min="0" step="0.001"
+                                                           @keydown.escape="qty = originalQty; editing = false"
+                                                           class="w-16 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-blue-500 focus:border-blue-500">
+                                                    <button type="submit" :disabled="saving" class="text-green-600 hover:text-green-800 disabled:opacity-50 p-1 touch-manipulation">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                    </button>
+                                                    <button type="button" @click="qty = originalQty; editing = false" class="text-gray-400 hover:text-gray-600 p-1 touch-manipulation">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                    </button>
+                                                </form>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    @if($hasCaseUnitChange)
+                                        <div class="mt-1" x-data="{ editing: false, caseQty: {{ $item->CaseUnits ?? 1 }}, originalCaseQty: {{ $item->CaseUnits ?? 1 }}, saving: false, canEdit: {{ $isCompleted ? 'false' : 'true' }} }">
+                                            <button type="button"
+                                                    onclick="window.deliveryMatchInstance.saveCaseUnits('{{ $item->Barcode }}', {{ $item->invoiceCaseUnits ?? 1 }}, () => location.reload())"
+                                                    class="text-xs px-2 py-0.5 bg-orange-200 text-orange-800 rounded hover:bg-orange-300 touch-manipulation transition-colors"
+                                                    title="Click to update DB case units to {{ $item->invoiceCaseUnits ?? 1 }}">
+                                                Case: {{ $item->invoiceCaseUnits ?? 1 }} &rarr; {{ $item->CaseUnits ?? '?' }}
+                                            </button>
+                                        </div>
+                                    @endif
+                                    <div class="mt-2 flex items-center gap-2">
+                                        <button class="text-xs px-3 py-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200 touch-manipulation transition-colors">Verify</button>
+                                        <button class="text-xs px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 touch-manipulation transition-colors">Flag</button>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                        {{-- Desktop Table --}}
+                        <div class="hidden md:block overflow-x-auto">
                             <table class="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead class="bg-red-50">
                                     <tr>
@@ -759,7 +1069,88 @@
                 </button>
                 <div x-show="sectionsOpen.warnings" x-collapse class="bg-white border border-yellow-200 border-t-0 rounded-b-lg overflow-hidden">
                     @if($warningItems->count() > 0)
-                        <div class="overflow-x-auto">
+                        {{-- Mobile Cards --}}
+                        <div class="md:hidden divide-y divide-gray-200">
+                            @foreach($warningItems as $item)
+                                @php
+                                    $cost = $item->cost ?? 0;
+                                    $profit = $isUdea ? (($item->PRICESELL ?? 0) - ($cost * 1.15)) : (($item->PRICESELL ?? 0) - $cost);
+                                    $margin = ($item->PRICESELL ?? 0) > 0 ? ($profit / $item->PRICESELL) * 100 : 0;
+                                    $caseUnits = $item->invoiceCaseUnits ?? 1;
+                                    $myOrder = $item->myOrder ?? 0;
+                                    $unitsDelivered = (fmod($myOrder, 1) != 0.0) ? $myOrder : $caseUnits * $myOrder;
+                                    $hasMarginIssue = $profit < 0 || $margin < 15;
+                                    $hasCaseUnitChange = $item->invoiceCaseUnits != $item->CaseUnits;
+                                    $issues = [];
+                                    if ($hasMarginIssue) $issues[] = 'Low margin';
+                                @endphp
+                                <div class="p-3 border-l-4 border-yellow-400"
+                                     x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div class="min-w-0 flex-1">
+                                            @if($item->productID)
+                                                <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->prodName }}</a>
+                                            @else
+                                                <span class="font-medium text-gray-900 text-sm">{{ $item->prodName }}</span>
+                                            @endif
+                                            <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                            <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
+                                        </div>
+                                        <div class="text-right flex-shrink-0">
+                                            <span class="font-medium text-sm {{ $margin < 15 ? 'text-red-600' : 'text-gray-500' }}">{{ number_format($margin, 0) }}%</span>
+                                            <span class="text-xs text-gray-500 block">margin</span>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 flex items-center gap-3 text-sm">
+                                        <span class="text-gray-500">Exp: <span class="font-medium text-gray-900">{{ $unitsDelivered }}</span></span>
+                                        <span class="text-gray-400">|</span>
+                                        <div x-data="{ editing: false, qty: {{ $item->scanned !== null ? $item->scanned : 'null' }}, originalQty: {{ $item->scanned !== null ? $item->scanned : 'null' }}, saving: false, canEdit: {{ $isCompleted ? 'false' : 'true' }} }" class="flex items-center gap-1">
+                                            <span class="text-gray-500">Scan:</span>
+                                            <template x-if="!editing">
+                                                <span @click="canEdit && (editing = true, $nextTick(() => $refs.qtyInput?.select()))"
+                                                      :class="canEdit ? 'cursor-pointer hover:bg-blue-100' : ''"
+                                                      class="px-1 py-0.5 rounded font-medium"
+                                                      :class="qty !== null ? 'text-blue-600' : 'text-gray-400'"
+                                                      x-text="qty !== null ? qty : '-'"></span>
+                                            </template>
+                                            <template x-if="editing">
+                                                <form @submit.prevent="saving = true; window.deliveryMatchInstance.saveScannedQty('{{ $item->Barcode }}', qty || 0, (newQty) => { qty = newQty; originalQty = newQty; editing = false; saving = false; }).catch(() => saving = false)"
+                                                      class="flex items-center gap-1">
+                                                    <input type="number" x-model="qty" x-ref="qtyInput" min="0" step="0.001"
+                                                           @keydown.escape="qty = originalQty; editing = false"
+                                                           class="w-16 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-blue-500 focus:border-blue-500">
+                                                    <button type="submit" :disabled="saving" class="text-green-600 hover:text-green-800 disabled:opacity-50 p-1 touch-manipulation">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                    </button>
+                                                    <button type="button" @click="qty = originalQty; editing = false" class="text-gray-400 hover:text-gray-600 p-1 touch-manipulation">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                    </button>
+                                                </form>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <div class="mt-1 flex flex-wrap items-center gap-1">
+                                        @foreach($issues as $issue)
+                                            <span class="text-xs px-2 py-0.5 bg-yellow-200 text-yellow-800 rounded">{{ $issue }}</span>
+                                        @endforeach
+                                        @if($hasCaseUnitChange)
+                                            <button type="button"
+                                                    onclick="window.deliveryMatchInstance.saveCaseUnits('{{ $item->Barcode }}', {{ $item->invoiceCaseUnits ?? 1 }}, () => location.reload())"
+                                                    class="text-xs px-2 py-0.5 bg-orange-200 text-orange-800 rounded hover:bg-orange-300 touch-manipulation transition-colors"
+                                                    title="Click to update DB case units to {{ $item->invoiceCaseUnits ?? 1 }}">
+                                                Case: {{ $item->invoiceCaseUnits ?? 1 }} &rarr; {{ $item->CaseUnits ?? '?' }}
+                                            </button>
+                                        @endif
+                                    </div>
+                                    <div class="mt-2 flex items-center gap-2">
+                                        <button class="text-xs px-3 py-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200 touch-manipulation transition-colors">Verify</button>
+                                        <button class="text-xs px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 touch-manipulation transition-colors">Flag</button>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                        {{-- Desktop Table --}}
+                        <div class="hidden md:block overflow-x-auto">
                             <table class="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead class="bg-yellow-50">
                                     <tr>
@@ -962,7 +1353,41 @@
                 </button>
                 <div x-show="sectionsOpen.verified" x-collapse class="bg-white border border-green-200 border-t-0 rounded-b-lg overflow-hidden">
                     @if($verifiedItems->count() > 0)
-                        <div class="overflow-x-auto">
+                        {{-- Mobile Cards --}}
+                        <div class="md:hidden divide-y divide-gray-200">
+                            @foreach($verifiedItems as $item)
+                                @php
+                                    $cost = $item->cost ?? 0;
+                                    $caseUnits = $item->invoiceCaseUnits ?? 1;
+                                    $myOrder = $item->myOrder ?? 0;
+                                    $unitsDelivered = (fmod($myOrder, 1) != 0.0) ? $myOrder : $caseUnits * $myOrder;
+                                    $value = $cost * $unitsDelivered;
+                                @endphp
+                                <div class="p-3 border-l-4 border-green-400"
+                                     x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div class="min-w-0 flex-1">
+                                            @if($item->productID)
+                                                <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->prodName }}</a>
+                                            @else
+                                                <span class="font-medium text-gray-900 text-sm">{{ $item->prodName }}</span>
+                                            @endif
+                                            <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                            <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
+                                        </div>
+                                        <div class="text-right flex-shrink-0">
+                                            <div class="flex items-center gap-1 text-green-600">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                <span class="font-semibold text-sm">{{ $unitsDelivered }}</span>
+                                            </div>
+                                            <span class="text-xs text-gray-500">&euro;{{ number_format($value, 2) }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                        {{-- Desktop Table --}}
+                        <div class="hidden md:block overflow-x-auto">
                             <table class="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead class="bg-green-50">
                                     <tr>
@@ -1141,7 +1566,38 @@
                     </svg>
                 </button>
                 <div x-show="sectionsOpen.oos" x-collapse class="bg-white border border-orange-200 border-t-0 rounded-b-lg overflow-hidden">
-                    <div class="overflow-x-auto">
+                    {{-- Mobile Cards --}}
+                    <div class="md:hidden divide-y divide-gray-200">
+                        @foreach($oosItems as $item)
+                            @php
+                                $hasCaseUnitChange = $item->invoiceCaseUnits != $item->CaseUnits;
+                            @endphp
+                            <div class="p-3 border-l-4 border-orange-400"
+                                 x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div class="min-w-0 flex-1">
+                                        @if($item->productID)
+                                            <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->prodName }}</a>
+                                        @else
+                                            <span class="font-medium text-gray-900 text-sm">{{ $item->prodName }}</span>
+                                        @endif
+                                        <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                        <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
+                                    </div>
+                                    <div class="text-right flex-shrink-0">
+                                        <span class="text-xs text-gray-500">Stock: <span class="font-medium">{{ floatval($item->UNITS ?? 0) }}</span></span>
+                                    </div>
+                                </div>
+                                @if($hasCaseUnitChange)
+                                    <div class="mt-1">
+                                        <span class="text-xs text-orange-700">Case: {{ $item->invoiceCaseUnits ?? 1 }} (inv) vs {{ $item->CaseUnits ?? '-' }} (db)</span>
+                                    </div>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                    {{-- Desktop Table --}}
+                    <div class="hidden md:block overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200 text-sm">
                             <thead class="bg-orange-50">
                                 <tr>
@@ -1198,166 +1654,6 @@
             </div>
             @endif
 
-            <!-- Pending Section -->
-            <div class="mb-4" x-show="filter === 'all'">
-                <button @click="sectionsOpen.pending = !sectionsOpen.pending"
-                        class="w-full flex justify-between items-center p-3 sm:p-4 bg-gray-100 hover:bg-gray-200 rounded-t-lg transition-colors touch-manipulation"
-                        :class="sectionsOpen.pending ? 'rounded-t-lg' : 'rounded-lg'">
-                    <span class="font-medium text-gray-700 text-sm sm:text-base">
-                        <svg class="w-4 h-4 sm:w-5 sm:h-5 inline mr-1 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>
-                        Pending ({{ $pendingItems->count() }})
-                    </span>
-                    <svg :class="sectionsOpen.pending ? 'rotate-180' : ''" class="w-5 h-5 text-gray-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-                <div x-show="sectionsOpen.pending" x-collapse class="bg-white border border-gray-200 border-t-0 rounded-b-lg overflow-hidden">
-                    @if($pendingItems->count() > 0)
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200 text-sm">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-2 py-2 w-12"></th>
-                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Barcode</th>
-                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Expected</th>
-                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase w-8"></th>
-                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Delivered</th>
-                                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Value</th>
-                                        <template x-if="showDetails">
-                                            <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">VAT</th>
-                                        </template>
-                                        <template x-if="showDetails">
-                                            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Cost</th>
-                                        </template>
-                                        <template x-if="showDetails">
-                                            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Sell</th>
-                                        </template>
-                                        <template x-if="showDetails">
-                                            <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Margin</th>
-                                        </template>
-                                        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Stock</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
-                                    @foreach($pendingItems as $item)
-                                        @php
-                                            $cost = $item->cost ?? 0;
-                                            $vat = ($item->RATE ?? 0) * 100;
-                                            $sell = ($item->PRICESELL ?? 0) * (1 + ($item->RATE ?? 0));
-                                            $profit = $isUdea ? (($item->PRICESELL ?? 0) - ($cost * 1.15)) : (($item->PRICESELL ?? 0) - $cost);
-                                            $margin = ($item->PRICESELL ?? 0) > 0 ? ($profit / $item->PRICESELL) * 100 : 0;
-                                            $caseUnits = $item->invoiceCaseUnits ?? 1;
-                                            $myOrder = $item->myOrder ?? 0;
-                                            // If myOrder has decimal, it's weight-based - don't multiply by caseUnits and don't round
-                                            $isWeightBased = fmod($myOrder, 1) != 0.0;
-                                            $unitsDelivered = $isWeightBased ? $myOrder : $caseUnits * $myOrder;
-                                            $value = $cost * $unitsDelivered;
-                                        @endphp
-                                        <tr class="hover:bg-gray-50"
-                                            x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')"
-                                            x-data="{ editing: false, qty: null, originalQty: null, saving: false, canEdit: {{ $isCompleted ? 'false' : 'true' }} }">
-                                            <td class="px-2 py-2">
-                                                @php
-                                                    $tempProduct = (object)[
-                                                        'barcode' => $item->Barcode,
-                                                        'supplier' => (object)['SupplierID' => $supplierId],
-                                                    ];
-                                                @endphp
-                                                <x-product-image
-                                                    :product="$tempProduct"
-                                                    :supplier-service="$supplierService"
-                                                    size="sm"
-                                                    :hover="true" />
-                                            </td>
-                                            <td class="px-3 py-2">
-                                                @if($item->productID)
-                                                    <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium">
-                                                        {{ $item->prodName }}
-                                                    </a>
-                                                @else
-                                                    <span class="font-medium text-gray-900">{{ $item->prodName }}</span>
-                                                @endif
-                                                <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
-                                                <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
-                                            </td>
-                                            <td class="px-3 py-2 text-sm text-gray-600 font-mono">{{ $item->Barcode }}</td>
-                                            <td class="px-3 py-2 text-center font-medium">
-                                                @if($isWeightBased)
-                                                    {{ number_format($unitsDelivered, 3) }}
-                                                    <span class="text-xs text-purple-600 block">kg</span>
-                                                @else
-                                                    {{ $unitsDelivered }}
-                                                @endif
-                                            </td>
-                                            <td class="px-3 py-2 text-center">
-                                                <button x-show="canEdit"
-                                                        @click="qty = {{ $unitsDelivered }}; editing = true; $nextTick(() => $refs.qtyInput?.focus())"
-                                                        class="text-gray-400 hover:text-blue-600 transition-colors"
-                                                        title="Copy expected to delivered">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
-                                                    </svg>
-                                                </button>
-                                            </td>
-                                            <td class="px-3 py-2 text-center">
-                                                <template x-if="!editing">
-                                                    <span @click="canEdit && (editing = true, $nextTick(() => $refs.qtyInput?.select()))"
-                                                          :class="canEdit ? 'cursor-pointer hover:bg-blue-100' : ''"
-                                                          class="px-2 py-1 rounded inline-flex items-center gap-1 text-gray-400"
-                                                          :title="canEdit ? 'Click to enter delivered quantity' : ''">
-                                                        <span x-text="qty !== null ? qty : '-'"></span>
-                                                        <svg x-show="canEdit" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
-                                                        </svg>
-                                                    </span>
-                                                </template>
-                                                <template x-if="editing">
-                                                    <form @submit.prevent="saving = true; window.deliveryMatchInstance.saveScannedQty('{{ $item->Barcode }}', qty || 0, (newQty) => { qty = newQty; originalQty = newQty; editing = false; saving = false; location.reload(); }).catch(() => saving = false)"
-                                                          class="flex items-center justify-center gap-1">
-                                                        <input type="number" x-model="qty" x-ref="qtyInput" min="0" step="0.001"
-                                                               @keydown.escape="qty = originalQty; editing = false"
-                                                               class="w-20 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-blue-500 focus:border-blue-500">
-                                                        <button type="submit" :disabled="saving" class="text-green-600 hover:text-green-800 disabled:opacity-50">
-                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                                                            </svg>
-                                                        </button>
-                                                        <button type="button" @click="qty = originalQty; editing = false" class="text-gray-400 hover:text-gray-600">
-                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                                            </svg>
-                                                        </button>
-                                                    </form>
-                                                </template>
-                                            </td>
-                                            <td class="px-3 py-2 text-right text-gray-500">&euro;{{ number_format($value, 2) }}</td>
-                                            <template x-if="showDetails">
-                                                <td class="px-3 py-2 text-center text-gray-500">{{ number_format($vat, 0) }}%</td>
-                                            </template>
-                                            <template x-if="showDetails">
-                                                <td class="px-3 py-2 text-right text-gray-500">&euro;{{ number_format($cost, 2) }}</td>
-                                            </template>
-                                            <template x-if="showDetails">
-                                                <td class="px-3 py-2 text-right text-gray-500">&euro;{{ number_format($sell, 2) }}</td>
-                                            </template>
-                                            <template x-if="showDetails">
-                                                <td class="px-3 py-2 text-center text-gray-500">{{ number_format($margin, 0) }}%</td>
-                                            </template>
-                                            <td class="px-3 py-2 text-center text-gray-500">{{ floatval($item->UNITS ?? 0) }}</td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @else
-                        <p class="p-4 text-gray-500">All items have been scanned.</p>
-                    @endif
-                </div>
-            </div>
-
             <!-- Extra Items Section (Scanned but NOT on Invoice) -->
             <div class="mb-4" x-show="filter === 'all' || filter === 'problems'">
                 <button @click="sectionsOpen.extra = !sectionsOpen.extra"
@@ -1375,7 +1671,62 @@
                 </button>
                 <div x-show="sectionsOpen.extra" x-collapse class="bg-white border border-orange-200 border-t-0 rounded-b-lg overflow-hidden">
                     @if(count($scannedNotOnInvoice) > 0)
-                        <div class="overflow-x-auto">
+                        {{-- Mobile Cards --}}
+                        <div class="md:hidden divide-y divide-gray-200">
+                            @foreach($scannedNotOnInvoice as $item)
+                                <div class="p-3 border-l-4 border-orange-400"
+                                     x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div class="min-w-0 flex-1">
+                                            <span class="font-medium text-gray-900 text-sm">{{ $item->NAME ?? 'Unknown Product' }}</span>
+                                            @if($item->productID)
+                                                <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-xs text-indigo-600 hover:text-indigo-900 block">{{ $item->Barcode }}</a>
+                                            @else
+                                                <span class="text-xs text-gray-500 block">{{ $item->Barcode }}</span>
+                                            @endif
+                                            @if($item->SupplierCode)
+                                                <span class="text-xs text-gray-500 block">{{ $item->SupplierCode }}</span>
+                                            @endif
+                                            <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
+                                        </div>
+                                        <div class="text-right flex-shrink-0 text-xs text-gray-500">
+                                            <span>Case: {{ $item->CaseUnits ?? '-' }}</span>
+                                            <span class="block">Stock: {{ floatval($item->UNITS ?? 0) }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 flex items-center gap-3 text-sm"
+                                         x-data="{ editing: false, qty: {{ $item->scanned ?? 0 }}, originalQty: {{ $item->scanned ?? 0 }}, saving: false, canEdit: {{ $isCompleted ? 'false' : 'true' }} }">
+                                        <span class="text-gray-500">Scanned:</span>
+                                        <template x-if="!editing">
+                                            <span @click="canEdit && (editing = true, $nextTick(() => $refs.qtyInput?.select()))"
+                                                  :class="canEdit ? 'cursor-pointer hover:bg-orange-100' : ''"
+                                                  class="px-1 py-0.5 rounded font-medium text-orange-600"
+                                                  x-text="qty"></span>
+                                        </template>
+                                        <template x-if="editing">
+                                            <form @submit.prevent="saving = true; window.deliveryMatchInstance.saveScannedQty('{{ $item->Barcode }}', qty, (newQty) => { originalQty = newQty; editing = false; saving = false; }).catch(() => saving = false)"
+                                                  class="flex items-center gap-1">
+                                                <input type="number" x-model="qty" x-ref="qtyInput" min="0" step="0.001"
+                                                       @keydown.escape="qty = originalQty; editing = false"
+                                                       class="w-16 text-center border border-gray-300 rounded px-1 py-0.5 text-sm focus:ring-blue-500 focus:border-blue-500">
+                                                <button type="submit" :disabled="saving" class="text-green-600 hover:text-green-800 disabled:opacity-50 p-1 touch-manipulation">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                </button>
+                                                <button type="button" @click="qty = originalQty; editing = false" class="text-gray-400 hover:text-gray-600 p-1 touch-manipulation">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                </button>
+                                            </form>
+                                        </template>
+                                    </div>
+                                    <div class="mt-2 flex items-center gap-2">
+                                        <button class="text-xs px-3 py-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200 touch-manipulation transition-colors">Verify</button>
+                                        <button class="text-xs px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 touch-manipulation transition-colors">Flag</button>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                        {{-- Desktop Table --}}
+                        <div class="hidden md:block overflow-x-auto">
                             <table class="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead class="bg-orange-50">
                                     <tr>
@@ -1498,7 +1849,44 @@
                 </button>
                 <div x-show="sectionsOpen.missing" x-collapse class="bg-white border border-red-200 border-t-0 rounded-b-lg overflow-hidden">
                     @if(count($onInvoiceNotScanned) > 0)
-                        <div class="overflow-x-auto">
+                        {{-- Mobile Cards --}}
+                        <div class="md:hidden divide-y divide-gray-200">
+                            @foreach($onInvoiceNotScanned as $item)
+                                @php
+                                    $caseUnits = $item->caseUnits ?? 1;
+                                    $myOrder = $item->myOrder ?? 0;
+                                    $isWeightBased = fmod($myOrder, 1) != 0.0;
+                                    $totalUnits = $isWeightBased ? $myOrder : $caseUnits * $myOrder;
+                                    $value = ($item->cost ?? 0) * $totalUnits;
+                                @endphp
+                                <div class="p-3 border-l-4 border-red-400">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div class="min-w-0 flex-1">
+                                            <span class="font-medium text-gray-900 text-sm">{{ $item->prodName }}</span>
+                                            <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                        </div>
+                                        <div class="text-right flex-shrink-0">
+                                            <span class="font-medium text-red-600 text-sm">&euro;{{ number_format($value, 2) }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="mt-1 text-sm text-gray-600">
+                                        @if($isWeightBased)
+                                            {{ number_format($myOrder, 3) }} <span class="text-xs text-purple-600">kg</span>
+                                            = <span class="font-medium text-red-600">{{ number_format($totalUnits, 3) }} <span class="text-xs text-purple-600">kg</span></span>
+                                        @else
+                                            {{ $myOrder }} x {{ $caseUnits }}/case
+                                            = <span class="font-medium text-red-600">{{ $totalUnits }} units</span>
+                                        @endif
+                                    </div>
+                                    <div class="mt-2 flex items-center gap-2">
+                                        <button class="text-xs px-3 py-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200 touch-manipulation transition-colors">Verify</button>
+                                        <button class="text-xs px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 touch-manipulation transition-colors">Flag</button>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                        {{-- Desktop Table --}}
+                        <div class="hidden md:block overflow-x-auto">
                             <table class="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead class="bg-red-50">
                                     <tr>
