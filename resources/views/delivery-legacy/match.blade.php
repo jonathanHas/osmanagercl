@@ -432,6 +432,7 @@
                     <div class="h-3 flex">
                         <div class="bg-green-500 h-3 transition-all duration-300" :style="'width: ' + (financials.totalItems > 0 ? (financials.verifiedCount / financials.totalItems) * 100 : 0) + '%'"></div>
                         <div class="bg-red-500 h-3 transition-all duration-300" :style="'width: ' + (financials.totalItems > 0 ? (financials.mismatchCount / financials.totalItems) * 100 : 0) + '%'"></div>
+                        <div class="bg-orange-400 h-3 transition-all duration-300" :style="'width: ' + (financials.totalItems > 0 ? (financials.oosCount / financials.totalItems) * 100 : 0) + '%'"></div>
                     </div>
                 </div>
             </div>

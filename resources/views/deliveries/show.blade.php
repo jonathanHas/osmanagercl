@@ -1,8 +1,8 @@
 <x-admin-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
             <div>
-                <div class="flex items-center space-x-3 mb-2">
+                <div class="flex items-center space-x-2 mb-1 sm:space-x-3 sm:mb-2">
                     @php
                         $supplierName = $delivery->supplier->Supplier ?? 'Unknown Supplier';
                         $supplierBadgeClass = match(strtolower($supplierName)) {
@@ -12,15 +12,15 @@
                             default => 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                         };
                     @endphp
-                    <span class="{{ $supplierBadgeClass }} inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold">
+                    <span class="{{ $supplierBadgeClass }} inline-flex items-center px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs sm:text-sm font-semibold">
                         {{ $supplierName }}
                     </span>
-                    <span class="px-2 py-1 text-xs font-medium rounded-full {{ $delivery->status_badge_class }}">
+                    <span class="px-2 py-0.5 sm:py-1 text-xs font-medium rounded-full {{ $delivery->status_badge_class }}">
                         {{ ucfirst($delivery->status) }}
                     </span>
                 </div>
-                <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Delivery {{ $delivery->delivery_number }}</h2>
-                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                <h2 class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Delivery {{ $delivery->delivery_number }}</h2>
+                <p class="hidden sm:block text-sm text-gray-600 dark:text-gray-400 mt-1">
                     Delivered on {{ $delivery->delivery_date->format('l, d/m/Y') }}
                 </p>
             </div>
@@ -122,7 +122,46 @@
                 }
             @endphp
             
-            <x-action-buttons :actions="$deliveryActions" spacing="loose" size="lg" />
+            {{-- Desktop action buttons --}}
+            <div class="hidden sm:block">
+                <x-action-buttons :actions="$deliveryActions" spacing="loose" size="lg" />
+            </div>
+            {{-- Mobile compact actions --}}
+            <div class="flex flex-wrap gap-2 sm:hidden" x-data="{ moreOpen: false }">
+                <a href="{{ route('deliveries.index') }}" class="px-2 py-1 bg-gray-600 text-white text-xs font-medium rounded">Back</a>
+                @if($delivery->status === 'draft')
+                    <a href="{{ route('deliveries.scan', $delivery) }}" class="px-2 py-1 bg-green-600 text-white text-xs font-medium rounded">Start Scanning</a>
+                @elseif($delivery->status === 'receiving')
+                    <a href="{{ route('deliveries.scan', $delivery) }}" class="px-2 py-1 bg-blue-600 text-white text-xs font-medium rounded">Continue</a>
+                    <a href="{{ route('deliveries.summary', $delivery) }}" class="px-2 py-1 bg-purple-600 text-white text-xs font-medium rounded">Summary</a>
+                @elseif($delivery->status === 'completed')
+                    <a href="{{ route('deliveries.summary', $delivery) }}" class="px-2 py-1 bg-indigo-600 text-white text-xs font-medium rounded">Report</a>
+                @endif
+                <div class="relative">
+                    <button @click="moreOpen = !moreOpen" class="px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs font-medium rounded">More...</button>
+                    <div x-show="moreOpen" @click.away="moreOpen = false" x-transition class="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 shadow-lg rounded-md py-1 z-50">
+                        @if(!in_array($delivery->status, ['completed', 'cancelled']))
+                            <form method="POST" action="{{ route('deliveries.toggle-order-stock', $delivery) }}" class="block">
+                                @csrf
+                                <button type="submit" class="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 dark:hover:bg-gray-700">
+                                    {{ $delivery->include_in_order_stock ? 'Included in Orders ✓' : 'Include in Orders' }}
+                                </button>
+                            </form>
+                        @endif
+                        <form method="POST" action="{{ route('deliveries.sync-legacy', $delivery) }}" class="block" onsubmit="return confirm('This will replace all data in the legacy delivery table. Continue?')">
+                            @csrf
+                            <button type="submit" class="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 dark:hover:bg-gray-700">Sync to Legacy</button>
+                        </form>
+                        @if(in_array($delivery->status, ['draft', 'cancelled']))
+                            <form method="POST" action="{{ route('deliveries.destroy', $delivery) }}" class="block" onsubmit="return confirm('Are you sure you want to delete this delivery?')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">Delete Delivery</button>
+                            </form>
+                        @endif
+                    </div>
+                </div>
+            </div>
         </div>
     </x-slot>
 
@@ -655,58 +694,58 @@
             @endif
 
             <!-- Delivery Overview -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 mb-4 sm:mb-8">
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 sm:p-6">
                     <div class="flex items-center">
-                        <div class="p-2 bg-blue-100 rounded-lg">
+                        <div class="hidden sm:block p-2 bg-blue-100 rounded-lg">
                             <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                             </svg>
                         </div>
-                        <div class="ml-4">
-                            <p class="text-sm text-gray-600 dark:text-gray-400">Total Items</p>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ $delivery->items->count() }}</p>
+                        <div class="sm:ml-4">
+                            <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Total Items</p>
+                            <p class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{{ $delivery->items->count() }}</p>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 sm:p-6">
                     <div class="flex items-center">
-                        <div class="p-2 bg-green-100 rounded-lg">
+                        <div class="hidden sm:block p-2 bg-green-100 rounded-lg">
                             <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
                         </div>
-                        <div class="ml-4">
-                            <p class="text-sm text-gray-600 dark:text-gray-400">Progress</p>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ number_format($delivery->completion_percentage, 0) }}%</p>
+                        <div class="sm:ml-4">
+                            <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Progress</p>
+                            <p class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-gray-100">{{ number_format($delivery->completion_percentage, 0) }}%</p>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 sm:p-6">
                     <div class="flex items-center">
-                        <div class="p-2 bg-yellow-100 rounded-lg">
+                        <div class="hidden sm:block p-2 bg-yellow-100 rounded-lg">
                             <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/>
                             </svg>
                         </div>
-                        <div class="ml-4">
-                            <p class="text-sm text-gray-600 dark:text-gray-400">Expected Value</p>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">€{{ number_format($delivery->total_expected ?? 0, 2) }}</p>
+                        <div class="sm:ml-4">
+                            <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Expected Value</p>
+                            <p class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-gray-100">€{{ number_format($delivery->total_expected ?? 0, 2) }}</p>
                         </div>
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 sm:p-6">
                     <div class="flex items-center">
-                        <div class="p-2 bg-purple-100 rounded-lg">
+                        <div class="hidden sm:block p-2 bg-purple-100 rounded-lg">
                             <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                             </svg>
                         </div>
-                        <div class="ml-4">
-                            <p class="text-sm text-gray-600 dark:text-gray-400">Status</p>
+                        <div class="sm:ml-4">
+                            <p class="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Status</p>
                             <p class="text-sm font-medium">
                                 <span class="px-2 py-1 rounded-full {{ $delivery->status_badge_class }}">
                                     {{ ucfirst($delivery->status) }}
@@ -718,10 +757,10 @@
             </div>
 
             <!-- Progress Bar with Price Legend -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
-                <div class="flex items-center justify-between mb-3">
-                    <div class="flex items-center gap-4">
-                        <h3 class="text-base font-medium text-gray-900 dark:text-gray-100">Progress</h3>
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-3 sm:p-4 mb-3 sm:mb-6">
+                <div class="flex items-center justify-between mb-2 sm:mb-3">
+                    <div class="flex items-center gap-2 sm:gap-4 flex-1">
+                        <h3 class="text-sm sm:text-base font-medium text-gray-900 dark:text-gray-100">Progress</h3>
                         <div class="flex-1 max-w-md">
                             <div class="w-full bg-gray-200 rounded-full h-2">
                                 <div class="bg-green-600 h-2 rounded-full transition-all duration-300" 
@@ -735,7 +774,7 @@
                     </div>
                 </div>
                 
-                <div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 pt-2 border-t border-gray-200 dark:border-gray-700">
+                <div class="hidden sm:flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 pt-2 border-t border-gray-200 dark:border-gray-700">
                     <div class="flex items-center gap-4">
                         <div class="flex items-center gap-2">
                             <span class="font-medium">Price Changes:</span>
@@ -758,33 +797,33 @@
 
             <!-- Items Table -->
             <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <div class="flex justify-between items-center">
-                        <div class="flex items-center gap-4">
-                            <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Delivery Items</h3>
-                            
+                <div class="px-3 py-2 sm:px-6 sm:py-4 border-b border-gray-200 dark:border-gray-700">
+                    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                        <div class="flex flex-wrap items-center gap-2 sm:gap-4">
+                            <h3 class="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100">Delivery Items</h3>
+
                             @if($delivery->status !== 'completed')
                                 <!-- Auto Update Costs Button -->
                                 <button onclick="autoUpdateCosts()" id="autoUpdateBtn"
-                                        class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors duration-200 flex items-center gap-2">
+                                        class="hidden sm:flex px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors duration-200 items-center gap-2">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                                     </svg>
                                     Auto Update Costs
                                 </button>
-                                
+
                                 <!-- Create New Product Button -->
-                                <button onclick="alert('New product creation is available in the scanning interface. Use the \'Continue Scanning\' button above.')" 
-                                        class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-md transition-colors duration-200 flex items-center gap-2">
+                                <button onclick="alert('New product creation is available in the scanning interface. Use the \'Continue Scanning\' button above.')"
+                                        class="hidden sm:flex px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-md transition-colors duration-200 items-center gap-2">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                                     </svg>
                                     New Product
                                 </button>
                             @endif
-                            
+
                             <!-- Sort Dropdown -->
-                            <div class="flex items-center gap-2">
+                            <div class="hidden sm:flex items-center gap-2">
                                 <span class="text-sm text-gray-600 dark:text-gray-400">Sort by:</span>
                                 <select id="sortSelect" onchange="sortDeliveryItems()"
                                         class="text-sm border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md">
@@ -798,13 +837,13 @@
                             </div>
 
                             <!-- Supplier OOS Filter -->
-                            <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
+                            <label class="flex items-center gap-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
                                 <input type="checkbox" id="hideOosFilter" onchange="toggleOosFilter()"
                                        class="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500">
-                                Hide Supplier OOS
+                                Hide OOS
                             </label>
                         </div>
-                        <div class="flex gap-2">
+                        <div class="hidden sm:flex gap-2">
                             <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded">
                                 {{ $delivery->items->where('status', 'pending')->count() }} Pending
                             </span>
@@ -835,7 +874,150 @@
                     </div>
                 </div>
                 
-                <div class="relative overflow-x-auto max-h-[calc(100vh-24rem)] overflow-y-auto">
+                {{-- Mobile Card View --}}
+                <div class="md:hidden max-h-[calc(100vh-14rem)] overflow-y-auto divide-y divide-gray-200 dark:divide-gray-700">
+                    @foreach($delivery->items as $item)
+                        @php
+                            $notOnDelivery = $item->ordered_quantity == 0;
+                            $supplierOos = $item->ordered_quantity > 0 && $item->invoice_delivered_quantity == 0;
+                            $partialDelivery = $item->ordered_quantity > 0 && $item->invoice_delivered_quantity > 0 && $item->invoice_delivered_quantity < $item->ordered_quantity;
+                            $itemSupplierCode = $item->supplier_code ?? $item->product?->supplierLink?->SupplierCode;
+
+                            if ($supplierOos) {
+                                $borderColor = 'border-red-400';
+                                $cardBg = 'bg-red-50 dark:bg-red-900/20';
+                            } elseif ($partialDelivery) {
+                                $borderColor = 'border-orange-400';
+                                $cardBg = 'bg-orange-50 dark:bg-orange-900/20';
+                            } elseif ($item->is_new_product) {
+                                $borderColor = 'border-green-400';
+                                $cardBg = 'bg-green-50 dark:bg-green-900/20';
+                            } elseif ($notOnDelivery) {
+                                $borderColor = 'border-amber-400';
+                                $cardBg = 'bg-amber-50 dark:bg-amber-900/20';
+                            } else {
+                                $borderColor = 'border-gray-300';
+                                $cardBg = '';
+                            }
+
+                            // Margin calculation
+                            $currentCost = $item->product ? $item->product->PRICEBUY : null;
+                            $currentSellMobile = $item->product ? $item->product->getGrossPrice() : null;
+                            $marginMobile = null;
+                            $marginPercentMobile = null;
+                            if ($item->product && $item->unit_cost > 0 && $currentSellMobile > 0) {
+                                $taxRateMobile = 0;
+                                if ($item->product->taxCategory && $item->product->taxCategory->primaryTax) {
+                                    $taxRateMobile = $item->product->taxCategory->primaryTax->RATE;
+                                }
+                                $vatExSell = $currentSellMobile / (1 + $taxRateMobile);
+                                $marginMobile = $vatExSell - $item->unit_cost;
+                                $marginPercentMobile = ($marginMobile / $vatExSell) * 100;
+                            }
+                        @endphp
+                        <div class="p-3 border-l-4 {{ $borderColor }} {{ $cardBg }}" data-item-id="{{ $item->id }}" data-supplier-oos="{{ $supplierOos ? 'true' : 'false' }}">
+                            <div class="flex items-start gap-2">
+                                {{-- Image --}}
+                                <div class="flex-shrink-0">
+                                    @if($item->product)
+                                        <x-product-image :product="$item->product" :supplier-service="$supplierService" size="md" :hover="true" />
+                                    @elseif($item->is_new_product && ($item->barcode || $item->supplier_code))
+                                        @php
+                                            $tempProduct = (object)[
+                                                'NAME' => $item->description,
+                                                'supplier' => (object)['SupplierID' => $delivery->supplier_id],
+                                                'barcode' => $item->barcode,
+                                                'supplier_code' => $item->supplier_code
+                                            ];
+                                        @endphp
+                                        <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="md" :hover="true" />
+                                    @else
+                                        <x-product-image :product="null" size="md" :fallback="true" />
+                                    @endif
+                                </div>
+
+                                {{-- Product Info --}}
+                                <div class="min-w-0 flex-1">
+                                    <div class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                        @if($item->product)
+                                            <a href="{{ route('products.show', $item->product->ID) }}" class="text-blue-600 dark:text-blue-400 hover:underline">{{ $item->description }}</a>
+                                        @else
+                                            {{ $item->description }}
+                                        @endif
+                                    </div>
+                                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                                        {{ $item->supplier_code }}
+                                        @if($item->is_new_product)
+                                            <span class="ml-1 px-1.5 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800 rounded">New</span>
+                                        @endif
+                                    </div>
+                                    @if($supplierOos)
+                                        <span class="text-xs text-red-600 dark:text-red-400 font-medium">Supplier OOS</span>
+                                    @elseif($partialDelivery)
+                                        <span class="text-xs text-orange-600 dark:text-orange-400 font-medium">Partial Delivery</span>
+                                    @endif
+                                </div>
+
+                                {{-- Status badge --}}
+                                <div class="flex-shrink-0">
+                                    <span class="px-1.5 py-0.5 text-xs font-medium rounded-full {{ $item->status_badge_class }}">{{ ucfirst($item->status) }}</span>
+                                </div>
+                            </div>
+
+                            {{-- Quantities & Cost row --}}
+                            <div class="mt-2 flex items-center gap-3 text-xs">
+                                <div>
+                                    <span class="text-gray-500 dark:text-gray-400">Inv:</span>
+                                    <span class="font-medium text-gray-900 dark:text-gray-100">{{ $item->invoice_delivered_quantity }}</span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-500 dark:text-gray-400">Rcv:</span>
+                                    <span class="font-medium text-gray-900 dark:text-gray-100">{{ $item->received_quantity }}</span>
+                                    @if($item->received_quantity != $item->invoice_delivered_quantity)
+                                        <span class="text-gray-500">({{ $item->received_quantity > $item->invoice_delivered_quantity ? '+' : '' }}{{ $item->received_quantity - $item->invoice_delivered_quantity }})</span>
+                                    @endif
+                                </div>
+                                <div>
+                                    <span class="text-gray-500 dark:text-gray-400">Cost:</span>
+                                    <span class="font-medium text-gray-900 dark:text-gray-100">€{{ number_format($item->unit_cost, 2) }}</span>
+                                </div>
+                                @if($marginMobile !== null)
+                                    <div class="ml-auto">
+                                        <span class="text-gray-500 dark:text-gray-400">Margin:</span>
+                                        <span class="font-medium {{ $marginMobile <= 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100' }}">{{ number_format($marginPercentMobile, 1) }}%</span>
+                                    </div>
+                                @endif
+                            </div>
+
+                            {{-- Actions row for new products --}}
+                            @if($item->is_new_product && $delivery->status !== 'completed')
+                                <div class="mt-2 flex items-center gap-2">
+                                    @if(!$item->barcode)
+                                        <button type="button"
+                                                onclick="openBarcodeScannerForItem({{ $item->id }}, {{ $delivery->id }})"
+                                                id="mobile-scan-btn-{{ $item->id }}"
+                                                class="inline-flex items-center px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors touch-manipulation">
+                                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9V5a2 2 0 012-2h4M15 3h4a2 2 0 012 2v4M21 15v4a2 2 0 01-2 2h-4M9 21H5a2 2 0 01-2-2v-4"/>
+                                            </svg>
+                                            Scan Barcode
+                                        </button>
+                                    @endif
+                                    <a href="{{ route('products.create', ['delivery_item' => $item->id]) }}"
+                                       class="inline-flex items-center px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors touch-manipulation">
+                                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                        </svg>
+                                        Add to POS
+                                    </a>
+                                </div>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+
+                {{-- Desktop Table --}}
+                <div class="hidden md:block relative overflow-x-auto max-h-[calc(100vh-24rem)] overflow-y-auto">
                     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 delivery-items-table">
                         <thead class="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                             <tr>

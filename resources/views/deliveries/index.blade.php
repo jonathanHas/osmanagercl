@@ -1,21 +1,21 @@
 <x-admin-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Deliveries</h2>
-            <div class="flex items-center space-x-4">
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+            <h2 class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Deliveries</h2>
+            <div class="flex items-center space-x-2 sm:space-x-4">
                 <a href="{{ route('barrel-codes.index') }}"
-                   class="inline-flex items-center px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-md transition-colors duration-200">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   class="inline-flex items-center px-2 py-1.5 sm:px-4 sm:py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-md transition-colors duration-200">
+                    <svg class="w-4 h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                     </svg>
-                    Barrel Codes
+                    <span class="hidden sm:inline">Barrel Codes</span>
                 </a>
                 <a href="{{ route('deliveries.create') }}"
-                   class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md transition-colors duration-200">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   class="inline-flex items-center px-2 py-1.5 sm:px-4 sm:py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-md transition-colors duration-200">
+                    <svg class="w-4 h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
-                    New Delivery
+                    <span class="hidden sm:inline">New Delivery</span>
                 </a>
             </div>
         </div>
@@ -29,7 +29,7 @@
             <!-- Search Form -->
             <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg overflow-hidden mb-6">
                 <div class="px-6 py-4">
-                    <form method="GET" action="{{ route('deliveries.index') }}" class="flex items-center space-x-4">
+                    <form method="GET" action="{{ route('deliveries.index') }}" class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-0 sm:space-x-4">
                         <div class="flex-1">
                             <label for="search" class="sr-only">Search deliveries</label>
                             <div class="relative">
@@ -94,28 +94,28 @@
                         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                             <thead class="bg-gray-50 dark:bg-gray-700">
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    <th class="px-2 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-normal sm:tracking-wider">
                                         Delivery #
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    <th class="px-2 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-normal sm:tracking-wider">
                                         Supplier
                                     </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    <th class="hidden md:table-cell px-2 py-2 sm:px-6 sm:py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-normal sm:tracking-wider">
                                         Date
                                     </th>
-                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    <th class="px-2 py-2 sm:px-6 sm:py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-normal sm:tracking-wider">
                                         Items
                                     </th>
-                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    <th class="hidden md:table-cell px-2 py-2 sm:px-6 sm:py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-normal sm:tracking-wider">
                                         Progress
                                     </th>
-                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    <th class="px-2 py-2 sm:px-6 sm:py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-normal sm:tracking-wider">
                                         Status
                                     </th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    <th class="hidden md:table-cell px-2 py-2 sm:px-6 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-normal sm:tracking-wider">
                                         Value
                                     </th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    <th class="px-2 py-2 sm:px-6 sm:py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-normal sm:tracking-wider">
                                         Actions
                                     </th>
                                 </tr>
@@ -123,15 +123,15 @@
                             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                 @foreach($deliveries as $delivery)
                                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                        <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm font-bold text-indigo-600 dark:text-indigo-400">
+                                        <td class="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
+                                            <div class="text-xs sm:text-sm font-bold text-indigo-600 dark:text-indigo-400">
                                                 {{ $delivery->delivery_number }}
                                             </div>
                                             <div class="text-xs text-gray-500 dark:text-gray-400">
                                                 {{ $delivery->created_at->format('H:i') }}
                                             </div>
                                         </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
+                                        <td class="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap">
                                             <div class="flex items-center">
                                                 <div class="flex-shrink-0">
                                                     @php
@@ -149,13 +149,13 @@
                                                 </div>
                                             </div>
                                         </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                                        <td class="hidden md:table-cell px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                                             {{ $delivery->delivery_date->format('d/m/Y') }}
                                         </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-900 dark:text-gray-100">
+                                        <td class="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-center text-xs sm:text-sm text-gray-900 dark:text-gray-100">
                                             {{ $delivery->items->count() }}
                                         </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-center">
+                                        <td class="hidden md:table-cell px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-center">
                                             <div class="flex items-center justify-center">
                                                 <div class="w-16 bg-gray-200 rounded-full h-2 mr-2">
                                                     <div class="bg-green-600 h-2 rounded-full" 
@@ -166,12 +166,12 @@
                                                 </span>
                                             </div>
                                         </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-center">
-                                            <span class="px-2 py-1 text-xs font-medium rounded-full {{ $delivery->status_badge_class }}">
+                                        <td class="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-center">
+                                            <span class="px-1.5 py-0.5 sm:px-2 sm:py-1 text-xs font-medium rounded-full {{ $delivery->status_badge_class }}">
                                                 {{ ucfirst($delivery->status) }}
                                             </span>
                                         </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
+                                        <td class="hidden md:table-cell px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-right text-sm">
                                             <div class="text-gray-900 dark:text-gray-100">
                                                 €{{ number_format($delivery->total_expected ?? 0, 2) }}
                                             </div>
@@ -181,7 +181,7 @@
                                                 </div>
                                             @endif
                                         </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <td class="px-2 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-right text-xs sm:text-sm font-medium">
                                             @php
                                                 $actions = [
                                                     ['type' => 'link', 'route' => 'deliveries.show', 'params' => $delivery, 'label' => 'View', 'color' => 'primary']
