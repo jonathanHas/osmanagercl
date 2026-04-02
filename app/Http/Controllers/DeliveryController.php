@@ -706,10 +706,15 @@ class DeliveryController extends Controller
                         // Existing product with supplier integration
                         $imageUrl = $this->supplierService->getExternalImageUrl($item->product);
                         $hasIntegration = true;
-                    } elseif ($item->barcode && $item->is_new_product && $this->supplierService->hasExternalIntegration($item->delivery->supplier_id)) {
-                        // New product with barcode and supplier integration
-                        $imageUrl = $this->supplierService->getExternalImageUrlByBarcode($item->delivery->supplier_id, $item->barcode);
-                        $hasIntegration = true;
+                    } elseif ($item->is_new_product && $this->supplierService->hasExternalIntegration($item->delivery->supplier_id)) {
+                        // New product - try supplier code first (Independent), fall back to barcode (Udea)
+                        if ($item->supplier_code) {
+                            $imageUrl = $this->supplierService->getExternalImageUrlBySupplierCode($item->delivery->supplier_id, $item->supplier_code);
+                        }
+                        if (! $imageUrl && $item->barcode) {
+                            $imageUrl = $this->supplierService->getExternalImageUrlByBarcode($item->delivery->supplier_id, $item->barcode);
+                        }
+                        $hasIntegration = (bool) $imageUrl;
                     }
 
                     // Check if barcode already exists in products database
