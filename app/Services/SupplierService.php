@@ -226,8 +226,33 @@ class SupplierService
                 return $cached->not_found ? null : $cached->image_url;
             }
 
-            // Build URL from template, replacing either placeholder
-            $imageUrl = str_replace(['{SUPPLIER_CODE}', '{CODE}'], $code, $config['image_url']);
+            if (str_contains($config['image_url'], '{SUPPLIER_CODE}')) {
+                // Supplier uses supplier code directly in image URLs (e.g., Independent)
+                $imageUrl = str_replace('{SUPPLIER_CODE}', $code, $config['image_url']);
+            } else {
+                // Supplier uses barcode in image URLs (e.g., Udea) — look up barcode from supplier_link
+                $barcode = \Illuminate\Support\Facades\DB::connection('pos')
+                    ->table('supplier_link')
+                    ->where('SupplierID', $supplierId)
+                    ->where('SupplierCode', $supplierCode)
+                    ->value('Barcode');
+
+                // If not found under exact supplier ID, try all IDs for this supplier group
+                if (! $barcode) {
+                    $allIds = $config['supplier_ids'] ?? [];
+                    $barcode = \Illuminate\Support\Facades\DB::connection('pos')
+                        ->table('supplier_link')
+                        ->whereIn('SupplierID', $allIds)
+                        ->where('SupplierCode', $supplierCode)
+                        ->value('Barcode');
+                }
+
+                if (! $barcode) {
+                    return null;
+                }
+
+                return $this->getExternalImageUrlByBarcode($supplierId, $barcode);
+            }
 
             if (! $this->isValidImageUrl($imageUrl)) {
                 return null;
@@ -452,6 +477,16 @@ class SupplierService
         }
 
         return null;
+    }
+
+    /**
+     * Check if a supplier uses {SUPPLIER_CODE} in its image URL template (vs {CODE}/barcode).
+     */
+    public function usesSupplierCodeImages(int $supplierId): bool
+    {
+        $config = $this->getSupplierConfig($supplierId);
+
+        return $config && ! empty($config['image_url']) && str_contains($config['image_url'], '{SUPPLIER_CODE}');
     }
 
     /**

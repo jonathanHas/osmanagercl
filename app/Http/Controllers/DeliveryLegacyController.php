@@ -119,9 +119,10 @@ class DeliveryLegacyController extends Controller
             $syncedDelivery = Delivery::with(['documents', 'supplier'])->find($syncedDeliveryId);
         }
 
-        // Determine which supplier codes need image resolution
+        // Determine which supplier codes need image resolution (only for {SUPPLIER_CODE} suppliers like Independent)
         $unresolvedCodes = collect();
-        if ($this->supplierService->hasExternalIntegration((int) $supplierId)) {
+        if ($this->supplierService->hasExternalIntegration((int) $supplierId)
+            && $this->supplierService->usesSupplierCodeImages((int) $supplierId)) {
             $allCodes = collect($matchedItems)->pluck('supCode')
                 ->merge(collect($scannedNotOnInvoice)->pluck('SupplierCode'))
                 ->merge(collect($onInvoiceNotScanned)->pluck('supCode'))

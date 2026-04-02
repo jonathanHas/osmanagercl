@@ -740,9 +740,10 @@ class DeliveryController extends Controller
             ]);
         }
 
-        // Determine which items need image resolution (supplier has integration, supplier code exists, not yet cached)
+        // Determine which items need image resolution (only for suppliers using {SUPPLIER_CODE} templates, e.g., Independent)
         $unresolvedItems = collect();
-        if ($this->supplierService->hasExternalIntegration($delivery->supplier_id)) {
+        if ($this->supplierService->hasExternalIntegration($delivery->supplier_id)
+            && $this->supplierService->usesSupplierCodeImages($delivery->supplier_id)) {
             $allSupplierCodes = $delivery->items
                 ->map(fn ($item) => $item->supplier_code ?? $item->product?->supplierLink?->SupplierCode)
                 ->filter()
