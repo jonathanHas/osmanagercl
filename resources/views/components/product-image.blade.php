@@ -49,12 +49,16 @@
                 $imageUrl = $supplierService->getExternalImageUrl($product);
             }
         }
-        // Handle temporary product objects (for new products with barcodes)
-        elseif (isset($product->barcode) && isset($product->supplier->SupplierID)) {
-            if (method_exists($supplierService, 'getExternalImageUrlByBarcode') &&
+        // Handle temporary product objects (for new products / legacy deliveries)
+        elseif (isset($product->supplier->SupplierID) &&
                 method_exists($supplierService, 'hasExternalIntegration') &&
                 $supplierService->hasExternalIntegration($product->supplier->SupplierID)) {
-                $imageUrl = $supplierService->getExternalImageUrlByBarcode($product->supplier->SupplierID, $product->barcode);
+            $sid = $product->supplier->SupplierID;
+            if (!empty($product->supplier_code) && method_exists($supplierService, 'getExternalImageUrlBySupplierCode')) {
+                $imageUrl = $supplierService->getExternalImageUrlBySupplierCode($sid, $product->supplier_code);
+            }
+            if (!$imageUrl && !empty($product->barcode) && method_exists($supplierService, 'getExternalImageUrlByBarcode')) {
+                $imageUrl = $supplierService->getExternalImageUrlByBarcode($sid, $product->barcode);
             }
         }
     }

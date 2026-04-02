@@ -932,31 +932,43 @@
                                 @endphp
                                 <tr class="{{ $rowClass }}" data-item-id="{{ $item->id }}" data-supplier-oos="{{ $supplierOos ? 'true' : 'false' }}">
                                     <td class="px-6 py-4 text-center">
-                                        <div id="image-cell-{{ $item->id }}" class="mx-auto">
+                                        @php
+                                            $itemSupplierCode = $item->supplier_code ?? $item->product?->supplierLink?->SupplierCode;
+                                            $needsResolve = $unresolvedItems->contains('id', $item->id);
+                                        @endphp
+                                        <div id="image-cell-{{ $item->id }}" class="mx-auto"
+                                            @if($needsResolve && $itemSupplierCode)
+                                                data-needs-resolve="true"
+                                                data-supplier-code="{{ $itemSupplierCode }}"
+                                                data-description="{{ $item->description }}"
+                                                data-barcode="{{ $item->barcode }}"
+                                            @endif
+                                        >
                                             @if($item->product)
-                                                <x-product-image 
-                                                    :product="$item->product" 
-                                                    :supplier-service="$supplierService" 
-                                                    size="md" 
+                                                <x-product-image
+                                                    :product="$item->product"
+                                                    :supplier-service="$supplierService"
+                                                    size="md"
                                                     :hover="true" />
-                                            @elseif($item->barcode && $item->is_new_product)
+                                            @elseif($item->is_new_product && ($item->barcode || $item->supplier_code))
                                                 @php
                                                     // For new products, create a temporary product-like object
                                                     $tempProduct = (object)[
                                                         'NAME' => $item->description,
                                                         'supplier' => (object)['SupplierID' => $delivery->supplier_id],
-                                                        'barcode' => $item->barcode
+                                                        'barcode' => $item->barcode,
+                                                        'supplier_code' => $item->supplier_code
                                                     ];
                                                 @endphp
-                                                <x-product-image 
-                                                    :product="$tempProduct" 
-                                                    :supplier-service="$supplierService" 
-                                                    size="md" 
+                                                <x-product-image
+                                                    :product="$tempProduct"
+                                                    :supplier-service="$supplierService"
+                                                    size="md"
                                                     :hover="true" />
                                             @else
-                                                <x-product-image 
-                                                    :product="null" 
-                                                    size="md" 
+                                                <x-product-image
+                                                    :product="null"
+                                                    size="md"
                                                     :fallback="true" />
                                             @endif
                                         </div>
@@ -2219,9 +2231,92 @@
             }
         }
 
+        // Lazy-resolve supplier images in background batches
+        function startImageResolution() {
+            const cells = document.querySelectorAll('[data-needs-resolve="true"]');
+            if (cells.length === 0) return;
+
+            // Group by supplier code (multiple items can share the same code)
+            const codeMap = {};
+            cells.forEach(cell => {
+                const code = cell.dataset.supplierCode;
+                const itemId = cell.id.replace('image-cell-', '');
+                if (!codeMap[code]) {
+                    codeMap[code] = { itemIds: [], description: cell.dataset.description, barcode: cell.dataset.barcode };
+                }
+                codeMap[code].itemIds.push(itemId);
+            });
+
+            const allCodes = Object.keys(codeMap);
+            const batchSize = 5;
+            let resolved = 0;
+
+            // Show subtle progress indicator
+            const indicator = document.createElement('div');
+            indicator.id = 'image-resolve-indicator';
+            indicator.className = 'fixed bottom-4 right-4 z-50 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg shadow-lg flex items-center gap-2';
+            indicator.innerHTML = `
+                <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                <span id="resolve-progress">Resolving images: 0/${allCodes.length}</span>
+            `;
+            document.body.appendChild(indicator);
+
+            async function processBatch(startIndex) {
+                const batch = allCodes.slice(startIndex, startIndex + batchSize);
+                if (batch.length === 0) {
+                    // All done
+                    indicator.className = 'fixed bottom-4 right-4 z-50 px-3 py-2 bg-green-600 text-white text-sm rounded-lg shadow-lg';
+                    indicator.innerHTML = `Images resolved: ${resolved} found`;
+                    setTimeout(() => indicator.remove(), 3000);
+                    return;
+                }
+
+                try {
+                    const response = await fetch('{{ route("deliveries.resolve-images-batch", $delivery) }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({ supplier_codes: batch })
+                    });
+
+                    const data = await response.json();
+
+                    for (const [code, result] of Object.entries(data.results)) {
+                        if (result.image_url) {
+                            resolved++;
+                            // Update all items with this supplier code
+                            const info = codeMap[code];
+                            info.itemIds.forEach(itemId => {
+                                updateImageCell(itemId, result.image_url, info.description, info.barcode || '');
+                            });
+                        }
+                    }
+                } catch (err) {
+                    console.warn('Image resolution batch failed:', err);
+                }
+
+                // Update progress
+                const processed = Math.min(startIndex + batchSize, allCodes.length);
+                document.getElementById('resolve-progress').textContent = `Resolving images: ${processed}/${allCodes.length}`;
+
+                // Process next batch with a small delay to be nice to IIH
+                setTimeout(() => processBatch(startIndex + batchSize), 500);
+            }
+
+            // Start after a short delay so the page renders first
+            setTimeout(() => processBatch(0), 1000);
+        }
+
         // Start auto-refresh when page loads
         document.addEventListener('DOMContentLoaded', function() {
             startBarcodeAutoRefresh();
+            startImageResolution();
             // Initial sort
             sortDeliveryItems();
             

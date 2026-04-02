@@ -119,6 +119,22 @@ class DeliveryLegacyController extends Controller
             $syncedDelivery = Delivery::with(['documents', 'supplier'])->find($syncedDeliveryId);
         }
 
+        // Determine which supplier codes need image resolution
+        $unresolvedCodes = collect();
+        if ($this->supplierService->hasExternalIntegration((int) $supplierId)) {
+            $allCodes = collect($matchedItems)->pluck('supCode')
+                ->merge(collect($scannedNotOnInvoice)->pluck('SupplierCode'))
+                ->merge(collect($onInvoiceNotScanned)->pluck('supCode'))
+                ->filter()
+                ->unique();
+
+            $cachedCodes = \App\Models\SupplierImageCache::where('supplier_id', (int) $supplierId)
+                ->whereIn('supplier_code', $allCodes)
+                ->pluck('supplier_code');
+
+            $unresolvedCodes = $allCodes->diff($cachedCodes)->values();
+        }
+
         return view('delivery-legacy.match', compact(
             'matchedItems',
             'scannedNotOnInvoice',
@@ -130,7 +146,8 @@ class DeliveryLegacyController extends Controller
             'financials',
             'stockPreview',
             'isCompleted',
-            'syncedDelivery'
+            'syncedDelivery',
+            'unresolvedCodes'
         ))->with('supplierService', $this->supplierService);
     }
 
@@ -734,5 +751,27 @@ class DeliveryLegacyController extends Controller
         return redirect()
             ->route('delivery-legacy.match', ['delID' => $sessionId, 'supplierID' => $supplierId])
             ->with('success', 'New scan session created for '.($supplier->Supplier ?? 'supplier').'.');
+    }
+
+    /**
+     * Resolve and cache images for a batch of supplier codes.
+     */
+    public function resolveImagesBatch(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $request->validate([
+            'supplier_codes' => 'required|array|max:10',
+            'supplier_codes.*' => 'string|max:50',
+            'supplier_id' => 'required|integer',
+        ]);
+
+        $supplierId = (int) $request->supplier_id;
+        $results = [];
+
+        foreach ($request->supplier_codes as $code) {
+            $imageUrl = $this->supplierService->resolveAndCacheImageUrl($code, $supplierId);
+            $results[$code] = ['image_url' => $imageUrl];
+        }
+
+        return response()->json(['results' => $results]);
     }
 }

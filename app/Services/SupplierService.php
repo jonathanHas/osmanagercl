@@ -199,6 +199,49 @@ class SupplierService
     }
 
     /**
+     * Get the external image URL using supplier ID and supplier code directly.
+     * Used for items that have a supplier code but no product record (e.g., legacy deliveries, new products).
+     */
+    public function getExternalImageUrlBySupplierCode(int $supplierId, ?string $supplierCode): ?string
+    {
+        try {
+            if (! $supplierCode) {
+                return null;
+            }
+
+            $config = $this->getSupplierConfig($supplierId);
+
+            if (! $config || ! $config['enabled'] || empty($config['image_url'])) {
+                return null;
+            }
+
+            $code = preg_replace('/[^a-zA-Z0-9_-]/', '', $supplierCode);
+
+            // Check cache first
+            $cached = SupplierImageCache::where('supplier_code', $supplierCode)
+                ->where('supplier_id', $supplierId)
+                ->first();
+
+            if ($cached) {
+                return $cached->not_found ? null : $cached->image_url;
+            }
+
+            // Build URL from template, replacing either placeholder
+            $imageUrl = str_replace(['{SUPPLIER_CODE}', '{CODE}'], $code, $config['image_url']);
+
+            if (! $this->isValidImageUrl($imageUrl)) {
+                return null;
+            }
+
+            return $imageUrl;
+        } catch (\Exception $e) {
+            \Log::error('Error generating external image URL by supplier code: '.$e->getMessage());
+
+            return null;
+        }
+    }
+
+    /**
      * Get the supplier website link for a product.
      */
     public function getSupplierWebsiteLink(Product $product): ?string

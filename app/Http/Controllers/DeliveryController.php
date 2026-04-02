@@ -9,6 +9,7 @@ use App\Models\LabelLog;
 use App\Models\LegacyDelivery;
 use App\Models\Product;
 use App\Models\Supplier;
+use App\Models\SupplierImageCache;
 use App\Services\DeliveryParsingService;
 use App\Services\DeliveryService;
 use App\Services\SupplierService;
@@ -734,7 +735,36 @@ class DeliveryController extends Controller
             ]);
         }
 
-        return view('deliveries.show', compact('delivery', 'summary'))->with('supplierService', $this->supplierService);
+        // Determine which items need image resolution (supplier has integration, supplier code exists, not yet cached)
+        $unresolvedItems = collect();
+        if ($this->supplierService->hasExternalIntegration($delivery->supplier_id)) {
+            $allSupplierCodes = $delivery->items
+                ->map(fn ($item) => $item->supplier_code ?? $item->product?->supplierLink?->SupplierCode)
+                ->filter()
+                ->unique();
+
+            $cachedCodes = SupplierImageCache::where('supplier_id', (int) $delivery->supplier_id)
+                ->whereIn('supplier_code', $allSupplierCodes)
+                ->pluck('supplier_code');
+
+            $uncachedCodes = $allSupplierCodes->diff($cachedCodes);
+
+            // Map uncached codes to item IDs for the JS
+            $unresolvedItems = $delivery->items
+                ->filter(function ($item) use ($uncachedCodes) {
+                    $code = $item->supplier_code ?? $item->product?->supplierLink?->SupplierCode;
+
+                    return $code && $uncachedCodes->contains($code);
+                })
+                ->map(fn ($item) => [
+                    'id' => $item->id,
+                    'supplier_code' => $item->supplier_code ?? $item->product?->supplierLink?->SupplierCode,
+                    'description' => $item->description,
+                ]);
+        }
+
+        return view('deliveries.show', compact('delivery', 'summary', 'unresolvedItems'))
+            ->with('supplierService', $this->supplierService);
     }
 
     /**
@@ -1746,5 +1776,36 @@ class DeliveryController extends Controller
             'not_found' => collect($results)->where('status', 'not_found')->count(),
             'results' => $results,
         ]);
+    }
+
+    /**
+     * Resolve and cache images for a batch of supplier codes (called via AJAX from show page)
+     */
+    public function resolveImagesBatch(Delivery $delivery, Request $request): JsonResponse
+    {
+        $request->validate([
+            'supplier_codes' => 'required|array|max:10',
+            'supplier_codes.*' => 'string|max:50',
+        ]);
+
+        $supplierId = (int) $delivery->supplier_id;
+        $results = [];
+
+        foreach ($request->supplier_codes as $code) {
+            $imageUrl = $this->supplierService->resolveAndCacheImageUrl($code, $supplierId);
+
+            // Find matching delivery items by supplier_code
+            $itemIds = $delivery->items()
+                ->where('supplier_code', $code)
+                ->pluck('id')
+                ->toArray();
+
+            $results[$code] = [
+                'image_url' => $imageUrl,
+                'item_ids' => $itemIds,
+            ];
+        }
+
+        return response()->json(['results' => $results]);
     }
 }

@@ -478,6 +478,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/delivery-items/{item}/refresh-barcode', [DeliveryController::class, 'refreshBarcode'])->name('delivery-items.refresh-barcode');
     Route::get('/deliveries/{delivery}/debug-images', [DeliveryController::class, 'debugImages'])->name('deliveries.debug-images');
     Route::post('/deliveries/{delivery}/resolve-images', [DeliveryController::class, 'resolveImages'])->name('deliveries.resolve-images');
+    Route::post('/deliveries/{delivery}/resolve-images-batch', [DeliveryController::class, 'resolveImagesBatch'])->name('deliveries.resolve-images-batch');
 
     // Delivery Documents
     Route::get('/deliveries/{delivery}/documents', [DeliveryDocumentController::class, 'index'])->name('deliveries.documents.index');
@@ -506,6 +507,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/complete', [DeliveryLegacyController::class, 'completeDelivery'])->name('complete');
         Route::post('/merge-sessions', [DeliveryLegacyController::class, 'mergeSessions'])->name('merge-sessions');
         Route::patch('/change-supplier', [DeliveryLegacyController::class, 'changeSupplier'])->name('change-supplier');
+        Route::post('/resolve-images-batch', [DeliveryLegacyController::class, 'resolveImagesBatch'])->name('resolve-images-batch');
     });
 
     // Order Management mockup routes (for UI testing)

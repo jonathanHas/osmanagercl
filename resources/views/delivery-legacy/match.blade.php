@@ -573,7 +573,7 @@
                                      x-data="{ editing: false, qty: null, originalQty: null, saving: false, canEdit: {{ $isCompleted ? 'false' : 'true' }} }">
                                     <div class="flex items-start justify-between gap-2">
                                         @php
-                                            $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
+                                            $tempProduct = (object)['barcode' => $item->Barcode, 'supplier_code' => $item->supCode ?? ($item->SupplierCode ?? null), 'supplier' => (object)['SupplierID' => $supplierId]];
                                         @endphp
                                         <div class="flex-shrink-0">
                                             <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="lg" :hover="true" />
@@ -677,6 +677,7 @@
                                                 @php
                                                     $tempProduct = (object)[
                                                         'barcode' => $item->Barcode,
+                                                        'supplier_code' => $item->supCode ?? ($item->SupplierCode ?? null),
                                                         'supplier' => (object)['SupplierID' => $supplierId],
                                                     ];
                                                 @endphp
@@ -805,7 +806,7 @@
                                      x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
                                     <div class="flex items-start justify-between gap-2">
                                         @php
-                                            $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
+                                            $tempProduct = (object)['barcode' => $item->Barcode, 'supplier_code' => $item->supCode ?? ($item->SupplierCode ?? null), 'supplier' => (object)['SupplierID' => $supplierId]];
                                         @endphp
                                         <div class="flex-shrink-0">
                                             <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="lg" :hover="true" />
@@ -922,6 +923,7 @@
                                                 @php
                                                     $tempProduct = (object)[
                                                         'barcode' => $item->Barcode,
+                                                        'supplier_code' => $item->supCode ?? ($item->SupplierCode ?? null),
                                                         'supplier' => (object)['SupplierID' => $supplierId],
                                                     ];
                                                 @endphp
@@ -1091,7 +1093,7 @@
                                      x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
                                     <div class="flex items-start justify-between gap-2">
                                         @php
-                                            $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
+                                            $tempProduct = (object)['barcode' => $item->Barcode, 'supplier_code' => $item->supCode ?? ($item->SupplierCode ?? null), 'supplier' => (object)['SupplierID' => $supplierId]];
                                         @endphp
                                         <div class="flex-shrink-0">
                                             <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="lg" :hover="true" />
@@ -1212,6 +1214,7 @@
                                                 @php
                                                     $tempProduct = (object)[
                                                         'barcode' => $item->Barcode,
+                                                        'supplier_code' => $item->supCode ?? ($item->SupplierCode ?? null),
                                                         'supplier' => (object)['SupplierID' => $supplierId],
                                                     ];
                                                 @endphp
@@ -1377,7 +1380,7 @@
                                      x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
                                     <div class="flex items-start justify-between gap-2">
                                         @php
-                                            $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
+                                            $tempProduct = (object)['barcode' => $item->Barcode, 'supplier_code' => $item->supCode ?? ($item->SupplierCode ?? null), 'supplier' => (object)['SupplierID' => $supplierId]];
                                         @endphp
                                         <div class="flex-shrink-0">
                                             <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="lg" :hover="true" />
@@ -1451,6 +1454,7 @@
                                                 @php
                                                     $tempProduct = (object)[
                                                         'barcode' => $item->Barcode,
+                                                        'supplier_code' => $item->supCode ?? ($item->SupplierCode ?? null),
                                                         'supplier' => (object)['SupplierID' => $supplierId],
                                                     ];
                                                 @endphp
@@ -1592,7 +1596,7 @@
                                  x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
                                 <div class="flex items-start justify-between gap-2">
                                     @php
-                                        $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
+                                        $tempProduct = (object)['barcode' => $item->Barcode, 'supplier_code' => $item->supCode ?? ($item->SupplierCode ?? null), 'supplier' => (object)['SupplierID' => $supplierId]];
                                     @endphp
                                     <div class="flex-shrink-0">
                                         <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="lg" :hover="true" />
@@ -1640,6 +1644,7 @@
                                             @php
                                                 $tempProduct = (object)[
                                                     'barcode' => $item->Barcode,
+                                                    'supplier_code' => $item->supCode ?? ($item->SupplierCode ?? null),
                                                     'supplier' => (object)['SupplierID' => $supplierId],
                                                 ];
                                             @endphp
@@ -1700,7 +1705,7 @@
                                      x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
                                     <div class="flex items-start justify-between gap-2">
                                         @php
-                                            $tempProduct = (object)['barcode' => $item->Barcode, 'supplier' => (object)['SupplierID' => $supplierId]];
+                                            $tempProduct = (object)['barcode' => $item->Barcode, 'supplier_code' => $item->supCode ?? ($item->SupplierCode ?? null), 'supplier' => (object)['SupplierID' => $supplierId]];
                                         @endphp
                                         <div class="flex-shrink-0">
                                             <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="lg" :hover="true" />
@@ -1776,6 +1781,7 @@
                                                 @php
                                                     $tempProduct = (object)[
                                                         'barcode' => $item->Barcode,
+                                                        'supplier_code' => $item->supCode ?? ($item->SupplierCode ?? null),
                                                         'supplier' => (object)['SupplierID' => $supplierId],
                                                     ];
                                                 @endphp
@@ -2311,6 +2317,87 @@
             };
         }
     </script>
+
+    {{-- Lazy-resolve supplier images in background --}}
+    @if($unresolvedCodes->isNotEmpty())
+    <script>
+        (function() {
+            const unresolvedCodes = @js($unresolvedCodes);
+            const supplierId = {{ (int) $supplierId }};
+            const batchSize = 5;
+            let resolved = 0;
+
+            const indicator = document.createElement('div');
+            indicator.className = 'fixed bottom-4 right-4 z-50 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg shadow-lg flex items-center gap-2';
+            indicator.innerHTML = `
+                <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                <span id="legacy-resolve-progress">Resolving images: 0/${unresolvedCodes.length}</span>
+            `;
+            document.body.appendChild(indicator);
+
+            async function processBatch(startIndex) {
+                const batch = unresolvedCodes.slice(startIndex, startIndex + batchSize);
+                if (batch.length === 0) {
+                    indicator.className = 'fixed bottom-4 right-4 z-50 px-3 py-2 bg-green-600 text-white text-sm rounded-lg shadow-lg';
+                    indicator.innerHTML = `Images resolved: ${resolved} found`;
+                    setTimeout(() => indicator.remove(), 3000);
+                    return;
+                }
+
+                try {
+                    const response = await fetch('{{ route("delivery-legacy.resolve-images-batch") }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({ supplier_codes: batch, supplier_id: supplierId })
+                    });
+
+                    const data = await response.json();
+
+                    for (const [code, result] of Object.entries(data.results)) {
+                        if (result.image_url) {
+                            resolved++;
+                            // Find all <img> tags whose src contains this supplier code and update them
+                            document.querySelectorAll(`img[src*="/${code}_"]`).forEach(img => {
+                                img.src = result.image_url;
+                                // Also update the hover preview image if present
+                                const hoverImg = img.closest('[x-data]')?.querySelector('img:not([src*="' + result.image_url + '"])');
+                                if (hoverImg && hoverImg !== img) {
+                                    hoverImg.src = result.image_url;
+                                }
+                            });
+                            // Also update fallback icons where the image failed to load (hidden img)
+                            document.querySelectorAll(`img[src*="${code}"]`).forEach(img => {
+                                if (img.style.display === 'none') {
+                                    img.src = result.image_url;
+                                    img.style.display = '';
+                                    // Hide the fallback icon
+                                    const fallback = img.parentElement?.querySelector('.fallback-icon');
+                                    if (fallback) fallback.style.display = 'none';
+                                }
+                            });
+                        }
+                    }
+                } catch (err) {
+                    console.warn('Image resolution batch failed:', err);
+                }
+
+                const processed = Math.min(startIndex + batchSize, unresolvedCodes.length);
+                document.getElementById('legacy-resolve-progress').textContent = `Resolving images: ${processed}/${unresolvedCodes.length}`;
+
+                setTimeout(() => processBatch(startIndex + batchSize), 500);
+            }
+
+            setTimeout(() => processBatch(0), 1000);
+        })();
+    </script>
+    @endif
 
     @push('scripts')
         @vite(['resources/js/barcode-scanner.js'])
