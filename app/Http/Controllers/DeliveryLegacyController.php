@@ -435,12 +435,14 @@ class DeliveryLegacyController extends Controller
             'barcode' => 'required|string',
             'quantity' => 'nullable|numeric|min:0',
             'supplierID' => 'required|string',
+            'outerCodeLookup' => 'nullable|string',
         ]);
 
         $delID = $validated['delID'];
         $scannedBarcode = $validated['barcode'];
         $increment = $validated['quantity'] ?? 1;
         $supplierID = $validated['supplierID'];
+        $outerCodeLookup = $validated['outerCodeLookup'] ?? null;
 
         // Resolve barcode: check if this is an outer/case barcode
         $scanType = 'unit';
@@ -466,9 +468,12 @@ class DeliveryLegacyController extends Controller
         );
 
         // If not found by unit barcode, try as an outer/case barcode
+        // Check both the scanned barcode and the GTIN-14 (from GS1 parsing) against OuterCode
         if (! $product) {
+            $outerCodes = array_unique(array_filter([$scannedBarcode, $outerCodeLookup]));
+            $placeholders = implode(',', array_fill(0, count($outerCodes), '?'));
             $outerMatch = DB::connection('pos')->selectOne(
-                'SELECT
+                "SELECT
                     supplier_link.Barcode as unitBarcode,
                     supplier_link.CaseUnits,
                     supplier_link.SupplierCode as supplierCode,
@@ -480,8 +485,8 @@ class DeliveryLegacyController extends Controller
                 JOIN PRODUCTS ON supplier_link.Barcode = PRODUCTS.CODE
                 LEFT JOIN CATEGORIES ON PRODUCTS.CATEGORY = CATEGORIES.ID
                 LEFT JOIN STOCKCURRENT ON PRODUCTS.ID = STOCKCURRENT.PRODUCT
-                WHERE supplier_link.OuterCode = ? AND supplier_link.SupplierID = ?',
-                [$scannedBarcode, $supplierID]
+                WHERE supplier_link.OuterCode IN ({$placeholders}) AND supplier_link.SupplierID = ?",
+                [...$outerCodes, $supplierID]
             );
 
             if ($outerMatch) {
