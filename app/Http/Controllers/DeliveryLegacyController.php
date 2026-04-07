@@ -587,6 +587,62 @@ class DeliveryLegacyController extends Controller
     }
 
     /**
+     * Save an outer barcode to a supplier link record.
+     */
+    public function saveOuterBarcode(Request $request)
+    {
+        $validated = $request->validate([
+            'unitBarcode' => 'required|string',
+            'supplierID' => 'required|string',
+            'outerCode' => 'required|string',
+        ]);
+
+        // Verify the unit barcode exists for this supplier
+        $link = DB::connection('pos')->table('supplier_link')
+            ->where('Barcode', $validated['unitBarcode'])
+            ->where('SupplierID', $validated['supplierID'])
+            ->first();
+
+        if (! $link) {
+            return response()->json(['success' => false, 'message' => 'Product not found for this supplier.'], 404);
+        }
+
+        // Check the outer code isn't already assigned to another product for this supplier
+        $existing = DB::connection('pos')->table('supplier_link')
+            ->where('OuterCode', $validated['outerCode'])
+            ->where('SupplierID', $validated['supplierID'])
+            ->where('Barcode', '!=', $validated['unitBarcode'])
+            ->first();
+
+        if ($existing) {
+            $productName = DB::connection('pos')->table('PRODUCTS')
+                ->where('CODE', $existing->Barcode)
+                ->value('NAME');
+
+            return response()->json([
+                'success' => false,
+                'message' => "This outer barcode is already assigned to: {$productName} ({$existing->Barcode})",
+            ], 409);
+        }
+
+        DB::connection('pos')->table('supplier_link')
+            ->where('Barcode', $validated['unitBarcode'])
+            ->where('SupplierID', $validated['supplierID'])
+            ->update(['OuterCode' => $validated['outerCode']]);
+
+        // Get the product name for confirmation
+        $productName = DB::connection('pos')->table('PRODUCTS')
+            ->where('CODE', $validated['unitBarcode'])
+            ->value('NAME');
+
+        return response()->json([
+            'success' => true,
+            'productName' => $productName,
+            'unitBarcode' => $validated['unitBarcode'],
+        ]);
+    }
+
+    /**
      * Complete the delivery by updating stock levels and marking as completed.
      */
     public function completeDelivery(Request $request)

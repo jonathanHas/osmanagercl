@@ -504,6 +504,7 @@ Route::middleware('auth')->group(function () {
         Route::patch('/scan-item', [DeliveryLegacyController::class, 'updateScannedQuantity'])->name('update-quantity');
         Route::post('/scan-increment', [DeliveryLegacyController::class, 'incrementScanQuantity'])->name('scan-increment');
         Route::patch('/update-case-units', [DeliveryLegacyController::class, 'updateCaseUnits'])->name('update-case-units');
+        Route::post('/save-outer-barcode', [DeliveryLegacyController::class, 'saveOuterBarcode'])->name('save-outer-barcode');
         Route::post('/complete', [DeliveryLegacyController::class, 'completeDelivery'])->name('complete');
         Route::post('/merge-sessions', [DeliveryLegacyController::class, 'mergeSessions'])->name('merge-sessions');
         Route::patch('/change-supplier', [DeliveryLegacyController::class, 'changeSupplier'])->name('change-supplier');

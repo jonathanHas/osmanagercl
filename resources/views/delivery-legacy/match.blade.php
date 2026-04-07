@@ -215,6 +215,55 @@
                         </button>
                     </div>
 
+                    {{-- Assign outer barcode step --}}
+                    <div x-show="scanner.step === 'assign-outer'" class="mb-4">
+                        <div class="bg-purple-900/30 border-2 border-purple-500 rounded-lg p-4 mb-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <h4 class="text-purple-300 font-semibold">Assign Outer Barcode</h4>
+                                <button @click="cancelOuterAssign()" class="text-gray-400 hover:text-white p-1 touch-manipulation" title="Cancel">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <p class="text-gray-300 text-sm mb-1">Outer barcode: <span class="text-white font-mono font-bold" x-text="scanner.outerBarcodeToAssign"></span></p>
+                            <p class="text-gray-400 text-sm mb-3">Scan the <span class="text-white font-semibold">unit barcode</span> on the product to link it.</p>
+
+                            {{-- Camera area for scanning unit barcode --}}
+                            <div x-show="scanner.cameraVisible" class="mb-3">
+                                <div id="outer-assign-scanner" class="w-full rounded-lg overflow-hidden" style="min-height: 200px;"></div>
+                            </div>
+                            <div x-show="!scanner.cameraVisible" class="text-center py-6 bg-gray-800/50 rounded-lg mb-3">
+                                <svg class="w-12 h-12 text-gray-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
+                                </svg>
+                                <p class="text-gray-400 text-sm">Opening camera...</p>
+                            </div>
+
+                            {{-- Manual barcode input fallback --}}
+                            <div class="flex gap-2">
+                                <input type="text"
+                                       x-ref="outerAssignInput"
+                                       x-model="scanner.outerAssignBarcode"
+                                       @keydown.enter.prevent="submitOuterAssign()"
+                                       placeholder="Or type unit barcode..."
+                                       inputmode="numeric"
+                                       class="flex-1 px-3 py-2 rounded-lg border border-gray-600 bg-gray-800 text-white text-sm placeholder-gray-500 focus:border-purple-500 focus:ring-0">
+                                <button @click="submitOuterAssign()"
+                                        :disabled="!scanner.outerAssignBarcode || scanner.processing"
+                                        class="px-4 py-2 rounded-lg text-white font-semibold text-sm touch-manipulation transition-colors"
+                                        :class="scanner.processing ? 'bg-gray-600 cursor-wait' : 'bg-purple-600 hover:bg-purple-700'">
+                                    Link
+                                </button>
+                            </div>
+
+                            {{-- Status messages --}}
+                            <template x-if="scanner.outerAssignStatus">
+                                <p class="mt-2 text-sm" :class="scanner.outerAssignError ? 'text-red-400' : 'text-green-400'" x-text="scanner.outerAssignStatus"></p>
+                            </template>
+                        </div>
+                    </div>
+
                     {{-- Last submitted result (shown after submit, above history) --}}
                     <div x-show="scanner.lastResult && scanner.step === 'scan'" class="mb-4">
                         <div class="rounded-lg border-2 p-4"
@@ -226,7 +275,15 @@
                                  'border-red-600 bg-red-900/40': scanner.lastResult?.error
                              }">
                             <template x-if="scanner.lastResult?.error">
-                                <p class="text-red-400 text-sm" x-text="scanner.lastResult.error"></p>
+                                <div>
+                                    <p class="text-red-400 text-sm" x-text="scanner.lastResult.error"></p>
+                                    <template x-if="scanner.lastResult?.unknownBarcode">
+                                        <button @click="startOuterAssign(scanner.lastResult.unknownBarcode)"
+                                                class="mt-2 text-purple-400 hover:text-purple-300 text-sm underline underline-offset-2">
+                                            Assign as outer barcode &rarr;
+                                        </button>
+                                    </template>
+                                </div>
                             </template>
                             <template x-if="!scanner.lastResult?.error">
                                 <div>
@@ -2086,6 +2143,10 @@
                     scanType: 'unit',    // 'unit' or 'case' (outer barcode)
                     caseUnits: 1,        // units per case for outer barcode scans
                     cameraWasActive: false, // track if camera was used for auto-restart
+                    outerBarcodeToAssign: null, // outer barcode being assigned
+                    outerAssignBarcode: '',     // unit barcode scanned/typed during assign
+                    outerAssignStatus: '',
+                    outerAssignError: false,
                 },
                 scannerDirty: false,
                 init() {
@@ -2125,6 +2186,119 @@
                         this.$nextTick(() => {
                             this.toggleScannerCamera();
                         });
+                    }
+                },
+                startOuterAssign(outerBarcode) {
+                    this.stopScannerCamera();
+                    this.scanner.step = 'assign-outer';
+                    this.scanner.outerBarcodeToAssign = outerBarcode;
+                    this.scanner.outerAssignBarcode = '';
+                    this.scanner.outerAssignStatus = '';
+                    this.scanner.outerAssignError = false;
+                    this.scanner.lastResult = null;
+                    // Auto-open camera for scanning the unit barcode
+                    this.$nextTick(() => {
+                        this.startOuterAssignCamera();
+                    });
+                },
+                cancelOuterAssign() {
+                    this.stopOuterAssignCamera();
+                    this.scanner.step = 'scan';
+                    this.scanner.outerBarcodeToAssign = null;
+                    this.scanner.outerAssignBarcode = '';
+                    this.scanner.outerAssignStatus = '';
+                    this.scanner.outerAssignError = false;
+                    this.restartCameraIfActive();
+                },
+                startOuterAssignCamera() {
+                    if (!window.BarcodeScanner) {
+                        this.scanner.outerAssignStatus = 'Scanner module not loaded. Type the barcode instead.';
+                        this.scanner.outerAssignError = true;
+                        return;
+                    }
+                    this.scanner.cameraVisible = true;
+                    this.$nextTick(() => {
+                        window.BarcodeScanner.startScanner(
+                            'outer-assign-scanner',
+                            (decodedText) => this.onScannerDetected(decodedText),
+                            (error) => {}
+                        ).then(() => {
+                            this.scanner.cameraActive = true;
+                        }).catch((err) => {
+                            this.scanner.outerAssignStatus = 'Camera error: ' + (err.message || err);
+                            this.scanner.outerAssignError = true;
+                            this.scanner.cameraActive = false;
+                        });
+                    });
+                },
+                stopOuterAssignCamera() {
+                    if (window.BarcodeScanner && window.BarcodeScanner.isRunning()) {
+                        window.BarcodeScanner.stopScanner().catch(() => {});
+                    }
+                    this.scanner.cameraActive = false;
+                    this.scanner.cameraVisible = false;
+                },
+                async submitOuterAssign() {
+                    const unitBarcode = this.scanner.outerAssignBarcode.trim();
+                    if (!unitBarcode || this.scanner.processing) return;
+
+                    this.scanner.processing = true;
+                    this.scanner.outerAssignStatus = '';
+                    this.scanner.outerAssignError = false;
+
+                    try {
+                        const response = await fetch('{{ route("delivery-legacy.save-outer-barcode") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                unitBarcode: unitBarcode,
+                                supplierID: this.supplierID,
+                                outerCode: this.scanner.outerBarcodeToAssign
+                            })
+                        });
+
+                        const data = await response.json();
+                        if (data.success) {
+                            this.scanner.outerAssignStatus = 'Linked to: ' + data.productName + ' (' + data.unitBarcode + ')';
+                            this.scanner.outerAssignError = false;
+                            const savedOuterBarcode = this.scanner.outerBarcodeToAssign;
+                            // After a short delay, go back to scanning and auto-scan the outer barcode
+                            setTimeout(() => {
+                                this.stopOuterAssignCamera();
+                                this.scanner.step = 'scan';
+                                this.scanner.outerBarcodeToAssign = null;
+                                this.scanner.outerAssignBarcode = '';
+                                this.scanner.outerAssignStatus = '';
+                                // Now scan the outer barcode which should resolve
+                                this.scanner.barcode = savedOuterBarcode || '';
+                                if (this.scanner.barcode) {
+                                    this.lookupBarcode();
+                                } else {
+                                    this.restartCameraIfActive();
+                                }
+                            }, 1500);
+                        } else {
+                            this.scanner.outerAssignStatus = data.message || 'Failed to save.';
+                            this.scanner.outerAssignError = true;
+                            this.scanner.outerAssignBarcode = '';
+                            // Restart camera for another attempt
+                            this.$nextTick(() => {
+                                this.startOuterAssignCamera();
+                            });
+                        }
+                    } catch (error) {
+                        this.scanner.outerAssignStatus = 'Network error. Try again.';
+                        this.scanner.outerAssignError = true;
+                        this.scanner.outerAssignBarcode = '';
+                        this.$nextTick(() => {
+                            this.startOuterAssignCamera();
+                        });
+                    } finally {
+                        this.scanner.processing = false;
                     }
                 },
                 toggleScannerCamera() {
@@ -2181,6 +2355,14 @@
                     this.scanner.lastScannedBarcode = text;
                     this.scanner.lastScanTime = now;
 
+                    if (this.scanner.step === 'assign-outer') {
+                        // In outer assign mode: scanned barcode is the unit barcode to link
+                        this.stopScannerCamera();
+                        this.scanner.outerAssignBarcode = text;
+                        this.submitOuterAssign();
+                        return;
+                    }
+
                     this.scanner.cameraWasActive = true;
                     this.stopScannerCamera();
                     this.scanner.barcode = text;
@@ -2229,7 +2411,7 @@
                                 }
                             });
                         } else if (data.success && !data.product) {
-                            this.scanner.lastResult = { error: 'Product not found for barcode: ' + barcode };
+                            this.scanner.lastResult = { error: 'Product not found for barcode: ' + barcode, unknownBarcode: barcode };
                             this.scanner.barcode = '';
                             this.restartCameraIfActive();
                         } else {
