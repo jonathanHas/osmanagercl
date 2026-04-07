@@ -2085,6 +2085,7 @@
                     currentScanned: 0,
                     scanType: 'unit',    // 'unit' or 'case' (outer barcode)
                     caseUnits: 1,        // units per case for outer barcode scans
+                    cameraWasActive: false, // track if camera was used for auto-restart
                 },
                 scannerDirty: false,
                 init() {
@@ -2098,6 +2099,7 @@
                 },
                 closeScanner() {
                     this.stopScannerCamera();
+                    this.scanner.cameraWasActive = false;
                     this.scannerOpen = false;
                     if (this.scannerDirty) {
                         location.reload();
@@ -2116,6 +2118,14 @@
                     this.$nextTick(() => {
                         if (this.$refs.scannerInput) this.$refs.scannerInput.focus();
                     });
+                    this.restartCameraIfActive();
+                },
+                restartCameraIfActive() {
+                    if (this.scanner.cameraWasActive && !this.scanner.cameraActive) {
+                        this.$nextTick(() => {
+                            this.toggleScannerCamera();
+                        });
+                    }
                 },
                 toggleScannerCamera() {
                     if (this.scanner.cameraActive) {
@@ -2171,6 +2181,7 @@
                     this.scanner.lastScannedBarcode = text;
                     this.scanner.lastScanTime = now;
 
+                    this.scanner.cameraWasActive = true;
                     this.stopScannerCamera();
                     this.scanner.barcode = text;
                     this.lookupBarcode();
@@ -2203,7 +2214,7 @@
                         }
 
                         const data = await response.json();
-                        if (data.success) {
+                        if (data.success && data.product) {
                             this.scanner.productInfo = data.product;
                             this.scanner.expectedQty = data.expectedQty;
                             this.scanner.currentScanned = data.newQuantity;
@@ -2217,6 +2228,10 @@
                                     this.$refs.qtyInput.select();
                                 }
                             });
+                        } else if (data.success && !data.product) {
+                            this.scanner.lastResult = { error: 'Product not found for barcode: ' + barcode };
+                            this.scanner.barcode = '';
+                            this.restartCameraIfActive();
                         } else {
                             this.scanner.lastResult = { error: data.message || 'Lookup failed' };
                         }
