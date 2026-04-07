@@ -603,7 +603,7 @@ class DeliveryLegacyController extends Controller
         ]);
 
         // Parse GS1-128 outer code to extract clean GTIN-14
-        $outerCode = $this->parseGS1OuterCode($outerCode);
+        $outerCode = $this->parseGS1OuterCode($validated['outerCode']);
 
         // Verify the unit barcode exists for this supplier
         $link = DB::connection('pos')->table('supplier_link')
