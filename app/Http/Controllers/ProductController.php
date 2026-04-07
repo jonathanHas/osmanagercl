@@ -1191,6 +1191,7 @@ class ProductController extends Controller
             'supplier_id' => $supplierLink?->SupplierID,
             'supplier_code' => $supplierLink?->SupplierCode,
             'units_per_case' => $supplierLink?->CaseUnits ?? 1,
+            'outer_code' => $supplierLink?->OuterCode,
         ];
 
         // Check if product is in stocking management
@@ -1486,6 +1487,8 @@ class ProductController extends Controller
                 try {
                     $supplierLink = $product->supplierLinks->first();
 
+                    $outerCode = $request->outer_code ?: null;
+
                     if ($supplierLink) {
                         // Update existing supplier link
                         $supplierLink->update([
@@ -1493,6 +1496,7 @@ class ProductController extends Controller
                             'SupplierCode' => $request->supplier_code,
                             'CaseUnits' => $request->units_per_case ?? 1,
                             'Cost' => $request->price_buy,
+                            'OuterCode' => $outerCode,
                         ]);
                     } else {
                         // Create new supplier link
@@ -1503,6 +1507,7 @@ class ProductController extends Controller
                             'CaseUnits' => $request->units_per_case ?? 1,
                             'Cost' => $request->price_buy,
                             'stocked' => true,
+                            'OuterCode' => $outerCode,
                         ]);
                     }
                 } catch (\Illuminate\Database\QueryException $e) {
@@ -1535,6 +1540,7 @@ class ProductController extends Controller
                                     'SupplierCode' => $request->supplier_code,
                                     'CaseUnits' => $request->units_per_case ?? 1,
                                     'Cost' => $request->price_buy,
+                                    'OuterCode' => $outerCode,
                                 ]);
                             } else {
                                 \App\Models\SupplierLink::create([
@@ -1544,6 +1550,7 @@ class ProductController extends Controller
                                     'CaseUnits' => $request->units_per_case ?? 1,
                                     'Cost' => $request->price_buy,
                                     'stocked' => true,
+                                    'OuterCode' => $outerCode,
                                 ]);
                             }
                         } else {

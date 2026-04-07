@@ -191,6 +191,17 @@
                                            class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:border-indigo-500 focus:ring-indigo-500">
                                 </div>
 
+                                <!-- Outer Barcode -->
+                                <div>
+                                    <label for="outer_code" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Outer/Case Barcode</label>
+                                    <input type="text"
+                                           id="outer_code"
+                                           name="outer_code"
+                                           value="{{ old('outer_code', $prefillData['outer_code']) }}"
+                                           placeholder="No outer barcode"
+                                           class="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:border-indigo-500 focus:ring-indigo-500">
+                                </div>
+
                             </div>
 
                             <!-- Stock Management Option -->
