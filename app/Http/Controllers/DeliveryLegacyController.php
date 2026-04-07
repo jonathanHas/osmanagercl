@@ -602,6 +602,9 @@ class DeliveryLegacyController extends Controller
             'outerCode' => 'required|string',
         ]);
 
+        // Parse GS1-128 outer code to extract clean GTIN-14
+        $outerCode = $this->parseGS1OuterCode($outerCode);
+
         // Verify the unit barcode exists for this supplier
         $link = DB::connection('pos')->table('supplier_link')
             ->where('Barcode', $validated['unitBarcode'])
@@ -614,7 +617,7 @@ class DeliveryLegacyController extends Controller
 
         // Check the outer code isn't already assigned to another product for this supplier
         $existing = DB::connection('pos')->table('supplier_link')
-            ->where('OuterCode', $validated['outerCode'])
+            ->where('OuterCode', $outerCode)
             ->where('SupplierID', $validated['supplierID'])
             ->where('Barcode', '!=', $validated['unitBarcode'])
             ->first();
@@ -633,7 +636,7 @@ class DeliveryLegacyController extends Controller
         DB::connection('pos')->table('supplier_link')
             ->where('Barcode', $validated['unitBarcode'])
             ->where('SupplierID', $validated['supplierID'])
-            ->update(['OuterCode' => $validated['outerCode']]);
+            ->update(['OuterCode' => $outerCode]);
 
         // Get the product name for confirmation
         $productName = DB::connection('pos')->table('PRODUCTS')
@@ -645,6 +648,33 @@ class DeliveryLegacyController extends Controller
             'productName' => $productName,
             'unitBarcode' => $validated['unitBarcode'],
         ]);
+    }
+
+    /**
+     * Parse a GS1-128 barcode string to extract the GTIN-14.
+     * Returns the GTIN-14 if found, otherwise the original string cleaned up.
+     */
+    private function parseGS1OuterCode(string $raw): string
+    {
+        $text = trim($raw);
+
+        // Strip GS1 symbology identifier prefixes
+        foreach ([']C1', ']d2', ']e0'] as $prefix) {
+            if (str_starts_with($text, $prefix)) {
+                $text = substr($text, strlen($prefix));
+                break;
+            }
+        }
+
+        // Replace group separator characters
+        $text = str_replace("\x1D", '|', $text);
+
+        // Extract GTIN-14 from AI (01) — always 14 digits
+        if (preg_match('/(?:^|\|)01(\d{14})/', $text, $matches)) {
+            return $matches[1];
+        }
+
+        return $text;
     }
 
     /**

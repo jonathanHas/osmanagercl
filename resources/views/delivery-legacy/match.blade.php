@@ -2396,6 +2396,18 @@
                     this.lookupBarcode();
                 },
                 async lookupBarcode() {
+                    const rawBarcode = this.scanner.barcode.trim();
+                    if (!rawBarcode) return;
+
+                    // Parse GS1 barcodes from manual input (camera scans are already parsed in onScannerDetected)
+                    if (!this.scanner.outerCodeLookup) {
+                        const parsed = this.parseBarcode(rawBarcode);
+                        if (parsed.isGS1) {
+                            this.scanner.barcode = parsed.ean13;
+                            this.scanner.outerCodeLookup = parsed.gtin14;
+                        }
+                    }
+
                     const barcode = this.scanner.barcode.trim();
                     if (!barcode) return;
 
