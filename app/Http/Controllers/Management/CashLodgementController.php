@@ -29,12 +29,12 @@ class CashLodgementController extends Controller
             ->with(['matches.cashReconciliation']);
 
         // Filter by till if specified
-        if ($request->has('till') && $request->till !== '') {
+        if ($request->filled('till')) {
             $query->where('till_name', $request->till);
         }
 
         // Filter by match status
-        if ($request->has('status') && $request->status !== '') {
+        if ($request->filled('status')) {
             if ($request->status === 'matched') {
                 $query->where('is_matched', true);
             } elseif ($request->status === 'unmatched') {
@@ -43,7 +43,7 @@ class CashLodgementController extends Controller
         }
 
         // Filter by type
-        if ($request->has('type') && $request->type !== '') {
+        if ($request->filled('type')) {
             $query->where('lodgement_type', $request->type);
         }
 
@@ -173,11 +173,11 @@ class CashLodgementController extends Controller
             ->with(['matches.cashReconciliation']);
 
         // Apply same filters as index
-        if ($request->has('till') && $request->till !== '') {
+        if ($request->filled('till')) {
             $query->where('till_name', $request->till);
         }
 
-        if ($request->has('status') && $request->status !== '') {
+        if ($request->filled('status')) {
             if ($request->status === 'matched') {
                 $query->where('is_matched', true);
             } elseif ($request->status === 'unmatched') {
@@ -185,7 +185,7 @@ class CashLodgementController extends Controller
             }
         }
 
-        if ($request->has('type') && $request->type !== '') {
+        if ($request->filled('type')) {
             $query->where('lodgement_type', $request->type);
         }
 

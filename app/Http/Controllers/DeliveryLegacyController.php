@@ -438,31 +438,16 @@ class DeliveryLegacyController extends Controller
         ]);
 
         $delID = $validated['delID'];
-        $barcode = $validated['barcode'];
+        $scannedBarcode = $validated['barcode'];
         $increment = $validated['quantity'] ?? 1;
         $supplierID = $validated['supplierID'];
 
-        // Get current total for this barcode in this session
-        $currentTotal = DeliveryScanItem::where('delID', $delID)
-            ->where('barcode', $barcode)
-            ->sum('quantity');
+        // Resolve barcode: check if this is an outer/case barcode
+        $scanType = 'unit';
+        $caseUnitsPerScan = 1;
+        $resolvedBarcode = $scannedBarcode;
 
-        $newQuantity = $currentTotal + $increment;
-
-        // Only write to DB if actually incrementing (quantity > 0)
-        if ($increment > 0) {
-            DeliveryScanItem::where('delID', $delID)
-                ->where('barcode', $barcode)
-                ->delete();
-
-            DeliveryScanItem::create([
-                'delID' => $delID,
-                'barcode' => $barcode,
-                'quantity' => $newQuantity,
-            ]);
-        }
-
-        // Look up product info via supplier_link → PRODUCTS
+        // First try as a regular unit barcode
         $product = DB::connection('pos')->selectOne(
             'SELECT
                 PRODUCTS.NAME as name,
@@ -477,8 +462,58 @@ class DeliveryLegacyController extends Controller
             LEFT JOIN CATEGORIES ON PRODUCTS.CATEGORY = CATEGORIES.ID
             LEFT JOIN STOCKCURRENT ON PRODUCTS.ID = STOCKCURRENT.PRODUCT
             WHERE PRODUCTS.CODE = ?',
-            [$supplierID, $barcode]
+            [$supplierID, $scannedBarcode]
         );
+
+        // If not found by unit barcode, try as an outer/case barcode
+        if (! $product) {
+            $outerMatch = DB::connection('pos')->selectOne(
+                'SELECT
+                    supplier_link.Barcode as unitBarcode,
+                    supplier_link.CaseUnits,
+                    supplier_link.SupplierCode as supplierCode,
+                    PRODUCTS.NAME as name,
+                    PRODUCTS.PRICESELL,
+                    CATEGORIES.NAME as categoryName,
+                    STOCKCURRENT.UNITS as currentStock
+                FROM supplier_link
+                JOIN PRODUCTS ON supplier_link.Barcode = PRODUCTS.CODE
+                LEFT JOIN CATEGORIES ON PRODUCTS.CATEGORY = CATEGORIES.ID
+                LEFT JOIN STOCKCURRENT ON PRODUCTS.ID = STOCKCURRENT.PRODUCT
+                WHERE supplier_link.OuterCode = ? AND supplier_link.SupplierID = ?',
+                [$scannedBarcode, $supplierID]
+            );
+
+            if ($outerMatch) {
+                $product = $outerMatch;
+                $scanType = 'case';
+                $caseUnitsPerScan = max(1, (int) ($outerMatch->CaseUnits ?? 1));
+                $resolvedBarcode = $outerMatch->unitBarcode;
+            }
+        }
+
+        // Multiply increment by case units for outer barcode scans
+        $effectiveIncrement = $increment * $caseUnitsPerScan;
+
+        // Get current total for the resolved barcode in this session
+        $currentTotal = DeliveryScanItem::where('delID', $delID)
+            ->where('barcode', $resolvedBarcode)
+            ->sum('quantity');
+
+        $newQuantity = $currentTotal + $effectiveIncrement;
+
+        // Only write to DB if actually incrementing (quantity > 0)
+        if ($effectiveIncrement > 0) {
+            DeliveryScanItem::where('delID', $delID)
+                ->where('barcode', $resolvedBarcode)
+                ->delete();
+
+            DeliveryScanItem::create([
+                'delID' => $delID,
+                'barcode' => $resolvedBarcode,
+                'quantity' => $newQuantity,
+            ]);
+        }
 
         // Check expected quantity from invoice
         $expectedQty = null;
@@ -492,7 +527,7 @@ class DeliveryLegacyController extends Controller
                     AND supplier_link.SupplierID = ?
                 WHERE supplier_link.Barcode = ?
                 GROUP BY delivery.supCode, delivery.caseUnits',
-                [$supplierID, $barcode]
+                [$supplierID, $resolvedBarcode]
             );
 
             if ($invoiceRow) {
@@ -516,7 +551,7 @@ class DeliveryLegacyController extends Controller
             'success' => true,
             'product' => $product ? [
                 'name' => $product->name,
-                'barcode' => $barcode,
+                'barcode' => $resolvedBarcode,
                 'supplierCode' => $product->supplierCode,
                 'categoryName' => $product->categoryName,
                 'currentStock' => $product->currentStock,
@@ -524,6 +559,8 @@ class DeliveryLegacyController extends Controller
             'expectedQty' => $expectedQty,
             'newQuantity' => $newQuantity,
             'matchStatus' => $matchStatus,
+            'scanType' => $scanType,
+            'caseUnits' => $caseUnitsPerScan,
         ]);
     }
 

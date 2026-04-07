@@ -143,6 +143,9 @@
                                 <template x-if="scanner.productInfo?.categoryName">
                                     <span> | <span x-text="scanner.productInfo.categoryName"></span></span>
                                 </template>
+                                <template x-if="scanner.scanType === 'case'">
+                                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-600 text-white">Case barcode &times; <span x-text="scanner.caseUnits"></span> units</span>
+                                </template>
                             </p>
                             <div class="flex items-center justify-between text-sm">
                                 <div class="flex flex-wrap gap-x-4 gap-y-1">
@@ -167,7 +170,14 @@
 
                         {{-- Quantity input + submit --}}
                         <div class="mb-4">
-                            <label class="text-gray-400 text-sm mb-2 block">Quantity to add:</label>
+                            <label class="text-gray-400 text-sm mb-2 block">
+                                <template x-if="scanner.scanType === 'case'">
+                                    <span>Cases to add (<span x-text="scanner.caseUnits"></span> units each):</span>
+                                </template>
+                                <template x-if="scanner.scanType !== 'case'">
+                                    <span>Quantity to add:</span>
+                                </template>
+                            </label>
                             <div class="flex gap-3 items-center justify-center">
                                 <button @click="adjustIncrement(-1)"
                                         class="w-16 h-16 rounded-xl bg-gray-700 text-white text-3xl font-bold flex items-center justify-center touch-manipulation hover:bg-gray-600 active:bg-gray-500 flex-shrink-0">-</button>
@@ -188,7 +198,12 @@
                                 class="w-full py-4 rounded-lg text-white font-bold text-lg touch-manipulation transition-colors"
                                 :class="scanner.processing ? 'bg-gray-600 cursor-wait' : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'">
                             <span x-show="!scanner.processing">
-                                Add <span x-text="scanner.incrementQty"></span> units
+                                <template x-if="scanner.scanType === 'case'">
+                                    <span>Add <span x-text="scanner.incrementQty"></span> case<span x-show="scanner.incrementQty > 1">s</span> (<span x-text="scanner.incrementQty * scanner.caseUnits"></span> units)</span>
+                                </template>
+                                <template x-if="scanner.scanType !== 'case'">
+                                    <span>Add <span x-text="scanner.incrementQty"></span> units</span>
+                                </template>
                             </span>
                             <span x-show="scanner.processing" class="flex items-center justify-center gap-2">
                                 <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -226,6 +241,9 @@
                                               }"
                                               x-text="{verified:'Match',partial:'Short',over:'Over',extra:'Extra',unknown:'Unknown'}[scanner.lastResult?.matchStatus] || scanner.lastResult?.matchStatus"></span>
                                     </div>
+                                    <template x-if="scanner.lastResult?.scanType === 'case'">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-600 text-white mb-2">Case scan &times; <span x-text="scanner.lastResult?.caseUnits"></span> units (<span x-text="scanner.lastResult?.casesAdded"></span> case<span x-show="scanner.lastResult?.casesAdded > 1">s</span>)</span>
+                                    </template>
                                     {{-- Match comparison --}}
                                     <div class="flex items-center gap-3 text-sm">
                                         <span class="text-gray-400">Added: <span class="text-white font-bold" x-text="scanner.lastResult?.addedQty"></span></span>
@@ -266,6 +284,9 @@
                                                   'bg-red-500': scan.matchStatus === 'unknown'
                                               }"></span>
                                         <span class="text-white truncate" x-text="scan.name || scan.barcode"></span>
+                                        <template x-if="scan.scanType === 'case'">
+                                            <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-600/70 text-purple-200 flex-shrink-0">CASE</span>
+                                        </template>
                                     </div>
                                     <div class="flex items-center gap-2 flex-shrink-0 ml-2">
                                         <span class="text-gray-400" x-text="'+' + scan.qty"></span>
@@ -2062,6 +2083,8 @@
                     productInfo: null,   // product data from lookup
                     expectedQty: null,
                     currentScanned: 0,
+                    scanType: 'unit',    // 'unit' or 'case' (outer barcode)
+                    caseUnits: 1,        // units per case for outer barcode scans
                 },
                 scannerDirty: false,
                 init() {
@@ -2088,6 +2111,8 @@
                     this.scanner.expectedQty = null;
                     this.scanner.currentScanned = 0;
                     this.scanner.processing = false;
+                    this.scanner.scanType = 'unit';
+                    this.scanner.caseUnits = 1;
                     this.$nextTick(() => {
                         if (this.$refs.scannerInput) this.$refs.scannerInput.focus();
                     });
@@ -2182,6 +2207,8 @@
                             this.scanner.productInfo = data.product;
                             this.scanner.expectedQty = data.expectedQty;
                             this.scanner.currentScanned = data.newQuantity;
+                            this.scanner.scanType = data.scanType || 'unit';
+                            this.scanner.caseUnits = data.caseUnits || 1;
                             this.scanner.step = 'quantity';
                             this.scanner.incrementQty = 1;
                             this.$nextTick(() => {
@@ -2223,13 +2250,20 @@
 
                         const data = await response.json();
                         if (data.success) {
+                            const scanType = this.scanner.scanType || 'unit';
+                            const caseUnits = this.scanner.caseUnits || 1;
+                            const effectiveQty = scanType === 'case' ? qty * caseUnits : qty;
+
                             this.scanner.lastResult = {
                                 product: data.product,
                                 barcode: barcode,
-                                addedQty: qty,
+                                addedQty: effectiveQty,
                                 expectedQty: data.expectedQty,
                                 newQuantity: data.newQuantity,
-                                matchStatus: data.matchStatus
+                                matchStatus: data.matchStatus,
+                                scanType: scanType,
+                                caseUnits: caseUnits,
+                                casesAdded: scanType === 'case' ? qty : null
                             };
                             this.scanner.scanCount++;
                             this.scannerDirty = true;
@@ -2237,8 +2271,10 @@
                             this.scanner.history.unshift({
                                 barcode: barcode,
                                 name: data.product?.name || 'Unknown',
-                                qty: qty,
+                                qty: effectiveQty,
                                 matchStatus: data.matchStatus,
+                                scanType: scanType,
+                                caseUnits: caseUnits,
                                 time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
                             });
                             if (this.scanner.history.length > 20) this.scanner.history.pop();
