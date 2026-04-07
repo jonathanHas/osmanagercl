@@ -2143,7 +2143,6 @@
                     scanType: 'unit',    // 'unit' or 'case' (outer barcode)
                     caseUnits: 1,        // units per case for outer barcode scans
                     cameraWasActive: false, // track if camera was used for auto-restart
-                    outerCodeLookup: null,      // GTIN-14 from GS1 parsing (for outer code server lookup)
                     outerBarcodeToAssign: null, // outer barcode being assigned
                     outerAssignBarcode: '',     // unit barcode scanned/typed during assign
                     outerAssignStatus: '',
@@ -2177,7 +2176,6 @@
                     this.scanner.processing = false;
                     this.scanner.scanType = 'unit';
                     this.scanner.caseUnits = 1;
-                    this.scanner.outerCodeLookup = null;
                     this.$nextTick(() => {
                         if (this.$refs.scannerInput) this.$refs.scannerInput.focus();
                     });
@@ -2345,12 +2343,10 @@
                     // Replace GS (group separator) characters
                     text = text.replace(/[\x1D\u001D]/g, '|');
 
-                    // Check for GS1 AI (01) GTIN — always 14 digits after "01"
+                    // Extract GTIN-14 from AI (01) — always 14 digits after "01"
                     const gtin14Match = text.match(/(?:^|\|)01(\d{14})/);
                     if (gtin14Match) {
-                        const gtin14 = gtin14Match[1];
-                        const ean13 = gtin14.substring(1);
-                        return { gtin14, ean13, isGS1: true, raw };
+                        return { barcode: gtin14Match[1], isGS1: true, raw };
                     }
 
                     return { barcode: text, isGS1: false, raw };
@@ -2376,37 +2372,26 @@
                     this.scanner.lastScannedBarcode = text;
                     this.scanner.lastScanTime = now;
 
-                    // Parse GS1-128 barcodes to extract GTIN
+                    // Parse GS1-128 barcodes to extract GTIN-14
                     const parsed = this.parseBarcode(text);
-                    const lookupCode = parsed.isGS1 ? parsed.ean13 : parsed.barcode;
-                    const outerCodeValue = parsed.isGS1 ? parsed.gtin14 : parsed.barcode;
 
                     if (this.scanner.step === 'assign-outer') {
                         // In outer assign mode: scanned barcode is the unit barcode to link
                         this.stopScannerCamera();
-                        this.scanner.outerAssignBarcode = lookupCode;
+                        this.scanner.outerAssignBarcode = parsed.barcode;
                         this.submitOuterAssign();
                         return;
                     }
 
                     this.scanner.cameraWasActive = true;
                     this.stopScannerCamera();
-                    this.scanner.barcode = lookupCode;
-                    this.scanner.outerCodeLookup = outerCodeValue !== lookupCode ? outerCodeValue : null;
+                    this.scanner.barcode = parsed.barcode;
                     this.lookupBarcode();
                 },
                 async lookupBarcode() {
-                    const rawBarcode = this.scanner.barcode.trim();
-                    if (!rawBarcode) return;
-
                     // Parse GS1 barcodes from manual input (camera scans are already parsed in onScannerDetected)
-                    if (!this.scanner.outerCodeLookup) {
-                        const parsed = this.parseBarcode(rawBarcode);
-                        if (parsed.isGS1) {
-                            this.scanner.barcode = parsed.ean13;
-                            this.scanner.outerCodeLookup = parsed.gtin14;
-                        }
-                    }
+                    const parsed = this.parseBarcode(this.scanner.barcode);
+                    this.scanner.barcode = parsed.barcode;
 
                     const barcode = this.scanner.barcode.trim();
                     if (!barcode) return;
@@ -2425,8 +2410,7 @@
                                 delID: this.deliveryId,
                                 barcode: barcode,
                                 quantity: 0,
-                                supplierID: this.supplierID,
-                                outerCodeLookup: this.scanner.outerCodeLookup || undefined
+                                supplierID: this.supplierID
                             })
                         });
 
@@ -2452,8 +2436,7 @@
                             });
                         } else if (data.success && !data.product) {
                             // Store the best outer code value: GTIN-14 if from GS1, otherwise the barcode itself
-                            const outerValue = this.scanner.outerCodeLookup || barcode;
-                            this.scanner.lastResult = { error: 'Product not found for barcode: ' + barcode, unknownBarcode: outerValue };
+                            this.scanner.lastResult = { error: 'Product not found for barcode: ' + barcode, unknownBarcode: barcode };
                             this.scanner.barcode = '';
                             this.restartCameraIfActive();
                         } else {
@@ -2484,7 +2467,6 @@
                                 barcode: barcode,
                                 quantity: qty,
                                 supplierID: this.supplierID,
-                                outerCodeLookup: this.scanner.outerCodeLookup || undefined
                             })
                         });
 
