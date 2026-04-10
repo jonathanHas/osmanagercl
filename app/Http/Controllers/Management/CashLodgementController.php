@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Management;
 
 use App\Http\Controllers\Controller;
+use App\Models\CashBagVerification;
 use App\Models\CashLodgement;
 use App\Models\CashReconciliation;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CashLodgementController extends Controller
 {
@@ -75,11 +77,19 @@ class CashLodgementController extends Controller
             ->orderBy('total', 'desc')
             ->get();
 
-        // Get recent reconciliation data for context
-        $recentReconciliations = CashReconciliation::whereBetween('date', [$startDate, $endDate])
-            ->with(['legacyCashLodgement', 'payments'])
+        // Pending bags: reconciliations with cash available but no bag verification
+        $pendingBags = CashReconciliation::whereDoesntHave('bagVerification')
+            ->with(['payments'])
             ->orderBy('date', 'desc')
-            ->take(10)
+            ->take(30)
+            ->get()
+            ->filter(fn ($r) => $r->calculateAvailableToLodge() > 0)
+            ->values();
+
+        // Verified bags: bag verifications not yet included in a lodgement
+        $verifiedBags = CashBagVerification::whereNull('cash_lodgement_id')
+            ->with(['reconciliation', 'verifier'])
+            ->orderBy('verified_at', 'desc')
             ->get();
 
         return view('management.cash-lodgements.index', compact(
@@ -95,7 +105,8 @@ class CashLodgementController extends Controller
             'matchRate',
             'tills',
             'lodgementsByTill',
-            'recentReconciliations'
+            'pendingBags',
+            'verifiedBags'
         ));
     }
 
@@ -246,5 +257,97 @@ class CashLodgementController extends Controller
             'Expires' => '0',
             'Pragma' => 'public',
         ]);
+    }
+
+    /**
+     * Verify a cash bag (denomination count against expected)
+     */
+    public function verifyBag(Request $request)
+    {
+        $validated = $request->validate([
+            'cash_reconciliation_id' => 'required|uuid|exists:cash_reconciliations,id',
+            'cash_50' => 'nullable|integer|min:0',
+            'cash_20' => 'nullable|integer|min:0',
+            'cash_10' => 'nullable|integer|min:0',
+            'cash_5' => 'nullable|integer|min:0',
+            'cash_2' => 'nullable|integer|min:0',
+            'cash_1' => 'nullable|integer|min:0',
+            'cash_50c' => 'nullable|integer|min:0',
+            'cash_20c' => 'nullable|integer|min:0',
+            'cash_10c' => 'nullable|integer|min:0',
+        ]);
+
+        $reconciliation = CashReconciliation::with('payments')->findOrFail($validated['cash_reconciliation_id']);
+
+        // Check no existing verification
+        if ($reconciliation->bagVerification) {
+            return back()->with('error', 'This bag has already been verified.');
+        }
+
+        $verification = new CashBagVerification($validated);
+        $countedTotal = $verification->calculateTotal();
+        $expectedTotal = $reconciliation->calculateAvailableToLodge();
+
+        $verification->fill([
+            'counted_total' => $countedTotal,
+            'expected_total' => $expectedTotal,
+            'variance' => $countedTotal - $expectedTotal,
+            'verified_by' => auth()->id(),
+            'verified_at' => now(),
+        ]);
+
+        $verification->save();
+
+        return back()->with('success', sprintf(
+            'Bag verified: €%.2f counted (expected €%.2f, variance €%.2f)',
+            $countedTotal,
+            $expectedTotal,
+            $countedTotal - $expectedTotal
+        ));
+    }
+
+    /**
+     * Create a lodgement from verified bags
+     */
+    public function createLodgement(Request $request)
+    {
+        $validated = $request->validate([
+            'verification_ids' => 'required|array|min:1',
+            'verification_ids.*' => 'uuid|exists:cash_bag_verifications,id',
+        ]);
+
+        $verifications = CashBagVerification::with('reconciliation')
+            ->whereIn('id', $validated['verification_ids'])
+            ->whereNull('cash_lodgement_id')
+            ->get();
+
+        if ($verifications->isEmpty()) {
+            return back()->with('error', 'No valid unlinked verifications selected.');
+        }
+
+        DB::transaction(function () use ($verifications) {
+            $totalCash = $verifications->sum('counted_total');
+
+            $lodgement = CashLodgement::create([
+                'money_id' => $verifications->first()->reconciliation->closed_cash_id,
+                'lodgement_date' => now()->toDateString(),
+                'cash_amount' => $totalCash,
+                'cheque_amount' => 0,
+                'till_name' => $verifications->first()->reconciliation->till_name,
+                'till_id' => $verifications->first()->reconciliation->till_id,
+                'imported_from_legacy' => false,
+                'created_by' => auth()->id(),
+            ]);
+
+            // Link verifications to lodgement
+            CashBagVerification::whereIn('id', $verifications->pluck('id'))
+                ->update(['cash_lodgement_id' => $lodgement->id]);
+        });
+
+        return back()->with('success', sprintf(
+            'Lodgement created: €%.2f from %d bag(s)',
+            $verifications->sum('counted_total'),
+            $verifications->count()
+        ));
     }
 }

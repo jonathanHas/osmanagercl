@@ -164,6 +164,14 @@ class CashReconciliation extends Model
     }
 
     /**
+     * Get the bag verification for this reconciliation
+     */
+    public function bagVerification(): HasOne
+    {
+        return $this->hasOne(CashBagVerification::class);
+    }
+
+    /**
      * Get cash lodgements linked to this reconciliation
      */
     public function cashLodgements(): HasMany

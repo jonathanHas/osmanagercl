@@ -1,336 +1,375 @@
 <x-admin-layout>
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <!-- Header -->
-    <div class="mb-8">
+    <div class="mb-6">
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Cash Lodgements</h1>
-                <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    Track cash deposits from POS to bank accounts
-                </p>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Verify bags, create lodgements, track deposits</p>
             </div>
             <div class="flex space-x-3">
                 <a href="{{ route('cash-reconciliation.index') }}"
                    class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-                    </svg>
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
                     Cash Reconciliation
-                </a>
-                <a href="{{ route('management.cash-lodgements.diagnostic', request()->query()) }}"
-                   class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    Diagnostic View
                 </a>
                 <a href="{{ route('management.cash-lodgements.export', request()->query()) }}"
                    class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                    Export CSV
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    Export
                 </a>
             </div>
         </div>
     </div>
 
-    <!-- Filters -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
-        <form method="GET" action="{{ route('management.cash-lodgements.index') }}" class="p-6">
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <!-- Date Range -->
+    @if(session('success'))
+    <div class="mb-4 bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-600 text-green-700 dark:text-green-300 px-4 py-3 rounded">
+        {{ session('success') }}
+    </div>
+    @endif
+    @if(session('error'))
+    <div class="mb-4 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-300 px-4 py-3 rounded">
+        {{ session('error') }}
+    </div>
+    @endif
+
+    {{-- ============================================================ --}}
+    {{-- SECTION 1: PENDING BAGS (need counting)                       --}}
+    {{-- ============================================================ --}}
+    @if($pendingBags->count() > 0)
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6" x-data="bagCounter()">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between">
                 <div>
-                    <label for="start_date" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Start Date</label>
-                    <input type="date" name="start_date" id="start_date" value="{{ request('start_date', $startDate->format('Y-m-d')) }}"
-                           class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">Pending Bags</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ $pendingBags->count() }} bag(s) waiting to be counted</p>
                 </div>
-                <div>
-                    <label for="end_date" class="block text-sm font-medium text-gray-700 dark:text-gray-300">End Date</label>
-                    <input type="date" name="end_date" id="end_date" value="{{ request('end_date', $endDate->format('Y-m-d')) }}"
-                           class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                <span class="text-2xl font-bold text-amber-600 dark:text-amber-400">€{{ number_format($pendingBags->sum(fn($r) => $r->calculateAvailableToLodge()), 2) }}</span>
+            </div>
+        </div>
+
+        <div class="divide-y divide-gray-200 dark:divide-gray-700">
+            @foreach($pendingBags as $bag)
+            @php $avail = $bag->calculateAvailableToLodge(); @endphp
+            <div class="px-6 py-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm font-medium text-gray-900 dark:text-white">{{ $bag->date->format('D, M j') }}</span>
+                        <span class="text-sm text-gray-500 dark:text-gray-400">{{ $bag->till_name }}</span>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm font-semibold text-gray-900 dark:text-white">€{{ number_format($avail, 2) }}</span>
+                        <button type="button"
+                                @click="openBag('{{ $bag->id }}', '{{ $bag->date->format('D, M j') }}', '{{ $bag->till_name }}', {{ $avail }})"
+                                class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm font-medium">
+                            Count Bag
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Till Filter -->
-                <div>
-                    <label for="till" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Till</label>
-                    <select name="till" id="till" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <option value="">All Tills</option>
-                        @foreach($tills as $till)
-                            <option value="{{ $till }}" {{ request('till') == $till ? 'selected' : '' }}>{{ $till }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                {{-- Inline counting form (shown when this bag is selected) --}}
+                <div x-show="activeBagId === '{{ $bag->id }}'" x-collapse class="mt-4">
+                    <form method="POST" action="{{ route('management.cash-lodgements.verify-bag') }}">
+                        @csrf
+                        <input type="hidden" name="cash_reconciliation_id" value="{{ $bag->id }}">
 
-                <!-- Status Filter -->
-                <div>
-                    <label for="status" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
-                    <select name="status" id="status" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <option value="">All Statuses</option>
-                        <option value="matched" {{ request('status') == 'matched' ? 'selected' : '' }}>Matched</option>
-                        <option value="unmatched" {{ request('status') == 'unmatched' ? 'selected' : '' }}>Unmatched</option>
-                    </select>
-                </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {{-- Denomination inputs --}}
+                            <div class="space-y-2">
+                                <h4 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Notes</h4>
+                                @foreach([50, 20, 10, 5] as $d)
+                                <div class="flex items-center justify-between">
+                                    <label class="text-sm text-gray-700 dark:text-gray-300 w-10">€{{ $d }}</label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" name="cash_{{ $d }}" min="0" value="0"
+                                               x-model.number="denominations.cash_{{ $d }}" @input="calculate()"
+                                               class="w-16 text-right rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                        <span class="text-xs text-gray-400 w-14 text-right">€<span x-text="(denominations.cash_{{ $d }} * {{ $d }}).toFixed(2)"></span></span>
+                                    </div>
+                                </div>
+                                @endforeach
 
-                <!-- Type Filter -->
-                <div>
-                    <label for="type" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Type</label>
-                    <select name="type" id="type" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                        <option value="">All Types</option>
-                        <option value="cash_only" {{ request('type') == 'cash_only' ? 'selected' : '' }}>Cash Only</option>
-                        <option value="cheque_only" {{ request('type') == 'cheque_only' ? 'selected' : '' }}>Cheque Only</option>
-                        <option value="mixed" {{ request('type') == 'mixed' ? 'selected' : '' }}>Mixed</option>
-                    </select>
+                                <h4 class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide pt-2">Coins</h4>
+                                @foreach([2, 1] as $d)
+                                <div class="flex items-center justify-between">
+                                    <label class="text-sm text-gray-700 dark:text-gray-300 w-10">€{{ $d }}</label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" name="cash_{{ $d }}" min="0" value="0"
+                                               x-model.number="denominations.cash_{{ $d }}" @input="calculate()"
+                                               class="w-16 text-right rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                        <span class="text-xs text-gray-400 w-14 text-right">€<span x-text="(denominations.cash_{{ $d }} * {{ $d }}).toFixed(2)"></span></span>
+                                    </div>
+                                </div>
+                                @endforeach
+                                @foreach(['50c', '20c', '10c'] as $d)
+                                @php $m = $d == '50c' ? 0.5 : ($d == '20c' ? 0.2 : 0.1); @endphp
+                                <div class="flex items-center justify-between">
+                                    <label class="text-sm text-gray-700 dark:text-gray-300 w-10">{{ $d }}</label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="number" name="cash_{{ $d }}" min="0" value="0"
+                                               x-model.number="denominations.cash_{{ $d }}" @input="calculate()"
+                                               class="w-16 text-right rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                        <span class="text-xs text-gray-400 w-14 text-right">€<span x-text="(denominations.cash_{{ $d }} * {{ $m }}).toFixed(2)"></span></span>
+                                    </div>
+                                </div>
+                                @endforeach
+                            </div>
+
+                            {{-- Summary --}}
+                            <div class="md:col-span-2">
+                                <div class="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 space-y-3">
+                                    <div class="flex justify-between text-sm">
+                                        <span class="text-gray-600 dark:text-gray-400">Counted Total</span>
+                                        <span class="text-lg font-bold text-gray-900 dark:text-white">€<span x-text="countedTotal.toFixed(2)"></span></span>
+                                    </div>
+                                    <div class="flex justify-between text-sm">
+                                        <span class="text-gray-600 dark:text-gray-400">Expected (from recon)</span>
+                                        <span class="font-medium text-gray-700 dark:text-gray-300">€<span x-text="expectedTotal.toFixed(2)"></span></span>
+                                    </div>
+                                    <div class="border-t dark:border-gray-700 pt-2 flex justify-between">
+                                        <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Variance</span>
+                                        <span class="text-xl font-bold"
+                                              :class="bagVariance > 0.01 ? 'text-green-600 dark:text-green-400' : (bagVariance < -0.01 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400')">
+                                            <span x-show="Math.abs(bagVariance) < 0.01">Exact match</span>
+                                            <span x-show="Math.abs(bagVariance) >= 0.01">
+                                                €<span x-text="Math.abs(bagVariance).toFixed(2)"></span>
+                                                <span x-text="bagVariance > 0 ? '↑ over' : '↓ under'"></span>
+                                            </span>
+                                        </span>
+                                    </div>
+
+                                    <div class="flex space-x-3 pt-2">
+                                        <button type="submit" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md">
+                                            Confirm Bag Count
+                                        </button>
+                                        <button type="button" @click="closeBag()" class="bg-gray-300 hover:bg-gray-400 text-gray-700 py-2 px-4 rounded-md">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
                 </div>
             </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
 
-            <div class="mt-4 flex justify-end space-x-3">
-                <a href="{{ route('management.cash-lodgements.index') }}" 
-                   class="bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">
-                    Clear Filters
-                </a>
-                <button type="submit" 
-                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-                    Apply Filters
+    {{-- ============================================================ --}}
+    {{-- SECTION 2: VERIFIED BAGS (ready to lodge)                     --}}
+    {{-- ============================================================ --}}
+    @if($verifiedBags->count() > 0)
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">Verified Bags — Ready to Lodge</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Select bags to include in a bank lodgement</p>
+                </div>
+                <span class="text-2xl font-bold text-green-600 dark:text-green-400">€{{ number_format($verifiedBags->sum('counted_total'), 2) }}</span>
+            </div>
+        </div>
+
+        <form method="POST" action="{{ route('management.cash-lodgements.create-lodgement') }}" x-data="{ selected: [], selectAll: false }">
+            @csrf
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-900/50">
+                        <tr>
+                            <th class="px-4 py-2 text-left">
+                                <input type="checkbox" x-model="selectAll"
+                                       @change="selected = selectAll ? @json($verifiedBags->pluck('id')) : []"
+                                       class="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500">
+                            </th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Till</th>
+                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Counted</th>
+                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Expected</th>
+                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Variance</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Verified By</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        @foreach($verifiedBags as $v)
+                        @php
+                            $absVar = abs($v->variance);
+                            $varClass = $absVar < 1 ? 'text-green-600 dark:text-green-400' : ($absVar > 20 ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400');
+                        @endphp
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                            <td class="px-4 py-2">
+                                <input type="checkbox" name="verification_ids[]" value="{{ $v->id }}"
+                                       x-model="selected"
+                                       class="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500">
+                            </td>
+                            <td class="px-4 py-2 text-sm text-gray-900 dark:text-white">{{ $v->reconciliation->date->format('D, M j') }}</td>
+                            <td class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">{{ $v->reconciliation->till_name }}</td>
+                            <td class="px-4 py-2 text-sm text-right font-medium text-gray-900 dark:text-white">€{{ number_format($v->counted_total, 2) }}</td>
+                            <td class="px-4 py-2 text-sm text-right text-gray-500 dark:text-gray-400">€{{ number_format($v->expected_total, 2) }}</td>
+                            <td class="px-4 py-2 text-sm text-right">
+                                <span class="{{ $varClass }} font-medium">
+                                    @if($absVar < 0.01) &check; @else €{{ number_format($absVar, 2) }} {{ $v->variance > 0 ? '↑' : '↓' }} @endif
+                                </span>
+                            </td>
+                            <td class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">{{ $v->verifier->name ?? '-' }}</td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <span class="text-sm text-gray-600 dark:text-gray-400">
+                    <span x-text="selected.length"></span> bag(s) selected
+                </span>
+                <button type="submit" x-bind:disabled="selected.length === 0"
+                        class="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-2 px-6 rounded-md">
+                    Create Lodgement
                 </button>
             </div>
         </form>
     </div>
+    @endif
 
-    <!-- Summary Statistics -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <div class="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                        <svg class="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                        </svg>
-                    </div>
+    {{-- ============================================================ --}}
+    {{-- SECTION 3: LODGEMENTS (existing table with filters)           --}}
+    {{-- ============================================================ --}}
+
+    <!-- Filters -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+        <form method="GET" action="{{ route('management.cash-lodgements.index') }}" class="p-4">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div>
+                    <label for="start_date" class="block text-xs font-medium text-gray-500 dark:text-gray-400">From</label>
+                    <input type="date" name="start_date" id="start_date" value="{{ request('start_date', $startDate->format('Y-m-d')) }}"
+                           class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                 </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Lodgements</p>
-                    <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ number_format($totalLodgements) }}</p>
+                <div>
+                    <label for="end_date" class="block text-xs font-medium text-gray-500 dark:text-gray-400">To</label>
+                    <input type="date" name="end_date" id="end_date" value="{{ request('end_date', $endDate->format('Y-m-d')) }}"
+                           class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                </div>
+                <div>
+                    <label for="till" class="block text-xs font-medium text-gray-500 dark:text-gray-400">Till</label>
+                    <select name="till" id="till" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        <option value="">All</option>
+                        @foreach($tills as $till)
+                        <option value="{{ $till }}" {{ request('till') == $till ? 'selected' : '' }}>{{ $till }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label for="status" class="block text-xs font-medium text-gray-500 dark:text-gray-400">Status</label>
+                    <select name="status" id="status" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        <option value="">All</option>
+                        <option value="matched" {{ request('status') == 'matched' ? 'selected' : '' }}>Matched</option>
+                        <option value="unmatched" {{ request('status') == 'unmatched' ? 'selected' : '' }}>Unmatched</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md text-sm font-medium">Filter</button>
                 </div>
             </div>
-        </div>
-
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <div class="w-8 h-8 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
-                        <svg class="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                        </svg>
-                    </div>
-                </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Amount</p>
-                    <p class="text-2xl font-semibold text-gray-900 dark:text-white">€{{ number_format($totalAmount, 2) }}</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <div class="w-8 h-8 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
-                        <svg class="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                        </svg>
-                    </div>
-                </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Matched</p>
-                    <p class="text-2xl font-semibold text-gray-900 dark:text-white">
-                        {{ number_format($matchedCount) }} 
-                        <span class="text-sm text-gray-500 dark:text-gray-400">({{ $matchRate }}%)</span>
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <div class="w-8 h-8 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center">
-                        <svg class="w-4 h-4 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                        </svg>
-                    </div>
-                </div>
-                <div class="ml-4">
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Unmatched</p>
-                    <p class="text-2xl font-semibold text-gray-900 dark:text-white">{{ number_format($unmatchedCount) }}</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Cash/Cheque Breakdown -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Cash vs Cheque Breakdown</h3>
-            <div class="space-y-3">
-                <div class="flex justify-between">
-                    <span class="text-gray-600 dark:text-gray-400">Cash Amount:</span>
-                    <span class="font-semibold text-gray-900 dark:text-white">€{{ number_format($totalCash, 2) }}</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-gray-600 dark:text-gray-400">Cheque Amount:</span>
-                    <span class="font-semibold text-gray-900 dark:text-white">€{{ number_format($totalCheque, 2) }}</span>
-                </div>
-                <div class="border-t pt-2 flex justify-between">
-                    <span class="text-gray-900 dark:text-white font-medium">Total:</span>
-                    <span class="font-bold text-gray-900 dark:text-white">€{{ number_format($totalAmount, 2) }}</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Top Tills by Amount</h3>
-            <div class="space-y-2">
-                @foreach($lodgementsByTill->take(5) as $till)
-                    <div class="flex justify-between items-center">
-                        <span class="text-gray-600 dark:text-gray-400">{{ $till->till_name ?: 'Unknown' }}</span>
-                        <div class="text-right">
-                            <span class="font-semibold text-gray-900 dark:text-white">€{{ number_format($till->total, 2) }}</span>
-                            <span class="text-xs text-gray-500 dark:text-gray-400 ml-2">({{ $till->count }})</span>
-                        </div>
-                    </div>
-                @endforeach
-            </div>
-        </div>
+        </form>
     </div>
 
     <!-- Lodgements Table -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
         <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 class="text-lg font-medium text-gray-900 dark:text-white">Cash Lodgements</h3>
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white">Lodgements</h3>
         </div>
-        
+
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead class="bg-gray-50 dark:bg-gray-900">
+                <thead class="bg-gray-50 dark:bg-gray-900/50">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Till</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Cash</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Cheque</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Type</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Recon Variance</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Till</th>
+                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Source</th>
+                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Actions</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                     @forelse($lodgements as $lodgement)
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                {{ $lodgement->lodgement_date->format('M j, Y') }}
-                                @if($lodgement->imported_from_legacy)
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 ml-2">
-                                        Legacy
-                                    </span>
-                                @endif
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                {{ $lodgement->till_name ?: 'Unknown' }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right">
-                                @if($lodgement->cash_amount > 0)
-                                    €{{ number_format($lodgement->cash_amount, 2) }}
-                                @else
-                                    <span class="text-gray-400">—</span>
-                                @endif
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white text-right">
-                                @if($lodgement->cheque_amount > 0)
-                                    €{{ number_format($lodgement->cheque_amount, 2) }}
-                                @else
-                                    <span class="text-gray-400">—</span>
-                                @endif
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white text-right">
-                                €{{ number_format($lodgement->total_amount, 2) }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-                                    @if($lodgement->lodgement_type === 'cash_only') bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300
-                                    @elseif($lodgement->lodgement_type === 'cheque_only') bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300
-                                    @else bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-300 @endif">
-                                    {{ ucfirst(str_replace('_', ' ', $lodgement->lodgement_type)) }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                @if($lodgement->is_matched)
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300">
-                                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                                        </svg>
-                                        Matched
-                                    </span>
-                                @else
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-300">
-                                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
-                                        </svg>
-                                        Unmatched
-                                    </span>
-                                @endif
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
-                                @php
-                                    $reconMatch = $lodgement->matches->first();
-                                    $reconVariance = null;
-                                    if ($reconMatch && $reconMatch->cashReconciliation) {
-                                        $availToLodge = $reconMatch->cashReconciliation->calculateAvailableToLodge();
-                                        $reconVariance = $lodgement->cash_amount - $availToLodge;
-                                    }
-                                @endphp
-                                @if($reconVariance !== null)
-                                    @php
-                                        $absVar = abs($reconVariance);
-                                        $varClass = $absVar < 1 ? 'text-green-600 dark:text-green-400' : ($absVar > 20 ? 'text-red-600 dark:text-red-400' : ($absVar > 5 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-700 dark:text-gray-300'));
-                                    @endphp
-                                    <span class="{{ $varClass }} font-medium">
-                                        @if($absVar < 0.01) &check; @else €{{ number_format($absVar, 2) }} {{ $reconVariance > 0 ? '↑' : '↓' }} @endif
-                                    </span>
-                                @else
-                                    <span class="text-gray-400">—</span>
-                                @endif
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
-                                <a href="{{ route('management.cash-lodgements.show', $lodgement) }}"
-                                   class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
-                                    View
-                                </a>
-                                @if($reconMatch && $reconMatch->cashReconciliation)
-                                <a href="{{ route('cash-reconciliation.index', ['date' => $reconMatch->cashReconciliation->date->format('Y-m-d'), 'till_id' => $reconMatch->cashReconciliation->till_id]) }}"
-                                   class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
-                                    Recon
-                                </a>
-                                @endif
-                            </td>
-                        </tr>
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">{{ $lodgement->lodgement_date->format('D, M j, Y') }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ $lodgement->till_name ?: '-' }}</td>
+                        <td class="px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-white">€{{ number_format($lodgement->total_amount, 2) }}</td>
+                        <td class="px-4 py-3 text-sm">
+                            @if($lodgement->imported_from_legacy)
+                            <span class="text-xs text-gray-500 dark:text-gray-400">Legacy</span>
+                            @else
+                            <span class="text-xs text-indigo-600 dark:text-indigo-400">New</span>
+                            @endif
+                        </td>
+                        <td class="px-4 py-3 text-sm text-right">
+                            <a href="{{ route('management.cash-lodgements.show', $lodgement) }}"
+                               class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">View</a>
+                        </td>
+                    </tr>
                     @empty
-                        <tr>
-                            <td colspan="9" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
-                                No cash lodgements found for the selected criteria.
-                            </td>
-                        </tr>
+                    <tr>
+                        <td colspan="5" class="px-4 py-4 text-center text-gray-500 dark:text-gray-400">No lodgements found.</td>
+                    </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
 
-        <!-- Pagination -->
         @if($lodgements->hasPages())
-            <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
-                {{ $lodgements->appends(request()->query())->links() }}
-            </div>
+        <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+            {{ $lodgements->appends(request()->query())->links() }}
+        </div>
         @endif
     </div>
 </div>
+
+@push('scripts')
+<script>
+    function bagCounter() {
+        return {
+            activeBagId: null,
+            expectedTotal: 0,
+            countedTotal: 0,
+            bagVariance: 0,
+            denominations: {
+                cash_50: 0, cash_20: 0, cash_10: 0, cash_5: 0,
+                cash_2: 0, cash_1: 0, cash_50c: 0, cash_20c: 0, cash_10c: 0
+            },
+
+            openBag(id, date, till, expected) {
+                this.activeBagId = id;
+                this.expectedTotal = expected;
+                this.resetDenominations();
+                this.calculate();
+            },
+
+            closeBag() {
+                this.activeBagId = null;
+            },
+
+            resetDenominations() {
+                Object.keys(this.denominations).forEach(k => this.denominations[k] = 0);
+            },
+
+            calculate() {
+                this.countedTotal =
+                    (this.denominations.cash_50 * 50) +
+                    (this.denominations.cash_20 * 20) +
+                    (this.denominations.cash_10 * 10) +
+                    (this.denominations.cash_5 * 5) +
+                    (this.denominations.cash_2 * 2) +
+                    (this.denominations.cash_1 * 1) +
+                    (this.denominations.cash_50c * 0.5) +
+                    (this.denominations.cash_20c * 0.2) +
+                    (this.denominations.cash_10c * 0.1);
+
+                this.bagVariance = this.countedTotal - this.expectedTotal;
+            }
+        }
+    }
+</script>
+@endpush
 </x-admin-layout>
