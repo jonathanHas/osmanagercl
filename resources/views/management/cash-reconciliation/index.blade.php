@@ -299,8 +299,7 @@
                                 : [['supplier_id' => '', 'payee_name' => '', 'amount' => '', 'description' => '']];
                             $paymentsData = old('payments', $initialPayments);
                         @endphp
-                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow"
-                             x-data="{ showPayments: {{ $hasPayments ? 'true' : 'false' }}, payments: {{ json_encode($paymentsData) }} }">
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
                             <button type="button" @click="showPayments = !showPayments"
                                     class="w-full flex items-center justify-between p-4 text-left">
                                 <div class="flex items-center">
@@ -391,14 +390,35 @@
                                     <span>€{{ number_format($reconciliation->pos_cash_total, 2) }}</span>
                                 </div>
 
-                                <!-- Variance - the key number -->
+                                <!-- Cash Variance -->
                                 <div class="border-t dark:border-gray-700 pt-3 mt-1">
                                     <div class="flex justify-between items-baseline">
-                                        <span class="text-base font-bold text-gray-800 dark:text-gray-200">Variance</span>
+                                        <span class="text-base font-bold text-gray-800 dark:text-gray-200">Cash Variance</span>
                                         <span class="text-2xl font-bold"
                                               :class="variance > 0 ? 'text-green-600 dark:text-green-400' : (variance < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400')">
                                             €<span x-text="Math.abs(variance).toFixed(2)"></span>
                                             <span class="text-base" x-show="variance != 0" x-text="variance > 0 ? '↑' : '↓'"></span>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Card Comparison -->
+                                <div class="border-t dark:border-gray-700 pt-3 mt-1 space-y-1">
+                                    <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                                        <span>Card Entered</span>
+                                        <span class="font-medium text-gray-800 dark:text-gray-200">€<span x-text="(parseFloat(card || 0) - parseFloat(cashBack || 0)).toFixed(2)"></span></span>
+                                    </div>
+                                    <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                                        <span>POS Card</span>
+                                        <span>€{{ number_format($reconciliation->pos_card_total, 2) }}</span>
+                                    </div>
+                                    @php $posCard = $reconciliation->pos_card_total; @endphp
+                                    <div class="flex justify-between items-baseline">
+                                        <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Card Variance</span>
+                                        <span class="text-lg font-bold"
+                                              :class="cardVariance > 0 ? 'text-green-600 dark:text-green-400' : (cardVariance < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400')">
+                                            €<span x-text="Math.abs(cardVariance).toFixed(2)"></span>
+                                            <span class="text-sm" x-show="cardVariance != 0" x-text="cardVariance > 0 ? '↑' : '↓'"></span>
                                         </span>
                                     </div>
                                 </div>
@@ -498,6 +518,8 @@
                 card: {{ $reconciliation->card ?? 0 }},
                 cashBack: {{ $reconciliation->cash_back ?? 0 }},
                 moneyAdded: {{ $reconciliation->money_added ?? 0 }},
+                showPayments: {{ $hasPayments ? 'true' : 'false' }},
+                payments: @json($paymentsData),
                 totalCash: 0,
                 totalNotes: 0,
                 totalCoins: 0,
@@ -505,7 +527,9 @@
                 previousFloat: 0,
                 daysCashTaking: 0,
                 variance: 0,
+                cardVariance: 0,
                 posCashTotal: {{ $reconciliation->pos_cash_total ?? 0 }},
+                posCardTotal: {{ $reconciliation->pos_card_total ?? 0 }},
 
                 init() {
                     this.calculateTotals();
@@ -543,13 +567,13 @@
                     this.totalCash = this.totalNotes + this.totalCoins;
                     this.daysCashTaking = this.totalCash + parseFloat(this.cashBack || 0) + this.totalPayments - this.previousFloat - parseFloat(this.moneyAdded || 0);
                     this.variance = this.daysCashTaking - this.posCashTotal;
+                    this.cardVariance = (parseFloat(this.card || 0) - parseFloat(this.cashBack || 0)) - this.posCardTotal;
                 },
 
                 calculatePayments() {
-                    const paymentElements = document.querySelectorAll('[name*="payments"][name*="[amount]"]');
                     this.totalPayments = 0;
-                    paymentElements.forEach(el => {
-                        this.totalPayments += parseFloat(el.value || 0);
+                    this.payments.forEach(p => {
+                        this.totalPayments += parseFloat(p.amount || 0);
                     });
                     this.calculateTotals();
                 }
