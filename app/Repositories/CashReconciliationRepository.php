@@ -282,14 +282,19 @@ class CashReconciliationRepository
     }
 
     /**
-     * Get available tills
+     * Get available tills (only those with activity in the last 6 months)
+     * New tills appear automatically once they have a CLOSEDCASH record.
+     * Cached for 5 minutes.
      */
     public function getAvailableTills(): Collection
     {
-        return Cache::remember('available_tills', 3600, function () {
+        return Cache::remember('available_tills', 300, function () {
+            $cutoff = Carbon::now()->subMonths(6);
+
             return DB::connection('pos')
                 ->table('CLOSEDCASH')
                 ->select('HOST')
+                ->where('DATEEND', '>=', $cutoff)
                 ->distinct()
                 ->orderBy('HOST')
                 ->pluck('HOST')
@@ -297,6 +302,31 @@ class CashReconciliationRepository
                     return [$index + 1 => $host];
                 });
         });
+    }
+
+    /**
+     * Get the previous and next closed cash dates for a given till and date
+     */
+    public function getAdjacentDates(Carbon $date, string $tillName): array
+    {
+        $prev = DB::connection('pos')
+            ->table('CLOSEDCASH')
+            ->where('HOST', $tillName)
+            ->whereDate('DATEEND', '<', $date)
+            ->orderBy('DATEEND', 'desc')
+            ->value(DB::raw('DATE(DATEEND)'));
+
+        $next = DB::connection('pos')
+            ->table('CLOSEDCASH')
+            ->where('HOST', $tillName)
+            ->whereDate('DATEEND', '>', $date)
+            ->orderBy('DATEEND', 'asc')
+            ->value(DB::raw('DATE(DATEEND)'));
+
+        return [
+            'prev' => $prev,
+            'next' => $next,
+        ];
     }
 
     /**

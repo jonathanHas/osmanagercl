@@ -35,6 +35,7 @@ class CashReconciliationController extends Controller
             $reconciliation->load(['legacyCashLodgement', 'cashLodgements.cashLodgement', 'payments']);
             $suppliers = $this->repository->getSuppliers();
             $history = $this->repository->getHistory($tillId, 7);
+            $adjacentDates = $this->repository->getAdjacentDates($selectedDate, $tillName);
 
             return view('management.cash-reconciliation.index', compact(
                 'reconciliation',
@@ -43,7 +44,8 @@ class CashReconciliationController extends Controller
                 'tillName',
                 'tills',
                 'suppliers',
-                'history'
+                'history',
+                'adjacentDates'
             ));
         } catch (\Exception $e) {
             Log::error('Cash reconciliation error: '.$e->getMessage());
@@ -57,6 +59,7 @@ class CashReconciliationController extends Controller
                 'suppliers' => collect(),
                 'history' => collect(),
                 'reconciliation' => null,
+                'adjacentDates' => ['prev' => null, 'next' => null],
             ]);
         }
     }

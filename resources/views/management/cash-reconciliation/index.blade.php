@@ -3,9 +3,6 @@
         <div class="flex items-center justify-between">
             <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200">Cash Reconciliation</h2>
             <div class="flex items-center space-x-3">
-                @if($reconciliation)
-                <span class="text-sm text-gray-600 dark:text-gray-400">{{ $tillName }} &mdash; {{ $selectedDate->format('l, F j, Y') }}</span>
-                @endif
                 <a href="{{ route('management.cash-lodgements.index') }}"
                    class="inline-flex items-center px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-md">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
@@ -29,28 +26,70 @@
             </div>
             @endif
 
-            <!-- Date and Till Selector -->
+            <!-- Date and Till Selector with Navigation -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6 p-4">
-                <form method="GET" action="{{ route('cash-reconciliation.index') }}" class="flex flex-wrap items-end gap-4">
-                    <div>
-                        <label for="till_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Till</label>
-                        <select name="till_id" id="till_id" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                            @foreach($tills as $id => $name)
-                            <option value="{{ $id }}" {{ $tillId == $id ? 'selected' : '' }}>{{ $name }}</option>
-                            @endforeach
-                        </select>
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <!-- Prev Arrow -->
+                    <div class="flex-shrink-0">
+                        @if($adjacentDates['prev'])
+                        <a href="{{ route('cash-reconciliation.index', ['date' => $adjacentDates['prev'], 'till_id' => $tillId]) }}"
+                           class="inline-flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md transition"
+                           title="Previous: {{ \Carbon\Carbon::parse($adjacentDates['prev'])->format('D, M j') }}">
+                            <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                            <span class="hidden sm:inline text-sm">{{ \Carbon\Carbon::parse($adjacentDates['prev'])->format('D j') }}</span>
+                        </a>
+                        @else
+                        <span class="inline-flex items-center px-3 py-2 text-gray-300 dark:text-gray-600 cursor-not-allowed">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                        </span>
+                        @endif
                     </div>
-                    <div>
-                        <label for="date" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Date</label>
-                        <input type="date" name="date" id="date" value="{{ $selectedDate->format('Y-m-d') }}"
-                               class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+
+                    <!-- Till + Date Selector -->
+                    <form method="GET" action="{{ route('cash-reconciliation.index') }}" class="flex flex-wrap items-end gap-3">
+                        <div>
+                            <label for="till_id" class="block text-xs font-medium text-gray-500 dark:text-gray-400">Till</label>
+                            <select name="till_id" id="till_id" onchange="this.form.submit()"
+                                    class="mt-1 block rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                @foreach($tills as $id => $name)
+                                <option value="{{ $id }}" {{ $tillId == $id ? 'selected' : '' }}>{{ $name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label for="date" class="block text-xs font-medium text-gray-500 dark:text-gray-400">Date</label>
+                            <input type="date" name="date" id="date" value="{{ $selectedDate->format('Y-m-d') }}"
+                                   class="mt-1 block rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md text-sm">
+                                Go
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Next Arrow -->
+                    <div class="flex-shrink-0">
+                        @if($adjacentDates['next'])
+                        <a href="{{ route('cash-reconciliation.index', ['date' => $adjacentDates['next'], 'till_id' => $tillId]) }}"
+                           class="inline-flex items-center px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md transition"
+                           title="Next: {{ \Carbon\Carbon::parse($adjacentDates['next'])->format('D, M j') }}">
+                            <span class="hidden sm:inline text-sm">{{ \Carbon\Carbon::parse($adjacentDates['next'])->format('D j') }}</span>
+                            <svg class="w-5 h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        </a>
+                        @else
+                        <span class="inline-flex items-center px-3 py-2 text-gray-300 dark:text-gray-600 cursor-not-allowed">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                        </span>
+                        @endif
                     </div>
-                    <div>
-                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md">
-                            Load
-                        </button>
-                    </div>
-                </form>
+                </div>
+
+                <!-- Current date display -->
+                <div class="mt-2 text-center">
+                    <span class="text-lg font-semibold text-gray-800 dark:text-gray-200">{{ $selectedDate->format('l, F j, Y') }}</span>
+                    <span class="text-sm text-gray-500 dark:text-gray-400 ml-2">{{ $tillName }}</span>
+                </div>
             </div>
 
             @if($reconciliation)
