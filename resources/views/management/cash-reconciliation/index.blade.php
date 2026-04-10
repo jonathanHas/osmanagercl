@@ -422,6 +422,26 @@
                                         </span>
                                     </div>
                                 </div>
+
+                                <!-- Total Balance -->
+                                <div class="border-t dark:border-gray-700 pt-3 mt-1 space-y-1">
+                                    <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                                        <span>Cash + Card</span>
+                                        <span class="font-medium text-gray-800 dark:text-gray-200">€<span x-text="(daysCashTaking + parseFloat(card || 0) - parseFloat(cashBack || 0)).toFixed(2)"></span></span>
+                                    </div>
+                                    <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                                        <span>Total Sales (POS)</span>
+                                        <span>€{{ number_format($reconciliation->pos_cash_total + $reconciliation->pos_card_total, 2) }}</span>
+                                    </div>
+                                    <div class="flex justify-between items-baseline">
+                                        <span class="text-base font-bold text-gray-800 dark:text-gray-200">Total Variance</span>
+                                        <span class="text-2xl font-bold"
+                                              :class="totalVariance > 0 ? 'text-green-600 dark:text-green-400' : (totalVariance < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400')">
+                                            €<span x-text="Math.abs(totalVariance).toFixed(2)"></span>
+                                            <span class="text-base" x-show="totalVariance != 0" x-text="totalVariance > 0 ? '↑' : '↓'"></span>
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Save + View Receipts -->
@@ -528,6 +548,7 @@
                 daysCashTaking: 0,
                 variance: 0,
                 cardVariance: 0,
+                totalVariance: 0,
                 posCashTotal: {{ $reconciliation->pos_cash_total ?? 0 }},
                 posCardTotal: {{ $reconciliation->pos_card_total ?? 0 }},
 
@@ -568,6 +589,7 @@
                     this.daysCashTaking = this.totalCash + parseFloat(this.cashBack || 0) + this.totalPayments - this.previousFloat - parseFloat(this.moneyAdded || 0);
                     this.variance = this.daysCashTaking - this.posCashTotal;
                     this.cardVariance = (parseFloat(this.card || 0) - parseFloat(this.cashBack || 0)) - this.posCardTotal;
+                    this.totalVariance = this.variance + this.cardVariance;
                 },
 
                 calculatePayments() {
