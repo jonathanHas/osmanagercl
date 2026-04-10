@@ -36,8 +36,8 @@ class CashReconciliationRepository
             // Calculate POS totals
             $posTotals = $this->calculatePosTotals($closedCash->MONEY);
 
-            // Get previous day's float
-            $previousFloat = $this->getPreviousDayFloat($date, $tillId);
+            // Get previous day's float (checks Laravel then falls back to POS)
+            $previousFloat = $this->getPreviousDayFloat($date, $tillId, $tillName);
 
             // Check for existing money record in legacy system
             $legacyMoney = DB::connection('pos')->table('money')
@@ -146,10 +146,11 @@ class CashReconciliationRepository
     }
 
     /**
-     * Get previous day's float
+     * Get previous day's float - checks Laravel records first, falls back to POS legacy data
      */
-    private function getPreviousDayFloat(Carbon $date, int $tillId): array
+    public function getPreviousDayFloat(Carbon $date, int $tillId, ?string $tillName = null): array
     {
+        // First check Laravel cash_reconciliations table
         $previousReconciliation = CashReconciliation::where('till_id', $tillId)
             ->where('date', '<', $date)
             ->orderBy('date', 'desc')
@@ -157,12 +158,40 @@ class CashReconciliationRepository
 
         if ($previousReconciliation) {
             return [
-                'notes' => $previousReconciliation->note_float,
-                'coins' => $previousReconciliation->coin_float,
+                'notes' => (float) $previousReconciliation->note_float,
+                'coins' => (float) $previousReconciliation->coin_float,
+                'date' => $previousReconciliation->date->format('Y-m-d'),
+                'source' => 'laravel',
             ];
         }
 
-        return ['notes' => 0, 'coins' => 0];
+        // Fall back to POS legacy data (CLOSEDCASH joined to money table)
+        if ($tillName === null) {
+            $tills = $this->getAvailableTills();
+            $tillName = $tills[$tillId] ?? null;
+        }
+
+        if ($tillName) {
+            $legacyPrevious = DB::connection('pos')
+                ->table('CLOSEDCASH')
+                ->leftJoin('money', 'CLOSEDCASH.MONEY', '=', 'money.ID')
+                ->where('CLOSEDCASH.HOST', $tillName)
+                ->whereDate('CLOSEDCASH.DATEEND', '<', $date)
+                ->orderBy('CLOSEDCASH.DATEEND', 'desc')
+                ->select('money.noteFloat', 'money.coinFloat', 'CLOSEDCASH.DATEEND')
+                ->first();
+
+            if ($legacyPrevious && ($legacyPrevious->noteFloat !== null || $legacyPrevious->coinFloat !== null)) {
+                return [
+                    'notes' => (float) ($legacyPrevious->noteFloat ?? 0),
+                    'coins' => (float) ($legacyPrevious->coinFloat ?? 0),
+                    'date' => Carbon::parse($legacyPrevious->DATEEND)->format('Y-m-d'),
+                    'source' => 'legacy',
+                ];
+            }
+        }
+
+        return ['notes' => 0, 'coins' => 0, 'date' => null, 'source' => null];
     }
 
     /**
@@ -202,7 +231,7 @@ class CashReconciliationRepository
             $reconciliation->total_cash_counted = $totalCash;
 
             // Calculate variance
-            $previousFloat = $this->getPreviousDayFloat($reconciliation->date, $reconciliation->till_id);
+            $previousFloat = $this->getPreviousDayFloat($reconciliation->date, $reconciliation->till_id, $reconciliation->till_name);
             $daysCashTakings = $totalCash + ($data['cash_back'] ?? 0) -
                               ($previousFloat['notes'] + $previousFloat['coins']) -
                               ($data['money_added'] ?? 0);

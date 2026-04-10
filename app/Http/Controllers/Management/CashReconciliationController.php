@@ -130,25 +130,14 @@ class CashReconciliationController extends Controller
             $date = Carbon::parse($request->input('date'));
             $tillId = $request->input('till_id');
 
-            $previousReconciliation = \App\Models\CashReconciliation::where('till_id', $tillId)
-                ->where('date', '<', $date)
-                ->orderBy('date', 'desc')
-                ->first();
-
-            if ($previousReconciliation) {
-                return response()->json([
-                    'success' => true,
-                    'note_float' => $previousReconciliation->note_float,
-                    'coin_float' => $previousReconciliation->coin_float,
-                    'date' => $previousReconciliation->date->format('Y-m-d'),
-                ]);
-            }
+            $previousFloat = $this->repository->getPreviousDayFloat($date, $tillId);
 
             return response()->json([
                 'success' => true,
-                'note_float' => 0,
-                'coin_float' => 0,
-                'date' => null,
+                'note_float' => $previousFloat['notes'],
+                'coin_float' => $previousFloat['coins'],
+                'date' => $previousFloat['date'],
+                'source' => $previousFloat['source'],
             ]);
         } catch (\Exception $e) {
             return response()->json([
