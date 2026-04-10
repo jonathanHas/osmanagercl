@@ -32,6 +32,7 @@ class CashReconciliationController extends Controller
         try {
             $selectedDate = Carbon::parse($date);
             $reconciliation = $this->repository->getOrCreateReconciliation($selectedDate, $tillId, $tillName);
+            $reconciliation->load(['legacyCashLodgement', 'cashLodgements.cashLodgement', 'payments']);
             $suppliers = $this->repository->getSuppliers();
             $history = $this->repository->getHistory($tillId, 7);
 

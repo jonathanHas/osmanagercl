@@ -310,27 +310,21 @@
                 </div>
             @endif
 
-            <!-- Related Reconciliations -->
+            <!-- Reconciliation Comparison -->
             @if($relatedReconciliations->count() > 0)
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
                     <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                        <h3 class="text-lg font-medium text-gray-900 dark:text-white">Related Reconciliations</h3>
+                        <h3 class="text-lg font-medium text-gray-900 dark:text-white">Reconciliation Comparison</h3>
                         <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                            Cash reconciliations for this money ID
+                            Side-by-side: what was counted vs what was lodged
                         </p>
                     </div>
-                    <div class="p-6 space-y-3">
+                    <div class="p-4 space-y-3">
                         @foreach($relatedReconciliations as $reconciliation)
-                            <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                                <div class="flex justify-between items-start mb-2">
-                                    <span class="text-sm font-medium text-gray-900 dark:text-white">{{ $reconciliation->date->format('M j, Y') }}</span>
-                                    <span class="text-sm text-gray-600 dark:text-gray-400">{{ $reconciliation->till_name }}</span>
-                                </div>
-                                <div class="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-                                    <div>Total Cash: €{{ number_format($reconciliation->calculateTotalCash(), 2) }}</div>
-                                    <div>Available to Lodge: €{{ number_format($reconciliation->calculateAvailableToLodge(), 2) }}</div>
-                                </div>
-                            </div>
+                            @include('management.cash-lodgements.partials.reconciliation-comparison', [
+                                'reconciliation' => $reconciliation,
+                                'lodgement' => $lodgement,
+                            ])
                         @endforeach
                     </div>
                 </div>

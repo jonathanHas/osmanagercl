@@ -10,6 +10,13 @@
                 </p>
             </div>
             <div class="flex space-x-3">
+                <a href="{{ route('cash-reconciliation.index') }}"
+                   class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                    </svg>
+                    Cash Reconciliation
+                </a>
                 <a href="{{ route('management.cash-lodgements.diagnostic', request()->query()) }}"
                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -213,6 +220,7 @@
                         <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Type</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Recon Variance</th>
                         <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
@@ -272,16 +280,43 @@
                                     </span>
                                 @endif
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <a href="{{ route('management.cash-lodgements.show', $lodgement) }}" 
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
+                                @php
+                                    $reconMatch = $lodgement->matches->first();
+                                    $reconVariance = null;
+                                    if ($reconMatch && $reconMatch->cashReconciliation) {
+                                        $availToLodge = $reconMatch->cashReconciliation->calculateAvailableToLodge();
+                                        $reconVariance = $lodgement->cash_amount - $availToLodge;
+                                    }
+                                @endphp
+                                @if($reconVariance !== null)
+                                    @php
+                                        $absVar = abs($reconVariance);
+                                        $varClass = $absVar < 1 ? 'text-green-600 dark:text-green-400' : ($absVar > 20 ? 'text-red-600 dark:text-red-400' : ($absVar > 5 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-700 dark:text-gray-300'));
+                                    @endphp
+                                    <span class="{{ $varClass }} font-medium">
+                                        @if($absVar < 0.01) &check; @else €{{ number_format($absVar, 2) }} {{ $reconVariance > 0 ? '↑' : '↓' }} @endif
+                                    </span>
+                                @else
+                                    <span class="text-gray-400">—</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
+                                <a href="{{ route('management.cash-lodgements.show', $lodgement) }}"
                                    class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
-                                    View Details
+                                    View
                                 </a>
+                                @if($reconMatch && $reconMatch->cashReconciliation)
+                                <a href="{{ route('cash-reconciliation.index', ['date' => $reconMatch->cashReconciliation->date->format('Y-m-d'), 'till_id' => $reconMatch->cashReconciliation->till_id]) }}"
+                                   class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
+                                    Recon
+                                </a>
+                                @endif
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                            <td colspan="9" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                                 No cash lodgements found for the selected criteria.
                             </td>
                         </tr>

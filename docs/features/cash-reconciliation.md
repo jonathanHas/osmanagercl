@@ -169,6 +169,8 @@ Variance = Day's Cash Taking - POS Cash Total
 
 ## Related Systems
 
+- [Cash Closed (End-of-Day Overview)](./cash-closed.md) - How reconciliation fits into the full cash-to-bank pipeline, legacy migration details
+- [Cash Lodgements](../features/cash-closed.md#key-integration-reconciliation--lodgements) - Bank deposit tracking with side-by-side reconciliation comparison
 - [Till Review System](./till-review.md) - View receipts and transactions
 - [POS Integration](./pos-integration.md) - Connection to uniCenta POS
 - [User Roles & Permissions](./user-roles-permissions.md) - Access control
