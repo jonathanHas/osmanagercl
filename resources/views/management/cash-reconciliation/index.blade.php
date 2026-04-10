@@ -393,11 +393,11 @@
                                 <!-- Cash Variance -->
                                 <div class="border-t dark:border-gray-700 pt-3 mt-1">
                                     <div class="flex justify-between items-baseline">
-                                        <span class="text-base font-bold text-gray-800 dark:text-gray-200">Cash Variance</span>
-                                        <span class="text-2xl font-bold"
+                                        <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Cash Variance</span>
+                                        <span class="text-lg font-bold"
                                               :class="variance > 0 ? 'text-green-600 dark:text-green-400' : (variance < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400')">
                                             €<span x-text="Math.abs(variance).toFixed(2)"></span>
-                                            <span class="text-base" x-show="variance != 0" x-text="variance > 0 ? '↑' : '↓'"></span>
+                                            <span class="text-sm" x-show="variance != 0" x-text="variance > 0 ? '↑' : '↓'"></span>
                                         </span>
                                     </div>
                                 </div>
@@ -444,71 +444,17 @@
                                 </div>
                             </div>
 
-                            <!-- Save + View Receipts -->
-                            <div class="mt-6 space-y-2">
+                            <!-- Save -->
+                            <div class="mt-6">
                                 <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-md text-base">
                                     Save
                                 </button>
-                                <a href="{{ route('till-review.index', ['date' => $selectedDate->format('Y-m-d')]) }}"
-                                   class="block w-full text-center text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 py-1">
-                                    View Receipts
-                                </a>
                             </div>
                         </div>
                     </div>
                 </div>
             </form>
 
-            <!-- Recent History -->
-            @if($history->count() > 0)
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow mt-6 p-4">
-                <h3 class="text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200">Recent History</h3>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead class="bg-gray-50 dark:bg-gray-900/50">
-                            <tr>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
-                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Cash</th>
-                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">POS</th>
-                                <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Variance</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">By</th>
-                                <th class="px-4 py-2"></th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                            @foreach($history as $item)
-                            @php
-                                $absVariance = abs($item->variance);
-                                $varianceClass = $item->variance == 0
-                                    ? 'text-gray-600 dark:text-gray-400'
-                                    : ($absVariance > 20
-                                        ? 'text-red-600 dark:text-red-400 font-semibold'
-                                        : ($absVariance > 5
-                                            ? 'text-amber-600 dark:text-amber-400'
-                                            : ($item->variance > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400')));
-                            @endphp
-                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                <td class="px-4 py-2 text-sm text-gray-800 dark:text-gray-200">{{ $item->date->format('D d/m') }}</td>
-                                <td class="px-4 py-2 text-sm text-gray-800 dark:text-gray-200 text-right">€{{ number_format($item->total_cash_counted, 2) }}</td>
-                                <td class="px-4 py-2 text-sm text-gray-800 dark:text-gray-200 text-right">€{{ number_format($item->pos_cash_total, 2) }}</td>
-                                <td class="px-4 py-2 text-sm text-right">
-                                    <span class="{{ $varianceClass }}">
-                                        €{{ number_format($absVariance, 2) }}
-                                        @if($item->variance != 0) {{ $item->variance > 0 ? '↑' : '↓' }} @endif
-                                    </span>
-                                </td>
-                                <td class="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">{{ $item->creator?->name ?? '-' }}</td>
-                                <td class="px-4 py-2 text-sm text-right">
-                                    <a href="{{ route('cash-reconciliation.index', ['date' => $item->date->format('Y-m-d'), 'till_id' => $item->till_id]) }}"
-                                       class="text-indigo-600 dark:text-indigo-400 hover:underline">View</a>
-                                </td>
-                            </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            @endif
             @else
             <div class="bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-400 dark:border-yellow-600 text-yellow-700 dark:text-yellow-300 px-4 py-3 rounded">
                 No closed cash record found for the selected date and till. Please ensure the till was closed on this date.
