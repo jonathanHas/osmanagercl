@@ -374,6 +374,10 @@
                                     <span>Cashback</span>
                                     <span>+€<span x-text="parseFloat(cashBack || 0).toFixed(2)"></span></span>
                                 </div>
+                                <div x-show="totalPayments > 0" class="flex justify-between text-gray-600 dark:text-gray-400">
+                                    <span>Supplier Payments</span>
+                                    <span>+€<span x-text="totalPayments.toFixed(2)"></span></span>
+                                </div>
                                 <div x-show="parseFloat(moneyAdded || 0) > 0" class="flex justify-between text-gray-600 dark:text-gray-400">
                                     <span>Money Added</span>
                                     <span>-€<span x-text="parseFloat(moneyAdded || 0).toFixed(2)"></span></span>
@@ -537,7 +541,7 @@
                     }
 
                     this.totalCash = this.totalNotes + this.totalCoins;
-                    this.daysCashTaking = this.totalCash + parseFloat(this.cashBack || 0) - this.previousFloat - parseFloat(this.moneyAdded || 0);
+                    this.daysCashTaking = this.totalCash + parseFloat(this.cashBack || 0) + this.totalPayments - this.previousFloat - parseFloat(this.moneyAdded || 0);
                     this.variance = this.daysCashTaking - this.posCashTotal;
                 },
 

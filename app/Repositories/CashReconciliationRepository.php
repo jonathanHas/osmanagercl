@@ -83,8 +83,14 @@ class CashReconciliationRepository
                 // Calculate total cash counted
                 $reconciliation->total_cash_counted = $reconciliation->calculateTotalCash();
 
-                // Calculate variance
-                $daysCashTakings = $reconciliation->total_cash_counted + ($legacyMoney->cashBack ?? 0) -
+                // Get legacy supplier payment total for variance calculation
+                $legacyPayeeTotal = DB::connection('pos')->table('payeePayments')
+                    ->where('closedCashID', $closedCash->MONEY)
+                    ->sum('amount');
+
+                // Calculate variance (matches legacy: cash + cashback + supplier payments - prev float - money added)
+                $daysCashTakings = $reconciliation->total_cash_counted + ($legacyMoney->cashBack ?? 0) +
+                                  $legacyPayeeTotal -
                                   ($previousFloat['notes'] + $previousFloat['coins']) -
                                   ($legacyMoney->moneyAdded ?? 0);
 
@@ -230,20 +236,23 @@ class CashReconciliationRepository
             $totalCash = $reconciliation->calculateTotalCash();
             $reconciliation->total_cash_counted = $totalCash;
 
-            // Calculate variance
+            // Handle payments first so we can include them in variance
+            if (isset($data['payments'])) {
+                $this->savePayments($reconciliation, $data['payments']);
+            }
+
+            // Calculate supplier payment total
+            $supplierPaymentTotal = $reconciliation->payments()->sum('amount');
+
+            // Calculate variance (matches legacy formula: cash + cashback + supplier payments - prev float - money added)
             $previousFloat = $this->getPreviousDayFloat($reconciliation->date, $reconciliation->till_id, $reconciliation->till_name);
-            $daysCashTakings = $totalCash + ($data['cash_back'] ?? 0) -
+            $daysCashTakings = $totalCash + ($data['cash_back'] ?? 0) + $supplierPaymentTotal -
                               ($previousFloat['notes'] + $previousFloat['coins']) -
                               ($data['money_added'] ?? 0);
 
             $reconciliation->variance = $daysCashTakings - $reconciliation->pos_cash_total;
 
             $reconciliation->save();
-
-            // Handle payments
-            if (isset($data['payments'])) {
-                $this->savePayments($reconciliation, $data['payments']);
-            }
 
             // Handle notes
             if (! empty($data['notes'])) {
