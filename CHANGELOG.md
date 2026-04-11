@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **AI Integration: Multi-Provider Camera Invoice Capture** (2026-04-11)
+  - Phone camera tab on bulk upload page for photographing paper invoices
+  - AI-powered extraction of supplier, invoice number, date, total, VAT breakdown, and line items
+  - Multi-provider support: Google Gemini, Mistral Vision, Mistral OCR, OpenAI-compatible APIs
+  - Per-feature AI configuration -- invoice parsing and label translation can use different providers
+  - Admin UI for switching providers/models from System Tools > AI Diagnostics (no server access needed)
+  - Database-backed settings (`app_settings` table) with `.env` fallback; API keys always in `.env`
+  - Queue-based processing: users snap multiple photos without waiting for AI results
+  - 4-layer supplier fuzzy matching (exact, substring, cleaned suffixes, word-based with Levenshtein)
+  - Date validation warnings for dates > 2 months old, wrong year, or future dates
+  - VAT safety: only assigns rates explicitly shown on invoice, warns when not specified
+  - Prominent warning display on preview page with red highlighting for date issues
+  - Connection diagnostics page with text, vision, and OCR test endpoints
+  - **New**: `app/Services/AiSettingsService.php`, `app/Services/InvoiceGeminiParsingService.php`, `app/Jobs/ParseInvoiceCameraImage.php`, `app/Http/Controllers/AiDiagnosticsController.php`, `resources/views/tools/ai-diagnostics.blade.php`, `docs/features/ai-integration.md`
+  - **Modified**: `app/Http/Controllers/InvoiceBulkUploadController.php`, `app/Http/Controllers/LabelTranslationController.php`, `app/Http/Controllers/LabelAreaController.php`, `resources/views/invoices/bulk-upload.blade.php`, `resources/views/invoices/bulk-upload-preview.blade.php`, `resources/views/layouts/admin.blade.php`, `config/invoices.php`, `routes/web.php`
+  - **Migration**: `add_parsing_source_to_invoice_upload_files_table`
+
 - **Delivery Legacy: Mobile-Friendly Card Layouts** (2026-04-01)
   - `/delivery-legacy` index: Recent Scan Sessions now display as compact cards on mobile with touch-friendly Select/View Match buttons, merge checkboxes, and inline supplier editing — no horizontal scrolling required
   - `/delivery-legacy/match`: All 7 table sections (Pending, Critical, Warnings, Verified, OOS, Extra, Missing) now show mobile card layouts below `md` breakpoint with color-coded left borders, product images, stock levels, and inline quantity editing

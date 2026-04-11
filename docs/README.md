@@ -52,6 +52,10 @@ Detailed documentation for each major feature. See **[Features Index](./FEATURES
 - [Stock Check Review](./features/stock-check-review.md) - Category stock review and reconciliation
 - [Destock Review](./features/destock-review.md) - Destock audit trail and restock suggestions
 
+**AI & Automation**
+- [AI Integration](./features/ai-integration.md) - Multi-provider AI for invoice parsing and label translation
+- [Label Translation System](./features/label-translation-system.md) - AI-powered foreign label translation
+
 **POS Integration**
 - [POS Integration](./features/pos-integration.md) - uniCenta POS database integration
 - [Coffee KDS System](./features/kds-coffee-system.md) - Real-time Kitchen Display

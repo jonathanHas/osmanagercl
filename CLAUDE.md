@@ -163,6 +163,11 @@ For a complete list of all features with detailed descriptions, see **[Features 
 - Bank Statement Analysis
 - Cash Reconciliation
 
+**AI & Automation**
+- Multi-Provider AI Integration (Gemini, Mistral, OpenAI)
+- Camera Invoice Capture
+- AI Diagnostics & Settings
+
 **POS Integration**
 - Receipts Management
 - Coffee KDS (Kitchen Display)
@@ -221,6 +226,7 @@ php artisan optimize:clear     # Clear caches
 
 **Where to Find Information:**
 - 🔥 **Performance**: [Sales Data Import Plan](./docs/features/sales-data-import-plan.md)
+- **AI Integration**: [AI Integration](./docs/features/ai-integration.md) - Multi-provider AI config, camera capture, diagnostics
 - **Features**: [Features Index](./docs/FEATURES_INDEX.md)
 - **Troubleshooting**: [Known Issues](./docs/development/known-issues.md)
 - **Development**: [Quick Start Guide](./docs/development/quick-start-guide.md)

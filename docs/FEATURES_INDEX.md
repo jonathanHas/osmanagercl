@@ -12,6 +12,7 @@ This document provides a comprehensive overview of all features in the OSManager
 - [Analytics & Reporting](#analytics--reporting)
 - [POS Integration](#pos-integration)
 - [User Management](#user-management)
+- [AI & Automation](#ai--automation)
 
 ---
 
@@ -498,9 +499,12 @@ Modern multi-file invoice upload system with drag-and-drop interface.
 - **Configurable Limits**: Customizable file count and size limits
 - **Recent History**: View and manage recent upload batches
 - **Python Parser Ready**: Foundation for automated data extraction (Phase 2)
+- **Camera Invoice Capture** (NEW! 2026-04-11): Phone camera tab for photographing paper invoices with AI-powered extraction
+- **Multi-Provider AI Parsing** (NEW! 2026-04-11): Supports Gemini, Mistral Vision, Mistral OCR, and OpenAI for camera-captured images
 
 📖 [Invoice Bulk Upload Documentation](./features/invoice-bulk-upload-system.md)
 📖 [Invoice Parser Integration Guide](./features/invoice-parser-integration.md) (Phase 2)
+📖 [AI Integration Documentation](./features/ai-integration.md)
 
 ### Udea Invoice Parser (NEW! 2026-01-28, Updated 2026-02-12)
 Debug and data extraction tool for UDEA B.V. invoice PDFs with structured output.
@@ -765,6 +769,35 @@ Role-based access control (RBAC) with granular permissions.
 - **User Management**: Assign roles, manage permissions, audit access
 
 📖 [User Roles & Permissions Documentation](./features/user-roles-permissions.md)
+
+---
+
+## AI & Automation
+
+### AI Integration (NEW! 2026-04-11)
+Multi-provider AI integration with per-feature configuration, admin-switchable from the UI.
+- **Multi-Provider Support**: Google Gemini, Mistral Vision, Mistral OCR, OpenAI
+- **Per-Feature Configuration**: Invoice parsing and label translation can use different providers
+- **Admin UI**: Switch providers/models from System Tools > AI Diagnostics without server access
+- **Camera Invoice Capture**: Phone camera captures paper invoices, AI extracts data via queue jobs
+- **Supplier Fuzzy Matching**: 4-layer matching algorithm (exact, substring, cleaned, word-based with Levenshtein)
+- **Date Validation**: Flags suspicious dates (> 2 months old, wrong year, future dates)
+- **VAT Safety**: Only assigns VAT rates explicitly shown on invoice
+- **Connection Diagnostics**: Test text, vision, and OCR endpoints with response timing
+- **Database-Backed Settings**: `app_settings` table, API keys stay in `.env`
+
+📖 [AI Integration Documentation](./features/ai-integration.md)
+
+### Camera Invoice Capture (NEW! 2026-04-11)
+Phone camera feature for the bulk upload page allowing users to photograph paper invoices.
+- **Capture Queue Pattern**: Take multiple photos without waiting -- each is uploaded and queued for AI processing immediately
+- **Tab-Based UI**: "Upload Files" (existing) and "Camera Capture" tabs, camera defaults on mobile
+- **Live Status Polling**: Thumbnail grid with real-time status badges (uploading, processing, done, failed)
+- **Feeds Existing Pipeline**: Results go through the same review/create flow as digital file uploads
+- **Client-Side Resize**: Images compressed before upload (1600px max, 85% JPEG)
+
+📖 [AI Integration Documentation](./features/ai-integration.md)
+📖 [Invoice Bulk Upload Documentation](./features/invoice-bulk-upload-system.md)
 
 ---
 

@@ -1,7 +1,7 @@
 <x-admin-layout>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {{-- Header --}}
-        <div class="flex justify-between items-center mb-6">
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
             <div>
                 @if(isset($isAmazonPendingView) && $isAmazonPendingView)
                     <h2 class="text-2xl font-bold text-gray-100">Amazon Payment Entry</h2>
@@ -11,20 +11,20 @@
                     <p class="text-gray-400 text-sm mt-1">Batch ID: {{ $batch->batch_id }}</p>
                 @endif
             </div>
-            <div class="flex space-x-2">
+            <div class="flex flex-wrap gap-2">
                 @if(isset($isAmazonPendingView) && $isAmazonPendingView)
-                    <a href="{{ route('invoices.bulk-upload.amazon-pending') }}" 
-                       class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                    <a href="{{ route('invoices.bulk-upload.amazon-pending') }}"
+                       class="bg-gray-600 hover:bg-gray-700 text-white font-bold text-sm py-1.5 px-3 sm:py-2 sm:px-4 rounded">
                         ← Back to Amazon Pending
                     </a>
                 @else
-                    <a href="{{ route('invoices.bulk-upload.index') }}" 
-                       class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                    <a href="{{ route('invoices.bulk-upload.index') }}"
+                       class="bg-gray-600 hover:bg-gray-700 text-white font-bold text-sm py-1.5 px-3 sm:py-2 sm:px-4 rounded">
                         New Upload
                     </a>
                 @endif
-                <a href="{{ route('invoices.index') }}" 
-                   class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                <a href="{{ route('invoices.index') }}"
+                   class="bg-gray-600 hover:bg-gray-700 text-white font-bold text-sm py-1.5 px-3 sm:py-2 sm:px-4 rounded">
                     Back to Invoices
                 </a>
             </div>
@@ -33,7 +33,7 @@
         {{-- Batch Summary --}}
         <div class="bg-gray-800 rounded-lg p-6 mb-6">
             <h3 class="text-lg font-semibold text-gray-100 mb-4">Batch Summary</h3>
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
                 <div>
                     <p class="text-gray-400 text-sm">Total Files</p>
                     <p class="text-2xl font-bold text-gray-100">{{ $batch->total_files }}</p>
@@ -77,7 +77,7 @@
             {{-- Progress Bar --}}
             @if($batch->status === 'processing')
             <div class="mt-6">
-                <div class="flex justify-between items-center text-sm text-gray-400 mb-2">
+                <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 text-sm text-gray-400 mb-2">
                     <span>Processing Progress</span>
                     <div class="flex items-center space-x-4">
                         <span>{{ $batch->processed_files }}/{{ $batch->total_files }} files</span>
@@ -121,20 +121,20 @@
 
         {{-- Files List --}}
         <div class="bg-gray-800 rounded-lg p-6" x-data="{ selectedFiles: [] }">
-            <div class="flex justify-between items-center mb-4">
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
                 <h3 class="text-lg font-semibold text-gray-100">Uploaded Files</h3>
                 @if($batch->status === 'uploaded')
-                <div class="flex space-x-2">
-                    <button onclick="startParsing()" 
-                            class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
-                        <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="startParsing()"
+                            class="bg-green-600 hover:bg-green-700 text-white font-bold text-sm py-1.5 px-3 sm:py-2 sm:px-4 rounded">
+                        <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
                         Start Processing
                     </button>
                     @if($batch->canBeCancelled())
-                    <button onclick="cancelBatch()" 
-                            class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                    <button onclick="cancelBatch()"
+                            class="bg-red-600 hover:bg-red-700 text-white font-bold text-sm py-1.5 px-3 sm:py-2 sm:px-4 rounded">
                         Cancel Batch
                     </button>
                     @endif
@@ -142,7 +142,408 @@
                 @endif
             </div>
 
-            <div class="overflow-x-auto">
+            {{-- Mobile Card Layout --}}
+            <div class="md:hidden space-y-4">
+                @foreach($files as $file)
+                <div class="bg-gray-700/50 rounded-lg p-4 @if($file->isPdf() && $file->page_count > 1) border-l-4 border-amber-500 @endif"
+                     x-data="{ showDetails: false, showActions: false, showEdit: false }">
+
+                    {{-- Card Header: filename + status --}}
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="flex items-center min-w-0">
+                            @if($file->isPdf())
+                                <svg class="w-5 h-5 flex-shrink-0 @if($file->page_count > 1) text-amber-400 @else text-red-400 @endif mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M4 18h12a2 2 0 002-2V6.414A2 2 0 0017.414 5L14 1.586A2 2 0 0012.586 1H4a2 2 0 00-2 2v13a2 2 0 002 2z"/>
+                                </svg>
+                            @elseif($file->isImage())
+                                <svg class="w-5 h-5 flex-shrink-0 text-blue-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
+                                </svg>
+                            @else
+                                <svg class="w-5 h-5 flex-shrink-0 text-gray-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M4 18h12a2 2 0 002-2V6.414A2 2 0 0017.414 5L14 1.586A2 2 0 0012.586 1H4a2 2 0 00-2 2v13a2 2 0 002 2z"/>
+                                </svg>
+                            @endif
+                            <div class="min-w-0">
+                                <p class="text-gray-200 text-sm font-medium truncate">{{ $file->original_filename }}</p>
+                                <p class="text-gray-400 text-xs mt-0.5">
+                                    {{ strtoupper($file->extension) }} &middot; {{ $file->formatted_file_size }}
+                                    @if($file->isPdf() && $file->page_count > 0)
+                                        &middot; {{ $file->page_count }} page{{ $file->page_count > 1 ? 's' : '' }}
+                                    @endif
+                                    @if($file->isSplitFile())
+                                        &middot; <span class="text-purple-300">Split ({{ $file->page_range }})</span>
+                                    @endif
+                                </p>
+                            </div>
+                        </div>
+                        <span class="flex-shrink-0 px-2 py-1 text-xs rounded-full bg-{{ $file->status_color }}-900 text-{{ $file->status_color }}-300">
+                            {{ $file->status_label }}
+                        </span>
+                    </div>
+
+                    {{-- Quick summary (always visible if parsed) --}}
+                    @if(in_array($file->status, ['parsed', 'review', 'amazon_pending', 'completed']) && $file->parsed_total_amount)
+                    <div class="mt-2 text-xs">
+                        <div class="font-semibold text-green-400">
+                            Total: &euro;{{ number_format($file->parsed_total_amount, 2) }}
+                            @if($file->supplier_detected)
+                                <span class="text-gray-300 font-normal">| {{ $file->supplier_detected }}</span>
+                            @endif
+                            @if($file->parsed_invoice_date)
+                                @php
+                                    $parsedDate = \Carbon\Carbon::parse($file->parsed_invoice_date);
+                                    $monthsDiff = abs($parsedDate->diffInMonths(now()));
+                                    $isSuspiciousDate = $monthsDiff > 2 || $parsedDate->year < now()->year - 1 || $parsedDate->isAfter(now()->addDays(7));
+                                @endphp
+                                <span class="{{ $isSuspiciousDate ? 'px-1.5 py-0.5 bg-red-900 border border-red-500 rounded text-red-300 font-bold' : 'text-gray-300 font-normal' }}">
+                                    | {{ $parsedDate->format('d/m/Y') }}
+                                    @if($isSuspiciousDate) ⚠@endif
+                                </span>
+                            @endif
+                        </div>
+                        @if($file->parsing_confidence)
+                            <span class="text-gray-400">({{ round($file->parsing_confidence * 100) }}% confidence)</span>
+                        @endif
+                    </div>
+                    @endif
+
+                    {{-- Duplicate badge --}}
+                    @if($file->error_message && str_contains(strtolower($file->error_message), 'duplicate'))
+                        <div class="mt-2">
+                            <span class="px-2 py-1 text-xs rounded-full bg-yellow-900 text-yellow-300">⚠ Possible Duplicate</span>
+                        </div>
+                    @endif
+
+                    {{-- Parsing spinner --}}
+                    @if($file->status === 'parsing')
+                        <div class="mt-3 p-3 bg-purple-900/30 border border-purple-600 rounded-md">
+                            <div class="flex items-center">
+                                <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-400 mr-2"></div>
+                                <span class="text-purple-300 text-sm font-medium">Processing Invoice...</span>
+                            </div>
+                        </div>
+                    @endif
+
+                    {{-- Toggle buttons --}}
+                    <div class="mt-3 flex items-center gap-3">
+                        @if(in_array($file->status, ['parsed', 'review', 'amazon_pending', 'completed']))
+                        <button @click="showDetails = !showDetails"
+                                class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
+                            <svg class="w-3 h-3 transition-transform" :class="showDetails && 'rotate-90'" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                            </svg>
+                            <span x-text="showDetails ? 'Hide Details' : 'Details'"></span>
+                        </button>
+                        @endif
+                        <button @click="showActions = !showActions"
+                                class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
+                            <svg class="w-3 h-3 transition-transform" :class="showActions && 'rotate-90'" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                            </svg>
+                            <span x-text="showActions ? 'Hide Actions' : 'Actions'"></span>
+                        </button>
+                    </div>
+
+                    {{-- Details panel (expandable) --}}
+                    <div x-show="showDetails" x-cloak x-collapse class="mt-3 space-y-2">
+                        {{-- VAT breakdown --}}
+                        @if($file->parsed_vat_data)
+                            @php
+                                $vatSummary = [];
+                                foreach (['vat_0' => '0%', 'vat_9' => '9%', 'vat_13_5' => '13.5%', 'vat_23' => '23%'] as $key => $rate) {
+                                    if (isset($file->parsed_vat_data[$key])) {
+                                        $netAmount = is_array($file->parsed_vat_data[$key])
+                                            ? ($file->parsed_vat_data[$key]['net'] ?? 0)
+                                            : $file->parsed_vat_data[$key];
+                                        if ($netAmount > 0) {
+                                            $vatSummary[] = $rate . ' (&euro;' . number_format($netAmount, 2) . ')';
+                                        }
+                                    }
+                                }
+                            @endphp
+                            @if(count($vatSummary) > 0)
+                                <div class="p-2 bg-gray-800 rounded text-xs text-gray-400">
+                                    <span class="font-medium text-gray-300">VAT:</span> {!! implode(' | ', $vatSummary) !!}
+                                </div>
+                            @endif
+                        @endif
+
+                        {{-- RTD Summary --}}
+                        @if($file->supplier_detected === 'Udea' && isset($file->parsed_data['lines']) && count($file->parsed_data['lines']) > 0)
+                            @php
+                                $rtdService = app(\App\Services\RtdResolutionService::class);
+                                $lines = $file->parsed_data['lines'];
+                                $resolvedCount = 0;
+                                $unresolvedCount = 0;
+                                $unresolvedValue = 0;
+                                foreach ($lines as $line) {
+                                    $lineType = $line['line_type'] ?? 'unknown';
+                                    if (!in_array($lineType, ['product_for_resale', 'unknown'])) continue;
+                                    $articleCode = $line['article_code'] ?? null;
+                                    $lineTotal = $rtdService->parseMonetaryValue($line['line_total'] ?? 0);
+                                    $resolution = $rtdService->resolveArticleCode($articleCode);
+                                    if ($resolution['status'] === 'resolved' && $rtdService->isValidIrishVatRate($resolution['vat_rate'] ?? null)) {
+                                        $resolvedCount++;
+                                    } else {
+                                        $unresolvedCount++;
+                                        $unresolvedValue += $lineTotal;
+                                    }
+                                }
+                                $totalProductLines = $resolvedCount + $unresolvedCount;
+                            @endphp
+                            @if($totalProductLines > 0)
+                                <div class="text-xs {{ $unresolvedCount > 0 ? 'text-yellow-400' : 'text-green-400' }}">
+                                    RTD: {{ $resolvedCount }}/{{ $totalProductLines }} resolved
+                                    @if($unresolvedCount > 0)
+                                        <span class="text-red-400">({{ $unresolvedCount }} unresolved: &euro;{{ number_format($unresolvedValue, 2) }})</span>
+                                    @endif
+                                </div>
+                            @endif
+                        @endif
+
+                        {{-- Warnings --}}
+                        @if($file->anomaly_warnings && count($file->anomaly_warnings) > 0)
+                            @php
+                                $hasDateWarning = collect($file->anomaly_warnings)->contains(fn($w) =>
+                                    str_contains(strtolower($w), 'date') || str_contains(strtolower($w), 'year')
+                                );
+                            @endphp
+                            <div class="p-2.5 rounded-md border {{ $hasDateWarning ? 'bg-red-900/40 border-red-500' : 'bg-yellow-900/30 border-yellow-600' }}">
+                                <p class="text-xs font-semibold {{ $hasDateWarning ? 'text-red-300' : 'text-yellow-300' }} mb-1">
+                                    {{ count($file->anomaly_warnings) }} Warning(s)
+                                </p>
+                                <ul class="text-xs space-y-0.5">
+                                    @foreach($file->anomaly_warnings as $warning)
+                                        @php $isDateW = str_contains(strtolower($warning), 'date') || str_contains(strtolower($warning), 'year'); @endphp
+                                        <li class="{{ $isDateW ? 'text-red-300 font-semibold' : 'text-yellow-200' }}">
+                                            {{ $isDateW ? '📅' : '•' }} {{ $warning }}
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
+
+                        {{-- Amazon Payment Adjustment --}}
+                        @php
+                            $adjustmentService = app(\App\Services\AmazonPaymentAdjustmentService::class);
+                            $needsAdjustment = $adjustmentService->needsPaymentAdjustment($file);
+                            $adjustmentData = $needsAdjustment ? $adjustmentService->getAdjustmentData($file) : [];
+                        @endphp
+                        @if($needsAdjustment)
+                            <div class="p-3 bg-yellow-900/30 border border-yellow-600 rounded-md">
+                                <div class="flex items-center mb-2">
+                                    <svg class="w-4 h-4 text-yellow-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <span class="text-yellow-300 text-sm font-medium">Payment Adjustment Needed</span>
+                                </div>
+                                <div class="text-xs text-gray-300 space-y-1">
+                                    @if($adjustmentData['is_pre_parsing'] ?? false)
+                                        <div class="text-blue-300">📋 Amazon invoice detected from filename</div>
+                                        <div>Enter the EUR amount you paid</div>
+                                    @elseif($adjustmentData['gbp_amounts_detected'] ?? false)
+                                        <div class="bg-gray-700 rounded p-2 mb-2">
+                                            <div class="font-medium text-gray-200 mb-1">Invoice Amounts (GBP):</div>
+                                            @if($adjustmentData['invoice_date'])
+                                            <div class="text-blue-300 font-medium text-sm mb-1">📅 {{ $adjustmentData['invoice_date'] }}</div>
+                                            @endif
+                                            @if($adjustmentData['gbp_total'] > 0)
+                                            <div>GBP Total: £{{ number_format($adjustmentData['gbp_total'], 2) }}</div>
+                                            @endif
+                                        </div>
+                                        @if($adjustmentData['eur_vat_detected'] ?? false)
+                                        <div class="bg-green-900/30 rounded p-2">
+                                            <div class="font-medium text-green-300 mb-1">Detected EUR Amounts:</div>
+                                            <div>EUR VAT: &euro;{{ number_format($adjustmentData['eur_vat_amount'], 2) }}</div>
+                                        </div>
+                                        @endif
+                                    @endif
+                                    <div class="mt-2">
+                                        <label class="block text-yellow-300 text-xs font-medium mb-1">Actual Amount Paid (from bank):</label>
+                                        <div class="flex items-center space-x-2">
+                                            <input type="number"
+                                                   step="0.01" min="0"
+                                                   name="actual_payment[{{ $file->id }}]"
+                                                   id="actual_payment_mobile_{{ $file->id }}"
+                                                   class="w-full px-2 py-1 text-xs bg-gray-800 border border-gray-600 rounded text-white focus:border-yellow-500 focus:outline-none"
+                                                   placeholder="22.65"
+                                                   onchange="updatePaymentPreview({{ $file->id }}, {{ $adjustmentData['eur_vat_amount'] ?? 0 }})"
+                                                   onkeyup="if(event.key === 'Enter') updatePaymentPreview({{ $file->id }}, {{ $adjustmentData['eur_vat_amount'] ?? 0 }})" />
+                                            <span class="text-xs text-gray-400">EUR</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- Actions panel (expandable) --}}
+                    <div x-show="showActions" x-cloak x-collapse class="mt-3">
+                        <div class="flex flex-wrap gap-2">
+                            @if($file->tempFileExists() && $file->isViewable())
+                            <button onclick="previewFile({{ $file->id }})"
+                                    class="px-3 py-1.5 text-xs rounded bg-gray-600 text-blue-400 hover:bg-gray-500">
+                                View Invoice
+                            </button>
+                            @endif
+                            @if($file->canBeSplit())
+                            <button onclick="splitPdf({{ $file->id }})"
+                                    class="px-3 py-1.5 text-xs rounded {{ $file->page_count > 1 ? 'bg-amber-600 text-white font-semibold' : 'bg-gray-600 text-green-400' }} hover:opacity-80">
+                                @if($file->page_count > 1) ⚠ Split @else Split @endif
+                            </button>
+                            @endif
+                            @if($file->status === 'failed')
+                            <button onclick="retryFile({{ $file->id }})"
+                                    class="px-3 py-1.5 text-xs rounded bg-gray-600 text-amber-400 hover:bg-gray-500">
+                                🔄 Retry
+                            </button>
+                            <button onclick="removeFile({{ $file->id }})"
+                                    class="px-3 py-1.5 text-xs rounded bg-gray-600 text-red-400 hover:bg-gray-500">
+                                Remove
+                            </button>
+                            @elseif($file->status === 'uploaded')
+                            <button onclick="removeFile({{ $file->id }})"
+                                    class="px-3 py-1.5 text-xs rounded bg-gray-600 text-red-400 hover:bg-gray-500">
+                                Remove
+                            </button>
+                            @elseif($file->status === 'review' && $file->error_message && str_contains(strtolower($file->error_message), 'duplicate'))
+                            <button onclick="removeDuplicateFile({{ $file->id }})"
+                                    class="px-3 py-1.5 text-xs rounded bg-gray-600 text-yellow-400 hover:bg-gray-500">
+                                Delete Duplicate
+                            </button>
+                            @endif
+                            @if($file->status === 'parsed' || $file->status === 'review')
+                            <button onclick="viewParsedData({{ $file->id }})"
+                                    class="px-3 py-1.5 text-xs rounded bg-gray-600 text-green-400 hover:bg-gray-500">
+                                View Data
+                            </button>
+                            @endif
+                            @if($file->isPdf())
+                            <button onclick="parseUdeaInvoice({{ $file->id }})"
+                                    class="px-3 py-1.5 text-xs rounded bg-gray-600 text-purple-400 hover:bg-gray-500">
+                                Parse Udea
+                            </button>
+                            @endif
+                            <button @click="showEdit = !showEdit"
+                                    class="px-3 py-1.5 text-xs rounded bg-gray-600 text-blue-400 hover:bg-gray-500">
+                                Edit/Enter Data
+                            </button>
+                        </div>
+                    </div>
+
+                    {{-- Inline Edit Form (expandable) --}}
+                    <div x-show="showEdit" x-cloak x-collapse class="mt-3">
+                        <div class="bg-gray-800 rounded-lg p-4">
+                            <h4 class="text-sm font-semibold text-gray-100 mb-3">
+                                Edit Invoice Data
+                            </h4>
+                            <form onsubmit="saveParsedData(event, {{ $file->id }}, '{{ $batch->batch_id }}')">
+                                <div class="space-y-3">
+                                    {{-- Supplier --}}
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-300 mb-1">Supplier <span class="text-red-400">*</span></label>
+                                        @php
+                                            $matchedSupplier = $file->supplier_detected ?? ($file->parsed_data['supplier_name'] ?? '');
+                                        @endphp
+                                        <select name="supplier_name"
+                                                class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white focus:border-blue-500 focus:outline-none"
+                                                required>
+                                            <option value="">-- Select Supplier --</option>
+                                            @foreach($suppliers as $supplier)
+                                                <option value="{{ $supplier->name }}" @selected($matchedSupplier === $supplier->name)>
+                                                    {{ $supplier->name }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        @php
+                                            $detectedSupplier = $file->supplier_detected ?? ($file->parsed_data['supplier_name'] ?? '');
+                                            $isInDropdown = $suppliers->contains('name', $detectedSupplier);
+                                            $customFieldValue = !$isInDropdown ? $detectedSupplier : '';
+                                        @endphp
+                                        <input type="text" name="supplier_name_custom"
+                                               placeholder="Or type new supplier"
+                                               class="w-full px-3 py-2 mt-1 text-sm bg-gray-700 border border-gray-600 rounded text-white focus:border-blue-500 focus:outline-none"
+                                               value="{{ $customFieldValue }}">
+                                    </div>
+                                    {{-- Invoice Ref + Date --}}
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-300 mb-1">Invoice Ref</label>
+                                            <input type="text" name="supplier_invoice_reference"
+                                                   value="{{ $file->parsed_invoice_number ?? ($file->parsed_data['supplier_invoice_reference'] ?? '') }}"
+                                                   class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white focus:border-blue-500 focus:outline-none">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-300 mb-1">Date</label>
+                                            <input type="date" name="invoice_date"
+                                                   value="{{ $file->parsed_invoice_date ? \Carbon\Carbon::parse($file->parsed_invoice_date)->format('Y-m-d') : ($file->parsed_data['invoice_date'] ?? '') }}"
+                                                   class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white focus:border-blue-500 focus:outline-none">
+                                        </div>
+                                    </div>
+                                    {{-- VAT fields --}}
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-300 mb-1">VAT 0% Net</label>
+                                            <input type="number" step="0.01" min="0" name="vat_0_net"
+                                                   value="{{ $file->parsed_data['vat_breakdown']['vat_0']['net'] ?? 0 }}"
+                                                   class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white focus:border-blue-500 focus:outline-none">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-300 mb-1">VAT 9% Net</label>
+                                            <input type="number" step="0.01" min="0" name="vat_9_net"
+                                                   value="{{ $file->parsed_data['vat_breakdown']['vat_9']['net'] ?? 0 }}"
+                                                   class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white focus:border-blue-500 focus:outline-none">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-300 mb-1">VAT 13.5% Net</label>
+                                            <input type="number" step="0.01" min="0" name="vat_13_5_net"
+                                                   value="{{ $file->parsed_data['vat_breakdown']['vat_13_5']['net'] ?? 0 }}"
+                                                   class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white focus:border-blue-500 focus:outline-none">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-gray-300 mb-1">VAT 23% Net</label>
+                                            <input type="number" step="0.01" min="0" name="vat_23_net"
+                                                   value="{{ $file->parsed_data['vat_breakdown']['vat_23']['net'] ?? 0 }}"
+                                                   class="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded text-white focus:border-blue-500 focus:outline-none">
+                                        </div>
+                                    </div>
+                                    {{-- Checkboxes --}}
+                                    <div class="flex space-x-4">
+                                        <label class="flex items-center text-xs text-gray-300">
+                                            <input type="checkbox" name="is_tax_free" value="1"
+                                                   {{ ($file->is_tax_free || ($file->parsed_data['is_tax_free'] ?? false)) ? 'checked' : '' }}
+                                                   class="mr-1.5">
+                                            Tax Free
+                                        </label>
+                                        <label class="flex items-center text-xs text-gray-300">
+                                            <input type="checkbox" name="is_credit_note" value="1"
+                                                   {{ ($file->is_credit_note || ($file->parsed_data['is_credit_note'] ?? false)) ? 'checked' : '' }}
+                                                   class="mr-1.5">
+                                            Credit Note
+                                        </label>
+                                    </div>
+                                    {{-- Buttons --}}
+                                    <div class="flex gap-2 pt-2">
+                                        <button type="button" @click="showEdit = false"
+                                                class="flex-1 bg-gray-600 hover:bg-gray-700 text-white text-sm font-bold py-2 rounded">
+                                            Cancel
+                                        </button>
+                                        <button type="submit"
+                                                class="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 rounded">
+                                            Save
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+
+            {{-- Desktop Table Layout --}}
+            <div class="hidden md:block overflow-x-auto">
                 <table class="min-w-full">
                     <thead>
                         <tr class="border-b border-gray-700">
@@ -434,11 +835,11 @@
                                 @endif
                             </td>
                             <td class="py-3 px-4">
-                                <div class="flex space-x-2">
+                                <div class="flex flex-wrap gap-1">
                                     @if($file->tempFileExists() && $file->isViewable())
-                                    <button onclick="previewFile({{ $file->id }})" 
+                                    <button onclick="previewFile({{ $file->id }})"
                                             class="text-blue-400 hover:text-blue-300 text-sm">
-                                        View
+                                        View Invoice
                                     </button>
                                     @endif
                                     @if($file->canBeSplit())
@@ -626,7 +1027,7 @@
                                             </div>
 
                                             {{-- Checkboxes --}}
-                                            <div class="col-span-2 flex space-x-6">
+                                            <div class="col-span-2 flex flex-col sm:flex-row sm:space-x-6 space-y-2 sm:space-y-0">
                                                 <label class="flex items-center text-sm text-gray-300">
                                                     <input type="checkbox"
                                                            name="is_tax_free"
@@ -674,9 +1075,9 @@
             @endphp
             
             @if($hasReviewFiles)
-            <div class="mt-6 flex justify-end space-x-3">
-                <button onclick="createInvoicesFromReview()" 
-                        class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+            <div class="mt-6 flex flex-col sm:flex-row sm:justify-end gap-3">
+                <button onclick="createInvoicesFromReview()"
+                        class="bg-green-600 hover:bg-green-700 text-white font-bold text-sm py-2 px-4 rounded">
                     <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
@@ -722,7 +1123,7 @@
 
         {{-- PDF Split Modal --}}
         <div id="splitPdfModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div class="bg-gray-800 rounded-lg max-w-6xl w-full max-h-[95vh] overflow-hidden">
+            <div class="bg-gray-800 rounded-lg w-full max-w-full sm:max-w-2xl md:max-w-4xl lg:max-w-6xl max-h-[95vh] overflow-hidden">
                 <div class="flex flex-col h-full">
                     {{-- Header --}}
                     <div class="flex justify-between items-center p-6 border-b border-gray-700">
@@ -755,7 +1156,7 @@
                             <div id="splitOptions" class="hidden">
                                 <div class="mb-6">
                                     <label class="block text-gray-300 font-medium mb-3">Split Mode:</label>
-                                    <div class="flex space-x-4">
+                                    <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-2 sm:space-y-0">
                                         <label class="flex items-center">
                                             <input type="radio" name="splitMode" value="per-page" checked class="form-radio text-blue-600">
                                             <span class="ml-2 text-gray-300">One invoice per page</span>
@@ -791,12 +1192,12 @@
                     </div>
                     
                     {{-- Footer --}}
-                    <div class="border-t border-gray-700 p-6">
-                        <div class="flex justify-end space-x-3">
-                            <button onclick="closeSplitPdfModal()" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded">
+                    <div class="border-t border-gray-700 p-4 sm:p-6">
+                        <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3">
+                            <button onclick="closeSplitPdfModal()" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm">
                                 Cancel
                             </button>
-                            <button id="confirmSplit" onclick="confirmPdfSplit()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded" disabled>
+                            <button id="confirmSplit" onclick="confirmPdfSplit()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm" disabled>
                                 Split PDF
                             </button>
                         </div>

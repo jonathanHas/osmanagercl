@@ -63,6 +63,16 @@
             width: 100vw;
             height: calc(100vh - 45px);
             position: relative;
+            overflow: auto;
+        }
+        .viewer-container img {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            display: block;
+            margin: 0 auto;
         }
         .fallback {
             position: absolute;
@@ -113,10 +123,16 @@
     </div>
 
     <div class="viewer-container">
-        <embed src="{{ $viewUrl }}"
-               type="application/pdf"
-               title="{{ $file->original_filename }}"
-               id="pdf-embed">
+        @if($file->isImage())
+            <img src="{{ $viewUrl }}"
+                 alt="{{ $file->original_filename }}"
+                 id="image-viewer">
+        @else
+            <embed src="{{ $viewUrl }}"
+                   type="application/pdf"
+                   title="{{ $file->original_filename }}"
+                   id="pdf-embed">
+        @endif
 
         <div class="fallback" id="pdf-fallback" style="display: none;">
             <div class="fallback-content">
@@ -132,13 +148,21 @@
     </div>
 
     <script>
-        setTimeout(function() {
-            const embed = document.getElementById('pdf-embed');
-            if (!embed || embed.offsetHeight === 0) {
+        @if($file->isImage())
+            const img = document.getElementById('image-viewer');
+            img.onerror = function() {
                 document.getElementById('pdf-fallback').style.display = 'flex';
-                if (embed) embed.style.display = 'none';
-            }
-        }, 3000);
+                img.style.display = 'none';
+            };
+        @else
+            setTimeout(function() {
+                const embed = document.getElementById('pdf-embed');
+                if (!embed || embed.offsetHeight === 0) {
+                    document.getElementById('pdf-fallback').style.display = 'flex';
+                    if (embed) embed.style.display = 'none';
+                }
+            }, 3000);
+        @endif
     </script>
 </body>
 </html>
