@@ -234,7 +234,15 @@
                                                 <span class="ml-2">| {{ $file->supplier_detected }}</span>
                                             @endif
                                             @if($file->parsed_invoice_date)
-                                                <span class="ml-2">| {{ \Carbon\Carbon::parse($file->parsed_invoice_date)->format('d/m/Y') }}</span>
+                                                @php
+                                                    $parsedDate = \Carbon\Carbon::parse($file->parsed_invoice_date);
+                                                    $monthsDiff = abs($parsedDate->diffInMonths(now()));
+                                                    $isSuspiciousDate = $monthsDiff > 2 || $parsedDate->year < now()->year - 1 || $parsedDate->isAfter(now()->addDays(7));
+                                                @endphp
+                                                <span class="ml-2 {{ $isSuspiciousDate ? 'px-1.5 py-0.5 bg-red-900 border border-red-500 rounded text-red-300 font-bold' : '' }}">
+                                                    | {{ $parsedDate->format('d/m/Y') }}
+                                                    @if($isSuspiciousDate) ⚠@endif
+                                                </span>
                                             @endif
                                         </div>
                                         @if($file->parsed_vat_data)
@@ -295,6 +303,37 @@
                                                 </div>
                                             @endif
                                         @endif
+                                    </div>
+                                @endif
+
+                                {{-- Warnings Block --}}
+                                @if($file->anomaly_warnings && count($file->anomaly_warnings) > 0)
+                                    @php
+                                        $hasDateWarning = collect($file->anomaly_warnings)->contains(fn($w) =>
+                                            str_contains(strtolower($w), 'date') || str_contains(strtolower($w), 'year')
+                                        );
+                                    @endphp
+                                    <div class="mt-2 p-2.5 rounded-md border {{ $hasDateWarning ? 'bg-red-900/40 border-red-500' : 'bg-yellow-900/30 border-yellow-600' }}">
+                                        <div class="flex items-start">
+                                            <svg class="w-4 h-4 {{ $hasDateWarning ? 'text-red-400' : 'text-yellow-400' }} mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                            </svg>
+                                            <div class="flex-1">
+                                                <p class="text-xs font-semibold {{ $hasDateWarning ? 'text-red-300' : 'text-yellow-300' }} mb-1">
+                                                    {{ count($file->anomaly_warnings) }} Warning(s)
+                                                </p>
+                                                <ul class="text-xs space-y-0.5">
+                                                    @foreach($file->anomaly_warnings as $warning)
+                                                        @php
+                                                            $isDateW = str_contains(strtolower($warning), 'date') || str_contains(strtolower($warning), 'year');
+                                                        @endphp
+                                                        <li class="{{ $isDateW ? 'text-red-300 font-semibold' : 'text-yellow-200' }}">
+                                                            {{ $isDateW ? '📅' : '•' }} {{ $warning }}
+                                                        </li>
+                                                    @endforeach
+                                                </ul>
+                                            </div>
+                                        </div>
                                     </div>
                                 @endif
 
@@ -440,7 +479,7 @@
                                         @endif
                                     @endif
                                     @if($file->anomaly_warnings && count($file->anomaly_warnings) > 0)
-                                    <span class="text-yellow-400 text-xs" title="{{ implode(', ', $file->anomaly_warnings) }}">
+                                    <span class="text-yellow-400 text-xs">
                                         ⚠ {{ count($file->anomaly_warnings) }} Warning(s)
                                     </span>
                                     @endif

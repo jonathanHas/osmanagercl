@@ -8,6 +8,7 @@ use App\Models\LabelTemplate;
 use App\Models\Product;
 use App\Models\ProductTranslation;
 use App\Models\ZebraLabel;
+use App\Services\AiSettingsService;
 use App\Services\LabelService;
 use App\Services\SupplierService;
 use App\Services\TillVisibilityService;
@@ -16,6 +17,7 @@ use Gemini\Data\Blob;
 use Gemini\Enums\MimeType;
 use Gemini\Laravel\Facades\Gemini;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
@@ -800,16 +802,16 @@ class LabelAreaController extends Controller
                 ."...\n"
                 .'^XZ';
 
-            $result = Gemini::generativeModel(model: 'gemini-2.5-flash')
-                ->generateContent([
-                    $prompt,
-                    new Blob(
-                        mimeType: MimeType::IMAGE_JPEG,
-                        data: $imageData,
-                    ),
-                ]);
+            $provider = AiSettingsService::get('label_translation', 'provider', 'gemini');
+            $labelModel = AiSettingsService::get('label_translation', 'model', 'gemini-2.5-flash');
 
-            $zpl = $result->text();
+            if ($provider === 'gemini') {
+                $result = Gemini::generativeModel(model: $labelModel)
+                    ->generateContent([$prompt, new Blob(mimeType: MimeType::IMAGE_JPEG, data: $imageData)]);
+                $zpl = $result->text();
+            } else {
+                $zpl = $this->callLabelAi($prompt, $imageData, $provider, $labelModel);
+            }
 
             // Strip markdown code fencing if Gemini wraps it
             $zpl = preg_replace('/^```(?:zpl|ZPL)?\s*\n?/m', '', $zpl);
@@ -1098,16 +1100,16 @@ class LabelAreaController extends Controller
                 .'"address":"Via Roma 12, 80100 Naples, Italy",'
                 .'"origin":null}';
 
-            $result = Gemini::generativeModel(model: 'gemini-2.5-flash')
-                ->generateContent([
-                    $prompt,
-                    new Blob(
-                        mimeType: MimeType::IMAGE_JPEG,
-                        data: $imageData,
-                    ),
-                ]);
+            $provider = AiSettingsService::get('label_translation', 'provider', 'gemini');
+            $labelModel = AiSettingsService::get('label_translation', 'model', 'gemini-2.5-flash');
 
-            $text = $result->text();
+            if ($provider === 'gemini') {
+                $result = Gemini::generativeModel(model: $labelModel)
+                    ->generateContent([$prompt, new Blob(mimeType: MimeType::IMAGE_JPEG, data: $imageData)]);
+                $text = $result->text();
+            } else {
+                $text = $this->callLabelAi($prompt, $imageData, $provider, $labelModel);
+            }
 
             // Strip markdown code fencing if Gemini wraps it
             $text = preg_replace('/^```(?:json)?\s*\n?/m', '', $text);
@@ -1174,5 +1176,40 @@ class LabelAreaController extends Controller
             'zpl' => $zpl,
             'font_scale' => $effectiveScale,
         ]);
+    }
+
+    /**
+     * Call a non-Gemini AI provider for label translation/analysis.
+     */
+    protected function callLabelAi(string $prompt, string $imageBase64, string $provider, string $model): string
+    {
+        $apiKey = AiSettingsService::getApiKey('label_translation');
+        $baseUrl = AiSettingsService::get('label_translation', 'base_url', 'https://api.mistral.ai/v1');
+        $timeout = (int) AiSettingsService::get('label_translation', 'timeout', 120);
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer '.$apiKey,
+            'Content-Type' => 'application/json',
+        ])->timeout($timeout)->post($baseUrl.'/chat/completions', [
+            'model' => $model,
+            'messages' => [
+                [
+                    'role' => 'user',
+                    'content' => [
+                        ['type' => 'text', 'text' => $prompt],
+                        ['type' => 'image_url', 'image_url' => ['url' => 'data:image/jpeg;base64,'.$imageBase64]],
+                    ],
+                ],
+            ],
+            'max_tokens' => 4096,
+            'temperature' => 0.1,
+        ]);
+
+        if (! $response->successful()) {
+            $error = $response->json('error.message') ?? $response->body();
+            throw new \Exception('AI API error ('.$response->status().'): '.$error);
+        }
+
+        return $response->json('choices.0.message.content', '');
     }
 }

@@ -25,6 +25,7 @@ class InvoiceUploadFile extends Model
         'parent_file_id',
         'page_range',
         'status',
+        'parsing_source',
         'parsed_data',
         'parsing_errors',
         'parsing_confidence',

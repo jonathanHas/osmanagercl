@@ -101,6 +101,37 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | AI Vision Parsing Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Settings for AI-powered invoice parsing from camera images.
+    | Supports any OpenAI-compatible vision API (Mistral, OpenAI, etc).
+    |
+    */
+
+    'ai_parsing' => [
+        'enabled' => env('INVOICE_AI_PARSING_ENABLED', true),
+
+        // Provider: 'gemini', 'mistral', 'mistral-ocr', 'openai'
+        'provider' => env('INVOICE_AI_PROVIDER', 'mistral-ocr'),
+
+        // API credentials (used by mistral, mistral-ocr, openai providers)
+        'api_key' => env('MISTRAL_API_KEY'),
+        'base_url' => env('INVOICE_AI_BASE_URL', 'https://api.mistral.ai/v1'),
+
+        // Vision/chat model (used by mistral, openai providers)
+        'model' => env('INVOICE_AI_MODEL', 'mistral-small-latest'),
+
+        // Chat model for structuring OCR text (used by mistral-ocr provider)
+        'ocr_chat_model' => env('INVOICE_AI_OCR_CHAT_MODEL', 'mistral-small-latest'),
+
+        'timeout' => env('INVOICE_AI_TIMEOUT', 120),
+        'max_image_dimension' => 1200,
+        'jpeg_quality' => 80,
+    ],
+
     'pdf_repair' => [
         // Enable automatic PDF repair during upload
         'enabled' => env('INVOICE_PDF_REPAIR_ENABLED', true),

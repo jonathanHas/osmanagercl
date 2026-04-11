@@ -9,13 +9,187 @@
             </a>
         </div>
 
+        {{-- Tab Switcher --}}
+        <div class="mb-6" x-data="{ activeTab: window.innerWidth < 768 ? 'camera' : 'upload' }">
+            <div class="flex border-b border-gray-700 mb-0">
+                <button @click="activeTab = 'upload'"
+                        :class="activeTab === 'upload' ? 'border-blue-500 text-blue-400' : 'border-transparent text-gray-400 hover:text-gray-300'"
+                        class="flex items-center px-6 py-3 border-b-2 font-medium text-sm transition-colors">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                    Upload Files
+                </button>
+                <button @click="activeTab = 'camera'"
+                        :class="activeTab === 'camera' ? 'border-blue-500 text-blue-400' : 'border-transparent text-gray-400 hover:text-gray-300'"
+                        class="flex items-center px-6 py-3 border-b-2 font-medium text-sm transition-colors">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    Camera Capture
+                </button>
+            </div>
+
+            {{-- Camera Capture Tab --}}
+            <div x-show="activeTab === 'camera'" x-data="cameraCapture()">
+                <div class="bg-gray-800 rounded-b-lg p-6">
+                    <div class="mb-4">
+                        <h3 class="text-lg font-semibold text-gray-100 mb-2">Camera Invoice Capture</h3>
+                        <p class="text-gray-400 text-sm">
+                            Take photos of paper invoices with your phone camera. Each photo is automatically sent
+                            for AI processing -- keep snapping without waiting for results.
+                        </p>
+                    </div>
+
+                    {{-- Capture Button --}}
+                    <div class="text-center mb-6">
+                        <label for="camera-input"
+                               class="inline-flex items-center justify-center px-8 py-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-lg font-medium rounded-xl cursor-pointer transition-colors touch-manipulation">
+                            <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                            Take Photo of Invoice
+                        </label>
+                        <input id="camera-input" type="file" accept="image/*" capture="environment" class="hidden"
+                               @change="handleCapture($event)">
+
+                        <p class="text-gray-500 text-xs mt-2">or</p>
+
+                        <label for="gallery-input"
+                               class="inline-flex items-center mt-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded cursor-pointer transition-colors">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                            Choose from Gallery
+                        </label>
+                        <input id="gallery-input" type="file" accept="image/*" multiple class="hidden"
+                               @change="handleGallerySelect($event)">
+                    </div>
+
+                    {{-- Captured Photos Grid --}}
+                    <div x-show="photos.length > 0">
+                        <div class="flex justify-between items-center mb-3">
+                            <h4 class="text-gray-200 font-medium">
+                                Captured Invoices (<span x-text="photos.length"></span>)
+                            </h4>
+                            <button @click="clearAll()"
+                                    class="text-sm text-red-400 hover:text-red-300"
+                                    x-show="!photos.some(p => p.status === 'uploading')">
+                                Clear All
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                            <template x-for="(photo, index) in photos" :key="photo.id">
+                                <div class="relative bg-gray-700 rounded-lg overflow-hidden aspect-[3/4]">
+                                    {{-- Thumbnail --}}
+                                    <img :src="photo.preview" class="w-full h-full object-cover" alt="Invoice photo">
+
+                                    {{-- Status Overlay --}}
+                                    <div class="absolute inset-0 flex items-center justify-center"
+                                         :class="{
+                                             'bg-black/40': photo.status === 'uploading' || photo.status === 'processing',
+                                             'bg-black/0': photo.status === 'done',
+                                             'bg-red-900/40': photo.status === 'failed'
+                                         }">
+                                        {{-- Uploading spinner --}}
+                                        <div x-show="photo.status === 'uploading'" class="text-center">
+                                            <svg class="animate-spin h-8 w-8 text-blue-400 mx-auto" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <span class="text-white text-xs mt-1 block">Uploading...</span>
+                                        </div>
+
+                                        {{-- Processing spinner --}}
+                                        <div x-show="photo.status === 'processing'" class="text-center">
+                                            <svg class="animate-spin h-8 w-8 text-yellow-400 mx-auto" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <span class="text-white text-xs mt-1 block">AI Processing...</span>
+                                        </div>
+
+                                        {{-- Done checkmark --}}
+                                        <div x-show="photo.status === 'done'" class="absolute top-2 right-2">
+                                            <span class="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow">
+                                                &#10003;
+                                            </span>
+                                        </div>
+
+                                        {{-- Failed --}}
+                                        <div x-show="photo.status === 'failed'" class="text-center">
+                                            <svg class="h-8 w-8 text-red-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                                            </svg>
+                                            <span class="text-red-300 text-xs mt-1 block">Failed</span>
+                                        </div>
+                                    </div>
+
+                                    {{-- Remove button --}}
+                                    <button @click="removePhoto(index)"
+                                            x-show="photo.status !== 'uploading'"
+                                            class="absolute top-1 left-1 bg-black/60 hover:bg-black/80 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs">
+                                        &#10005;
+                                    </button>
+
+                                    {{-- Supplier detected label --}}
+                                    <div x-show="photo.supplier" class="absolute bottom-0 left-0 right-0 bg-black/70 px-2 py-1">
+                                        <p class="text-green-300 text-xs truncate" x-text="photo.supplier"></p>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        {{-- Summary & Actions --}}
+                        <div class="mt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                            <div class="text-sm text-gray-400">
+                                <span x-show="processingCount > 0" class="text-yellow-400">
+                                    <svg class="animate-spin h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span x-text="processingCount"></span> processing...
+                                </span>
+                                <span x-show="doneCount > 0" class="text-green-400 ml-2">
+                                    &#10003; <span x-text="doneCount"></span> done
+                                </span>
+                                <span x-show="failedCount > 0" class="text-red-400 ml-2">
+                                    &#10005; <span x-text="failedCount"></span> failed
+                                </span>
+                            </div>
+                            <a x-show="batchId && doneCount > 0"
+                               :href="`{{ url('invoices/bulk-upload/preview') }}/${batchId}`"
+                               class="inline-flex items-center px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded transition-colors">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                </svg>
+                                View Results
+                            </a>
+                        </div>
+                    </div>
+
+                    {{-- Error Messages --}}
+                    <div x-show="error" class="mt-4">
+                        <div class="bg-red-900/50 border border-red-600 rounded-lg p-4">
+                            <p class="text-red-300 text-sm" x-text="error"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Upload Files Tab --}}
+            <div x-show="activeTab === 'upload'">
         {{-- Upload Interface --}}
-        <div class="bg-gray-800 rounded-lg p-6 mb-6" x-data="bulkUpload()">
+        <div class="bg-gray-800 rounded-b-lg p-6" x-data="bulkUpload()">
             <div class="mb-4">
                 <h3 class="text-lg font-semibold text-gray-100 mb-2">Upload Invoice Files</h3>
                 <p class="text-gray-400 text-sm">
-                    Upload up to {{ $maxFiles }} invoice files at once. Supported formats: 
-                    {{ implode(', ', array_map('strtoupper', $allowedExtensions)) }}. 
+                    Upload up to {{ $maxFiles }} invoice files at once. Supported formats:
+                    {{ implode(', ', array_map('strtoupper', $allowedExtensions)) }}.
                     Maximum file size: {{ $maxFileSize }}MB each.
                 </p>
             </div>
@@ -167,6 +341,8 @@
                 </div>
             </div>
         </div>
+            </div>{{-- /upload tab --}}
+        </div>{{-- /tab switcher --}}
 
         {{-- Recent Uploads --}}
         @if($recentUploads->count() > 0)
@@ -438,6 +614,216 @@
                         this.isUploading = false;
                     }
                 }
+            }
+        }
+
+        function cameraCapture() {
+            return {
+                photos: [],
+                batchId: null,
+                error: null,
+                pollTimer: null,
+                photoIdCounter: 0,
+
+                get processingCount() {
+                    return this.photos.filter(p => p.status === 'uploading' || p.status === 'processing').length;
+                },
+                get doneCount() {
+                    return this.photos.filter(p => p.status === 'done').length;
+                },
+                get failedCount() {
+                    return this.photos.filter(p => p.status === 'failed').length;
+                },
+
+                handleCapture(event) {
+                    const file = event.target.files[0];
+                    event.target.value = '';
+                    if (file) this.processAndUpload(file);
+                },
+
+                handleGallerySelect(event) {
+                    const files = Array.from(event.target.files);
+                    event.target.value = '';
+                    files.forEach(f => this.processAndUpload(f));
+                },
+
+                async processAndUpload(file) {
+                    this.error = null;
+                    const id = ++this.photoIdCounter;
+
+                    // Create preview
+                    const preview = await this.createPreview(file);
+                    const photo = {
+                        id,
+                        preview,
+                        status: 'uploading',
+                        fileId: null,
+                        supplier: null,
+                    };
+                    this.photos.push(photo);
+
+                    // Resize image client-side before uploading
+                    const resized = await this.resizeImage(file);
+
+                    // Upload to server
+                    try {
+                        const formData = new FormData();
+                        formData.append('image', resized);
+                        if (this.batchId) {
+                            formData.append('batch_id', this.batchId);
+                        }
+
+                        const response = await fetch('{{ route("invoices.bulk-upload.camera-upload") }}', {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json',
+                            },
+                            body: formData,
+                        });
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            photo.status = 'processing';
+                            photo.fileId = data.file_id;
+
+                            if (!this.batchId) {
+                                this.batchId = data.batch_id;
+                            }
+
+                            this.startPolling();
+                        } else {
+                            photo.status = 'failed';
+                            this.error = data.error || 'Upload failed';
+                        }
+                    } catch (e) {
+                        photo.status = 'failed';
+                        this.error = 'Upload failed: ' + e.message;
+                    }
+                },
+
+                createPreview(file) {
+                    return new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve(e.target.result);
+                        reader.readAsDataURL(file);
+                    });
+                },
+
+                resizeImage(file) {
+                    return new Promise((resolve) => {
+                        const img = document.createElement('img');
+                        const url = URL.createObjectURL(file);
+                        img.onload = () => {
+                            URL.revokeObjectURL(url);
+                            let w = img.naturalWidth;
+                            let h = img.naturalHeight;
+                            const maxDim = 1600;
+
+                            if (w > maxDim || h > maxDim) {
+                                if (w > h) {
+                                    h = Math.round(h * (maxDim / w));
+                                    w = maxDim;
+                                } else {
+                                    w = Math.round(w * (maxDim / h));
+                                    h = maxDim;
+                                }
+                            }
+
+                            const canvas = document.createElement('canvas');
+                            canvas.width = w;
+                            canvas.height = h;
+                            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+
+                            canvas.toBlob((blob) => {
+                                resolve(new File([blob], file.name || 'invoice.jpg', {
+                                    type: 'image/jpeg',
+                                    lastModified: Date.now(),
+                                }));
+                            }, 'image/jpeg', 0.85);
+                        };
+                        img.onerror = () => {
+                            URL.revokeObjectURL(url);
+                            resolve(file);
+                        };
+                        img.src = url;
+                    });
+                },
+
+                startPolling() {
+                    if (this.pollTimer) return;
+                    this.pollTimer = setInterval(() => this.pollStatus(), 3000);
+                },
+
+                stopPolling() {
+                    if (this.pollTimer) {
+                        clearInterval(this.pollTimer);
+                        this.pollTimer = null;
+                    }
+                },
+
+                async pollStatus() {
+                    if (!this.batchId) return;
+
+                    // Stop polling if nothing is still processing
+                    if (this.processingCount === 0) {
+                        this.stopPolling();
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch(`{{ url('invoices/bulk-upload/status') }}/${this.batchId}`, {
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            },
+                        });
+
+                        const data = await response.json();
+
+                        if (data.files) {
+                            for (const serverFile of data.files) {
+                                const photo = this.photos.find(p => p.fileId == serverFile.id);
+                                if (!photo) continue;
+
+                                if (['parsed', 'review', 'completed'].includes(serverFile.status)) {
+                                    photo.status = 'done';
+                                    photo.supplier = serverFile.supplier_detected || null;
+                                } else if (serverFile.status === 'failed') {
+                                    photo.status = 'failed';
+                                } else if (['uploaded', 'parsing'].includes(serverFile.status)) {
+                                    photo.status = 'processing';
+                                }
+                            }
+                        }
+
+                        if (this.processingCount === 0) {
+                            this.stopPolling();
+                        }
+                    } catch (e) {
+                        // Silently ignore polling errors
+                    }
+                },
+
+                removePhoto(index) {
+                    this.photos.splice(index, 1);
+                    if (this.photos.length === 0) {
+                        this.batchId = null;
+                        this.stopPolling();
+                    }
+                },
+
+                clearAll() {
+                    this.photos = [];
+                    this.batchId = null;
+                    this.error = null;
+                    this.stopPolling();
+                },
+
+                destroy() {
+                    this.stopPolling();
+                },
             }
         }
     </script>

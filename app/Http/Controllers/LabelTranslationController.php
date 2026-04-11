@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Models\ProductTranslation;
 use App\Models\ZebraLabel;
+use App\Services\AiSettingsService;
 use App\Services\ZplGeneratorService;
 use Gemini\Data\Blob;
 use Gemini\Enums\MimeType;
@@ -12,6 +13,7 @@ use Gemini\Laravel\Facades\Gemini;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
@@ -162,19 +164,51 @@ class LabelTranslationController extends Controller
                 .'"origin":null,'
                 .'"original_text":"Pomodori Secchi sott\'olio. Ingredienti: pomodori secchi** 60%, olio di girasole*, SOLFITI (come conservante), sale, aglio, origano. *da agricoltura biologica. **da agricoltura biologica e biodinamica."}';
 
-            // Build content array with prompt + all image blobs
-            $contents = [$prompt];
-            foreach ($resizedImages as $imageData) {
-                $contents[] = new Blob(
-                    mimeType: MimeType::IMAGE_JPEG,
-                    data: $imageData,
-                );
+            // Call AI provider
+            $provider = AiSettingsService::get('label_translation', 'provider', 'gemini');
+            $model = AiSettingsService::get('label_translation', 'model', 'gemini-2.5-flash');
+
+            if ($provider === 'gemini') {
+                $contents = [$prompt];
+                foreach ($resizedImages as $imageData) {
+                    $contents[] = new Blob(
+                        mimeType: MimeType::IMAGE_JPEG,
+                        data: $imageData,
+                    );
+                }
+                $result = Gemini::generativeModel(model: $model)->generateContent($contents);
+                $text = $result->text();
+            } else {
+                // OpenAI-compatible API (Mistral, OpenAI, etc.)
+                $apiKey = AiSettingsService::getApiKey('label_translation');
+                $baseUrl = AiSettingsService::get('label_translation', 'base_url', 'https://api.mistral.ai/v1');
+                $timeout = (int) AiSettingsService::get('label_translation', 'timeout', 120);
+
+                $imageContent = [['type' => 'text', 'text' => $prompt]];
+                foreach ($resizedImages as $imageData) {
+                    $imageContent[] = [
+                        'type' => 'image_url',
+                        'image_url' => ['url' => 'data:image/jpeg;base64,'.$imageData],
+                    ];
+                }
+
+                $response = Http::withHeaders([
+                    'Authorization' => 'Bearer '.$apiKey,
+                    'Content-Type' => 'application/json',
+                ])->timeout($timeout)->post($baseUrl.'/chat/completions', [
+                    'model' => $model,
+                    'messages' => [['role' => 'user', 'content' => $imageContent]],
+                    'max_tokens' => 4096,
+                    'temperature' => 0.1,
+                ]);
+
+                if (! $response->successful()) {
+                    $error = $response->json('error.message') ?? $response->body();
+                    throw new \Exception('AI API error ('.$response->status().'): '.$error);
+                }
+
+                $text = $response->json('choices.0.message.content', '');
             }
-
-            $result = Gemini::generativeModel(model: 'gemini-2.5-flash')
-                ->generateContent($contents);
-
-            $text = $result->text();
 
             // Strip markdown code fencing if Gemini wraps it
             $text = preg_replace('/^```(?:json)?\s*\n?/m', '', $text);

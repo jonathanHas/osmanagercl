@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\ParseInvoiceCameraImage;
 use App\Jobs\ParseInvoiceFile;
 use App\Models\InvoiceBulkUpload;
 use App\Models\InvoiceUploadFile;
@@ -209,7 +210,7 @@ class InvoiceBulkUploadController extends Controller
             ->where('user_id', auth()->id())
             ->with(['files' => function ($query) {
                 $query->select('id', 'bulk_upload_id', 'original_filename', 'status',
-                    'upload_progress', 'error_message', 'parsing_confidence');
+                    'upload_progress', 'error_message', 'parsing_confidence', 'supplier_detected');
             }])
             ->firstOrFail();
 
@@ -230,6 +231,7 @@ class InvoiceBulkUploadController extends Controller
                     'status_color' => $file->status_color,
                     'progress' => $file->upload_progress,
                     'confidence' => $file->parsing_confidence,
+                    'supplier_detected' => $file->supplier_detected,
                     'error' => $file->error_message,
                 ];
             }),
@@ -433,7 +435,11 @@ class InvoiceBulkUploadController extends Controller
         $queuedCount = 0;
         foreach ($batch->files as $file) {
             if (in_array($file->status, ['uploaded', 'failed'])) {
-                ParseInvoiceFile::dispatch($file);
+                if ($file->parsing_source === 'gemini') {
+                    ParseInvoiceCameraImage::dispatch($file);
+                } else {
+                    ParseInvoiceFile::dispatch($file);
+                }
                 $queuedCount++;
             }
         }
@@ -708,8 +714,12 @@ class InvoiceBulkUploadController extends Controller
             $file->is_credit_note = false;
             $file->save();
 
-            // Queue new parsing job
-            \App\Jobs\ParseInvoiceFile::dispatch($file);
+            // Queue new parsing job based on parsing source
+            if ($file->parsing_source === 'gemini') {
+                ParseInvoiceCameraImage::dispatch($file);
+            } else {
+                ParseInvoiceFile::dispatch($file);
+            }
 
             Log::info('File queued for retry parsing', [
                 'file_id' => $file->id,
@@ -1327,5 +1337,117 @@ class InvoiceBulkUploadController extends Controller
                 'is_complete' => $breakdown['unresolved']['count'] === 0,
             ],
         ];
+    }
+
+    /**
+     * Handle a single camera-captured invoice image upload.
+     *
+     * Supports lazy batch creation: first photo creates the batch,
+     * subsequent photos add to it via the returned batch_id.
+     * Each image is immediately dispatched for Gemini AI parsing.
+     */
+    public function cameraUpload(Request $request)
+    {
+        $request->validate([
+            'image' => 'required|image|max:10240',
+            'batch_id' => 'nullable|string',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            // Find or create batch
+            $batch = null;
+            if ($request->filled('batch_id')) {
+                $batch = InvoiceBulkUpload::where('batch_id', $request->input('batch_id'))
+                    ->where('user_id', auth()->id())
+                    ->first();
+            }
+
+            if (! $batch) {
+                $batch = InvoiceBulkUpload::create([
+                    'batch_id' => InvoiceBulkUpload::generateBatchId(),
+                    'user_id' => auth()->id(),
+                    'total_files' => 0,
+                    'status' => 'processing',
+                    'metadata' => [
+                        'source' => 'camera',
+                        'ip_address' => $request->ip(),
+                        'user_agent' => $request->userAgent(),
+                    ],
+                ]);
+            }
+
+            $tempPath = config('invoices.bulk_upload.temp_path');
+            $batchFolder = $tempPath.'/'.$batch->batch_id;
+
+            Storage::disk('local')->makeDirectory($batchFolder);
+            $fullBatchPath = Storage::disk('local')->path($batchFolder);
+            if (! is_writable($fullBatchPath)) {
+                chmod($fullBatchPath, 0775);
+            }
+
+            $file = $request->file('image');
+            $originalName = $file->getClientOriginalName();
+            $extension = $file->getClientOriginalExtension() ?: 'jpg';
+            $mimeType = $file->getMimeType();
+            $fileSize = $file->getSize();
+
+            $storedName = Str::uuid().'.'.$extension;
+            $storedPath = $file->storeAs($batchFolder, $storedName, 'local');
+
+            $fullPath = Storage::disk('local')->path($batchFolder.'/'.$storedName);
+            chmod($fullPath, 0664);
+            $fileHash = hash_file('sha256', $fullPath);
+
+            $uploadFile = InvoiceUploadFile::create([
+                'bulk_upload_id' => $batch->id,
+                'original_filename' => $originalName,
+                'stored_filename' => $storedName,
+                'temp_path' => $storedPath,
+                'mime_type' => $mimeType,
+                'file_size' => $fileSize,
+                'file_hash' => $fileHash,
+                'status' => 'uploaded',
+                'parsing_source' => 'gemini',
+                'upload_progress' => 100,
+                'uploaded_at' => now(),
+            ]);
+
+            // Update batch file count
+            $batch->update([
+                'total_files' => $batch->files()->count(),
+            ]);
+
+            DB::commit();
+
+            // Dispatch AI parsing job immediately
+            ParseInvoiceCameraImage::dispatch($uploadFile);
+
+            Log::info('Camera invoice image uploaded and queued for AI parsing', [
+                'file_id' => $uploadFile->id,
+                'batch_id' => $batch->batch_id,
+                'filename' => $originalName,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'batch_id' => $batch->batch_id,
+                'file_id' => $uploadFile->id,
+                'filename' => $originalName,
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            Log::error('Camera upload failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to upload image: '.$e->getMessage(),
+            ], 500);
+        }
     }
 }

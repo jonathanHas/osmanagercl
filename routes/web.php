@@ -99,6 +99,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/products/{id}/toggle-till-visibility', [ProductController::class, 'toggleTillVisibility'])->name('products.toggle-till-visibility');
     Route::get('/products/{id}/print-label', [ProductController::class, 'printLabel'])->name('products.print-label');
     Route::get('/tools/udea-debug', UdeaDiagnosticsController::class)->name('tools.udea-debug');
+    Route::get('/tools/ai-diagnostics', [\App\Http\Controllers\AiDiagnosticsController::class, 'index'])->name('tools.ai-diagnostics');
+    Route::post('/tools/ai-diagnostics/test', [\App\Http\Controllers\AiDiagnosticsController::class, 'testConnection'])->name('tools.ai-diagnostics.test');
+    Route::post('/tools/ai-diagnostics/settings', [\App\Http\Controllers\AiDiagnosticsController::class, 'saveSettings'])->name('tools.ai-diagnostics.settings');
 
     // Product AJAX API routes (for real-time validation)
     Route::post('/api/products/check-barcode-duplicate', [ProductController::class, 'checkBarcodeDuplicate'])->name('api.products.check-barcode-duplicate');
@@ -153,6 +156,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('invoices/bulk-upload')->name('invoices.bulk-upload.')->group(function () {
         Route::get('/', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'index'])->name('index');
         Route::post('/upload', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'upload'])->name('upload');
+        Route::post('/camera-upload', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'cameraUpload'])->name('camera-upload');
         Route::get('/status/{batchId}', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'status'])->name('status');
         Route::get('/preview/{batchId}', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'preview'])->name('preview');
         Route::get('/amazon-pending', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'amazonPending'])->name('amazon-pending');
