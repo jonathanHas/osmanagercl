@@ -146,7 +146,7 @@
             <div class="md:hidden space-y-4">
                 @foreach($files as $file)
                 <div class="bg-gray-700/50 rounded-lg p-4 @if($file->isPdf() && $file->page_count > 1) border-l-4 border-amber-500 @endif"
-                     x-data="{ showDetails: false, showActions: false, showEdit: false }">
+                     x-data="{ showEdit: false }">
 
                     {{-- Card Header: filename + status --}}
                     <div class="flex items-start justify-between gap-2">
@@ -225,28 +225,9 @@
                         </div>
                     @endif
 
-                    {{-- Toggle buttons --}}
-                    <div class="mt-3 flex items-center gap-3">
-                        @if(in_array($file->status, ['parsed', 'review', 'amazon_pending', 'completed']))
-                        <button @click="showDetails = !showDetails"
-                                class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
-                            <svg class="w-3 h-3 transition-transform" :class="showDetails && 'rotate-90'" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
-                            </svg>
-                            <span x-text="showDetails ? 'Hide Details' : 'Details'"></span>
-                        </button>
-                        @endif
-                        <button @click="showActions = !showActions"
-                                class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
-                            <svg class="w-3 h-3 transition-transform" :class="showActions && 'rotate-90'" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
-                            </svg>
-                            <span x-text="showActions ? 'Hide Actions' : 'Actions'"></span>
-                        </button>
-                    </div>
 
-                    {{-- Details panel (expandable) --}}
-                    <div x-show="showDetails" x-cloak x-collapse class="mt-3 space-y-2">
+                    {{-- Details panel --}}
+                    <div class="mt-3 space-y-2">
                         {{-- VAT breakdown --}}
                         @if($file->parsed_vat_data)
                             @php
@@ -391,8 +372,8 @@
                         @endif
                     </div>
 
-                    {{-- Actions panel (expandable) --}}
-                    <div x-show="showActions" x-cloak x-collapse class="mt-3">
+                    {{-- Actions panel --}}
+                    <div class="mt-3">
                         <div class="flex flex-wrap gap-2">
                             @if($file->tempFileExists() && $file->isViewable())
                             <button onclick="previewFile({{ $file->id }})"
@@ -1162,10 +1143,16 @@
                     </div>
 
                     <div class="space-y-4">
-                        {{-- Amount Display --}}
+                        {{-- Amount Display (editable) --}}
                         <div class="bg-gray-700 rounded p-3">
-                            <p class="text-gray-400 text-xs mb-1">Parsed Amount</p>
-                            <p class="text-white text-2xl font-bold" id="vatFixAmount"></p>
+                            <label for="vatFixAmountInput" class="text-gray-400 text-xs mb-1 block">Amount</label>
+                            <div class="flex items-center">
+                                <span class="text-white text-2xl font-bold mr-1">&euro;</span>
+                                <input type="number" id="vatFixAmountInput" step="0.01" min="0"
+                                       class="bg-gray-600 border border-gray-500 rounded px-3 py-1 text-white text-2xl font-bold w-40 focus:border-blue-500 focus:outline-none"
+                                       onchange="vatFixState.amount = parseFloat(this.value) || 0; updateVatPreview()"
+                                       oninput="vatFixState.amount = parseFloat(this.value) || 0; updateVatPreview()">
+                            </div>
                         </div>
 
                         {{-- Is this Gross or Net? --}}
@@ -2297,7 +2284,7 @@
 
         function openVatFixModal(fileId, batchId, amount, warningIdx, isMobile = false) {
             vatFixState = { fileId, batchId, amount, warningIdx, isMobile };
-            document.getElementById('vatFixAmount').textContent = '€' + amount.toFixed(2);
+            document.getElementById('vatFixAmountInput').value = amount.toFixed(2);
 
             // Reset selections
             document.querySelector('input[name="vat_amount_type"][value="gross"]').checked = true;
