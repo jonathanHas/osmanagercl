@@ -987,7 +987,7 @@ class InvoiceBulkUploadController extends Controller
         $validated = $request->validate([
             'supplier_invoice_reference' => 'nullable|string|max:255',
             'invoice_date' => 'nullable|date_format:Y-m-d',
-            'supplier_name' => 'required|string|max:255',
+            'supplier_name' => 'nullable|string|max:255',
             'is_tax_free' => 'boolean',
             'is_credit_note' => 'boolean',
             'vat_0_net' => 'nullable|numeric|min:0',
@@ -1000,12 +1000,18 @@ class InvoiceBulkUploadController extends Controller
             // Update parsed_data JSON field
             $parsedData = $file->parsed_data ?? [];
 
-            // Update with validated data
-            $parsedData['supplier_invoice_reference'] = $validated['supplier_invoice_reference'] ?? null;
-            $parsedData['invoice_date'] = $validated['invoice_date'] ?? null;
-            $parsedData['supplier_name'] = $validated['supplier_name'];
-            $parsedData['is_tax_free'] = $validated['is_tax_free'] ?? false;
-            $parsedData['is_credit_note'] = $validated['is_credit_note'] ?? false;
+            // Only update fields that were provided (allows partial updates like VAT-only fix)
+            if ($request->has('supplier_invoice_reference')) {
+                $parsedData['supplier_invoice_reference'] = $validated['supplier_invoice_reference'] ?? null;
+            }
+            if ($request->has('invoice_date')) {
+                $parsedData['invoice_date'] = $validated['invoice_date'] ?? null;
+            }
+            if ($request->filled('supplier_name')) {
+                $parsedData['supplier_name'] = $validated['supplier_name'];
+            }
+            $parsedData['is_tax_free'] = $validated['is_tax_free'] ?? ($parsedData['is_tax_free'] ?? false);
+            $parsedData['is_credit_note'] = $validated['is_credit_note'] ?? ($parsedData['is_credit_note'] ?? false);
 
             // Update VAT breakdown
             $vatBreakdown = [
@@ -1040,13 +1046,19 @@ class InvoiceBulkUploadController extends Controller
 
             // Save to database
             $file->parsed_data = $parsedData;
-            $file->parsed_vat_data = $vatBreakdown; // Also save to separate field for InvoiceCreationService
-            $file->parsed_invoice_number = $validated['supplier_invoice_reference'] ?? null;  // Store as parsed_invoice_number for InvoiceCreationService
-            $file->parsed_invoice_date = $validated['invoice_date'] ?? null;
+            $file->parsed_vat_data = $vatBreakdown;
+            if ($request->has('supplier_invoice_reference')) {
+                $file->parsed_invoice_number = $validated['supplier_invoice_reference'] ?? null;
+            }
+            if ($request->has('invoice_date')) {
+                $file->parsed_invoice_date = $validated['invoice_date'] ?? null;
+            }
             $file->parsed_total_amount = $totalAmount;
-            $file->supplier_detected = $validated['supplier_name'];
-            $file->is_tax_free = $validated['is_tax_free'] ?? false;
-            $file->is_credit_note = $validated['is_credit_note'] ?? false;
+            if ($request->filled('supplier_name')) {
+                $file->supplier_detected = $validated['supplier_name'];
+            }
+            $file->is_tax_free = $validated['is_tax_free'] ?? $file->is_tax_free;
+            $file->is_credit_note = $validated['is_credit_note'] ?? $file->is_credit_note;
 
             // Update status to 'review' if it was in failed/uploaded state
             if (in_array($file->status, ['uploaded', 'failed', 'parsing'])) {

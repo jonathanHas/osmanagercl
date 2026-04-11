@@ -309,16 +309,29 @@
                                     str_contains(strtolower($w), 'date') || str_contains(strtolower($w), 'year')
                                 );
                             @endphp
-                            <div class="p-2.5 rounded-md border {{ $hasDateWarning ? 'bg-red-900/40 border-red-500' : 'bg-yellow-900/30 border-yellow-600' }}">
+                            <div class="p-2.5 rounded-md border {{ $hasDateWarning ? 'bg-red-900/40 border-red-500' : 'bg-yellow-900/30 border-yellow-600' }}"
+                                 id="warnings-block-mobile-{{ $file->id }}">
                                 <p class="text-xs font-semibold {{ $hasDateWarning ? 'text-red-300' : 'text-yellow-300' }} mb-1">
                                     {{ count($file->anomaly_warnings) }} Warning(s)
                                 </p>
-                                <ul class="text-xs space-y-0.5">
-                                    @foreach($file->anomaly_warnings as $warning)
-                                        @php $isDateW = str_contains(strtolower($warning), 'date') || str_contains(strtolower($warning), 'year'); @endphp
-                                        <li class="{{ $isDateW ? 'text-red-300 font-semibold' : 'text-yellow-200' }}">
-                                            {{ $isDateW ? '📅' : '•' }} {{ $warning }}
-                                        </li>
+                                <ul class="text-xs space-y-1">
+                                    @foreach($file->anomaly_warnings as $wIdx => $warning)
+                                        @php
+                                            $isDateW = str_contains(strtolower($warning), 'date') || str_contains(strtolower($warning), 'year');
+                                            $isVatW = str_contains(strtolower($warning), 'vat');
+                                        @endphp
+                                        @if($isVatW)
+                                            <li id="vat-warning-mobile-{{ $file->id }}-{{ $wIdx }}"
+                                                class="text-yellow-200 cursor-pointer active:bg-yellow-900/50 rounded p-1 -m-1"
+                                                onclick="openVatFixModal({{ $file->id }}, '{{ $batch->batch_id }}', {{ $file->parsed_total_amount ?? 0 }}, {{ $wIdx }}, true)">
+                                                <span class="underline decoration-dotted">&#9888; {{ $warning }}</span>
+                                                <span class="ml-1 inline-block px-2 py-0.5 bg-blue-600 text-white text-xs rounded font-medium">Fix</span>
+                                            </li>
+                                        @else
+                                            <li class="{{ $isDateW ? 'text-red-300 font-semibold' : 'text-yellow-200' }}">
+                                                {{ $isDateW ? '📅' : '•' }} {{ $warning }}
+                                            </li>
+                                        @endif
                                     @endforeach
                                 </ul>
                             </div>
@@ -713,8 +726,12 @@
                                         $hasDateWarning = collect($file->anomaly_warnings)->contains(fn($w) =>
                                             str_contains(strtolower($w), 'date') || str_contains(strtolower($w), 'year')
                                         );
+                                        $hasVatWarning = collect($file->anomaly_warnings)->contains(fn($w) =>
+                                            str_contains(strtolower($w), 'vat')
+                                        );
                                     @endphp
-                                    <div class="mt-2 p-2.5 rounded-md border {{ $hasDateWarning ? 'bg-red-900/40 border-red-500' : 'bg-yellow-900/30 border-yellow-600' }}">
+                                    <div class="mt-2 p-2.5 rounded-md border {{ $hasDateWarning ? 'bg-red-900/40 border-red-500' : 'bg-yellow-900/30 border-yellow-600' }}"
+                                         id="warnings-block-{{ $file->id }}">
                                         <div class="flex items-start">
                                             <svg class="w-4 h-4 {{ $hasDateWarning ? 'text-red-400' : 'text-yellow-400' }} mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                                 <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
@@ -724,13 +741,23 @@
                                                     {{ count($file->anomaly_warnings) }} Warning(s)
                                                 </p>
                                                 <ul class="text-xs space-y-0.5">
-                                                    @foreach($file->anomaly_warnings as $warning)
+                                                    @foreach($file->anomaly_warnings as $wIdx => $warning)
                                                         @php
                                                             $isDateW = str_contains(strtolower($warning), 'date') || str_contains(strtolower($warning), 'year');
+                                                            $isVatW = str_contains(strtolower($warning), 'vat');
                                                         @endphp
-                                                        <li class="{{ $isDateW ? 'text-red-300 font-semibold' : 'text-yellow-200' }}">
-                                                            {{ $isDateW ? '📅' : '•' }} {{ $warning }}
-                                                        </li>
+                                                        @if($isVatW)
+                                                            <li id="vat-warning-{{ $file->id }}-{{ $wIdx }}"
+                                                                class="text-yellow-200 cursor-pointer hover:text-white transition-colors"
+                                                                onclick="openVatFixModal({{ $file->id }}, '{{ $batch->batch_id }}', {{ $file->parsed_total_amount ?? 0 }}, {{ $wIdx }})">
+                                                                <span class="underline decoration-dotted">&#9888; {{ $warning }}</span>
+                                                                <span class="ml-1 text-blue-400 text-xs">[Fix]</span>
+                                                            </li>
+                                                        @else
+                                                            <li class="{{ $isDateW ? 'text-red-300 font-semibold' : 'text-yellow-200' }}">
+                                                                {{ $isDateW ? '📅' : '•' }} {{ $warning }}
+                                                            </li>
+                                                        @endif
                                                     @endforeach
                                                 </ul>
                                             </div>
@@ -1116,6 +1143,96 @@
                     </div>
                     <div id="parsedDataContent" class="space-y-4">
                         <!-- Content will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- VAT Quick Fix Modal --}}
+        <div id="vatFixModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-800 rounded-lg max-w-md w-full">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-bold text-gray-100">Quick VAT Fix</h3>
+                        <button onclick="closeVatFixModal()" class="text-gray-400 hover:text-gray-200">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="space-y-4">
+                        {{-- Amount Display --}}
+                        <div class="bg-gray-700 rounded p-3">
+                            <p class="text-gray-400 text-xs mb-1">Parsed Amount</p>
+                            <p class="text-white text-2xl font-bold" id="vatFixAmount"></p>
+                        </div>
+
+                        {{-- Is this Gross or Net? --}}
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">This amount is:</label>
+                            <div class="flex space-x-3">
+                                <label class="flex items-center px-4 py-2 bg-gray-700 rounded cursor-pointer hover:bg-gray-600 transition-colors flex-1">
+                                    <input type="radio" name="vat_amount_type" value="gross" checked
+                                           class="mr-2 text-blue-500" onchange="updateVatPreview()">
+                                    <span class="text-gray-200 text-sm">Gross (inc. VAT)</span>
+                                </label>
+                                <label class="flex items-center px-4 py-2 bg-gray-700 rounded cursor-pointer hover:bg-gray-600 transition-colors flex-1">
+                                    <input type="radio" name="vat_amount_type" value="net"
+                                           class="mr-2 text-blue-500" onchange="updateVatPreview()">
+                                    <span class="text-gray-200 text-sm">Net (ex. VAT)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        {{-- VAT Rate Selection --}}
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">Correct VAT Rate:</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <label class="flex items-center px-3 py-2 bg-gray-700 rounded cursor-pointer hover:bg-gray-600 transition-colors">
+                                    <input type="radio" name="vat_rate_fix" value="23"
+                                           class="mr-2 text-blue-500" onchange="updateVatPreview()">
+                                    <span class="text-gray-200 text-sm">23% (Standard)</span>
+                                </label>
+                                <label class="flex items-center px-3 py-2 bg-gray-700 rounded cursor-pointer hover:bg-gray-600 transition-colors">
+                                    <input type="radio" name="vat_rate_fix" value="13.5"
+                                           class="mr-2 text-blue-500" onchange="updateVatPreview()">
+                                    <span class="text-gray-200 text-sm">13.5% (Reduced)</span>
+                                </label>
+                                <label class="flex items-center px-3 py-2 bg-gray-700 rounded cursor-pointer hover:bg-gray-600 transition-colors">
+                                    <input type="radio" name="vat_rate_fix" value="9"
+                                           class="mr-2 text-blue-500" onchange="updateVatPreview()">
+                                    <span class="text-gray-200 text-sm">9% (2nd Reduced)</span>
+                                </label>
+                                <label class="flex items-center px-3 py-2 bg-gray-700 rounded cursor-pointer hover:bg-gray-600 transition-colors">
+                                    <input type="radio" name="vat_rate_fix" value="0" checked
+                                           class="mr-2 text-blue-500" onchange="updateVatPreview()">
+                                    <span class="text-gray-200 text-sm">0% (Zero/Exempt)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        {{-- Calculated Preview --}}
+                        <div id="vatFixPreview" class="hidden bg-blue-900/30 border border-blue-600 rounded p-3 text-sm">
+                            <p class="text-blue-300 font-semibold mb-1">Calculated Breakdown:</p>
+                            <div class="text-gray-300 space-y-0.5">
+                                <div>Net: <span id="vatFixNet" class="text-white font-mono"></span></div>
+                                <div>VAT: <span id="vatFixVat" class="text-white font-mono"></span></div>
+                                <div>Gross: <span id="vatFixGross" class="text-white font-mono"></span></div>
+                            </div>
+                        </div>
+
+                        {{-- Actions --}}
+                        <div class="flex justify-end space-x-3 pt-2">
+                            <button onclick="closeVatFixModal()"
+                                    class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded transition-colors">
+                                Cancel
+                            </button>
+                            <button onclick="saveVatFix()" id="vatFixSaveBtn"
+                                    class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded transition-colors">
+                                Apply Fix
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2174,6 +2291,130 @@
             // Show in modal (reuse existing parsedDataModal)
             document.getElementById('parsedDataContent').innerHTML = content;
             document.getElementById('parsedDataModal').classList.remove('hidden');
+        }
+        // ─── VAT Quick Fix Modal ─────────────────────────────────
+        let vatFixState = { fileId: null, batchId: null, amount: 0, warningIdx: null, isMobile: false };
+
+        function openVatFixModal(fileId, batchId, amount, warningIdx, isMobile = false) {
+            vatFixState = { fileId, batchId, amount, warningIdx, isMobile };
+            document.getElementById('vatFixAmount').textContent = '€' + amount.toFixed(2);
+
+            // Reset selections
+            document.querySelector('input[name="vat_amount_type"][value="gross"]').checked = true;
+            document.querySelector('input[name="vat_rate_fix"][value="0"]').checked = true;
+            document.getElementById('vatFixPreview').classList.add('hidden');
+
+            document.getElementById('vatFixModal').classList.remove('hidden');
+        }
+
+        function closeVatFixModal() {
+            document.getElementById('vatFixModal').classList.add('hidden');
+        }
+
+        function updateVatPreview() {
+            const amountType = document.querySelector('input[name="vat_amount_type"]:checked')?.value;
+            const rateStr = document.querySelector('input[name="vat_rate_fix"]:checked')?.value;
+
+            if (!rateStr) return;
+
+            const rate = parseFloat(rateStr) / 100;
+            const amount = vatFixState.amount;
+            let net, vat, gross;
+
+            if (rate === 0) {
+                net = amount;
+                vat = 0;
+                gross = amount;
+            } else if (amountType === 'gross') {
+                gross = amount;
+                net = gross / (1 + rate);
+                vat = gross - net;
+            } else {
+                net = amount;
+                vat = net * rate;
+                gross = net + vat;
+            }
+
+            document.getElementById('vatFixNet').textContent = '€' + net.toFixed(2);
+            document.getElementById('vatFixVat').textContent = '€' + vat.toFixed(2);
+            document.getElementById('vatFixGross').textContent = '€' + gross.toFixed(2);
+            document.getElementById('vatFixPreview').classList.remove('hidden');
+        }
+
+        function saveVatFix() {
+            const amountType = document.querySelector('input[name="vat_amount_type"]:checked')?.value;
+            const rateStr = document.querySelector('input[name="vat_rate_fix"]:checked')?.value;
+            const rate = parseFloat(rateStr) / 100;
+            const amount = vatFixState.amount;
+
+            let net;
+            if (rate === 0) {
+                net = amount;
+            } else if (amountType === 'gross') {
+                net = amount / (1 + rate);
+            } else {
+                net = amount;
+            }
+
+            // Build VAT data -- put all into the selected rate bucket
+            const data = {
+                vat_0_net: 0,
+                vat_9_net: 0,
+                vat_13_5_net: 0,
+                vat_23_net: 0,
+            };
+
+            const rateKey = {
+                '0': 'vat_0_net',
+                '9': 'vat_9_net',
+                '13.5': 'vat_13_5_net',
+                '23': 'vat_23_net',
+            }[rateStr];
+
+            data[rateKey] = parseFloat(net.toFixed(2));
+
+            const saveBtn = document.getElementById('vatFixSaveBtn');
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+
+            fetch(`/invoices/bulk-upload/${vatFixState.batchId}/file/${vatFixState.fileId}/parsed-data`, {
+                method: 'PUT',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json())
+            .then(result => {
+                if (result.success) {
+                    const rateLabel = rateStr === '0' ? '0%' : rateStr + '%';
+                    const resolvedHtml = `<span>&#10003; VAT corrected to ${rateLabel} (Net: €${net.toFixed(2)})</span>`;
+
+                    // Mark both desktop and mobile warning elements as resolved (green)
+                    ['', 'mobile-'].forEach(prefix => {
+                        const el = document.getElementById(`vat-warning-${prefix}${vatFixState.fileId}-${vatFixState.warningIdx}`);
+                        if (el) {
+                            el.className = 'text-green-400 p-1 -m-1';
+                            el.innerHTML = resolvedHtml;
+                            el.onclick = null;
+                            el.style.cursor = 'default';
+                        }
+                    });
+                    closeVatFixModal();
+                } else {
+                    alert(result.error || 'Failed to save');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Error saving VAT fix');
+            })
+            .finally(() => {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Apply Fix';
+            });
         }
     </script>
     @endpush
