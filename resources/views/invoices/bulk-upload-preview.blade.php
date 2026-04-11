@@ -182,28 +182,62 @@
                         </span>
                     </div>
 
-                    {{-- Quick summary (always visible if parsed) --}}
-                    @if(in_array($file->status, ['parsed', 'review', 'amazon_pending', 'completed']) && $file->parsed_total_amount)
-                    <div class="mt-2 text-xs">
-                        <div class="font-semibold text-green-400">
-                            Total: &euro;{{ number_format($file->parsed_total_amount, 2) }}
-                            @if($file->supplier_detected)
-                                <span class="text-gray-300 font-normal">| {{ $file->supplier_detected }}</span>
-                            @endif
+                    {{-- Key invoice data (always visible if parsed) --}}
+                    @if(in_array($file->status, ['parsed', 'review', 'amazon_pending', 'completed']))
+                    <div class="mt-3 bg-gray-800 rounded-lg p-3 space-y-2">
+                        @if($file->supplier_detected)
+                        <div class="text-white text-base font-bold">{{ $file->supplier_detected }}</div>
+                        @endif
+
+                        <div class="flex items-center justify-between">
                             @if($file->parsed_invoice_date)
                                 @php
                                     $parsedDate = \Carbon\Carbon::parse($file->parsed_invoice_date);
                                     $monthsDiff = abs($parsedDate->diffInMonths(now()));
                                     $isSuspiciousDate = $monthsDiff > 2 || $parsedDate->year < now()->year - 1 || $parsedDate->isAfter(now()->addDays(7));
                                 @endphp
-                                <span class="{{ $isSuspiciousDate ? 'px-1.5 py-0.5 bg-red-900 border border-red-500 rounded text-red-300 font-bold' : 'text-gray-300 font-normal' }}">
-                                    | {{ $parsedDate->format('d/m/Y') }}
+                                <span class="text-sm {{ $isSuspiciousDate ? 'px-2 py-0.5 bg-red-900 border border-red-500 rounded text-red-300 font-bold' : 'text-gray-300' }}">
+                                    {{ $parsedDate->format('d/m/Y') }}
                                     @if($isSuspiciousDate) ⚠@endif
                                 </span>
                             @endif
+                            @if($file->parsed_invoice_number)
+                                <span class="text-sm text-gray-400 font-mono">#{{ $file->parsed_invoice_number }}</span>
+                            @endif
                         </div>
+
+                        @if($file->parsed_total_amount)
+                            @php
+                                $vatData = $file->parsed_vat_data;
+                                $totalVat = 0;
+                                $totalNet = 0;
+                                if ($vatData) {
+                                    foreach ($vatData as $rate) {
+                                        if (is_array($rate)) {
+                                            $totalNet += $rate['net'] ?? 0;
+                                            $totalVat += $rate['vat'] ?? 0;
+                                        }
+                                    }
+                                }
+                            @endphp
+                            <div class="grid grid-cols-3 gap-2 text-center bg-gray-700/50 rounded p-2">
+                                <div>
+                                    <div class="text-gray-400 text-xs">Net</div>
+                                    <div class="text-gray-100 text-sm font-semibold">&euro;{{ number_format($totalNet > 0 ? $totalNet : $file->parsed_total_amount, 2) }}</div>
+                                </div>
+                                <div>
+                                    <div class="text-gray-400 text-xs">VAT</div>
+                                    <div class="text-gray-100 text-sm font-semibold">&euro;{{ number_format($totalVat, 2) }}</div>
+                                </div>
+                                <div>
+                                    <div class="text-gray-400 text-xs">Total</div>
+                                    <div class="text-green-400 text-sm font-bold">&euro;{{ number_format($file->parsed_total_amount, 2) }}</div>
+                                </div>
+                            </div>
+                        @endif
+
                         @if($file->parsing_confidence)
-                            <span class="text-gray-400">({{ round($file->parsing_confidence * 100) }}% confidence)</span>
+                            <div class="text-gray-500 text-xs">{{ round($file->parsing_confidence * 100) }}% confidence</div>
                         @endif
                     </div>
                     @endif
@@ -620,45 +654,66 @@
                                     </span>
                                 @endif
 
-                                {{-- Parsed Amount Summary --}}
-                                @if(in_array($file->status, ['parsed', 'review', 'amazon_pending', 'completed']) && $file->parsed_total_amount)
-                                    <div class="mt-2 text-xs text-gray-300">
-                                        <div class="font-semibold text-green-400">
-                                            Total: €{{ number_format($file->parsed_total_amount, 2) }}
-                                            @if($file->supplier_detected)
-                                                <span class="ml-2">| {{ $file->supplier_detected }}</span>
-                                            @endif
+                                {{-- Parsed Invoice Summary --}}
+                                @if(in_array($file->status, ['parsed', 'review', 'amazon_pending', 'completed']))
+                                    <div class="mt-2">
+                                        @if($file->supplier_detected)
+                                            <div class="text-white text-sm font-bold">{{ $file->supplier_detected }}</div>
+                                        @endif
+                                        <div class="flex items-center gap-3 mt-1">
                                             @if($file->parsed_invoice_date)
                                                 @php
                                                     $parsedDate = \Carbon\Carbon::parse($file->parsed_invoice_date);
                                                     $monthsDiff = abs($parsedDate->diffInMonths(now()));
                                                     $isSuspiciousDate = $monthsDiff > 2 || $parsedDate->year < now()->year - 1 || $parsedDate->isAfter(now()->addDays(7));
                                                 @endphp
-                                                <span class="ml-2 {{ $isSuspiciousDate ? 'px-1.5 py-0.5 bg-red-900 border border-red-500 rounded text-red-300 font-bold' : '' }}">
-                                                    | {{ $parsedDate->format('d/m/Y') }}
+                                                <span class="text-sm {{ $isSuspiciousDate ? 'px-1.5 py-0.5 bg-red-900 border border-red-500 rounded text-red-300 font-bold' : 'text-gray-300' }}">
+                                                    {{ $parsedDate->format('d/m/Y') }}
                                                     @if($isSuspiciousDate) ⚠@endif
                                                 </span>
                                             @endif
+                                            @if($file->parsed_invoice_number)
+                                                <span class="text-sm text-gray-400 font-mono">#{{ $file->parsed_invoice_number }}</span>
+                                            @endif
                                         </div>
-                                        @if($file->parsed_vat_data)
+                                        @if($file->parsed_total_amount)
                                             @php
-                                                // Collect non-zero VAT rates for compact display
-                                                $vatSummary = [];
-                                                foreach (['vat_0' => '0%', 'vat_9' => '9%', 'vat_13_5' => '13.5%', 'vat_23' => '23%'] as $key => $rate) {
-                                                    if (isset($file->parsed_vat_data[$key])) {
-                                                        $netAmount = is_array($file->parsed_vat_data[$key])
-                                                            ? ($file->parsed_vat_data[$key]['net'] ?? 0)
-                                                            : $file->parsed_vat_data[$key];
-                                                        if ($netAmount > 0) {
-                                                            $vatSummary[] = $rate . ' (€' . number_format($netAmount, 2) . ')';
+                                                $vatData = $file->parsed_vat_data;
+                                                $totalVat = 0;
+                                                $totalNet = 0;
+                                                if ($vatData) {
+                                                    foreach ($vatData as $rate) {
+                                                        if (is_array($rate)) {
+                                                            $totalNet += $rate['net'] ?? 0;
+                                                            $totalVat += $rate['vat'] ?? 0;
                                                         }
                                                     }
                                                 }
                                             @endphp
-                                            @if(count($vatSummary) > 0)
-                                                <div class="text-gray-400 mt-1">
-                                                    VAT: {{ implode(' | ', $vatSummary) }}
-                                                </div>
+                                            <div class="flex items-center gap-4 mt-1 text-sm">
+                                                <span class="text-gray-300">Net: <span class="text-gray-100 font-semibold">€{{ number_format($totalNet > 0 ? $totalNet : $file->parsed_total_amount, 2) }}</span></span>
+                                                <span class="text-gray-300">VAT: <span class="text-gray-100 font-semibold">€{{ number_format($totalVat, 2) }}</span></span>
+                                                <span class="text-green-400 font-bold">Total: €{{ number_format($file->parsed_total_amount, 2) }}</span>
+                                            </div>
+                                            @if($file->parsed_vat_data)
+                                                @php
+                                                    $vatSummary = [];
+                                                    foreach (['vat_0' => '0%', 'vat_9' => '9%', 'vat_13_5' => '13.5%', 'vat_23' => '23%'] as $key => $rate) {
+                                                        if (isset($file->parsed_vat_data[$key])) {
+                                                            $netAmount = is_array($file->parsed_vat_data[$key])
+                                                                ? ($file->parsed_vat_data[$key]['net'] ?? 0)
+                                                                : $file->parsed_vat_data[$key];
+                                                            if ($netAmount > 0) {
+                                                                $vatSummary[] = $rate . ' (€' . number_format($netAmount, 2) . ')';
+                                                            }
+                                                        }
+                                                    }
+                                                @endphp
+                                                @if(count($vatSummary) > 0)
+                                                    <div class="text-gray-400 text-xs mt-1">
+                                                        VAT Rates: {{ implode(' | ', $vatSummary) }}
+                                                    </div>
+                                                @endif
                                             @endif
                                         @endif
 

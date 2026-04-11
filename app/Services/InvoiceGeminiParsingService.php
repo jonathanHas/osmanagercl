@@ -308,8 +308,9 @@ class InvoiceGeminiParsingService
             .'RULES:'
             ."\n".'- This is an Irish business. VAT rates are 23% (standard), 13.5% (reduced), 9% (second reduced), and 0% (zero/exempt).'
             ."\n".'- Assign each line item and net amount to the correct VAT rate bracket ONLY if the VAT rate is explicitly shown on the invoice.'
-            ."\n".'- VAT GUESSING: If the invoice does NOT explicitly state the VAT rate for an item or total, do NOT assume 23%. '
-            .'Instead put the amount under vat_0 and add a warning: "VAT rate not shown on invoice -- assigned to 0% pending review". '
+            ."\n".'- VAT GUESSING: If the invoice does NOT explicitly state the VAT rate, do NOT assume 23%. '
+            .'Instead put the total amount under vat_0 and add ONE single warning: "VAT rate not shown on invoice -- total assigned to 0% pending review". '
+            .'Do NOT add separate VAT warnings per line item -- only one warning for the overall invoice. '
             .'Only assign to a specific VAT rate (23%, 13.5%, 9%) when the invoice clearly states it.'
             ."\n".'- If the invoice shows a negative total or is labeled "credit note", set is_credit_note to true.'
             ."\n".'- If no VAT is charged at all, set is_tax_free to true and put the full amount under vat_0.'
@@ -446,6 +447,13 @@ class InvoiceGeminiParsingService
     protected function formatOutput(array $data, array $knownSuppliers, string $provider): array
     {
         $warnings = $data['warnings'] ?? [];
+
+        // Collapse multiple per-line VAT warnings into a single warning
+        $vatWarnings = array_filter($warnings, fn ($w) => str_contains(strtolower($w), 'vat'));
+        if (count($vatWarnings) > 1) {
+            $warnings = array_values(array_filter($warnings, fn ($w) => ! str_contains(strtolower($w), 'vat')));
+            $warnings[] = 'VAT rate not shown on invoice -- total assigned to 0% pending review';
+        }
 
         // Validate parsed date
         $invoiceDate = $data['invoice_date'] ?? null;
