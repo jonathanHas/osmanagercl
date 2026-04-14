@@ -39,6 +39,7 @@ class LegacyDelivery extends Model
         'caseUnits',
         'myOrder',
         'rrPrice',
+        'orderNumber',
     ];
 
     /**

@@ -596,6 +596,18 @@ class DeliveryUdeaParser:
                 })
                 return result
 
+            # Extract order number from PDF content or filename
+            order_number = None
+            # Try PDF content first — Udea PDFs typically contain the order number
+            order_match = re.search(r'Order[_\s\-]*(\d{5,10})', text, re.IGNORECASE)
+            if not order_match:
+                # Fallback: extract from filename (e.g., Order_4452479.pdf)
+                order_match = re.search(r'Order[_\-]?(\d+)', os.path.basename(pdf_path), re.IGNORECASE)
+            if order_match:
+                order_number = order_match.group(1)
+                self.log(f"Extracted order number: {order_number}", "DEBUG")
+            result["metadata"]["order_number"] = order_number
+
             items = []
             total_value = 0.0
             capture = False

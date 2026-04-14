@@ -268,7 +268,11 @@ class InvoiceGeminiParsingService
     {
         $supplierList = implode(', ', array_map(fn ($s) => '"'.$s.'"', $knownSuppliers));
 
+        $today = now()->format('Y-m-d');
+
         return 'You are an invoice data extraction system. Extract all data from this invoice into JSON.'
+            ."\n\n"
+            .'TODAY\'S DATE: '.$today.'. The current year is '.now()->year.'. Dates in '.now()->year.' are NOT in the future.'
             ."\n\n"
             .'IMPORTANT: Only extract information physically visible on the invoice. Do not guess or fabricate any values.'
             ."\n\n"

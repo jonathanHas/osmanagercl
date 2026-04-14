@@ -168,6 +168,11 @@ def process_delivery_pdf(file_path: str, supplier_hint: str = None, verbose: boo
             if unmatched_lines:
                 response['metadata']['unmatched_lines'] = unmatched_lines
 
+            # Pass through order number from parser
+            order_number = result.get('metadata', {}).get('order_number')
+            if order_number:
+                response['metadata']['order_number'] = order_number
+
         else:
             response['errors'] = result.get('errors', [])
             response['warnings'] = result.get('warnings', [])

@@ -107,7 +107,7 @@ class DeliveryParsingService
      * @param  string|null  $supplierHint  Optional supplier name to help detection
      * @return array Merged parsed delivery data with per-file results
      */
-    public function parseMultipleDeliveryPdfs(array $pdfPaths, ?string $supplierHint = null): array
+    public function parseMultipleDeliveryPdfs(array $pdfPaths, ?string $supplierHint = null, array $originalFilenames = []): array
     {
         $allItems = [];
         $totalValue = 0.0;
@@ -122,8 +122,8 @@ class DeliveryParsingService
         $totalBarrelsValue = 0.0;
         $totalCostsValue = 0.0;
 
-        foreach ($pdfPaths as $pdfPath) {
-            $filename = basename($pdfPath);
+        foreach ($pdfPaths as $index => $pdfPath) {
+            $filename = $originalFilenames[$index] ?? basename($pdfPath);
 
             try {
                 $result = $this->parseDeliveryPdf($pdfPath, $supplierHint);
@@ -166,8 +166,26 @@ class DeliveryParsingService
                         $detectedSupplier = $result['data']['supplier'] ?? $result['metadata']['supplier_detected'] ?? null;
                     }
 
+                    // Extract order number from parser metadata or filename
+                    $orderNumber = $result['data']['metadata']['order_number']
+                        ?? $result['metadata']['order_number']
+                        ?? null;
+                    if (! $orderNumber && preg_match('/Order[_\-]?(\d+)/i', $filename, $m)) {
+                        $orderNumber = $m[1];
+                    }
+
+                    // Tag each item with its order number before merging
+                    $fileItems = $result['data']['items'];
+                    foreach ($fileItems as &$item) {
+                        $item['order_number'] = $orderNumber;
+                    }
+                    unset($item);
+
+                    // Store order number in file results for document saving
+                    $fileResults[count($fileResults) - 1]['order_number'] = $orderNumber;
+
                     // Merge items
-                    $allItems = array_merge($allItems, $result['data']['items']);
+                    $allItems = array_merge($allItems, $fileItems);
                     $totalValue += $productsTotal;
 
                     // Merge barrel items (Udea-specific: crates, bottles, pallets)
@@ -346,6 +364,7 @@ class DeliveryParsingService
                 'weight_per_unit' => $item['weight_per_unit'] ?? null,
                 'weight_unit' => $item['weight_unit'] ?? null,
                 'total_weight' => $item['total_weight'] ?? null,
+                'order_number' => $item['order_number'] ?? null,
             ];
         }
 

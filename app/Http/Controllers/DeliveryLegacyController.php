@@ -176,7 +176,8 @@ class DeliveryLegacyController extends Controller
                     b.barcode as scannedBarcode,
                     b.scanned,
                     PRODUCTS.ID as productID,
-                    CATEGORIES.NAME as categoryName
+                    CATEGORIES.NAME as categoryName,
+                    MIN(delivery.orderNumber) as orderNumber
                 FROM delivery
                 LEFT JOIN supplier_link ON delivery.supCode = supplier_link.SupplierCode
                     AND supplier_link.SupplierID = ?
@@ -257,7 +258,8 @@ class DeliveryLegacyController extends Controller
                     delivery.prodName,
                     SUM(delivery.myOrder) as myOrder,
                     MIN(delivery.cost) as cost,
-                    delivery.caseUnits
+                    delivery.caseUnits,
+                    MIN(delivery.orderNumber) as orderNumber
                 FROM delivery
                 INNER JOIN supplier_link ON delivery.supCode = supplier_link.SupplierCode
                     AND supplier_link.SupplierID = ?

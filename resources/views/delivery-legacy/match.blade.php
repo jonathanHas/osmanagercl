@@ -663,7 +663,7 @@
                                             @else
                                                 <span class="font-medium text-gray-900 text-sm">{{ $item->prodName }}</span>
                                             @endif
-                                            <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                            <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                             <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                         </div>
                                         <div class="text-right flex-shrink-0">
@@ -774,7 +774,7 @@
                                                 @else
                                                     <span class="font-medium text-gray-900">{{ $item->prodName }}</span>
                                                 @endif
-                                                <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                                <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                                 <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                             </td>
                                             <td class="px-3 py-2 text-sm text-gray-600 font-mono">{{ $item->Barcode }}</td>
@@ -896,7 +896,7 @@
                                             @else
                                                 <span class="font-medium text-gray-900 text-sm">{{ $item->prodName }}</span>
                                             @endif
-                                            <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                            <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                             <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                         </div>
                                         <div class="text-right flex-shrink-0">
@@ -1020,7 +1020,7 @@
                                                 @else
                                                     <span class="font-medium text-gray-900">{{ $item->prodName }}</span>
                                                 @endif
-                                                <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                                <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                                 <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                             </td>
                                             <td class="px-3 py-2 text-center font-medium">{{ $unitsDelivered }}</td>
@@ -1183,7 +1183,7 @@
                                             @else
                                                 <span class="font-medium text-gray-900 text-sm">{{ $item->prodName }}</span>
                                             @endif
-                                            <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                            <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                             <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                         </div>
                                         <div class="text-right flex-shrink-0">
@@ -1311,7 +1311,7 @@
                                                 @else
                                                     <span class="font-medium text-gray-900">{{ $item->prodName }}</span>
                                                 @endif
-                                                <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                                <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                                 <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                             </td>
                                             <td class="px-3 py-2 text-center font-medium">{{ $unitsDelivered }}</td>
@@ -1470,7 +1470,7 @@
                                             @else
                                                 <span class="font-medium text-gray-900 text-sm">{{ $item->prodName }}</span>
                                             @endif
-                                            <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                            <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                             <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                         </div>
                                         <div class="text-right flex-shrink-0">
@@ -1551,7 +1551,7 @@
                                                 @else
                                                     <span class="font-medium text-gray-900">{{ $item->prodName }}</span>
                                                 @endif
-                                                <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                                <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                                 <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                             </td>
                                             <td class="px-3 py-2 text-center font-medium text-green-600">{{ $unitsDelivered }}</td>
@@ -1686,7 +1686,7 @@
                                         @else
                                             <span class="font-medium text-gray-900 text-sm">{{ $item->prodName }}</span>
                                         @endif
-                                        <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                        <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                         <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                     </div>
                                     <div class="text-right flex-shrink-0">
@@ -1741,7 +1741,7 @@
                                             @else
                                                 <span class="font-medium text-gray-900">{{ $item->prodName }}</span>
                                             @endif
-                                            <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                            <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                             <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                         </td>
                                         <td class="px-3 py-2 text-center {{ $hasCaseUnitChange ? 'bg-orange-100' : '' }}">
@@ -1979,7 +1979,7 @@
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             <span class="font-medium text-gray-900 text-sm">{{ $item->prodName }}</span>
-                                            <span class="text-xs text-gray-500 block">{{ $item->supCode }}</span>
+                                            <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                         </div>
                                         <div class="text-right flex-shrink-0">
                                             <span class="font-medium text-red-600 text-sm">&euro;{{ number_format($value, 2) }}</span>
@@ -2034,7 +2034,7 @@
                                                     size="sm" />
                                             </td>
                                             <td class="px-3 py-2 font-medium text-gray-900">{{ $item->prodName }}</td>
-                                            <td class="px-3 py-2 text-gray-500">{{ $item->supCode }}</td>
+                                            <td class="px-3 py-2 text-gray-500">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</td>
                                             <td class="px-3 py-2 text-center">
                                                 @if($isWeightBased)
                                                     {{ number_format($myOrder, 3) }} <span class="text-xs text-purple-600">kg</span>

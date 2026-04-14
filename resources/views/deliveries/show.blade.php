@@ -947,6 +947,9 @@
                                     </div>
                                     <div class="text-xs text-gray-500 dark:text-gray-400">
                                         {{ $item->supplier_code }}
+                                        @if($item->order_number)
+                                            <span class="ml-1 px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded">Order #{{ $item->order_number }}</span>
+                                        @endif
                                         @if($item->is_new_product)
                                             <span class="ml-1 px-1.5 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800 rounded">New</span>
                                         @endif
@@ -1169,6 +1172,9 @@
                                         </div>
                                         <div class="text-sm text-gray-500 dark:text-gray-400">
                                             Code: {{ $item->supplier_code }}
+                                            @if($item->order_number)
+                                                <span class="ml-1 px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded">Order #{{ $item->order_number }}</span>
+                                            @endif
                                             @if($item->is_new_product)
                                                 <span class="ml-2 px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded">
                                                     New Product

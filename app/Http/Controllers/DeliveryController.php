@@ -273,6 +273,7 @@ class DeliveryController extends Controller
         ]);
 
         $storedPaths = [];
+        $originalFilenames = [];
 
         try {
             // Handle both single file and multiple files
@@ -318,6 +319,7 @@ class DeliveryController extends Controller
 
                 $pdfPath = $file->store('temp');
                 $storedPaths[] = Storage::disk('local')->path($pdfPath);
+                $originalFilenames[] = $file->getClientOriginalName();
             }
 
             // Get supplier hint based on supplier ID
@@ -327,7 +329,7 @@ class DeliveryController extends Controller
             if (count($storedPaths) === 1) {
                 $result = $this->deliveryParsingService->parseDeliveryPdf($storedPaths[0], $supplierHint);
             } else {
-                $result = $this->deliveryParsingService->parseMultipleDeliveryPdfs($storedPaths, $supplierHint);
+                $result = $this->deliveryParsingService->parseMultipleDeliveryPdfs($storedPaths, $supplierHint, $originalFilenames);
             }
 
             // Clean up temp files
@@ -445,8 +447,24 @@ class DeliveryController extends Controller
             // Parse PDF(s)
             if (count($storedPaths) === 1) {
                 $result = $this->deliveryParsingService->parseDeliveryPdf($storedPaths[0], $supplierHint);
+
+                // Tag single-file items with order number before conversion
+                if ($result['success'] ?? false) {
+                    $orderNumber = $result['data']['metadata']['order_number']
+                        ?? $result['metadata']['order_number']
+                        ?? null;
+                    if (! $orderNumber && preg_match('/Order[_\-]?(\d+)/i', $originalFilenames[0], $m)) {
+                        $orderNumber = $m[1];
+                    }
+                    if ($orderNumber && ! empty($result['data']['items'])) {
+                        foreach ($result['data']['items'] as &$item) {
+                            $item['order_number'] = $orderNumber;
+                        }
+                        unset($item);
+                    }
+                }
             } else {
-                $result = $this->deliveryParsingService->parseMultipleDeliveryPdfs($storedPaths, $supplierHint);
+                $result = $this->deliveryParsingService->parseMultipleDeliveryPdfs($storedPaths, $supplierHint, $originalFilenames);
             }
 
             if (! $this->deliveryParsingService->wasSuccessful($result)) {
@@ -537,12 +555,19 @@ class DeliveryController extends Controller
                         ];
                     }
 
+                    // Extract order number from file results or filename
+                    $fileOrderNumber = $fileResults[$index]['order_number'] ?? null;
+                    if (! $fileOrderNumber && preg_match('/Order[_\-]?(\d+)/i', $originalFilenames[$index], $m)) {
+                        $fileOrderNumber = $m[1];
+                    }
+
                     $this->saveDeliveryDocument(
                         $delivery,
                         $path,
                         $originalFilenames[$index],
                         'invoice_pdf',
-                        $fileParsingMetadata
+                        $fileParsingMetadata,
+                        $fileOrderNumber
                     );
                 }
             }
@@ -646,7 +671,8 @@ class DeliveryController extends Controller
         string $tempFilePath,
         string $originalFilename,
         string $documentType = 'invoice_pdf',
-        ?array $parsingMetadata = null
+        ?array $parsingMetadata = null,
+        ?string $orderNumber = null
     ): DeliveryDocument {
         $storedFilename = DeliveryDocument::generateStoredFilename($originalFilename);
         $filePath = DeliveryDocument::generateFilePath($delivery->id, $storedFilename);
@@ -674,6 +700,7 @@ class DeliveryController extends Controller
         return DeliveryDocument::create([
             'delivery_id' => $delivery->id,
             'original_filename' => $originalFilename,
+            'order_number' => $orderNumber,
             'stored_filename' => $storedFilename,
             'file_path' => $filePath,
             'mime_type' => $mimeType,
@@ -1513,6 +1540,7 @@ class DeliveryController extends Controller
                         'caseUnits' => $syncCaseUnits,
                         'myOrder' => $syncMyOrder,
                         'rrPrice' => $item->sale_price ?? 0,
+                        'orderNumber' => $item->order_number,
                     ]);
                 };
 

@@ -15,6 +15,7 @@ class DeliveryDocument extends Model
     protected $fillable = [
         'delivery_id',
         'original_filename',
+        'order_number',
         'stored_filename',
         'file_path',
         'mime_type',

@@ -165,11 +165,11 @@
                                 </svg>
                             @endif
                             <div class="min-w-0">
-                                <p class="text-gray-200 text-sm font-medium truncate">{{ $file->original_filename }}</p>
-                                <p class="text-gray-400 text-xs mt-0.5">
+                                <p class="text-gray-500 text-xs truncate" title="{{ $file->original_filename }}">{{ $file->original_filename }}</p>
+                                <p class="text-gray-500 text-xs">
                                     {{ strtoupper($file->extension) }} &middot; {{ $file->formatted_file_size }}
                                     @if($file->isPdf() && $file->page_count > 0)
-                                        &middot; {{ $file->page_count }} page{{ $file->page_count > 1 ? 's' : '' }}
+                                        &middot; {{ $file->page_count }}pg
                                     @endif
                                     @if($file->isSplitFile())
                                         &middot; <span class="text-purple-300">Split ({{ $file->page_range }})</span>
@@ -262,28 +262,6 @@
 
                     {{-- Details panel --}}
                     <div class="mt-3 space-y-2">
-                        {{-- VAT breakdown --}}
-                        @if($file->parsed_vat_data)
-                            @php
-                                $vatSummary = [];
-                                foreach (['vat_0' => '0%', 'vat_9' => '9%', 'vat_13_5' => '13.5%', 'vat_23' => '23%'] as $key => $rate) {
-                                    if (isset($file->parsed_vat_data[$key])) {
-                                        $netAmount = is_array($file->parsed_vat_data[$key])
-                                            ? ($file->parsed_vat_data[$key]['net'] ?? 0)
-                                            : $file->parsed_vat_data[$key];
-                                        if ($netAmount > 0) {
-                                            $vatSummary[] = $rate . ' (&euro;' . number_format($netAmount, 2) . ')';
-                                        }
-                                    }
-                                }
-                            @endphp
-                            @if(count($vatSummary) > 0)
-                                <div class="p-2 bg-gray-800 rounded text-xs text-gray-400">
-                                    <span class="font-medium text-gray-300">VAT:</span> {!! implode(' | ', $vatSummary) !!}
-                                </div>
-                            @endif
-                        @endif
-
                         {{-- RTD Summary --}}
                         @if($file->supplier_detected === 'Udea' && isset($file->parsed_data['lines']) && count($file->parsed_data['lines']) > 0)
                             @php
@@ -619,7 +597,7 @@
                                             <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 1 1 0 000 2H4v10h12V5h-2a1 1 0 100-2 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5z" clip-rule="evenodd"/>
                                         </svg>
                                     @endif
-                                    <span class="text-gray-200">{{ $file->original_filename }}</span>
+                                    <span class="text-gray-400 text-xs max-w-xs truncate inline-block align-middle" title="{{ $file->original_filename }}">{{ $file->original_filename }}</span>
                                     @if($file->isPdf() && $file->page_count > 0)
                                         <span class="ml-2 px-2 py-1 text-xs rounded-full @if($file->page_count > 1) bg-amber-900 text-amber-300 font-semibold @else bg-blue-900 text-blue-300 @endif">
                                             {{ $file->page_count }} page{{ $file->page_count > 1 ? 's' : '' }}
@@ -695,26 +673,6 @@
                                                 <span class="text-gray-300">VAT: <span class="text-gray-100 font-semibold">€{{ number_format($totalVat, 2) }}</span></span>
                                                 <span class="text-green-400 font-bold">Total: €{{ number_format($file->parsed_total_amount, 2) }}</span>
                                             </div>
-                                            @if($file->parsed_vat_data)
-                                                @php
-                                                    $vatSummary = [];
-                                                    foreach (['vat_0' => '0%', 'vat_9' => '9%', 'vat_13_5' => '13.5%', 'vat_23' => '23%'] as $key => $rate) {
-                                                        if (isset($file->parsed_vat_data[$key])) {
-                                                            $netAmount = is_array($file->parsed_vat_data[$key])
-                                                                ? ($file->parsed_vat_data[$key]['net'] ?? 0)
-                                                                : $file->parsed_vat_data[$key];
-                                                            if ($netAmount > 0) {
-                                                                $vatSummary[] = $rate . ' (€' . number_format($netAmount, 2) . ')';
-                                                            }
-                                                        }
-                                                    }
-                                                @endphp
-                                                @if(count($vatSummary) > 0)
-                                                    <div class="text-gray-400 text-xs mt-1">
-                                                        VAT Rates: {{ implode(' | ', $vatSummary) }}
-                                                    </div>
-                                                @endif
-                                            @endif
                                         @endif
 
                                         {{-- RTD Summary for Udea invoices with line items --}}

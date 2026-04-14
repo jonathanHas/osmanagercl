@@ -136,6 +136,7 @@ class DeliveryService
                 // Create delivery item with correct quantity interpretation
                 $deliveryItem = DeliveryItem::create([
                     'delivery_id' => $delivery->id,
+                    'order_number' => $record['order_number'] ?? null,
                     'supplier_code' => $productCode,
                     'description' => $productName,
                     'units_per_case' => $caseSize,
