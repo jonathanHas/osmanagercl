@@ -466,6 +466,12 @@
     </div>
 
     @push('scripts')
+    @php
+        if (!isset($hasPayments)) {
+            $hasPayments = false;
+            $paymentsData = [['supplier_id' => '', 'payee_name' => '', 'amount' => '', 'description' => '']];
+        }
+    @endphp
     <script>
         function cashReconciliation() {
             return {
