@@ -205,15 +205,16 @@ class CashReconciliation extends Model
     }
 
     /**
-     * Calculate cash available for lodgement (after float and supplier payments)
+     * Calculate cash available for lodgement (after removing float)
+     * Note: supplier payments are already paid out before the end-of-day cash count,
+     * so the counted denominations already reflect that deduction.
      */
     public function calculateAvailableToLodge(): float
     {
         $totalCash = $this->calculateTotalCash();
         $totalFloat = $this->note_float + $this->coin_float;
-        $supplierPayments = $this->payments->sum('amount');
 
-        return max(0, $totalCash - $totalFloat - $supplierPayments);
+        return max(0, $totalCash - $totalFloat);
     }
 
     /**
