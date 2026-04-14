@@ -52,6 +52,13 @@ class CashLodgementController extends Controller
 
         $lodgements = $query->orderBy('lodgement_date', 'desc')->paginate(50);
 
+        // Re-sort current page by till closed date (cross-database, can't sort in query)
+        $lodgements->setCollection(
+            $lodgements->getCollection()->sortByDesc(
+                fn ($l) => $l->closedCash?->DATEEND ?? $l->lodgement_date
+            )->values()
+        );
+
         // Get summary statistics
         $totalLodgements = CashLodgement::whereBetween('lodgement_date', [$startDate, $endDate])->count();
         $totalAmount = CashLodgement::whereBetween('lodgement_date', [$startDate, $endDate])->sum('total_amount');
@@ -78,6 +85,35 @@ class CashLodgementController extends Controller
             ->orderBy('total', 'desc')
             ->get();
 
+        // Build till name → till_id lookup for linking to cash-reconciliation page
+        $reconciliationRepo = app(\App\Repositories\CashReconciliationRepository::class);
+        $tillNameToId = $reconciliationRepo->getAvailableTills()->flip();
+
+        // Auto-create CashReconciliation records for POS till closes that don't have one yet
+        // This imports legacy denomination data so they appear in Pending Bags
+        $reconciledMoneyIds = CashReconciliation::pluck('closed_cash_id')->toArray();
+        $lodgedMoneyIds = CashLodgement::pluck('money_id')->toArray();
+        $excludedMoneyIds = array_unique(array_merge($reconciledMoneyIds, $lodgedMoneyIds));
+        $unreconciledClosedCash = ClosedCash::whereNotIn('MONEY', $excludedMoneyIds)
+            ->whereDate('DATEEND', '>=', now()->subDays(60))
+            ->orderBy('DATEEND', 'desc')
+            ->get();
+
+        // Create reconciliation records for unreconciled days (imports legacy money data)
+        foreach ($unreconciledClosedCash as $closedCash) {
+            try {
+                $tillId = $tillNameToId[$closedCash->HOST] ?? 1;
+                $reconciliationRepo->getOrCreateReconciliation(
+                    $closedCash->DATEEND->startOfDay(),
+                    $tillId,
+                    $closedCash->HOST
+                );
+            } catch (\Exception $e) {
+                // Skip if creation fails (e.g., missing POS data)
+                continue;
+            }
+        }
+
         // Pending bags: reconciliations with cash available but no bag verification
         $pendingBags = CashReconciliation::whereDoesntHave('bagVerification')
             ->with(['payments'])
@@ -87,17 +123,14 @@ class CashLodgementController extends Controller
             ->take(30)
             ->values();
 
-        // Unreconciled days: POS till closes with no CashReconciliation record yet
-        $reconciledMoneyIds = CashReconciliation::pluck('closed_cash_id')->toArray();
-        $unreconciledDays = ClosedCash::whereNotIn('MONEY', $reconciledMoneyIds)
+        // Remaining unreconciled days: those where auto-creation didn't produce a lodgeable amount
+        // (e.g., no legacy money data, denominations still zero)
+        $allReconciledMoneyIds = CashReconciliation::pluck('closed_cash_id')->toArray();
+        $allExcludedMoneyIds = array_unique(array_merge($allReconciledMoneyIds, $lodgedMoneyIds));
+        $unreconciledDays = ClosedCash::whereNotIn('MONEY', $allExcludedMoneyIds)
             ->whereDate('DATEEND', '>=', now()->subDays(60))
             ->orderBy('DATEEND', 'desc')
             ->get();
-
-        // Build till name → till_id lookup for linking to cash-reconciliation page
-        $tillNameToId = app(\App\Repositories\CashReconciliationRepository::class)
-            ->getAvailableTills()
-            ->flip();
 
         // Verified bags: bag verifications not yet included in a lodgement
         $verifiedBags = CashBagVerification::whereNull('cash_lodgement_id')
