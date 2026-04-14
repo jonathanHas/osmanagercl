@@ -120,7 +120,7 @@ class CashLodgementController extends Controller
             ->orderBy('date', 'desc')
             ->get()
             ->filter(fn ($r) => $r->calculateAvailableToLodge() > 0)
-            ->take(30)
+            ->take(40)
             ->values();
 
         // Remaining unreconciled days: those where auto-creation didn't produce a lodgeable amount
