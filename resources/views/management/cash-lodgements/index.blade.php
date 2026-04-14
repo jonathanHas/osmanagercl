@@ -158,6 +158,38 @@
     @endif
 
     {{-- ============================================================ --}}
+    {{-- SECTION 1b: UNRECONCILED DAYS (need cash counting first)      --}}
+    {{-- ============================================================ --}}
+    @if($unreconciledDays->count() > 0)
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">Needs Cash Reconciliation</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ $unreconciledDays->count() }} day(s) with till closes but no cash count yet</p>
+                </div>
+                <span class="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/30 px-3 py-1 text-sm font-medium text-amber-800 dark:text-amber-300">Action Required</span>
+            </div>
+        </div>
+
+        <div class="divide-y divide-gray-200 dark:divide-gray-700">
+            @foreach($unreconciledDays as $day)
+            <div class="px-6 py-3 flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm font-medium text-gray-900 dark:text-white">{{ $day->DATEEND->format('D, M j, Y') }}</span>
+                    <span class="text-sm text-gray-500 dark:text-gray-400">{{ $day->HOST }}</span>
+                </div>
+                <a href="{{ route('cash-reconciliation.index', ['date' => $day->DATEEND->format('Y-m-d'), 'till_id' => $tillNameToId[$day->HOST] ?? 1]) }}"
+                   class="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded text-sm font-medium">
+                    Count Cash
+                </a>
+            </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
+
+    {{-- ============================================================ --}}
     {{-- SECTION 2: VERIFIED BAGS (ready to lodge)                     --}}
     {{-- ============================================================ --}}
     @if($verifiedBags->count() > 0)
@@ -284,7 +316,8 @@
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead class="bg-gray-50 dark:bg-gray-900/50">
                     <tr>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Lodgement Date</th>
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Till Closed</th>
                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Till</th>
                         <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Source</th>
@@ -295,6 +328,7 @@
                     @forelse($lodgements as $lodgement)
                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                         <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">{{ $lodgement->lodgement_date->format('D, M j, Y') }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ $lodgement->closedCash?->DATEEND?->format('D, M j, Y') ?? '-' }}</td>
                         <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ $lodgement->till_name ?: '-' }}</td>
                         <td class="px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-white">€{{ number_format($lodgement->total_amount, 2) }}</td>
                         <td class="px-4 py-3 text-sm">
@@ -311,7 +345,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="5" class="px-4 py-4 text-center text-gray-500 dark:text-gray-400">No lodgements found.</td>
+                        <td colspan="6" class="px-4 py-4 text-center text-gray-500 dark:text-gray-400">No lodgements found.</td>
                     </tr>
                     @endforelse
                 </tbody>

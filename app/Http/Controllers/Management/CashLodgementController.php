@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CashBagVerification;
 use App\Models\CashLodgement;
 use App\Models\CashReconciliation;
+use App\Models\POS\ClosedCash;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -28,7 +29,7 @@ class CashLodgementController extends Controller
 
         // Get cash lodgements with pagination
         $query = CashLodgement::whereBetween('lodgement_date', [$startDate, $endDate])
-            ->with(['matches.cashReconciliation']);
+            ->with(['matches.cashReconciliation', 'closedCash']);
 
         // Filter by till if specified
         if ($request->filled('till')) {
@@ -86,6 +87,18 @@ class CashLodgementController extends Controller
             ->take(30)
             ->values();
 
+        // Unreconciled days: POS till closes with no CashReconciliation record yet
+        $reconciledMoneyIds = CashReconciliation::pluck('closed_cash_id')->toArray();
+        $unreconciledDays = ClosedCash::whereNotIn('MONEY', $reconciledMoneyIds)
+            ->whereDate('DATEEND', '>=', now()->subDays(60))
+            ->orderBy('DATEEND', 'desc')
+            ->get();
+
+        // Build till name → till_id lookup for linking to cash-reconciliation page
+        $tillNameToId = app(\App\Repositories\CashReconciliationRepository::class)
+            ->getAvailableTills()
+            ->flip();
+
         // Verified bags: bag verifications not yet included in a lodgement
         $verifiedBags = CashBagVerification::whereNull('cash_lodgement_id')
             ->with(['reconciliation', 'verifier'])
@@ -106,6 +119,8 @@ class CashLodgementController extends Controller
             'tills',
             'lodgementsByTill',
             'pendingBags',
+            'unreconciledDays',
+            'tillNameToId',
             'verifiedBags'
         ));
     }
