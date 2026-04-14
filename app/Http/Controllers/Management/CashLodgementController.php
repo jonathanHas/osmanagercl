@@ -81,9 +81,9 @@ class CashLodgementController extends Controller
         $pendingBags = CashReconciliation::whereDoesntHave('bagVerification')
             ->with(['payments'])
             ->orderBy('date', 'desc')
-            ->take(30)
             ->get()
             ->filter(fn ($r) => $r->calculateAvailableToLodge() > 0)
+            ->take(30)
             ->values();
 
         // Verified bags: bag verifications not yet included in a lodgement
