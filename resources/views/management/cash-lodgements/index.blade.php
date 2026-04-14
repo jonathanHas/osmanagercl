@@ -51,7 +51,7 @@
         <div class="divide-y divide-gray-200 dark:divide-gray-700">
             @foreach($pendingBags as $bag)
             @php $avail = $bag->calculateAvailableToLodge(); @endphp
-            <div class="px-6 py-3">
+            <div class="px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-4">
                         <span class="text-sm font-medium text-gray-900 dark:text-white">{{ $bag->date->format('D, M j') }}</span>
@@ -59,6 +59,11 @@
                     </div>
                     <div class="flex items-center space-x-4">
                         <span class="text-sm font-semibold text-gray-900 dark:text-white">€{{ number_format($avail, 2) }}</span>
+                        <a href="{{ route('cash-reconciliation.index', ['date' => $bag->date->format('Y-m-d'), 'till_id' => $bag->till_id]) }}"
+                           target="_blank"
+                           class="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 text-sm font-medium">
+                            View Recon
+                        </a>
                         <button type="button"
                                 @click="openBag('{{ $bag->id }}', '{{ $bag->date->format('D, M j') }}', '{{ $bag->till_name }}', {{ $avail }})"
                                 class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm font-medium">
