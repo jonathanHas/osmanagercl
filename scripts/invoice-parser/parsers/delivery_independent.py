@@ -297,7 +297,8 @@ class DeliveryIndependentParser:
             "warnings": [],
             "metadata": {
                 "filename": os.path.basename(pdf_path),
-                "parsing_method": "unknown"
+                "parsing_method": "unknown",
+                "order_number": None
             }
         }
 
@@ -312,6 +313,12 @@ class DeliveryIndependentParser:
                     "message": f"No text could be extracted from {pdf_path}"
                 })
                 return result
+
+            # Extract invoice number from PDF content (e.g., "Invoice No: IN466447")
+            invoice_match = re.search(r'Invoice\s*No[.:]?\s*(\w+)', text, re.IGNORECASE)
+            if invoice_match:
+                result["metadata"]["order_number"] = invoice_match.group(1)
+                self.log(f"Extracted invoice number: {result['metadata']['order_number']}", "DEBUG")
 
             # Keywords to skip (non-product lines)
             # NOTE: Use whole words carefully — "Nett" was previously matching "Nettle" products

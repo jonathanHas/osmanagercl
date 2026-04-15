@@ -284,6 +284,10 @@ External supplier connectivity for images, pricing, and product data.
 
 ### Delivery Verification
 Comprehensive delivery processing with barcode scanning and PDF invoice parsing.
+- **Invoice/Order Number Extraction** (NEW! 2026-04-15): Automatically extracts order/invoice numbers from delivery PDFs and displays them as badges on each item
+  - Udea: Extracts order numbers (e.g., "Order 4452479") from PDF content or filename
+  - Independent (IIH): Extracts invoice numbers (e.g., "Invoice No: IN466447") from PDF content
+  - Stored per-item and per-document for traceability across multi-PDF deliveries
 - **Partial Delivery Detection** (NEW! 2026-03-19): INVOICED column now shows delivered quantity (not ordered), with orange highlighting for partial deliveries and "Ordered: X" sub-detail when quantities differ
 - **Phone Camera Barcode Scanning** (NEW! 2026-03-19): Scan barcodes with phone camera directly on delivery show page
   - "Scan Barcode" button on new product items without a barcode
@@ -718,11 +722,15 @@ Comprehensive end-of-day cash management with physical counting and variance tra
 - **Physical Cash Counting**: Count by denomination (€50 to 10c) with real-time totals
 - **Legacy Data Import**: Seamlessly imports from PHP system (converts totals to counts)
 - **Variance Tracking**: Automatic calculation against POS with visual indicators
-- **Supplier Payments**: Track cash payments made from till
+- **Supplier Payments**: Track cash payments made from till (already deducted before cash count)
 - **Float Management**: Automatic carry-over between days
 - **Multi-Till Support**: Manage all terminals from one interface
 - **Export to CSV**: Generate reconciliation reports
 - **Audit Trail**: Complete tracking with user timestamps
+- **Bag Verification & Lodgement**: Count bags, verify against expected, create bank lodgements
+- **Auto-Reconciliation**: Auto-creates records for POS till closes with legacy data on lodgement page load
+- **Unreconciled Days**: Shows days needing cash reconciliation with direct links
+- **Till Close Date**: Lodgements table shows POS till close date alongside lodgement date
 
 📖 [Cash Reconciliation Documentation](./features/cash-reconciliation.md)
 

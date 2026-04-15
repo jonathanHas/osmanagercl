@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **📦 Delivery: Invoice Number Extraction for Independent Supplier** (2026-04-15)
+  - Independent (IIH) delivery parser now extracts invoice numbers (e.g., "Invoice No: IN466447") from PDF content
+  - Each PDF's invoice number is stored as the order number on delivery items and documents
+  - Displayed as badge on delivery items, matching existing Udea order number feature
+  - Uses proven regex pattern from IIH RTD invoice parser
+  - **Modified**: `scripts/invoice-parser/parsers/delivery_independent.py`
+
+- **💰 Cash Lodgements: Unreconciled Days, Till Close Date & Workflow Fixes** (2026-04-14)
+  - **Auto-Creation of Reconciliations**: Page load auto-creates `CashReconciliation` records for POS till closes missing one, importing legacy denomination data so they appear in Pending Bags immediately
+  - **Needs Cash Reconciliation Section**: New section showing days where the till was closed but no denomination data exists, with links to cash-reconciliation page
+  - **Till Closed Date Column**: Lodgements table now shows the POS till close date alongside the lodgement date, sorted by till closed date descending
+  - **Available-to-Lodge Fix**: Removed double-deduction of supplier payments — payments are already taken out before the end-of-day cash count, so the formula is now `Total Cash - Float`
+  - **Select All Fix**: Verified bags select-all checkbox now works correctly using Alpine.js getter/setter pattern
+  - **Null Denomination Handling**: Empty denomination fields on bag verification treated as 0 instead of throwing integrity constraint error
+  - **View Recon Links**: Each pending bag now has a "View Recon" link opening cash reconciliation in a new tab
+  - **Hover Highlighting**: Pending bags rows highlight on hover for easier identification
+  - **Modified**: `app/Http/Controllers/Management/CashLodgementController.php`, `app/Models/CashReconciliation.php`, `resources/views/management/cash-lodgements/index.blade.php`, `resources/views/management/cash-reconciliation/index.blade.php`
+
 - **AI Integration: Multi-Provider Camera Invoice Capture** (2026-04-11)
   - Phone camera tab on bulk upload page for photographing paper invoices
   - AI-powered extraction of supplier, invoice number, date, total, VAT breakdown, and line items

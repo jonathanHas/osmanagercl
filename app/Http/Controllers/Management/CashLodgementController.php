@@ -325,6 +325,11 @@ class CashLodgementController extends Controller
             'cash_10c' => 'nullable|integer|min:0',
         ]);
 
+        // Treat empty/null denomination fields as 0
+        foreach (['cash_50', 'cash_20', 'cash_10', 'cash_5', 'cash_2', 'cash_1', 'cash_50c', 'cash_20c', 'cash_10c'] as $field) {
+            $validated[$field] = $validated[$field] ?? 0;
+        }
+
         $reconciliation = CashReconciliation::with('payments')->findOrFail($validated['cash_reconciliation_id']);
 
         // Check no existing verification

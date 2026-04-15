@@ -173,7 +173,7 @@ class AccountingSuppliersController extends Controller
      */
     public function create()
     {
-        $supplierTypes = ['product', 'service', 'utility', 'professional', 'other'];
+        $supplierTypes = ['product', 'service', 'utility', 'professional', 'asset', 'other'];
         $statuses = ['active', 'inactive', 'suspended', 'archived'];
         $paymentMethods = ['bacs', 'cheque', 'card', 'cash', 'other'];
         $vatTreatments = AccountingSupplier::VAT_TREATMENTS;
@@ -199,7 +199,7 @@ class AccountingSuppliersController extends Controller
             'code' => 'nullable|string|max:50|unique:accounting_suppliers,code',
             'create_in_pos' => 'boolean',
             'name' => 'required|string|max:255',
-            'supplier_type' => 'required|in:product,service,utility,professional,other',
+            'supplier_type' => 'required|in:product,service,utility,professional,asset,other',
             'address' => 'nullable|string|max:1000',
             'phone' => 'nullable|string|max:20',
             'phone_secondary' => 'nullable|string|max:20',
@@ -327,7 +327,7 @@ class AccountingSuppliersController extends Controller
      */
     public function edit(AccountingSupplier $supplier)
     {
-        $supplierTypes = ['product', 'service', 'utility', 'professional', 'other'];
+        $supplierTypes = ['product', 'service', 'utility', 'professional', 'asset', 'other'];
         $statuses = ['active', 'inactive', 'suspended', 'archived'];
         $paymentMethods = ['bacs', 'cheque', 'card', 'cash', 'other'];
         $vatTreatments = AccountingSupplier::VAT_TREATMENTS;
@@ -354,7 +354,7 @@ class AccountingSuppliersController extends Controller
             'code' => ['required', 'string', 'max:50', Rule::unique('accounting_suppliers', 'code')->ignore($supplier)],
             'create_in_pos' => 'boolean',
             'name' => 'required|string|max:255',
-            'supplier_type' => 'required|in:product,service,utility,professional,other',
+            'supplier_type' => 'required|in:product,service,utility,professional,asset,other',
             'address' => 'nullable|string|max:1000',
             'phone' => 'nullable|string|max:20',
             'phone_secondary' => 'nullable|string|max:20',

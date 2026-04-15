@@ -68,6 +68,7 @@ The delivery verification system provides a complete workflow for handling suppl
 - barcode (nullable, retrieved from scraping)
 - case_ordered_quantity, unit_ordered_quantity -- Case/unit breakdown of ordered
 - quantity_type (enum: unit, case, mixed)
+- order_number (varchar 50, nullable) -- Order/invoice number extracted from PDF
 - is_weight_based (boolean, default false) -- Weight-based product flag
 - weight_per_unit (decimal 8,4, nullable) -- Individual item weight (e.g., 0.307 kg)
 - weight_unit (varchar 10, nullable) -- Unit of measurement (kilogram, gram)
@@ -98,6 +99,7 @@ The delivery verification system provides a complete workflow for handling suppl
 - file_hash (SHA-256, nullable, for duplicate detection)
 - document_type (enum: invoice_pdf, csv_import, delivery_note, other)
 - is_primary (boolean, default false)
+- order_number (varchar 50, nullable) -- Order/invoice number extracted from PDF
 - parsing_metadata (JSON, nullable) -- NEW: Full parsing details for audit
 - uploaded_by (foreign key to users, nullable)
 - uploaded_at (timestamp)
@@ -415,6 +417,7 @@ The system supports direct parsing of supplier delivery invoice PDFs, eliminatin
 - **Parser**: `scripts/invoice-parser/parsers/delivery_independent.py`
 - **Output Format**: JSON with cases/units breakdown
 - **Features**:
+  - Invoice number extraction (e.g., "Invoice No: IN466447") — stored as order number per item/document (NEW! 2026-04-15)
   - Case and unit quantity parsing (e.g., "6/5" = 6 cases, 5 units)
   - Case price to unit cost conversion
   - RSP (Recommended Selling Price) extraction
@@ -438,6 +441,7 @@ The system supports direct parsing of supplier delivery invoice PDFs, eliminatin
 - **Parser**: `scripts/invoice-parser/parsers/delivery_udea.py`
 - **Output Format**: JSON with total units and prices
 - **Features**:
+  - Order number extraction (e.g., "Order 4452479") from PDF content or filename (NEW! 2026-04-14)
   - European number formatting (1.234,56 → 1234.56)
   - Three-tier regex matching (NORMAL → QUANTITY_SKU → FALLBACK)
   - Weight-based product handling (kilogram, gram)
@@ -717,6 +721,42 @@ The IIH parser now performs a second pass after parsing: it scans the raw PDF te
 - ✅ **Visual Warnings**: Clear UI indicators when issues detected
 - ✅ **Per-File Verification**: Each PDF in multi-file upload verified separately
 - ✅ **Tolerance Handling**: €0.50 tolerance prevents false positives from rounding
+
+### Order/Invoice Number Extraction (NEW! 2026-04-15)
+
+#### Overview
+Each delivery PDF parser extracts an order or invoice number from the document and stores it as `order_number` on both `delivery_items` and `delivery_documents`. This allows tracing which items came from which invoice in multi-PDF deliveries.
+
+#### Supplier-Specific Extraction
+
+| Supplier | Field Extracted | Regex Pattern | Example |
+|----------|----------------|---------------|---------|
+| Udea | Order number | `Order[_\s\-]*(\d{5,10})` (content), `Order[_\-]?(\d+)` (filename fallback) | Order 4452479 |
+| Independent (IIH) | Invoice number | `Invoice\s*No[.:]?\s*(\w+)` | Invoice No: IN466447 |
+
+#### Data Flow
+```
+Python parser extracts order/invoice number → metadata.order_number
+         ↓
+delivery_parser_laravel.py passes through metadata.order_number
+         ↓
+DeliveryParsingService tags each item with order_number
+         ↓
+DeliveryService saves to delivery_items.order_number
+DeliveryController saves to delivery_documents.order_number
+         ↓
+show.blade.php displays as blue badge: "Order #IN466447"
+```
+
+#### Key Files
+| File | Role |
+|------|------|
+| `delivery_udea.py` | Extracts order number from PDF content/filename |
+| `delivery_independent.py` | Extracts invoice number from PDF content |
+| `delivery_parser_laravel.py` | Passes `metadata.order_number` through to Laravel |
+| `DeliveryParsingService.php` | Tags items with order number, stores in file results |
+| `DeliveryService.php` | Saves `order_number` on `DeliveryItem` creation |
+| `DeliveryController.php` | Saves `order_number` on `DeliveryDocument` creation |
 
 ## Troubleshooting Guide
 

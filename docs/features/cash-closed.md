@@ -19,13 +19,18 @@ POS CLOSEDCASH (till close)
     v
 Cash Reconciliation (count cash, record float, supplier payments)
     |
-    v  "Available to Lodge" = Total Cash - Float - Supplier Payments
+    v  "Available to Lodge" = Total Cash - Float
+    |  (supplier payments are already paid out before the cash count)
     |
 Cash Lodgement (record what was deposited at the bank)
     |
     v
 Bank Statement Match (verify the deposit appeared on the statement)
 ```
+
+> **Note**: Supplier payments are deducted from the till during the day,
+> so the end-of-day denomination count already reflects those payments.
+> The available-to-lodge calculation only subtracts the float.
 
 ## User Interface Layout
 
@@ -183,12 +188,14 @@ Records also re-import automatically on first visit to `/cash-reconciliation` fo
 ### The Process
 1. **Employee** closes the till daily, stores cash (minus float) in a sealed bag — one bag per till per day
 2. **Manager** visits `/management/cash-lodgements` every few days
-3. **Pending Bags** section shows reconciliations with cash available but no verification yet
-4. Manager clicks **"Count Bag"** — an inline denomination counting form expands
-5. Manager counts notes and coins, system calculates total and compares against expected (available-to-lodge from reconciliation)
-6. Manager clicks **"Confirm Bag Count"** — creates a `CashBagVerification` record
-7. Verified bags appear in **"Verified Bags — Ready to Lodge"** section with checkboxes
-8. Manager selects bags and clicks **"Create Lodgement"** — creates a `CashLodgement` record with the combined total
+3. **Auto-creation**: On page load, the system auto-creates `CashReconciliation` records for any POS till closes that don't have one yet, importing legacy denomination data from the POS `money` table. This ensures all recent days appear without needing to visit the cash-reconciliation page first.
+4. **Needs Cash Reconciliation** section shows days where the till was closed but no denomination data exists (no legacy money record and no manual count). Each row links to the cash-reconciliation page for that date.
+5. **Pending Bags** section shows reconciliations with cash available (denominations counted) but no bag verification yet. Each row includes a **"View Recon"** link (opens in new tab) to help investigate discrepancies.
+6. Manager clicks **"Count Bag"** — an inline denomination counting form expands. Empty fields are treated as 0.
+7. Manager counts notes and coins, system calculates total and compares against expected (available-to-lodge from reconciliation)
+8. Manager clicks **"Confirm Bag Count"** — creates a `CashBagVerification` record
+9. Verified bags appear in **"Verified Bags — Ready to Lodge"** section with select-all checkbox support
+10. Manager selects bags and clicks **"Create Lodgement"** — creates a `CashLodgement` record with the combined total
 
 ### Database: `cash_bag_verifications` table
 - `id` (uuid) — primary key
@@ -220,14 +227,14 @@ When a user is preparing a bank lodgement, the lodgement views show a **side-by-
 `resources/views/management/cash-lodgements/partials/reconciliation-comparison.blade.php`
 
 Shows:
-- **Reconciliation side**: Total cash counted, notes/coins breakdown, float retained, supplier payments, available to lodge
+- **Reconciliation side**: Total cash counted, notes/coins breakdown, float retained, available to lodge
 - **Lodgement side**: Cash lodged, cheque lodged, total lodged
 - **Variance row**: Difference with colour coding (green < EUR1, amber < EUR20, red > EUR20)
 - Link to edit the reconciliation
 
 Used in the lodgement show view (`cash-lodgements/show.blade.php`).
 
-The lodgement index view (`cash-lodgements/index.blade.php`) also shows a "Recon Variance" column and a link to the associated reconciliation.
+The lodgement index view (`cash-lodgements/index.blade.php`) shows columns for **Lodgement Date**, **Till Closed** date (from POS `CLOSEDCASH.DATEEND`), **Till**, **Amount**, **Source**, and **Actions**. Results are sorted by till closed date descending.
 
 ## Routes
 

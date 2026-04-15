@@ -209,7 +209,7 @@
             </div>
         </div>
 
-        <form method="POST" action="{{ route('management.cash-lodgements.create-lodgement') }}" x-data="{ selected: [], selectAll: false }">
+        <form method="POST" action="{{ route('management.cash-lodgements.create-lodgement') }}" x-data="{ selected: [], get selectAll() { return this.selected.length === {{ $verifiedBags->count() }}; }, set selectAll(val) { this.selected = val ? {{ $verifiedBags->pluck('id')->map(fn($id) => (string) $id)->toJson() }} : []; } }">
             @csrf
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -217,7 +217,6 @@
                         <tr>
                             <th class="px-4 py-2 text-left">
                                 <input type="checkbox" x-model="selectAll"
-                                       @change="selected = selectAll ? @json($verifiedBags->pluck('id')) : []"
                                        class="rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500">
                             </th>
                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
