@@ -4,6 +4,10 @@
             <div>
                 <div class="flex items-center space-x-2 mb-1 sm:space-x-3 sm:mb-2">
                     @php
+                        $deliveryChargeSupplierIds = config('suppliers.external_links.udea.supplier_ids', [5, 44, 85]);
+                        $deliveryChargeSupplierIds[] = 56; // Dynamis
+                        $isDeliveryChargeSupplier = in_array((int) $delivery->supplier_id, $deliveryChargeSupplierIds);
+
                         $supplierName = $delivery->supplier->Supplier ?? 'Unknown Supplier';
                         $supplierBadgeClass = match(strtolower($supplierName)) {
                             'udea' => 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
@@ -918,7 +922,10 @@
                                     $taxRateMobile = $item->product->taxCategory->primaryTax->RATE;
                                 }
                                 $vatExSell = $currentSellMobile / (1 + $taxRateMobile);
-                                $marginMobile = $vatExSell - $item->unit_cost;
+                                $totalCostMobile = $isDeliveryChargeSupplier
+                                    ? $item->unit_cost * 1.15
+                                    : $item->unit_cost;
+                                $marginMobile = $vatExSell - $totalCostMobile;
                                 $marginPercentMobile = ($marginMobile / $vatExSell) * 100;
                             }
                         @endphp
@@ -1054,6 +1061,15 @@
                     @endforeach
                 </div>
 
+                @if($isDeliveryChargeSupplier)
+                    <div class="mb-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md text-sm text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                        </svg>
+                        Margins include 15% delivery charge for {{ $supplierName }}
+                    </div>
+                @endif
+
                 {{-- Desktop Table --}}
                 <div class="hidden md:block relative overflow-x-auto max-h-[calc(100vh-24rem)] overflow-y-auto">
                     <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 delivery-items-table">
@@ -1105,9 +1121,12 @@
                                     Current Stock
                                 </th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                                    onclick="sortDeliveryItems('margin')" title="Sort by Margin">
+                                    onclick="sortDeliveryItems('margin')" title="Sort by Margin{{ $isDeliveryChargeSupplier ? ' (includes 15% delivery charge)' : '' }}">
                                     <div class="flex items-center justify-end gap-1">
                                         <span>Margin</span>
+                                        @if($isDeliveryChargeSupplier)
+                                            <span class="text-amber-500 dark:text-amber-400" title="Includes 15% delivery charge">*</span>
+                                        @endif
                                         <svg id="sort-icon-margin" class="w-3 h-3 text-gray-400 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>
                                         </svg>
@@ -1441,19 +1460,24 @@
                                             $margin = null;
                                             $marginPercent = null;
                                             $showWarning = false;
-                                            
+
                                             if ($item->product && $item->unit_cost > 0 && $currentSell > 0) {
                                                 // Get the tax rate from the tax category
                                                 $taxRate = 0; // Default to 0% if no tax rate
                                                 if ($item->product->taxCategory && $item->product->taxCategory->primaryTax) {
                                                     $taxRate = $item->product->taxCategory->primaryTax->RATE; // This is already a decimal (e.g., 0.20 for 20%)
                                                 }
-                                                
+
                                                 // Calculate VAT-exclusive sell price
                                                 $vatExclusiveSellPrice = $currentSell / (1 + $taxRate);
-                                                
+
+                                                // Include 15% delivery charge for relevant suppliers
+                                                $totalCost = $isDeliveryChargeSupplier
+                                                    ? $item->unit_cost * 1.15
+                                                    : $item->unit_cost;
+
                                                 // Calculate margin using VAT-exclusive price
-                                                $margin = $vatExclusiveSellPrice - $item->unit_cost;
+                                                $margin = $vatExclusiveSellPrice - $totalCost;
                                                 $marginPercent = ($margin / $vatExclusiveSellPrice) * 100;
                                                 $showWarning = $margin <= 0;
                                             }

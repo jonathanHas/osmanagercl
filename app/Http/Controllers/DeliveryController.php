@@ -933,8 +933,14 @@ class DeliveryController extends Controller
             // Log the price update for label printing
             LabelLog::logPriceUpdate($item->product->CODE);
 
-            // Calculate new margin for response
-            $deliveryCost = $item->unit_cost;
+            // Calculate new margin for response (include 15% delivery charge for relevant suppliers)
+            $deliveryChargeSupplierIds = config('suppliers.external_links.udea.supplier_ids', [5, 44, 85]);
+            $deliveryChargeSupplierIds[] = 56; // Dynamis
+            $isDeliveryChargeSupplier = in_array((int) $delivery->supplier_id, $deliveryChargeSupplierIds);
+
+            $deliveryCost = $isDeliveryChargeSupplier
+                ? $item->unit_cost * 1.15
+                : $item->unit_cost;
             $margin = $netPrice - $deliveryCost;
             $marginPercent = $netPrice > 0 ? ($margin / $netPrice) * 100 : 0;
 
