@@ -365,6 +365,49 @@
                 </div>
             @endif
 
+            <!-- Compact Progress Bar (always visible) -->
+            <div class="mb-3 bg-white rounded-lg shadow-sm border border-gray-200 px-3 py-2">
+                <div class="flex items-center gap-3">
+                    <div class="flex-1 min-w-0">
+                        <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                            <div class="h-2 flex">
+                                <div class="bg-green-500 h-2 transition-all duration-300" :style="'width: ' + (financials.totalItems > 0 ? (financials.verifiedCount / financials.totalItems) * 100 : 0) + '%'"></div>
+                                <div class="bg-red-500 h-2 transition-all duration-300" :style="'width: ' + (financials.totalItems > 0 ? (financials.mismatchCount / financials.totalItems) * 100 : 0) + '%'"></div>
+                                <div class="bg-orange-400 h-2 transition-all duration-300" :style="'width: ' + (financials.totalItems > 0 ? (financials.oosCount / financials.totalItems) * 100 : 0) + '%'"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <span class="text-xs text-gray-500 flex-shrink-0 whitespace-nowrap">
+                        <span class="text-green-600 font-medium" x-text="financials.verifiedCount"></span>/<span x-text="financials.totalItems"></span>
+                    </span>
+                    <button @click="dashboardOpen = !dashboardOpen"
+                            class="text-gray-400 hover:text-gray-600 flex-shrink-0 p-0.5 transition-colors"
+                            :title="dashboardOpen ? 'Hide details' : 'Show details'">
+                        <svg :class="dashboardOpen ? 'rotate-180' : ''" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                </div>
+                <div x-show="dashboardOpen" x-collapse x-cloak class="mt-2 pt-2 border-t border-gray-100">
+                    <div class="text-xs text-gray-600 flex flex-wrap gap-x-2 gap-y-0.5">
+                        <span><span class="text-green-600 font-medium" x-text="financials.verifiedCount"></span> verified</span>
+                        <span class="text-gray-300">|</span>
+                        <span><span class="text-red-600 font-medium" x-text="financials.mismatchCount"></span> mismatch</span>
+                        <span class="text-gray-300">|</span>
+                        <span><span class="text-gray-500 font-medium" x-text="financials.pendingCount"></span> pending</span>
+                        <template x-if="financials.oosCount > 0">
+                            <span>
+                                <span class="text-gray-300">|</span>
+                                <span class="text-orange-600 font-medium" x-text="financials.oosCount"></span> OOS
+                            </span>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Collapsible Dashboard Section -->
+            <div x-show="dashboardOpen" x-collapse x-cloak>
+
             {{-- Synced Delivery Documents --}}
             @if($syncedDelivery && $syncedDelivery->documents->count() > 0)
                 <div class="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
@@ -486,35 +529,6 @@
                 </div>
             </div>
 
-            <!-- Progress Bar -->
-            <div class="bg-white rounded-lg shadow p-3 sm:p-4 mb-4 sm:mb-6">
-                <div class="flex flex-col sm:flex-row sm:justify-between text-xs sm:text-sm mb-2 gap-1">
-                    <span class="font-medium text-gray-700">Verification Progress</span>
-                    <span class="text-gray-600 flex flex-wrap gap-x-1">
-                        <span><span class="text-green-600 font-medium" x-text="financials.verifiedCount"></span> verified</span>
-                        <span class="text-gray-400">|</span>
-                        <span><span class="text-red-600 font-medium" x-text="financials.mismatchCount"></span> mismatch</span>
-                        <span class="text-gray-400">|</span>
-                        <span><span class="text-gray-500 font-medium" x-text="financials.pendingCount"></span> pending</span>
-                        <template x-if="financials.oosCount > 0">
-                            <span>
-                                <span class="text-gray-400">|</span>
-                                <span class="text-orange-600 font-medium" x-text="financials.oosCount"></span> OOS
-                            </span>
-                        </template>
-                        <span class="text-gray-400">|</span>
-                        <span><span x-text="financials.totalItems"></span> total</span>
-                    </span>
-                </div>
-                <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                    <div class="h-3 flex">
-                        <div class="bg-green-500 h-3 transition-all duration-300" :style="'width: ' + (financials.totalItems > 0 ? (financials.verifiedCount / financials.totalItems) * 100 : 0) + '%'"></div>
-                        <div class="bg-red-500 h-3 transition-all duration-300" :style="'width: ' + (financials.totalItems > 0 ? (financials.mismatchCount / financials.totalItems) * 100 : 0) + '%'"></div>
-                        <div class="bg-orange-400 h-3 transition-all duration-300" :style="'width: ' + (financials.totalItems > 0 ? (financials.oosCount / financials.totalItems) * 100 : 0) + '%'"></div>
-                    </div>
-                </div>
-            </div>
-
             <!-- Quick Filters -->
             <div class="bg-white rounded-lg shadow p-3 sm:p-4 mb-4 sm:mb-6">
                 <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-4">
@@ -570,6 +584,8 @@
                     </div>
                 </div>
             </div>
+
+            </div><!-- end collapsible dashboard -->
 
             @php
                 // Pre-categorize items for the sections
@@ -2137,6 +2153,7 @@
         function deliveryMatch() {
             return {
                 filter: 'all',
+                dashboardOpen: false,
                 showDetails: false,
                 showCategories: false,
                 categoryDropdownOpen: false,
