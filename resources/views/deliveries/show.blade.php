@@ -2146,6 +2146,10 @@
         // Price editor functionality
         let currentEditingItem = null;
 
+        // Supplier IDs that should have delivery charge (15%) toggled on by default
+        const deliveryChargeSupplierIds = [5, 44, 85, 56]; // Udea, Udea Veg, Udea Frozen, Dynamis
+        const currentSupplierId = {{ (int) $delivery->supplier_id }};
+
         function openPriceEditor(itemId, productCode, description, currentNetPrice, deliveryCost, taxRate = 0, rspPrice = 0) {
             currentEditingItem = {
                 itemId: itemId,
@@ -2155,22 +2159,26 @@
                 deliveryCost: parseFloat(deliveryCost),
                 taxRate: parseFloat(taxRate)
             };
-            
+
             // Show modal
             document.getElementById('priceEditorModal').classList.remove('hidden');
             document.getElementById('modalProductName').textContent = description;
             document.getElementById('modalProductCode').textContent = productCode;
             document.getElementById('modalCurrentPrice').textContent = '€' + currentNetPrice;
             document.getElementById('modalDeliveryCost').textContent = '€' + deliveryCost.toFixed(2);
-            
+
+            // Auto-toggle delivery charge for suppliers with delivery charges
+            const checkbox = document.getElementById('includeDeliveryCharge');
+            checkbox.checked = deliveryChargeSupplierIds.includes(currentSupplierId);
+
             // Set initial values - default to gross mode with RSP as default
             document.getElementById('grossPriceInput').value = rspPrice > 0 ? rspPrice.toFixed(2) : '';
             document.getElementById('netPriceInput').value = currentNetPrice;
             document.getElementById('priceInputMode').value = 'gross';
-            
+
             // Toggle to show gross mode UI
             togglePriceMode();
-            
+
             // Calculate initial margin
             updateMarginDisplay();
         }
@@ -2182,26 +2190,43 @@
 
         function updateMarginDisplay() {
             if (!currentEditingItem) return;
-            
+
             const mode = document.getElementById('priceInputMode').value;
             const grossInput = parseFloat(document.getElementById('grossPriceInput').value) || 0;
             const netInput = parseFloat(document.getElementById('netPriceInput').value) || 0;
-            
+            const includeDeliveryCharge = document.getElementById('includeDeliveryCharge').checked;
+
             let netPrice = mode === 'gross' ? grossInput / (1 + currentEditingItem.taxRate) : netInput;
-            let margin = netPrice - currentEditingItem.deliveryCost;
+
+            // Calculate total cost with optional 15% delivery charge
+            const baseCost = currentEditingItem.deliveryCost;
+            const deliveryCharge = includeDeliveryCharge ? baseCost * 0.15 : 0;
+            const totalCost = baseCost + deliveryCharge;
+
+            // Show/hide delivery charge breakdown
+            const chargeRow = document.getElementById('deliveryChargeRow');
+            if (includeDeliveryCharge) {
+                chargeRow.classList.remove('hidden');
+                document.getElementById('deliveryChargeAmount').textContent = '€' + deliveryCharge.toFixed(2);
+                document.getElementById('totalCostWithCharge').textContent = '€' + totalCost.toFixed(2);
+            } else {
+                chargeRow.classList.add('hidden');
+            }
+
+            let margin = netPrice - totalCost;
             let marginPercent = netPrice > 0 ? (margin / netPrice) * 100 : 0;
-            
+
             // Update margin display
             const marginDisplay = document.getElementById('marginDisplay');
             const marginPercentDisplay = document.getElementById('marginPercentDisplay');
-            
+
             marginDisplay.textContent = '€' + margin.toFixed(2);
             marginPercentDisplay.textContent = marginPercent.toFixed(1) + '%';
-            
+
             // Color coding
             const container = document.getElementById('marginContainer');
             container.className = 'p-3 rounded-lg border-2 ';
-            
+
             if (margin <= 0) {
                 container.className += 'border-red-300 bg-red-50';
                 marginDisplay.className = 'font-medium text-red-600';
@@ -2662,7 +2687,28 @@
                         <div id="modalDeliveryCost" class="font-medium text-gray-900 dark:text-gray-100"></div>
                     </div>
                 </div>
-                
+
+                <!-- Delivery Charge Toggle -->
+                <div class="mb-4 flex items-center">
+                    <input type="checkbox" id="includeDeliveryCharge"
+                           class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                           onchange="updateMarginDisplay()">
+                    <label for="includeDeliveryCharge" class="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                        Include delivery cost (15%)
+                        <span class="block text-xs text-gray-500">For suppliers with delivery charges</span>
+                    </label>
+                </div>
+                <div id="deliveryChargeRow" class="mb-4 p-2 bg-amber-50 dark:bg-amber-900/20 rounded text-sm hidden">
+                    <div class="flex justify-between">
+                        <span class="text-amber-700 dark:text-amber-400">Delivery Charge (15%):</span>
+                        <span id="deliveryChargeAmount" class="font-medium text-amber-700 dark:text-amber-400">€0.00</span>
+                    </div>
+                    <div class="flex justify-between mt-1">
+                        <span class="text-amber-700 dark:text-amber-400">Total Cost:</span>
+                        <span id="totalCostWithCharge" class="font-medium text-amber-700 dark:text-amber-400">€0.00</span>
+                    </div>
+                </div>
+
                 <!-- Price Input Mode -->
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Input Mode</label>

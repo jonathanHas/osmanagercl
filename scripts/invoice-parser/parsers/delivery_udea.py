@@ -642,6 +642,7 @@ class DeliveryUdeaParser:
                         qty = int(parsed["Qty"])
                         sku = float(parsed["SKU"]) if parsed["SKU"] else 1.0
                         price = float(parsed["Price"]) if parsed["Price"] else 0.0
+                        sale = float(parsed["Sale"]) if parsed.get("Sale") else 0.0
                         total = float(parsed["Total"]) if parsed["Total"] else 0.0
                         description = parsed.get("Description", "")
                         content = parsed.get("Content", "")
@@ -714,6 +715,7 @@ class DeliveryUdeaParser:
                             "total_ordered_units": total_ordered_units,
                             "total_delivered_units": total_delivered_units,
                             "unit_cost": round(unit_cost, 4),
+                            "rsp": sale,
                             "line_total": total,
                             "price_valid": is_valid,
                             "is_weight_based": is_weight_based,

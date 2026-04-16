@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **📦 Product Page Consolidation: Show Merged into Edit** (2026-04-16)
+  - Product show page (`/products/{id}`) now redirects to edit page (`/products/{id}/edit`)
+  - **Quick Stats Bar** added to edit page: Stock Level with inline edit, Stocking Status toggle (AJAX), Min Stock Override (Alpine.js editor, admin/manager), VAT Rate badge
+  - **Sales History** collapsible section on edit page with Chart.js chart, time period buttons (4m/6m/12m/YTD), stats cards, monthly table, and detailed sales modal
+  - **Requeue Label** and **Print Label** buttons added to edit page header
+  - **Kitchen toggle** button added to edit page for marking products as kitchen products
+  - **Supplier product images** from Udea, Udea Frozen, and Independent displayed on edit page and create page (uses `x-product-image` component with cached image resolution)
+  - All `route('products.show')` links updated to `route('products.edit')` across codebase (deliveries, orders, labels, stocking logs, destock review, supplier code lookup)
+  - Stocking management moved from form checkbox to AJAX toggle in stats bar
+  - Cancel button now links to products index instead of removed show page
+  - **Modified**: `app/Http/Controllers/ProductController.php`, `resources/views/products/edit.blade.php`, `resources/views/products/create.blade.php`, `resources/views/deliveries/show.blade.php`, `resources/views/products/index.blade.php`, `resources/views/labels/index.blade.php`, `resources/views/destock-review/suggestions.blade.php`, `resources/views/supplier-code-lookup/index.blade.php`, `resources/views/stocking/logs.blade.php`, `resources/views/orders/grid-view.blade.php`, `tests/Feature/ProductTest.php`
+
+- **🍳 Kitchen Toggle on Deliveries Page** (2026-04-16)
+  - "Kitchen" toggle button added to delivery show page for matched products (mobile card view and desktop table view)
+  - Uses existing `/kitchen/products/toggle` AJAX endpoint
+  - Orange highlight when product is flagged, gray when not
+  - **Modified**: `resources/views/deliveries/show.blade.php`
+
 - **📦 Delivery: Invoice Number Extraction for Independent Supplier** (2026-04-15)
   - Independent (IIH) delivery parser now extracts invoice numbers (e.g., "Invoice No: IN466447") from PDF content
   - Each PDF's invoice number is stored as the order number on delivery items and documents

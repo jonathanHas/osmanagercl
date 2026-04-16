@@ -1197,7 +1197,7 @@ async function updateProductCost(productId, newCost, productName) {
 ```html
 <!-- Product name links -->
 @if($item->product)
-    <a href="{{ route('products.show', $item->product->ID) }}" 
+    <a href="{{ route('products.edit', $item->product->ID) }}" 
        class="text-blue-600 hover:text-blue-900 hover:underline">
         {{ $item->description }}
     </a>

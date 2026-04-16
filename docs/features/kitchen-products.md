@@ -35,6 +35,14 @@ On the Orders review page (`/orders/`), each product row has a "Kitchen" toggle 
 - **Gray button**: Product is not flagged
 - Click to toggle status with instant AJAX update
 
+### Quick Flag from Deliveries Page (2026-04-16)
+
+On the Delivery show page (`/deliveries/{id}`), matched products display a "Kitchen" toggle button in both mobile card view and desktop table view. Uses the same AJAX endpoint (`POST /kitchen/products/toggle`) and styling as the Orders page.
+
+### Quick Flag from Product Edit Page (2026-04-16)
+
+On the Product edit page (`/products/{id}/edit`), a "Kitchen Product" toggle section allows marking/unmarking the product as a kitchen product with instant AJAX update.
+
 ### Product Search & Add
 
 Search and add products directly from the kitchen products page:

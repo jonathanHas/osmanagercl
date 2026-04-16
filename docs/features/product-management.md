@@ -105,7 +105,7 @@ The system provides multiple ways to update product costs with enhanced delivery
              'cost' => $request->cost_price
          ]);
      }
-     return redirect()->route('products.show', $id);
+     return redirect()->route('products.edit', $id);
      ```
 
 3. **Delivery Integration Cost Updates**:
@@ -249,7 +249,7 @@ class Product extends Model
 ```php
 // Product management endpoints
 public function index()     // List products with filtering
-public function show($id)   // Product detail page
+public function show($id)   // Redirects to edit page
 public function create()    // Create form
 public function store()     // Save new product
 public function updateName() // Update product name
@@ -264,7 +264,11 @@ public function toggleStocking() // Toggle stock management
 - `GET /products` - List products with search/filtering
 - `GET /products/create` - Show create form
 - `POST /products` - Create new product
-- `GET /products/{id}` - Show product details
+- `GET /products/{id}` - Redirects to edit page
+- `GET /products/{id}/edit` - Product edit page (consolidated with former show page)
+- `GET /products/{id}/sales-data` - Sales history data (JSON, lazy-loaded)
+- `POST /products/{id}/update-stock` - Update stock level (AJAX)
+- `PATCH /products/{id}/min-stock-override` - Update minimum stock override (AJAX)
 - `PATCH /products/{id}/name` - Update product name
 - `PATCH /products/{id}/display` - Update display name
 - `PATCH /products/{id}/tax` - Update tax category
@@ -292,15 +296,40 @@ public function toggleStocking() // Toggle stock management
 - Automatic price fetching from external suppliers (UDEA)
 - Supplier code linking for inventory management
 - Cost and pricing recommendations based on supplier data
-- **Independent Health Foods Integration**:
-  - Product images automatically displayed when supplier code is entered
-  - Smart image path detection (supports both `/cdn/shop/files/` and `/cdn/shop/products/`)
-  - Multiple format support (.webp and .jpg)
-  - Click-to-view full-size modal for product images
-  - Direct website search links to Independent's product pages
+- **Supplier Product Images** (2026-04-16): Product images from supported suppliers displayed on both edit and create pages via `x-product-image` component
+  - **Udea / Udea Veg / Udea Frozen** (IDs 5, 44, 85): Deterministic image URLs from `cdn.ekoplaza.nl` using product barcode
+  - **Independent Health Foods** (ID 37): Cached image URLs resolved from `iihealthfoods.com` with fallback chain (webp → png → jpg)
+  - Images cached in `supplier_image_cache` table to avoid repeated external requests
+  - Hover preview with click-to-enlarge on product edit page
+  - On create page (`?delivery_item=`): temp product object constructed from delivery item data
+  - Direct website search links for both Udea and Independent
   - Test page available at `/products/independent-test` for debugging
 
 ## Enhanced Features
+
+### Consolidated Product Page (2026-04-16)
+
+The product show page has been merged into the edit page, providing a single unified interface for all product management. The show route (`/products/{id}`) now redirects to the edit page (`/products/{id}/edit`).
+
+#### Quick Stats Bar
+Above the edit form, a stats bar provides at-a-glance information and quick actions:
+- **Stock Level**: Current stock with inline edit (AJAX, arrow keys increment by 1)
+- **VAT Rate**: Read-only badge showing current tax rate
+- **Stocking Status**: Stocked/Not Stocked badge with AJAX toggle button
+- **Min Stock Override** (Admin/Manager): Alpine.js inline editor with Save/Cancel/Remove buttons
+
+#### Sales History (Collapsible)
+Below the form, a collapsible section (collapsed by default) provides:
+- Chart.js bar chart with time period selection (4m, 6m, 12m, YTD)
+- Sales statistics cards (Total 12m, Avg Monthly, This Month, Trend)
+- Monthly sales table with trend indicators
+- "Detailed Sales" button launching the interactive drill-down modal
+
+#### Header Actions
+- **Requeue Label**: AJAX button to add product back to label print queue
+- **Print Label**: Direct link to print label (opens in new tab)
+- **Kitchen Toggle**: Mark/unmark product as kitchen product
+- Context-aware back navigation (delivery, coffee, or products list)
 
 ### Enhanced Price Editor (2025)
 

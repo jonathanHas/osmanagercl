@@ -68,18 +68,24 @@ Universal category management interface for all product categories.
 📖 [Categories Management Documentation](./features/categories-management.md)
 
 ### Product Management
-Comprehensive product catalog management with inline editing capabilities and real-time duplicate detection.
+Comprehensive product catalog management with unified edit page consolidating all product features.
+- **Consolidated Product Page** (NEW! 2026-04-16): Show page merged into edit page — single page for all product management with show route redirecting to edit
+- **Quick Stats Bar** (NEW! 2026-04-16): Stock level with inline edit, stocking status AJAX toggle, min stock override (admin/manager), VAT rate badge — all on the edit page
+- **Sales History Collapsible** (NEW! 2026-04-16): Collapsible sales chart section on edit page with Chart.js, time period selection, stats cards, and monthly table
+- **Supplier Product Images** (NEW! 2026-04-16): Product images from Udea, Udea Frozen, and Independent displayed on edit and create pages using cached image resolution
+- **Label Management Buttons** (NEW! 2026-04-16): Requeue Label and Print Label buttons in product edit header
+- **Kitchen Toggle** (NEW! 2026-04-16): Kitchen product toggle button on product edit page and delivery show page
 - **Real-time Barcode Validation** (NEW! 2025-11-01): Instant duplicate detection when creating products with direct links to edit existing products
 - **Supplier Link Duplicate Prevention** (NEW! 2025-11-01): Real-time warning and override system for duplicate supplier codes with full audit trail
-- **Inline Editing**: Edit product names, tax categories, prices, and costs directly from product detail pages
-- **Stock Editing**: Inline stock editing on products list and detail pages with 2 decimal precision (arrow keys increment by 1)
-- **Stocking Management**: Toggle products in/out of stock management operations with visual indicators
-- **Delivery Integration**: Create products directly from delivery items with pre-populated data
+- **Inline Editing**: Edit product names, tax categories, prices, and costs directly from product edit page
+- **Stock Editing**: Inline stock editing on products list and edit pages with 2 decimal precision (arrow keys increment by 1)
+- **Stocking Management**: AJAX toggle for products in/out of stock management with visual badge indicators
+- **Delivery Integration**: Create products directly from delivery items with pre-populated data and supplier images
 - **Smart Navigation**: Context-aware navigation maintaining delivery workflow state
 - **Validation & Error Handling**: Robust form validation with user-friendly error messages
-- **Lazy-Loaded Sales Data** (NEW! 2026-01-22): Product detail page sales history loads asynchronously for instant page rendering
+- **Lazy-Loaded Sales Data** (NEW! 2026-01-22): Sales history loads asynchronously for instant page rendering
 - **Detailed Sales History Modal** (NEW! 2026-01-22): Interactive drill-down from weekly → daily → transaction level views
-- **Image Upload at Creation** (NEW! 2026-03-16): Upload product image during creation with client-side preview, eliminating the extra edit step
+- **Image Upload at Creation** (NEW! 2026-03-16): Upload product image during creation with client-side preview
 
 📖 [Product Management Documentation](./features/product-management.md)
 
@@ -232,6 +238,8 @@ Audit trail for destock/restock actions with intelligent restock suggestions bas
 Manage products that regularly go to the kitchen with quick flagging and ingredient profile creation.
 - **Kitchen Products List**: Dedicated page at `/kitchen/products` showing all flagged kitchen products
 - **Quick Flag from Orders**: "Kitchen" toggle button on Orders page to quickly flag products
+- **Quick Flag from Deliveries** (NEW! 2026-04-16): "Kitchen" toggle button on delivery show page for matched products (mobile and desktop)
+- **Quick Flag from Product Edit** (NEW! 2026-04-16): "Kitchen" toggle button on product edit page
 - **Product Search & Add**: Search and add products by name, barcode, or supplier code directly from kitchen products page
 - **Supplier Code Quick Copy**: Click-to-copy supplier codes for easy ordering
 - **Shop Stock Display**: Real-time stock levels from POS STOCKCURRENT table
