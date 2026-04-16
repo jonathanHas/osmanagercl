@@ -427,6 +427,23 @@
                                 </h3>
                             </div>
 
+                            @if($prefillData && isset($prefillData['supplier_id']) && $supplierService->hasExternalIntegration($prefillData['supplier_id']))
+                                @php
+                                    $tempProduct = (object) [
+                                        'barcode' => $prefillData['code'] ?? null,
+                                        'supplier_code' => $prefillData['supplier_code'] ?? null,
+                                        'supplier' => (object) ['SupplierID' => $prefillData['supplier_id']],
+                                    ];
+                                    $supplierName = \App\Models\Supplier::where('SupplierID', $prefillData['supplier_id'])->value('Supplier') ?? 'Supplier';
+                                @endphp
+                                <div class="mb-4">
+                                    <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        {{ $supplierName }} Image
+                                    </p>
+                                    <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="xl" :hover="true" />
+                                </div>
+                            @endif
+
                             <div class="flex items-start space-x-6">
                                 <div class="flex-1">
                                     <input type="file"

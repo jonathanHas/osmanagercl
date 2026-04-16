@@ -499,6 +499,16 @@
                                 <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Product Image</h3>
                             </div>
 
+                            @if($product->supplier && $supplierService->hasExternalIntegration($product->supplier->SupplierID))
+                                <!-- Supplier Image -->
+                                <div class="mb-4">
+                                    <p class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        {{ $product->supplier->Supplier ?? 'Supplier' }} Image
+                                    </p>
+                                    <x-product-image :product="$product" :supplier-service="$supplierService" size="xl" :hover="true" />
+                                </div>
+                            @endif
+
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                 <!-- Current Image Display -->
                                 <div>

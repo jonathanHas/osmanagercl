@@ -1080,7 +1080,9 @@ class ProductController extends Controller
             }
         }
 
-        return view('products.create', compact('taxCategories', 'categories', 'suppliers', 'prefillData', 'deliveryItemId', 'categoryId', 'taxRates', 'udeaSupplierIds', 'suggestedBarcode', 'categoryConfig'));
+        $supplierService = $this->supplierService;
+
+        return view('products.create', compact('taxCategories', 'categories', 'suppliers', 'prefillData', 'deliveryItemId', 'categoryId', 'taxRates', 'udeaSupplierIds', 'suggestedBarcode', 'categoryConfig', 'supplierService'));
     }
 
     /**
@@ -1160,6 +1162,8 @@ class ProductController extends Controller
         $fromDelivery = $request->query('from_delivery');
         $fromContext = $request->query('from');
 
+        $supplierService = $this->supplierService;
+
         return view('products.edit', compact(
             'product',
             'taxCategories',
@@ -1172,6 +1176,7 @@ class ProductController extends Controller
             'showOnTill',
             'orderSettings',
             'isKitchenProduct',
+            'supplierService',
             'fromDelivery',
             'fromContext'
         ));
