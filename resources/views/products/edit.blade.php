@@ -5,13 +5,38 @@
                 Edit Product: {{ $product->NAME }}
             </h2>
             @php
+                $headerActions = [];
+
+                // Requeue for Labels button
+                $headerActions[] = [
+                    'type' => 'button',
+                    'onclick' => "requeueProduct('{$product->ID}', this)",
+                    'label' => 'Requeue Label',
+                    'color' => 'green',
+                    'class' => 'inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-md transition-colors duration-200',
+                    'icon' => 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'
+                ];
+
+                // Print Label link
+                $headerActions[] = [
+                    'type' => 'link',
+                    'route' => 'products.print-label',
+                    'params' => $product->ID,
+                    'label' => 'Print Label',
+                    'color' => 'indigo',
+                    'class' => 'inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md transition-colors duration-200',
+                    'icon' => 'M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z',
+                    'target' => '_blank'
+                ];
+
+                // Back navigation
                 $backAction = [
                     'type' => 'link',
                     'color' => 'secondary',
                     'class' => 'inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-md transition-colors duration-200',
                     'icon' => 'M10 19l-7-7m0 0l7-7m-7 7h18'
                 ];
-                
+
                 if ($fromDelivery) {
                     $backAction['route'] = 'deliveries.show';
                     $backAction['params'] = ['delivery' => $fromDelivery];
@@ -20,12 +45,12 @@
                     $backAction['route'] = 'coffee.products';
                     $backAction['label'] = 'Back to Coffee Products';
                 } else {
-                    $backAction['route'] = 'products.show';
-                    $backAction['params'] = $product->ID;
-                    $backAction['label'] = 'Back to Product Details';
+                    $backAction['route'] = 'products.index';
+                    $backAction['label'] = 'Back to Products';
                 }
+                $headerActions[] = $backAction;
             @endphp
-            <x-action-buttons :actions="[$backAction]" size="lg" />
+            <x-action-buttons :actions="$headerActions" spacing="tight" size="lg" />
         </div>
     </x-slot>
 
@@ -34,12 +59,274 @@
             <x-alert type="error" :messages="$errors->all()" />
             <x-alert type="success" :message="session('success')" />
 
+            <!-- Quick Stats Bar -->
+            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
+                <div class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <!-- Stock Status -->
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Stock Status</h3>
+                                @if(!$product->isService())
+                                    <button type="button"
+                                            onclick="toggleStockEdit()"
+                                            class="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors"
+                                            title="Edit Stock">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                        </svg>
+                                    </button>
+                                @endif
+                            </div>
+                            @if($product->isService())
+                                <p class="text-lg font-semibold text-gray-500">Service Item</p>
+                            @else
+                                <div id="stockDisplay">
+                                    <p class="text-2xl font-bold {{ $product->getCurrentStock() > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
+                                        <span id="currentStockValue">{{ number_format($product->getCurrentStock(), 2) }}</span>
+                                    </p>
+                                    @if($product->getCurrentStock() > 0 && $product->getCurrentStock() < 10)
+                                        <p class="text-xs text-yellow-600 dark:text-yellow-400">Low Stock</p>
+                                    @endif
+                                </div>
+
+                                <!-- Stock Edit Form (hidden by default) -->
+                                <form id="stockEditForm" class="hidden mt-2" onsubmit="updateStock(event)">
+                                    @csrf
+                                    <div class="flex items-center gap-2">
+                                        <input type="number"
+                                               name="stock_units"
+                                               id="stockUnitsInput"
+                                               value="{{ $product->getCurrentStock() }}"
+                                               step="0.01"
+                                               min="0"
+                                               max="9999.99"
+                                               class="w-20 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                               required>
+                                        <button type="submit"
+                                                class="inline-flex items-center px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded transition-colors">
+                                            Save
+                                        </button>
+                                        <button type="button"
+                                                onclick="toggleStockEdit()"
+                                                class="inline-flex items-center px-2 py-1 bg-gray-500 hover:bg-gray-600 text-white text-xs font-medium rounded transition-colors">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Update current stock level</p>
+                                </form>
+                            @endif
+                        </div>
+
+                        <!-- VAT Rate -->
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">VAT Rate</h3>
+                            <span class="inline-flex items-center px-3 py-1 text-lg font-semibold rounded-full {{ $product->tax_category_badge_class }}">
+                                {{ $product->formatted_vat_rate }}
+                            </span>
+                        </div>
+
+                        <!-- Stocking Status -->
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Stock Management</h3>
+                            <div class="flex items-center space-x-3">
+                                @if($product->stocking)
+                                    <span class="inline-flex items-center px-3 py-1 text-lg font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                        </svg>
+                                        Stocked
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center px-3 py-1 text-lg font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                                        </svg>
+                                        Not Stocked
+                                    </span>
+                                @endif
+                                <button type="button"
+                                        onclick="toggleStocking('{{ $product->ID }}', {{ $product->stocking ? 'false' : 'true' }})"
+                                        class="inline-flex items-center px-2 py-1 text-xs font-medium rounded border {{ $product->stocking ? 'border-red-300 text-red-700 hover:bg-red-50 dark:border-red-600 dark:text-red-400 dark:hover:bg-red-900/20' : 'border-green-300 text-green-700 hover:bg-green-50 dark:border-green-600 dark:text-green-400 dark:hover:bg-green-900/20' }} transition-colors duration-200">
+                                    {{ $product->stocking ? 'Remove' : 'Add' }}
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                {{ $product->stocking ? 'Included in ordering operations' : 'Excluded from automated ordering' }}
+                            </p>
+                        </div>
+
+                        <!-- Minimum Stock Override (Admin/Manager Only) -->
+                        @if(auth()->user()->hasAnyRole(['admin', 'manager']))
+                            <div x-data="{
+                                editing: false,
+                                value: '{{ $orderSettings?->min_stock_override ?? '' }}',
+                                originalValue: '{{ $orderSettings?->min_stock_override ?? '' }}',
+                                saving: false,
+                                error: null
+                            }">
+                                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Minimum Stock Override</h3>
+                                <div class="flex items-center space-x-3">
+                                    <!-- Display Mode -->
+                                    <div x-show="!editing" class="flex items-center space-x-2">
+                                        @if($orderSettings?->min_stock_override)
+                                            <span class="inline-flex items-center px-3 py-1 text-lg font-semibold rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clip-rule="evenodd"/>
+                                                </svg>
+                                                {{ number_format($orderSettings->min_stock_override, 0) }} units
+                                            </span>
+                                        @else
+                                            <span class="text-lg text-gray-500 dark:text-gray-400">Not set</span>
+                                        @endif
+                                        <button type="button"
+                                                @click="editing = true"
+                                                class="inline-flex items-center px-2 py-1 text-xs font-medium rounded border border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-600 dark:text-blue-400 dark:hover:bg-blue-900/20 transition-colors duration-200">
+                                            {{ $orderSettings?->min_stock_override ? 'Edit' : 'Set' }}
+                                        </button>
+                                    </div>
+
+                                    <!-- Edit Mode -->
+                                    <div x-show="editing" class="flex items-center space-x-2">
+                                        <input type="number"
+                                               x-model="value"
+                                               step="1"
+                                               min="0"
+                                               placeholder="Enter minimum stock"
+                                               class="w-32 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-gray-100"
+                                               @keydown.enter="
+                                                   saving = true;
+                                                   error = null;
+                                                   fetch('{{ route('products.update-min-stock-override', $product->ID) }}', {
+                                                       method: 'PATCH',
+                                                       headers: {
+                                                           'Content-Type': 'application/json',
+                                                           'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                                           'Accept': 'application/json'
+                                                       },
+                                                       body: JSON.stringify({ min_stock_override: value !== '' ? value : null })
+                                                   })
+                                                   .then(response => response.json())
+                                                   .then(data => {
+                                                       if (data.message) {
+                                                           originalValue = value;
+                                                           editing = false;
+                                                           window.location.reload();
+                                                       } else {
+                                                           error = 'Failed to update';
+                                                       }
+                                                   })
+                                                   .catch(err => {
+                                                       error = 'Network error';
+                                                   })
+                                                   .finally(() => {
+                                                       saving = false;
+                                                   })
+                                               "
+                                               @keydown.escape="editing = false; value = originalValue">
+                                        <button type="button"
+                                                @click="
+                                                    saving = true;
+                                                    error = null;
+                                                    fetch('{{ route('products.update-min-stock-override', $product->ID) }}', {
+                                                        method: 'PATCH',
+                                                        headers: {
+                                                            'Content-Type': 'application/json',
+                                                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                                            'Accept': 'application/json'
+                                                        },
+                                                        body: JSON.stringify({ min_stock_override: value !== '' ? value : null })
+                                                    })
+                                                    .then(response => response.json())
+                                                    .then(data => {
+                                                        if (data.message) {
+                                                            originalValue = value;
+                                                            editing = false;
+                                                            window.location.reload();
+                                                        } else {
+                                                            error = 'Failed to update';
+                                                        }
+                                                    })
+                                                    .catch(err => {
+                                                        error = 'Network error';
+                                                    })
+                                                    .finally(() => {
+                                                        saving = false;
+                                                    })
+                                                "
+                                                :disabled="saving"
+                                                class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50">
+                                            <span x-show="!saving">Save</span>
+                                            <span x-show="saving">Saving...</span>
+                                        </button>
+                                        <button type="button"
+                                                @click="editing = false; value = originalValue"
+                                                :disabled="saving"
+                                                class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-gray-300 text-gray-700 hover:bg-gray-400 disabled:opacity-50 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500">
+                                            Cancel
+                                        </button>
+                                        @if($orderSettings?->min_stock_override)
+                                            <button type="button"
+                                                    @click="
+                                                        value = '';
+                                                        saving = true;
+                                                        error = null;
+                                                        fetch('{{ route('products.update-min-stock-override', $product->ID) }}', {
+                                                            method: 'PATCH',
+                                                            headers: {
+                                                                'Content-Type': 'application/json',
+                                                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                                                'Accept': 'application/json'
+                                                            },
+                                                            body: JSON.stringify({ min_stock_override: null })
+                                                        })
+                                                        .then(response => response.json())
+                                                        .then(data => {
+                                                            if (data.message) {
+                                                                originalValue = '';
+                                                                editing = false;
+                                                                window.location.reload();
+                                                            } else {
+                                                                error = 'Failed to remove';
+                                                            }
+                                                        })
+                                                        .catch(err => {
+                                                            error = 'Network error';
+                                                        })
+                                                        .finally(() => {
+                                                            saving = false;
+                                                        })
+                                                    "
+                                                    :disabled="saving"
+                                                    class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+                                                Remove
+                                            </button>
+                                        @endif
+                                    </div>
+                                </div>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    @if($orderSettings?->min_stock_override)
+                                        System will maintain at least this stock level when ordering
+                                    @else
+                                        Optional: Override calculated minimum stock level
+                                    @endif
+                                </p>
+                                <p x-show="error" x-text="error" class="text-xs text-red-600 dark:text-red-400 mt-1"></p>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
             <form action="{{ route('products.update', $product->ID) }}" method="POST">
                 @csrf
                 @method('PUT')
                 
                 <!-- Hidden product code field - required for validation -->
                 <input type="hidden" name="code" value="{{ $prefillData['code'] }}">
+
+                <!-- Preserve stocking status (managed via AJAX toggle in stats bar) -->
+                <input type="hidden" name="include_in_stocking" value="{{ $includeInStocking ? '1' : '0' }}">
                 
                 @if($fromDelivery)
                     <input type="hidden" name="from_delivery" value="{{ $fromDelivery }}">
@@ -204,23 +491,6 @@
 
                             </div>
 
-                            <!-- Stock Management Option -->
-                            <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-                                <div class="flex items-start">
-                                    <input type="checkbox"
-                                           id="include_in_stocking"
-                                           name="include_in_stocking"
-                                           value="1"
-                                           {{ old('include_in_stocking', $includeInStocking) ? 'checked' : '' }}
-                                           class="mt-1 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                                    <label for="include_in_stocking" class="ml-3 block text-sm text-gray-700 dark:text-gray-300">
-                                        <span class="font-medium">Include in Stock Management</span>
-                                        <span class="block text-xs text-gray-500 mt-1">
-                                            Add this product to stocking operations. Uncheck for one-time items that won't be regularly stocked.
-                                        </span>
-                                    </label>
-                                </div>
-                            </div>
                         </div>
 
                         <!-- Product Image Section -->
@@ -513,6 +783,24 @@
                             </div>
                         @endif
 
+                        <!-- Kitchen Product Toggle -->
+                        <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Kitchen Product</h3>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Mark this product as used by the kitchen</p>
+                                </div>
+                                <button type="button"
+                                        class="kitchen-toggle-btn text-[11px] font-medium border rounded px-2 py-0.5 transition-colors {{ $isKitchenProduct ? 'text-orange-600 border-orange-300 bg-orange-50 hover:bg-orange-100' : 'text-gray-500 border-gray-300 hover:border-orange-300 hover:text-orange-600' }}"
+                                        data-product-id="{{ $product->ID }}"
+                                        data-product-name="{{ e($product->NAME) }}"
+                                        data-is-kitchen="{{ $isKitchenProduct ? 'true' : 'false' }}"
+                                        title="{{ $isKitchenProduct ? 'Remove from kitchen products' : 'Add to kitchen products' }}">
+                                    Kitchen
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- Action Buttons -->
                         <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
                             <div class="flex items-center justify-end space-x-4">
@@ -527,7 +815,7 @@
                                         Cancel
                                     </a>
                                 @else
-                                    <a href="{{ route('products.show', $product->ID) }}" 
+                                    <a href="{{ route('products.index') }}"
                                        class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-md transition-colors duration-200">
                                         Cancel
                                     </a>
@@ -541,6 +829,168 @@
                     </div>
                 </div>
             </form>
+
+            <!-- Sales History Section (Collapsible) -->
+            <div x-data="{ salesOpen: false }" class="mt-6 bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
+                <button type="button"
+                        @click="salesOpen = !salesOpen; if(salesOpen && !window.salesChartLoaded) { loadInitialSalesData(); window.salesChartLoaded = true; }"
+                        class="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
+                    <div class="flex items-center text-sm font-medium text-gray-900 dark:text-gray-100">
+                        <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                        Sales History
+                    </div>
+                    <svg class="w-5 h-5 text-gray-400 transition-transform duration-200" :class="{ 'rotate-180': salesOpen }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+
+                <div x-show="salesOpen" x-collapse>
+                    <div class="p-6 border-t border-gray-200 dark:border-gray-700">
+                        <!-- Time Period Selection -->
+                        <div class="mb-6 flex flex-wrap items-center gap-3">
+                            <button type="button" onclick="loadSalesData(4)" class="period-btn active px-3 py-1.5 text-sm font-medium rounded-lg bg-indigo-600 text-white transition-colors">Last 4 Months</button>
+                            <button type="button" onclick="loadSalesData(6)" class="period-btn px-3 py-1.5 text-sm font-medium rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 transition-colors">Last 6 Months</button>
+                            <button type="button" onclick="loadSalesData(12)" class="period-btn px-3 py-1.5 text-sm font-medium rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 transition-colors">Last 12 Months</button>
+                            <button type="button" onclick="loadSalesData('ytd')" class="period-btn px-3 py-1.5 text-sm font-medium rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 transition-colors">Year to Date</button>
+                            <button type="button" onclick="showSalesChartModal('{{ $product->ID }}', '{{ addslashes($product->NAME) }}')"
+                                    class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                                </svg>
+                                Detailed Sales
+                            </button>
+                        </div>
+
+                        <!-- Chart Container -->
+                        <div class="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg mb-6">
+                            <div class="relative" style="height: 300px;">
+                                <canvas id="salesChart"></canvas>
+                                <div id="chartLoading" class="hidden absolute inset-0 bg-white dark:bg-gray-800 bg-opacity-75 flex items-center justify-center rounded-lg">
+                                    <div class="text-center">
+                                        <svg class="animate-spin h-8 w-8 text-indigo-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Loading sales data...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sales Stats & Table (lazy loaded via Alpine) -->
+                        <div x-data="{
+                            loading: true,
+                            error: null,
+                            salesHistory: [],
+                            salesStats: {},
+                            salesUrl: '{{ route('products.sales-data', $product->ID) }}'
+                        }" x-init="
+                            fetch(salesUrl)
+                                .then(r => r.ok ? r.json() : Promise.reject('HTTP ' + r.status))
+                                .then(data => { salesHistory = data.salesHistory || []; salesStats = data.salesStats || {}; })
+                                .catch(e => { console.error(e); error = String(e); })
+                                .finally(() => { loading = false; })
+                        ">
+                            <!-- Loading skeleton -->
+                            <template x-if="loading">
+                                <div class="animate-pulse">
+                                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                                        <div class="bg-gray-200 dark:bg-gray-700 h-20 rounded-lg"></div>
+                                        <div class="bg-gray-200 dark:bg-gray-700 h-20 rounded-lg"></div>
+                                        <div class="bg-gray-200 dark:bg-gray-700 h-20 rounded-lg"></div>
+                                        <div class="bg-gray-200 dark:bg-gray-700 h-20 rounded-lg"></div>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- Loaded content -->
+                            <template x-if="!loading && !error && salesHistory.length > 0">
+                                <div>
+                                    <!-- Sales Statistics Cards -->
+                                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                                        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                                            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Sales (12m)</div>
+                                            <div class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100" data-stat="total_sales_12m" x-text="Math.round(salesStats.total_sales_12m || 0).toLocaleString()"></div>
+                                        </div>
+                                        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                                            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Avg Monthly</div>
+                                            <div class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100" data-stat="avg_monthly_sales" x-text="(salesStats.avg_monthly_sales || 0).toFixed(1)"></div>
+                                        </div>
+                                        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                                            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">This Month</div>
+                                            <div class="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100" data-stat="this_month_sales" x-text="Math.round(salesStats.this_month_sales || 0).toLocaleString()"></div>
+                                        </div>
+                                        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                                            <div class="text-sm font-medium text-gray-500 dark:text-gray-400">Trend</div>
+                                            <div class="mt-1 text-2xl font-semibold" data-stat="trend">
+                                                <span x-show="salesStats.trend === 'up'" class="text-green-600 dark:text-green-400">↑ Up</span>
+                                                <span x-show="salesStats.trend === 'down'" class="text-red-600 dark:text-red-400">↓ Down</span>
+                                                <span x-show="salesStats.trend === 'stable'" class="text-gray-600 dark:text-gray-400">→ Stable</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Sales by Month Table -->
+                                    <h3 class="text-lg font-semibold mb-4">Sales by Month</h3>
+                                    <div class="overflow-x-auto">
+                                        <table id="salesTable" class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                            <thead class="bg-gray-50 dark:bg-gray-700">
+                                                <tr>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Month</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Units Sold</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Trend</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                                <template x-for="(monthData, index) in salesHistory" :key="index">
+                                                    <tr>
+                                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100" x-text="monthData.month"></td>
+                                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100" x-text="parseFloat(monthData.units || 0).toFixed(1)"></td>
+                                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                                            <template x-if="index > 0">
+                                                                <span>
+                                                                    <template x-if="monthData.units > salesHistory[index-1].units">
+                                                                        <span class="text-green-600 dark:text-green-400">↑</span>
+                                                                    </template>
+                                                                    <template x-if="monthData.units < salesHistory[index-1].units">
+                                                                        <span class="text-red-600 dark:text-red-400">↓</span>
+                                                                    </template>
+                                                                    <template x-if="monthData.units === salesHistory[index-1].units">
+                                                                        <span class="text-gray-400">→</span>
+                                                                    </template>
+                                                                </span>
+                                                            </template>
+                                                        </td>
+                                                    </tr>
+                                                </template>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- Error state -->
+                            <template x-if="!loading && error">
+                                <div class="text-center py-8">
+                                    <p class="text-sm text-red-600 dark:text-red-400" x-text="'Failed to load sales data: ' + error"></p>
+                                </div>
+                            </template>
+
+                            <!-- No data state -->
+                            <template x-if="!loading && !error && salesHistory.length === 0">
+                                <div class="text-center py-8">
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">No sales data available for this product.</p>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sales Chart Modal -->
+            <x-sales-chart-modal />
 
             <!-- Alternate Barcode Section -->
             <div x-data="{ open: false }" class="mt-6 bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
@@ -1195,5 +1645,440 @@
                 closeOverrideModal();
             }
         });
+
+        // Kitchen toggle button handler
+        document.querySelectorAll('.kitchen-toggle-btn').forEach(button => {
+            button.addEventListener('click', async function() {
+                const productId = this.dataset.productId;
+                const isKitchen = this.dataset.isKitchen === 'true';
+
+                this.disabled = true;
+                const originalText = this.textContent;
+                this.textContent = isKitchen ? 'Removing...' : 'Adding...';
+
+                try {
+                    const response = await fetch('/kitchen/products/toggle', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({ product_id: productId })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok && data.success) {
+                        this.dataset.isKitchen = data.is_kitchen.toString();
+                        if (data.is_kitchen) {
+                            this.classList.remove('text-gray-500', 'border-gray-300');
+                            this.classList.add('text-orange-600', 'border-orange-300', 'bg-orange-50');
+                            this.title = 'Remove from kitchen products';
+                        } else {
+                            this.classList.remove('text-orange-600', 'border-orange-300', 'bg-orange-50');
+                            this.classList.add('text-gray-500', 'border-gray-300');
+                            this.title = 'Add to kitchen products';
+                        }
+                        this.textContent = 'Kitchen';
+                        this.disabled = false;
+                    } else {
+                        alert('Failed to update kitchen status: ' + (data.error || 'Unknown error'));
+                        this.disabled = false;
+                        this.textContent = originalText;
+                    }
+                } catch (error) {
+                    console.error('Kitchen toggle error:', error);
+                    alert('Failed to update kitchen status. Please try again.');
+                    this.disabled = false;
+                    this.textContent = originalText;
+                }
+            });
+        });
+        // ========================================
+        // Stock Edit Functions
+        // ========================================
+        function toggleStockEdit() {
+            const display = document.getElementById('stockDisplay');
+            const form = document.getElementById('stockEditForm');
+            const input = document.getElementById('stockUnitsInput');
+
+            if (form.classList.contains('hidden')) {
+                display.classList.add('hidden');
+                form.classList.remove('hidden');
+                input.focus();
+                input.select();
+            } else {
+                form.classList.add('hidden');
+                display.classList.remove('hidden');
+            }
+        }
+
+        // Handle arrow keys to increment/decrement by 1
+        const stockInput = document.getElementById('stockUnitsInput');
+        if (stockInput) {
+            stockInput.addEventListener('keydown', function(e) {
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    this.value = parseFloat((parseFloat(this.value || 0) + 1).toFixed(2));
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    this.value = Math.max(0, parseFloat((parseFloat(this.value || 0) - 1).toFixed(2)));
+                }
+            });
+        }
+
+        function updateStock(event) {
+            event.preventDefault();
+
+            const form = event.target;
+            const input = form.querySelector('input[name="stock_units"]');
+            const stockValue = parseFloat(input.value);
+            const prodId = '{{ $product->ID }}';
+
+            const submitButton = form.querySelector('button[type="submit"]');
+            const originalText = submitButton.textContent;
+            submitButton.disabled = true;
+            submitButton.textContent = 'Saving...';
+
+            fetch(`/products/${prodId}/update-stock`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({ stock_units: stockValue })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const currentStockValue = document.getElementById('currentStockValue');
+                    currentStockValue.textContent = Number(stockValue).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+                    const stockDisplay = currentStockValue.closest('p');
+                    stockDisplay.className = stockValue > 0 ?
+                        'text-2xl font-bold text-green-600 dark:text-green-400' :
+                        'text-2xl font-bold text-red-600 dark:text-red-400';
+
+                    toggleStockEdit();
+                    showMessage(data.message || 'Stock updated successfully', 'success');
+                } else {
+                    showMessage(data.message || 'Failed to update stock', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showMessage('Network error while updating stock. Please try again.', 'error');
+            })
+            .finally(() => {
+                submitButton.disabled = false;
+                submitButton.textContent = originalText;
+            });
+        }
+
+        // ========================================
+        // Stocking Toggle
+        // ========================================
+        function toggleStocking(productId, includeInStocking) {
+            const button = event.target.closest('button');
+            const originalContent = button.innerHTML;
+
+            button.disabled = true;
+            button.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>';
+
+            fetch(`/products/${productId}/toggle-stocking`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({ include_in_stocking: includeInStocking, source: 'product_edit' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to update stocking status'));
+                    button.disabled = false;
+                    button.innerHTML = originalContent;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Network error while updating stocking status. Please try again.');
+                button.disabled = false;
+                button.innerHTML = originalContent;
+            });
+        }
+
+        // ========================================
+        // Requeue for Labels
+        // ========================================
+        function requeueProduct(productId, buttonElement) {
+            const button = buttonElement || event?.target?.closest('button');
+
+            fetch('/labels/requeue', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                },
+                body: JSON.stringify({ product_id: productId })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (button) {
+                        const originalText = button.innerHTML;
+                        button.innerHTML = '<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>Added!';
+                        button.disabled = true;
+                        setTimeout(() => {
+                            button.innerHTML = originalText;
+                            button.disabled = false;
+                        }, 2000);
+                    }
+                } else {
+                    alert('Error: ' + (data.message || data.error));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error adding product back to labels list');
+            });
+        }
+
+        // ========================================
+        // Sales Chart Functions
+        // ========================================
+        let salesChart = null;
+        const productId = '{{ $product->ID }}';
+        const minStockOverride = {{ $orderSettings?->min_stock_override ?? 'null' }};
+        window.salesChartLoaded = false;
+
+        function loadInitialSalesData() {
+            const chartLoading = document.getElementById('chartLoading');
+            if (chartLoading) chartLoading.classList.remove('hidden');
+
+            fetch(`/products/${productId}/sales-data?period=4`, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.salesHistory && data.salesHistory.length > 0) {
+                    createChart(data.salesHistory);
+                }
+                if (chartLoading) chartLoading.classList.add('hidden');
+            })
+            .catch(error => {
+                console.error('Error loading initial sales data:', error);
+                if (chartLoading) chartLoading.classList.add('hidden');
+            });
+        }
+
+        function createChart(salesData) {
+            const canvas = document.getElementById('salesChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            if (salesChart) {
+                salesChart.destroy();
+            }
+
+            const labels = salesData.map(item => item.month_short + ' ' + item.year);
+            const data = salesData.map(item => item.units);
+
+            const gradient = ctx.createLinearGradient(0, 0, 0, 250);
+            gradient.addColorStop(0, 'rgba(99, 102, 241, 0.8)');
+            gradient.addColorStop(1, 'rgba(99, 102, 241, 0.1)');
+
+            const datasets = [{
+                label: 'Units Sold',
+                data: data,
+                backgroundColor: gradient,
+                borderColor: 'rgb(99, 102, 241)',
+                borderWidth: 2,
+                borderRadius: 8,
+                borderSkipped: false,
+                order: 2
+            }];
+
+            if (minStockOverride !== null && minStockOverride > 0) {
+                datasets.push({
+                    type: 'line',
+                    label: 'Min Stock Override',
+                    data: Array(labels.length).fill(minStockOverride),
+                    borderColor: 'rgb(249, 115, 22)',
+                    borderWidth: 2,
+                    borderDash: [8, 4],
+                    pointRadius: 0,
+                    pointHoverRadius: 0,
+                    fill: false,
+                    tension: 0,
+                    order: 1
+                });
+            }
+
+            salesChart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: labels, datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: minStockOverride !== null && minStockOverride > 0,
+                            position: 'top',
+                            labels: { color: 'rgb(107, 114, 128)', usePointStyle: true, padding: 15 }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleColor: 'white',
+                            bodyColor: 'white',
+                            borderColor: 'rgb(99, 102, 241)',
+                            borderWidth: 1,
+                            displayColors: true,
+                            callbacks: {
+                                label: function(context) {
+                                    if (context.dataset.label === 'Min Stock Override') {
+                                        return 'Min Stock: ' + context.parsed.y.toFixed(0) + ' units';
+                                    }
+                                    return 'Units Sold: ' + context.parsed.y.toFixed(1);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(156, 163, 175, 0.1)' }, ticks: { color: 'rgb(107, 114, 128)' } },
+                        x: { grid: { display: false }, ticks: { color: 'rgb(107, 114, 128)' } }
+                    },
+                    animation: { duration: 750, easing: 'easeInOutQuart' }
+                }
+            });
+        }
+
+        function loadSalesData(period) {
+            document.querySelectorAll('.period-btn').forEach(btn => {
+                btn.classList.remove('active', 'bg-indigo-600', 'text-white');
+                btn.classList.add('bg-white', 'dark:bg-gray-800', 'text-gray-700', 'dark:text-gray-300', 'border', 'border-gray-300', 'dark:border-gray-600');
+            });
+            event.target.classList.remove('bg-white', 'dark:bg-gray-800', 'text-gray-700', 'dark:text-gray-300', 'border', 'border-gray-300', 'dark:border-gray-600');
+            event.target.classList.add('active', 'bg-indigo-600', 'text-white');
+
+            const chartLoading = document.getElementById('chartLoading');
+            if (chartLoading) chartLoading.classList.remove('hidden');
+
+            fetch(`/products/${productId}/sales-data?period=${period}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                createChart(data.salesHistory);
+                updateStatistics(data.salesStats);
+                updateTable(data.salesHistory);
+                if (chartLoading) chartLoading.classList.add('hidden');
+            })
+            .catch(error => {
+                console.error('Error loading sales data:', error);
+                if (chartLoading) chartLoading.classList.add('hidden');
+                alert('Failed to load sales data. Please try again.');
+            });
+        }
+
+        function updateStatistics(stats) {
+            const els = {
+                'total_sales_12m': document.querySelector('[data-stat="total_sales_12m"]'),
+                'avg_monthly_sales': document.querySelector('[data-stat="avg_monthly_sales"]'),
+                'this_month_sales': document.querySelector('[data-stat="this_month_sales"]'),
+                'trend': document.querySelector('[data-stat="trend"]')
+            };
+            if (els.total_sales_12m) els.total_sales_12m.textContent = Math.round(stats.total_sales_12m).toLocaleString();
+            if (els.avg_monthly_sales) els.avg_monthly_sales.textContent = stats.avg_monthly_sales.toFixed(1);
+            if (els.this_month_sales) els.this_month_sales.textContent = Math.round(stats.this_month_sales).toLocaleString();
+            if (els.trend) {
+                els.trend.innerHTML = stats.trend === 'up'
+                    ? '<span class="text-green-600 dark:text-green-400">↑ Up</span>'
+                    : stats.trend === 'down'
+                    ? '<span class="text-red-600 dark:text-red-400">↓ Down</span>'
+                    : '<span class="text-gray-600 dark:text-gray-400">→ Stable</span>';
+            }
+        }
+
+        function updateTable(salesData) {
+            const tbody = document.querySelector('#salesTable tbody');
+            if (!tbody) return;
+
+            tbody.innerHTML = '';
+            let previousUnits = null;
+
+            salesData.forEach(monthData => {
+                const row = document.createElement('tr');
+
+                const monthCell = document.createElement('td');
+                monthCell.className = 'px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100';
+                monthCell.textContent = monthData.month;
+                row.appendChild(monthCell);
+
+                const unitsCell = document.createElement('td');
+                unitsCell.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100';
+                unitsCell.textContent = monthData.units.toFixed(1);
+                row.appendChild(unitsCell);
+
+                const trendCell = document.createElement('td');
+                trendCell.className = 'px-6 py-4 whitespace-nowrap text-sm';
+                if (previousUnits !== null) {
+                    if (monthData.units > previousUnits) {
+                        const percent = ((monthData.units - previousUnits) / Math.max(previousUnits, 1)) * 100;
+                        trendCell.innerHTML = `<span class="text-green-600 dark:text-green-400">↑ ${percent.toFixed(1)}%</span>`;
+                    } else if (monthData.units < previousUnits) {
+                        const percent = ((previousUnits - monthData.units) / Math.max(previousUnits, 1)) * 100;
+                        trendCell.innerHTML = `<span class="text-red-600 dark:text-red-400">↓ ${percent.toFixed(1)}%</span>`;
+                    } else {
+                        trendCell.innerHTML = '<span class="text-gray-600 dark:text-gray-400">→ 0%</span>';
+                    }
+                } else {
+                    trendCell.innerHTML = '<span class="text-gray-400 dark:text-gray-500">-</span>';
+                }
+                row.appendChild(trendCell);
+                tbody.appendChild(row);
+                previousUnits = monthData.units;
+            });
+        }
+
+        // ========================================
+        // Flash Message Helper
+        // ========================================
+        function showMessage(message, type = 'info') {
+            let messageEl = document.getElementById('flash-message');
+            if (!messageEl) {
+                messageEl = document.createElement('div');
+                messageEl.id = 'flash-message';
+                messageEl.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; padding: 12px 20px; border-radius: 6px; font-weight: 500; transition: opacity 0.3s;';
+                document.body.appendChild(messageEl);
+            }
+
+            const colors = {
+                success: 'background: #10b981; color: white;',
+                error: 'background: #ef4444; color: white;',
+                info: 'background: #3b82f6; color: white;',
+                warning: 'background: #f59e0b; color: white;'
+            };
+
+            messageEl.style.cssText += colors[type] || colors.info;
+            messageEl.textContent = message;
+            messageEl.style.opacity = '1';
+
+            setTimeout(() => {
+                messageEl.style.opacity = '0';
+                setTimeout(() => {
+                    if (messageEl.parentNode) messageEl.parentNode.removeChild(messageEl);
+                }, 300);
+            }, 3000);
+        }
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </x-admin-layout>

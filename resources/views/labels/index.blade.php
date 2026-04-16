@@ -265,7 +265,7 @@
                                                         </svg>
                                                         Single
                                                     </a>
-                                                    <a href="{{ route('products.show', $product->ID) }}" 
+                                                    <a href="{{ route('products.edit', $product->ID) }}" 
                                                        class="inline-flex items-center px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded transition">
                                                         <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>

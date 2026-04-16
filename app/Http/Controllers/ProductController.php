@@ -163,65 +163,15 @@ class ProductController extends Controller
     }
 
     /**
-     * Display the specified product.
+     * Display the specified product — redirects to edit page.
      */
-    public function show(string $id, Request $request): View
+    public function show(string $id, Request $request)
     {
-        $product = $this->productRepository->findById($id);
-
-        if (! $product) {
-            abort(404, 'Product not found');
-        }
-
-        // Check for delivery context
-        $fromDelivery = $request->query('from_delivery');
-
-        // Check for referrer context
-        $from = $request->query('from');
-
-        $taxCategories = $this->productRepository->getAllTaxCategories();
-
-        // Sales data is now loaded via AJAX for better page performance
-        // See: /products/{id}/sales-data endpoint
-
-        // Fetch Udea pricing if product has supplier code and is Udea supplier
-        $udeaPricing = null;
-        if ($product->supplierLink?->SupplierCode &&
-            $product->supplier &&
-            $this->supplierService->hasExternalIntegration($product->supplier->SupplierID)) {
-
-            try {
-                $udeaPricing = $this->udeaScrapingService->getProductData($product->supplierLink->SupplierCode);
-            } catch (\Exception $e) {
-                // Log error but don't break the page
-                \Log::warning('Failed to fetch Udea pricing for product', [
-                    'product_id' => $id,
-                    'supplier_code' => $product->supplierLink->SupplierCode,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-
-        // Check if product is visible on till
-        $isVisibleOnTill = $this->tillVisibilityService->isVisibleOnTill($id);
-
-        // Get all categories for the category selector
-        $allCategories = $this->getAllCategoriesForDropdown();
-
-        // Get order settings for this product (if any)
-        $orderSettings = ProductOrderSetting::where('product_id', $id)->first();
-
-        return view('products.show', [
-            'product' => $product,
-            'taxCategories' => $taxCategories,
-            'supplierService' => $this->supplierService,
-            'udeaPricing' => $udeaPricing,
-            'fromDelivery' => $fromDelivery,
-            'from' => $from,
-            'isVisibleOnTill' => $isVisibleOnTill,
-            'allCategories' => $allCategories,
-            'orderSettings' => $orderSettings,
-        ]);
+        return redirect()->route('products.edit', array_filter([
+            'id' => $id,
+            'from_delivery' => $request->query('from_delivery'),
+            'from' => $request->query('from'),
+        ]));
     }
 
     /**
@@ -245,7 +195,7 @@ class ProductController extends Controller
         ]);
 
         return redirect()
-            ->route('products.show', $id)
+            ->route('products.edit', $id)
             ->with('success', 'Product name updated successfully.');
     }
 
@@ -270,7 +220,7 @@ class ProductController extends Controller
         ]);
 
         return redirect()
-            ->route('products.show', $id)
+            ->route('products.edit', $id)
             ->with('success', 'Tax category updated successfully.');
     }
 
@@ -628,7 +578,7 @@ class ProductController extends Controller
         $inputMode = $request->price_input_mode === 'gross' ? 'gross price' : 'net price';
 
         return redirect()
-            ->route('products.show', $id)
+            ->route('products.edit', $id)
             ->with('success', "Price updated successfully from {$inputMode}.");
     }
 
@@ -684,7 +634,7 @@ class ProductController extends Controller
         }
 
         return redirect()
-            ->route('products.show', $id)
+            ->route('products.edit', $id)
             ->with('success', 'Cost updated successfully.');
     }
 
@@ -706,7 +656,7 @@ class ProductController extends Controller
         // If barcode hasn't changed, just redirect back
         if ($oldBarcode === $newBarcode) {
             return redirect()
-                ->route('products.show', $id)
+                ->route('products.edit', $id)
                 ->with('info', 'Barcode unchanged.');
         }
 
@@ -763,7 +713,7 @@ class ProductController extends Controller
             });
 
             return redirect()
-                ->route('products.show', $id)
+                ->route('products.edit', $id)
                 ->with('success', "Barcode successfully changed from {$oldBarcode} to {$newBarcode}. All related records have been updated.");
 
         } catch (\Exception $e) {
@@ -775,7 +725,7 @@ class ProductController extends Controller
             ]);
 
             return redirect()
-                ->route('products.show', $id)
+                ->route('products.edit', $id)
                 ->with('error', 'Failed to update barcode. Please check the logs for details.');
         }
     }
@@ -1203,6 +1153,9 @@ class ProductController extends Controller
         // Get product order settings (for short-dated flag and shelf life)
         $orderSettings = ProductOrderSetting::where('product_id', $product->ID)->first();
 
+        // Check if product is a kitchen product
+        $isKitchenProduct = \App\Models\KitchenProduct::where('product_id', $product->ID)->exists();
+
         // Context information for navigation
         $fromDelivery = $request->query('from_delivery');
         $fromContext = $request->query('from');
@@ -1218,6 +1171,7 @@ class ProductController extends Controller
             'includeInStocking',
             'showOnTill',
             'orderSettings',
+            'isKitchenProduct',
             'fromDelivery',
             'fromContext'
         ));
@@ -1431,14 +1385,14 @@ class ProductController extends Controller
             // Determine redirect route with context
             if ($request->delivery_item_id) {
                 $deliveryItem = \App\Models\DeliveryItem::findOrFail($request->delivery_item_id);
-                $redirectUrl = route('products.show', $productId).'?from_delivery='.$deliveryItem->delivery_id;
+                $redirectUrl = route('products.edit', $productId).'?from_delivery='.$deliveryItem->delivery_id;
 
                 return redirect($redirectUrl)
                     ->with('success', 'Product created successfully!');
             }
 
             return redirect()
-                ->route('products.show', $productId)
+                ->route('products.edit', $productId)
                 ->with('success', 'Product created successfully!');
 
         } catch (\Exception $e) {
@@ -1655,7 +1609,7 @@ class ProductController extends Controller
             $fromDelivery = $request->query('from_delivery');
             $fromContext = $request->query('from');
 
-            $redirectUrl = route('products.show', $product->ID);
+            $redirectUrl = route('products.edit', $product->ID);
 
             if ($fromDelivery) {
                 $redirectUrl .= '?from_delivery='.$fromDelivery;
@@ -1829,7 +1783,7 @@ class ProductController extends Controller
                     'selling_price' => $existingProduct->getGrossPrice(),
                     'cost_price' => $existingProduct->PRICEBUY,
                     'edit_url' => route('products.edit', $existingProduct->ID),
-                    'view_url' => route('products.show', $existingProduct->ID),
+                    'view_url' => route('products.edit', $existingProduct->ID),
                 ],
             ]);
 
@@ -2018,7 +1972,7 @@ class ProductController extends Controller
         ]);
 
         return redirect()
-            ->route('products.show', $id)
+            ->route('products.edit', $id)
             ->with('success', 'Product category updated successfully.');
     }
 
@@ -2327,7 +2281,7 @@ class ProductController extends Controller
         }
 
         return redirect()
-            ->route('products.show', $id)
+            ->route('products.edit', $id)
             ->with('success', $minStockValue !== null
                 ? 'Minimum stock override set successfully.'
                 : 'Minimum stock override removed successfully.');
@@ -2396,7 +2350,7 @@ class ProductController extends Controller
             }
 
             return redirect()
-                ->route('products.show', $id)
+                ->route('products.edit', $id)
                 ->with('success', 'Short-dated settings updated successfully.');
         } catch (\Exception $e) {
             \Log::error('Failed to update short-dated settings', [
@@ -2409,7 +2363,7 @@ class ProductController extends Controller
             }
 
             return redirect()
-                ->route('products.show', $id)
+                ->route('products.edit', $id)
                 ->with('error', 'Failed to update short-dated settings.');
         }
     }

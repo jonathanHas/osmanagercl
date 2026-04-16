@@ -77,7 +77,7 @@
                                     {{ $adjustment->user?->name ?? 'Unknown' }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
-                                    <a href="{{ route('products.show', $adjustment->product_id) }}" class="text-blue-600 hover:text-blue-800">
+                                    <a href="{{ route('products.edit', $adjustment->product_id) }}" class="text-blue-600 hover:text-blue-800">
                                         {{ $adjustment->barcode }}
                                     </a>
                                 </td>

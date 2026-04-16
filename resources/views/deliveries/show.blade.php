@@ -874,6 +874,13 @@
                     </div>
                 </div>
                 
+                @php
+                    // Load kitchen product IDs to show kitchen toggle state
+                    $kitchenProductIds = \App\Models\KitchenProduct::whereIn('product_id',
+                        $delivery->items->pluck('product_id')->filter()
+                    )->pluck('product_id')->toArray();
+                @endphp
+
                 {{-- Mobile Card View --}}
                 <div class="md:hidden max-h-[calc(100vh-14rem)] overflow-y-auto divide-y divide-gray-200 dark:divide-gray-700">
                     @foreach($delivery->items->sortByDesc('is_new_product') as $item)
@@ -940,7 +947,7 @@
                                 <div class="min-w-0 flex-1">
                                     <div class="text-sm font-medium text-gray-900 dark:text-gray-100">
                                         @if($item->product)
-                                            <a href="{{ route('products.show', $item->product->ID) }}" class="text-blue-600 dark:text-blue-400 hover:underline">{{ $item->description }}</a>
+                                            <a href="{{ route('products.edit', $item->product->ID) }}" class="text-blue-600 dark:text-blue-400 hover:underline">{{ $item->description }}</a>
                                         @else
                                             {{ $item->description }}
                                         @endif
@@ -1026,6 +1033,21 @@
                                         </svg>
                                         Add to POS
                                     </a>
+                                </div>
+                            @endif
+
+                            {{-- Kitchen toggle for matched products --}}
+                            @if($item->product)
+                                @php $isKitchenProduct = in_array($item->product->ID, $kitchenProductIds); @endphp
+                                <div class="mt-2 flex items-center gap-2">
+                                    <button type="button"
+                                            class="kitchen-toggle-btn text-[11px] font-medium border rounded px-2 py-0.5 transition-colors {{ $isKitchenProduct ? 'text-orange-600 border-orange-300 bg-orange-50 hover:bg-orange-100' : 'text-gray-500 border-gray-300 hover:border-orange-300 hover:text-orange-600' }}"
+                                            data-product-id="{{ $item->product->ID }}"
+                                            data-product-name="{{ e($item->description) }}"
+                                            data-is-kitchen="{{ $isKitchenProduct ? 'true' : 'false' }}"
+                                            title="{{ $isKitchenProduct ? 'Remove from kitchen products' : 'Add to kitchen products' }}">
+                                        Kitchen
+                                    </button>
                                 </div>
                             @endif
                         </div>
@@ -1174,7 +1196,7 @@
                                     <td class="px-6 py-4">
                                         <div class="text-sm font-medium text-gray-900 dark:text-gray-100">
                                             @if($item->product)
-                                                <a href="{{ route('products.show', $item->product->ID) }}" 
+                                                <a href="{{ route('products.edit', $item->product->ID) }}" 
                                                    class="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
                                                    title="View product details">
                                                     {{ $item->description }}
@@ -1511,7 +1533,19 @@
                                                     Add to POS
                                                 </a>
                                             @endif
-                                            
+
+                                            @if($item->product)
+                                                @php $isKitchenProduct = in_array($item->product->ID, $kitchenProductIds); @endphp
+                                                <button type="button"
+                                                        class="kitchen-toggle-btn text-[11px] font-medium border rounded px-2 py-0.5 transition-colors {{ $isKitchenProduct ? 'text-orange-600 border-orange-300 bg-orange-50 hover:bg-orange-100' : 'text-gray-500 border-gray-300 hover:border-orange-300 hover:text-orange-600' }}"
+                                                        data-product-id="{{ $item->product->ID }}"
+                                                        data-product-name="{{ e($item->description) }}"
+                                                        data-is-kitchen="{{ $isKitchenProduct ? 'true' : 'false' }}"
+                                                        title="{{ $isKitchenProduct ? 'Remove from kitchen products' : 'Add to kitchen products' }}">
+                                                    Kitchen
+                                                </button>
+                                            @endif
+
                                         </div>
                                     </td>
                                 </tr>
@@ -1652,7 +1686,7 @@
                         if (data.exists_in_database && data.existing_product) {
                             // Highlight with green background - product already exists in database
                             barcodeCell.innerHTML = `
-                                <a href="/products/${data.existing_product.id}" target="_blank"
+                                <a href="/products/${data.existing_product.id}/edit" target="_blank"
                                    class="inline-flex items-center gap-1 hover:opacity-80 transition-opacity"
                                    title="Product exists: ${data.existing_product.name} - Click to view">
                                     <code class="px-2 py-1 bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 rounded text-xs border border-green-300 dark:border-green-600">
@@ -1718,7 +1752,7 @@
                 if (item.exists_in_database && item.existing_product) {
                     // Highlight with green background - product already exists in database
                     barcodeCell.innerHTML = `
-                        <a href="/products/${item.existing_product.id}" target="_blank"
+                        <a href="/products/${item.existing_product.id}/edit" target="_blank"
                            class="inline-flex items-center gap-1 hover:opacity-80 transition-opacity"
                            title="Product exists: ${item.existing_product.name} - Click to view">
                             <code class="px-2 py-1 bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 rounded text-xs border border-green-300 dark:border-green-600">
@@ -2837,7 +2871,7 @@
                     if (barcodeCell) {
                         if (data.exists_in_database && data.existing_product) {
                             barcodeCell.innerHTML = `
-                                <a href="/products/${data.existing_product.id}" target="_blank"
+                                <a href="/products/${data.existing_product.id}/edit" target="_blank"
                                    class="inline-flex items-center gap-1 hover:opacity-80 transition-opacity"
                                    title="Product exists: ${data.existing_product.name} - Click to view">
                                     <code class="px-2 py-1 bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 rounded text-xs border border-green-300 dark:border-green-600">
@@ -2937,6 +2971,61 @@
             if (e.key === 'Escape' && !document.getElementById('delivery-barcode-scanner-modal').classList.contains('hidden')) {
                 closeDeliveryBarcodeScanner();
             }
+        });
+
+        // Kitchen toggle button handler
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.kitchen-toggle-btn').forEach(button => {
+                if (button.dataset.kitchenInitialized) return;
+                button.dataset.kitchenInitialized = 'true';
+
+                button.addEventListener('click', async function() {
+                    const productId = this.dataset.productId;
+                    const isKitchen = this.dataset.isKitchen === 'true';
+
+                    this.disabled = true;
+                    const originalText = this.textContent;
+                    this.textContent = isKitchen ? 'Removing...' : 'Adding...';
+
+                    try {
+                        const response = await fetch('/kitchen/products/toggle', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({ product_id: productId })
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok && data.success) {
+                            this.dataset.isKitchen = data.is_kitchen.toString();
+                            if (data.is_kitchen) {
+                                this.classList.remove('text-gray-500', 'border-gray-300');
+                                this.classList.add('text-orange-600', 'border-orange-300', 'bg-orange-50');
+                                this.title = 'Remove from kitchen products';
+                            } else {
+                                this.classList.remove('text-orange-600', 'border-orange-300', 'bg-orange-50');
+                                this.classList.add('text-gray-500', 'border-gray-300');
+                                this.title = 'Add to kitchen products';
+                            }
+                            this.textContent = 'Kitchen';
+                            this.disabled = false;
+                        } else {
+                            alert('Failed to update kitchen status: ' + (data.error || 'Unknown error'));
+                            this.disabled = false;
+                            this.textContent = originalText;
+                        }
+                    } catch (error) {
+                        console.error('Kitchen toggle error:', error);
+                        alert('Failed to update kitchen status. Please try again.');
+                        this.disabled = false;
+                        this.textContent = originalText;
+                    }
+                });
+            });
         });
     </script>
 

@@ -140,7 +140,7 @@
 
                                 <div class="mt-auto space-y-2 border-t border-slate-800/60 pt-5 text-xs">
                                     <p class="text-slate-500 uppercase tracking-wide text-[10px]">Admin actions</p>
-                                    <a href="{{ route('products.show', $product) }}" class="block w-full rounded-lg border border-slate-700/40 bg-slate-800/60 px-3 py-2 font-semibold text-center text-slate-100 transition hover:bg-slate-700/80">
+                                    <a href="{{ route('products.edit', $product) }}" class="block w-full rounded-lg border border-slate-700/40 bg-slate-800/60 px-3 py-2 font-semibold text-center text-slate-100 transition hover:bg-slate-700/80">
                                         View Product
                                     </a>
                                 </div>

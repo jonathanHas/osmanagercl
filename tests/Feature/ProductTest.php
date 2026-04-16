@@ -151,12 +151,8 @@ class ProductTest extends TestCase
 
         $response = $this->actingAs($user)->get('/products/prod001');
 
-        $response->assertStatus(200);
-        $response->assertViewIs('products.show');
-        $response->assertSee('Test Product 1');
-        $response->assertSee('REF001');
-        $response->assertSee('CODE001');
-        $response->assertSee('$15.00');
+        // Show route redirects to edit page
+        $response->assertRedirect('/products/prod001/edit');
     }
 
     public function test_shows_404_for_non_existent_product()

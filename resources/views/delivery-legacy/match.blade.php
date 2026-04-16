@@ -659,11 +659,14 @@
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             @if($item->productID)
-                                                <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->prodName }}</a>
+                                                <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->dbProductName ?? $item->prodName }}</a>
                                             @else
-                                                <span class="font-medium text-gray-900 text-sm">{{ $item->prodName }}</span>
+                                                <span class="font-medium text-gray-900 text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
                                             @endif
                                             <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
+                                            @if($item->Barcode)
+                                                <span class="text-xs text-gray-400 font-mono block">{{ $item->Barcode }}</span>
+                                            @endif
                                             <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                         </div>
                                         <div class="text-right flex-shrink-0">
@@ -769,10 +772,10 @@
                                             <td class="px-3 py-2">
                                                 @if($item->productID)
                                                     <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium">
-                                                        {{ $item->prodName }}
+                                                        {{ $item->dbProductName ?? $item->prodName }}
                                                     </a>
                                                 @else
-                                                    <span class="font-medium text-gray-900">{{ $item->prodName }}</span>
+                                                    <span class="font-medium text-gray-900">{{ $item->dbProductName ?? $item->prodName }}</span>
                                                 @endif
                                                 <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                                 <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
@@ -892,9 +895,9 @@
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             @if($item->productID)
-                                                <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->prodName }}</a>
+                                                <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->dbProductName ?? $item->prodName }}</a>
                                             @else
-                                                <span class="font-medium text-gray-900 text-sm">{{ $item->prodName }}</span>
+                                                <span class="font-medium text-gray-900 text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
                                             @endif
                                             <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                             <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
@@ -1015,10 +1018,10 @@
                                             <td class="px-3 py-2">
                                                 @if($item->productID)
                                                     <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium">
-                                                        {{ $item->prodName }}
+                                                        {{ $item->dbProductName ?? $item->prodName }}
                                                     </a>
                                                 @else
-                                                    <span class="font-medium text-gray-900">{{ $item->prodName }}</span>
+                                                    <span class="font-medium text-gray-900">{{ $item->dbProductName ?? $item->prodName }}</span>
                                                 @endif
                                                 <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                                 <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
@@ -1179,9 +1182,9 @@
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             @if($item->productID)
-                                                <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->prodName }}</a>
+                                                <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->dbProductName ?? $item->prodName }}</a>
                                             @else
-                                                <span class="font-medium text-gray-900 text-sm">{{ $item->prodName }}</span>
+                                                <span class="font-medium text-gray-900 text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
                                             @endif
                                             <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                             <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
@@ -1306,10 +1309,10 @@
                                             <td class="px-3 py-2">
                                                 @if($item->productID)
                                                     <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium">
-                                                        {{ $item->prodName }}
+                                                        {{ $item->dbProductName ?? $item->prodName }}
                                                     </a>
                                                 @else
-                                                    <span class="font-medium text-gray-900">{{ $item->prodName }}</span>
+                                                    <span class="font-medium text-gray-900">{{ $item->dbProductName ?? $item->prodName }}</span>
                                                 @endif
                                                 <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                                 <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
@@ -1466,9 +1469,9 @@
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             @if($item->productID)
-                                                <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->prodName }}</a>
+                                                <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->dbProductName ?? $item->prodName }}</a>
                                             @else
-                                                <span class="font-medium text-gray-900 text-sm">{{ $item->prodName }}</span>
+                                                <span class="font-medium text-gray-900 text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
                                             @endif
                                             <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                             <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
@@ -1546,10 +1549,10 @@
                                             <td class="px-3 py-2">
                                                 @if($item->productID)
                                                     <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium">
-                                                        {{ $item->prodName }}
+                                                        {{ $item->dbProductName ?? $item->prodName }}
                                                     </a>
                                                 @else
-                                                    <span class="font-medium text-gray-900">{{ $item->prodName }}</span>
+                                                    <span class="font-medium text-gray-900">{{ $item->dbProductName ?? $item->prodName }}</span>
                                                 @endif
                                                 <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                                 <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
@@ -1682,9 +1685,9 @@
                                     </div>
                                     <div class="min-w-0 flex-1">
                                         @if($item->productID)
-                                            <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->prodName }}</a>
+                                            <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->dbProductName ?? $item->prodName }}</a>
                                         @else
-                                            <span class="font-medium text-gray-900 text-sm">{{ $item->prodName }}</span>
+                                            <span class="font-medium text-gray-900 text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
                                         @endif
                                         <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                         <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
@@ -1736,10 +1739,10 @@
                                         <td class="px-3 py-2">
                                             @if($item->productID)
                                                 <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium">
-                                                    {{ $item->prodName }}
+                                                    {{ $item->dbProductName ?? $item->prodName }}
                                                 </a>
                                             @else
-                                                <span class="font-medium text-gray-900">{{ $item->prodName }}</span>
+                                                <span class="font-medium text-gray-900">{{ $item->dbProductName ?? $item->prodName }}</span>
                                             @endif
                                             <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                             <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
@@ -1975,11 +1978,25 @@
                                 <div class="p-3 border-l-4 border-red-400">
                                     <div class="flex items-start justify-between gap-2">
                                         <div class="flex-shrink-0">
-                                            <x-product-image :product="null" size="lg" />
+                                            @php
+                                                $tempProduct = $item->Barcode ? (object)[
+                                                    'barcode' => $item->Barcode,
+                                                    'supplier_code' => $item->supCode,
+                                                    'supplier' => (object)['SupplierID' => $supplierId],
+                                                ] : null;
+                                            @endphp
+                                            <x-product-image :product="$tempProduct" :supplier-service="$supplierService" size="lg" :hover="true" />
                                         </div>
                                         <div class="min-w-0 flex-1">
-                                            <span class="font-medium text-gray-900 text-sm">{{ $item->prodName }}</span>
+                                            @if($item->productID)
+                                                <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->dbProductName ?? $item->prodName }}</a>
+                                            @else
+                                                <span class="font-medium text-gray-900 text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
+                                            @endif
                                             <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
+                                            @if($item->Barcode)
+                                                <span class="text-xs text-gray-400 font-mono block">{{ $item->Barcode }}</span>
+                                            @endif
                                         </div>
                                         <div class="text-right flex-shrink-0">
                                             <span class="font-medium text-red-600 text-sm">&euro;{{ number_format($value, 2) }}</span>
@@ -2008,6 +2025,7 @@
                                     <tr>
                                         <th class="px-2 py-2 w-12"></th>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Barcode</th>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Supplier Code</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Cases</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Units/Case</th>
@@ -2028,12 +2046,27 @@
                                         @endphp
                                         <tr class="bg-red-50">
                                             <td class="px-2 py-2">
-                                                {{-- Missing items only have supplier code, no barcode - show fallback --}}
+                                                @php
+                                                    $tempProduct = $item->Barcode ? (object)[
+                                                        'barcode' => $item->Barcode,
+                                                        'supplier_code' => $item->supCode,
+                                                        'supplier' => (object)['SupplierID' => $supplierId],
+                                                    ] : null;
+                                                @endphp
                                                 <x-product-image
-                                                    :product="null"
-                                                    size="sm" />
+                                                    :product="$tempProduct"
+                                                    :supplier-service="$supplierService"
+                                                    size="sm"
+                                                    :hover="true" />
                                             </td>
-                                            <td class="px-3 py-2 font-medium text-gray-900">{{ $item->prodName }}</td>
+                                            <td class="px-3 py-2 font-medium text-gray-900">
+                                                @if($item->productID)
+                                                    <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900">{{ $item->dbProductName ?? $item->prodName }}</a>
+                                                @else
+                                                    {{ $item->dbProductName ?? $item->prodName }}
+                                                @endif
+                                            </td>
+                                            <td class="px-3 py-2 text-sm text-gray-600 font-mono">{{ $item->Barcode ?? '-' }}</td>
                                             <td class="px-3 py-2 text-gray-500">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</td>
                                             <td class="px-3 py-2 text-center">
                                                 @if($isWeightBased)

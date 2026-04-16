@@ -62,7 +62,16 @@ class DeliveryLegacyController extends Controller
             $syncedDelivery = Delivery::with(['documents', 'supplier'])->find($syncedDeliveryId);
         }
 
-        return view('delivery-legacy.index', compact('suppliers', 'scanSessions', 'scanItemCounts', 'syncedDelivery'));
+        // Get supplier IDs that have pending scan sessions (for duplicate warning)
+        $pendingSupplierIds = DB::connection('pos')
+            ->table('deliveriesScan')
+            ->where('status', 0)
+            ->pluck('supID')
+            ->unique()
+            ->values()
+            ->toArray();
+
+        return view('delivery-legacy.index', compact('suppliers', 'scanSessions', 'scanItemCounts', 'syncedDelivery', 'pendingSupplierIds'));
     }
 
     /**
@@ -176,6 +185,7 @@ class DeliveryLegacyController extends Controller
                     b.barcode as scannedBarcode,
                     b.scanned,
                     PRODUCTS.ID as productID,
+                    PRODUCTS.NAME as dbProductName,
                     CATEGORIES.NAME as categoryName,
                     MIN(delivery.orderNumber) as orderNumber
                 FROM delivery
@@ -193,7 +203,7 @@ class DeliveryLegacyController extends Controller
                 ) b ON b.barcode = supplier_link.Barcode
                 WHERE supplier_link.SupplierID = ?
                 GROUP BY prodName, supCode, supplier_link.Barcode, rrPrice, PRICEBUY, PRICESELL,
-                         RATE, delivery.caseUnits, supplier_link.CaseUnits, b.barcode, b.scanned, UNITS, PRODUCTS.ID, CATEGORIES.NAME
+                         RATE, delivery.caseUnits, supplier_link.CaseUnits, b.barcode, b.scanned, UNITS, PRODUCTS.ID, PRODUCTS.NAME, CATEGORIES.NAME
                 ORDER BY scanned DESC, margin ASC';
 
         $results = DB::connection('pos')->select($sql, [$supplierId, $deliveryId, $supplierId]);
@@ -259,16 +269,20 @@ class DeliveryLegacyController extends Controller
                     SUM(delivery.myOrder) as myOrder,
                     MIN(delivery.cost) as cost,
                     delivery.caseUnits,
-                    MIN(delivery.orderNumber) as orderNumber
+                    MIN(delivery.orderNumber) as orderNumber,
+                    supplier_link.Barcode,
+                    PRODUCTS.NAME as dbProductName,
+                    PRODUCTS.ID as productID
                 FROM delivery
                 INNER JOIN supplier_link ON delivery.supCode = supplier_link.SupplierCode
                     AND supplier_link.SupplierID = ?
+                LEFT JOIN PRODUCTS ON supplier_link.Barcode = PRODUCTS.CODE
                 WHERE supplier_link.Barcode NOT IN (
                     SELECT barcode
                     FROM deliveriesScanItems
                     WHERE delID = ?
                 )
-                GROUP BY delivery.supCode, delivery.prodName, delivery.caseUnits
+                GROUP BY delivery.supCode, delivery.prodName, delivery.caseUnits, supplier_link.Barcode, PRODUCTS.NAME, PRODUCTS.ID
                 HAVING SUM(delivery.myOrder) > 0
                 ORDER BY delivery.prodName ASC';
 

@@ -65,75 +65,38 @@
 
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">Select Delivery to Match</h3>
+                    <h3 class="text-lg font-medium text-gray-900 mb-3">Create New Scan Session</h3>
                     <p class="text-sm text-gray-600 mb-4">
-                        Select a supplier and a scan session to compare scanned items against the supplier's invoice data.
+                        Select a supplier to start a new delivery scan session.
                     </p>
 
-                    <form action="{{ route('delivery-legacy.match') }}" method="GET" class="space-y-4">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <!-- Supplier Selection -->
-                            <div>
-                                <label for="supplierID" class="block text-sm font-medium text-gray-700">Supplier</label>
-                                <select name="supplierID" id="supplierID" required
-                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                    <option value="">-- Select Supplier --</option>
-                                    @foreach($suppliers as $supplier)
-                                        <option value="{{ $supplier->SupplierID }}">{{ $supplier->Supplier }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-
-                            <!-- Scan Session ID Selection -->
-                            <div>
-                                <label for="delID" class="block text-sm font-medium text-gray-700">Scan Session ID</label>
-                                <select name="delID" id="delID" required
-                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                    <option value="">-- Select Scan Session --</option>
-                                    @foreach($scanSessions as $session)
-                                        @php
-                                            $itemCount = $scanItemCounts[$session->ID] ?? 0;
-                                        @endphp
-                                        <option value="{{ $session->ID }}" data-supplier="{{ $session->supID }}">
-                                            #{{ $session->ID }} - {{ $session->Supplier ?? 'Supplier ' . $session->supID }} - {{ $session->dateUpload }} ({{ $itemCount }} items)
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="flex justify-end">
-                            <button type="submit"
-                                class="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-700 focus:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150">
-                                View Invoice Match
-                            </button>
-                        </div>
-                    </form>
-
-                    {{-- Create New Scan Session --}}
-                    <div class="mt-6 pt-6 border-t border-gray-200">
-                        <h4 class="text-md font-medium text-gray-900 mb-3">Or Create New Scan Session</h4>
-                        <form action="{{ route('delivery-legacy.create-session') }}" method="POST" class="flex items-end gap-4">
-                            @csrf
-                            <div class="flex-1">
-                                <label for="newSessionSupplier" class="block text-sm font-medium text-gray-700">Supplier</label>
-                                <select name="supplierID" id="newSessionSupplier" required
-                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500">
-                                    <option value="">-- Select Supplier --</option>
-                                    @foreach($suppliers as $supplier)
-                                        <option value="{{ $supplier->SupplierID }}">{{ $supplier->Supplier }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <button type="submit"
-                                class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700 focus:bg-green-700 active:bg-green-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition ease-in-out duration-150">
-                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                                </svg>
-                                Create New Session
-                            </button>
-                        </form>
+                    <div id="pendingSupplierWarning" class="hidden mb-4 bg-yellow-50 border border-yellow-300 text-yellow-800 px-4 py-3 rounded flex items-center">
+                        <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.832c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                        </svg>
+                        <span>This supplier already has a pending scan session. You can still create another if needed.</span>
                     </div>
+
+                    <form action="{{ route('delivery-legacy.create-session') }}" method="POST" class="flex items-end gap-4">
+                        @csrf
+                        <div class="flex-1">
+                            <label for="newSessionSupplier" class="block text-sm font-medium text-gray-700">Supplier</label>
+                            <select name="supplierID" id="newSessionSupplier" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500">
+                                <option value="">-- Select Supplier --</option>
+                                @foreach($suppliers as $supplier)
+                                    <option value="{{ $supplier->SupplierID }}">{{ $supplier->Supplier }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <button type="submit"
+                            class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700 focus:bg-green-700 active:bg-green-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            Create New Session
+                        </button>
+                    </form>
                 </div>
             </div>
 
@@ -224,11 +187,6 @@
                                 </div>
                                 <div class="text-xs text-gray-500 mb-2">{{ $itemCount }} items</div>
                                 <div class="flex gap-2">
-                                    <button type="button"
-                                        onclick="selectSession('{{ $session->ID }}', '{{ $session->supID }}')"
-                                        class="flex-1 py-2 px-3 text-xs font-semibold text-indigo-600 bg-indigo-50 rounded-md hover:bg-indigo-100 touch-manipulation text-center">
-                                        Select
-                                    </button>
                                     <a href="{{ route('delivery-legacy.match', ['delID' => $session->ID, 'supplierID' => $session->supID]) }}"
                                        class="flex-1 py-2 px-3 text-xs font-semibold text-green-600 bg-green-50 rounded-md hover:bg-green-100 touch-manipulation text-center">
                                         View Match
@@ -332,11 +290,6 @@
                                             @endif
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                            <button type="button"
-                                                onclick="selectSession('{{ $session->ID }}', '{{ $session->supID }}')"
-                                                class="text-indigo-600 hover:text-indigo-900 mr-3">
-                                                Select
-                                            </button>
                                             <a href="{{ route('delivery-legacy.match', ['delID' => $session->ID, 'supplierID' => $session->supID]) }}"
                                                class="text-green-600 hover:text-green-900">
                                                 View Match
@@ -403,10 +356,16 @@
 
     @push('scripts')
     <script>
-        function selectSession(sessionId, supplierId) {
-            document.getElementById('delID').value = sessionId;
-            document.getElementById('supplierID').value = supplierId;
-        }
+        const pendingSupplierIds = @json($pendingSupplierIds);
+
+        document.getElementById('newSessionSupplier').addEventListener('change', function() {
+            const warning = document.getElementById('pendingSupplierWarning');
+            if (this.value && pendingSupplierIds.includes(this.value)) {
+                warning.classList.remove('hidden');
+            } else {
+                warning.classList.add('hidden');
+            }
+        });
 
         function sessionManager() {
             return {
@@ -438,25 +397,6 @@
             };
         }
 
-        // Filter scan sessions by supplier when supplier is selected
-        document.getElementById('supplierID').addEventListener('change', function() {
-            const supplierId = this.value;
-            const delIdSelect = document.getElementById('delID');
-            const options = delIdSelect.querySelectorAll('option[data-supplier]');
-
-            options.forEach(option => {
-                if (supplierId === '' || option.dataset.supplier === supplierId) {
-                    option.style.display = '';
-                } else {
-                    option.style.display = 'none';
-                }
-            });
-
-            // Reset selection if current selection is hidden
-            if (delIdSelect.selectedOptions[0] && delIdSelect.selectedOptions[0].style.display === 'none') {
-                delIdSelect.value = '';
-            }
-        });
     </script>
     @endpush
 </x-admin-layout>
