@@ -992,6 +992,19 @@
                                 @endif
                             </div>
 
+                            {{-- Barcode display for new products --}}
+                            @if($item->is_new_product && $item->barcode)
+                                <div class="mt-1.5 flex items-center gap-1.5" id="mobile-barcode-display-{{ $item->id }}">
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">Barcode:</span>
+                                    <code class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono text-gray-900 dark:text-gray-100">{{ $item->barcode }}</code>
+                                    @if($delivery->status !== 'completed')
+                                        <button type="button"
+                                                onclick="openBarcodeScannerForItem({{ $item->id }}, {{ $delivery->id }})"
+                                                class="text-blue-600 dark:text-blue-400 text-xs underline touch-manipulation">rescan</button>
+                                    @endif
+                                </div>
+                            @endif
+
                             {{-- Actions row for new products --}}
                             @if($item->is_new_product && $delivery->status !== 'completed')
                                 <div class="mt-2 flex items-center gap-2">
@@ -2847,6 +2860,35 @@
                     if (scanBtn) scanBtn.remove();
                     const refreshBtn = document.getElementById(`refresh-btn-${itemId}`);
                     if (refreshBtn) refreshBtn.remove();
+
+                    // Update mobile barcode display
+                    const mobileScanBtn = document.getElementById(`mobile-scan-btn-${itemId}`);
+                    if (mobileScanBtn) mobileScanBtn.remove();
+                    let mobileDisplay = document.getElementById(`mobile-barcode-display-${itemId}`);
+                    if (!mobileDisplay) {
+                        // Create mobile barcode display if it didn't exist yet
+                        const itemCard = document.querySelector(`[data-item-id="${itemId}"]`);
+                        if (itemCard) {
+                            const actionsRow = itemCard.querySelector('.mt-2.flex.items-center.gap-2');
+                            const displayDiv = document.createElement('div');
+                            displayDiv.id = `mobile-barcode-display-${itemId}`;
+                            displayDiv.className = 'mt-1.5 flex items-center gap-1.5';
+                            displayDiv.innerHTML = `
+                                <span class="text-xs text-gray-500 dark:text-gray-400">Barcode:</span>
+                                <code class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono text-gray-900 dark:text-gray-100">${data.barcode}</code>
+                                <button type="button" onclick="openBarcodeScannerForItem(${itemId}, ${deliveryId})" class="text-blue-600 dark:text-blue-400 text-xs underline touch-manipulation">rescan</button>
+                            `;
+                            if (actionsRow) {
+                                actionsRow.parentNode.insertBefore(displayDiv, actionsRow);
+                            } else {
+                                itemCard.appendChild(displayDiv);
+                            }
+                        }
+                    } else {
+                        // Update existing display
+                        const codeEl = mobileDisplay.querySelector('code');
+                        if (codeEl) codeEl.textContent = data.barcode;
+                    }
 
                     statusEl.textContent = `Barcode saved: ${barcode}`;
                     statusEl.className = 'text-center text-sm text-green-600 font-semibold mb-4';
