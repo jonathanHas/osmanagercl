@@ -1072,7 +1072,7 @@ class ProductController extends Controller
             $prefillData = [
                 'name' => $deliveryItem->description,
                 'code' => $deliveryItem->barcode ?: '',
-                'price_buy' => $deliveryItem->unit_cost,
+                'price_buy' => round($deliveryItem->unit_cost, 2),
                 'supplier_id' => $deliveryItem->delivery->supplier_id,
                 'supplier_code' => $deliveryItem->supplier_code,
                 'units_per_case' => $deliveryItem->units_per_case,
