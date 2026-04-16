@@ -876,7 +876,7 @@
                 
                 {{-- Mobile Card View --}}
                 <div class="md:hidden max-h-[calc(100vh-14rem)] overflow-y-auto divide-y divide-gray-200 dark:divide-gray-700">
-                    @foreach($delivery->items as $item)
+                    @foreach($delivery->items->sortByDesc('is_new_product') as $item)
                         @php
                             $notOnDelivery = $item->ordered_quantity == 0;
                             $supplierOos = $item->ordered_quantity > 0 && $item->invoice_delivered_quantity == 0;
