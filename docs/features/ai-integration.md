@@ -35,6 +35,18 @@ Parses paper invoices photographed via phone camera. Extracts supplier, invoice 
 - **Date validation**: Flags dates > 2 months old, wrong year, or future dates
 - **VAT handling**: Only assigns VAT rates explicitly shown on invoice; warns when guessing
 
+### Invoice AI Fallback (Failed Parses)
+
+Re-routes bulk-upload invoices that the Python parsers couldn't parse (status `failed`) or parsed with low confidence / anomalies (status `review`) through the AI pipeline. Driven by a "✨ Send to AI" button on the bulk-upload preview page.
+
+- **Feature key**: `invoice_ai_fallback`
+- **Default provider**: falls through to `invoice_parsing` (Camera Capture provider) when unset; can be overridden independently at `/tools/ai-diagnostics`
+- **Processing**: Reuses `ParseInvoiceCameraImage` queue job with a `featureKey` argument
+- **PDF support**: Only when provider is `mistral-ocr` -- uses Mistral's native `document_url` endpoint, no Ghostscript/Imagick dependency. For any other provider, PDFs return a structured error pointing users to `/tools/ai-diagnostics`
+- **Image support**: All four providers work identically to Camera Capture
+- **Excluded**: Files flagged as duplicates (which keep their "Delete Duplicate" action)
+- **Data pipeline**: After AI extraction, output flows through the same `InvoiceParsingService::processParserOutput()` as every other parser -- confidence heuristics, duplicate detection, and auto-creation thresholds all apply unchanged
+
 ### Label Translation
 
 Translates foreign food labels from photos. Extracts product name, ingredients (with EU allergen formatting), nutrition, storage, and origin.
@@ -95,6 +107,12 @@ AiSettingsService::get('invoice_parsing', 'provider')
     1. Check app_settings table: key = "ai.invoice_parsing.provider"
     2. Fall back to config('invoices.ai_parsing.provider')
     3. Fall back to default value
+
+AiSettingsService::get('invoice_ai_fallback', 'provider')
+    1. Check app_settings table: key = "ai.invoice_ai_fallback.provider"
+    2. Fall through to invoice_parsing resolution (so the fallback feature
+       defaults to the Camera Capture provider until explicitly overridden)
+    3. Fall back to default value
 ```
 
 API keys always come from `.env` via `AiSettingsService::getApiKey()`, never from the database.
@@ -102,14 +120,19 @@ API keys always come from `.env` via `AiSettingsService::getApiKey()`, never fro
 ### Provider Dispatch (Invoice Parsing)
 
 ```
-InvoiceGeminiParsingService::parseImage()
+InvoiceGeminiParsingService::parseImage($file, $featureKey = 'invoice_parsing')
+    detect file type (pdf vs image)
+    if pdf && provider != 'mistral-ocr':
+        return structured error pointing to /tools/ai-diagnostics
     match provider:
-        'gemini'      -> Gemini PHP package (generativeModel)
-        'mistral'     -> HTTP POST /chat/completions with vision
-        'mistral-ocr' -> HTTP POST /ocr (text extraction)
-                         then HTTP POST /chat/completions (JSON structuring)
-        'openai'      -> HTTP POST /chat/completions with vision
+        'gemini'      -> Gemini PHP package (generativeModel)               [image only]
+        'mistral'     -> HTTP POST /chat/completions with vision             [image only]
+        'mistral-ocr' -> HTTP POST /ocr with image_url or document_url
+                         then HTTP POST /chat/completions (JSON structuring) [image + PDF]
+        'openai'      -> HTTP POST /chat/completions with vision             [image only]
 ```
+
+The same method serves both Camera Capture and the Failed-Parse Fallback -- the `$featureKey` argument selects which `app_settings` namespace to read.
 
 ### Provider Dispatch (Label Translation)
 
@@ -130,6 +153,7 @@ LabelAreaController::uploadPhoto() / uploadPhoto2()
 | POST | `/tools/ai-diagnostics/test` | `AiDiagnosticsController@testConnection` | Test API connection |
 | POST | `/tools/ai-diagnostics/settings` | `AiDiagnosticsController@saveSettings` | Save per-feature settings |
 | POST | `/invoices/bulk-upload/camera-upload` | `InvoiceBulkUploadController@cameraUpload` | Camera invoice upload |
+| POST | `/invoices/bulk-upload/{batchId}/file/{fileId}/send-to-ai` | `InvoiceBulkUploadController@sendToAi` | Send a failed / review bulk-upload file to the AI fallback parser |
 
 ## Technical Details
 

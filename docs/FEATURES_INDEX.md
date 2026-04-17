@@ -793,9 +793,10 @@ Role-based access control (RBAC) with granular permissions.
 ### AI Integration (NEW! 2026-04-11)
 Multi-provider AI integration with per-feature configuration, admin-switchable from the UI.
 - **Multi-Provider Support**: Google Gemini, Mistral Vision, Mistral OCR, OpenAI
-- **Per-Feature Configuration**: Invoice parsing and label translation can use different providers
+- **Per-Feature Configuration**: Invoice parsing, invoice AI fallback, and label translation can use different providers
 - **Admin UI**: Switch providers/models from System Tools > AI Diagnostics without server access
 - **Camera Invoice Capture**: Phone camera captures paper invoices, AI extracts data via queue jobs
+- **AI Fallback for Failed Parses** (NEW! 2026-04-17): "Send to AI" button on bulk-upload preview reroutes failed/review files through the AI pipeline; PDFs supported via Mistral OCR's native `document_url`
 - **Supplier Fuzzy Matching**: 4-layer matching algorithm (exact, substring, cleaned, word-based with Levenshtein)
 - **Date Validation**: Flags suspicious dates (> 2 months old, wrong year, future dates)
 - **VAT Safety**: Only assigns VAT rates explicitly shown on invoice

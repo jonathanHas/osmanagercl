@@ -200,6 +200,8 @@ Configuration is stored in `config/invoices.php`:
 | GET | `/invoices/bulk-upload/preview/{batchId}` | Preview uploaded files |
 | POST | `/invoices/bulk-upload/{batchId}/cancel` | Cancel a batch |
 | DELETE | `/invoices/bulk-upload/{batchId}/file/{fileId}` | Remove a file from batch |
+| POST | `/invoices/bulk-upload/{batchId}/file/{fileId}/retry` | Re-run the Python parsers on a failed file |
+| POST | `/invoices/bulk-upload/{batchId}/file/{fileId}/send-to-ai` | Send a failed / review file to the AI fallback parser (uses `invoice_ai_fallback` provider from `/tools/ai-diagnostics`; PDFs require Mistral OCR). See [AI Integration: Invoice AI Fallback](./ai-integration.md#invoice-ai-fallback-failed-parses) |
 
 ## File Storage
 

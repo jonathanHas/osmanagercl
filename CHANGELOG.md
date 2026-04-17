@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **✨ Invoice Bulk Upload: AI Fallback for Failed / Review Parses** (2026-04-17)
+  - New "Send to AI" button on bulk-upload preview for files that Python parsers fail on or route to `review` with low confidence
+  - Routes the file through the same AI pipeline used by Camera Capture (`InvoiceGeminiParsingService` + `ParseInvoiceCameraImage` job)
+  - **PDF support**: Mistral OCR's native `document_url` endpoint is used for PDF invoices (no Ghostscript dependency); non-OCR providers return a clear error pointing to `/tools/ai-diagnostics`
+  - **New AI feature key**: `invoice_ai_fallback` -- selectable independently of Camera Capture at `/tools/ai-diagnostics`, defaults to the Camera Capture provider when unset
+  - Button visible on `failed` files and on `review` files (except duplicates, which keep their "Delete Duplicate" action); present in both the card and table preview layouts
+  - New route: `POST /invoices/bulk-upload/{batchId}/file/{fileId}/send-to-ai`
+  - **Modified**: `app/Services/AiSettingsService.php`, `app/Services/InvoiceGeminiParsingService.php`, `app/Jobs/ParseInvoiceCameraImage.php`, `app/Http/Controllers/InvoiceBulkUploadController.php`, `routes/web.php`, `resources/views/invoices/bulk-upload-preview.blade.php`
+
 - **📦 Product Page Consolidation: Show Merged into Edit** (2026-04-16)
   - Product show page (`/products/{id}`) now redirects to edit page (`/products/{id}/edit`)
   - **Quick Stats Bar** added to edit page: Stock Level with inline edit, Stocking Status toggle (AJAX), Min Stock Override (Alpine.js editor, admin/manager), VAT Rate badge
