@@ -749,6 +749,85 @@ class InvoiceBulkUploadController extends Controller
     }
 
     /**
+     * Send a failed file to the AI fallback parser.
+     *
+     * Uses the 'invoice_ai_fallback' AI settings (which default to the
+     * Camera Capture provider but can be overridden at /tools/ai-diagnostics).
+     */
+    public function sendToAi($batchId, $fileId)
+    {
+        $batch = InvoiceBulkUpload::where('batch_id', $batchId)
+            ->where('user_id', auth()->id())
+            ->firstOrFail();
+
+        $file = InvoiceUploadFile::where('id', $fileId)
+            ->where('bulk_upload_id', $batch->id)
+            ->firstOrFail();
+
+        if (! in_array($file->status, ['failed', 'review'], true)) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Only failed or review files can be sent to AI. Current status: '.$file->status,
+            ], 400);
+        }
+
+        if ($file->status === 'review'
+            && $file->error_message
+            && str_contains(strtolower($file->error_message), 'duplicate')
+        ) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Duplicate files cannot be sent to AI.',
+            ], 400);
+        }
+
+        try {
+            $file->status = 'uploaded';
+            $file->error_message = null;
+            $file->parsing_errors = null;
+            $file->parsing_confidence = null;
+            $file->anomaly_warnings = null;
+            $file->supplier_detected = null;
+            $file->parsed_data = null;
+            $file->parsed_invoice_date = null;
+            $file->parsed_invoice_number = null;
+            $file->parsed_total_amount = null;
+            $file->parsed_vat_data = null;
+            $file->is_tax_free = false;
+            $file->is_credit_note = false;
+            $file->parsing_source = 'gemini';
+            $file->save();
+
+            ParseInvoiceCameraImage::dispatch($file, 'invoice_ai_fallback');
+
+            Log::info('File sent to AI fallback parser', [
+                'file_id' => $file->id,
+                'filename' => $file->original_filename,
+                'batch_id' => $batch->batch_id,
+                'sent_by' => auth()->id(),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'File sent to AI parser. The page will refresh automatically to show progress.',
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to send file to AI', [
+                'file_id' => $file->id,
+                'error' => $e->getMessage(),
+                'batch_id' => $batch->batch_id,
+                'user_id' => auth()->id(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to send to AI: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Display embedded file viewer page.
      */
     public function fileViewer($batchId, $fileId)

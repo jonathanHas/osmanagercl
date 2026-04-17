@@ -22,9 +22,12 @@ class ParseInvoiceCameraImage implements ShouldQueue
 
     protected $file;
 
-    public function __construct(InvoiceUploadFile $file)
+    protected string $featureKey;
+
+    public function __construct(InvoiceUploadFile $file, string $featureKey = 'invoice_parsing')
     {
         $this->file = $file;
+        $this->featureKey = $featureKey;
 
         $queueName = config('invoices.parsing.queue_name');
         if ($queueName) {
@@ -39,11 +42,12 @@ class ParseInvoiceCameraImage implements ShouldQueue
                 'file_id' => $this->file->id,
                 'filename' => $this->file->original_filename,
                 'batch_id' => $this->file->bulk_upload_id,
+                'feature_key' => $this->featureKey,
             ]);
 
             $this->file->markAsParsing();
 
-            $result = $geminiParser->parseImage($this->file);
+            $result = $geminiParser->parseImage($this->file, $this->featureKey);
 
             $parser->processParserOutput($this->file, $result);
 

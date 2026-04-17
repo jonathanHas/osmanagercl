@@ -13,31 +13,57 @@ use Illuminate\Support\Facades\Log;
 class InvoiceGeminiParsingService
 {
     /**
-     * Parse an invoice image using the configured AI provider.
+     * Parse an invoice file (image or PDF) using the configured AI provider.
      *
      * Returns data in the same format as the Python parser output
      * so it can be fed into InvoiceParsingService::processParserOutput().
+     *
+     * $featureKey selects which AI feature's settings to read --
+     * 'invoice_parsing' (Camera Capture) or 'invoice_ai_fallback' (failed-parse retry).
+     *
+     * PDFs are only supported when provider = 'mistral-ocr' (native document_url).
      */
-    public function parseImage(InvoiceUploadFile $file): array
+    public function parseImage(InvoiceUploadFile $file, string $featureKey = 'invoice_parsing'): array
     {
-        $imageData = $this->prepareImage($file);
+        $fullPath = $file->temp_file_path;
 
-        if (! $imageData) {
+        if (! $fullPath || ! file_exists($fullPath)) {
             return [
                 'success' => false,
-                'errors' => [['message' => 'Could not read or process the invoice image.']],
+                'errors' => [['message' => 'Could not read the invoice file.']],
             ];
         }
 
+        $isPdf = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION)) === 'pdf';
+        $provider = AiSettingsService::get($featureKey, 'provider', 'mistral-ocr');
+
+        if ($isPdf && $provider !== 'mistral-ocr') {
+            return [
+                'success' => false,
+                'errors' => [['message' => 'PDF AI fallback requires Mistral OCR. Configure it at /tools/ai-diagnostics.']],
+            ];
+        }
+
+        if ($isPdf) {
+            $fileData = base64_encode(file_get_contents($fullPath));
+        } else {
+            $fileData = $this->prepareImage($file, $featureKey);
+            if (! $fileData) {
+                return [
+                    'success' => false,
+                    'errors' => [['message' => 'Could not read or process the invoice image.']],
+                ];
+            }
+        }
+
         $knownSuppliers = $this->getKnownSupplierNames();
-        $provider = AiSettingsService::get('invoice_parsing', 'provider', 'mistral-ocr');
 
         try {
             $text = match ($provider) {
-                'gemini' => $this->callGemini($imageData, $knownSuppliers),
-                'mistral' => $this->callMistralVision($imageData, $knownSuppliers),
-                'mistral-ocr' => $this->callMistralOcr($imageData, $knownSuppliers),
-                'openai' => $this->callOpenAiCompatible($imageData, $knownSuppliers),
+                'gemini' => $this->callGemini($fileData, $knownSuppliers, $featureKey),
+                'mistral' => $this->callMistralVision($fileData, $knownSuppliers, $featureKey),
+                'mistral-ocr' => $this->callMistralOcr($fileData, $knownSuppliers, $featureKey, $isPdf),
+                'openai' => $this->callOpenAiCompatible($fileData, $knownSuppliers, $featureKey),
                 default => throw new \Exception("Unknown AI provider: {$provider}"),
             };
 
@@ -61,12 +87,13 @@ class InvoiceGeminiParsingService
                 ];
             }
 
-            return $this->formatOutput($data, $knownSuppliers, $provider);
+            return $this->formatOutput($data, $knownSuppliers, $provider, $featureKey);
 
         } catch (\Exception $e) {
             Log::error('AI invoice parsing failed', [
                 'file_id' => $file->id,
                 'provider' => $provider,
+                'feature_key' => $featureKey,
                 'error' => $e->getMessage(),
             ]);
 
@@ -79,9 +106,9 @@ class InvoiceGeminiParsingService
     /**
      * Google Gemini via the google-gemini-php/laravel package.
      */
-    protected function callGemini(string $imageBase64, array $knownSuppliers): string
+    protected function callGemini(string $imageBase64, array $knownSuppliers, string $featureKey = 'invoice_parsing'): string
     {
-        $model = AiSettingsService::get('invoice_parsing', 'model', 'gemini-2.5-flash');
+        $model = AiSettingsService::get($featureKey, 'model', 'gemini-2.5-flash');
 
         $contents = [
             $this->buildPrompt($knownSuppliers),
@@ -96,30 +123,32 @@ class InvoiceGeminiParsingService
     /**
      * Mistral vision via chat/completions (pixtral models).
      */
-    protected function callMistralVision(string $imageBase64, array $knownSuppliers): string
+    protected function callMistralVision(string $imageBase64, array $knownSuppliers, string $featureKey = 'invoice_parsing'): string
     {
-        return $this->callChatCompletions($imageBase64, $knownSuppliers);
+        return $this->callChatCompletions($imageBase64, $knownSuppliers, $featureKey);
     }
 
     /**
      * Mistral OCR: two-step -- OCR extracts text, then chat model structures it.
+     * Handles both images and PDFs natively via document_url.
      */
-    protected function callMistralOcr(string $imageBase64, array $knownSuppliers): string
+    protected function callMistralOcr(string $fileBase64, array $knownSuppliers, string $featureKey = 'invoice_parsing', bool $isPdf = false): string
     {
-        $apiKey = AiSettingsService::getApiKey('invoice_parsing');
-        $baseUrl = AiSettingsService::get('invoice_parsing', 'base_url', 'https://api.mistral.ai/v1');
-        $timeout = (int) AiSettingsService::get('invoice_parsing', 'timeout', 120);
+        $apiKey = AiSettingsService::getApiKey($featureKey);
+        $baseUrl = AiSettingsService::get($featureKey, 'base_url', 'https://api.mistral.ai/v1');
+        $timeout = (int) AiSettingsService::get($featureKey, 'timeout', 120);
 
-        // Step 1: OCR -- extract text from image
+        $document = $isPdf
+            ? ['type' => 'document_url', 'document_url' => 'data:application/pdf;base64,'.$fileBase64]
+            : ['type' => 'image_url', 'image_url' => 'data:image/jpeg;base64,'.$fileBase64];
+
+        // Step 1: OCR -- extract text from image or PDF
         $ocrResponse = Http::withHeaders([
             'Authorization' => 'Bearer '.$apiKey,
             'Content-Type' => 'application/json',
         ])->timeout($timeout)->post($baseUrl.'/ocr', [
             'model' => 'mistral-ocr-latest',
-            'document' => [
-                'type' => 'image_url',
-                'image_url' => 'data:image/jpeg;base64,'.$imageBase64,
-            ],
+            'document' => $document,
         ]);
 
         if (! $ocrResponse->successful()) {
@@ -138,10 +167,11 @@ class InvoiceGeminiParsingService
         Log::info('Mistral OCR text extracted', [
             'pages' => count($pages),
             'text_length' => strlen($ocrText),
+            'is_pdf' => $isPdf,
         ]);
 
         // Step 2: Send extracted text to chat model for structured JSON extraction
-        $chatModel = AiSettingsService::get('invoice_parsing', 'ocr_chat_model', 'mistral-small-latest');
+        $chatModel = AiSettingsService::get($featureKey, 'ocr_chat_model', 'mistral-small-latest');
 
         $chatResponse = Http::withHeaders([
             'Authorization' => 'Bearer '.$apiKey,
@@ -171,20 +201,20 @@ class InvoiceGeminiParsingService
     /**
      * OpenAI-compatible chat/completions with vision (works for Mistral, OpenAI, etc).
      */
-    protected function callOpenAiCompatible(string $imageBase64, array $knownSuppliers): string
+    protected function callOpenAiCompatible(string $imageBase64, array $knownSuppliers, string $featureKey = 'invoice_parsing'): string
     {
-        return $this->callChatCompletions($imageBase64, $knownSuppliers);
+        return $this->callChatCompletions($imageBase64, $knownSuppliers, $featureKey);
     }
 
     /**
      * Shared: OpenAI-compatible chat/completions with vision.
      */
-    protected function callChatCompletions(string $imageBase64, array $knownSuppliers): string
+    protected function callChatCompletions(string $imageBase64, array $knownSuppliers, string $featureKey = 'invoice_parsing'): string
     {
-        $apiKey = AiSettingsService::getApiKey('invoice_parsing');
-        $model = AiSettingsService::get('invoice_parsing', 'model', 'mistral-small-latest');
-        $baseUrl = AiSettingsService::get('invoice_parsing', 'base_url', 'https://api.mistral.ai/v1');
-        $timeout = (int) AiSettingsService::get('invoice_parsing', 'timeout', 120);
+        $apiKey = AiSettingsService::getApiKey($featureKey);
+        $model = AiSettingsService::get($featureKey, 'model', 'mistral-small-latest');
+        $baseUrl = AiSettingsService::get($featureKey, 'base_url', 'https://api.mistral.ai/v1');
+        $timeout = (int) AiSettingsService::get($featureKey, 'timeout', 120);
 
         $response = Http::withHeaders([
             'Authorization' => 'Bearer '.$apiKey,
@@ -217,7 +247,7 @@ class InvoiceGeminiParsingService
 
     // ─── Image Processing ────────────────────────────────────────────
 
-    protected function prepareImage(InvoiceUploadFile $file): ?string
+    protected function prepareImage(InvoiceUploadFile $file, string $featureKey = 'invoice_parsing'): ?string
     {
         $fullPath = $file->temp_file_path;
 
@@ -233,7 +263,7 @@ class InvoiceGeminiParsingService
 
         $origW = imagesx($img);
         $origH = imagesy($img);
-        $maxDim = (int) AiSettingsService::get('invoice_parsing', 'max_image_dimension', 1200);
+        $maxDim = (int) AiSettingsService::get($featureKey, 'max_image_dimension', 1200);
 
         if (max($origW, $origH) > $maxDim) {
             $scale = $maxDim / max($origW, $origH);
@@ -245,7 +275,7 @@ class InvoiceGeminiParsingService
             $img = $resized;
         }
 
-        $quality = (int) AiSettingsService::get('invoice_parsing', 'jpeg_quality', 80);
+        $quality = (int) AiSettingsService::get($featureKey, 'jpeg_quality', 80);
         ob_start();
         imagejpeg($img, null, $quality);
         $encoded = base64_encode(ob_get_clean());
@@ -448,7 +478,7 @@ class InvoiceGeminiParsingService
         }));
     }
 
-    protected function formatOutput(array $data, array $knownSuppliers, string $provider): array
+    protected function formatOutput(array $data, array $knownSuppliers, string $provider, string $featureKey = 'invoice_parsing'): array
     {
         $warnings = $data['warnings'] ?? [];
 
@@ -516,7 +546,7 @@ class InvoiceGeminiParsingService
         }
         $confidence = max(0.10, min(1.0, $confidence));
 
-        $model = AiSettingsService::get('invoice_parsing', 'model', 'unknown');
+        $model = AiSettingsService::get($featureKey, 'model', 'unknown');
 
         return [
             'success' => true,

@@ -419,6 +419,13 @@
                                 Delete Duplicate
                             </button>
                             @endif
+                            @if($file->status === 'failed' || ($file->status === 'review' && !(strtolower((string) $file->error_message) && str_contains(strtolower((string) $file->error_message), 'duplicate'))))
+                            <button onclick="sendToAi({{ $file->id }})"
+                                    class="px-3 py-1.5 text-xs rounded bg-indigo-700 text-indigo-100 hover:bg-indigo-600"
+                                    title="Send to the configured AI parser (see /tools/ai-diagnostics)">
+                                ✨ Send to AI
+                            </button>
+                            @endif
                             @if($file->status === 'parsed' || $file->status === 'review')
                             <button onclick="viewParsedData({{ $file->id }})"
                                     class="px-3 py-1.5 text-xs rounded bg-gray-600 text-green-400 hover:bg-gray-500">
@@ -884,9 +891,16 @@
                                         Remove
                                     </button>
                                     @elseif($file->status === 'review' && $file->error_message && str_contains(strtolower($file->error_message), 'duplicate'))
-                                    <button onclick="removeDuplicateFile({{ $file->id }})" 
+                                    <button onclick="removeDuplicateFile({{ $file->id }})"
                                             class="text-yellow-400 hover:text-yellow-300 text-sm">
                                         Delete Duplicate
+                                    </button>
+                                    @endif
+                                    @if($file->status === 'failed' || ($file->status === 'review' && !(strtolower((string) $file->error_message) && str_contains(strtolower((string) $file->error_message), 'duplicate'))))
+                                    <button onclick="sendToAi({{ $file->id }})"
+                                            class="text-indigo-400 hover:text-indigo-300 text-sm ml-2"
+                                            title="Send to the configured AI parser (see /tools/ai-diagnostics)">
+                                        ✨ Send to AI
                                     </button>
                                     @endif
                                     @if($file->error_message)
@@ -1447,6 +1461,31 @@
                 .catch(error => {
                     console.error('Error:', error);
                     alert('An error occurred while retrying the file');
+                });
+            }
+        }
+
+        function sendToAi(fileId) {
+            if (confirm('Send this failed invoice to the configured AI parser?\n\nThis uses the provider set under "Invoice AI Fallback" at /tools/ai-diagnostics (defaults to the Camera Capture provider).\n\nNote: PDFs require Mistral OCR.')) {
+                fetch(`/invoices/bulk-upload/${batchId}/file/${fileId}/send-to-ai`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message || 'File sent to AI parser');
+                        window.location.reload();
+                    } else {
+                        alert(data.error || 'Failed to send file to AI');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while sending the file to AI');
                 });
             }
         }

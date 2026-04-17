@@ -169,6 +169,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/{batchId}/file/{fileId}/view', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'viewFile'])->name('view-file');
         Route::delete('/{batchId}/file/{fileId}', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'deleteFile'])->name('delete-file');
         Route::post('/{batchId}/file/{fileId}/retry', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'retryFile'])->name('retry-file');
+        Route::post('/{batchId}/file/{fileId}/send-to-ai', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'sendToAi'])->name('send-to-ai');
         Route::get('/{batchId}/file/{fileId}/thumbnails', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'getThumbnails'])->name('get-thumbnails');
         Route::post('/{batchId}/file/{fileId}/split', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'splitPdf'])->name('split-pdf');
         Route::put('/{batchId}/file/{fileId}/parsed-data', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'updateParsedData'])->name('update-parsed-data');

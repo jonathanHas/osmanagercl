@@ -12,6 +12,9 @@ class AiSettingsService
      * Reads from app_settings table key "ai.{feature}.{key}".
      * Falls back to config('invoices.ai_parsing.{key}') for invoice_parsing,
      * or config('gemini.{key}') for label_translation, then to $default.
+     *
+     * The 'invoice_ai_fallback' feature falls through to 'invoice_parsing' when unset,
+     * so by default it mirrors the Camera Capture provider but can be overridden.
      */
     public static function get(string $feature, string $key, mixed $default = null): mixed
     {
@@ -21,6 +24,11 @@ class AiSettingsService
 
         if ($row && $row->value !== null && $row->value !== '') {
             return $row->value;
+        }
+
+        // invoice_ai_fallback inherits from invoice_parsing when not explicitly set.
+        if ($feature === 'invoice_ai_fallback') {
+            return self::get('invoice_parsing', $key, $default);
         }
 
         // Fall back to config
@@ -97,6 +105,13 @@ class AiSettingsService
                 'base_url' => 'https://api.mistral.ai/v1',
                 'timeout' => '120',
             ],
+            'invoice_ai_fallback' => [
+                'provider' => 'mistral-ocr',
+                'model' => 'mistral-small-latest',
+                'ocr_chat_model' => 'mistral-small-latest',
+                'base_url' => 'https://api.mistral.ai/v1',
+                'timeout' => '120',
+            ],
             'label_translation' => [
                 'provider' => 'gemini',
                 'model' => 'gemini-2.5-flash',
@@ -143,6 +158,7 @@ class AiSettingsService
     {
         return [
             'invoice_parsing' => 'Invoice Parsing (Camera Capture)',
+            'invoice_ai_fallback' => 'Invoice AI Fallback (Failed Parses)',
             'label_translation' => 'Label Translation',
         ];
     }
