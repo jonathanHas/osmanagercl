@@ -279,24 +279,9 @@ class AccountingSuppliersController extends Controller
                 'data' => $validated,
             ]);
 
-            $errorMessage = 'Failed to create supplier.';
-
-            // Provide more specific error messages
-            if (str_contains($e->getMessage(), 'payment_terms_days')) {
-                $errorMessage .= ' Payment terms issue detected.';
-            } elseif (str_contains($e->getMessage(), 'Duplicate entry')) {
-                $errorMessage .= ' This supplier code already exists.';
-            } elseif (str_contains($e->getMessage(), 'code')) {
-                $errorMessage .= ' Supplier code issue detected.';
-            } elseif (str_contains($e->getMessage(), 'connection')) {
-                $errorMessage .= ' Database connection issue.';
-            } elseif (str_contains($e->getMessage(), 'POS')) {
-                $errorMessage .= ' POS system connection issue.';
-            }
-
             return back()
                 ->withInput()
-                ->with('error', $errorMessage.' Please try again.');
+                ->with('error', 'Failed to create supplier. '.$this->describeDbError($e).' Please try again.');
         }
     }
 
@@ -437,24 +422,9 @@ class AccountingSuppliersController extends Controller
                 'data' => $validated,
             ]);
 
-            $errorMessage = 'Failed to update supplier.';
-
-            // Provide more specific error messages
-            if (str_contains($e->getMessage(), 'payment_terms_days')) {
-                $errorMessage .= ' Payment terms issue detected.';
-            } elseif (str_contains($e->getMessage(), 'Duplicate entry')) {
-                $errorMessage .= ' This supplier code already exists.';
-            } elseif (str_contains($e->getMessage(), 'code')) {
-                $errorMessage .= ' Supplier code issue detected.';
-            } elseif (str_contains($e->getMessage(), 'connection')) {
-                $errorMessage .= ' Database connection issue.';
-            } elseif (str_contains($e->getMessage(), 'POS')) {
-                $errorMessage .= ' POS system connection issue.';
-            }
-
             return back()
                 ->withInput()
-                ->with('error', $errorMessage.' Please try again.');
+                ->with('error', 'Failed to update supplier. '.$this->describeDbError($e).' Please try again.');
         }
     }
 
@@ -661,6 +631,41 @@ class AccountingSuppliersController extends Controller
                 'message' => 'Failed to update RTD classification. Please try again.',
             ], 422);
         }
+    }
+
+    /**
+     * Translate a DB exception into a short, user-facing explanation.
+     */
+    private function describeDbError(\Throwable $e): string
+    {
+        $raw = (string) $e->getMessage();
+        $message = explode(' (Connection:', $raw, 2)[0];
+
+        if (preg_match("/Duplicate entry '[^']*' for key '([^']+)'/", $message, $m)) {
+            if (str_contains($m[1], 'code')) {
+                return 'This supplier code already exists.';
+            }
+
+            return 'A duplicate value was detected.';
+        }
+
+        if (preg_match("/Data truncated for column '([^']+)'/", $message, $m)) {
+            return "Invalid value for '{$m[1]}' — not one of the allowed options.";
+        }
+
+        if (preg_match("/Column '([^']+)' cannot be null/", $message, $m)) {
+            return "The field '{$m[1]}' is required.";
+        }
+
+        if (preg_match("/Field '([^']+)' doesn't have a default value/", $message, $m)) {
+            return "The field '{$m[1]}' is required.";
+        }
+
+        if (str_contains($message, 'SQLSTATE[HY000] [2002]') || str_contains($message, 'could not find driver')) {
+            return 'Database connection issue.';
+        }
+
+        return app()->environment('local') ? $message : 'A database error occurred.';
     }
 
     /**
