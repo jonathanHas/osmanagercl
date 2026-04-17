@@ -392,4 +392,8 @@
             };
         }
     </script>
+
+    @push('scripts')
+        @vite(['resources/js/barcode-scanner.js'])
+    @endpush
 </x-admin-layout>
