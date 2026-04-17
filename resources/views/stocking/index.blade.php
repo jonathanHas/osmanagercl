@@ -156,10 +156,12 @@
                     cameraStatus: '',
                     lastScannedBarcode: '',
                     lastScanTime: 0,
+                    cameraWasActive: false,
                 },
 
                 toggleScannerCamera() {
                     if (this.scanner.cameraActive) {
+                        this.scanner.cameraWasActive = false;
                         this.stopScannerCamera();
                         return;
                     }
@@ -177,6 +179,7 @@
                             (error) => {}
                         ).then(() => {
                             this.scanner.cameraActive = true;
+                            this.scanner.cameraWasActive = true;
                             this.scanner.cameraStatus = 'Point camera at barcode';
                         }).catch((err) => {
                             this.scanner.cameraStatus = 'Camera error: ' + (err.message || err);
@@ -192,6 +195,12 @@
                     this.scanner.cameraActive = false;
                     this.scanner.cameraVisible = false;
                     this.scanner.cameraStatus = '';
+                },
+
+                restartCameraIfActive() {
+                    if (this.scanner.cameraWasActive && !this.scanner.cameraActive) {
+                        this.$nextTick(() => this.toggleScannerCamera());
+                    }
                 },
 
                 parseBarcode(raw) {
@@ -301,6 +310,7 @@
                             this.feedbackSuccess = true;
                             // Update history entry
                             this.updateHistoryStock(this.currentProduct.product.code, data.stock);
+                            this.restartCameraIfActive();
                         } else {
                             this.feedback = data.message || 'Failed to update stock';
                             this.feedbackSuccess = false;
@@ -340,6 +350,7 @@
                         if (data.success) {
                             this.feedback = 'Added to label queue';
                             this.feedbackSuccess = true;
+                            this.restartCameraIfActive();
                         } else {
                             this.feedback = data.message || 'Failed to add to labels';
                             this.feedbackSuccess = false;

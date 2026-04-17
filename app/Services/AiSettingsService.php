@@ -86,9 +86,9 @@ class AiSettingsService
 
         return match (true) {
             str_starts_with($provider, 'gemini') => config('gemini.api_key') ?: env('GEMINI_API_KEY'),
-            str_starts_with($provider, 'mistral') => env('MISTRAL_API_KEY'),
-            $provider === 'openai' => env('OPENAI_API_KEY'),
-            default => env('MISTRAL_API_KEY'),
+            str_starts_with($provider, 'mistral') => config('invoices.ai_parsing.api_key') ?: env('MISTRAL_API_KEY'),
+            $provider === 'openai' => config('invoices.ai_parsing.api_key') ?: env('OPENAI_API_KEY'),
+            default => config('invoices.ai_parsing.api_key') ?: env('MISTRAL_API_KEY'),
         };
     }
 
