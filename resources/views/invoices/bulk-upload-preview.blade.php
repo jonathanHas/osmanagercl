@@ -7,7 +7,10 @@
                     <h2 class="text-2xl font-bold text-gray-100">Amazon Payment Entry</h2>
                     <p class="text-gray-400 text-sm mt-1">Enter EUR payment amounts for Amazon invoices • Batch ID: {{ $batch->batch_id }}</p>
                 @else
-                    <h2 class="text-2xl font-bold text-gray-100">Upload Preview</h2>
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <h2 class="text-2xl font-bold text-gray-100">Upload Preview</h2>
+                        <x-ai-provider-badge feature="invoice_ai_fallback" label="AI Fallback" />
+                    </div>
                     <p class="text-gray-400 text-sm mt-1">Batch ID: {{ $batch->batch_id }}</p>
                 @endif
             </div>

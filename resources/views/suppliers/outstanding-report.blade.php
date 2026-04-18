@@ -275,7 +275,14 @@
                                                         </div>
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                        <a href="{{ route('invoices.show', $invoice) }}"
+                                                        @php
+                                                            $viewAttachment = $invoice->attachments->firstWhere('is_primary', true) ?? $invoice->attachments->first();
+                                                            $viewUrl = $viewAttachment
+                                                                ? route('invoices.attachments.viewer-minimal', $viewAttachment)
+                                                                : route('invoices.show', $invoice);
+                                                        @endphp
+                                                        <a href="{{ $viewUrl }}"
+                                                           @if($viewAttachment) onclick="return openInvoicePopup(event, this.href)" @endif
                                                            class="{{ $isOutstanding ? 'text-blue-600 hover:text-blue-900' : 'text-green-700 hover:text-green-900' }}">
                                                             View Invoice
                                                         </a>
@@ -444,6 +451,17 @@
 
     @push('scripts')
     <script>
+        function openInvoicePopup(event, url) {
+            event.preventDefault();
+            const width = Math.min(1100, window.screen.availWidth - 100);
+            const height = Math.min(900, window.screen.availHeight - 100);
+            const left = Math.max(0, (window.screen.availWidth - width) / 2);
+            const top = Math.max(0, (window.screen.availHeight - height) / 2);
+            const features = `popup=yes,width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`;
+            window.open(url, 'invoiceViewer_' + Date.now(), features);
+            return false;
+        }
+
         let selectedInvoices = new Map();
         
         document.addEventListener('DOMContentLoaded', function() {

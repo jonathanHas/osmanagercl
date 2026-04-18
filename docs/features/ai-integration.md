@@ -81,7 +81,19 @@ Navigate to **System Tools > AI Diagnostics** (`/tools/ai-diagnostics`) to:
 2. **Test connections** -- text, vision, and OCR tests with response time
 3. **View recent errors** -- filtered AI-related log entries
 
+**Access control**: The diagnostics page and its sub-routes are restricted to the `admin` role via `role:admin` middleware. The sidebar entry is hidden for non-admins.
+
 Settings are stored in the `app_settings` table with keys like `ai.invoice_parsing.provider`. Changes automatically restart queue workers.
+
+### Visible Provider Badge
+
+Every page that consumes an AI feature renders a small pill-shaped badge next to its title showing the currently configured provider (e.g. "AI: Mistral OCR", "AI: Google Gemini"). Hover reveals the model. The badge is a non-clickable `<span>` -- non-admins see the badge but have no link into the diagnostics page.
+
+Implemented by `resources/views/components/ai-provider-badge.blade.php`. Used in:
+
+- `resources/views/invoices/bulk-upload.blade.php` -- feature `invoice_parsing`
+- `resources/views/invoices/bulk-upload-preview.blade.php` -- feature `invoice_ai_fallback`, labelled "AI Fallback"
+- `resources/views/labels/translate.blade.php` -- feature `label_translation`, `variant="light"` for the light-themed header
 
 ### Config File Defaults
 
@@ -116,6 +128,16 @@ AiSettingsService::get('invoice_ai_fallback', 'provider')
 ```
 
 API keys always come from `.env` via `AiSettingsService::getApiKey()`, never from the database.
+
+**Config-cache-safe key resolution** (important for production): Each provider branch in `getApiKey()` reads the config repository *first*, then falls back to `env()`:
+
+```php
+'gemini'      => config('gemini.api_key')           ?: env('GEMINI_API_KEY'),
+'mistral*'    => config('invoices.ai_parsing.api_key') ?: env('MISTRAL_API_KEY'),
+'openai'      => config('invoices.ai_parsing.api_key') ?: env('OPENAI_API_KEY'),
+```
+
+This matters because once `php artisan config:cache` runs (standard on production deploys), Laravel unsets the Dotenv variables and `env()` returns `null` outside `config/*.php` files. Reading through `config(...)` keeps the key available because `config/invoices.php` and `config/gemini.php` baked the env values into the cached config.
 
 ### Provider Dispatch (Invoice Parsing)
 
@@ -173,8 +195,9 @@ LabelAreaController::uploadPhoto() / uploadPhoto2()
 - `app/Jobs/ParseInvoiceCameraImage.php` -- Queue job for AI invoice parsing
 
 **Views:**
-- `resources/views/tools/ai-diagnostics.blade.php` -- Diagnostics UI with per-feature settings
+- `resources/views/tools/ai-diagnostics.blade.php` -- Diagnostics UI with per-feature settings (admin-only route)
 - `resources/views/invoices/bulk-upload.blade.php` -- Camera capture tab on bulk upload page
+- `resources/views/components/ai-provider-badge.blade.php` -- Reusable provider indicator pill shown next to AI-feature page titles
 
 **Config:**
 - `config/invoices.php` -- `ai_parsing` section with defaults

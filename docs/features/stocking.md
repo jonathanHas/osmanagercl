@@ -35,6 +35,14 @@ The Stocking Scanner is a mobile-first tool designed for use in the store room. 
 - Tap the keyboard icon to enable manual entry
 - Button highlights blue when keyboard mode is enabled
 
+### Camera Scanning (2026-04-17)
+- Green camera button next to the barcode input opens a live camera viewport (`html5-qrcode`)
+- Detected barcodes auto-trigger the product lookup (no button press needed)
+- Audio beep + haptic vibration on successful detection; 2-second duplicate cooldown
+- GS1-128 barcodes are parsed to extract the GTIN-14 (AI `01` segment)
+- **Persistent mode**: Once enabled, the camera auto-restarts after a successful **Update Stock** or **Add to Labels**, allowing continuous scan → adjust → scan loops without touching the camera button. Pressing the red camera button disables this until re-enabled.
+- Requires HTTPS (browser restriction for `getUserMedia`)
+
 ### Scan History
 - Last 10 scanned products are saved locally (localStorage)
 - Shows product name and stock level

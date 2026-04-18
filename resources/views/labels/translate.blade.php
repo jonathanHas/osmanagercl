@@ -1,7 +1,10 @@
 <x-admin-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">Label Translation</h2>
+            <div class="flex items-center gap-3">
+                <h2 class="font-semibold text-xl text-gray-800 leading-tight">Label Translation</h2>
+                <x-ai-provider-badge feature="label_translation" label="AI" variant="light" />
+            </div>
             @if (request()->input('from') === 'zebra')
                 <a href="{{ route('labels.zebra', ['view' => 'translations']) }}" class="px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-200 transition">Back to Translated Labels</a>
             @else

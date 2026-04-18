@@ -45,6 +45,7 @@ Create linked product copies when suppliers change packaging barcodes.
 - **Complete Data Copy**: All product details, stocking, till visibility inherited
 - **Name Uniqueness**: Auto-appends `[alt]` suffix (editable after creation)
 - **Expandable UI**: Minimal footprint panel at bottom of edit page
+- **Camera Scanning** (NEW! 2026-04-17): Green camera button next to the "New Barcode" input fills the field from a live phone-camera scan; auto-stops when the panel is collapsed (HTTPS required)
 
 📖 [Product Management Documentation](./features/product-management.md#alternate-barcode-feature-2026-01)
 
@@ -190,6 +191,7 @@ Mobile-first store room scanner for checking stock levels and managing inventory
 - **Add to Label Queue**: Quick button to add scanned products to the label print queue
 - **Audit Trail**: All adjustments logged with user, timestamp, and old/new values
 - **Keyboard Toggle**: Button to show/hide mobile keyboard (scanner mode vs manual entry)
+- **Camera Scanning with Persistent Mode** (NEW! 2026-04-17): Live phone-camera barcode scanning via `html5-qrcode`; camera auto-restarts after each stock update so users can scan continuously without pressing the button (HTTPS required)
 - **Scan History**: Recent scans stored locally for quick reference
 - **Mobile-Optimized**: Large touch targets, minimal UI, designed for handheld scanners
 
@@ -591,6 +593,7 @@ Secure file management for invoice attachments with missing file detection.
 Comprehensive supplier payment management with bulk processing and status synchronization.
 - **Enhanced Payment Date Sorting**: Smart toggle between payment status and payment date sorting - click "Status/Paid On" column to sort by payment date (most recent first)
 - **Outstanding Report Bulk Payments**: NEW! Mark invoices as paid directly from outstanding report with collapsible supplier sections, alphabetical ordering, and sticky bulk actions bar
+- **Outstanding Report Pop-out Viewer** (2026-04-17): "View Invoice" links on the outstanding report open the invoice's primary attachment in a standalone pop-out window using the chrome-free minimal viewer; multiple invoices can be opened in separate windows for side-by-side comparison
 - **Comprehensive CSV Export**: Export current view with statistics cards (Total Unpaid, Overdue, etc.) and complete invoice table data, respecting all active filters and sorting
 - **Unified Unpaid Filter**: Combined view of pending, overdue, and partial invoices
 - **Bulk Payment Processing**: Multi-invoice selection with real-time total calculations
@@ -797,6 +800,9 @@ Multi-provider AI integration with per-feature configuration, admin-switchable f
 - **Admin UI**: Switch providers/models from System Tools > AI Diagnostics without server access
 - **Camera Invoice Capture**: Phone camera captures paper invoices, AI extracts data via queue jobs
 - **AI Fallback for Failed Parses** (NEW! 2026-04-17): "Send to AI" button on bulk-upload preview reroutes failed/review files through the AI pipeline; PDFs supported via Mistral OCR's native `document_url`
+- **Provider Badge on AI Pages** (NEW! 2026-04-17): Small pill next to the page title on every AI-consuming page shows which provider is currently configured (tooltip reveals the model); reusable `<x-ai-provider-badge>` Blade component
+- **Admin-Only Diagnostics** (NEW! 2026-04-17): `/tools/ai-diagnostics` and its sub-routes require the `admin` role; sidebar entry hidden for non-admins
+- **Config-Cache-Safe Key Resolution** (NEW! 2026-04-17): Mistral and OpenAI API keys now resolved via `config('invoices.ai_parsing.api_key')` with `env()` fallback, mirroring Gemini and surviving `php artisan config:cache` on production
 - **Supplier Fuzzy Matching**: 4-layer matching algorithm (exact, substring, cleaned, word-based with Levenshtein)
 - **Date Validation**: Flags suspicious dates (> 2 months old, wrong year, future dates)
 - **VAT Safety**: Only assigns VAT rates explicitly shown on invoice

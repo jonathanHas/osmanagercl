@@ -528,6 +528,7 @@
                             </a>
                             @endif
 
+                            @if(auth()->user()->isAdmin())
                             <a href="{{ route('tools.ai-diagnostics') }}"
                                class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('tools.ai-diagnostics*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                                 <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -535,6 +536,7 @@
                                 </svg>
                                 AI Diagnostics
                             </a>
+                            @endif
                         </div>
                         @endunless
 

@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **🧾 Outstanding Report: Pop-out Invoice Viewer** (2026-04-17)
+  - "View Invoice" links on `/suppliers/outstanding-report` now open the invoice's primary attachment in a standalone pop-out window (centered, ~1100x900, resizable) instead of navigating to `/invoices/{id}`
+  - Uses the existing `invoices.attachments.viewer-minimal` route — chrome-free PDF/image viewer, same clean pattern as the bulk-upload file viewer
+  - Each click opens its own window (unique `Date.now()` window name) so multiple invoices can be compared side-by-side
+  - Falls back to `invoices.show` (same-tab) for invoices that have no attachment
+  - Eager-loads `attachments` on both the outstanding query and the previous-payments query to avoid N+1
+  - **Modified**: `app/Http/Controllers/SupplierOutstandingController.php`, `resources/views/suppliers/outstanding-report.blade.php`
+
+- **📷 Camera Barcode Scanning: Stocking + Product Edit Alternate Barcode** (2026-04-17)
+  - **Stocking (`/stocking`)**: Green camera toggle button added next to the barcode input. Tapping opens a live camera viewport using `html5-qrcode`; a detected barcode triggers the existing lookup flow (beep, vibrate, 2s duplicate cooldown, GS1-128 → GTIN-14 parsing)
+  - **Persistent camera mode on stocking**: Mirrors the delivery-legacy pattern — once enabled, the camera auto-restarts after a successful **Update Stock** or **Add to Labels**, so the user can scan → adjust → scan continuously without pressing the button again. Pressing the red (active) camera button manually clears the flag and keeps it off
+  - **Product Edit alternate-barcode panel**: The "Add alternate barcode for this product" section now has a green camera button that fills the `new_barcode` input from a scan. Camera auto-stops when the collapsible section is closed
+  - Requires HTTPS for live camera (browser restriction)
+  - **Modified**: `resources/views/stocking/index.blade.php`, `resources/views/products/edit.blade.php`
+
+- **🔒 AI Diagnostics: Admin-only access + provider badge on AI pages** (2026-04-17)
+  - `/tools/ai-diagnostics` routes now require `role:admin` middleware; sidebar entry hidden from non-admins
+  - New `<x-ai-provider-badge>` component: small pill near the page title on `bulk-upload`, `bulk-upload-preview`, and `labels/translate`, showing which provider (Mistral OCR / Gemini / etc.) is currently configured for that feature
+  - Tooltip on hover shows provider + model; non-clickable (users don't link into the diagnostics page)
+  - **Modified**: `routes/web.php`, `resources/views/layouts/admin.blade.php`, `resources/views/invoices/bulk-upload.blade.php`, `resources/views/invoices/bulk-upload-preview.blade.php`, `resources/views/labels/translate.blade.php`
+  - **New**: `resources/views/components/ai-provider-badge.blade.php`
+
 - **✨ Invoice Bulk Upload: AI Fallback for Failed / Review Parses** (2026-04-17)
   - New "Send to AI" button on bulk-upload preview for files that Python parsers fail on or route to `review` with low confidence
   - Routes the file through the same AI pipeline used by Camera Capture (`InvoiceGeminiParsingService` + `ParseInvoiceCameraImage` job)
@@ -80,6 +102,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Modified**: `resources/views/delivery-legacy/index.blade.php`, `resources/views/delivery-legacy/match.blade.php`, `resources/views/components/product-image.blade.php`
 
 ### Fixed
+
+- **AI Diagnostics: Mistral / OpenAI "No API Key" on production with cached config** (2026-04-17)
+  - Switching any feature to Mistral or Mistral OCR on production surfaced "No API key configured for this provider" even though `MISTRAL_API_KEY` was present in `.env`; Gemini always worked
+  - Root cause: `AiSettingsService::getApiKey()` read the Mistral/OpenAI key via `env()` directly. Once `php artisan config:cache` runs (standard on production deploy), Laravel unsets Dotenv variables and `env()` returns `null` outside `config/*.php` files. Gemini survived because its lookup went through `config('gemini.api_key')` first
+  - Fix: Mistral, OpenAI, and default branches now read `config('invoices.ai_parsing.api_key')` first, falling back to `env()` — mirroring Gemini's pattern and surviving `config:cache`
+  - No `.env` or config file changes required; `config/invoices.php` already exposed `MISTRAL_API_KEY` via the `ai_parsing.api_key` key
+  - **Modified**: `app/Services/AiSettingsService.php`
 
 - **Label Translation: Smarter layout with no text overlap** (2026-03-28)
   - Replaced naive character-count line estimation with word-wrap simulation plus 10% safety margin, matching ZPL's actual word-boundary wrapping behaviour

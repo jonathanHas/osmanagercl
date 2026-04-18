@@ -99,9 +99,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/products/{id}/toggle-till-visibility', [ProductController::class, 'toggleTillVisibility'])->name('products.toggle-till-visibility');
     Route::get('/products/{id}/print-label', [ProductController::class, 'printLabel'])->name('products.print-label');
     Route::get('/tools/udea-debug', UdeaDiagnosticsController::class)->name('tools.udea-debug');
-    Route::get('/tools/ai-diagnostics', [\App\Http\Controllers\AiDiagnosticsController::class, 'index'])->name('tools.ai-diagnostics');
-    Route::post('/tools/ai-diagnostics/test', [\App\Http\Controllers\AiDiagnosticsController::class, 'testConnection'])->name('tools.ai-diagnostics.test');
-    Route::post('/tools/ai-diagnostics/settings', [\App\Http\Controllers\AiDiagnosticsController::class, 'saveSettings'])->name('tools.ai-diagnostics.settings');
+    Route::get('/tools/ai-diagnostics', [\App\Http\Controllers\AiDiagnosticsController::class, 'index'])->middleware('role:admin')->name('tools.ai-diagnostics');
+    Route::post('/tools/ai-diagnostics/test', [\App\Http\Controllers\AiDiagnosticsController::class, 'testConnection'])->middleware('role:admin')->name('tools.ai-diagnostics.test');
+    Route::post('/tools/ai-diagnostics/settings', [\App\Http\Controllers\AiDiagnosticsController::class, 'saveSettings'])->middleware('role:admin')->name('tools.ai-diagnostics.settings');
 
     // Product AJAX API routes (for real-time validation)
     Route::post('/api/products/check-barcode-duplicate', [ProductController::class, 'checkBarcodeDuplicate'])->name('api.products.check-barcode-duplicate');

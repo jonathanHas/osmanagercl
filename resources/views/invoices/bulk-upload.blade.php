@@ -2,8 +2,11 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {{-- Header --}}
         <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold text-gray-100">Bulk Invoice Upload</h2>
-            <a href="{{ route('invoices.index') }}" 
+            <div class="flex items-center gap-3">
+                <h2 class="text-2xl font-bold text-gray-100">Bulk Invoice Upload</h2>
+                <x-ai-provider-badge feature="invoice_parsing" label="AI" />
+            </div>
+            <a href="{{ route('invoices.index') }}"
                class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
                 Back to Invoices
             </a>

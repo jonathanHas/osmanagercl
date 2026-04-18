@@ -108,6 +108,7 @@ php artisan osaccounts:import-invoices --update-existing --user=1
   - Real-time selection summary with count and total amount
   - Payment modal with date selection and payment methods
   - Supplier breakdown in modal showing selected invoices
+- **Pop-out Invoice Viewer** (2026-04-17): "View Invoice" action opens the invoice's primary attachment in a standalone pop-out window (centered, ~1100x900, resizable) using the chrome-free `invoices.attachments.viewer-minimal` route. Each click opens its own window so multiple invoices can be compared side-by-side. Invoices with no attachment fall back to the full invoice detail page in the same tab.
 - **CSV Export**: Download complete report with all supplier groupings
 - **Warning Indicators**: Highlights invoices still unpaid for manual review
 

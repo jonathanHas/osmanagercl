@@ -24,7 +24,7 @@ class SupplierOutstandingController extends Controller
         // An invoice was outstanding if it was created before/on the date AND either:
         // 1. Not paid (payment_status is not 'paid')
         // 2. Paid after the report date (payment_status is 'paid' but payment_date > report date)
-        $outstandingInvoices = Invoice::with(['supplier', 'vatLines'])
+        $outstandingInvoices = Invoice::with(['supplier', 'vatLines', 'attachments'])
             ->where('invoice_date', '<=', $reportDateTime)
             ->where(function ($query) use ($reportDateTime) {
                 // Include invoices that are not paid (pending, overdue, partial)
@@ -53,7 +53,8 @@ class SupplierOutstandingController extends Controller
 
             // Get last 2 paid invoices for this supplier if requested
             if ($showPreviousPayments && $supplierId) {
-                $previousPayments = Invoice::where('supplier_id', $supplierId)
+                $previousPayments = Invoice::with('attachments')
+                    ->where('supplier_id', $supplierId)
                     ->where('payment_status', 'paid')
                     ->whereNotNull('payment_date')
                     ->where('payment_date', '<=', $reportDateTime)

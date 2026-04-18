@@ -507,6 +507,7 @@ When a supplier changes product packaging (new barcode for same product), users 
    - Subtle collapsible panel at bottom of product edit page
    - Alpine.js animation for smooth expand/collapse
    - Minimal UI footprint when collapsed
+   - **Camera Scanning** (2026-04-17): Green camera button next to the "New Barcode" input opens a live phone-camera viewport (`html5-qrcode`); detected barcode (with GS1-128 → GTIN-14 parsing) fills the field automatically. Camera auto-stops when the panel is collapsed. Requires HTTPS.
 
 2. **Product Copying**
    - Creates new product with unique UUID
