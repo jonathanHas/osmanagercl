@@ -138,6 +138,16 @@ class CashLodgementController extends Controller
             ->orderBy('verified_at', 'desc')
             ->get();
 
+        $finishLodgementSummary = null;
+        if (session('prompt_finish_lodgement') && $verifiedBags->count() > 0) {
+            $finishLodgementSummary = [
+                'count' => $verifiedBags->count(),
+                'total' => $verifiedBags->sum('counted_total'),
+                'max_variance' => (float) ($verifiedBags->max(fn ($v) => abs($v->variance)) ?? 0),
+                'all_ids' => $verifiedBags->pluck('id')->map(fn ($id) => (string) $id)->values(),
+            ];
+        }
+
         return view('management.cash-lodgements.index', compact(
             'lodgements',
             'startDate',
@@ -154,7 +164,8 @@ class CashLodgementController extends Controller
             'pendingBags',
             'unreconciledDays',
             'tillNameToId',
-            'verifiedBags'
+            'verifiedBags',
+            'finishLodgementSummary'
         ));
     }
 
@@ -351,12 +362,28 @@ class CashLodgementController extends Controller
 
         $verification->save();
 
-        return back()->with('success', sprintf(
-            'Bag verified: €%.2f counted (expected €%.2f, variance €%.2f)',
-            $countedTotal,
-            $expectedTotal,
-            $countedTotal - $expectedTotal
-        ));
+        $flashData = [
+            'success' => sprintf(
+                'Bag verified: €%.2f counted (expected €%.2f, variance €%.2f)',
+                $countedTotal,
+                $expectedTotal,
+                $countedTotal - $expectedTotal
+            ),
+        ];
+
+        $remainingPending = CashReconciliation::whereDoesntHave('bagVerification')
+            ->with('payments')
+            ->get()
+            ->filter(fn ($r) => $r->calculateAvailableToLodge() > 0)
+            ->count();
+
+        $verifiedUnlinked = CashBagVerification::whereNull('cash_lodgement_id')->count();
+
+        if ($remainingPending === 0 && $verifiedUnlinked > 0) {
+            $flashData['prompt_finish_lodgement'] = true;
+        }
+
+        return back()->with($flashData);
     }
 
     /**

@@ -34,6 +34,57 @@
     @endif
 
     {{-- ============================================================ --}}
+    {{-- FINISH LODGEMENT PROMPT (auto-opens after final bag counted)  --}}
+    {{-- ============================================================ --}}
+    @if($finishLodgementSummary)
+    <div x-data
+         x-init="$nextTick(() => $dispatch('open-modal', 'finish-lodgement'))">
+    </div>
+
+    <x-modal name="finish-lodgement" maxWidth="md">
+        <div class="bg-white dark:bg-gray-800">
+            <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">All bags counted — ready to lodge?</h3>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Every pending bag has been verified. You can create the lodgement now.</p>
+            </div>
+
+            <div class="px-6 py-5 space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Total to lodge</span>
+                    <span class="text-2xl font-bold text-green-600 dark:text-green-400">€{{ number_format($finishLodgementSummary['total'], 2) }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Verified bags</span>
+                    <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ $finishLodgementSummary['count'] }}</span>
+                </div>
+
+                @if($finishLodgementSummary['max_variance'] > 1)
+                <div class="mt-2 rounded-md bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+                    One or more bags have a variance over €1.00 (max €{{ number_format($finishLodgementSummary['max_variance'], 2) }}). Consider reviewing before lodging.
+                </div>
+                @endif
+            </div>
+
+            <form method="POST" action="{{ route('management.cash-lodgements.create-lodgement') }}" class="px-6 py-4 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-3">
+                @csrf
+                @foreach($finishLodgementSummary['all_ids'] as $id)
+                <input type="hidden" name="verification_ids[]" value="{{ $id }}">
+                @endforeach
+                <button type="button"
+                        @click="$dispatch('close-modal', 'finish-lodgement')"
+                        class="bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium py-2 px-4 rounded-md border border-gray-300 dark:border-gray-600">
+                    Review first
+                </button>
+                <button type="submit"
+                        class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md">
+                    Create Lodgement
+                </button>
+            </form>
+        </div>
+    </x-modal>
+    @endif
+
+    {{-- ============================================================ --}}
     {{-- SECTION 1: PENDING BAGS (need counting)                       --}}
     {{-- ============================================================ --}}
     @if($pendingBags->count() > 0)

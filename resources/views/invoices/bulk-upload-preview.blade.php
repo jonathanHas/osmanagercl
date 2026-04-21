@@ -247,8 +247,22 @@
 
                     {{-- Duplicate badge --}}
                     @if($file->error_message && str_contains(strtolower($file->error_message), 'duplicate'))
-                        <div class="mt-2">
+                        @php
+                            $duplicateInvoiceId = preg_match('/\(ID:\s*(\d+)\)/', $file->error_message, $m) ? $m[1] : null;
+                        @endphp
+                        <div class="mt-2 flex flex-wrap items-center gap-2">
                             <span class="px-2 py-1 text-xs rounded-full bg-yellow-900 text-yellow-300">⚠ Possible Duplicate</span>
+                            @if($duplicateInvoiceId)
+                                <a href="{{ route('invoices.show', $duplicateInvoiceId) }}"
+                                   target="_blank"
+                                   rel="noopener"
+                                   class="px-2 py-1 text-xs rounded-full bg-blue-900 text-blue-300 hover:bg-blue-800 inline-flex items-center">
+                                    View existing
+                                    <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                                    </svg>
+                                </a>
+                            @endif
                         </div>
                     @endif
 
@@ -631,10 +645,24 @@
                                     {{ $file->status_label }}
                                 </span>
                                 @if($file->error_message && str_contains(strtolower($file->error_message), 'duplicate'))
-                                    <span class="ml-2 px-2 py-1 text-xs rounded-full bg-yellow-900 text-yellow-300 cursor-help" 
+                                    @php
+                                        $duplicateInvoiceId = preg_match('/\(ID:\s*(\d+)\)/', $file->error_message, $m) ? $m[1] : null;
+                                    @endphp
+                                    <span class="ml-2 px-2 py-1 text-xs rounded-full bg-yellow-900 text-yellow-300 cursor-help"
                                           title="{{ $file->error_message }}">
                                         ⚠ Possible Duplicate
                                     </span>
+                                    @if($duplicateInvoiceId)
+                                        <a href="{{ route('invoices.show', $duplicateInvoiceId) }}"
+                                           target="_blank"
+                                           rel="noopener"
+                                           class="ml-2 px-2 py-1 text-xs rounded-full bg-blue-900 text-blue-300 hover:bg-blue-800 inline-flex items-center">
+                                            View existing
+                                            <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                                            </svg>
+                                        </a>
+                                    @endif
                                 @endif
                                 @if($file->parsing_confidence)
                                     <span class="ml-2 text-xs text-gray-400">
