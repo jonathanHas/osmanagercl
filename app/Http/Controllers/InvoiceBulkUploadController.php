@@ -269,16 +269,61 @@ class InvoiceBulkUploadController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        $duplicateViewerUrls = $this->buildDuplicateViewerUrls($files);
+
         return view('invoices.bulk-upload-preview', [
             'batch' => $batch,
             'files' => $files,
             'isAmazonPendingView' => $isAmazonPendingView,
             'suppliers' => $suppliers,
+            'duplicateViewerUrls' => $duplicateViewerUrls,
             'filters' => [
                 'supplier' => $request->supplier,
                 'status' => $request->status,
             ],
         ]);
+    }
+
+    /**
+     * Build a map of file_id => viewer URL for the matched existing invoice
+     * when a file has been flagged as a potential duplicate. Falls back to the
+     * invoice show page when no viewable primary attachment exists.
+     */
+    private function buildDuplicateViewerUrls($files): array
+    {
+        $pairs = [];
+        foreach ($files as $file) {
+            if (! $file->error_message || ! str_contains(strtolower($file->error_message), 'duplicate')) {
+                continue;
+            }
+            if (preg_match('/\(ID:\s*(\d+)\)/', $file->error_message, $m)) {
+                $pairs[$file->id] = (int) $m[1];
+            }
+        }
+
+        if (empty($pairs)) {
+            return [];
+        }
+
+        $invoices = \App\Models\Invoice::with('attachments')
+            ->whereIn('id', array_values($pairs))
+            ->get()
+            ->keyBy('id');
+
+        $urls = [];
+        foreach ($pairs as $fileId => $invoiceId) {
+            $invoice = $invoices->get($invoiceId);
+            if (! $invoice) {
+                continue;
+            }
+            $attachment = $invoice->attachments->firstWhere('is_primary', true)
+                ?? $invoice->attachments->first();
+            $urls[$fileId] = $attachment
+                ? route('invoices.attachments.viewer-minimal', $attachment)
+                : route('invoices.show', $invoice);
+        }
+
+        return $urls;
     }
 
     /**

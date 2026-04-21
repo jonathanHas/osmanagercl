@@ -247,15 +247,11 @@
 
                     {{-- Duplicate badge --}}
                     @if($file->error_message && str_contains(strtolower($file->error_message), 'duplicate'))
-                        @php
-                            $duplicateInvoiceId = preg_match('/\(ID:\s*(\d+)\)/', $file->error_message, $m) ? $m[1] : null;
-                        @endphp
                         <div class="mt-2 flex flex-wrap items-center gap-2">
                             <span class="px-2 py-1 text-xs rounded-full bg-yellow-900 text-yellow-300">⚠ Possible Duplicate</span>
-                            @if($duplicateInvoiceId)
-                                <a href="{{ route('invoices.show', $duplicateInvoiceId) }}"
-                                   target="_blank"
-                                   rel="noopener"
+                            @if(!empty($duplicateViewerUrls[$file->id]))
+                                <a href="{{ $duplicateViewerUrls[$file->id] }}"
+                                   onclick="return openDuplicateInvoicePopup(event, this.href)"
                                    class="px-2 py-1 text-xs rounded-full bg-blue-900 text-blue-300 hover:bg-blue-800 inline-flex items-center">
                                     View existing
                                     <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -645,17 +641,13 @@
                                     {{ $file->status_label }}
                                 </span>
                                 @if($file->error_message && str_contains(strtolower($file->error_message), 'duplicate'))
-                                    @php
-                                        $duplicateInvoiceId = preg_match('/\(ID:\s*(\d+)\)/', $file->error_message, $m) ? $m[1] : null;
-                                    @endphp
                                     <span class="ml-2 px-2 py-1 text-xs rounded-full bg-yellow-900 text-yellow-300 cursor-help"
                                           title="{{ $file->error_message }}">
                                         ⚠ Possible Duplicate
                                     </span>
-                                    @if($duplicateInvoiceId)
-                                        <a href="{{ route('invoices.show', $duplicateInvoiceId) }}"
-                                           target="_blank"
-                                           rel="noopener"
+                                    @if(!empty($duplicateViewerUrls[$file->id]))
+                                        <a href="{{ $duplicateViewerUrls[$file->id] }}"
+                                           onclick="return openDuplicateInvoicePopup(event, this.href)"
                                            class="ml-2 px-2 py-1 text-xs rounded-full bg-blue-900 text-blue-300 hover:bg-blue-800 inline-flex items-center">
                                             View existing
                                             <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1525,6 +1517,17 @@
             // Open embedded file viewer in new window
             const viewerUrl = `/invoices/bulk-upload/${batchId}/file/${fileId}/viewer`;
             window.open(viewerUrl, 'file-viewer', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+        }
+
+        function openDuplicateInvoicePopup(event, url) {
+            event.preventDefault();
+            const width = Math.min(1100, window.screen.availWidth - 100);
+            const height = Math.min(900, window.screen.availHeight - 100);
+            const left = Math.max(0, (window.screen.availWidth - width) / 2);
+            const top = Math.max(0, (window.screen.availHeight - height) / 2);
+            const features = `popup=yes,width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`;
+            window.open(url, 'duplicateInvoiceViewer_' + Date.now(), features);
+            return false;
         }
         
         function viewParsedData(fileId) {
