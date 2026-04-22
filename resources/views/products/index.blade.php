@@ -105,7 +105,18 @@
                         'checked' => $showSuppliers
                     ]
                 ]">
-                
+
+                <x-slot:searchAction>
+                    <button type="button" onclick="openProductScannerModal()"
+                            class="inline-flex items-center justify-center px-3 py-2 bg-green-100 border-2 border-green-500 text-green-700 dark:bg-green-900/30 dark:border-green-500 dark:text-green-400 rounded-md hover:bg-green-200 dark:hover:bg-green-900/50 transition touch-manipulation"
+                            title="Scan barcode with camera">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                    </button>
+                </x-slot:searchAction>
+
                 <div id="supplier-dropdown" class="mt-4 {{ $showSuppliers ? '' : 'hidden' }}">
                     <label for="supplier_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Filter by Supplier</label>
                     <select name="supplier_id" id="supplier_id" class="rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600">
@@ -432,4 +443,138 @@
 
     {{-- Sales Chart Modal --}}
     <x-sales-chart-modal />
+
+    <!-- Product Barcode Scanner Modal -->
+    <div id="product-scanner-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden" x-data="productSearchScanner()" x-show="modalOpen" @keydown.escape="closeModal()">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full" @click.away="closeModal()">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Scan Product Barcode</h3>
+                        <button type="button" @click="closeModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div id="product-search-scanner-camera" class="rounded-lg overflow-hidden bg-gray-900" style="min-height: 260px;"></div>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm text-center mt-2" x-text="scanner.cameraStatus"></p>
+
+                    <div class="flex justify-end mt-4">
+                        <button type="button" @click="closeModal()"
+                                class="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @push('scripts')
+        @vite(['resources/js/barcode-scanner.js'])
+        <script>
+            function openProductScannerModal() {
+                const modal = document.getElementById('product-scanner-modal');
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    const alpineData = Alpine.$data(modal);
+                    if (alpineData) {
+                        alpineData.openModal();
+                    }
+                }, 50);
+            }
+
+            function productSearchScanner() {
+                return {
+                    modalOpen: false,
+                    scanner: {
+                        cameraActive: false,
+                        cameraStatus: '',
+                        lastScannedBarcode: '',
+                        lastScanTime: 0,
+                    },
+
+                    openModal() {
+                        this.modalOpen = true;
+                        this.$nextTick(() => this.startScannerCamera());
+                    },
+
+                    closeModal() {
+                        this.modalOpen = false;
+                        this.stopScannerCamera();
+                        document.getElementById('product-scanner-modal').classList.add('hidden');
+                    },
+
+                    startScannerCamera() {
+                        if (!window.BarcodeScanner) {
+                            this.scanner.cameraStatus = 'Scanner module not loaded. Ensure HTTPS is enabled.';
+                            return;
+                        }
+                        this.scanner.cameraStatus = 'Starting camera...';
+                        window.BarcodeScanner.startScanner(
+                            'product-search-scanner-camera',
+                            (decodedText) => this.onScannerDetected(decodedText),
+                            (error) => {}
+                        ).then(() => {
+                            this.scanner.cameraActive = true;
+                            this.scanner.cameraStatus = 'Point camera at barcode';
+                        }).catch((err) => {
+                            this.scanner.cameraStatus = 'Camera error: ' + (err.message || err);
+                            this.scanner.cameraActive = false;
+                        });
+                    },
+
+                    stopScannerCamera() {
+                        if (window.BarcodeScanner && window.BarcodeScanner.isRunning()) {
+                            window.BarcodeScanner.stopScanner().catch(() => {});
+                        }
+                        this.scanner.cameraActive = false;
+                        this.scanner.cameraStatus = '';
+                    },
+
+                    parseBarcode(raw) {
+                        let text = raw.trim();
+                        if (text.startsWith(']C1')) text = text.substring(3);
+                        if (text.startsWith(']d2')) text = text.substring(3);
+                        if (text.startsWith(']e0')) text = text.substring(3);
+                        text = text.replace(/[\x1D]/g, '|');
+                        const gtin14Match = text.match(/(?:^|\|)01(\d{14})/);
+                        if (gtin14Match) {
+                            return { barcode: gtin14Match[1], isGS1: true, raw };
+                        }
+                        return { barcode: text, isGS1: false, raw };
+                    },
+
+                    onScannerDetected(text) {
+                        const now = Date.now();
+                        if (text === this.scanner.lastScannedBarcode && now - this.scanner.lastScanTime < 2000) {
+                            return;
+                        }
+                        this.scanner.lastScannedBarcode = text;
+                        this.scanner.lastScanTime = now;
+
+                        try {
+                            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                            const osc = ctx.createOscillator();
+                            osc.type = 'square';
+                            osc.frequency.value = 1000;
+                            osc.connect(ctx.destination);
+                            osc.start();
+                            osc.stop(ctx.currentTime + 0.1);
+                        } catch(e) {}
+                        if (navigator.vibrate) navigator.vibrate(100);
+
+                        const parsed = this.parseBarcode(text);
+                        this.stopScannerCamera();
+
+                        const url = new URL('{{ route('products.index') }}', window.location.origin);
+                        url.searchParams.set('search', parsed.barcode.trim());
+                        window.location.href = url.toString();
+                    },
+                };
+            }
+        </script>
+    @endpush
 </x-admin-layout>

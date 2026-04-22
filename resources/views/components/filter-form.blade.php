@@ -28,14 +28,17 @@
             @if($searchName)
                 <div class="flex gap-4">
                     <div class="flex-1">
-                        <input type="text" 
-                               name="{{ $searchName }}" 
-                               value="{{ $searchValue }}" 
+                        <input type="text"
+                               name="{{ $searchName }}"
+                               value="{{ $searchValue }}"
                                placeholder="{{ $searchPlaceholder }}"
                                class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 focus:border-indigo-500 dark:focus:border-indigo-600 focus:ring-indigo-500 dark:focus:ring-indigo-600">
                     </div>
+                    @isset($searchAction)
+                        {{ $searchAction }}
+                    @endisset
                     @if($showSubmit)
-                        <button type="submit" 
+                        <button type="submit"
                                 class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md transition-colors duration-200">
                             {{ $submitLabel }}
                         </button>
