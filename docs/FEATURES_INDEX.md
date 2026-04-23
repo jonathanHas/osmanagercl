@@ -294,6 +294,7 @@ External supplier connectivity for images, pricing, and product data.
 
 ### Delivery Verification
 Comprehensive delivery processing with barcode scanning and PDF invoice parsing.
+- **Dynamis Fruit & Veg XLSX Import** (NEW! 2026-04-22): Accepts Dynamis `Historique(NN).xlsx` delivery files on the **XLSX (Dynamis)** tab at `/deliveries/create`. Parsed in PHP via PhpSpreadsheet; matches lines to till-visible F&V products via name-based fuzzy match (SupplierLink unused for F&V). Persistent `dynamis_product_links` table means subsequent imports auto-match. Optional **Suggest with AI** button (uses the `dynamis_matcher` feature on `AiSettingsService`). Freight row (`DIV0010`) routed to `freight_charge`. 📖 [Dynamis Delivery Import Documentation](./features/dynamis-delivery-import.md)
 - **Invoice/Order Number Extraction** (NEW! 2026-04-15): Automatically extracts order/invoice numbers from delivery PDFs and displays them as badges on each item
   - Udea: Extracts order numbers (e.g., "Order 4452479") from PDF content or filename
   - Independent (IIH): Extracts invoice numbers (e.g., "Invoice No: IN466447") from PDF content

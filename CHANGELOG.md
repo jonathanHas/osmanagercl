@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **🥬 Dynamis Fruit & Veg Delivery Import (XLSX)** (2026-04-22)
+  - New **XLSX (Dynamis)** tab on `/deliveries/create` accepts Dynamis `Historique(NN).xlsx` delivery files
+  - Parsed in PHP via PhpSpreadsheet (no Python round-trip). Columns A-L mapped to SKU / description / unit cost / unit type (K/C/P) / line total; the `DIV0010` "MISCELLANEOUS TRANSPORT" row is routed to `freight_charge`
+  - Kg rows stored as boxes with `weight_per_unit` (mirrors the Independent weight-based flow). C/P rows use piece count
+  - `SupplierLink` is **not** used for matching — F&V SKUs are matched by name. Priority: saved link → fuzzy Jaccard on normalised tokens (threshold 0.75) → unmatched with top-3 suggestions
+  - New `dynamis_product_links` table persists confirmed matches so subsequent imports auto-match (`matched_saved`)
+  - **Suggest with AI** button runs a bulk AI pass (Mistral / Gemini configurable via new `dynamis_matcher` feature key on `AiSettingsService`) over still-unmatched items
+  - Matching scoped to **till-visible** F&V products (`PRODUCTS_CAT` × `CATEGORY IN (SUB1, SUB2, SUB3)`). Unmatched items are dropped unless the user picks one — no new products are created automatically
+  - `DeliveryService::importFromPdfData()` now honours a preset `product_id` on incoming items (used by this flow; PDF path unchanged)
+  - New routes: `POST /deliveries/parse-xlsx`, `POST /deliveries/ai-suggest-xlsx`, `POST /deliveries/store-xlsx`
+  - **New**: `app/Services/DynamisXlsxParserService.php`, `app/Services/DynamisMatcherService.php`, `app/Services/DynamisAiSuggesterService.php`, `app/Models/DynamisProductLink.php`, `resources/views/deliveries/partials/xlsx-tab.blade.php`, `tests/Unit/DynamisXlsxParserServiceTest.php`, `tests/Unit/DynamisMatcherServiceTest.php`, migration `2026_04_22_154911_create_dynamis_product_links_table.php`
+  - **Modified**: `app/Http/Controllers/DeliveryController.php`, `app/Services/DeliveryService.php`, `app/Services/AiSettingsService.php`, `routes/web.php`, `resources/views/deliveries/create.blade.php`
+  - 📖 [Dynamis Delivery Import Documentation](./docs/features/dynamis-delivery-import.md)
+
 - **🧾 Outstanding Report: Pop-out Invoice Viewer** (2026-04-17)
   - "View Invoice" links on `/suppliers/outstanding-report` now open the invoice's primary attachment in a standalone pop-out window (centered, ~1100x900, resizable) instead of navigating to `/invoices/{id}`
   - Uses the existing `invoices.attachments.viewer-minimal` route — chrome-free PDF/image viewer, same clean pattern as the bulk-upload file viewer

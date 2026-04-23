@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Delivery;
 use App\Models\DeliveryDocument;
 use App\Models\DeliveryItem;
+use App\Models\DynamisProductLink;
 use App\Models\LabelLog;
 use App\Models\LegacyDelivery;
 use App\Models\Product;
@@ -12,6 +13,9 @@ use App\Models\Supplier;
 use App\Models\SupplierImageCache;
 use App\Services\DeliveryParsingService;
 use App\Services\DeliveryService;
+use App\Services\DynamisAiSuggesterService;
+use App\Services\DynamisMatcherService;
+use App\Services\DynamisXlsxParserService;
 use App\Services\SupplierService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -28,14 +32,26 @@ class DeliveryController extends Controller
 
     private DeliveryParsingService $deliveryParsingService;
 
+    private DynamisXlsxParserService $dynamisParser;
+
+    private DynamisMatcherService $dynamisMatcher;
+
+    private DynamisAiSuggesterService $dynamisAiSuggester;
+
     public function __construct(
         DeliveryService $deliveryService,
         SupplierService $supplierService,
-        DeliveryParsingService $deliveryParsingService
+        DeliveryParsingService $deliveryParsingService,
+        DynamisXlsxParserService $dynamisParser,
+        DynamisMatcherService $dynamisMatcher,
+        DynamisAiSuggesterService $dynamisAiSuggester
     ) {
         $this->deliveryService = $deliveryService;
         $this->supplierService = $supplierService;
         $this->deliveryParsingService = $deliveryParsingService;
+        $this->dynamisParser = $dynamisParser;
+        $this->dynamisMatcher = $dynamisMatcher;
+        $this->dynamisAiSuggester = $dynamisAiSuggester;
     }
 
     /**
@@ -245,6 +261,7 @@ class DeliveryController extends Controller
             'natural medicine' => 65,
             'natural medicine company' => 65,
             'the natural medicine company' => 65,
+            'dynamis' => 56,
         ];
 
         // Try exact match first
@@ -634,6 +651,237 @@ class DeliveryController extends Controller
             return back()
                 ->withInput()
                 ->withErrors(['pdf_file' => 'Failed to import PDF: '.$e->getMessage()]);
+        }
+    }
+
+    /**
+     * Dynamis SupplierID (POS database). The XLSX flow is hard-wired to this
+     * supplier because the file format is specific to Dynamis.
+     */
+    private const DYNAMIS_SUPPLIER_ID = 56;
+
+    /**
+     * Parse an uploaded Dynamis XLSX and return matched/unmatched/freight buckets
+     * for the preview UI.
+     */
+    public function parseXlsx(Request $request): JsonResponse
+    {
+        $request->validate([
+            'xlsx_file' => 'required|file|mimes:xlsx,xls|max:10240',
+        ]);
+
+        $uploadedFile = $request->file('xlsx_file');
+        $storedPath = Storage::disk('local')->path($uploadedFile->store('temp'));
+
+        try {
+            $parsed = $this->dynamisParser->parse($storedPath);
+
+            if (! $parsed['success']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $parsed['errors'][0] ?? 'Failed to parse XLSX',
+                ], 422);
+            }
+
+            $matched = $this->dynamisMatcher->matchItems($parsed['data']['items']);
+            [$matchedBucket, $unmatchedBucket] = $this->splitMatches($matched);
+
+            return response()->json([
+                'success' => true,
+                'supplier_id' => self::DYNAMIS_SUPPLIER_ID,
+                'order_number' => $parsed['data']['metadata']['order_number'] ?? null,
+                'totals' => $parsed['data']['totals'],
+                'matched' => $matchedBucket,
+                'unmatched' => $unmatchedBucket,
+                'freight' => $parsed['data']['costs'],
+                'warnings' => $parsed['warnings'] ?? [],
+            ]);
+        } finally {
+            if (file_exists($storedPath)) {
+                unlink($storedPath);
+            }
+        }
+    }
+
+    /**
+     * Run a bulk AI pass over unmatched items and return the updated matches.
+     */
+    public function aiSuggestXlsx(Request $request): JsonResponse
+    {
+        $request->validate([
+            'unmatched' => 'required|array',
+            'unmatched.*.code' => 'required|string',
+            'unmatched.*.product' => 'required|string',
+        ]);
+
+        try {
+            $candidates = $this->dynamisMatcher->loadTillProducts();
+            $suggested = $this->dynamisAiSuggester->suggest($request->input('unmatched'), $candidates);
+
+            return response()->json([
+                'success' => true,
+                'items' => $suggested,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'AI suggestion failed: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Commit the confirmed matches as a Delivery.
+     */
+    public function storeXlsx(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'delivery_date' => 'required|date',
+            'xlsx_file' => 'required|file|mimes:xlsx,xls|max:10240',
+            'confirmed' => 'required|string',
+        ]);
+
+        $confirmed = json_decode($request->input('confirmed'), true);
+
+        if (! is_array($confirmed) || empty($confirmed)) {
+            return back()->withInput()->withErrors(['confirmed' => 'No confirmed items submitted']);
+        }
+
+        $uploadedFile = $request->file('xlsx_file');
+        $storedPath = Storage::disk('local')->path($uploadedFile->store('temp'));
+
+        try {
+            $parsed = $this->dynamisParser->parse($storedPath);
+
+            if (! $parsed['success']) {
+                return back()->withInput()->withErrors([
+                    'xlsx_file' => $parsed['errors'][0] ?? 'Failed to parse XLSX',
+                ]);
+            }
+
+            $confirmedByCode = [];
+            foreach ($confirmed as $row) {
+                if (! empty($row['code']) && ! empty($row['product_id'])) {
+                    $confirmedByCode[(string) $row['code']] = $row;
+                }
+            }
+
+            $deliveryItems = $this->dynamisParser->convertToDeliveryItems($parsed);
+            $filteredItems = [];
+
+            foreach ($deliveryItems as $item) {
+                $code = (string) $item['Code'];
+                if (! isset($confirmedByCode[$code])) {
+                    continue;
+                }
+
+                $decision = $confirmedByCode[$code];
+                $item['product_id'] = (string) $decision['product_id'];
+                $filteredItems[] = $item;
+            }
+
+            if (empty($filteredItems)) {
+                return back()->withInput()->withErrors([
+                    'confirmed' => 'No confirmed items matched the parsed file',
+                ]);
+            }
+
+            $delivery = DB::transaction(function () use ($filteredItems, $parsed, $request, $uploadedFile, $confirmedByCode) {
+                $delivery = $this->deliveryService->importFromPdfData(
+                    $filteredItems,
+                    self::DYNAMIS_SUPPLIER_ID,
+                    $request->input('delivery_date'),
+                    $uploadedFile->getClientOriginalName(),
+                    $parsed['data']['totals']
+                );
+
+                $this->persistDynamisLinks($filteredItems, $confirmedByCode);
+
+                return $delivery;
+            });
+
+            $this->saveDeliveryDocument(
+                $delivery,
+                $storedPath,
+                $uploadedFile->getClientOriginalName(),
+                'dynamis_xlsx',
+                [
+                    'item_count' => count($filteredItems),
+                    'products_calculated' => $parsed['data']['totals']['products_calculated'] ?? 0,
+                    'costs_calculated' => $parsed['data']['totals']['costs_calculated'] ?? 0,
+                    'grand_calculated' => $parsed['data']['totals']['grand_calculated'] ?? 0,
+                ],
+                $parsed['data']['metadata']['order_number'] ?? null
+            );
+
+            return redirect()
+                ->route('deliveries.show', $delivery)
+                ->with('success', 'Dynamis delivery imported: '.count($filteredItems).' items.');
+        } catch (\Throwable $e) {
+            return back()->withInput()->withErrors([
+                'xlsx_file' => 'Failed to import XLSX: '.$e->getMessage(),
+            ]);
+        } finally {
+            if (file_exists($storedPath)) {
+                unlink($storedPath);
+            }
+        }
+    }
+
+    /**
+     * Split matcher-annotated items into matched/unmatched UI buckets.
+     *
+     * @return array{0: array, 1: array}
+     */
+    private function splitMatches(array $items): array
+    {
+        $matched = [];
+        $unmatched = [];
+
+        foreach ($items as $item) {
+            $status = $item['match_status'] ?? 'unmatched';
+            if ($status === 'unmatched') {
+                $unmatched[] = $item;
+            } else {
+                $matched[] = $item;
+            }
+        }
+
+        return [$matched, $unmatched];
+    }
+
+    /**
+     * Insert/update dynamis_product_links rows for new matches. Existing rows
+     * (matched_by='manual' or previously saved) are left alone unless the user
+     * changed the mapping, in which case the newer decision wins.
+     */
+    private function persistDynamisLinks(array $items, array $confirmedByCode): void
+    {
+        foreach ($items as $item) {
+            $code = (string) $item['Code'];
+            $decision = $confirmedByCode[$code] ?? null;
+            if (! $decision) {
+                continue;
+            }
+
+            $matchedBy = $decision['matched_by'] ?? 'manual';
+            if (! in_array($matchedBy, ['ai', 'fuzzy', 'manual'], true)) {
+                $matchedBy = 'manual';
+            }
+
+            DynamisProductLink::updateOrCreate(
+                ['dynamis_code' => $code],
+                [
+                    'dynamis_description' => $item['Product'] ?? null,
+                    'pos_product_id' => (string) $decision['product_id'],
+                    'pos_product_code' => $decision['product_code'] ?? null,
+                    'matched_by' => $matchedBy,
+                    'confidence' => isset($decision['confidence']) ? (float) $decision['confidence'] : null,
+                    'ai_model' => $decision['ai_model'] ?? null,
+                    'verified_at' => now(),
+                    'verified_by' => auth()->id(),
+                ]
+            );
         }
     }
 

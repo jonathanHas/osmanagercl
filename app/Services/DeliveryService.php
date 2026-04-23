@@ -120,8 +120,14 @@ class DeliveryService
                     $normalizedTaxRate = $this->normalizeIrishVatRate($taxRate);
                 }
 
-                // Check if product exists in our system
-                $product = $this->findProductBySupplierCode($productCode, $supplierId);
+                // Caller-supplied product_id wins (e.g. Dynamis F&V matcher).
+                // When absent we fall back to the SupplierLink lookup.
+                $presetProductId = $record['product_id'] ?? null;
+                if ($presetProductId) {
+                    $product = Product::find($presetProductId);
+                } else {
+                    $product = $this->findProductBySupplierCode($productCode, $supplierId);
+                }
                 $supplierLink = SupplierLink::where('SupplierID', $supplierId)
                     ->where('SupplierCode', $productCode)
                     ->first();

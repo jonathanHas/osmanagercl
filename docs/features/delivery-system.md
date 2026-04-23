@@ -401,9 +401,24 @@ Code,Product,Ordered,Qty,RSP,Price,Tax,Value
 
 ### File Uploads
 - **Maximum Size**: 10MB
-- **Accepted Types**: .csv, .txt, .pdf
+- **Accepted Types**: .csv, .txt, .pdf, .xlsx (Dynamis F&V)
 - **Storage**: Temporary storage with automatic cleanup
 - **Validation**: Required supplier selection and delivery date
+
+## Dynamis Fruit & Veg XLSX Import (NEW! 2026-04-22)
+
+Dynamis (SupplierID 56) sends a structured `Historique(NN).xlsx` per delivery.
+The **XLSX (Dynamis)** tab on `/deliveries/create` parses it in PHP (PhpSpreadsheet,
+no Python), separates the `DIV0010` "MISCELLANEOUS TRANSPORT" freight row into
+`freight_charge`, and matches lines to till-visible F&V products by **name**
+(SupplierLink is not populated for F&V). Matching order: persisted link in
+`dynamis_product_links` → fuzzy Jaccard score on normalised tokens (threshold
+0.75) → unmatched with top-3 suggestions. An optional **Suggest with AI**
+button runs a bulk pass against the `dynamis_matcher` AI feature. Confirmed
+matches are saved so the next import auto-matches.
+
+See the [full documentation](./dynamis-delivery-import.md) for column mapping,
+matching internals, AI config, and the resume/follow-up checklist.
 
 ## PDF Delivery Parsing System
 

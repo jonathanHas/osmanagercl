@@ -464,6 +464,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/deliveries/detect-supplier', [DeliveryController::class, 'detectSupplier'])->name('deliveries.detect-supplier');
     Route::post('/deliveries/parse-pdf', [DeliveryController::class, 'parsePdf'])->name('deliveries.parse-pdf');
     Route::post('/deliveries/store-pdf', [DeliveryController::class, 'storePdf'])->name('deliveries.store-pdf');
+    Route::post('/deliveries/parse-xlsx', [DeliveryController::class, 'parseXlsx'])->name('deliveries.parse-xlsx');
+    Route::post('/deliveries/ai-suggest-xlsx', [DeliveryController::class, 'aiSuggestXlsx'])->name('deliveries.ai-suggest-xlsx');
+    Route::post('/deliveries/store-xlsx', [DeliveryController::class, 'storeXlsx'])->name('deliveries.store-xlsx');
     Route::get('/deliveries/{delivery}/scan', [DeliveryController::class, 'scan'])->name('deliveries.scan');
     Route::post('/deliveries/{delivery}/scan', [DeliveryController::class, 'processScan'])->name('deliveries.process-scan');
     Route::patch('/deliveries/{delivery}/items/{item}/quantity', [DeliveryController::class, 'adjustQuantity'])->name('deliveries.adjust-quantity');

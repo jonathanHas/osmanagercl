@@ -31,6 +31,11 @@ class AiSettingsService
             return self::get('invoice_parsing', $key, $default);
         }
 
+        // dynamis_matcher inherits from invoice_parsing when not explicitly set.
+        if ($feature === 'dynamis_matcher') {
+            return self::get('invoice_parsing', $key, $default);
+        }
+
         // Fall back to config
         $configValue = match ($feature) {
             'invoice_parsing' => config("invoices.ai_parsing.{$key}"),
@@ -112,6 +117,12 @@ class AiSettingsService
                 'base_url' => 'https://api.mistral.ai/v1',
                 'timeout' => '120',
             ],
+            'dynamis_matcher' => [
+                'provider' => 'mistral',
+                'model' => 'mistral-small-latest',
+                'base_url' => 'https://api.mistral.ai/v1',
+                'timeout' => '60',
+            ],
             'label_translation' => [
                 'provider' => 'gemini',
                 'model' => 'gemini-2.5-flash',
@@ -160,6 +171,7 @@ class AiSettingsService
             'invoice_parsing' => 'Invoice Parsing (Camera Capture)',
             'invoice_ai_fallback' => 'Invoice AI Fallback (Failed Parses)',
             'label_translation' => 'Label Translation',
+            'dynamis_matcher' => 'Dynamis Product Matcher',
         ];
     }
 }
