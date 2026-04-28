@@ -44,8 +44,16 @@ class SupplierCodeLookupController extends Controller
         $rawCodes = $request->input('supplier_codes');
         $supplierId = $request->input('supplier_id');
 
-        // Parse codes: split on commas, spaces, newlines, tabs, semicolons
-        $inputCodes = collect(preg_split('/[\s,;]+/', $rawCodes))
+        // Parse codes. If the input contains quoted substrings (e.g. supplier
+        // destock reports like: ❌ "43139B" Product code from imported file...),
+        // extract those. Otherwise split on commas/whitespace/semicolons.
+        if (preg_match_all('/"([^"]+)"/', $rawCodes, $matches) && ! empty($matches[1])) {
+            $tokens = $matches[1];
+        } else {
+            $tokens = preg_split('/[\s,;]+/', $rawCodes);
+        }
+
+        $inputCodes = collect($tokens)
             ->map(fn ($code) => trim($code))
             ->filter(fn ($code) => $code !== '')
             ->unique()
@@ -91,12 +99,12 @@ class SupplierCodeLookupController extends Controller
         // Fetch 3-month sales data (aggregates)
         $startDate = Carbon::now()->subMonths(3);
         $salesData = SalesDailySummary::select(
-                'product_code',
-                DB::raw('SUM(total_units) as total_units_sold'),
-                DB::raw('SUM(total_revenue) as total_revenue'),
-                DB::raw('COUNT(DISTINCT sale_date) as days_with_sales'),
-                DB::raw('MAX(sale_date) as last_sale')
-            )
+            'product_code',
+            DB::raw('SUM(total_units) as total_units_sold'),
+            DB::raw('SUM(total_revenue) as total_revenue'),
+            DB::raw('COUNT(DISTINCT sale_date) as days_with_sales'),
+            DB::raw('MAX(sale_date) as last_sale')
+        )
             ->whereIn('product_code', $barcodes)
             ->where('sale_date', '>=', $startDate->format('Y-m-d'))
             ->groupBy('product_code')
