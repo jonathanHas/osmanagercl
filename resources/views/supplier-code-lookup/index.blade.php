@@ -498,6 +498,18 @@
                     @endif
                 @endforeach
             @endif
+
+            // Open sales-history modal when an inline chart is clicked
+            document.querySelectorAll('canvas[data-product-id]').forEach(function(canvas) {
+                canvas.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const productId = this.dataset.productId;
+                    const productName = this.dataset.productName || 'Product';
+                    const salesWeeks = parseInt(this.dataset.salesWeeks, 10) || 12;
+                    if (!productId || typeof window.showSalesChartModal !== 'function') return;
+                    window.showSalesChartModal(productId, productName, salesWeeks);
+                });
+            });
         });
     </script>
     @endpush
