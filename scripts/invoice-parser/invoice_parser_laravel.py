@@ -23,7 +23,7 @@ from parsers import (
     mossfield, slievebloom, garryhinch, oxigen, kellys, udea, breadelicious,
     kleepaper, ardu, vico, loughboora, coolnagrower, merrymill, flogas,
     oldyard_organics, amazon, ecobike, dunany_flour, beechlawn, mentons, kilbeggan,
-    default_parser
+    hetzner, default_parser
 )
 
 # Configure logging
@@ -49,6 +49,8 @@ def detect_supplier(text):
         return openai, "OpenAI"
     elif "AKAMAI" in upper_text or "LINODE" in upper_text:
         return linode, "Linode"
+    elif "HETZNER" in upper_text:
+        return hetzner, "Hetzner"
     elif "JETBRAINS" in upper_text:
         return jetbrains, "JetBrains"
     elif "INDEPENDENT IRISH HEALTH FOODS" in upper_text:
