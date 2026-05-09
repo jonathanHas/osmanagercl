@@ -101,7 +101,7 @@
                                 @endif
                             </td>
                             <td class="px-4 py-2 text-right">{{ rtrim(rtrim(number_format($item->quantity, 3), '0'), '.') }}</td>
-                            <td class="px-4 py-2 text-right">€{{ number_format($item->unit_price, 4) }}</td>
+                            <td class="px-4 py-2 text-right">€{{ number_format($item->unit_price, 2) }}</td>
                             <td class="px-4 py-2 text-right">{{ number_format($item->vat_rate * 100, 1) }}%</td>
                             <td class="px-4 py-2 text-right">€{{ number_format($item->net_amount, 2) }}</td>
                             <td class="px-4 py-2 text-right">€{{ number_format($item->vat_amount, 2) }}</td>

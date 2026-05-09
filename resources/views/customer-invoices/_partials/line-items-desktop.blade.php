@@ -41,7 +41,7 @@
                         </div>
                     </div>
                     <div class="num">
-                        <input type="number" step="0.0001" min="0" inputmode="decimal" class="num-input mono" x-model.number="item.unit_price">
+                        <input type="number" step="0.01" min="0" inputmode="decimal" class="num-input mono" x-model.number="item.unit_price">
                     </div>
                     <div class="num">
                         <select class="vat-select" x-model.number="item.vat_rate">
