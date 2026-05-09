@@ -217,8 +217,8 @@ class ZebraLabel extends Model
 
             if (preg_match('/\^A\d*\w/', $segment) && preg_match('/\^FD([^\^]*)\^FS/', $segment, $fdMatch)) {
                 if (array_key_exists($fieldIndex, $replacements)) {
-                    $oldFd = '^FD' . $fdMatch[1] . '^FS';
-                    $newFd = '^FD' . $replacements[$fieldIndex] . '^FS';
+                    $oldFd = '^FD'.$fdMatch[1].'^FS';
+                    $newFd = '^FD'.$replacements[$fieldIndex].'^FS';
                     // Replace only the first occurrence in the modified block
                     $pos = strpos($modifiedBlock, $oldFd);
                     if ($pos !== false) {

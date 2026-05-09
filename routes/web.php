@@ -4,6 +4,8 @@ use App\Http\Controllers\BarrelCodeController;
 use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\CoffeeController;
 use App\Http\Controllers\CoffeeMetadataController;
+use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\CustomerInvoiceController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\DeliveryDocumentController;
 use App\Http\Controllers\DeliveryLegacyController;
@@ -24,6 +26,7 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\StockCheckReviewController;
 use App\Http\Controllers\StockingController;
 use App\Http\Controllers\TestScraperController;
+use App\Http\Controllers\TillProductBrowserController;
 use App\Http\Controllers\UdeaDiagnosticsController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\ZebraLabelController;
@@ -893,6 +896,28 @@ Route::middleware('auth')->group(function () {
             Route::post('/{snapshot}/finalize', [\App\Http\Controllers\Management\StockValuationController::class, 'finalize'])->name('finalize');
             Route::get('/{snapshot}/export', [\App\Http\Controllers\Management\StockValuationController::class, 'export'])->name('export');
             Route::delete('/{snapshot}', [\App\Http\Controllers\Management\StockValuationController::class, 'destroy'])->name('destroy');
+        });
+    });
+
+    // Customer Invoicing
+    Route::middleware('permission:customer-invoices.manage')->group(function () {
+        Route::get('customer-invoices', [CustomerInvoiceController::class, 'index'])->name('customer-invoices.index');
+        Route::get('customer-invoices/create', [CustomerInvoiceController::class, 'create'])->name('customer-invoices.create');
+        Route::post('customer-invoices', [CustomerInvoiceController::class, 'store'])->name('customer-invoices.store');
+        Route::get('customer-invoices/{customer_invoice}', [CustomerInvoiceController::class, 'show'])->name('customer-invoices.show');
+        Route::get('customer-invoices/{customer_invoice}/edit', [CustomerInvoiceController::class, 'edit'])->name('customer-invoices.edit');
+        Route::put('customer-invoices/{customer_invoice}', [CustomerInvoiceController::class, 'update'])->name('customer-invoices.update');
+        Route::delete('customer-invoices/{customer_invoice}', [CustomerInvoiceController::class, 'destroy'])->name('customer-invoices.destroy');
+        Route::post('customer-invoices/{customer_invoice}/issue', [CustomerInvoiceController::class, 'issue'])->name('customer-invoices.issue');
+        Route::post('customer-invoices/{customer_invoice}/void', [CustomerInvoiceController::class, 'void'])->name('customer-invoices.void');
+        Route::get('customer-invoices/{customer_invoice}/pdf', [CustomerInvoiceController::class, 'downloadPdf'])->name('customer-invoices.pdf');
+
+        Route::prefix('api/customer-invoices')->name('customer-invoices.api.')->group(function () {
+            Route::get('customers/search', [CustomerController::class, 'search'])->name('customers.search');
+            Route::post('customers', [CustomerController::class, 'store'])->name('customers.store');
+            Route::get('till-categories', [TillProductBrowserController::class, 'categories'])->name('till.categories');
+            Route::get('till-products', [TillProductBrowserController::class, 'products'])->name('till.products');
+            Route::get('products/search', [TillProductBrowserController::class, 'search'])->name('products.search');
         });
     });
 });

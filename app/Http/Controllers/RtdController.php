@@ -509,7 +509,7 @@ class RtdController extends Controller
             return $this->rtdResponse(true, "RTD for #{$invoice->invoice_number} unfrozen — ready for recomputation.", $invoice);
         }
 
-        return $this->rtdResponse(false, "Cannot unfreeze — invoice is in a submitted RTD submission.", $invoice);
+        return $this->rtdResponse(false, 'Cannot unfreeze — invoice is in a submitted RTD submission.', $invoice);
     }
 
     /**

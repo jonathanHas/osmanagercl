@@ -29,7 +29,8 @@
             revenueOpen: localStorage.getItem('nav_revenueOpen') === 'true',
             stockOpen: localStorage.getItem('nav_stockOpen') === 'true',
             systemToolsOpen: localStorage.getItem('nav_systemToolsOpen') === 'true',
-            adminOpen: localStorage.getItem('nav_adminOpen') === 'true'
+            adminOpen: localStorage.getItem('nav_adminOpen') === 'true',
+            customerOpen: localStorage.getItem('nav_customerOpen') === 'true'
         }"
         x-init="
             $watch('sidebarCollapsed', val => localStorage.setItem('sidebarCollapsed', val));
@@ -42,6 +43,7 @@
             $watch('stockOpen', val => localStorage.setItem('nav_stockOpen', val));
             $watch('systemToolsOpen', val => localStorage.setItem('nav_systemToolsOpen', val));
             $watch('adminOpen', val => localStorage.setItem('nav_adminOpen', val));
+            $watch('customerOpen', val => localStorage.setItem('nav_customerOpen', val));
         "
         class="flex h-screen bg-gray-100">
             <!-- Sidebar -->
@@ -101,6 +103,18 @@
                                 </svg>
                                 <span class="sr-only">Upload Invoices</span>
                             </a>
+
+                            @if(auth()->user()->can('customer-invoices.manage'))
+                            <a href="{{ route('customer-invoices.index') }}"
+                               title="Customer Invoices"
+                               aria-label="Customer Invoices"
+                               class="group flex h-10 w-10 items-center justify-center rounded-lg bg-gray-800 text-gray-400 transition hover:bg-blue-600/20 hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-gray-900">
+                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                                </svg>
+                                <span class="sr-only">Customer Invoices</span>
+                            </a>
+                            @endif
 
                             <a href="{{ route('suppliers.outstanding-report') }}"
                                title="Suppliers Outstanding Report"
@@ -172,6 +186,37 @@
                             </a>
                         </div>
                         @endunless
+
+                        <!-- CUSTOMER SECTION -->
+                        @if(auth()->user()->can('customer-invoices.manage'))
+                        <div class="px-2 pt-4">
+                            <button @click="customerOpen = !customerOpen"
+                                    class="w-full flex items-center justify-between text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-300 py-2">
+                                <span>Customer</span>
+                                <svg class="w-4 h-4 transition-transform duration-200" :class="customerOpen ? 'rotate-90' : 'rotate-0'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div x-show="customerOpen" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-1">
+                            <a href="{{ route('customer-invoices.index') }}"
+                               class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('customer-invoices.index') || request()->routeIs('customer-invoices.show') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                                <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                Customer Invoices
+                            </a>
+
+                            <a href="{{ route('customer-invoices.create') }}"
+                               class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('customer-invoices.create') || request()->routeIs('customer-invoices.edit') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                                <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                </svg>
+                                New Invoice
+                            </a>
+                        </div>
+                        @endif
 
                         <!-- KITCHEN SECTION -->
                         @if(auth()->user()->hasAnyRole(['admin', 'manager']))

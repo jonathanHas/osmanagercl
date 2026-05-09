@@ -78,7 +78,7 @@ class ImportLegacyCashReconciliations extends Command
                 (clone $query)->pluck('cc.MONEY')
             )->count();
 
-            $this->line("  Would import: ".($totalCount - $existingCount)." new reconciliations");
+            $this->line('  Would import: '.($totalCount - $existingCount).' new reconciliations');
             $this->line("  Already exist: {$existingCount} (would be skipped)");
 
             return 0;

@@ -35,7 +35,7 @@ class DestockReviewController extends Controller
         }
 
         if ($request->filled('barcode')) {
-            $query->where('barcode', 'like', '%' . $request->barcode . '%');
+            $query->where('barcode', 'like', '%'.$request->barcode.'%');
         }
 
         $audits = $query->paginate(30);
@@ -63,15 +63,15 @@ class DestockReviewController extends Controller
 
         // Build query
         $query = SalesDailySummary::select(
-                'product_code',
-                'product_name',
-                'category_id',
-                DB::raw('SUM(total_units) as total_units_sold'),
-                DB::raw('SUM(total_revenue) as total_revenue'),
-                DB::raw('COUNT(DISTINCT sale_date) as days_with_sales'),
-                DB::raw('MIN(sale_date) as first_sale'),
-                DB::raw('MAX(sale_date) as last_sale')
-            )
+            'product_code',
+            'product_name',
+            'category_id',
+            DB::raw('SUM(total_units) as total_units_sold'),
+            DB::raw('SUM(total_revenue) as total_revenue'),
+            DB::raw('COUNT(DISTINCT sale_date) as days_with_sales'),
+            DB::raw('MIN(sale_date) as first_sale'),
+            DB::raw('MAX(sale_date) as last_sale')
+        )
             ->where('sale_date', '>=', $startDate->format('Y-m-d'))
             ->whereNotIn('product_code', $stockedBarcodes);
 
@@ -83,8 +83,8 @@ class DestockReviewController extends Controller
         // Search by product name or barcode
         if ($search) {
             $query->where(function ($q) use ($search) {
-                $q->where('product_name', 'like', '%' . $search . '%')
-                  ->orWhere('product_code', 'like', '%' . $search . '%');
+                $q->where('product_name', 'like', '%'.$search.'%')
+                    ->orWhere('product_code', 'like', '%'.$search.'%');
             });
         }
 

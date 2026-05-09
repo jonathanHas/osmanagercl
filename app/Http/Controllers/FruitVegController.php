@@ -366,7 +366,7 @@ class FruitVegController extends Controller
                         'field_index' => $priceField[0],
                         'label_value' => number_format($priceField[1], 2),
                         'db_value' => number_format($dbPrice, 2),
-                        'new_field' => '\\15' . number_format($dbPrice, 2),
+                        'new_field' => '\\15'.number_format($dbPrice, 2),
                     ];
                 }
             }
@@ -974,7 +974,7 @@ class FruitVegController extends Controller
                         'field_index' => $priceField[0],
                         'label_value' => number_format($priceField[1], 2),
                         'db_value' => number_format($dbPrice, 2),
-                        'new_field' => '\\15' . number_format($dbPrice, 2),
+                        'new_field' => '\\15'.number_format($dbPrice, 2),
                     ];
                 }
             }

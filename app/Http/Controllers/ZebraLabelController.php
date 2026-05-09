@@ -18,8 +18,8 @@ class ZebraLabelController extends Controller
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('product_code', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%");
+                        ->orWhere('product_code', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%");
                 });
             })
             ->latest()
@@ -227,7 +227,7 @@ class ZebraLabelController extends Controller
 
         return response()->json([
             'success' => $success,
-            'message' => $success ? "Print job sent ({$copies} " . ($copies === 1 ? 'copy' : 'copies') . ')' : 'Print failed',
+            'message' => $success ? "Print job sent ({$copies} ".($copies === 1 ? 'copy' : 'copies').')' : 'Print failed',
             'output' => trim($output ?? 'No output'),
         ], $success ? 200 : 500);
     }

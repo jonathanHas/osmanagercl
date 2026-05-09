@@ -110,12 +110,12 @@ class KitchenRepository
     {
         return Product::active()
             ->search($search)
-            ->orderByRaw("CASE
+            ->orderByRaw('CASE
                 WHEN CODE = ? THEN 0
                 WHEN NAME = ? THEN 1
                 WHEN NAME LIKE ? THEN 2
                 ELSE 3
-            END", [$search, $search, $search.'%'])
+            END', [$search, $search, $search.'%'])
             ->orderBy('NAME')
             ->limit($limit)
             ->get()

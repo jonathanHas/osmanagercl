@@ -222,6 +222,14 @@ class RolesAndPermissionsSeeder extends Seeder
                 'module' => 'User Management',
             ],
 
+            // Customer Invoicing
+            [
+                'name' => 'customer-invoices.manage',
+                'display_name' => 'Manage Customer Invoices',
+                'description' => 'Create, issue, view and download customer invoices',
+                'module' => 'Customer Invoicing',
+            ],
+
             // System Settings
             [
                 'name' => 'settings.view',
@@ -287,6 +295,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'labels.manage',
             'categories.manage',
             'users.view',
+            'customer-invoices.manage',
         ]);
 
         foreach ($managerPermissions as $permission) {
