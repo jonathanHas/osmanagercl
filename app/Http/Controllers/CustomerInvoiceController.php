@@ -63,22 +63,39 @@ class CustomerInvoiceController extends Controller
         return view('customer-invoices.show', ['invoice' => $customerInvoice]);
     }
 
-    public function edit(CustomerInvoice $customerInvoice)
+    public function edit(CustomerInvoice $customerInvoice, Request $request)
     {
-        abort_unless($customerInvoice->isEditable(), 403, 'Issued invoices cannot be edited.');
+        $user = $request->user();
+        $isAdminEdit = ! $customerInvoice->isEditable() && $customerInvoice->isAdminEditable() && $user->isAdmin();
+
+        abort_unless($customerInvoice->isEditable() || $isAdminEdit, 403, 'This invoice cannot be edited.');
+
         $customerInvoice->load('items', 'customer');
 
-        return view('customer-invoices.create', ['invoice' => $customerInvoice]);
+        return view('customer-invoices.create', [
+            'invoice' => $customerInvoice,
+            'adminEdit' => $isAdminEdit,
+        ]);
     }
 
     public function update(Request $request, CustomerInvoice $customerInvoice)
     {
-        abort_unless($customerInvoice->isEditable(), 403, 'Issued invoices cannot be edited.');
+        $user = $request->user();
+        $isAdminEdit = ! $customerInvoice->isEditable() && $customerInvoice->isAdminEditable() && $user->isAdmin();
+
+        abort_unless($customerInvoice->isEditable() || $isAdminEdit, 403, 'This invoice cannot be edited.');
 
         $data = $this->validateInvoice($request);
 
         $customerInvoice->update($data['invoice']);
-        $this->service->syncItems($customerInvoice, $data['items']);
+        $this->service->syncItems($customerInvoice, $data['items'], force: $isAdminEdit);
+
+        if ($isAdminEdit) {
+            $this->service->markAdminEdited($customerInvoice);
+
+            return redirect()->route('customer-invoices.show', $customerInvoice)
+                ->with('status', "Invoice {$customerInvoice->invoice_number} updated (admin edit logged).");
+        }
 
         if ($request->boolean('issue')) {
             $this->service->issue($customerInvoice);

@@ -50,17 +50,26 @@
             <span>Total</span>
             <span class="mono">€<span x-text="totalGross().toFixed(2)"></span></span>
         </div>
-        <div class="totals-actions">
+        <div class="totals-actions" x-show="!adminEdit">
             <button type="button" class="btn ghost" @click="submitForm('0')">Save draft</button>
             <button type="button" class="btn primary" @click="submitForm('1')">
                 Issue &amp; save
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
             </button>
         </div>
+        <div class="totals-actions" x-show="adminEdit" x-cloak style="grid-template-columns: 1fr;">
+            <button type="button" class="btn primary" @click="submitForm('0')">
+                Save changes
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            </button>
+        </div>
     </div>
 @else
-    <div class="m-actions">
+    <div class="m-actions" x-show="!adminEdit">
         <button type="button" class="btn ghost" @click="submitForm('0')">Save draft</button>
         <button type="button" class="btn primary" @click="submitForm('1')">Issue &amp; save</button>
+    </div>
+    <div class="m-actions" x-show="adminEdit" x-cloak style="grid-template-columns: 1fr;">
+        <button type="button" class="btn primary" @click="submitForm('0')">Save changes</button>
     </div>
 @endif

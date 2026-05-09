@@ -41,10 +41,16 @@ class CustomerInvoiceService
 
     /**
      * Replace an invoice's line items wholesale (used by edit/update on a draft).
+     *
+     * Pass $force=true to override the draft-only guard — used by admins editing
+     * an already-issued invoice. Voided invoices are still rejected.
      */
-    public function syncItems(CustomerInvoice $invoice, array $items): void
+    public function syncItems(CustomerInvoice $invoice, array $items, bool $force = false): void
     {
-        if (! $invoice->isEditable()) {
+        if ($invoice->status === CustomerInvoice::STATUS_VOID) {
+            throw new \DomainException('Voided invoices cannot be edited.');
+        }
+        if (! $invoice->isEditable() && ! $force) {
             throw new \DomainException('Only draft invoices can be edited.');
         }
 
@@ -60,6 +66,16 @@ class CustomerInvoiceService
             $invoice->refresh();
             $invoice->calculateTotals();
         });
+    }
+
+    /**
+     * Stamp the audit fields when an admin edits a non-draft invoice.
+     */
+    public function markAdminEdited(CustomerInvoice $invoice): void
+    {
+        $invoice->last_edited_at = now();
+        $invoice->last_edited_by = Auth::id();
+        $invoice->save();
     }
 
     /**

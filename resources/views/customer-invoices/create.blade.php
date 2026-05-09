@@ -12,6 +12,7 @@
         ])->values() : collect();
         $invoiceNumber = $isEdit && $invoice->invoice_number ? $invoice->invoice_number : 'INV-'.now()->year.'-DRAFT';
         $isDraft = ! $isEdit || $invoice->isEditable();
+        $adminEdit = $adminEdit ?? false;
     @endphp
 
     <div class="invoice-composer"
@@ -36,6 +37,7 @@
                  'customerSearch' => route('customer-invoices.api.customers.search'),
                  'customerStore' => route('customer-invoices.api.customers.store'),
              ],
+             'adminEdit' => $adminEdit,
          ]) }})">
 
         {{-- Top bar --}}
@@ -65,6 +67,14 @@
                         <li>{{ $err }}</li>
                     @endforeach
                 </ul>
+            </div>
+        @endif
+
+        @if ($adminEdit)
+            <div class="errors" style="background: oklch(0.78 0.13 80 / 0.12); border-color: oklch(0.78 0.13 80 / 0.4); color: #f7c777;">
+                <strong>Admin edit</strong> — you are editing the issued invoice <strong>{{ $invoice->invoice_number }}</strong>.
+                The invoice number and status are preserved; the change will be recorded in the audit trail (last_edited_at, last_edited_by).
+                Use this only to correct mistakes — for substantive changes, void and reissue instead.
             </div>
         @endif
 
@@ -356,6 +366,7 @@
             return {
                 urls: config.urls,
                 isEdit: config.isEdit,
+                adminEdit: config.adminEdit ?? false,
                 invoice: config.invoice ?? {
                     issue_date: new Date().toISOString().slice(0, 10),
                     due_date: '',

@@ -24,6 +24,14 @@
                 @if ($invoice->isIssued())
                     <a href="{{ route('customer-invoices.pdf', $invoice) }}"
                        class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded">Download PDF</a>
+                    @if (auth()->user()->isAdmin())
+                        <a href="{{ route('customer-invoices.edit', $invoice) }}"
+                           class="bg-yellow-700 hover:bg-yellow-800 text-white px-4 py-2 rounded"
+                           onclick="return confirm('Edit an issued invoice? This is admin-only and will be logged.');"
+                           title="Admin override — edit will be recorded in the audit trail">
+                            Edit (admin)
+                        </a>
+                    @endif
                     <form action="{{ route('customer-invoices.void', $invoice) }}" method="POST" class="inline"
                           onsubmit="return confirm('Void this invoice? The number will be retained for audit trail.');">
                         @csrf
@@ -35,6 +43,14 @@
 
         @if (session('status'))
             <div class="mb-4 rounded bg-green-700 text-white px-4 py-2">{{ session('status') }}</div>
+        @endif
+
+        @if ($invoice->last_edited_at)
+            <div class="mb-4 rounded bg-yellow-900/40 border border-yellow-700/50 text-yellow-200 px-4 py-2 text-sm">
+                <strong>Admin-edited</strong> on {{ $invoice->last_edited_at->format('Y-m-d H:i') }}
+                @if ($invoice->lastEditor) by {{ $invoice->lastEditor->name }}@endif.
+                Invoice number and audit trail preserved.
+            </div>
         @endif
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">

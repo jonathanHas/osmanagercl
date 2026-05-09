@@ -43,12 +43,15 @@ class CustomerInvoice extends Model
         'created_by',
         'voided_at',
         'voided_by',
+        'last_edited_at',
+        'last_edited_by',
     ];
 
     protected $casts = [
         'issue_date' => 'date',
         'due_date' => 'date',
         'voided_at' => 'datetime',
+        'last_edited_at' => 'datetime',
         'subtotal' => 'decimal:2',
         'vat_total' => 'decimal:2',
         'total' => 'decimal:2',
@@ -83,9 +86,27 @@ class CustomerInvoice extends Model
         return $this->belongsTo(User::class, 'voided_by');
     }
 
+    public function lastEditor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'last_edited_by');
+    }
+
+    /**
+     * Drafts can be edited by anyone with manage permission.
+     */
     public function isEditable(): bool
     {
         return $this->status === self::STATUS_DRAFT;
+    }
+
+    /**
+     * Admins can edit any non-void invoice — used to fix typos/mistakes after an
+     * invoice has been issued. Edits are recorded in last_edited_at/by.
+     * Voided invoices are immutable for audit reasons.
+     */
+    public function isAdminEditable(): bool
+    {
+        return $this->status !== self::STATUS_VOID;
     }
 
     public function isIssued(): bool
