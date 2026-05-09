@@ -25,6 +25,7 @@
                  'customer_email' => $invoice->customer_email,
                  'issue_date' => optional($invoice->issue_date)->toDateString(),
                  'due_date' => optional($invoice->due_date)?->toDateString(),
+                 'discount_percent' => (float) $invoice->discount_percent,
                  'notes' => $invoice->notes,
              ] : null,
              'items' => $existingItems,
@@ -80,6 +81,7 @@
             <input type="hidden" name="customer_vat_number" :value="customer.vat_number">
             <input type="hidden" name="issue_date" :value="invoice.issue_date">
             <input type="hidden" name="due_date" :value="invoice.due_date">
+            <input type="hidden" name="discount_percent" :value="invoice.discount_percent || 0">
             <input type="hidden" name="notes" :value="invoice.notes">
             <input type="hidden" name="issue" :value="submitMode">
 
@@ -276,6 +278,30 @@
 
                 <footer class="m-foot">
                     <div class="m-totals">
+                        <div class="m-trow" x-show="hasDiscount()" x-cloak>
+                            <span>Subtotal (before)</span>
+                            <span class="mono">€<span x-text="preDiscountNet().toFixed(2)"></span></span>
+                        </div>
+                        <div class="m-trow" x-show="hasDiscount()" x-cloak>
+                            <span style="display: inline-flex; align-items: center; gap: 6px;">
+                                Discount
+                                <input type="number" step="0.01" min="0" max="100" inputmode="decimal"
+                                       x-model.number="invoice.discount_percent"
+                                       style="width: 56px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 4px; padding: 2px 4px; color: var(--text); font-family: var(--mono); font-size: 11.5px; text-align: right;">
+                                <span style="color: var(--text-mute); font-size: 11px;">%</span>
+                                <button type="button" @click="invoice.discount_percent = 0"
+                                        style="background: none; border: 0; color: var(--text-mute); font-size: 11px;">×</button>
+                            </span>
+                            <span class="mono" style="color: var(--danger);">−€<span x-text="discountAmount().toFixed(2)"></span></span>
+                        </div>
+                        <div class="m-trow" x-show="!hasDiscount()" x-cloak>
+                            <button type="button"
+                                    @click="invoice.discount_percent = 10"
+                                    class="link-btn" style="text-align: left; padding: 0;">
+                                + Add discount
+                            </button>
+                            <span></span>
+                        </div>
                         <div class="m-trow"><span>Subtotal</span><span class="mono">€<span x-text="totalNet().toFixed(2)"></span></span></div>
                         <div class="m-trow"><span>VAT</span><span class="mono">€<span x-text="totalVat().toFixed(2)"></span></span></div>
                         <div class="m-trow total"><span>Total</span><span class="mono">€<span x-text="totalGross().toFixed(2)"></span></span></div>
@@ -300,7 +326,13 @@
                     <div class="field"><label>City</label><input type="text" x-model="newCustomer.city"></div>
                     <div class="field"><label>Postcode</label><input type="text" x-model="newCustomer.postcode"></div>
                 </div>
-                <div class="field full"><label>VAT Number</label><input type="text" x-model="newCustomer.vat_number"></div>
+                <div class="grid-2">
+                    <div class="field"><label>VAT Number</label><input type="text" x-model="newCustomer.vat_number"></div>
+                    <div class="field">
+                        <label>Default discount %</label>
+                        <input type="number" step="0.01" min="0" max="100" inputmode="decimal" placeholder="0" x-model.number="newCustomer.default_discount_percent">
+                    </div>
+                </div>
                 <div class="totals-actions">
                     <button type="button" class="btn ghost" @click="showCustomerModal = false">Cancel</button>
                     <button type="button" class="btn primary" @click="saveCustomer()">Save customer</button>
@@ -327,6 +359,7 @@
                 invoice: config.invoice ?? {
                     issue_date: new Date().toISOString().slice(0, 10),
                     due_date: '',
+                    discount_percent: 0,
                     notes: '',
                 },
                 customer: {
@@ -353,7 +386,7 @@
                 loadingProducts: false,
 
                 showCustomerModal: false,
-                newCustomer: { name: '', email: '', phone: '', address_line1: '', address_line2: '', city: '', postcode: '', country: 'IE', vat_number: '' },
+                newCustomer: { name: '', email: '', phone: '', address_line1: '', address_line2: '', city: '', postcode: '', country: 'IE', vat_number: '', default_discount_percent: 0 },
 
                 mobileTab: 'items',
                 submitMode: '0',
@@ -482,9 +515,57 @@
                 lineGross(item) {
                     return Math.round((this.lineNet(item) + this.lineVat(item)) * 100) / 100;
                 },
-                totalNet() { return this.items.reduce((s, i) => s + this.lineNet(i), 0); },
-                totalVat() { return this.items.reduce((s, i) => s + this.lineVat(i), 0); },
-                totalGross() { return this.items.reduce((s, i) => s + this.lineGross(i), 0); },
+
+                discountFactor() {
+                    const p = parseFloat(this.invoice.discount_percent) || 0;
+                    return Math.max(0, 1 - p / 100);
+                },
+
+                /**
+                 * Mirror the server-side calculateTotals(): group line nets by VAT band,
+                 * apply discount factor per band, recompute VAT on the discounted net.
+                 * This keeps live preview consistent with what the controller will store.
+                 */
+                computedBands() {
+                    const bands = {
+                        '0.23': { rate: 0.23, net: 0 },
+                        '0.135': { rate: 0.135, net: 0 },
+                        '0.09': { rate: 0.09, net: 0 },
+                        '0': { rate: 0, net: 0 },
+                    };
+                    for (const it of this.items) {
+                        const r = parseFloat(it.vat_rate) || 0;
+                        const key = String(r);
+                        if (bands[key]) bands[key].net += this.lineNet(it);
+                        else bands['0.23'].net += this.lineNet(it);
+                    }
+                    const factor = this.discountFactor();
+                    for (const k of Object.keys(bands)) {
+                        bands[k].postNet = Math.round(bands[k].net * factor * 100) / 100;
+                        bands[k].postVat = Math.round(bands[k].postNet * bands[k].rate * 100) / 100;
+                    }
+                    return bands;
+                },
+
+                preDiscountNet() {
+                    return this.items.reduce((s, i) => s + this.lineNet(i), 0);
+                },
+
+                totalNet() {
+                    const b = this.computedBands();
+                    return b['0.23'].postNet + b['0.135'].postNet + b['0.09'].postNet + b['0'].postNet;
+                },
+                totalVat() {
+                    const b = this.computedBands();
+                    return b['0.23'].postVat + b['0.135'].postVat + b['0.09'].postVat + b['0'].postVat;
+                },
+                totalGross() { return this.totalNet() + this.totalVat(); },
+                discountAmount() {
+                    return Math.round((this.preDiscountNet() - this.totalNet()) * 100) / 100;
+                },
+                hasDiscount() {
+                    return (parseFloat(this.invoice.discount_percent) || 0) > 0;
+                },
 
                 submitForm(mode) {
                     this.submitMode = mode;
@@ -506,6 +587,11 @@
                         address: [c.address_line1, c.address_line2, c.city, c.postcode].filter(Boolean).join('\n'),
                         vat_number: c.vat_number ?? '',
                     };
+                    // Auto-apply customer's default wholesale discount if set
+                    const defDisc = parseFloat(c.default_discount_percent);
+                    if (!isNaN(defDisc) && defDisc > 0) {
+                        this.invoice.discount_percent = defDisc;
+                    }
                     this.customerResults = [];
                     this.customerSearchTerm = '';
                 },
@@ -528,7 +614,7 @@
                     const { data } = await r.json();
                     this.pickCustomer(data);
                     this.showCustomerModal = false;
-                    this.newCustomer = { name: '', email: '', phone: '', address_line1: '', address_line2: '', city: '', postcode: '', country: 'IE', vat_number: '' };
+                    this.newCustomer = { name: '', email: '', phone: '', address_line1: '', address_line2: '', city: '', postcode: '', country: 'IE', vat_number: '', default_discount_percent: 0 };
                 },
 
                 // ===== Camera =====

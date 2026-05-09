@@ -109,6 +109,15 @@
                 @endforelse
             </div>
             <div class="bg-gray-800 p-4 rounded text-right">
+                @if ($invoice->hasDiscount())
+                    <div class="flex justify-between text-gray-300 py-1">
+                        <span>Subtotal (before discount):</span><span>€{{ number_format($invoice->getPreDiscountNet(), 2) }}</span>
+                    </div>
+                    <div class="flex justify-between text-red-400 py-1">
+                        <span>Discount ({{ rtrim(rtrim(number_format($invoice->discount_percent, 2), '0'), '.') }}%):</span>
+                        <span>−€{{ number_format($invoice->getDiscountAmount(), 2) }}</span>
+                    </div>
+                @endif
                 <div class="flex justify-between text-gray-300 py-1">
                     <span>Subtotal (net):</span><span>€{{ number_format($invoice->subtotal, 2) }}</span>
                 </div>

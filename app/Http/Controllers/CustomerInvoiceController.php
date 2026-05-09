@@ -134,6 +134,7 @@ class CustomerInvoiceController extends Controller
             'customer_email' => ['nullable', 'email', 'max:255'],
             'issue_date' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:issue_date'],
+            'discount_percent' => ['nullable', 'numeric', 'gte:0', 'lte:100'],
             'notes' => ['nullable', 'string', 'max:5000'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.pos_product_id' => ['nullable', 'string', 'max:64'],

@@ -28,7 +28,7 @@ class CustomerController extends Controller
         $customers = $query->orderBy('name')->limit(25)->get([
             'id', 'name', 'email', 'phone',
             'address_line1', 'address_line2', 'city', 'postcode', 'country',
-            'vat_number',
+            'vat_number', 'default_discount_percent',
         ]);
 
         return response()->json(['data' => $customers]);
@@ -46,6 +46,7 @@ class CustomerController extends Controller
             'postcode' => ['nullable', 'string', 'max:32'],
             'country' => ['nullable', 'string', 'size:2'],
             'vat_number' => ['nullable', 'string', 'max:64'],
+            'default_discount_percent' => ['nullable', 'numeric', 'gte:0', 'lte:100'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 

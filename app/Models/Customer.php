@@ -22,8 +22,13 @@ class Customer extends Model
         'postcode',
         'country',
         'vat_number',
+        'default_discount_percent',
         'notes',
         'created_by',
+    ];
+
+    protected $casts = [
+        'default_discount_percent' => 'decimal:2',
     ];
 
     public function invoices(): HasMany

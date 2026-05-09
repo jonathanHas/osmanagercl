@@ -29,6 +29,7 @@ class CustomerInvoice extends Model
         'subtotal',
         'vat_total',
         'total',
+        'discount_percent',
         'standard_net',
         'standard_vat',
         'reduced_net',
@@ -51,6 +52,7 @@ class CustomerInvoice extends Model
         'subtotal' => 'decimal:2',
         'vat_total' => 'decimal:2',
         'total' => 'decimal:2',
+        'discount_percent' => 'decimal:2',
         'standard_net' => 'decimal:2',
         'standard_vat' => 'decimal:2',
         'reduced_net' => 'decimal:2',
@@ -99,54 +101,75 @@ class CustomerInvoice extends Model
     /**
      * Recalculate totals from line items, including per-VAT-band breakdown.
      * Bands match the supplier Invoice model so the PDF/UI can share the same shape.
+     *
+     * If discount_percent is set, the band columns and subtotal/vat_total/total
+     * store POST-discount amounts (the customer-paid figures). Line-item amounts
+     * remain at their listed prices — the discount is reconstructable as
+     * getPreDiscountNet() - subtotal.
      */
     public function calculateTotals(): void
     {
         $items = $this->items()->get();
+        $factor = max(0.0, 1.0 - ((float) $this->discount_percent / 100));
 
-        $this->subtotal = round($items->sum('net_amount'), 2);
-        $this->vat_total = round($items->sum('vat_amount'), 2);
-        $this->total = round($items->sum('gross_amount'), 2);
-
-        $this->standard_net = 0;
-        $this->standard_vat = 0;
-        $this->reduced_net = 0;
-        $this->reduced_vat = 0;
-        $this->second_reduced_net = 0;
-        $this->second_reduced_vat = 0;
-        $this->zero_net = 0;
-        $this->zero_vat = 0;
+        // Group line nets by VAT band first (pre-discount).
+        $bands = [
+            'standard' => ['rate' => 0.23, 'net' => 0.0],
+            'reduced' => ['rate' => 0.135, 'net' => 0.0],
+            'second_reduced' => ['rate' => 0.09, 'net' => 0.0],
+            'zero' => ['rate' => 0.0, 'net' => 0.0],
+        ];
 
         foreach ($items as $item) {
             $rate = (string) (float) $item->vat_rate; // avoid float-key/decimal-string gotcha
-
-            switch ($rate) {
-                case '0.23':
-                    $this->standard_net += $item->net_amount;
-                    $this->standard_vat += $item->vat_amount;
-                    break;
-                case '0.135':
-                    $this->reduced_net += $item->net_amount;
-                    $this->reduced_vat += $item->vat_amount;
-                    break;
-                case '0.09':
-                    $this->second_reduced_net += $item->net_amount;
-                    $this->second_reduced_vat += $item->vat_amount;
-                    break;
-                case '0':
-                case '0.0':
-                    $this->zero_net += $item->net_amount;
-                    $this->zero_vat += $item->vat_amount;
-                    break;
-                default:
-                    // Non-standard rates roll into standard bucket
-                    $this->standard_net += $item->net_amount;
-                    $this->standard_vat += $item->vat_amount;
-                    break;
-            }
+            $key = match ($rate) {
+                '0.23' => 'standard',
+                '0.135' => 'reduced',
+                '0.09' => 'second_reduced',
+                '0', '0.0' => 'zero',
+                default => 'standard',
+            };
+            $bands[$key]['net'] += (float) $item->net_amount;
         }
 
+        // Apply discount factor per-band, then recompute VAT on the discounted net.
+        $subtotal = 0.0;
+        $vatTotal = 0.0;
+        foreach ($bands as $key => $b) {
+            $postNet = round($b['net'] * $factor, 2);
+            $postVat = round($postNet * $b['rate'], 2);
+            $this->{$key.'_net'} = $postNet;
+            $this->{$key.'_vat'} = $postVat;
+            $subtotal += $postNet;
+            $vatTotal += $postVat;
+        }
+
+        $this->subtotal = round($subtotal, 2);
+        $this->vat_total = round($vatTotal, 2);
+        $this->total = round($subtotal + $vatTotal, 2);
+
         $this->save();
+    }
+
+    /**
+     * Pre-discount net (sum of line net amounts).
+     */
+    public function getPreDiscountNet(): float
+    {
+        return round((float) $this->items->sum('net_amount'), 2);
+    }
+
+    /**
+     * Discount amount on net (positive number; 0 when no discount applied).
+     */
+    public function getDiscountAmount(): float
+    {
+        return round($this->getPreDiscountNet() - (float) $this->subtotal, 2);
+    }
+
+    public function hasDiscount(): bool
+    {
+        return (float) $this->discount_percent > 0;
     }
 
     public function getVatBreakdown(): array

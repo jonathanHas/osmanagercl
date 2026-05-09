@@ -125,4 +125,25 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Business Details
+    |--------------------------------------------------------------------------
+    |
+    | Used on customer-facing documents (invoices, receipts).
+    |
+    */
+
+    'business' => [
+        'name' => 'Mossfield Organic Store',
+        'address_line1' => 'Main Street',
+        'address_line2' => 'Birr',
+        'county' => 'Co. Offaly',
+        'postcode' => 'R42TY29',
+        'phone' => '057 9125881',
+        'email' => 'accounts@organicstore.ie',
+        'vat' => '4390864GH',
+        'organic_cert_image' => 'images/organic-cert.png',
+    ],
+
 ];
