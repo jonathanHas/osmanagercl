@@ -58,10 +58,17 @@ class TillProductBrowser
     }
 
     /**
-     * Search till-visible products by barcode or name. Order: exact code match first,
-     * then exact name, then prefix matches, then contains.
+     * Search products by barcode or name.
+     *
+     * Default scope is ALL active products — invoicing sometimes needs items
+     * that aren't on the till menu (back-stock, wholesale-only, etc.).
+     * Set $tillOnly = true to restrict to till-visible items.
+     *
+     * Result order: exact code match → exact name → prefix matches → contains;
+     * within those buckets, till-visible items are surfaced before non-till.
+     * Each Product has a transient `is_till_visible` flag set on it.
      */
-    public function searchTillVisible(string $term, int $limit = 50): EloquentCollection
+    public function searchTillVisible(string $term, int $limit = 50, bool $tillOnly = false): EloquentCollection
     {
         $term = trim($term);
         if ($term === '') {
@@ -69,23 +76,43 @@ class TillProductBrowser
         }
 
         $visibleIds = ProductsCat::pluck('PRODUCT')->all();
-        if (empty($visibleIds)) {
-            return new EloquentCollection;
-        }
-
         $like = '%'.$term.'%';
         $prefix = $term.'%';
 
-        return Product::with('tax')
-            ->whereIn('ID', $visibleIds)
+        // SQLite doesn't support boolean expressions in ORDER BY directly,
+        // so we hand-roll a CASE that prioritises till-visible items.
+        $tillCase = empty($visibleIds)
+            ? 'NULL'
+            : 'CASE WHEN PRODUCTS.ID IN ('.implode(',', array_map(fn ($id) => "'".addslashes($id)."'", $visibleIds)).') THEN 0 ELSE 1 END';
+
+        $query = Product::with('tax')
+            ->active()
             ->where(function ($q) use ($like) {
                 $q->where('NAME', 'like', $like)
                     ->orWhere('CODE', 'like', $like)
                     ->orWhere('REFERENCE', 'like', $like);
-            })
+            });
+
+        if ($tillOnly) {
+            if (empty($visibleIds)) {
+                return new EloquentCollection;
+            }
+            $query->whereIn('ID', $visibleIds);
+        }
+
+        $products = $query
             ->orderByRaw('CASE WHEN CODE = ? THEN 0 WHEN NAME = ? THEN 1 WHEN CODE LIKE ? THEN 2 WHEN NAME LIKE ? THEN 3 ELSE 4 END', [$term, $term, $prefix, $prefix])
+            ->orderByRaw($tillCase)
             ->orderBy('NAME')
             ->limit($limit)
             ->get();
+
+        // Stamp till-visibility on each result for the UI badge.
+        $visibleSet = array_flip($visibleIds);
+        $products->each(function ($p) use ($visibleSet) {
+            $p->is_till_visible = isset($visibleSet[$p->ID]);
+        });
+
+        return $products;
     }
 }

@@ -20,7 +20,10 @@
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
             </button>
         </div>
-        <div class="scan-hint">Press <kbd>⏎</kbd> to commit top match</div>
+        <div class="scan-hint">
+            Press <kbd>⏎</kbd> to commit top match · searches all products
+            (<span class="sr-till-badge" style="margin-left: 0;">till</span> badge marks items on the till)
+        </div>
 
         <div x-show="scanner.cameraVisible" x-transition x-cloak>
             <div id="invoice-scanner-desktop" class="camera-viewport"></div>
@@ -32,7 +35,11 @@
                 <button type="button"
                         @click="addProduct(p); searchResults = []; searchTerm = ''; $refs.searchBoxDesktop?.focus()">
                     <span class="sr-name">
-                        <span x-text="p.name"></span>
+                        <span>
+                            <span x-text="p.name"></span>
+                            <span x-show="p.is_till_visible" class="sr-till-badge">Till</span>
+                            <span x-show="!p.is_till_visible" class="sr-not-till">Catalog</span>
+                        </span>
                         <span class="sr-code" x-text="p.code"></span>
                     </span>
                     <span class="sr-price" x-text="'€' + p.gross_price.toFixed(2)"></span>
@@ -68,7 +75,11 @@
             <button type="button"
                     @click="addProduct(p); searchResults = []; searchTerm = ''; mobileTab='items'">
                 <span class="sr-name">
-                    <span x-text="p.name"></span>
+                    <span>
+                        <span x-text="p.name"></span>
+                        <span x-show="p.is_till_visible" class="sr-till-badge">Till</span>
+                        <span x-show="!p.is_till_visible" class="sr-not-till">Catalog</span>
+                    </span>
                     <span class="sr-code" x-text="p.code"></span>
                 </span>
                 <span class="sr-price" x-text="'€' + p.gross_price.toFixed(2)"></span>

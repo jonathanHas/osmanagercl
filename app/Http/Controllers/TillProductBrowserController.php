@@ -36,7 +36,12 @@ class TillProductBrowserController extends Controller
     public function search(Request $request): JsonResponse
     {
         $term = (string) $request->query('q', '');
-        $products = $this->browser->searchTillVisible($term, (int) $request->query('limit', 25));
+        $tillOnly = $request->query('scope') === 'till';
+        $products = $this->browser->searchTillVisible(
+            $term,
+            (int) $request->query('limit', 25),
+            $tillOnly,
+        );
 
         return response()->json(['data' => $this->mapProducts($products)]);
     }
@@ -51,6 +56,7 @@ class TillProductBrowserController extends Controller
             'unit_price_net' => (float) $p->PRICESELL,
             'vat_rate' => (float) $p->getVatRate(),
             'gross_price' => round((float) $p->PRICESELL * (1 + (float) $p->getVatRate()), 2),
+            'is_till_visible' => (bool) ($p->is_till_visible ?? false),
         ])->all();
     }
 }

@@ -313,6 +313,18 @@
     font-family: var(--mono); font-size: 11px; color: var(--text-mute); margin-top: 2px;
 }
 .invoice-composer .search-results .sr-price { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--text); white-space: nowrap; }
+.invoice-composer .sr-till-badge {
+    font-size: 9.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--accent); background: var(--accent-soft);
+    padding: 1px 5px; border-radius: 999px;
+    margin-left: 6px; vertical-align: middle;
+}
+.invoice-composer .sr-not-till {
+    font-size: 9.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--text-mute); background: var(--surface-2);
+    padding: 1px 5px; border-radius: 999px;
+    margin-left: 6px; vertical-align: middle;
+}
 
 /* Categories */
 .invoice-composer .category-card { padding: 14px; display: flex; flex-direction: column; min-height: 0; }
