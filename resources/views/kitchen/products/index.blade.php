@@ -24,55 +24,7 @@
             @endif
 
             <!-- Statistics Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                    <div class="p-6">
-                        <div class="flex items-center">
-                            <div class="p-3 rounded-full bg-orange-100 text-orange-800">
-                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                                </svg>
-                            </div>
-                            <div class="ml-4">
-                                <p class="text-gray-500 text-sm">Kitchen Products</p>
-                                <p class="text-2xl font-semibold text-gray-900">{{ $totalKitchenProducts }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                    <div class="p-6">
-                        <div class="flex items-center">
-                            <div class="p-3 rounded-full bg-green-100 text-green-800">
-                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                            </div>
-                            <div class="ml-4">
-                                <p class="text-gray-500 text-sm">With Profiles</p>
-                                <p class="text-2xl font-semibold text-green-600">{{ $totalWithProfiles }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                    <div class="p-6">
-                        <div class="flex items-center">
-                            <div class="p-3 rounded-full bg-amber-100 text-amber-800">
-                                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                                </svg>
-                            </div>
-                            <div class="ml-4">
-                                <p class="text-gray-500 text-sm">Need Profiles</p>
-                                <p class="text-2xl font-semibold text-amber-600">{{ $totalKitchenProducts - $totalWithProfiles }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            @include('kitchen.products.partials.stats')
 
             <!-- Info Box -->
             <div class="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
@@ -260,16 +212,25 @@
             <!-- Filters -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
                 <div class="p-6">
-                    <form method="GET" action="{{ route('kitchen.products.index') }}" class="flex flex-wrap items-center gap-4">
-                        <div class="flex-1 min-w-[200px]">
-                            <input type="text" name="search" value="{{ $search }}"
+                    <form id="kitchen-filter-form" method="GET" action="{{ route('kitchen.products.index') }}"
+                          class="flex flex-wrap items-center gap-4">
+                        <div class="flex-1 min-w-[200px] relative">
+                            <input type="text" name="search" id="kitchen-filter-search" value="{{ $search }}"
                                    placeholder="Search by product name or code..."
-                                   class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                   autocomplete="off"
+                                   class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 pr-10">
+                            <div id="kitchen-filter-spinner" class="absolute right-3 top-2.5 pointer-events-none hidden">
+                                <svg class="animate-spin h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </div>
                         </div>
 
                         <!-- Supplier dropdown -->
                         <div class="w-48">
-                            <select name="supplier" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <select name="supplier" id="kitchen-filter-supplier"
+                                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 <option value="">All Suppliers</option>
                                 @foreach($availableSuppliers as $supplier)
                                     <option value="{{ $supplier }}" {{ $selectedSupplier === $supplier ? 'selected' : '' }}>
@@ -281,110 +242,106 @@
 
                         <!-- Group by Category checkbox -->
                         <label class="inline-flex items-center cursor-pointer">
-                            <input type="checkbox" name="group_by_category" value="1"
+                            <input type="checkbox" name="group_by_category" id="kitchen-filter-group" value="1"
                                    {{ $groupByCategory ? 'checked' : '' }}
                                    class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
                             <span class="ml-2 text-sm text-gray-700">Group by Category</span>
                         </label>
 
-                        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
-                            Filter
-                        </button>
-                        @if($search || $selectedSupplier || $groupByCategory)
-                            <a href="{{ route('kitchen.products.index') }}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">
-                                Clear
-                            </a>
-                        @endif
+                        <a href="{{ route('kitchen.products.index') }}"
+                           id="kitchen-filter-clear"
+                           class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 {{ ($search || $selectedSupplier || $groupByCategory) ? '' : 'hidden' }}">
+                            Clear
+                        </a>
+
+                        <noscript>
+                            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+                                Filter
+                            </button>
+                        </noscript>
                     </form>
                 </div>
             </div>
 
-            <!-- Products Table -->
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6">
-                    @if($kitchenProducts->isEmpty())
-                        <div class="text-center py-12">
-                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                            </svg>
-                            <h3 class="mt-2 text-sm font-medium text-gray-900">No kitchen products</h3>
-                            <p class="mt-1 text-sm text-gray-500">
-                                Products can be flagged as kitchen products from the Orders page using the "Kitchen" button.
-                            </p>
-                            <div class="mt-6">
-                                <a href="{{ route('orders.index') }}" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
-                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                                    </svg>
-                                    Go to Orders
-                                </a>
-                            </div>
-                        </div>
-                    @elseif($groupByCategory)
-                        {{-- Grouped by Category View --}}
-                        @php
-                            $groupedProducts = $kitchenProducts->groupBy(function($kp) use ($categoryInfo) {
-                                return $categoryInfo[$kp->product_id]['name'] ?? 'Uncategorized';
-                            })->sortKeys();
-                        @endphp
+            <script>
+                (function () {
+                    function init() {
+                        const form = document.getElementById('kitchen-filter-form');
+                        if (!form) return;
 
-                        @foreach($groupedProducts as $categoryName => $products)
-                            <div class="mb-8 last:mb-0">
-                                <h3 class="text-lg font-semibold text-gray-800 mb-3 pb-2 border-b border-gray-200">
-                                    {{ $categoryName }}
-                                    <span class="text-sm font-normal text-gray-500">({{ $products->count() }} products)</span>
-                                </h3>
-                                <table class="min-w-full divide-y divide-gray-200">
-                                    <thead class="bg-gray-50">
-                                        <tr>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
-                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier Code</th>
-                                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Shop Stock</th>
-                                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Kitchen Stock</th>
-                                            <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Profile</th>
-                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="bg-white divide-y divide-gray-200">
-                                        @foreach($products as $kitchenProduct)
-                                            @include('kitchen.products.partials.product-row', [
-                                                'kitchenProduct' => $kitchenProduct,
-                                                'supplierInfo' => $supplierInfo,
-                                                'profiledProductIds' => $profiledProductIds,
-                                            ])
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        @endforeach
-                    @else
-                        {{-- Standard Table View --}}
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier Code</th>
-                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Shop Stock</th>
-                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Kitchen Stock</th>
-                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Profile</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                @foreach($kitchenProducts as $kitchenProduct)
-                                    @include('kitchen.products.partials.product-row', [
-                                        'kitchenProduct' => $kitchenProduct,
-                                        'supplierInfo' => $supplierInfo,
-                                        'profiledProductIds' => $profiledProductIds,
-                                    ])
-                                @endforeach
-                            </tbody>
-                        </table>
-                    @endif
-                </div>
-            </div>
+                        const searchInput = document.getElementById('kitchen-filter-search');
+                        const supplierSel = document.getElementById('kitchen-filter-supplier');
+                        const groupChk = document.getElementById('kitchen-filter-group');
+                        const spinner = document.getElementById('kitchen-filter-spinner');
+                        const clearLink = document.getElementById('kitchen-filter-clear');
+
+                        let abortCtl = null;
+                        let debounceTimer = null;
+
+                        function updateClearVisibility() {
+                            const data = new FormData(form);
+                            const any = !!(data.get('search') || data.get('supplier') || data.get('group_by_category'));
+                            clearLink.classList.toggle('hidden', !any);
+                        }
+
+                        async function refresh() {
+                            if (abortCtl) abortCtl.abort();
+                            abortCtl = new AbortController();
+                            const params = new URLSearchParams(new FormData(form)).toString();
+                            const url = form.action + (params ? '?' + params : '');
+                            spinner.classList.remove('hidden');
+                            try {
+                                const res = await fetch(url, {
+                                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' },
+                                    signal: abortCtl.signal,
+                                });
+                                if (!res.ok) throw new Error('HTTP ' + res.status);
+                                const html = await res.text();
+                                const doc = new DOMParser().parseFromString(html, 'text/html');
+                                ['kitchen-stats-content', 'kitchen-table-content'].forEach(function (id) {
+                                    const fresh = doc.getElementById(id);
+                                    const current = document.getElementById(id);
+                                    if (fresh && current) current.innerHTML = fresh.innerHTML;
+                                });
+                                window.history.replaceState({}, '', url);
+                                updateClearVisibility();
+                            } catch (err) {
+                                if (err.name !== 'AbortError') console.error('Filter refresh failed:', err);
+                            } finally {
+                                spinner.classList.add('hidden');
+                            }
+                        }
+
+                        function debouncedRefresh() {
+                            clearTimeout(debounceTimer);
+                            debounceTimer = setTimeout(refresh, 400);
+                        }
+
+                        searchInput.addEventListener('input', debouncedRefresh);
+                        supplierSel.addEventListener('change', function () { clearTimeout(debounceTimer); refresh(); });
+                        groupChk.addEventListener('change', function () { clearTimeout(debounceTimer); refresh(); });
+                        form.addEventListener('submit', function (e) {
+                            e.preventDefault();
+                            clearTimeout(debounceTimer);
+                            refresh();
+                        });
+
+                        if (searchInput.value) {
+                            searchInput.focus();
+                            searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+                        }
+                    }
+
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', init);
+                    } else {
+                        init();
+                    }
+                })();
+            </script>
+
+            <!-- Products Table -->
+            @include('kitchen.products.partials.table')
         </div>
     </div>
 </x-admin-layout>

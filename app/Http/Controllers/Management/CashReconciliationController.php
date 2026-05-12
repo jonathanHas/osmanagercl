@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Management;
 
 use App\Http\Controllers\Controller;
+use App\Models\CustomerPayment;
 use App\Repositories\CashReconciliationRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -37,6 +38,23 @@ class CashReconciliationController extends Controller
             $history = $this->repository->getHistory($tillId, 7);
             $adjacentDates = $this->repository->getAdjacentDates($selectedDate, $tillName);
 
+            // Customer-invoice payments through this till on this date — informational only.
+            // Variance maths are NOT touched; this just explains why the operator may see
+            // extra cash/card revenue that the POS doesn't know about.
+            $customerInvoicePayments = CustomerPayment::query()
+                ->whereDate('payment_date', $selectedDate)
+                ->where(function ($q) use ($tillId, $tillName) {
+                    $q->where('till_id', (string) $tillId);
+                    if ($tillName) {
+                        $q->orWhere('till_name', $tillName);
+                    }
+                })
+                ->whereIn('method', [CustomerPayment::METHOD_CARD_TILL, CustomerPayment::METHOD_CASH_TILL])
+                ->notVoid()
+                ->with('customer', 'allocations.invoice')
+                ->orderBy('id')
+                ->get();
+
             return view('management.cash-reconciliation.index', compact(
                 'reconciliation',
                 'selectedDate',
@@ -45,7 +63,8 @@ class CashReconciliationController extends Controller
                 'tills',
                 'suppliers',
                 'history',
-                'adjacentDates'
+                'adjacentDates',
+                'customerInvoicePayments'
             ));
         } catch (\Exception $e) {
             Log::error('Cash reconciliation error: '.$e->getMessage());
@@ -60,6 +79,7 @@ class CashReconciliationController extends Controller
                 'history' => collect(),
                 'reconciliation' => null,
                 'adjacentDates' => ['prev' => null, 'next' => null],
+                'customerInvoicePayments' => collect(),
             ]);
         }
     }

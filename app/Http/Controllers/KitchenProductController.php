@@ -84,7 +84,7 @@ class KitchenProductController extends Controller
         $totalKitchenProducts = $kitchenProducts->count();
         $totalWithProfiles = count(array_intersect($filteredProductIds, array_keys($profiledProductIds)));
 
-        return view('kitchen.products.index', [
+        $viewData = [
             'kitchenProducts' => $kitchenProducts,
             'profiledProductIds' => $profiledProductIds,
             'supplierInfo' => $supplierInfo,
@@ -95,7 +95,13 @@ class KitchenProductController extends Controller
             'selectedSupplier' => $supplierFilter,
             'categoryInfo' => $categoryInfo,
             'groupByCategory' => $groupByCategory,
-        ]);
+        ];
+
+        if ($request->ajax()) {
+            return view('kitchen.products.partials.results', $viewData);
+        }
+
+        return view('kitchen.products.index', $viewData);
     }
 
     /**

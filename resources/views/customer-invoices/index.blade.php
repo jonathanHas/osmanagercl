@@ -46,6 +46,7 @@
                         <th class="px-4 py-2 text-left">Date</th>
                         <th class="px-4 py-2 text-left">Customer</th>
                         <th class="px-4 py-2 text-right">Total</th>
+                        <th class="px-4 py-2 text-right">Outstanding</th>
                         <th class="px-4 py-2 text-left">Status</th>
                         <th class="px-4 py-2"></th>
                     </tr>
@@ -57,6 +58,13 @@
                             <td class="px-4 py-2">{{ $invoice->issue_date->format('Y-m-d') }}</td>
                             <td class="px-4 py-2">{{ $invoice->customer_name }}</td>
                             <td class="px-4 py-2 text-right">€{{ number_format($invoice->total, 2) }}</td>
+                            <td class="px-4 py-2 text-right">
+                                @if ($invoice->status !== 'void' && $invoice->outstanding_amount > 0.005)
+                                    <span class="text-yellow-400 font-mono">€{{ number_format($invoice->outstanding_amount, 2) }}</span>
+                                @else
+                                    <span class="text-gray-600">—</span>
+                                @endif
+                            </td>
                             <td class="px-4 py-2">
                                 @php
                                     $color = match ($invoice->status) {
@@ -67,6 +75,19 @@
                                     };
                                 @endphp
                                 <span class="text-xs px-2 py-0.5 rounded {{ $color }} text-white uppercase">{{ $invoice->status }}</span>
+                                @if ($invoice->status !== 'void')
+                                    @php
+                                        $payStatus = $invoice->paymentStatus();
+                                        $payColor = match ($payStatus) {
+                                            'paid' => 'bg-green-800/60 text-green-300',
+                                            'partial' => 'bg-yellow-800/60 text-yellow-300',
+                                            'overpaid' => 'bg-blue-800/60 text-blue-300',
+                                            'unpaid' => 'bg-gray-700 text-gray-300',
+                                            default => 'bg-gray-700 text-gray-300',
+                                        };
+                                    @endphp
+                                    <span class="text-xs px-2 py-0.5 rounded {{ $payColor }} uppercase ml-1">{{ $payStatus }}</span>
+                                @endif
                             </td>
                             <td class="px-4 py-2 text-right space-x-2">
                                 <a href="{{ route('customer-invoices.show', $invoice) }}" class="text-blue-400 hover:text-blue-300">View</a>
@@ -80,7 +101,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-4 py-8 text-center text-gray-500">No invoices yet.</td>
+                            <td colspan="7" class="px-4 py-8 text-center text-gray-500">No invoices yet.</td>
                         </tr>
                     @endforelse
                 </tbody>

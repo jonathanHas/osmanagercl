@@ -5,10 +5,26 @@
                 <h2 class="text-2xl font-bold text-gray-100">
                     Invoice {{ $invoice->invoice_number ?? '(Draft)' }}
                 </h2>
-                <p class="text-gray-400 text-sm mt-1">
-                    Issued {{ $invoice->issue_date->format('Y-m-d') }} ·
-                    Status:
+                <p class="text-gray-400 text-sm mt-1 flex flex-wrap items-center gap-2">
+                    <span>Issued {{ $invoice->issue_date->format('Y-m-d') }}</span>
+                    <span>·</span>
                     <span class="uppercase font-semibold text-gray-200">{{ $invoice->status }}</span>
+                    @php
+                        $payStatus = $invoice->paymentStatus();
+                        $payColor = match ($payStatus) {
+                            'paid' => 'bg-green-700',
+                            'partial' => 'bg-yellow-700',
+                            'overpaid' => 'bg-blue-700',
+                            'unpaid' => 'bg-gray-600',
+                            default => 'bg-gray-700',
+                        };
+                    @endphp
+                    @if ($invoice->status !== 'void')
+                        <span class="text-xs px-2 py-0.5 rounded {{ $payColor }} text-white uppercase">{{ $payStatus }}</span>
+                        @if ($invoice->outstanding_amount > 0.005)
+                            <span class="text-xs text-yellow-400">€{{ number_format($invoice->outstanding_amount, 2) }} outstanding</span>
+                        @endif
+                    @endif
                 </p>
             </div>
             <div class="space-x-2">
@@ -22,6 +38,10 @@
                     </form>
                 @endif
                 @if ($invoice->isIssued())
+                    @if ($invoice->outstanding_amount > 0.005)
+                        <a href="{{ route('customer-payments.create', ['customer_invoice_id' => $invoice->id, 'customer_id' => $invoice->customer_id]) }}"
+                           class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">+ Record payment</a>
+                    @endif
                     <a href="{{ route('customer-invoices.pdf', $invoice) }}"
                        class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded">Download PDF</a>
                     @if (auth()->user()->isAdmin())
@@ -111,6 +131,46 @@
                 </tbody>
             </table>
         </div>
+
+        @php
+            $invoice->load('allocations.payment');
+            $allocations = $invoice->allocations;
+        @endphp
+        @if ($allocations->isNotEmpty())
+            <div class="bg-gray-800 rounded shadow mb-4">
+                <div class="px-4 py-3 border-b border-gray-700 flex justify-between items-center">
+                    <h3 class="font-semibold text-gray-200">Payments</h3>
+                    <span class="text-xs text-gray-400">€{{ number_format($invoice->total_paid, 2) }} of €{{ number_format($invoice->total, 2) }} paid</span>
+                </div>
+                <table class="min-w-full divide-y divide-gray-700 text-sm">
+                    <thead class="bg-gray-900 text-gray-400">
+                        <tr>
+                            <th class="px-4 py-2 text-left">Date</th>
+                            <th class="px-4 py-2 text-left">Method</th>
+                            <th class="px-4 py-2 text-left">Till / Ref</th>
+                            <th class="px-4 py-2 text-right">Applied</th>
+                            <th class="px-4 py-2"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-700 text-gray-200">
+                        @foreach ($allocations as $a)
+                            <tr>
+                                <td class="px-4 py-2">{{ $a->payment->payment_date->format('Y-m-d') }}</td>
+                                <td class="px-4 py-2">{{ $a->payment->methodLabel() }}</td>
+                                <td class="px-4 py-2 text-xs text-gray-400">
+                                    @if ($a->payment->till_name){{ $a->payment->till_name }}@endif
+                                    @if ($a->payment->reference) <span class="text-gray-500">· {{ $a->payment->reference }}</span>@endif
+                                </td>
+                                <td class="px-4 py-2 text-right font-mono">€{{ number_format($a->amount, 2) }}</td>
+                                <td class="px-4 py-2 text-right">
+                                    <a href="{{ route('customer-payments.show', $a->payment) }}" class="text-blue-400 hover:text-blue-300 text-xs">View</a>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="bg-gray-800 p-4 rounded text-sm">

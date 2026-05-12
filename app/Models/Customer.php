@@ -36,9 +36,43 @@ class Customer extends Model
         return $this->hasMany(CustomerInvoice::class);
     }
 
+    /**
+     * All non-void payments. Voided payments are excluded from balance maths.
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(CustomerPayment::class)->whereNull('voided_at');
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * Sum of non-void invoice totals.
+     */
+    public function getTotalInvoicedAttribute(): float
+    {
+        return round((float) $this->invoices()
+            ->where('status', '!=', CustomerInvoice::STATUS_VOID)
+            ->sum('total'), 2);
+    }
+
+    /**
+     * Sum of non-void payment amounts.
+     */
+    public function getTotalPaidAttribute(): float
+    {
+        return round((float) $this->payments()->sum('amount'), 2);
+    }
+
+    /**
+     * Customer balance: positive = customer owes us; negative = on-account credit.
+     */
+    public function getBalanceAttribute(): float
+    {
+        return round($this->total_invoiced - $this->total_paid, 2);
     }
 
     public function getFullAddressAttribute(): string

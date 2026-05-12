@@ -13,7 +13,7 @@ class CustomerInvoiceController extends Controller
 
     public function index(Request $request)
     {
-        $query = CustomerInvoice::with('customer', 'creator');
+        $query = CustomerInvoice::with('customer', 'creator', 'allocations');
 
         if ($status = $request->query('status')) {
             $query->where('status', $status);

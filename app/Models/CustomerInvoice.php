@@ -76,6 +76,16 @@ class CustomerInvoice extends Model
         return $this->hasMany(CustomerInvoiceItem::class)->orderBy('position');
     }
 
+    /**
+     * Allocations from non-void payments only — voided payments are excluded
+     * from outstanding-balance maths via the join condition.
+     */
+    public function allocations(): HasMany
+    {
+        return $this->hasMany(CustomerPaymentAllocation::class)
+            ->whereHas('payment', fn ($q) => $q->whereNull('voided_at'));
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -191,6 +201,46 @@ class CustomerInvoice extends Model
     public function hasDiscount(): bool
     {
         return (float) $this->discount_percent > 0;
+    }
+
+    /**
+     * Sum of allocations from non-void payments applied to this invoice.
+     */
+    public function getTotalPaidAttribute(): float
+    {
+        return round((float) $this->allocations->sum('amount'), 2);
+    }
+
+    /**
+     * Outstanding (positive). Clamped at 0 — overpayments don't make this negative;
+     * the overpayment surfaces on the customer's account-credit balance instead.
+     */
+    public function getOutstandingAmountAttribute(): float
+    {
+        return round(max(0, (float) $this->total - $this->total_paid), 2);
+    }
+
+    /**
+     * Derived payment status. void invoices report 'void' regardless of allocations.
+     */
+    public function paymentStatus(): string
+    {
+        if ($this->status === self::STATUS_VOID) {
+            return 'void';
+        }
+        $paid = $this->total_paid;
+        $total = (float) $this->total;
+        if (abs($paid - $total) < 0.01) {
+            return 'paid';
+        }
+        if ($paid > $total) {
+            return 'overpaid';
+        }
+        if ($paid > 0) {
+            return 'partial';
+        }
+
+        return 'unpaid';
     }
 
     public function getVatBreakdown(): array

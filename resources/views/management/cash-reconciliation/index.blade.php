@@ -100,6 +100,82 @@
                 </div>
             </div>
 
+            {{-- Customer-invoice payments through this till — informational, not in variance maths --}}
+            @if (! empty($customerInvoicePayments) && $customerInvoicePayments->count() > 0)
+                @php
+                    $cardPayments = $customerInvoicePayments->where('method', 'card_till');
+                    $cashPayments = $customerInvoicePayments->where('method', 'cash_till');
+                    $cardSum = $cardPayments->sum('amount');
+                    $cashSum = $cashPayments->sum('amount');
+                @endphp
+                <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+                    <div class="flex items-start justify-between mb-3">
+                        <div>
+                            <h3 class="text-sm font-semibold text-blue-800 dark:text-blue-200 uppercase tracking-wide">Customer-invoice payments</h3>
+                            <p class="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                                These payments hit the card terminal / cash drawer but were NOT entered as till sales,
+                                so they explain extra revenue compared with the POS totals above. Variance maths are not adjusted —
+                                the operator just needs to know they happened.
+                            </p>
+                        </div>
+                        <a href="{{ route('customer-payments.index', ['from' => $selectedDate->toDateString(), 'to' => $selectedDate->toDateString()]) }}"
+                           class="text-xs text-blue-700 dark:text-blue-300 hover:underline whitespace-nowrap">All →</a>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div class="bg-white dark:bg-gray-800 rounded p-3">
+                            <div class="text-xs text-gray-500 dark:text-gray-400 uppercase">Card via this till</div>
+                            <div class="text-xl font-bold text-purple-600 dark:text-purple-400 mt-1">
+                                €{{ number_format($cardSum, 2) }}
+                                <span class="text-xs text-gray-500 dark:text-gray-400 font-normal ml-1">({{ $cardPayments->count() }})</span>
+                            </div>
+                        </div>
+                        <div class="bg-white dark:bg-gray-800 rounded p-3">
+                            <div class="text-xs text-gray-500 dark:text-gray-400 uppercase">Cash via this till</div>
+                            <div class="text-xl font-bold text-green-600 dark:text-green-400 mt-1">
+                                €{{ number_format($cashSum, 2) }}
+                                <span class="text-xs text-gray-500 dark:text-gray-400 font-normal ml-1">({{ $cashPayments->count() }})</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-xs">
+                            <thead class="text-gray-600 dark:text-gray-400">
+                                <tr>
+                                    <th class="px-2 py-1 text-left">Customer</th>
+                                    <th class="px-2 py-1 text-left">Method</th>
+                                    <th class="px-2 py-1 text-right">Amount</th>
+                                    <th class="px-2 py-1 text-left">Ref</th>
+                                    <th class="px-2 py-1 text-left">Applied to</th>
+                                    <th class="px-2 py-1"></th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-gray-700 dark:text-gray-300">
+                                @foreach ($customerInvoicePayments as $cp)
+                                    <tr class="border-t border-blue-200/40 dark:border-blue-800/40">
+                                        <td class="px-2 py-1">{{ $cp->customer->name }}</td>
+                                        <td class="px-2 py-1">{{ $cp->method === 'card_till' ? 'Card' : 'Cash' }}</td>
+                                        <td class="px-2 py-1 text-right font-mono">€{{ number_format($cp->amount, 2) }}</td>
+                                        <td class="px-2 py-1">{{ $cp->reference }}</td>
+                                        <td class="px-2 py-1">
+                                            @foreach ($cp->allocations as $a)
+                                                <span class="font-mono">{{ $a->invoice->invoice_number ?? '(draft)' }}</span>@if (! $loop->last), @endif
+                                            @endforeach
+                                            @if ($cp->allocations->isEmpty())
+                                                <span class="text-gray-400">on-account</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-2 py-1 text-right">
+                                            <a href="{{ route('customer-payments.show', $cp) }}"
+                                               class="text-blue-600 dark:text-blue-400 hover:underline">view</a>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @endif
+
             <!-- Main Form -->
             <form method="POST" action="{{ route('cash-reconciliation.store') }}" x-data="cashReconciliation()">
                 @csrf

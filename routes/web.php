@@ -6,6 +6,8 @@ use App\Http\Controllers\CoffeeController;
 use App\Http\Controllers\CoffeeMetadataController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerInvoiceController;
+use App\Http\Controllers\CustomerPaymentController;
+use App\Http\Controllers\CustomerStatementController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\DeliveryDocumentController;
 use App\Http\Controllers\DeliveryLegacyController;
@@ -914,11 +916,29 @@ Route::middleware('auth')->group(function () {
 
         Route::prefix('api/customer-invoices')->name('customer-invoices.api.')->group(function () {
             Route::get('customers/search', [CustomerController::class, 'search'])->name('customers.search');
-            Route::post('customers', [CustomerController::class, 'store'])->name('customers.store');
+            Route::post('customers', [CustomerController::class, 'apiStore'])->name('customers.store');
             Route::get('till-categories', [TillProductBrowserController::class, 'categories'])->name('till.categories');
             Route::get('till-products', [TillProductBrowserController::class, 'products'])->name('till.products');
             Route::get('products/search', [TillProductBrowserController::class, 'search'])->name('products.search');
         });
+
+        // Customers HTML CRUD (browse, view, edit). Uses the same controller as the
+        // JSON endpoints above but with redirect-based methods.
+        Route::resource('customers', CustomerController::class);
+
+        // Customer payments — record, list, view, void.
+        Route::resource('customer-payments', CustomerPaymentController::class)
+            ->except(['edit', 'update']);
+        Route::get('api/customer-payments/tills', [CustomerPaymentController::class, 'tillsApi'])
+            ->name('customer-payments.api.tills');
+        Route::get('api/customer-payments/customers/{customer}/open-invoices', [CustomerPaymentController::class, 'customerOpenInvoicesApi'])
+            ->name('customer-payments.api.open-invoices');
+
+        // Customer statements
+        Route::get('customers/{customer}/statement', [CustomerStatementController::class, 'show'])
+            ->name('customers.statement');
+        Route::get('customers/{customer}/statement.pdf', [CustomerStatementController::class, 'downloadPdf'])
+            ->name('customers.statement.pdf');
     });
 });
 
