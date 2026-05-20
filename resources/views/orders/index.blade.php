@@ -61,6 +61,9 @@
                                             Supplier
                                         </th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Coverage
+                                        </th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Status
                                         </th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -95,6 +98,20 @@
                                                 <div class="text-sm text-gray-500">
                                                     ID: {{ $order->supplier_id }}
                                                 </div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                @if($order->coverage_days)
+                                                    <div class="text-sm font-medium text-gray-900">
+                                                        {{ $order->coverage_days }} {{ \Illuminate\Support\Str::plural('day', $order->coverage_days) }}
+                                                    </div>
+                                                    @if($order->coverage_ends_on)
+                                                        <div class="text-sm text-gray-500">
+                                                            until {{ $order->coverage_ends_on->format('M j, Y') }}
+                                                        </div>
+                                                    @endif
+                                                @else
+                                                    <span class="text-sm text-gray-400">&mdash;</span>
+                                                @endif
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full
