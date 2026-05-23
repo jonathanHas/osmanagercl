@@ -197,6 +197,7 @@ class KdsController extends Controller
                             'compact_display' => $order->compact_display,
                             'should_use_compact' => $order->shouldUseCompactDisplay(),
                             'customer_info' => $order->customer_info,
+                            'person_name' => $order->person_name,
                         ];
                     })->toArray(),
                     'completed' => $completedOrders->map(function ($order) {
@@ -211,6 +212,7 @@ class KdsController extends Controller
                                     'quantity' => $item->formatted_quantity,
                                 ];
                             })->toArray(),
+                            'person_name' => $order->person_name,
                         ];
                     })->toArray(),
                 ]);
