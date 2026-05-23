@@ -63,16 +63,7 @@ class KdsController extends Controller
                     'status' => $order->status,
                     'order_time' => $order->order_time->format('H:i:s'),
                     'waiting_time' => $order->waiting_time_formatted,
-                    'items' => $order->items->map(function ($item) {
-                        return [
-                            'id' => $item->id,
-                            'product_name' => $item->display_name,
-                            'quantity' => $item->formatted_quantity,
-                            'kind' => $item->kind,
-                            'modifiers' => $item->modifiers,
-                            'notes' => $item->notes,
-                        ];
-                    }),
+                    'items' => $order->card_items,
                     'compact_display' => $order->compact_display,
                     'should_use_compact' => $order->shouldUseCompactDisplay(),
                     'customer_info' => $order->customer_info,
@@ -188,16 +179,7 @@ class KdsController extends Controller
                             'status' => $order->status,
                             'order_time' => $order->order_time->format('H:i:s'),
                             'waiting_time' => $order->waiting_time_formatted,
-                            'items' => $order->items->map(function ($item) {
-                                return [
-                                    'id' => $item->id,
-                                    'product_name' => $item->display_name,
-                                    'quantity' => $item->formatted_quantity,
-                                    'kind' => $item->kind,
-                                    'modifiers' => $item->modifiers,
-                                    'notes' => $item->notes,
-                                ];
-                            })->toArray(),
+                            'items' => $order->card_items,
                             'compact_display' => $order->compact_display,
                             'should_use_compact' => $order->shouldUseCompactDisplay(),
                             'customer_info' => $order->customer_info,

@@ -665,8 +665,9 @@
         <main class="kds__feed" id="orders-container">
             @forelse($orders as $order)
                 @php
-                    $drinks = $order->items->filter(fn ($i) => $i->kind === 'drink');
-                    $bakery = $order->items->filter(fn ($i) => $i->kind !== 'drink');
+                    $cardItems = $order->card_items;
+                    $drinks = array_values(array_filter($cardItems, fn ($i) => $i['kind'] === 'drink'));
+                    $bakery = array_values(array_filter($cardItems, fn ($i) => $i['kind'] !== 'drink'));
                 @endphp
                 <div class="order-wrap order-wrap--fresh-entry" data-order-id="{{ $order->id }}">
                     <article class="order order--fresh"
@@ -695,12 +696,12 @@
                         @endif
 
                         <div class="order__groups">
-                            @if($drinks->count())
+                            @if(count($drinks))
                                 <section class="group group--drink">
                                     <div class="group__label">
                                         <span class="group__dot"></span>
                                         <span class="group__name">Drinks</span>
-                                        <span class="group__count">{{ $drinks->sum(fn ($i) => (float) $i->quantity) }}</span>
+                                        <span class="group__count">{{ array_sum(array_map(fn ($i) => (float) $i['quantity'], $drinks)) }}</span>
                                     </div>
                                     <ul class="group__list">
                                         @foreach($drinks as $item)
@@ -709,12 +710,12 @@
                                     </ul>
                                 </section>
                             @endif
-                            @if($bakery->count())
+                            @if(count($bakery))
                                 <section class="group group--bakery">
                                     <div class="group__label">
                                         <span class="group__dot"></span>
                                         <span class="group__name">Bakery</span>
-                                        <span class="group__count">{{ $bakery->sum(fn ($i) => (float) $i->quantity) }}</span>
+                                        <span class="group__count">{{ array_sum(array_map(fn ($i) => (float) $i['quantity'], $bakery)) }}</span>
                                     </div>
                                     <ul class="group__list">
                                         @foreach($bakery as $item)
@@ -728,8 +729,8 @@
                         <button type="button" class="order__cta" onclick="completeOrder({{ $order->id }})">
                             <span class="order__cta-check">✓</span>
                             <span>Complete order</span>
-                            @if($order->items->count() > 1)
-                                <span class="order__cta-progress" data-role="progress">0/{{ $order->items->count() }}</span>
+                            @if(count($cardItems) > 1)
+                                <span class="order__cta-progress" data-role="progress">0/{{ count($cardItems) }}</span>
                             @endif
                         </button>
                     </article>

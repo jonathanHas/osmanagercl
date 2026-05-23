@@ -155,6 +155,52 @@ class KdsOrder extends Model
     }
 
     /**
+     * Build the option-folded item list used by the /kds card layout.
+     * Option-typed lines (per coffee_product_metadata) collapse into the
+     * previous drink's modifiers as short-name chips; everything else
+     * stays as its own card item.
+     */
+    public function getCardItemsAttribute(): array
+    {
+        $productIds = $this->items->pluck('product_id')->unique()->all();
+        $optionTypeFor = empty($productIds)
+            ? collect()
+            : \App\Models\CoffeeProductMetadata::whereIn('product_id', $productIds)->pluck('type', 'product_id');
+        $shortNameFor = empty($productIds)
+            ? collect()
+            : \App\Models\CoffeeProductMetadata::whereIn('product_id', $productIds)->pluck('short_name', 'product_id');
+
+        $out = [];
+        foreach ($this->items as $item) {
+            $isOption = ($optionTypeFor[$item->product_id] ?? null) === 'option';
+
+            // Flatten POS ATTRIBUTES modifiers (key/value array) into bare values.
+            $native = is_array($item->modifiers)
+                ? array_values(array_filter(array_values($item->modifiers), fn ($v) => $v !== null && $v !== ''))
+                : [];
+
+            $lastIdx = count($out) - 1;
+            if ($isOption && $lastIdx >= 0 && $out[$lastIdx]['kind'] === 'drink') {
+                $label = $shortNameFor[$item->product_id] ?? $item->display_name;
+                $out[$lastIdx]['modifiers'][] = (string) $label;
+
+                continue;
+            }
+
+            $out[] = [
+                'id' => $item->id,
+                'product_name' => $item->display_name,
+                'quantity' => $item->formatted_quantity,
+                'kind' => $item->kind,
+                'modifiers' => $native,
+                'notes' => $item->notes,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * Check if order should use compact display (mobile view)
      */
     public function shouldUseCompactDisplay()
