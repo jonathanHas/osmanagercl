@@ -35,4 +35,9 @@ class KdsProduct extends Model
     {
         return $query->where('trigger_mode', 'companion');
     }
+
+    public function scopeExcluder(Builder $query): Builder
+    {
+        return $query->where('trigger_mode', 'excluder');
+    }
 }

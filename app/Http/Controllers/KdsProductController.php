@@ -18,6 +18,7 @@ class KdsProductController extends Controller
         return view('kds.products', [
             'primaryProducts' => $products->where('trigger_mode', 'primary')->values(),
             'companionProducts' => $products->where('trigger_mode', 'companion')->values(),
+            'excluderProducts' => $products->where('trigger_mode', 'excluder')->values(),
             'activeCount' => $products->where('is_active', true)->count(),
             'inactiveCount' => $products->where('is_active', false)->count(),
         ]);
@@ -62,7 +63,7 @@ class KdsProductController extends Controller
     {
         $validated = $request->validate([
             'product_id' => 'required|string|max:50|unique:kds_products,product_id',
-            'trigger_mode' => 'sometimes|in:primary,companion',
+            'trigger_mode' => 'sometimes|in:primary,companion,excluder',
             'notes' => 'nullable|string|max:255',
         ]);
 
@@ -105,7 +106,7 @@ class KdsProductController extends Controller
     {
         $validated = $request->validate([
             'is_active' => 'sometimes|boolean',
-            'trigger_mode' => 'sometimes|in:primary,companion',
+            'trigger_mode' => 'sometimes|in:primary,companion,excluder',
             'notes' => 'sometimes|nullable|string|max:255',
         ]);
 
@@ -132,7 +133,7 @@ class KdsProductController extends Controller
     {
         $validated = $request->validate([
             'category_id' => 'required|string|max:50',
-            'trigger_mode' => 'required|in:primary,companion',
+            'trigger_mode' => 'required|in:primary,companion,excluder',
         ]);
 
         $existingIds = KdsProduct::pluck('product_id')->all();

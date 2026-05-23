@@ -29,6 +29,7 @@
                                     class="text-sm px-2 py-1 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                                 <option value="primary" {{ $product->trigger_mode === 'primary' ? 'selected' : '' }}>Primary</option>
                                 <option value="companion" {{ $product->trigger_mode === 'companion' ? 'selected' : '' }}>Companion</option>
+                                <option value="excluder" {{ $product->trigger_mode === 'excluder' ? 'selected' : '' }}>Excluder</option>
                             </select>
                         </td>
                         <td class="px-4 py-2">

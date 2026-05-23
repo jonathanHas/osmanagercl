@@ -17,8 +17,8 @@
             <!-- Legend -->
             <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6 text-sm text-gray-700 dark:text-gray-200">
                 <strong>Primary</strong> products trigger a KDS entry when sold.
-                <strong>Companion</strong> products only appear on the KDS when sold on the same ticket as a primary product.
-                Bakery items are typically companions to coffee.
+                <strong>Companion</strong> products only appear on the KDS when sold on the same ticket as a primary product (bakery items are typically companions).
+                <strong>Excluder</strong> products suppress the KDS entry entirely when present on a ticket (e.g. "Served Already").
             </div>
 
             <!-- Add a single product (search) -->
@@ -33,6 +33,7 @@
                         <select id="search-mode" class="px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                             <option value="primary">Mode: Primary</option>
                             <option value="companion">Mode: Companion</option>
+                            <option value="excluder">Mode: Excluder</option>
                         </select>
                     </div>
                     <div id="search-status" class="text-xs text-gray-500 mt-1 h-4"></div>
@@ -54,6 +55,7 @@
                         <select id="bulk-mode" class="px-3 py-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
                             <option value="primary">Add as Primary</option>
                             <option value="companion" selected>Add as Companion</option>
+                            <option value="excluder">Add as Excluder</option>
                         </select>
                         <button id="bulk-add-btn"
                                 onclick="bulkAdd()"
@@ -80,7 +82,7 @@
             </div>
 
             <!-- Companion section -->
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
                 <div class="p-6 text-gray-900 dark:text-gray-100">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-lg font-semibold">
@@ -90,6 +92,20 @@
                         <span class="text-xs text-gray-500">Only appear on a KDS entry alongside a primary</span>
                     </div>
                     @include('kds._products_table', ['rows' => $companionProducts])
+                </div>
+            </div>
+
+            <!-- Excluder section -->
+            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+                <div class="p-6 text-gray-900 dark:text-gray-100">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">
+                            Excluder products
+                            <span class="text-sm font-normal text-gray-500">({{ $excluderProducts->count() }})</span>
+                        </h3>
+                        <span class="text-xs text-gray-500">Suppress the KDS entry when present on a ticket</span>
+                    </div>
+                    @include('kds._products_table', ['rows' => $excluderProducts])
                 </div>
             </div>
         </div>

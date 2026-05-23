@@ -31,8 +31,12 @@ class KdsRealtimeController extends Controller
             // Full allow-list (primary + companion) and primary-only subset.
             // Eligibility uses primaries (a companion alone can't trigger a KDS entry);
             // line inclusion uses the full list so companions ride along when a primary is present.
+            // Excluder products suppress the whole KDS entry when present on a ticket.
             $kdsProductIds = KdsProduct::active()->pluck('product_id')->all();
             $primaryIds = KdsProduct::active()->primary()->pluck('product_id')->all();
+            $excluderIds = KdsProduct::active()->excluder()->pluck('product_id')->all();
+            // product_id => trigger_mode for snapshotting 'kind' onto each item.
+            $kindMap = KdsProduct::active()->pluck('trigger_mode', 'product_id');
 
             if (empty($primaryIds)) {
                 return response()->json([
@@ -44,7 +48,8 @@ class KdsRealtimeController extends Controller
                 ]);
             }
 
-            // Find new tickets containing at least one primary KDS product
+            // Find new tickets containing at least one primary KDS product,
+            // excluding tickets that also contain an excluder (e.g. "Served Already").
             $newOrders = DB::connection('pos')
                 ->table('TICKETS as t')
                 ->join('RECEIPTS as r', 't.ID', '=', 'r.ID')
@@ -54,6 +59,9 @@ class KdsRealtimeController extends Controller
                 ->where('r.DATENEW', '>', $lastProcessedTime)
                 ->whereIn('p.ID', $primaryIds)
                 ->where('t.TICKETTYPE', 0) // Normal sales
+                ->when(! empty($excluderIds), fn ($q) => $q->whereNotIn('t.ID', function ($sub) use ($excluderIds) {
+                    $sub->from('TICKETLINES')->select('TICKET')->whereIn('PRODUCT', $excluderIds);
+                }))
                 ->select('t.ID', 't.TICKETID', 'r.DATENEW', 't.PERSON', 'pp.NAME as person_name')
                 ->distinct()
                 ->limit(10)
@@ -92,6 +100,7 @@ class KdsRealtimeController extends Controller
                         'product_id' => $line->PRODUCT,
                         'product_name' => $line->NAME ?? 'Unknown',
                         'display_name' => $line->DISPLAY ?? $line->NAME,
+                        'kind' => ($kindMap[$line->PRODUCT] ?? 'primary') === 'companion' ? 'bakery' : 'drink',
                         'quantity' => $line->UNITS ?? 1,
                     ]);
                 }

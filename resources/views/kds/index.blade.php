@@ -1,754 +1,1141 @@
 <x-admin-layout>
     <x-slot name="header">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4">
-            <h2 class="font-semibold text-base sm:text-xl text-gray-800 dark:text-gray-200 leading-tight">
-                <span class="hidden sm:inline">Coffee KDS - Kitchen Display System</span>
-                <span class="sm:hidden">Coffee KDS</span>
-            </h2>
-            <div class="flex flex-wrap items-center gap-2 sm:gap-4">
-                <!-- System Status Indicator -->
-                <div id="system-status" class="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm bg-green-100 dark:bg-green-900">
-                    <span class="relative flex h-2 sm:h-3 w-2 sm:w-3">
-                        <span id="status-ping" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span id="status-dot" class="relative inline-flex rounded-full h-2 sm:h-3 w-2 sm:w-3 bg-green-500"></span>
-                    </span>
-                    <div class="text-sm">
-                        <span id="status-text" class="font-semibold text-green-700 dark:text-green-300">
-                            System: Active
-                        </span>
-                        <span id="last-check" class="text-gray-600 dark:text-gray-400 ml-1">
-                            Last check: just now
-                        </span>
-                    </div>
-                </div>
-                
-                <span class="hidden sm:inline text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                    Auto-refresh: <span id="refresh-status" class="font-semibold text-green-600">Active</span>
-                </span>
-                <button onclick="manualRefresh()" class="px-2 sm:px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs sm:text-sm">
-                    <span class="hidden sm:inline">Refresh Now</span>
-                    <span class="sm:hidden">Refresh</span>
-                </button>
-
-                <a href="{{ route('kds.products.index') }}"
-                   class="px-2 sm:px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-xs sm:text-sm">
-                    <span class="hidden sm:inline">Manage Products</span>
-                    <span class="sm:hidden">Products</span>
-                </a>
-                
-                <!-- Clear Orders Dropdown -->
-                <div class="relative" x-data="{ open: false }">
-                    <button @click="open = !open" class="px-2 sm:px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 text-xs sm:text-sm">
-                        Clear ▼
-                    </button>
-                    <div x-show="open" @click.away="open = false" 
-                         class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-50">
-                        <button onclick="clearCompleted()" 
-                                class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-                            Clear Completed (1hr+)
-                        </button>
-                        <button onclick="if(confirm('Mark all active orders as completed?')) clearAll()" 
-                                class="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20">
-                            Complete All Orders
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+            Coffee KDS
+        </h2>
     </x-slot>
 
-    <div class="py-6">
-        <div class="max-w-full mx-auto sm:px-6 lg:px-8">
-            <!-- POS Connection Warning (only if disconnected) -->
-            @if(!$systemStatus['pos_connected'])
-            <div class="mb-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-2 sm:p-3">
-                <div class="flex items-center gap-2">
-                    <svg class="h-4 w-4 text-red-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-                    </svg>
-                    <div class="text-xs sm:text-sm text-red-700 dark:text-red-300">
-                        <span class="font-medium">POS Database Disconnected</span> - 
-                        Unable to connect to POS system. New orders will not be detected.
+    {{-- Geist + Geist Mono fonts (loaded once for this view) --}}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap" rel="stylesheet">
+
+    {{-- /kds design styles (mobile-first, ported from Claude Design bundle Z5SX0Nv6IX4Uh6uEQjriLA) --}}
+    <style>
+        /* Mobile only: hide the admin layout's white top bar.
+           The new KDS bar (beige) provides its own hamburger + title. */
+        @media (max-width: 1023px) {
+            header.bg-white.shadow-sm { display: none !important; }
+            .kds { min-height: 100vh; }
+        }
+
+        .kds {
+            --bg:        #fbf7f0;
+            --bg-2:      #f3ede2;
+            --panel:     #ffffff;
+            --line:      #ece4d4;
+            --line-2:    #ddd2bd;
+            --ink:       #1c1714;
+            --ink-2:     #4a423a;
+            --muted:     #8a8073;
+            --muted-2:   #b3a896;
+
+            --accent:    #ba6531;
+            --accent-fg: #ffffff;
+
+            --fresh:     #2f7d4f;
+            --warn:      #c87a1e;
+            --late:      #c43c2e;
+            --ready:     #1f6f47;
+
+            --drink-tag: #5b3a26;
+            --bakery-tag:#6b4516;
+
+            --r-card:    18px;
+            --r-pill:    999px;
+            --pad-x:     14px;
+
+            background: var(--bg);
+            color: var(--ink);
+            font-family: 'Geist', system-ui, -apple-system, sans-serif;
+            font-feature-settings: "ss01", "cv11", "cv02";
+            letter-spacing: -0.005em;
+            min-height: calc(100vh - 64px);
+            display: flex;
+            flex-direction: column;
+        }
+        .kds * { box-sizing: border-box; }
+
+        /* top bar */
+        .kds__bar {
+            background: var(--bg);
+            border-bottom: 1px solid var(--line);
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+        .kds__bar-top {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px var(--pad-x);
+        }
+        .kds__menu {
+            width: 38px; height: 38px;
+            border-radius: 10px;
+            border: 1px solid var(--line);
+            background: var(--panel);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            cursor: pointer;
+            padding: 0;
+            flex-shrink: 0;
+        }
+        .kds__menu span {
+            display: block;
+            width: 16px; height: 2px;
+            background: var(--ink-2);
+            border-radius: 2px;
+        }
+        /* Hamburger only relevant on mobile — desktop shows the admin chrome above */
+        @media (min-width: 1024px) {
+            .kds__menu { display: none; }
+        }
+        .kds__brand {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+        .kds__brand > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .kds__title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--ink);
+            line-height: 1.1;
+        }
+        .kds__status {
+            font-family: 'Geist Mono', ui-monospace, monospace;
+            font-size: 11px;
+            color: var(--muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-variant-numeric: tabular-nums;
+        }
+        .kds__live {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: var(--fresh);
+            box-shadow: 0 0 0 0 rgba(47, 125, 79, 0.5);
+            animation: kdsPulse 2s infinite;
+        }
+        .kds__live--down {
+            background: var(--late);
+            animation: none;
+        }
+        @keyframes kdsPulse {
+            0%   { box-shadow: 0 0 0 0 rgba(47,125,79,0.45); }
+            70%  { box-shadow: 0 0 0 8px rgba(47,125,79,0); }
+            100% { box-shadow: 0 0 0 0 rgba(47,125,79,0); }
+        }
+
+        /* chip */
+        .kds-chip {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+            padding: 4px 10px;
+            border-radius: 10px;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            min-width: 48px;
+            cursor: pointer;
+            font: inherit;
+            color: var(--ink);
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+        .kds-chip:hover { background: var(--bg-2); }
+        .kds-chip:active { transform: scale(0.97); }
+        .kds-chip--active {
+            background: var(--ink);
+            color: var(--bg);
+            border-color: var(--ink);
+        }
+        .kds-chip__num {
+            font-family: 'Geist Mono', ui-monospace, monospace;
+            font-size: 16px;
+            font-weight: 600;
+            line-height: 1.05;
+            font-variant-numeric: tabular-nums;
+        }
+        .kds-chip__lbl {
+            font-size: 9px;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--muted);
+            line-height: 1.1;
+        }
+        .kds-chip--active .kds-chip__lbl { color: var(--bg); opacity: 0.7; }
+
+        /* clear dropdown */
+        .kds__clear-wrap { position: relative; }
+        .kds__clear-menu {
+            position: absolute;
+            right: 0;
+            top: calc(100% + 4px);
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            min-width: 200px;
+            padding: 4px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+            z-index: 10;
+        }
+        .kds__clear-menu[hidden] { display: none; }
+        .kds__clear-item {
+            display: block;
+            width: 100%;
+            text-align: left;
+            background: transparent;
+            border: 0;
+            padding: 8px 10px;
+            border-radius: 6px;
+            font: inherit;
+            font-size: 13px;
+            color: var(--ink);
+            cursor: pointer;
+        }
+        .kds__clear-item:hover { background: var(--bg-2); }
+        .kds__clear-item--danger { color: var(--late); }
+
+        /* POS-disconnected strip */
+        .kds__pos-down {
+            background: #fee2e2;
+            color: #7f1d1d;
+            font-size: 12px;
+            padding: 8px var(--pad-x);
+            border-bottom: 1px solid #fecaca;
+        }
+
+        /* feed */
+        .kds__feed {
+            flex: 1;
+            padding: 12px var(--pad-x) 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: var(--bg);
+        }
+        .order-wrap {
+            transition: opacity 0.3s ease, transform 0.3s ease, max-height 0.3s ease, margin 0.3s ease;
+        }
+        .order-wrap--fresh-entry {
+            animation: kdsIn 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .order-wrap--leaving {
+            opacity: 0;
+            transform: translateX(110%) rotate(2deg);
+            max-height: 0;
+            margin-bottom: -12px;
+            pointer-events: none;
+        }
+        @keyframes kdsIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* card */
+        .order {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: var(--r-card);
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        .order::before {
+            content: "";
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 4px;
+            background: var(--fresh);
+            transition: background 0.4s ease;
+        }
+        .order--warn::before { background: var(--warn); }
+        .order--late::before {
+            background: var(--late);
+            animation: kdsRail 1.6s ease-in-out infinite;
+        }
+        @keyframes kdsRail {
+            0%, 100% { opacity: 1; }
+            50%      { opacity: 0.4; }
+        }
+
+        .order__head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 14px 8px 18px;
+        }
+        .order__id-block { flex: 1; min-width: 0; }
+        .order__id {
+            font-family: 'Geist Mono', ui-monospace, monospace;
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--ink);
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+        }
+        .order__meta {
+            margin-top: 4px;
+            font-size: 11px;
+            color: var(--muted);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+        }
+        .order__channel {
+            font-weight: 500;
+            color: var(--ink-2);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            font-size: 10px;
+        }
+        .order__placed {
+            font-family: 'Geist Mono', ui-monospace, monospace;
+            font-variant-numeric: tabular-nums;
+        }
+        .order__dot { opacity: 0.4; }
+
+        .order__timer {
+            text-align: right;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 2px;
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+        .order__time {
+            font-family: 'Geist Mono', ui-monospace, monospace;
+            font-size: 26px;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+            letter-spacing: -0.02em;
+            color: var(--fresh);
+        }
+        .order--warn .order__time { color: var(--warn); }
+        .order--late .order__time { color: var(--late); }
+        .order__time-label {
+            font-size: 9px;
+            letter-spacing: 0.12em;
+            font-weight: 600;
+            color: var(--fresh);
+            text-transform: uppercase;
+        }
+        .order--warn .order__time-label { color: var(--warn); }
+        .order--late .order__time-label { color: var(--late); }
+
+        .order__customer {
+            padding: 0 14px 4px 18px;
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            font-size: 13px;
+        }
+        .order__customer-label {
+            color: var(--muted);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            font-weight: 500;
+        }
+        .order__customer-name {
+            font-weight: 600;
+            color: var(--ink);
+            font-size: 14px;
+        }
+
+        .order__groups {
+            padding: 4px 14px 12px 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .group {
+            border-top: 1px dashed var(--line);
+            padding-top: 8px;
+        }
+        .group:first-child { border-top: none; padding-top: 4px; }
+        .group__label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+        .group__dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--drink-tag);
+        }
+        .group--bakery .group__dot { background: var(--bakery-tag); border-radius: 2px; }
+        .group__name {
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--ink-2);
+        }
+        .group--drink .group__name  { color: var(--drink-tag); }
+        .group--bakery .group__name { color: var(--bakery-tag); }
+        .group__count {
+            font-family: 'Geist Mono', ui-monospace, monospace;
+            font-size: 10px;
+            color: var(--muted);
+            margin-left: auto;
+            font-variant-numeric: tabular-nums;
+        }
+        .group__list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 8px 4px 8px 0;
+            cursor: pointer;
+            border-radius: 8px;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            transition: background 0.15s ease;
+        }
+        .item:active { background: var(--bg-2); }
+        .item__check {
+            width: 24px; height: 24px;
+            border-radius: 7px;
+            border: 1.5px solid var(--line-2);
+            background: transparent;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: transparent;
+            font-size: 14px;
+            font-weight: 700;
+            transition: all 0.15s ease;
+            margin-top: 1px;
+        }
+        .item--done .item__check {
+            background: var(--ready);
+            border-color: var(--ready);
+            color: #fff;
+        }
+        .item__body { flex: 1; min-width: 0; }
+        .item__main {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            font-size: 16px;
+            line-height: 1.2;
+        }
+        .item__qty {
+            font-family: 'Geist Mono', ui-monospace, monospace;
+            font-weight: 600;
+            color: var(--ink);
+            font-variant-numeric: tabular-nums;
+            min-width: 26px;
+        }
+        .item__name {
+            font-weight: 600;
+            color: var(--ink);
+            letter-spacing: -0.01em;
+        }
+        .item--done .item__name,
+        .item--done .item__qty {
+            text-decoration: line-through;
+            text-decoration-color: var(--muted-2);
+            text-decoration-thickness: 1.5px;
+            color: var(--muted);
+        }
+        .item__mods {
+            margin-top: 4px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 6px;
+        }
+        .item__mod {
+            font-size: 11px;
+            padding: 2px 7px;
+            border-radius: 5px;
+            background: var(--bg-2);
+            color: var(--ink-2);
+            font-weight: 500;
+            border: 1px solid var(--line);
+            white-space: nowrap;
+        }
+        .item--done .item__mod {
+            opacity: 0.5;
+            text-decoration: line-through;
+        }
+        .item__notes {
+            margin-top: 4px;
+            font-size: 12px;
+            color: var(--warn);
+            font-weight: 500;
+        }
+
+        /* cta */
+        .order__cta {
+            margin: 0;
+            border: none;
+            border-top: 1px solid var(--line);
+            background: var(--ready);
+            color: #ffffff;
+            padding: 14px;
+            font: inherit;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border-top-color: var(--ready);
+        }
+        .order__cta:active { transform: scale(0.995); }
+        .order__cta-progress {
+            font-family: 'Geist Mono', ui-monospace, monospace;
+            font-variant-numeric: tabular-nums;
+            font-size: 12px;
+            background: rgba(255,255,255,0.18);
+            color: #ffffff;
+            border: 1px solid rgba(255,255,255,0.25);
+            padding: 2px 7px;
+            border-radius: 6px;
+            margin-left: 4px;
+        }
+        .order__cta-check { font-size: 18px; line-height: 1; }
+
+        /* empty */
+        .kds__empty {
+            margin: 40px auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            color: var(--muted);
+            text-align: center;
+        }
+        .kds__empty-mark {
+            width: 56px; height: 56px;
+            border-radius: 50%;
+            background: var(--bg-2);
+            border: 1px solid var(--line);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--ready);
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .kds__empty-title { font-size: 16px; font-weight: 600; color: var(--ink); }
+        .kds__empty-sub { font-size: 13px; }
+
+        /* done panel */
+        .kds__done-panel {
+            background: var(--bg-2);
+            border-top: 1px solid var(--line);
+            padding: 12px var(--pad-x);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .kds__done-panel[hidden] { display: none; }
+        .kds__done-title {
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+        .kds__done-row {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 10px 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+        }
+        .kds__done-id {
+            font-family: 'Geist Mono', ui-monospace, monospace;
+            font-weight: 600;
+            color: var(--ink);
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        .kds__done-items {
+            flex: 1;
+            color: var(--ink-2);
+            font-size: 12px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .kds__done-time {
+            font-family: 'Geist Mono', ui-monospace, monospace;
+            color: var(--muted);
+            font-size: 12px;
+        }
+        .kds__done-restore {
+            background: transparent;
+            border: 1px solid var(--line-2);
+            color: var(--ink-2);
+            border-radius: 6px;
+            padding: 4px 10px;
+            font: inherit;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .kds__done-restore:hover { background: var(--bg-2); }
+        .kds__done-empty {
+            color: var(--muted);
+            font-size: 13px;
+            text-align: center;
+            padding: 16px;
+        }
+    </style>
+
+    <div class="kds" id="kds-root">
+        <header class="kds__bar">
+            <div class="kds__bar-top">
+                <button type="button" class="kds__menu" @click="sidebarOpen = true" aria-label="Open menu">
+                    <span></span><span></span><span></span>
+                </button>
+                <div class="kds__brand">
+                    <div class="kds__title">Coffee KDS</div>
+                    <div class="kds__status">
+                        <span id="kds-live" class="kds__live"></span>
+                        <span>Live · <span id="kds-clock">--:--:--</span></span>
                     </div>
                 </div>
+
+                <div class="kds__clear-wrap">
+                    <button type="button" class="kds-chip" onclick="toggleClearMenu(event)" aria-haspopup="true">
+                        <span class="kds-chip__num">⌫</span>
+                        <span class="kds-chip__lbl">Clear</span>
+                    </button>
+                    <div id="clear-menu" class="kds__clear-menu" hidden>
+                        <button type="button" class="kds__clear-item" onclick="clearCompleted()">
+                            Clear completed (1hr+)
+                        </button>
+                        <button type="button" class="kds__clear-item kds__clear-item--danger" onclick="if(confirm('Mark all active orders as completed?')) clearAll()">
+                            Complete all orders
+                        </button>
+                    </div>
+                </div>
+
+                <button type="button" class="kds-chip" id="done-chip" onclick="toggleDonePanel()" aria-pressed="false">
+                    <span class="kds-chip__num" id="done-count">0</span>
+                    <span class="kds-chip__lbl">Done</span>
+                </button>
+
+                <div class="kds-chip" aria-label="Open tickets">
+                    <span class="kds-chip__num" id="open-count">{{ $orders->count() }}</span>
+                    <span class="kds-chip__lbl">Open</span>
+                </div>
             </div>
+
+            @if(!$systemStatus['pos_connected'])
+                <div class="kds__pos-down">
+                    <strong>POS database disconnected</strong> — new orders will not be detected.
+                </div>
             @endif
+        </header>
 
-            <!-- Orders Grid -->
-            <div id="orders-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                @forelse($orders as $order)
-                    <div id="order-{{ $order->id }}" class="order-card bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 border-t-4 
-                        {{ $order->status === 'new' ? 'border-red-500' : '' }}
-                        {{ $order->status === 'viewed' ? 'border-yellow-500' : '' }}
-                        {{ $order->status === 'preparing' ? 'border-blue-500' : '' }}
-                        {{ $order->status === 'ready' ? 'border-green-500' : '' }}">
-                        
-                        <!-- Order Header -->
-                        <div class="flex justify-between items-start mb-3">
-                            <div>
-                                <h3 class="text-2xl font-bold">#{{ $order->ticket_number }}</h3>
-                                <p class="text-sm text-gray-600 dark:text-gray-400">{{ $order->order_time->format('H:i:s') }}</p>
-                                @if($order->person_name)
-                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">By: {{ $order->person_name }}</p>
-                                @endif
+        <main class="kds__feed" id="orders-container">
+            @forelse($orders as $order)
+                @php
+                    $drinks = $order->items->filter(fn ($i) => $i->kind === 'drink');
+                    $bakery = $order->items->filter(fn ($i) => $i->kind !== 'drink');
+                @endphp
+                <div class="order-wrap order-wrap--fresh-entry" data-order-id="{{ $order->id }}">
+                    <article class="order order--fresh"
+                             data-placed-at="{{ $order->order_time->valueOf() }}"
+                             data-order-id="{{ $order->id }}">
+                        <header class="order__head">
+                            <div class="order__id-block">
+                                <div class="order__id">#{{ $order->ticket_number }}</div>
+                                <div class="order__meta">
+                                    <span class="order__channel">In-store</span>
+                                    <span class="order__dot">·</span>
+                                    <span class="order__placed">{{ $order->order_time->format('H:i') }}</span>
+                                </div>
                             </div>
-                            <div class="text-right">
-                                <span class="text-lg font-semibold text-red-600">{{ $order->waiting_time_formatted }}</span>
-                                @if($order->customer_info)
-                                    <p class="text-sm text-gray-600 dark:text-gray-400">{{ $order->customer_info['name'] ?? '' }}</p>
-                                @endif
+                            <div class="order__timer">
+                                <div class="order__time" data-role="time">00:00</div>
+                                <div class="order__time-label" data-role="time-label">FRESH</div>
                             </div>
-                        </div>
+                        </header>
 
-                        <!-- Order Items - Mobile Optimized Display -->
-                        <div class="border-t border-gray-200 dark:border-gray-700 pt-3 mb-3">
-                            @if($order->shouldUseCompactDisplay() && $order->compact_display)
-                                <!-- Compact Mobile Display -->
-                                <div class="sm:hidden">
-                                    @foreach($order->compact_display as $line)
-                                        <div class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
-                                            {{ $line }}
-                                        </div>
-                                    @endforeach
-                                </div>
-                                <!-- Desktop Display (hidden on mobile) -->
-                                <div class="hidden sm:block">
-                                    @foreach($order->items as $item)
-                                        <div class="mb-3">
-                                            <div class="flex justify-between items-center">
-                                                <span class="text-xl font-bold text-blue-600">{{ $item->formatted_quantity }}x</span>
-                                                <span class="text-lg font-semibold">{{ $item->display_name }}</span>
-                                            </div>
-                                            @if($item->modifiers)
-                                                <div class="text-base text-gray-600 dark:text-gray-400 ml-6 mt-1">
-                                                    @foreach($item->modifiers as $key => $value)
-                                                        <span class="inline-block mr-2">{{ $key }}: {{ $value }}</span>
-                                                    @endforeach
-                                                </div>
-                                            @endif
-                                            @if($item->notes)
-                                                <div class="text-base text-yellow-600 ml-6 mt-1 font-medium">
-                                                    Note: {{ $item->notes }}
-                                                </div>
-                                            @endif
-                                        </div>
-                                    @endforeach
-                                </div>
-                            @else
-                                <!-- Standard Display for Simple Orders -->
-                                @foreach($order->items as $item)
-                                    <div class="mb-3">
-                                        <div class="flex justify-between items-center">
-                                            <span class="text-xl font-bold text-blue-600">{{ $item->formatted_quantity }}x</span>
-                                            <span class="text-lg font-semibold">{{ $item->display_name }}</span>
-                                        </div>
-                                        @if($item->modifiers)
-                                            <div class="text-base text-gray-600 dark:text-gray-400 ml-6 mt-1">
-                                                @foreach($item->modifiers as $key => $value)
-                                                    <span class="inline-block mr-2">{{ $key }}: {{ $value }}</span>
-                                                @endforeach
-                                            </div>
-                                        @endif
-                                        @if($item->notes)
-                                            <div class="text-base text-yellow-600 ml-6 mt-1 font-medium">
-                                                Note: {{ $item->notes }}
-                                            </div>
-                                        @endif
+                        @if($order->person_name)
+                            <div class="order__customer">
+                                <span class="order__customer-label">Taken by</span>
+                                <span class="order__customer-name">{{ $order->person_name }}</span>
+                            </div>
+                        @endif
+
+                        <div class="order__groups">
+                            @if($drinks->count())
+                                <section class="group group--drink">
+                                    <div class="group__label">
+                                        <span class="group__dot"></span>
+                                        <span class="group__name">Drinks</span>
+                                        <span class="group__count">{{ $drinks->sum(fn ($i) => (float) $i->quantity) }}</span>
                                     </div>
-                                @endforeach
+                                    <ul class="group__list">
+                                        @foreach($drinks as $item)
+                                            @include('kds._item', ['item' => $item, 'orderId' => $order->id])
+                                        @endforeach
+                                    </ul>
+                                </section>
+                            @endif
+                            @if($bakery->count())
+                                <section class="group group--bakery">
+                                    <div class="group__label">
+                                        <span class="group__dot"></span>
+                                        <span class="group__name">Bakery</span>
+                                        <span class="group__count">{{ $bakery->sum(fn ($i) => (float) $i->quantity) }}</span>
+                                    </div>
+                                    <ul class="group__list">
+                                        @foreach($bakery as $item)
+                                            @include('kds._item', ['item' => $item, 'orderId' => $order->id])
+                                        @endforeach
+                                    </ul>
+                                </section>
                             @endif
                         </div>
 
-                        <!-- Single Complete Button -->
-                        <div class="mt-3">
-                            <button onclick="updateOrderStatus({{ $order->id }}, 'completed')" 
-                                class="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold text-lg">
-                                ✓ Complete Order
-                            </button>
-                        </div>
-                    </div>
-                @empty
-                    <div class="col-span-full text-center py-12">
-                        <p class="text-gray-500 dark:text-gray-400 text-lg">No active coffee orders</p>
-                        <p class="text-gray-400 dark:text-gray-500 text-sm mt-2">Orders will appear here automatically when placed</p>
-                    </div>
-                @endforelse
-            </div>
-            
-            <!-- Completed Orders Section -->
-            @if(isset($completedOrders) && $completedOrders->count() > 0)
-            <div id="completed-orders-section" class="mt-8">
-                <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">Recently Completed Orders</h3>
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead class="bg-gray-50 dark:bg-gray-700">
-                            <tr>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Order #</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Items</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Completed</th>
-                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="completed-orders-tbody" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                            @foreach($completedOrders as $order)
-                            <tr id="completed-{{ $order->id }}" class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                                    #{{ $order->ticket_number }}
-                                </td>
-                                <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
-                                    @foreach($order->items as $item)
-                                        <span class="inline-block">
-                                            {{ $item->formatted_quantity }}x {{ $item->display_name }}
-                                            @if(!$loop->last), @endif
-                                        </span>
-                                    @endforeach
-                                </td>
-                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                                    {{ $order->completed_at ? $order->completed_at->format('H:i:s') : '' }}
-                                </td>
-                                <td class="px-4 py-2 whitespace-nowrap">
-                                    <button onclick="restoreOrder({{ $order->id }})" 
-                                        class="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">
-                                        ↺ Restore
-                                    </button>
-                                </td>
-                            </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
+                        <button type="button" class="order__cta" onclick="completeOrder({{ $order->id }})">
+                            <span class="order__cta-check">✓</span>
+                            <span>Complete order</span>
+                            @if($order->items->count() > 1)
+                                <span class="order__cta-progress" data-role="progress">0/{{ $order->items->count() }}</span>
+                            @endif
+                        </button>
+                    </article>
                 </div>
-            </div>
-            @endif
+            @empty
+                <div class="kds__empty" id="empty-state">
+                    <div class="kds__empty-mark">✓</div>
+                    <div class="kds__empty-title">All caught up</div>
+                    <div class="kds__empty-sub">No open tickets right now.</div>
+                </div>
+            @endforelse
+        </main>
+
+        <div id="done-panel" class="kds__done-panel" hidden>
+            <div class="kds__done-title">Recently completed (last 30 min)</div>
+            <div id="done-list"></div>
         </div>
     </div>
 
     @push('scripts')
     <script>
+        const CSRF = '{{ csrf_token() }}';
+        const STREAM_URL = '{{ route('kds.stream') }}';
+        const ORDERS_URL = '{{ route('kds.orders') }}';
+        const POLL_URL = '{{ route('kds.poll') }}';
+        const REALTIME_URL = '{{ route('kds.realtime-check') }}';
+        const CLEAR_COMPLETED_URL = '{{ route('kds.clear-completed') }}';
+        const CLEAR_ALL_URL = '{{ route('kds.clear-all') }}';
+
+        const WARN_SECONDS = 240;
+        const LATE_SECONDS = 540;
+
+        // Per-item tick state: Map<"orderId:itemId", boolean>
+        const tickState = new Map();
+        // Track which order IDs were previously rendered so we can avoid
+        // re-firing the entry animation on cards that were already on screen.
+        const seenOrderIds = new Set([...document.querySelectorAll('[data-order-id]')]
+            .map(el => el.dataset.orderId));
+
+        // Cached SSE payload + completed-panel state
+        let lastCompleted = [];
+        let donePanelOpen = false;
         let eventSource = null;
         let isRefreshing = false;
 
-        // Initialize SSE connection
-        function initializeSSE() {
-            if (eventSource) {
-                eventSource.close();
-            }
+        /* ─────────────── helpers ─────────────── */
+        const pad = (n) => String(n).padStart(2, '0');
+        const fmtElapsed = (ms) => {
+            const s = Math.max(0, Math.floor(ms / 1000));
+            return `${pad(Math.floor(s / 60))}:${pad(s % 60)}`;
+        };
+        const fmtClock = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        const fmtHM = (ms) => {
+            const d = new Date(ms);
+            return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        };
+        const urgencyOf = (elapsedSec) => {
+            if (elapsedSec >= LATE_SECONDS) return 'late';
+            if (elapsedSec >= WARN_SECONDS) return 'warn';
+            return 'fresh';
+        };
+        const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c =>
+            ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const modifiersHtml = (mods) => {
+            if (!mods) return '';
+            const list = Array.isArray(mods)
+                ? mods
+                : Object.entries(mods).map(([k, v]) => `${k}: ${v}`);
+            return list.length
+                ? `<div class="item__mods">${list.map(m => `<span class="item__mod">${escapeHtml(m)}</span>`).join('')}</div>`
+                : '';
+        };
 
-            eventSource = new EventSource('{{ route('kds.stream') }}');
-            
-            eventSource.onmessage = function(event) {
-                const data = JSON.parse(event.data);
-                console.log('SSE Update: Received', data.orders.length, 'active orders,', (data.completed ? data.completed.length : 0), 'completed');
-                updateOrdersDisplay(data.orders);
-                if (data.completed) {
-                    updateCompletedOrdersTable(data.completed);
-                }
-            };
-
-            eventSource.onerror = function(error) {
-                console.error('SSE Error:', error);
-                document.getElementById('refresh-status').textContent = 'Disconnected';
-                document.getElementById('refresh-status').className = 'font-semibold text-red-600';
-                
-                // Reconnect after 5 seconds
-                setTimeout(() => {
-                    initializeSSE();
-                }, 5000);
-            };
-
-            eventSource.onopen = function() {
-                document.getElementById('refresh-status').textContent = 'Active';
-                document.getElementById('refresh-status').className = 'font-semibold text-green-600';
-            };
-        }
-
-        // Restore completed order back to active
-        async function restoreOrder(orderId) {
-            try {
-                const response = await fetch(`{{ url('kds/orders') }}/${orderId}/status`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify({ status: 'new' })
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to restore order');
-                }
-
-                const result = await response.json();
-                
-                // Remove from completed table
-                const row = document.getElementById(`completed-${orderId}`);
-                if (row) {
-                    row.style.transition = 'opacity 0.5s';
-                    row.style.opacity = '0';
-                    setTimeout(() => row.remove(), 500);
-                }
-                
-                // Trigger refresh to show in active orders
-                setTimeout(() => manualRefresh(), 600);
-                
-            } catch (error) {
-                console.error('Error restoring order:', error);
-                alert('Failed to restore order. Please try again.');
-            }
-        }
-
-        // Update completed orders table
-        function updateCompletedOrdersTable(completedOrders) {
-            // Find or create the completed orders section
-            let completedSection = document.getElementById('completed-orders-section');
-            
-            if (!completedSection && completedOrders.length > 0) {
-                // Create the section if it doesn't exist and we have completed orders
-                const container = document.querySelector('.max-w-full.mx-auto');
-                const section = document.createElement('div');
-                section.id = 'completed-orders-section';
-                section.className = 'mt-8';
-                section.innerHTML = `
-                    <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">Recently Completed Orders</h3>
-                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead class="bg-gray-50 dark:bg-gray-700">
-                                <tr>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Order #</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Items</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Completed</th>
-                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="completed-orders-tbody" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                            </tbody>
-                        </table>
+        /* ─────────────── card render ─────────────── */
+        function itemHtml(orderId, item) {
+            const key = `${orderId}:${item.id}`;
+            const done = tickState.get(key) === true;
+            return `
+                <li class="item ${done ? 'item--done' : ''}" data-item-id="${item.id}" onclick="toggleItem(${orderId}, ${item.id})">
+                    <button type="button" class="item__check" tabindex="-1" aria-label="${done ? 'Uncheck' : 'Check'}">
+                        ${done ? '✓' : ''}
+                    </button>
+                    <div class="item__body">
+                        <div class="item__main">
+                            <span class="item__qty">${escapeHtml(item.quantity)}×</span>
+                            <span class="item__name">${escapeHtml(item.product_name)}</span>
+                        </div>
+                        ${modifiersHtml(item.modifiers)}
+                        ${item.notes ? `<div class="item__notes">Note: ${escapeHtml(item.notes)}</div>` : ''}
                     </div>
-                `;
-                container.appendChild(section);
-                completedSection = section;
-            }
-            
-            if (completedSection) {
-                const tbody = document.getElementById('completed-orders-tbody') || completedSection.querySelector('tbody');
-                
-                if (completedOrders.length === 0) {
-                    // Hide section if no completed orders
-                    completedSection.style.display = 'none';
-                } else {
-                    // Show section and update content
-                    completedSection.style.display = 'block';
-                    
-                    tbody.innerHTML = completedOrders.map(order => `
-                        <tr id="completed-${order.id}" class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                            <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                                #${order.ticket_number}
-                            </td>
-                            <td class="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
-                                ${order.items.map(item => 
-                                    `<span class="inline-block">${item.quantity}x ${item.product_name}</span>`
-                                ).join(', ')}
-                            </td>
-                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                                ${order.completed_time}
-                            </td>
-                            <td class="px-4 py-2 whitespace-nowrap">
-                                <button onclick="restoreOrder(${order.id})" 
-                                    class="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">
-                                    ↺ Restore
-                                </button>
-                            </td>
-                        </tr>
-                    `).join('');
-                }
-            }
+                </li>`;
         }
 
-        // Update orders display
-        function updateOrdersDisplay(orders) {
+        function groupHtml(orderId, kind, items, label) {
+            if (!items.length) return '';
+            const totalQty = items.reduce((s, i) => s + (parseFloat(i.quantity) || 0), 0);
+            const qtyDisplay = totalQty === Math.floor(totalQty) ? String(totalQty) : totalQty.toFixed(2);
+            return `
+                <section class="group group--${kind}">
+                    <div class="group__label">
+                        <span class="group__dot"></span>
+                        <span class="group__name">${label}</span>
+                        <span class="group__count">${qtyDisplay}</span>
+                    </div>
+                    <ul class="group__list">
+                        ${items.map(it => itemHtml(orderId, it)).join('')}
+                    </ul>
+                </section>`;
+        }
+
+        function cardHtml(order) {
+            const drinks = order.items.filter(i => i.kind === 'drink');
+            const bakery = order.items.filter(i => i.kind !== 'drink');
+            const totalItems = order.items.length;
+            const doneCount = order.items.filter(i => tickState.get(`${order.id}:${i.id}`) === true).length;
+
+            return `
+                <article class="order order--fresh"
+                         data-placed-at="${order.placed_at_ts}"
+                         data-order-id="${order.id}">
+                    <header class="order__head">
+                        <div class="order__id-block">
+                            <div class="order__id">#${escapeHtml(order.ticket_number)}</div>
+                            <div class="order__meta">
+                                <span class="order__channel">In-store</span>
+                                <span class="order__dot">·</span>
+                                <span class="order__placed">${fmtHM(order.placed_at_ts)}</span>
+                            </div>
+                        </div>
+                        <div class="order__timer">
+                            <div class="order__time" data-role="time">00:00</div>
+                            <div class="order__time-label" data-role="time-label">FRESH</div>
+                        </div>
+                    </header>
+                    ${order.person_name ? `
+                        <div class="order__customer">
+                            <span class="order__customer-label">Taken by</span>
+                            <span class="order__customer-name">${escapeHtml(order.person_name)}</span>
+                        </div>` : ''}
+                    <div class="order__groups">
+                        ${groupHtml(order.id, 'drink',  drinks, 'Drinks')}
+                        ${groupHtml(order.id, 'bakery', bakery, 'Bakery')}
+                    </div>
+                    <button type="button" class="order__cta" onclick="completeOrder(${order.id})">
+                        <span class="order__cta-check">✓</span>
+                        <span>Complete order</span>
+                        ${totalItems > 1 ? `<span class="order__cta-progress" data-role="progress">${doneCount}/${totalItems}</span>` : ''}
+                    </button>
+                </article>`;
+        }
+
+        function renderActive(orders) {
             const container = document.getElementById('orders-container');
-            
-            if (orders.length === 0) {
-                container.innerHTML = `
-                    <div class="col-span-full text-center py-12">
-                        <p class="text-gray-500 dark:text-gray-400 text-lg">No active coffee orders</p>
-                        <p class="text-gray-400 dark:text-gray-500 text-sm mt-2">Orders will appear here automatically when placed</p>
-                    </div>
-                `;
-                return;
-            }
+            document.getElementById('open-count').textContent = orders.length;
 
-            // Check for new orders to play notification sound
-            orders.forEach(order => {
-                if (!document.getElementById(`order-${order.id}`) && order.status === 'new') {
+            // Play notification sound for orders we've never seen
+            orders.forEach(o => {
+                if (!seenOrderIds.has(String(o.id)) && o.status === 'new') {
                     playNotificationSound();
                 }
             });
 
-            // Rebuild the orders display
-            container.innerHTML = orders.map(order => createOrderCard(order)).join('');
-        }
+            const newIdSet = new Set(orders.map(o => String(o.id)));
 
-        // Create order card HTML
-        function createOrderCard(order) {
-            const statusColors = {
-                'new': 'border-red-500',
-                'viewed': 'border-yellow-500',
-                'preparing': 'border-blue-500',
-                'ready': 'border-green-500'
-            };
-
-            // Check if we should use compact display (from server logic)
-            const useCompactDisplay = order.should_use_compact || (order.compact_display && order.compact_display.length > 0);
-            
-            let itemsHtml = '';
-            
-            if (useCompactDisplay && order.compact_display) {
-                // Use compact display for mobile
-                itemsHtml = `
-                    <!-- Compact Mobile Display -->
-                    <div class="sm:hidden">
-                        ${order.compact_display.map(line => 
-                            `<div class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">${line}</div>`
-                        ).join('')}
-                    </div>
-                    <!-- Desktop Display (hidden on mobile) -->
-                    <div class="hidden sm:block">
-                        ${order.items.map(item => createItemHtml(item)).join('')}
-                    </div>
-                `;
-            } else {
-                // Standard display for simple orders
-                itemsHtml = order.items.map(item => createItemHtml(item)).join('');
+            if (orders.length === 0) {
+                container.innerHTML = `
+                    <div class="kds__empty" id="empty-state">
+                        <div class="kds__empty-mark">✓</div>
+                        <div class="kds__empty-title">All caught up</div>
+                        <div class="kds__empty-sub">No open tickets right now.</div>
+                    </div>`;
+                seenOrderIds.clear();
+                return;
             }
 
-            const buttonsHtml = getActionButtons(order.id, order.status);
+            container.innerHTML = orders.map(o => {
+                const isNew = !seenOrderIds.has(String(o.id));
+                return `<div class="order-wrap ${isNew ? 'order-wrap--fresh-entry' : ''}" data-order-id="${o.id}">${cardHtml(o)}</div>`;
+            }).join('');
 
-            return `
-                <div id="order-${order.id}" class="order-card bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 border-t-4 ${statusColors[order.status] || ''}">
-                    <div class="flex justify-between items-start mb-3">
-                        <div>
-                            <h3 class="text-2xl font-bold">#${order.ticket_number}</h3>
-                            <p class="text-sm text-gray-600 dark:text-gray-400">${order.order_time}</p>
-                            ${order.person_name ? `<p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">By: ${order.person_name}</p>` : ''}
-                        </div>
-                        <div class="text-right">
-                            <span class="text-lg font-semibold text-red-600">${order.waiting_time}</span>
-                            ${order.customer_info ? `<p class="text-sm text-gray-600 dark:text-gray-400">${order.customer_info.name || ''}</p>` : ''}
-                        </div>
-                    </div>
-                    <div class="border-t border-gray-200 dark:border-gray-700 pt-3 mb-3">
-                        ${itemsHtml}
-                    </div>
-                    <div class="mt-3">
-                        ${buttonsHtml}
-                    </div>
-                </div>
-            `;
+            // Update memory of which order IDs are on screen
+            seenOrderIds.clear();
+            newIdSet.forEach(id => seenOrderIds.add(id));
+
+            updateTimers();
         }
 
-        // Create individual item HTML
-        function createItemHtml(item) {
-            let modifiersHtml = '';
-            if (item.modifiers && Object.keys(item.modifiers).length > 0) {
-                modifiersHtml = `
-                    <div class="text-base text-gray-600 dark:text-gray-400 ml-6 mt-1">
-                        ${Object.entries(item.modifiers).map(([key, value]) => 
-                            `<span class="inline-block mr-2">${key}: ${value}</span>`
-                        ).join('')}
-                    </div>
-                `;
+        function renderCompleted(completed) {
+            lastCompleted = completed || [];
+            document.getElementById('done-count').textContent = lastCompleted.length;
+            if (!donePanelOpen) return;
+            const list = document.getElementById('done-list');
+            if (!lastCompleted.length) {
+                list.innerHTML = `<div class="kds__done-empty">No completed orders in the last 30 minutes.</div>`;
+                return;
             }
+            list.innerHTML = lastCompleted.map(o => `
+                <div class="kds__done-row" id="done-row-${o.id}">
+                    <span class="kds__done-id">#${escapeHtml(o.ticket_number)}</span>
+                    <span class="kds__done-items">${o.items.map(i => `${escapeHtml(i.quantity)}× ${escapeHtml(i.product_name)}`).join(', ')}</span>
+                    <span class="kds__done-time">${escapeHtml(o.completed_time)}</span>
+                    <button type="button" class="kds__done-restore" onclick="restoreOrder(${o.id})">↺ Restore</button>
+                </div>`).join('');
+        }
 
-            let notesHtml = '';
-            if (item.notes) {
-                notesHtml = `
-                    <div class="text-base text-yellow-600 ml-6 mt-1 font-medium">
-                        Note: ${item.notes}
-                    </div>
-                `;
+        function updateTimers() {
+            const now = Date.now();
+            document.querySelectorAll('.order[data-placed-at]').forEach(card => {
+                const placed = parseInt(card.dataset.placedAt, 10);
+                if (!placed) return;
+                const elapsedMs = now - placed;
+                const elapsedSec = Math.floor(elapsedMs / 1000);
+                const urgency = urgencyOf(elapsedSec);
+                card.classList.remove('order--fresh', 'order--warn', 'order--late');
+                card.classList.add(`order--${urgency}`);
+                const timeEl = card.querySelector('[data-role="time"]');
+                const labelEl = card.querySelector('[data-role="time-label"]');
+                if (timeEl) timeEl.textContent = fmtElapsed(elapsedMs);
+                if (labelEl) labelEl.textContent = urgency === 'late' ? 'LATE' : urgency === 'warn' ? 'AGING' : 'FRESH';
+            });
+            document.getElementById('kds-clock').textContent = fmtClock(new Date());
+        }
+
+        /* ─────────────── interactions ─────────────── */
+        window.toggleItem = function (orderId, itemId) {
+            const key = `${orderId}:${itemId}`;
+            const newVal = !tickState.get(key);
+            tickState.set(key, newVal);
+
+            const card = document.querySelector(`.order[data-order-id="${orderId}"]`);
+            if (!card) return;
+            const li = card.querySelector(`.item[data-item-id="${itemId}"]`);
+            if (li) {
+                li.classList.toggle('item--done', newVal);
+                const check = li.querySelector('.item__check');
+                if (check) check.textContent = newVal ? '✓' : '';
             }
+            // Update progress badge
+            const progress = card.querySelector('[data-role="progress"]');
+            if (progress) {
+                const total = card.querySelectorAll('.item').length;
+                const done = card.querySelectorAll('.item--done').length;
+                progress.textContent = `${done}/${total}`;
+            }
+        };
 
-            return `
-                <div class="mb-3">
-                    <div class="flex justify-between items-center">
-                        <span class="text-xl font-bold text-blue-600">${item.quantity}x</span>
-                        <span class="text-lg font-semibold">${item.product_name}</span>
-                    </div>
-                    ${modifiersHtml}
-                    ${notesHtml}
-                </div>
-            `;
-        }
-
-        // Get action buttons - simplified to just Complete button
-        function getActionButtons(orderId, status) {
-            return `
-                <button onclick="updateOrderStatus(${orderId}, 'completed')" 
-                    class="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold text-lg">
-                    ✓ Complete Order
-                </button>
-            `;
-        }
-
-        // Update order status
-        async function updateOrderStatus(orderId, status) {
+        window.completeOrder = async function (orderId) {
+            const wrap = document.querySelector(`.order-wrap[data-order-id="${orderId}"]`);
+            if (wrap) wrap.classList.add('order-wrap--leaving');
             try {
-                const response = await fetch(`{{ url('kds/orders') }}/${orderId}/status`, {
+                await fetch(`/kds/orders/${orderId}/status`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify({ status })
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF },
+                    body: JSON.stringify({ status: 'completed' }),
                 });
+            } catch (e) {
+                console.error('Failed to complete order', e);
+            }
+            setTimeout(() => wrap && wrap.remove(), 320);
+        };
 
-                if (!response.ok) {
-                    throw new Error('Failed to update order status');
-                }
-
-                const result = await response.json();
-                
-                // Remove card if completed
-                if (status === 'completed') {
-                    const card = document.getElementById(`order-${orderId}`);
-                    if (card) {
-                        card.style.transition = 'opacity 0.5s';
-                        card.style.opacity = '0';
-                        setTimeout(() => card.remove(), 500);
-                    }
-                }
-                
-                // Trigger manual refresh to get updated data
+        window.restoreOrder = async function (orderId) {
+            try {
+                const r = await fetch(`/kds/orders/${orderId}/status`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF },
+                    body: JSON.stringify({ status: 'new' }),
+                });
+                if (!r.ok) throw new Error('restore failed');
+                const row = document.getElementById(`done-row-${orderId}`);
+                if (row) row.remove();
                 manualRefresh();
-                
-            } catch (error) {
-                console.error('Error updating order status:', error);
-                alert('Failed to update order status. Please try again.');
+            } catch (e) {
+                console.error('Failed to restore order', e);
+                alert('Failed to restore order.');
             }
-        }
+        };
 
-        // Manual refresh
-        async function manualRefresh() {
-            if (isRefreshing) return;
-            
-            isRefreshing = true;
-            try {
-                // Trigger polling job and get orders in parallel for speed
-                const [pollResponse, ordersResponse] = await Promise.all([
-                    fetch('{{ route('kds.poll') }}', {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                        }
-                    }),
-                    fetch('{{ route('kds.orders') }}')
-                ]);
+        window.toggleDonePanel = function () {
+            donePanelOpen = !donePanelOpen;
+            const panel = document.getElementById('done-panel');
+            const chip = document.getElementById('done-chip');
+            panel.hidden = !donePanelOpen;
+            chip.classList.toggle('kds-chip--active', donePanelOpen);
+            chip.setAttribute('aria-pressed', donePanelOpen ? 'true' : 'false');
+            if (donePanelOpen) renderCompleted(lastCompleted);
+        };
 
-                const data = await ordersResponse.json();
-                
-                // Handle both old format (array) and new format (object with active/completed)
-                if (Array.isArray(data)) {
-                    updateOrdersDisplay(data);
-                } else if (data.active) {
-                    updateOrdersDisplay(data.active);
-                    if (data.completed) {
-                        updateCompletedOrdersTable(data.completed);
-                    }
-                }
-                
-            } catch (error) {
-                console.error('Error refreshing orders:', error);
-            } finally {
-                isRefreshing = false;
+        window.toggleClearMenu = function (e) {
+            e.stopPropagation();
+            const menu = document.getElementById('clear-menu');
+            menu.hidden = !menu.hidden;
+        };
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('clear-menu');
+            if (menu && !menu.hidden && !menu.parentElement.contains(e.target)) {
+                menu.hidden = true;
             }
-        }
+        });
 
-        // Play notification sound for new orders
-        function playNotificationSound() {
-            const audio = new Audio('/sounds/notification.mp3');
-            audio.play().catch(e => console.log('Could not play notification sound'));
-        }
-
-        // Clear completed orders
-        async function clearCompleted() {
+        window.clearCompleted = async function () {
             try {
-                const response = await fetch('{{ route('kds.clear-completed') }}', {
+                const r = await fetch(CLEAR_COMPLETED_URL, {
                     method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    }
+                    headers: { 'X-CSRF-TOKEN': CSRF },
                 });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    alert(result.message);
+                const data = await r.json();
+                if (data.success) {
+                    document.getElementById('clear-menu').hidden = true;
                     manualRefresh();
                 }
-            } catch (error) {
-                console.error('Error clearing completed orders:', error);
-                alert('Failed to clear completed orders');
-            }
-        }
+            } catch (e) { console.error(e); alert('Failed to clear completed orders.'); }
+        };
 
-        // Clear all orders
-        async function clearAll() {
-            console.log('Clear All: Starting clear operation...');
+        window.clearAll = async function () {
             try {
-                const response = await fetch('{{ route('kds.clear-all') }}', {
+                const r = await fetch(CLEAR_ALL_URL, {
                     method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    }
+                    headers: { 'X-CSRF-TOKEN': CSRF },
                 });
-                
-                const result = await response.json();
-                console.log('Clear All: Response received', result);
-                
-                if (result.success) {
-                    alert(result.message);
-                    
-                    // Log debug info if available
-                    if (result.debug) {
-                        console.log('Clear All Debug Info:', result.debug);
-                    }
-                    
-                    // Immediately clear the display
-                    document.getElementById('orders-container').innerHTML = `
-                        <div class="col-span-full text-center py-12">
-                            <p class="text-gray-500 dark:text-gray-400 text-lg">No active coffee orders</p>
-                            <p class="text-gray-400 dark:text-gray-500 text-sm mt-2">Orders will appear here automatically when placed</p>
-                        </div>
-                    `;
-                    
-                    // Clear completed orders table if it exists
-                    const completedTbody = document.getElementById('completed-orders-tbody');
-                    if (completedTbody) {
-                        completedTbody.innerHTML = '';
-                    }
-                    
-                    // Hide completed orders section if empty
-                    const completedSection = document.getElementById('completed-orders-section');
-                    if (completedSection) {
-                        completedSection.style.display = 'none';
-                    }
-                    
-                    // Wait a moment before refreshing to ensure clear is processed
-                    console.log('Clear All: Waiting 2 seconds before refresh...');
-                    setTimeout(() => {
-                        console.log('Clear All: Triggering manual refresh');
-                        manualRefresh();
-                    }, 2000);
-                } else {
-                    console.error('Clear All: Failed', result.message);
-                    alert('Failed: ' + result.message);
+                const data = await r.json();
+                if (data.success) {
+                    document.getElementById('clear-menu').hidden = true;
+                    renderActive([]);
+                    setTimeout(manualRefresh, 1500);
                 }
-            } catch (error) {
-                console.error('Error clearing all orders:', error);
-                alert('Failed to clear all orders');
-            }
+            } catch (e) { console.error(e); alert('Failed to clear orders.'); }
+        };
+
+        function playNotificationSound() {
+            try {
+                const a = new Audio('/sounds/notification.mp3');
+                a.play().catch(() => {});
+            } catch (e) {}
         }
 
-        let lastSuccessfulCheck = Date.now();
-        let failedChecks = 0;
-        
-        // Fast direct polling for new orders
+        /* ─────────────── data layer (SSE + polling) ─────────────── */
+        function initializeSSE() {
+            if (eventSource) eventSource.close();
+            eventSource = new EventSource(STREAM_URL);
+            eventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.orders) renderActive(data.orders);
+                    if (data.completed) renderCompleted(data.completed);
+                    setLive(true);
+                } catch (e) { console.error('SSE parse error', e); }
+            };
+            eventSource.onerror = () => {
+                setLive(false);
+                setTimeout(initializeSSE, 5000);
+            };
+            eventSource.onopen = () => setLive(true);
+        }
+
+        function setLive(active) {
+            const dot = document.getElementById('kds-live');
+            if (dot) dot.classList.toggle('kds__live--down', !active);
+        }
+
+        async function manualRefresh() {
+            if (isRefreshing) return;
+            isRefreshing = true;
+            try {
+                const [_, ordersResp] = await Promise.all([
+                    fetch(POLL_URL, { method: 'POST', headers: { 'X-CSRF-TOKEN': CSRF } }),
+                    fetch(ORDERS_URL),
+                ]);
+                const data = await ordersResp.json();
+                if (data.active) renderActive(data.active);
+                if (data.completed) renderCompleted(data.completed);
+            } catch (e) { console.error('Refresh failed', e); }
+            finally { isRefreshing = false; }
+        }
+
         async function fastRealtimeCheck() {
             try {
-                const response = await fetch('{{ route('kds.realtime-check') }}');
-                const data = await response.json();
-                
-                if (data.success) {
-                    // Update status to show success
-                    lastSuccessfulCheck = Date.now();
-                    failedChecks = 0;
-                    updateSystemStatus(true, data.duration_ms);
-                    
-                    if (data.orders_created > 0) {
-                        console.log(`Created ${data.orders_created} new orders in ${data.duration_ms}ms`);
-                        // Refresh display immediately
-                        const ordersResponse = await fetch('{{ route('kds.orders') }}');
-                        const ordersData = await ordersResponse.json();
-                        
-                        if (ordersData.active) {
-                            updateOrdersDisplay(ordersData.active);
-                            if (ordersData.completed) {
-                                updateCompletedOrdersTable(ordersData.completed);
-                            }
-                        }
-                    }
-                } else {
-                    failedChecks++;
-                    updateSystemStatus(false);
+                const r = await fetch(REALTIME_URL);
+                const data = await r.json();
+                if (data.success && data.orders_created > 0) {
+                    const ordersResp = await fetch(ORDERS_URL);
+                    const ordersData = await ordersResp.json();
+                    if (ordersData.active) renderActive(ordersData.active);
+                    if (ordersData.completed) renderCompleted(ordersData.completed);
                 }
-            } catch (error) {
-                console.error('Realtime check error:', error);
-                failedChecks++;
-                updateSystemStatus(false);
+                setLive(true);
+            } catch (e) {
+                setLive(false);
             }
         }
-        
-        // Update system status indicator
-        function updateSystemStatus(isActive, responseTime = null) {
-            const statusDiv = document.getElementById('system-status');
-            const statusText = document.getElementById('status-text');
-            const statusPing = document.getElementById('status-ping');
-            const statusDot = document.getElementById('status-dot');
-            const lastCheck = document.getElementById('last-check');
-            
-            if (isActive) {
-                statusDiv.className = 'flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm bg-green-100 dark:bg-green-900';
-                statusText.className = 'font-semibold text-green-700 dark:text-green-300';
-                statusText.textContent = 'System: Active';
-                statusPing.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75';
-                statusDot.className = 'relative inline-flex rounded-full h-2 sm:h-3 w-2 sm:w-3 bg-green-500';
-                
-                if (responseTime) {
-                    lastCheck.textContent = `Response: ${responseTime}ms`;
-                } else {
-                    lastCheck.textContent = 'Last check: just now';
-                }
-            } else if (failedChecks >= 3) {
-                statusDiv.className = 'flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm bg-red-100 dark:bg-red-900';
-                statusText.className = 'font-semibold text-red-700 dark:text-red-300';
-                statusText.textContent = 'System: Disconnected';
-                statusPing.className = 'hidden';
-                statusDot.className = 'relative inline-flex rounded-full h-2 sm:h-3 w-2 sm:w-3 bg-red-500';
-                lastCheck.textContent = 'Connection lost';
-            } else {
-                statusDiv.className = 'flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm bg-yellow-100 dark:bg-yellow-900';
-                statusText.className = 'font-semibold text-yellow-700 dark:text-yellow-300';
-                statusText.textContent = 'System: Checking...';
-                statusDot.className = 'relative inline-flex rounded-full h-2 sm:h-3 w-2 sm:w-3 bg-yellow-500';
-            }
-        }
-        
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', function() {
+
+        /* ─────────────── boot ─────────────── */
+        document.addEventListener('DOMContentLoaded', () => {
+            updateTimers();
+            setInterval(updateTimers, 1000);
+
             initializeSSE();
-            
-            // Trigger initial poll to check for orders
             manualRefresh();
-            
-            // Fast polling every 2 seconds for new orders
             setInterval(fastRealtimeCheck, 2000);
-            
-            // Regular refresh as backup (every 5 seconds)
-            setInterval(manualRefresh, 5000);
+            setInterval(manualRefresh, 10000);
         });
 
-        // Clean up on page unload
-        window.addEventListener('beforeunload', function() {
-            if (eventSource) {
-                eventSource.close();
-            }
+        window.addEventListener('beforeunload', () => {
+            if (eventSource) eventSource.close();
         });
-        
-        // Refresh immediately when page gets focus
-        window.addEventListener('focus', function() {
-            console.log('Page focused - triggering refresh');
-            manualRefresh();
-        });
+        window.addEventListener('focus', manualRefresh);
     </script>
     @endpush
 </x-admin-layout>

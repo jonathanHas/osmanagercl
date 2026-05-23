@@ -68,10 +68,14 @@ class MonitorCoffeeOrdersJob implements ShouldQueue
                 'time_window' => 'Last 2 hours max',
             ]);
 
-            // Full allow-list and primary-only subset. Eligibility uses primaries;
-            // line inclusion uses the full list so companions ride along.
+            // Full allow-list, primary-only subset, and excluder list.
+            // Eligibility uses primaries; line inclusion uses the full list so
+            // companions ride along; excluder presence suppresses the ticket.
             $kdsProductIds = KdsProduct::active()->pluck('product_id')->all();
             $primaryIds = KdsProduct::active()->primary()->pluck('product_id')->all();
+            $excluderIds = KdsProduct::active()->excluder()->pluck('product_id')->all();
+            // Map product_id => trigger_mode so we can snapshot 'kind' onto each item.
+            $kindMap = KdsProduct::active()->pluck('trigger_mode', 'product_id');
 
             if (empty($primaryIds)) {
                 Log::info('No active primary KDS products configured — nothing to monitor');
@@ -106,6 +110,13 @@ class MonitorCoffeeOrdersJob implements ShouldQueue
             $ticketQuery->whereHas('ticketLines.product', function ($query) use ($primaryIds) {
                 $query->whereIn('ID', $primaryIds);
             });
+
+            // Suppress tickets that also contain an excluder line (e.g. "Served Already")
+            if (! empty($excluderIds)) {
+                $ticketQuery->whereDoesntHave('ticketLines.product', function ($query) use ($excluderIds) {
+                    $query->whereIn('ID', $excluderIds);
+                });
+            }
 
             $coffeeTickets = (clone $ticketQuery)->count();
             Log::info('KDS-eligible tickets found', ['count' => $coffeeTickets]);
@@ -188,6 +199,7 @@ class MonitorCoffeeOrdersJob implements ShouldQueue
                         'product_id' => $line->PRODUCT,
                         'product_name' => $line->product->NAME ?? 'Unknown Product',
                         'display_name' => $line->product->DISPLAY ?? null,
+                        'kind' => ($kindMap[$line->PRODUCT] ?? 'primary') === 'companion' ? 'bakery' : 'drink',
                         'quantity' => $line->UNITS,
                         'modifiers' => $modifiers,
                         'notes' => null, // Could extract from attributes if available

@@ -12,6 +12,7 @@ class KdsOrderItem extends Model
         'product_id',
         'product_name',
         'display_name',
+        'kind',
         'quantity',
         'modifiers',
         'notes',

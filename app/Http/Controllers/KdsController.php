@@ -68,6 +68,7 @@ class KdsController extends Controller
                             'id' => $item->id,
                             'product_name' => $item->display_name,
                             'quantity' => $item->formatted_quantity,
+                            'kind' => $item->kind,
                             'modifiers' => $item->modifiers,
                             'notes' => $item->notes,
                         ];
@@ -76,6 +77,7 @@ class KdsController extends Controller
                     'should_use_compact' => $order->shouldUseCompactDisplay(),
                     'customer_info' => $order->customer_info,
                     'person_name' => $order->person_name,
+                    'placed_at_ts' => $order->order_time->valueOf(),
                 ];
             });
 
@@ -97,6 +99,7 @@ class KdsController extends Controller
                             'id' => $item->id,
                             'product_name' => $item->display_name,
                             'quantity' => $item->formatted_quantity,
+                            'kind' => $item->kind,
                         ];
                     }),
                     'person_name' => $order->person_name,
@@ -190,6 +193,7 @@ class KdsController extends Controller
                                     'id' => $item->id,
                                     'product_name' => $item->display_name,
                                     'quantity' => $item->formatted_quantity,
+                                    'kind' => $item->kind,
                                     'modifiers' => $item->modifiers,
                                     'notes' => $item->notes,
                                 ];
@@ -198,6 +202,7 @@ class KdsController extends Controller
                             'should_use_compact' => $order->shouldUseCompactDisplay(),
                             'customer_info' => $order->customer_info,
                             'person_name' => $order->person_name,
+                            'placed_at_ts' => $order->order_time->valueOf(),
                         ];
                     })->toArray(),
                     'completed' => $completedOrders->map(function ($order) {
@@ -210,6 +215,7 @@ class KdsController extends Controller
                                 return [
                                     'product_name' => $item->display_name,
                                     'quantity' => $item->formatted_quantity,
+                                    'kind' => $item->kind,
                                 ];
                             })->toArray(),
                             'person_name' => $order->person_name,
