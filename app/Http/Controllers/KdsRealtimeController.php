@@ -28,29 +28,33 @@ class KdsRealtimeController extends Controller
                 $lastProcessedTime = $maxLookback;
             }
 
-            // Allow-list of POS product IDs that feed the KDS
+            // Full allow-list (primary + companion) and primary-only subset.
+            // Eligibility uses primaries (a companion alone can't trigger a KDS entry);
+            // line inclusion uses the full list so companions ride along when a primary is present.
             $kdsProductIds = KdsProduct::active()->pluck('product_id')->all();
+            $primaryIds = KdsProduct::active()->primary()->pluck('product_id')->all();
 
-            if (empty($kdsProductIds)) {
+            if (empty($primaryIds)) {
                 return response()->json([
                     'success' => true,
                     'orders_created' => 0,
                     'duration_ms' => round((microtime(true) - $startTime) * 1000, 2),
                     'checked_at' => now()->toDateTimeString(),
-                    'note' => 'No active KDS products configured.',
+                    'note' => 'No active primary KDS products configured.',
                 ]);
             }
 
-            // Find new orders containing any active KDS product
+            // Find new tickets containing at least one primary KDS product
             $newOrders = DB::connection('pos')
                 ->table('TICKETS as t')
                 ->join('RECEIPTS as r', 't.ID', '=', 'r.ID')
                 ->join('TICKETLINES as tl', 't.ID', '=', 'tl.TICKET')
                 ->join('PRODUCTS as p', 'tl.PRODUCT', '=', 'p.ID')
+                ->leftJoin('PEOPLE as pp', 't.PERSON', '=', 'pp.ID')
                 ->where('r.DATENEW', '>', $lastProcessedTime)
-                ->whereIn('p.ID', $kdsProductIds)
+                ->whereIn('p.ID', $primaryIds)
                 ->where('t.TICKETTYPE', 0) // Normal sales
-                ->select('t.ID', 't.TICKETID', 'r.DATENEW', 't.PERSON')
+                ->select('t.ID', 't.TICKETID', 'r.DATENEW', 't.PERSON', 'pp.NAME as person_name')
                 ->distinct()
                 ->limit(10)
                 ->get();
@@ -68,6 +72,7 @@ class KdsRealtimeController extends Controller
                     'ticket_id' => $ticket->ID,
                     'ticket_number' => $ticket->TICKETID ?? 0,
                     'person' => $ticket->PERSON,
+                    'person_name' => $ticket->person_name ?? null,
                     'status' => 'new',
                     'order_time' => Carbon::parse($ticket->DATENEW),
                 ]);

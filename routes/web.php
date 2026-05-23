@@ -602,6 +602,8 @@ Route::middleware('auth')->group(function () {
         // KDS product allow-list (controls which POS products feed the KDS)
         Route::get('/products', [KdsProductController::class, 'index'])->name('products.index');
         Route::get('/products/search', [KdsProductController::class, 'searchPos'])->name('products.search');
+        Route::get('/products/pos-categories', [KdsProductController::class, 'posCategories'])->name('products.pos-categories');
+        Route::post('/products/bulk-add', [KdsProductController::class, 'bulkAddCategory'])->name('products.bulk-add');
         Route::post('/products', [KdsProductController::class, 'store'])->name('products.store');
         Route::patch('/products/{kdsProduct}', [KdsProductController::class, 'update'])->name('products.update');
         Route::delete('/products/{kdsProduct}', [KdsProductController::class, 'destroy'])->name('products.destroy');

@@ -14,6 +14,7 @@ class KdsOrder extends Model
         'ticket_id',
         'ticket_number',
         'person',
+        'person_name',
         'status',
         'order_time',
         'viewed_at',

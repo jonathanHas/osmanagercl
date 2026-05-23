@@ -75,6 +75,7 @@ class KdsController extends Controller
                     'compact_display' => $order->compact_display,
                     'should_use_compact' => $order->shouldUseCompactDisplay(),
                     'customer_info' => $order->customer_info,
+                    'person_name' => $order->person_name,
                 ];
             });
 
@@ -98,6 +99,7 @@ class KdsController extends Controller
                             'quantity' => $item->formatted_quantity,
                         ];
                     }),
+                    'person_name' => $order->person_name,
                 ];
             });
 

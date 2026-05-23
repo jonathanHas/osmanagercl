@@ -68,11 +68,13 @@ class MonitorCoffeeOrdersJob implements ShouldQueue
                 'time_window' => 'Last 2 hours max',
             ]);
 
-            // Allow-list of POS product IDs that feed the KDS
+            // Full allow-list and primary-only subset. Eligibility uses primaries;
+            // line inclusion uses the full list so companions ride along.
             $kdsProductIds = KdsProduct::active()->pluck('product_id')->all();
+            $primaryIds = KdsProduct::active()->primary()->pluck('product_id')->all();
 
-            if (empty($kdsProductIds)) {
-                Log::info('No active KDS products configured — nothing to monitor');
+            if (empty($primaryIds)) {
+                Log::info('No active primary KDS products configured — nothing to monitor');
 
                 return;
             }
@@ -100,9 +102,9 @@ class MonitorCoffeeOrdersJob implements ShouldQueue
                 'cutoff' => $lastProcessedTime->toDateTimeString(),
             ]);
 
-            // Only tickets that contain at least one KDS-enabled product
-            $ticketQuery->whereHas('ticketLines.product', function ($query) use ($kdsProductIds) {
-                $query->whereIn('ID', $kdsProductIds);
+            // Only tickets that contain at least one PRIMARY KDS-enabled product
+            $ticketQuery->whereHas('ticketLines.product', function ($query) use ($primaryIds) {
+                $query->whereIn('ID', $primaryIds);
             });
 
             $coffeeTickets = (clone $ticketQuery)->count();
@@ -153,6 +155,7 @@ class MonitorCoffeeOrdersJob implements ShouldQueue
                     'ticket_id' => $ticket->ID,
                     'ticket_number' => $ticket->TICKETID ?? 0,
                     'person' => $ticket->PERSON,
+                    'person_name' => $ticket->person?->NAME,
                     'status' => 'new',
                     'order_time' => $ticket->receipt ? Carbon::parse($ticket->receipt->DATENEW) : now(),
                     'customer_info' => $customerInfo,

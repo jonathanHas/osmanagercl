@@ -88,6 +88,9 @@
                             <div>
                                 <h3 class="text-2xl font-bold">#{{ $order->ticket_number }}</h3>
                                 <p class="text-sm text-gray-600 dark:text-gray-400">{{ $order->order_time->format('H:i:s') }}</p>
+                                @if($order->person_name)
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">By: {{ $order->person_name }}</p>
+                                @endif
                             </div>
                             <div class="text-right">
                                 <span class="text-lg font-semibold text-red-600">{{ $order->waiting_time_formatted }}</span>
@@ -426,6 +429,7 @@
                         <div>
                             <h3 class="text-2xl font-bold">#${order.ticket_number}</h3>
                             <p class="text-sm text-gray-600 dark:text-gray-400">${order.order_time}</p>
+                            ${order.person_name ? `<p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">By: ${order.person_name}</p>` : ''}
                         </div>
                         <div class="text-right">
                             <span class="text-lg font-semibold text-red-600">${order.waiting_time}</span>

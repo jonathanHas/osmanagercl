@@ -13,6 +13,7 @@ class KdsProduct extends Model
         'category_id',
         'category_name',
         'is_active',
+        'trigger_mode',
         'notes',
     ];
 
@@ -23,5 +24,15 @@ class KdsProduct extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopePrimary(Builder $query): Builder
+    {
+        return $query->where('trigger_mode', 'primary');
+    }
+
+    public function scopeCompanion(Builder $query): Builder
+    {
+        return $query->where('trigger_mode', 'companion');
     }
 }

@@ -16,7 +16,8 @@ class KdsProductController extends Controller
             ->get();
 
         return view('kds.products', [
-            'products' => $products,
+            'primaryProducts' => $products->where('trigger_mode', 'primary')->values(),
+            'companionProducts' => $products->where('trigger_mode', 'companion')->values(),
             'activeCount' => $products->where('is_active', true)->count(),
             'inactiveCount' => $products->where('is_active', false)->count(),
         ]);
@@ -61,6 +62,7 @@ class KdsProductController extends Controller
     {
         $validated = $request->validate([
             'product_id' => 'required|string|max:50|unique:kds_products,product_id',
+            'trigger_mode' => 'sometimes|in:primary,companion',
             'notes' => 'nullable|string|max:255',
         ]);
 
@@ -89,6 +91,7 @@ class KdsProductController extends Controller
             'category_id' => $pos->category_id,
             'category_name' => $pos->category_name,
             'is_active' => true,
+            'trigger_mode' => $validated['trigger_mode'] ?? 'primary',
             'notes' => $validated['notes'] ?? null,
         ]);
 
@@ -102,6 +105,7 @@ class KdsProductController extends Controller
     {
         $validated = $request->validate([
             'is_active' => 'sometimes|boolean',
+            'trigger_mode' => 'sometimes|in:primary,companion',
             'notes' => 'sometimes|nullable|string|max:255',
         ]);
 
@@ -110,6 +114,61 @@ class KdsProductController extends Controller
         return response()->json([
             'success' => true,
             'product' => $kdsProduct->fresh(),
+        ]);
+    }
+
+    public function posCategories(): JsonResponse
+    {
+        $categories = DB::connection('pos')
+            ->table('CATEGORIES')
+            ->orderBy('NAME')
+            ->select('ID as id', 'NAME as name')
+            ->get();
+
+        return response()->json(['categories' => $categories]);
+    }
+
+    public function bulkAddCategory(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'category_id' => 'required|string|max:50',
+            'trigger_mode' => 'required|in:primary,companion',
+        ]);
+
+        $existingIds = KdsProduct::pluck('product_id')->all();
+
+        $rows = DB::connection('pos')
+            ->table('PRODUCTS as p')
+            ->leftJoin('CATEGORIES as c', 'p.CATEGORY', '=', 'c.ID')
+            ->where('p.CATEGORY', $validated['category_id'])
+            ->when(! empty($existingIds), fn ($q) => $q->whereNotIn('p.ID', $existingIds))
+            ->select(
+                'p.ID as product_id',
+                'p.NAME as product_name',
+                'p.CATEGORY as category_id',
+                'c.NAME as category_name',
+            )
+            ->get()
+            ->map(fn ($r) => [
+                'product_id' => $r->product_id,
+                'product_name' => $r->product_name,
+                'category_id' => $r->category_id,
+                'category_name' => $r->category_name,
+                'is_active' => true,
+                'trigger_mode' => $validated['trigger_mode'],
+                'notes' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ])
+            ->all();
+
+        if (! empty($rows)) {
+            KdsProduct::insert($rows);
+        }
+
+        return response()->json([
+            'success' => true,
+            'added' => count($rows),
         ]);
     }
 
