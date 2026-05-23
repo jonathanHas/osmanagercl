@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\KdsOrder;
 use App\Models\KdsOrderItem;
+use App\Models\KdsProduct;
 use App\Models\POS\Ticket;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
@@ -67,7 +68,16 @@ class MonitorCoffeeOrdersJob implements ShouldQueue
                 'time_window' => 'Last 2 hours max',
             ]);
 
-            // Find new coffee orders from POS - LIMIT to last 2 hours and max 50 tickets
+            // Allow-list of POS product IDs that feed the KDS
+            $kdsProductIds = KdsProduct::active()->pluck('product_id')->all();
+
+            if (empty($kdsProductIds)) {
+                Log::info('No active KDS products configured — nothing to monitor');
+
+                return;
+            }
+
+            // Find new orders from POS - LIMIT to last 2 hours and max 50 tickets
             $ticketQuery = Ticket::with(['ticketLines.product', 'person'])
                 ->where('TICKETTYPE', 0); // Normal sales only
 
@@ -90,14 +100,13 @@ class MonitorCoffeeOrdersJob implements ShouldQueue
                 'cutoff' => $lastProcessedTime->toDateTimeString(),
             ]);
 
-            // Add coffee category filter
-            $ticketQuery->whereHas('ticketLines.product', function ($query) {
-                // Filter for Coffee Fresh products (category 081)
-                $query->where('CATEGORY', '081');
+            // Only tickets that contain at least one KDS-enabled product
+            $ticketQuery->whereHas('ticketLines.product', function ($query) use ($kdsProductIds) {
+                $query->whereIn('ID', $kdsProductIds);
             });
 
             $coffeeTickets = (clone $ticketQuery)->count();
-            Log::info('Coffee tickets found', ['count' => $coffeeTickets]);
+            Log::info('KDS-eligible tickets found', ['count' => $coffeeTickets]);
 
             $newTickets = $ticketQuery->limit(50)->get(); // Process max 50 tickets at a time
 
@@ -121,9 +130,9 @@ class MonitorCoffeeOrdersJob implements ShouldQueue
                     continue;
                 }
 
-                // Get coffee items only
-                $coffeeLines = $ticket->ticketLines->filter(function ($line) {
-                    return $line->product && $line->product->CATEGORY === '081';
+                // Only KDS-enabled items from this ticket
+                $coffeeLines = $ticket->ticketLines->filter(function ($line) use ($kdsProductIds) {
+                    return $line->product && in_array($line->product->ID, $kdsProductIds, true);
                 });
 
                 if ($coffeeLines->isEmpty()) {

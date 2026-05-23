@@ -29,6 +29,12 @@
                     <span class="hidden sm:inline">Refresh Now</span>
                     <span class="sm:hidden">Refresh</span>
                 </button>
+
+                <a href="{{ route('kds.products.index') }}"
+                   class="px-2 sm:px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-xs sm:text-sm">
+                    <span class="hidden sm:inline">Manage Products</span>
+                    <span class="sm:hidden">Products</span>
+                </a>
                 
                 <!-- Clear Orders Dropdown -->
                 <div class="relative" x-data="{ open: false }">

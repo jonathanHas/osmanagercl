@@ -47,7 +47,32 @@
             <!-- Orders Table -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 bg-white border-b border-gray-200">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Recent Orders</h3>
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
+                        <h3 class="text-lg font-semibold text-gray-900">Recent Orders</h3>
+
+                        <form method="GET" action="{{ route('orders.index') }}" class="flex items-center gap-2">
+                            <label for="supplier_id" class="text-sm text-gray-600">Filter by supplier:</label>
+                            <select name="supplier_id"
+                                    id="supplier_id"
+                                    onchange="this.form.submit()"
+                                    class="border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 text-sm">
+                                <option value="">All suppliers</option>
+                                @foreach($availableSuppliers as $supplier)
+                                    <option value="{{ $supplier->SupplierID }}"
+                                            @selected((string) $selectedSupplierId === (string) $supplier->SupplierID)>
+                                        {{ $supplier->Supplier }}
+                                    </option>
+                                @endforeach
+                            </select>
+
+                            @if($selectedSupplierId)
+                                <a href="{{ route('orders.index') }}"
+                                   class="text-sm text-gray-500 hover:text-gray-700 underline">
+                                    Clear
+                                </a>
+                            @endif
+                        </form>
+                    </div>
                     
                     @if($orders->count() > 0)
                         <div class="overflow-x-auto">

@@ -15,6 +15,7 @@ use App\Http\Controllers\Financials\BankStatementController;
 use App\Http\Controllers\Financials\CardReconciliationController;
 use App\Http\Controllers\FruitVegController;
 use App\Http\Controllers\KdsController;
+use App\Http\Controllers\KdsProductController;
 use App\Http\Controllers\KitchenController;
 use App\Http\Controllers\KitchenIngredientProfileController;
 use App\Http\Controllers\KitchenProductController;
@@ -597,6 +598,13 @@ Route::middleware('auth')->group(function () {
         Route::post('/clear-completed', [KdsController::class, 'clearCompleted'])->name('clear-completed');
         Route::post('/clear-all', [KdsController::class, 'clearAll'])->name('clear-all');
         Route::get('/realtime-check', [\App\Http\Controllers\KdsRealtimeController::class, 'checkNewOrders'])->name('realtime-check');
+
+        // KDS product allow-list (controls which POS products feed the KDS)
+        Route::get('/products', [KdsProductController::class, 'index'])->name('products.index');
+        Route::get('/products/search', [KdsProductController::class, 'searchPos'])->name('products.search');
+        Route::post('/products', [KdsProductController::class, 'store'])->name('products.store');
+        Route::patch('/products/{kdsProduct}', [KdsProductController::class, 'update'])->name('products.update');
+        Route::delete('/products/{kdsProduct}', [KdsProductController::class, 'destroy'])->name('products.destroy');
     });
 
     // Sales Import routes

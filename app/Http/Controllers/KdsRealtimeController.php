@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\KdsOrder;
 use App\Models\KdsOrderItem;
+use App\Models\KdsProduct;
 use App\Models\POS\Ticket;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -27,14 +28,27 @@ class KdsRealtimeController extends Controller
                 $lastProcessedTime = $maxLookback;
             }
 
-            // Find new coffee orders - SIMPLIFIED QUERY
+            // Allow-list of POS product IDs that feed the KDS
+            $kdsProductIds = KdsProduct::active()->pluck('product_id')->all();
+
+            if (empty($kdsProductIds)) {
+                return response()->json([
+                    'success' => true,
+                    'orders_created' => 0,
+                    'duration_ms' => round((microtime(true) - $startTime) * 1000, 2),
+                    'checked_at' => now()->toDateTimeString(),
+                    'note' => 'No active KDS products configured.',
+                ]);
+            }
+
+            // Find new orders containing any active KDS product
             $newOrders = DB::connection('pos')
                 ->table('TICKETS as t')
                 ->join('RECEIPTS as r', 't.ID', '=', 'r.ID')
                 ->join('TICKETLINES as tl', 't.ID', '=', 'tl.TICKET')
                 ->join('PRODUCTS as p', 'tl.PRODUCT', '=', 'p.ID')
                 ->where('r.DATENEW', '>', $lastProcessedTime)
-                ->where('p.CATEGORY', '081') // Coffee category
+                ->whereIn('p.ID', $kdsProductIds)
                 ->where('t.TICKETTYPE', 0) // Normal sales
                 ->select('t.ID', 't.TICKETID', 'r.DATENEW', 't.PERSON')
                 ->distinct()
@@ -58,12 +72,12 @@ class KdsRealtimeController extends Controller
                     'order_time' => Carbon::parse($ticket->DATENEW),
                 ]);
 
-                // Get ticket lines for this order
+                // Get ticket lines for this order (only KDS-enabled products)
                 $lines = DB::connection('pos')
                     ->table('TICKETLINES as tl')
                     ->join('PRODUCTS as p', 'tl.PRODUCT', '=', 'p.ID')
                     ->where('tl.TICKET', $ticket->ID)
-                    ->where('p.CATEGORY', '081')
+                    ->whereIn('p.ID', $kdsProductIds)
                     ->select('tl.*', 'p.NAME', 'p.DISPLAY')
                     ->get();
 

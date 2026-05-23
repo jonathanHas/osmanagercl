@@ -36,13 +36,29 @@ class OrderController extends Controller
     /**
      * Display a listing of order sessions.
      */
-    public function index(): View
+    public function index(Request $request): View
     {
-        $orders = OrderSession::with(['supplier', 'user'])
-            ->orderBy('created_at', 'desc')
-            ->paginate(20);
+        $selectedSupplierId = $request->input('supplier_id');
 
-        return view('orders.index', compact('orders'));
+        $query = OrderSession::with(['supplier', 'user'])
+            ->orderBy('created_at', 'desc');
+
+        if ($selectedSupplierId !== null && $selectedSupplierId !== '') {
+            $query->where('supplier_id', $selectedSupplierId);
+        }
+
+        $orders = $query->paginate(20)->withQueryString();
+
+        $supplierIdsWithOrders = OrderSession::query()
+            ->select('supplier_id')
+            ->distinct()
+            ->pluck('supplier_id');
+
+        $availableSuppliers = Supplier::whereIn('SupplierID', $supplierIdsWithOrders)
+            ->orderBy('Supplier')
+            ->get();
+
+        return view('orders.index', compact('orders', 'availableSuppliers', 'selectedSupplierId'));
     }
 
     /**
