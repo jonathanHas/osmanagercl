@@ -99,7 +99,7 @@ class KdsRealtimeController extends Controller
                         'kds_order_id' => $kdsOrder->id,
                         'product_id' => $line->PRODUCT,
                         'product_name' => $line->NAME ?? 'Unknown',
-                        'display_name' => $line->DISPLAY ?? $line->NAME,
+                        'display_name' => KdsOrderItem::cleanPosDisplay($line->DISPLAY) ?? $line->NAME,
                         'kind' => ($kindMap[$line->PRODUCT] ?? 'primary') === 'companion' ? 'bakery' : 'drink',
                         'quantity' => $line->UNITS ?? 1,
                     ]);

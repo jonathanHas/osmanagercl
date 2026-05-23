@@ -198,7 +198,7 @@ class MonitorCoffeeOrdersJob implements ShouldQueue
                         'kds_order_id' => $kdsOrder->id,
                         'product_id' => $line->PRODUCT,
                         'product_name' => $line->product->NAME ?? 'Unknown Product',
-                        'display_name' => $line->product->DISPLAY ?? null,
+                        'display_name' => KdsOrderItem::cleanPosDisplay($line->product->DISPLAY) ?? $line->product->NAME ?? null,
                         'kind' => ($kindMap[$line->PRODUCT] ?? 'primary') === 'companion' ? 'bakery' : 'drink',
                         'quantity' => $line->UNITS,
                         'modifiers' => $modifiers,

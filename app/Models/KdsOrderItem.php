@@ -46,4 +46,22 @@ class KdsOrderItem extends Model
     {
         return $value ?: $this->product_name;
     }
+
+    /**
+     * Sanitize the POS PRODUCTS.DISPLAY field into a plain string suitable for
+     * the KDS. The POS stores till-button labels as HTML fragments like
+     * `<html>Pain<br>au<br>Chocolat` — we strip the tags and collapse newlines.
+     */
+    public static function cleanPosDisplay(?string $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        $s = preg_replace('/<br\s*\/?>/i', ' ', $value);
+        $s = strip_tags($s);
+        $s = html_entity_decode($s, ENT_QUOTES | ENT_HTML5);
+        $s = trim(preg_replace('/\s+/', ' ', $s));
+
+        return $s !== '' ? $s : null;
+    }
 }
