@@ -225,10 +225,11 @@
                                             return `Avg weekly: ${avgWeekly.toFixed(1)} units`;
                                         }
                                         if (context.dataset.label === 'Sales') {
-                                            const value = Math.round(context.parsed.y);
-                                            if (value === 0) {
+                                            const rounded = Math.round(context.parsed.y * 10) / 10;
+                                            if (rounded === 0) {
                                                 return '0 units sold';
                                             }
+                                            const value = Number.isInteger(rounded) ? rounded : rounded.toFixed(1);
                                             return value + ' units sold';
                                         }
                                         return null;
