@@ -62,7 +62,7 @@
             <!-- Total Sales -->
             <td class="px-4 py-3">
                 <div class="text-center">
-                    <div class="text-2xl font-bold text-blue-600">{{ number_format($totalSales, 0) }}</div>
+                    <div class="text-2xl font-bold text-blue-600">{{ rtrim(rtrim(number_format($totalSales, 2), '0'), '.') }}</div>
                     <div class="text-xs text-gray-500 mb-1">total sold</div>
                     <div class="mt-2 flex items-center justify-center gap-4 text-xs text-gray-600">
                         <span>avg {{ number_format($avgWeekly, 1) }}/wk</span>

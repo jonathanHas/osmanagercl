@@ -3,6 +3,18 @@
 return [
     /*
     |--------------------------------------------------------------------------
+    | Own-Farm Produce Supplier
+    |--------------------------------------------------------------------------
+    |
+    | POS SupplierID for "Jon" — the supplier representing produce grown on our
+    | own farm. Used by the Harvest log to list the products to record against.
+    |
+    */
+
+    'jon' => '2',
+
+    /*
+    |--------------------------------------------------------------------------
     | External Supplier Integrations
     |--------------------------------------------------------------------------
     |

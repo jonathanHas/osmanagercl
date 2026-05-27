@@ -14,6 +14,7 @@ use App\Http\Controllers\DeliveryLegacyController;
 use App\Http\Controllers\Financials\BankStatementController;
 use App\Http\Controllers\Financials\CardReconciliationController;
 use App\Http\Controllers\FruitVegController;
+use App\Http\Controllers\HarvestController;
 use App\Http\Controllers\KdsController;
 use App\Http\Controllers\KdsProductController;
 use App\Http\Controllers\KitchenController;
@@ -385,6 +386,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/orders', [FruitVegController::class, 'orders'])->name('orders');
         Route::post('/orders', [FruitVegController::class, 'generateOrder'])->name('orders.generate');
         Route::post('/orders/generate-stream', [FruitVegController::class, 'generateOrderWithProgress'])->name('orders.generate-stream');
+
+        // Harvest log (own-farm produce, records only)
+        Route::get('/harvest', [HarvestController::class, 'index'])->name('harvest');
+        Route::post('/harvest', [HarvestController::class, 'store'])->name('harvest.store');
+        Route::get('/harvest/history', [HarvestController::class, 'history'])->name('harvest.history');
+        Route::delete('/harvest/{harvest}', [HarvestController::class, 'destroy'])->name('harvest.destroy');
     });
 
     // Coffee routes

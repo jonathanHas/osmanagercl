@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **🌱 Fruit & Veg Harvest Log** (2026-05-26)
+  - New **Log Harvest** page under the F&V module (`/fruit-veg/harvest`) for recording quantities of own-farm produce harvested per day
+  - Product list is scoped to supplier **Jon** (own farm, POS `SupplierID = 2`) via the existing `SupplierRepository::getSupplierProducts()`; supplier id referenced from new `config('suppliers.jon')` key
+  - **Combo entry**: products harvested in the last 30 days (and anything already logged for the chosen date) appear as quantity inputs ready to fill/edit; remaining Jon products are added via an Alpine search dropdown. All rows post as a single `items[product_code]` map
+  - **Per-product unit** (`kg` or `unit`): each row has a kg/unit toggle, and the choice is remembered per product (`harvest_product_units` table) so future harvest logs default to the correct measure (e.g. Rocket 100g → bags/unit, Spinach → kg). Unset products default to `kg`. History totals are grouped by unit rather than summed together
+  - Records-only — no POS stock changes or delivery records. A `UNIQUE (harvest_date, product_code)` constraint makes re-saving a date an in-place edit; a cleared/zero quantity deletes that row. `product_name`/`unit` are snapshotted so history survives POS renames/deletions
+  - History page (`/fruit-veg/harvest/history`) groups past harvests by date (counts + per-unit totals) with per-line delete and edit links
+  - **New**: `app/Http/Controllers/HarvestController.php`, `app/Models/Harvest.php`, `app/Models/HarvestProductUnit.php`, migrations `2026_05_26_145633_create_harvests_table.php` + `2026_05_26_152805_create_harvest_product_units_table.php`, `resources/views/fruit-veg/harvest.blade.php`, `resources/views/fruit-veg/harvest-history.blade.php`
+  - **Modified**: `routes/web.php`, `config/suppliers.php`, `resources/views/fruit-veg/index.blade.php`
+
 - **🥬 Dynamis Fruit & Veg Delivery Import (XLSX)** (2026-04-22)
   - New **XLSX (Dynamis)** tab on `/deliveries/create` accepts Dynamis `Historique(NN).xlsx` delivery files
   - Parsed in PHP via PhpSpreadsheet (no Python round-trip). Columns A-L mapped to SKU / description / unit cost / unit type (K/C/P) / line total; the `DIV0010` "MISCELLANEOUS TRANSPORT" row is routed to `freight_charge`
