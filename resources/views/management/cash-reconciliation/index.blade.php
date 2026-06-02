@@ -583,6 +583,21 @@
                 posCardTotal: {{ $reconciliation->pos_card_total ?? 0 }},
 
                 init() {
+                    // Preserve a previously-saved manual coin float. If the value loaded
+                    // from the DB differs from the sum of coin denominations, treat it as
+                    // a manual override so calculateTotals() does not silently overwrite
+                    // it on page load (which would diverge from what other screens read
+                    // from the database until the user pressed Save).
+                    const initialTotalCoins =
+                        (this.denominations.cash_2 * 2) +
+                        (this.denominations.cash_1 * 1) +
+                        (this.denominations.cash_50c * 0.5) +
+                        (this.denominations.cash_20c * 0.2) +
+                        (this.denominations.cash_10c * 0.1);
+                    if (Math.abs(this.coinFloat - Math.round(initialTotalCoins * 100) / 100) > 0.005) {
+                        this.coinFloatManual = true;
+                    }
+
                     this.calculateTotals();
                     this.calculatePayments();
                     @if($reconciliation)
