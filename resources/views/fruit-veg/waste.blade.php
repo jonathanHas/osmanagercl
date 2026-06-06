@@ -132,40 +132,50 @@
                                     <!-- Amount -->
                                     <td class="px-2 sm:px-4 py-3">
                                         <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                                            <div class="flex items-center h-9 rounded-lg border overflow-hidden bg-white"
+                                            <div class="flex items-center h-9 rounded-lg border bg-white"
                                                  :class="row.quantity > 0 ? 'border-[#c2410c] bg-orange-50' : 'border-gray-300'">
                                                 <button type="button" x-show="row.unit === 'unit'" tabindex="-1"
                                                         @click="step(row, -1)" :disabled="!(row.quantity > 0)"
-                                                        class="w-8 self-stretch flex items-center justify-center bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 disabled:opacity-40">
+                                                        class="w-8 self-stretch flex items-center justify-center rounded-l-md bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 disabled:opacity-40">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" d="M5 12h14"/></svg>
                                                 </button>
                                                 <input type="number" inputmode="decimal" min="0" :step="row.unit === 'unit' ? 1 : 0.1"
                                                        placeholder="0"
                                                        :value="row.quantity > 0 ? row.quantity : ''"
                                                        @input="onType(row, $event.target.value)"
-                                                       class="w-14 sm:w-16 h-full border-0 text-center text-[15px] font-bold text-gray-900 focus:ring-0 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                       class="w-14 sm:w-16 h-full border-0 rounded-l-md text-center text-[15px] font-bold text-gray-900 focus:ring-0 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                        :class="row.quantity > 0 ? 'bg-orange-50' : 'bg-white'">
                                                 <button type="button" x-show="row.unit === 'unit'" tabindex="-1"
                                                         @click="step(row, 1)"
                                                         class="w-8 self-stretch flex items-center justify-center bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" d="M12 5v14M5 12h14"/></svg>
                                                 </button>
-                                                <span class="px-2 text-xs font-semibold border-l self-stretch flex items-center"
-                                                      :class="row.quantity > 0 ? 'text-[#c2410c] border-orange-200' : 'text-gray-400 border-gray-200'"
-                                                      x-text="row.unit === 'kg' ? 'kg' : 'units'"></span>
-                                            </div>
-                                            <!-- kg / units toggle -->
-                                            <div class="flex h-9 rounded-lg border border-gray-300 overflow-hidden" role="group" title="Log by weight or by units">
-                                                <button type="button" @click="setUnit(row, 'kg')"
-                                                        class="px-2.5 text-xs font-semibold flex items-center gap-1"
-                                                        :class="row.unit === 'kg' ? 'bg-[#c2410c] text-white' : 'bg-white text-gray-400 hover:text-gray-600'">
-                                                    kg
-                                                </button>
-                                                <button type="button" @click="setUnit(row, 'unit')"
-                                                        class="px-2.5 text-xs font-semibold flex items-center gap-1 border-l border-gray-300"
-                                                        :class="row.unit === 'unit' ? 'bg-[#c2410c] text-white' : 'bg-white text-gray-400 hover:text-gray-600'">
-                                                    units
-                                                </button>
+                                                <!-- Unit suffix doubles as a quiet switcher (dropdown) -->
+                                                <span class="relative self-stretch flex" @click.away="if (unitMenu === row.code) unitMenu = null">
+                                                    <button type="button" tabindex="-1" title="Change unit (kg / units)"
+                                                            @click="unitMenu = unitMenu === row.code ? null : row.code"
+                                                            class="px-2 text-xs font-semibold border-l self-stretch flex items-center gap-0.5 rounded-r-md hover:bg-gray-50"
+                                                            :class="row.quantity > 0 ? 'text-[#c2410c] border-orange-200' : 'text-gray-400 border-gray-200'">
+                                                        <span x-text="row.unit === 'kg' ? 'kg' : 'units'"></span>
+                                                        <svg class="w-2.5 h-2.5 opacity-60" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>
+                                                    </button>
+                                                    <div x-show="unitMenu === row.code" x-cloak
+                                                         class="absolute right-0 top-full mt-1 z-20 w-28 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+                                                        <div class="px-3 pt-1 pb-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-400">Log by</div>
+                                                        <button type="button" @click="setUnit(row, 'kg'); unitMenu = null"
+                                                                class="w-full px-3 py-1.5 text-left text-sm hover:bg-gray-50 flex items-center justify-between"
+                                                                :class="row.unit === 'kg' ? 'font-semibold text-gray-900' : 'text-gray-600'">
+                                                            kg
+                                                            <svg x-show="row.unit === 'kg'" class="w-3.5 h-3.5 text-[#c2410c]" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20 6L9 17l-5-5"/></svg>
+                                                        </button>
+                                                        <button type="button" @click="setUnit(row, 'unit'); unitMenu = null"
+                                                                class="w-full px-3 py-1.5 text-left text-sm hover:bg-gray-50 flex items-center justify-between"
+                                                                :class="row.unit === 'unit' ? 'font-semibold text-gray-900' : 'text-gray-600'">
+                                                            units
+                                                            <svg x-show="row.unit === 'unit'" class="w-3.5 h-3.5 text-[#c2410c]" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20 6L9 17l-5-5"/></svg>
+                                                        </button>
+                                                    </div>
+                                                </span>
                                             </div>
                                             <!-- Save state -->
                                             <span x-show="saveState[row.code] === 'saving'" x-cloak class="text-xs text-gray-400">saving…</span>
@@ -235,6 +245,7 @@
                 search: '',
                 searching: false,
                 searchCodes: null,    // codes matching the current search (null = no active search)
+                unitMenu: null,       // code of the row whose unit dropdown is open
                 saveState: {},        // code -> 'saving' | 'saved' | 'error'
                 saveTimers: {},
                 stateTimers: {},
