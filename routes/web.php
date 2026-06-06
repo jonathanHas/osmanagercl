@@ -33,6 +33,7 @@ use App\Http\Controllers\TestScraperController;
 use App\Http\Controllers\TillProductBrowserController;
 use App\Http\Controllers\UdeaDiagnosticsController;
 use App\Http\Controllers\UserManagementController;
+use App\Http\Controllers\WasteController;
 use App\Http\Controllers\ZebraLabelController;
 use Illuminate\Support\Facades\Route;
 
@@ -392,6 +393,13 @@ Route::middleware('auth')->group(function () {
         Route::post('/harvest', [HarvestController::class, 'store'])->name('harvest.store');
         Route::get('/harvest/history', [HarvestController::class, 'history'])->name('harvest.history');
         Route::delete('/harvest/{harvest}', [HarvestController::class, 'destroy'])->name('harvest.destroy');
+
+        // Waste log (till-visible F&V range + full-range search, instant save)
+        Route::get('/waste', [WasteController::class, 'index'])->name('waste');
+        Route::post('/waste/entry', [WasteController::class, 'entry'])->name('waste.entry');
+        Route::get('/waste/search', [WasteController::class, 'search'])->name('waste.search');
+        Route::get('/waste/history', [WasteController::class, 'history'])->name('waste.history');
+        Route::delete('/waste/{wasteLog}', [WasteController::class, 'destroy'])->name('waste.destroy');
     });
 
     // Coffee routes

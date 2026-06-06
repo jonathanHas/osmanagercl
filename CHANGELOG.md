@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **🗑️ Fruit & Veg Waste Log** (2026-06-06)
+  - New **Log Waste** page under the F&V module (`/fruit-veg/waste`) for recording spoiled/discarded stock, built from a Claude Design handoff (List layout)
+  - Default list shows all **till-visible** F&V products (`TillVisibilityService`, `PRODUCTS_CAT` × `SUB1/SUB2/SUB3`) with product image, name, code/category/origin/class meta, current price and an **On till** badge; a debounced **search-all bar** covers the full F&V range via `searchAllProductsWithVisibility()` (results badged **Full range**)
+  - **Instant save**: typing an amount upserts that day's row via AJAX (`POST /fruit-veg/waste/entry`, 500ms debounce, per-row saving/saved/failed indicator); a cleared/zero amount deletes the row. `UNIQUE (waste_date, product_code)` keeps one editable row per product per day
+  - **Per-row kg/units toggle** with +/− steppers in units mode; default unit chain = today's entry → last-used unit for the product → the product's veg unit. `unit_price`/`value` are snapshotted at save time so historical totals stay stable; value is null (—) when logged in a non-priced unit
+  - **Live totals bar**: items logged, total kg (+ units), and **est. value lost** (accent `#c2410c`), plus a **Waste report** link
+  - Date picker (max today) to edit past days; history page (`/fruit-veg/waste/history`) groups entries by date with counts, per-unit totals, est. value, per-line delete and "Edit this day" links
+  - Records-only — no POS stock changes
+  - **New**: `app/Http/Controllers/WasteController.php`, `app/Models/WasteLog.php`, migration `2026_06_06_000001_create_fv_waste_logs_table.php`, `resources/views/fruit-veg/waste.blade.php`, `resources/views/fruit-veg/waste-history.blade.php`, `tests/Feature/WasteLogTest.php`
+  - **Modified**: `routes/web.php`, `resources/views/fruit-veg/index.blade.php`
+
 - **🌱 Fruit & Veg Harvest Log** (2026-05-26)
   - New **Log Harvest** page under the F&V module (`/fruit-veg/harvest`) for recording quantities of own-farm produce harvested per day
   - Product list is scoped to supplier **Jon** (own farm, POS `SupplierID = 2`) via the existing `SupplierRepository::getSupplierProducts()`; supplier id referenced from new `config('suppliers.jon')` key
