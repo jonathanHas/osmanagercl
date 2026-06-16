@@ -44,6 +44,14 @@
                         </svg>
                         Deviation Report
                     </a>
+                    <button type="button" onclick="generateDeviationReport()"
+                            class="hidden sm:inline-flex items-center px-3 py-2 bg-purple-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-purple-700 gap-1.5 touch-manipulation">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        Generate from Selected
+                    </button>
                 @endif
                 <a href="{{ route('delivery-legacy.index') }}"
                    class="inline-flex items-center px-3 py-2 bg-gray-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 touch-manipulation">
@@ -983,6 +991,11 @@
                             <table class="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead class="bg-red-50">
                                     <tr>
+                                        @if($isUdea)
+                                            <th class="px-2 py-2 w-8 text-center" title="Select for deviation report">
+                                                <input type="checkbox" onclick="toggleDeviationGroup(this, 'mismatch')" class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                                            </th>
+                                        @endif
                                         <th class="px-2 py-2 w-12"></th>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Expected</th>
@@ -1027,6 +1040,13 @@
                                             $hasCaseUnitChange = $item->invoiceCaseUnits != $item->CaseUnits;
                                         @endphp
                                         <tr class="bg-red-50" x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
+                                            @if($isUdea)
+                                                <td class="px-2 py-2 text-center">
+                                                    @if(!empty($item->Barcode))
+                                                        <input type="checkbox" class="deviation-select rounded border-gray-300 text-purple-600 focus:ring-purple-500" value="mismatch:{{ $item->Barcode }}">
+                                                    @endif
+                                                </td>
+                                            @endif
                                             <td class="px-2 py-2">
                                                 @php
                                                     $tempProduct = (object)[
@@ -2049,6 +2069,11 @@
                             <table class="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead class="bg-red-50">
                                     <tr>
+                                        @if($isUdea)
+                                            <th class="px-2 py-2 w-8 text-center" title="Select for deviation report">
+                                                <input type="checkbox" onclick="toggleDeviationGroup(this, 'pending')" class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                                            </th>
+                                        @endif
                                         <th class="px-2 py-2 w-12"></th>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Barcode</th>
@@ -2071,6 +2096,13 @@
                                             $value = ($item->cost ?? 0) * $totalUnits;
                                         @endphp
                                         <tr class="bg-red-50">
+                                            @if($isUdea)
+                                                <td class="px-2 py-2 text-center">
+                                                    @if(!empty($item->Barcode))
+                                                        <input type="checkbox" class="deviation-select rounded border-gray-300 text-purple-600 focus:ring-purple-500" value="pending:{{ $item->Barcode }}">
+                                                    @endif
+                                                </td>
+                                            @endif
                                             <td class="px-2 py-2">
                                                 @php
                                                     $tempProduct = $item->Barcode ? (object)[
@@ -2159,6 +2191,54 @@
     <script>
         // Global reference to store the Alpine component instance
         window.deliveryMatchInstance = null;
+
+        // Toggle all deviation checkboxes within one table group (header "select all").
+        function toggleDeviationGroup(headerCheckbox, source) {
+            document.querySelectorAll('.deviation-select').forEach(function (cb) {
+                if (cb.value.startsWith(source + ':')) {
+                    cb.checked = headerCheckbox.checked;
+                }
+            });
+        }
+
+        // Build the deviation report from the ticked pending / mismatch rows and download it.
+        function generateDeviationReport() {
+            const selected = Array.from(document.querySelectorAll('.deviation-select:checked')).map(cb => cb.value);
+
+            if (selected.length === 0) {
+                alert('Please tick at least one item (in Qty Mismatches or Missing) to include in the deviation report.');
+                return;
+            }
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{{ route('delivery-legacy.deviation-report') }}';
+            form.style.display = 'none';
+
+            const fields = {
+                '_token': '{{ csrf_token() }}',
+                'delID': '{{ $deliveryId }}',
+                'supplierID': '{{ $supplierId }}',
+            };
+            for (const [name, value] of Object.entries(fields)) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = name;
+                input.value = value;
+                form.appendChild(input);
+            }
+            selected.forEach(function (value) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'items[]';
+                input.value = value;
+                form.appendChild(input);
+            });
+
+            document.body.appendChild(form);
+            form.submit();
+            form.remove();
+        }
 
         function deliveryMatch() {
             return {

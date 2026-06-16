@@ -7,6 +7,9 @@ use App\Models\DeliveryScanItem;
 use App\Services\SupplierService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class DeliveryLegacyController extends Controller
 {
@@ -159,6 +162,123 @@ class DeliveryLegacyController extends Controller
             'syncedDelivery',
             'unresolvedCodes'
         ))->with('supplierService', $this->supplierService);
+    }
+
+    /**
+     * Generate a filled-in Udea "deviation report" Excel file from the items the user
+     * selected on the match page (pending / not delivered, and quantity mismatches).
+     *
+     * The template (public/downloads/deviation-report-template-2025.xlsx) is loaded so its
+     * styling, dropdowns and named ranges are preserved; data rows are written from row 9.
+     */
+    public function deviationReport(Request $request)
+    {
+        $deliveryId = $request->input('delID');
+        $supplierId = $request->input('supplierID');
+        $selected = (array) $request->input('items', []);
+
+        if (! $deliveryId || ! $supplierId || count($selected) === 0) {
+            return redirect()
+                ->to(route('delivery-legacy.match', ['delID' => $deliveryId, 'supplierID' => $supplierId]))
+                ->with('error', 'Please select at least one item for the deviation report.');
+        }
+
+        // Re-query server-side so names/amounts can't be tampered with via the form payload.
+        $matched = $this->getMatchedItems($deliveryId, $supplierId);
+        $pending = $this->getOnInvoiceNotScanned($deliveryId, $supplierId);
+
+        // Build barcode => item lookups per source.
+        $pendingByBarcode = [];
+        foreach ($pending as $item) {
+            if (! empty($item->Barcode)) {
+                $pendingByBarcode[(string) $item->Barcode] = $item;
+            }
+        }
+        $matchedByBarcode = [];
+        foreach ($matched as $item) {
+            if (! empty($item->Barcode)) {
+                $matchedByBarcode[(string) $item->Barcode] = $item;
+            }
+        }
+
+        // Delivery date from the scan session.
+        $dateUpload = DB::connection('pos')->table('deliveriesScan')
+            ->where('ID', $deliveryId)
+            ->value('dateUpload');
+        $deliveryDate = $dateUpload ? date('d/m/Y', strtotime($dateUpload)) : '';
+
+        // Resolve each selected "source:barcode" into a report row.
+        $rows = [];
+        foreach ($selected as $value) {
+            [$source, $barcode] = array_pad(explode(':', (string) $value, 2), 2, null);
+            if ($barcode === null) {
+                continue;
+            }
+
+            if ($source === 'pending' && isset($pendingByBarcode[$barcode])) {
+                $item = $pendingByBarcode[$barcode];
+                $caseUnits = $item->caseUnits ?? 1;
+                $myOrder = $item->myOrder ?? 0;
+                $expected = (fmod((float) $myOrder, 1) != 0.0) ? (float) $myOrder : $caseUnits * $myOrder;
+                $rows[] = [
+                    'orderNumber' => $item->orderNumber ?? '',
+                    'supCode' => $item->supCode ?? '',
+                    'name' => $item->dbProductName ?? $item->prodName ?? '',
+                    'amount' => $this->formatDeviationAmount($expected),
+                ];
+            } elseif ($source === 'mismatch' && isset($matchedByBarcode[$barcode])) {
+                $item = $matchedByBarcode[$barcode];
+                $caseUnits = $item->invoiceCaseUnits ?? 1;
+                $myOrder = $item->myOrder ?? 0;
+                $expected = (fmod((float) $myOrder, 1) != 0.0) ? (float) $myOrder : $caseUnits * $myOrder;
+                $shortfall = abs($expected - (float) ($item->scanned ?? 0));
+                $rows[] = [
+                    'orderNumber' => $item->orderNumber ?? '',
+                    'supCode' => $item->supCode ?? '',
+                    'name' => $item->dbProductName ?? $item->prodName ?? '',
+                    'amount' => $this->formatDeviationAmount($shortfall),
+                ];
+            }
+        }
+
+        if (count($rows) === 0) {
+            return redirect()
+                ->to(route('delivery-legacy.match', ['delID' => $deliveryId, 'supplierID' => $supplierId]))
+                ->with('error', 'None of the selected items could be matched for the deviation report.');
+        }
+
+        // Load the template and fill data rows starting at row 9 (header is row 8).
+        $spreadsheet = IOFactory::load(public_path('downloads/deviation-report-template-2025.xlsx'));
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $row = 9;
+        foreach ($rows as $data) {
+            $sheet->setCellValue("A{$row}", $deliveryDate);
+            $sheet->setCellValueExplicit("B{$row}", (string) $data['orderNumber'], DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit("C{$row}", (string) $data['supCode'], DataType::TYPE_STRING);
+            $sheet->setCellValue("D{$row}", $data['name']);
+            $sheet->setCellValue("E{$row}", $data['amount']);
+            $sheet->setCellValue("F{$row}", 'Not recieved (Partially)');
+            $row++;
+        }
+
+        $writer = new Xlsx($spreadsheet);
+        $filename = 'deviation-report-'.($dateUpload ? date('Y-m-d', strtotime($dateUpload)) : $deliveryId).'.xlsx';
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
+    /**
+     * Format a deviation amount: drop the decimals for whole numbers (case-based),
+     * keep up to 3 decimals for weight-based (kg) quantities.
+     */
+    private function formatDeviationAmount(float $amount): float|int
+    {
+        return (fmod($amount, 1) == 0.0) ? (int) $amount : round($amount, 3);
     }
 
     /**

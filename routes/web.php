@@ -538,6 +538,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/merge-sessions', [DeliveryLegacyController::class, 'mergeSessions'])->name('merge-sessions');
         Route::patch('/change-supplier', [DeliveryLegacyController::class, 'changeSupplier'])->name('change-supplier');
         Route::post('/resolve-images-batch', [DeliveryLegacyController::class, 'resolveImagesBatch'])->name('resolve-images-batch');
+        Route::post('/deviation-report', [DeliveryLegacyController::class, 'deviationReport'])->name('deviation-report');
     });
 
     // Order Management mockup routes (for UI testing)
