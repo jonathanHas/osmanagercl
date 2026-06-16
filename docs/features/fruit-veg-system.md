@@ -189,6 +189,33 @@ Supplier-agnostic order generation based on historical sales data for all F&V pr
 - **Currency Consistency**: Euro (€) display throughout all chart labels and statistics
 - **Performance Monitoring**: Comprehensive logging for troubleshooting chart issues
 
+### 11. Waste Log (NEW! 2026-06-06 🗑️)
+Inline quick-log for recording spoiled/discarded produce with live value totals. Records-only — no POS stock changes.
+
+**Key Features:**
+- **Instant Save**: Typing a weight or count on any row auto-saves via debounced AJAX (500ms); per-row saving/saved/failed indicator. A cleared/zero amount deletes the entry
+- **Till Range + Search-All**: Default list is all till-visible F&V products (`PRODUCTS_CAT` × SUB1/SUB2/SUB3); the search bar covers the full F&V range, with "On till" (green) / "Full range" (orange) badges
+- **One Row Per Day**: `UNIQUE (waste_date, product_code)` — re-saving a date edits in place; date picker (max today) to edit past days
+- **Units**: Quantities logged in `kg` or `unit`. The unit label inside the amount field is a quiet dropdown switcher (deliberately low-prominence to avoid accidental taps); +/− steppers appear in units mode. Default unit chain: today's entry → last-used unit for the product → the product's veg unit
+- **Value Tracking**: `unit_price` and `value` snapshotted at save time so historical totals stay stable; value is null (shown as —) when logged in a unit that differs from the priced unit
+- **Live Totals Bar**: Items logged, total kg (+ units), and est. value lost (accent `#c2410c`), sticky at the bottom
+- **Mobile Responsive**: Price/value columns collapse into the product cell at narrow widths; amount control wraps; numeric keypad via `inputmode="decimal"`
+
+**History Page** (`/fruit-veg/waste/history`):
+- Entries grouped by date with line counts, per-unit totals, and per-day est. value
+- Per-line delete and "Edit this day" link back to the entry page
+
+**Access:**
+- Dashboard: "Log Waste" button on F&V dashboard
+- Direct URL: `/fruit-veg/waste`
+
+**Technical Implementation:**
+- Controller: `WasteController` (`index`, `entry` AJAX upsert, `search` AJAX, `history`, `destroy`)
+- Model: `WasteLog` (`fv_waste_logs` table, Laravel DB)
+- Views: `fruit-veg/waste.blade.php` (Alpine `wasteLog` component), `fruit-veg/waste-history.blade.php`
+- Routes: `fruit-veg.waste`, `fruit-veg.waste.entry` (POST), `fruit-veg.waste.search`, `fruit-veg.waste.history`, `fruit-veg.waste.destroy`
+- Product scope/search via `TillVisibilityService::getProductsWithVisibility()` / `searchAllProductsWithVisibility()`; prices batch-loaded from `veg_price_history` (latest per code) with `Product::getGrossPrice()` fallback
+
 ## Technical Implementation
 
 ### Database Structure
@@ -301,6 +328,24 @@ CREATE TABLE veg_print_queue (
     created_at TIMESTAMP,
     updated_at TIMESTAMP
 );
+
+-- Waste log (records-only; one editable row per product per day)
+CREATE TABLE fv_waste_logs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    waste_date DATE NOT NULL,
+    product_code VARCHAR(255) NOT NULL, -- POS Product CODE; cross-connection, no FK
+    product_name VARCHAR(255) NOT NULL, -- snapshot at entry time
+    quantity DECIMAL(10,2) NOT NULL,
+    unit VARCHAR(20) DEFAULT 'kg',      -- 'kg' | 'unit'
+    unit_price DECIMAL(10,2),           -- € snapshot for stable historical totals
+    value DECIMAL(10,2),                -- qty * unit_price when unit matches priced unit, else NULL
+    created_by BIGINT,                  -- FK -> users.id (null on delete)
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
+    UNIQUE KEY (waste_date, product_code),
+    INDEX idx_product_code (product_code),
+    INDEX idx_waste_date (waste_date)
+);
 ```
 
 #### POS Database Tables (Read-Only)
@@ -360,6 +405,15 @@ VegUnit::orderBy('sort_order')->get();
 ```php
 // Quality classes (Extra, I, II, III)
 VegClass::orderBy('sort_order')->get();
+```
+
+#### WasteLog Model
+```php
+// One row per (waste_date, product_code); Laravel DB ('mysql' connection)
+WasteLog::UNITS;            // ['kg', 'unit']
+$wasteLog->product;         // POS Product relationship (cross-database, by CODE)
+$wasteLog->creator;         // User who recorded the entry
+// quantity/unit_price/value cast decimal:2; product_name + unit_price snapshotted at save time
 ```
 
 ### Controller Methods

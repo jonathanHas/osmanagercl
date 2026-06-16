@@ -172,7 +172,7 @@ class SupplierService
 
             $config = $this->getSupplierConfig($supplierId);
 
-            if (! $config || ! $config['enabled']) {
+            if (! $config || ! $config['enabled'] || empty($config['image_url'])) {
                 return null;
             }
 

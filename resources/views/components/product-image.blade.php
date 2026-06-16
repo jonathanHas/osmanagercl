@@ -54,7 +54,17 @@
                 method_exists($supplierService, 'hasExternalIntegration') &&
                 $supplierService->hasExternalIntegration($product->supplier->SupplierID)) {
             $sid = $product->supplier->SupplierID;
-            if (!empty($product->supplier_code) && method_exists($supplierService, 'getExternalImageUrlBySupplierCode')) {
+            $barcodeKeyed = method_exists($supplierService, 'usesSupplierCodeImages')
+                && ! $supplierService->usesSupplierCodeImages($sid);
+
+            // Barcode-keyed suppliers (e.g. Udea): trust the barcode we already have — matches the new
+            // deliveries page and avoids the supplier_link re-derivation that diverges between the dev
+            // snapshot and the live POS (duplicate/stale rows can resolve to an imageless barcode).
+            if ($barcodeKeyed && !empty($product->barcode) && method_exists($supplierService, 'getExternalImageUrlByBarcode')) {
+                $imageUrl = $supplierService->getExternalImageUrlByBarcode($sid, $product->barcode);
+            }
+            // {SUPPLIER_CODE} suppliers (e.g. Independent) keep using the supplier-code path (cache + JS resolver).
+            if (!$imageUrl && !empty($product->supplier_code) && method_exists($supplierService, 'getExternalImageUrlBySupplierCode')) {
                 $imageUrl = $supplierService->getExternalImageUrlBySupplierCode($sid, $product->supplier_code);
             }
             if (!$imageUrl && !empty($product->barcode) && method_exists($supplierService, 'getExternalImageUrlByBarcode')) {

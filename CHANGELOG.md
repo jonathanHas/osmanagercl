@@ -13,9 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New **Log Waste** page under the F&V module (`/fruit-veg/waste`) for recording spoiled/discarded stock, built from a Claude Design handoff (List layout)
   - Default list shows all **till-visible** F&V products (`TillVisibilityService`, `PRODUCTS_CAT` × `SUB1/SUB2/SUB3`) with product image, name, code/category/origin/class meta, current price and an **On till** badge; a debounced **search-all bar** covers the full F&V range via `searchAllProductsWithVisibility()` (results badged **Full range**)
   - **Instant save**: typing an amount upserts that day's row via AJAX (`POST /fruit-veg/waste/entry`, 500ms debounce, per-row saving/saved/failed indicator); a cleared/zero amount deletes the row. `UNIQUE (waste_date, product_code)` keeps one editable row per product per day
-  - **Per-row kg/units toggle** with +/− steppers in units mode; default unit chain = today's entry → last-used unit for the product → the product's veg unit. `unit_price`/`value` are snapshotted at save time so historical totals stay stable; value is null (—) when logged in a non-priced unit
+  - **Per-row kg/units switching** via a quiet dropdown on the unit label inside the amount field (deliberately low-prominence so it can't be hit by mistake — replaced an always-visible segmented toggle); +/− steppers in units mode. Default unit chain = today's entry → last-used unit for the product → the product's veg unit. `unit_price`/`value` are snapshotted at save time so historical totals stay stable; value is null (—) when logged in a non-priced unit
   - **Live totals bar**: items logged, total kg (+ units), and **est. value lost** (accent `#c2410c`), plus a **Waste report** link
   - Date picker (max today) to edit past days; history page (`/fruit-veg/waste/history`) groups entries by date with counts, per-unit totals, est. value, per-line delete and "Edit this day" links
+  - **Mobile responsive**: price/value columns collapse into the product cell below `md`/`lg`, meta condenses to code below `sm`, amount control wraps, numeric keypad via `inputmode="decimal"`, sticky totals bar
   - Records-only — no POS stock changes
   - **New**: `app/Http/Controllers/WasteController.php`, `app/Models/WasteLog.php`, migration `2026_06_06_000001_create_fv_waste_logs_table.php`, `resources/views/fruit-veg/waste.blade.php`, `resources/views/fruit-veg/waste-history.blade.php`, `tests/Feature/WasteLogTest.php`
   - **Modified**: `routes/web.php`, `resources/views/fruit-veg/index.blade.php`
@@ -137,6 +138,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Modified**: `resources/views/delivery-legacy/index.blade.php`, `resources/views/delivery-legacy/match.blade.php`, `resources/views/components/product-image.blade.php`
 
 ### Fixed
+
+- **Legacy delivery match: missing Udea product images on production** (2026-06-16)
+  - On `delivery-legacy/match` for Udea (supplier 5), many product images were missing on production while displaying correctly on dev; the newer `deliveries/{id}` page showed all images correctly on both
+  - Root cause: the legacy page builds synthetic product objects and resolved Udea images via `getExternalImageUrlBySupplierCode()`, which re-derives the barcode from POS with `supplier_link...->value('Barcode')`. With duplicate/stale `supplier_link` rows on the live POS, `value()` returned an imageless barcode, so the CDN URL 404'd. The new page uses the product's own barcode directly and was unaffected. Not reproducible on dev (separate POS snapshot)
+  - Fix: for barcode-keyed suppliers (Udea), `product-image.blade.php` now builds the image URL from the barcode it already has (matching the new page), before falling back to the supplier-code path. `{SUPPLIER_CODE}` suppliers (Independent) are unchanged
+  - Hardened `getExternalImageUrlByBarcode()` to guard an empty `image_url` (e.g. Natural Medicine), preventing a PHP 8.2 `str_replace(null)` deprecation
+  - **Modified**: `resources/views/components/product-image.blade.php`, `app/Services/SupplierService.php`
 
 - **AI Diagnostics: Mistral / OpenAI "No API Key" on production with cached config** (2026-04-17)
   - Switching any feature to Mistral or Mistral OCR on production surfaced "No API key configured for this provider" even though `MISTRAL_API_KEY` was present in `.env`; Gemini always worked

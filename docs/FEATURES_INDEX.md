@@ -184,11 +184,14 @@ Supplier-agnostic order generation based on historical sales data for all F&V pr
 Inline quick-log for recording spoiled/discarded produce, with live value totals.
 - **Instant Save**: Type a weight or count on any row and it saves automatically (debounced AJAX); zero/cleared amounts delete the entry
 - **Till Range + Search-All**: Defaults to till-visible products; search bar covers the full F&V range (SUB1/SUB2/SUB3) with "On till" / "Full range" badges
-- **Native Units**: Per-row kg/units toggle with +/− steppers in units mode; last-used unit remembered per product
+- **Native Units**: Unit label in the amount field is a quiet kg/units dropdown switcher (tucked away to avoid accidental taps); +/− steppers in units mode; last-used unit remembered per product
 - **Value Tracking**: Price and value snapshotted per entry; running totals bar shows items, kg + units, and est. value lost
 - **One Row Per Day**: `UNIQUE (waste_date, product_code)` — re-saving a date edits in place; date picker for past days
 - **History**: `/fruit-veg/waste/history` groups entries by date with counts, unit totals, est. value, delete and edit links
+- **Mobile Responsive**: Columns collapse gracefully at narrow widths; numeric keypad on phones; sticky totals bar
 - **Access**: Available at `/fruit-veg/waste` ("Log Waste" on the F&V dashboard)
+
+📖 [F&V System Documentation](./features/fruit-veg-system.md#waste-log)
 
 ---
 
