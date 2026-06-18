@@ -53,6 +53,16 @@
                         Generate from Selected
                     </button>
                 @endif
+                @if($isIndependent)
+                    <button type="button" onclick="generateGoodsReturnSheet()"
+                            class="hidden sm:inline-flex items-center px-3 py-2 bg-purple-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-purple-700 gap-1.5 touch-manipulation">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        Generate Returns Sheet
+                    </button>
+                @endif
                 <a href="{{ route('delivery-legacy.index') }}"
                    class="inline-flex items-center px-3 py-2 bg-gray-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 touch-manipulation">
                     <span class="hidden sm:inline">Back to Selection</span>
@@ -991,8 +1001,8 @@
                             <table class="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead class="bg-red-50">
                                     <tr>
-                                        @if($isUdea)
-                                            <th class="px-2 py-2 w-8 text-center" title="Select for deviation report">
+                                        @if($isUdea || $isIndependent)
+                                            <th class="px-2 py-2 w-8 text-center" title="Select for returns/deviation report">
                                                 <input type="checkbox" onclick="toggleDeviationGroup(this, 'mismatch')" class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
                                             </th>
                                         @endif
@@ -1040,7 +1050,7 @@
                                             $hasCaseUnitChange = $item->invoiceCaseUnits != $item->CaseUnits;
                                         @endphp
                                         <tr class="bg-red-50" x-show="categoryVisible('{{ addslashes($item->categoryName ?? '') }}')">
-                                            @if($isUdea)
+                                            @if($isUdea || $isIndependent)
                                                 <td class="px-2 py-2 text-center">
                                                     @if(!empty($item->Barcode))
                                                         <input type="checkbox" class="deviation-select rounded border-gray-300 text-purple-600 focus:ring-purple-500" value="mismatch:{{ $item->Barcode }}">
@@ -2069,8 +2079,8 @@
                             <table class="min-w-full divide-y divide-gray-200 text-sm">
                                 <thead class="bg-red-50">
                                     <tr>
-                                        @if($isUdea)
-                                            <th class="px-2 py-2 w-8 text-center" title="Select for deviation report">
+                                        @if($isUdea || $isIndependent)
+                                            <th class="px-2 py-2 w-8 text-center" title="Select for returns/deviation report">
                                                 <input type="checkbox" onclick="toggleDeviationGroup(this, 'pending')" class="rounded border-gray-300 text-purple-600 focus:ring-purple-500">
                                             </th>
                                         @endif
@@ -2096,7 +2106,7 @@
                                             $value = ($item->cost ?? 0) * $totalUnits;
                                         @endphp
                                         <tr class="bg-red-50">
-                                            @if($isUdea)
+                                            @if($isUdea || $isIndependent)
                                                 <td class="px-2 py-2 text-center">
                                                     @if(!empty($item->Barcode))
                                                         <input type="checkbox" class="deviation-select rounded border-gray-300 text-purple-600 focus:ring-purple-500" value="pending:{{ $item->Barcode }}">
@@ -2201,18 +2211,18 @@
             });
         }
 
-        // Build the deviation report from the ticked pending / mismatch rows and download it.
-        function generateDeviationReport() {
+        // Build a report/sheet from the ticked pending / mismatch rows and download it.
+        function submitSelectedItems(actionUrl, noun) {
             const selected = Array.from(document.querySelectorAll('.deviation-select:checked')).map(cb => cb.value);
 
             if (selected.length === 0) {
-                alert('Please tick at least one item (in Qty Mismatches or Missing) to include in the deviation report.');
+                alert('Please tick at least one item (in Qty Mismatches or Missing) to include in the ' + noun + '.');
                 return;
             }
 
             const form = document.createElement('form');
             form.method = 'POST';
-            form.action = '{{ route('delivery-legacy.deviation-report') }}';
+            form.action = actionUrl;
             form.style.display = 'none';
 
             const fields = {
@@ -2238,6 +2248,16 @@
             document.body.appendChild(form);
             form.submit();
             form.remove();
+        }
+
+        // Udea deviation report (Excel)
+        function generateDeviationReport() {
+            submitSelectedItems('{{ route('delivery-legacy.deviation-report') }}', 'deviation report');
+        }
+
+        // Independent (IIHF) goods return sheet (PDF)
+        function generateGoodsReturnSheet() {
+            submitSelectedItems('{{ route('delivery-legacy.goods-return-sheet') }}', 'goods return sheet');
         }
 
         function deliveryMatch() {

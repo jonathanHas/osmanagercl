@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Delivery;
 use App\Models\DeliveryScanItem;
+use App\Services\IihfGoodsReturnPdfService;
 use App\Services\SupplierService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -109,6 +110,10 @@ class DeliveryLegacyController extends Controller
         $udeaIds = config('suppliers.external_links.udea.supplier_ids', [5, 44, 85]);
         $isUdea = in_array((int) $supplierId, $udeaIds) || in_array($supplierId, array_map('strval', $udeaIds));
 
+        // Check if this is Independent (IIHF) supplier - uses a PDF goods-return sheet
+        $independentIds = config('suppliers.external_links.independent.supplier_ids', [37]);
+        $isIndependent = in_array((int) $supplierId, $independentIds) || in_array($supplierId, array_map('strval', $independentIds));
+
         // Calculate financial summaries for dashboard
         $financials = $this->calculateFinancials($matchedItems, $scannedNotOnInvoice, $onInvoiceNotScanned, $isUdea);
 
@@ -156,6 +161,7 @@ class DeliveryLegacyController extends Controller
             'deliveryId',
             'supplierId',
             'isUdea',
+            'isIndependent',
             'financials',
             'stockPreview',
             'isCompleted',
@@ -282,6 +288,111 @@ class DeliveryLegacyController extends Controller
     }
 
     /**
+     * Generate a filled-in IIHF (Independent) "Goods Return Record" PDF from the items the user
+     * selected on the match page (pending / not delivered, and quantity mismatches).
+     *
+     * Mirrors deviationReport() but outputs the IIHF PDF form via IihfGoodsReturnPdfService.
+     */
+    public function goodsReturnSheet(Request $request, IihfGoodsReturnPdfService $pdfService)
+    {
+        $deliveryId = $request->input('delID');
+        $supplierId = $request->input('supplierID');
+        $selected = (array) $request->input('items', []);
+
+        if (! $deliveryId || ! $supplierId || count($selected) === 0) {
+            return redirect()
+                ->to(route('delivery-legacy.match', ['delID' => $deliveryId, 'supplierID' => $supplierId]))
+                ->with('error', 'Please select at least one item for the goods return sheet.');
+        }
+
+        // Re-query server-side so names/amounts can't be tampered with via the form payload.
+        $matched = $this->getMatchedItems($deliveryId, $supplierId);
+        $pending = $this->getOnInvoiceNotScanned($deliveryId, $supplierId);
+
+        $pendingByBarcode = [];
+        foreach ($pending as $item) {
+            if (! empty($item->Barcode)) {
+                $pendingByBarcode[(string) $item->Barcode] = $item;
+            }
+        }
+        $matchedByBarcode = [];
+        foreach ($matched as $item) {
+            if (! empty($item->Barcode)) {
+                $matchedByBarcode[(string) $item->Barcode] = $item;
+            }
+        }
+
+        $rows = [];
+        foreach ($selected as $value) {
+            [$source, $barcode] = array_pad(explode(':', (string) $value, 2), 2, null);
+            if ($barcode === null) {
+                continue;
+            }
+
+            if ($source === 'pending' && isset($pendingByBarcode[$barcode])) {
+                $item = $pendingByBarcode[$barcode];
+                $caseUnits = $item->caseUnits ?? 1;
+                $myOrder = $item->myOrder ?? 0;
+                $qty = (fmod((float) $myOrder, 1) != 0.0) ? (float) $myOrder : $caseUnits * $myOrder;
+            } elseif ($source === 'mismatch' && isset($matchedByBarcode[$barcode])) {
+                $item = $matchedByBarcode[$barcode];
+                $caseUnits = $item->invoiceCaseUnits ?? 1;
+                $myOrder = $item->myOrder ?? 0;
+                $expected = (fmod((float) $myOrder, 1) != 0.0) ? (float) $myOrder : $caseUnits * $myOrder;
+                $qty = abs($expected - (float) ($item->scanned ?? 0));
+            } else {
+                continue;
+            }
+
+            $amount = $this->formatDeviationAmount((float) $qty);
+            $value = (float) ($item->cost ?? 0) * (float) $qty;
+
+            $rows[] = [
+                'invoice' => (string) ($item->orderNumber ?? ''),
+                'code' => (string) ($item->supCode ?? ''),
+                'description' => (string) ($item->dbProductName ?? $item->prodName ?? ''),
+                'qty' => (string) $amount,
+                'value' => '€'.number_format($value, 2),
+                'vat' => $this->formatVatRate($item->RATE ?? null),
+                'reason' => 'A', // A: Not delivered
+            ];
+        }
+
+        if (count($rows) === 0) {
+            return redirect()
+                ->to(route('delivery-legacy.match', ['delID' => $deliveryId, 'supplierID' => $supplierId]))
+                ->with('error', 'None of the selected items could be matched for the goods return sheet.');
+        }
+
+        $dateUpload = DB::connection('pos')->table('deliveriesScan')
+            ->where('ID', $deliveryId)
+            ->value('dateUpload');
+        $filename = 'goods-return-'.($dateUpload ? date('Y-m-d', strtotime($dateUpload)) : $deliveryId).'.pdf';
+        $displayDate = $dateUpload ? date('d/m/Y', strtotime($dateUpload)) : null;
+
+        $pdf = $pdfService->generate($rows, $displayDate);
+
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    /**
+     * Format a POS tax rate (decimal, e.g. 0.135) as a percentage string (e.g. "13.5%").
+     */
+    private function formatVatRate($rate): string
+    {
+        if ($rate === null || $rate === '') {
+            return '';
+        }
+
+        $pct = (float) $rate * 100;
+
+        return rtrim(rtrim(number_format($pct, 2, '.', ''), '0'), '.').'%';
+    }
+
+    /**
      * Get matched items between invoice and scans.
      * Replicates the main query from the legacy PHP page.
      * Note: delivery table doesn't have SupplierID - filtering via supplier_link
@@ -392,17 +503,19 @@ class DeliveryLegacyController extends Controller
                     MIN(delivery.orderNumber) as orderNumber,
                     supplier_link.Barcode,
                     PRODUCTS.NAME as dbProductName,
-                    PRODUCTS.ID as productID
+                    PRODUCTS.ID as productID,
+                    TAXES.RATE as RATE
                 FROM delivery
                 INNER JOIN supplier_link ON delivery.supCode = supplier_link.SupplierCode
                     AND supplier_link.SupplierID = ?
                 LEFT JOIN PRODUCTS ON supplier_link.Barcode = PRODUCTS.CODE
+                LEFT JOIN TAXES ON PRODUCTS.TAXCAT = TAXES.ID
                 WHERE supplier_link.Barcode NOT IN (
                     SELECT barcode
                     FROM deliveriesScanItems
                     WHERE delID = ?
                 )
-                GROUP BY delivery.supCode, delivery.prodName, delivery.caseUnits, supplier_link.Barcode, PRODUCTS.NAME, PRODUCTS.ID
+                GROUP BY delivery.supCode, delivery.prodName, delivery.caseUnits, supplier_link.Barcode, PRODUCTS.NAME, PRODUCTS.ID, TAXES.RATE
                 HAVING SUM(delivery.myOrder) > 0
                 ORDER BY delivery.prodName ASC';
 

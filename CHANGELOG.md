@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **📄 IIHF (Independent) Goods Return Sheet Generator** (2026-06-16)
+  - On the delivery match page (`/delivery-legacy/match`), Independent (IIHF, supplier 37) deliveries can now generate a **pre-filled "Goods Return Record" PDF** for short/missing items — the PDF counterpart to the Udea deviation report
+  - Reuses the same desktop-only checkbox selection on the **Qty Mismatches** and **Missing – Not Scanned** tables; adds a **Generate Returns Sheet** button
+  - Because the official form is a **flat PDF with no fillable fields**, our data is **overlaid** onto the official form via FPDI/FPDF. The form is converted once with Ghostscript to PDF 1.4 and stored at `public/downloads/iihf-goods-return-template.pdf`
+  - Fills per line: Invoice No., Product Code, Description, Quantity, Value (€), VAT (%), and an **X on reason code A (Not delivered)**. Also auto-fills the header/footer: Account Name (Mossfield Organic Store Ltd), IIHF Account No. (20128), Customer Contact Name (Jonathan Haslam) and Date (delivery date)
+  - Values are **re-queried server-side** (checkboxes only carry `source:barcode`). `getOnInvoiceNotScanned()` now also selects `TAXES.RATE` so VAT can be filled for missing items
+  - **New deps**: `setasign/fpdi`, `setasign/fpdf`. **New route**: `POST delivery-legacy/goods-return-sheet`
+  - **New**: `app/Services/IihfGoodsReturnPdfService.php`. **Modified**: `app/Http/Controllers/DeliveryLegacyController.php`, `resources/views/delivery-legacy/match.blade.php`, `routes/web.php`
+  - 📖 [IIHF Goods Return Sheet Documentation](./docs/features/iihf-goods-return-sheet.md)
+
+- **📄 Udea Deviation Report Generator** (2026-06-16)
+  - On the delivery match page (`/delivery-legacy/match`), Udea deliveries can now generate a **pre-filled Udea deviation report** `.xlsx` for short/missing items, instead of hand-typing the blank template
+  - Adds a checkbox column to the **Qty Mismatches** and **Missing – Not Scanned** desktop tables (Udea-only, hidden on mobile) plus a **Generate from Selected** button beside the existing blank-template download
+  - Fills the template from row 9: delivery date, order number, article (supplier) code, product name, amount, and deviation = `"Not recieved (Partially)"`. Amount = expected qty for missing items, shortfall (`abs(expected − scanned)`) for mismatches
+  - Values are **re-queried server-side** from the same POS queries the page uses (checkboxes only carry `source:barcode`), so the report can't be tampered with. The template (`public/downloads/deviation-report-template-2025.xlsx`) is loaded/re-saved with PhpSpreadsheet so its dropdowns, styling and baked-in customer number are preserved
+  - **New route**: `POST delivery-legacy/deviation-report`
+  - **Modified**: `app/Http/Controllers/DeliveryLegacyController.php` (`deviationReport()`), `resources/views/delivery-legacy/match.blade.php`, `routes/web.php`
+  - 📖 [Udea Deviation Report Documentation](./docs/features/udea-deviation-report.md)
+
 - **🗑️ Fruit & Veg Waste Log** (2026-06-06)
   - New **Log Waste** page under the F&V module (`/fruit-veg/waste`) for recording spoiled/discarded stock, built from a Claude Design handoff (List layout)
   - Default list shows all **till-visible** F&V products (`TillVisibilityService`, `PRODUCTS_CAT` × `SUB1/SUB2/SUB3`) with product image, name, code/category/origin/class meta, current price and an **On till** badge; a debounced **search-all bar** covers the full F&V range via `searchAllProductsWithVisibility()` (results badged **Full range**)

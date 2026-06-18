@@ -1759,26 +1759,21 @@ class DeliveryController extends Controller
                         $syncCaseUnits = 1;
                         $syncMyOrder = $item->total_weight;
                     } else {
-                        // Regular products: calculate based on case/unit structure
+                        // Regular products: base the legacy quantity on the DELIVERED amount
+                        // (the invoice "Amount" column = invoice_delivered_quantity), not what was
+                        // ordered. Preserve case structure when the delivered units divide evenly
+                        // into full cases; otherwise store as loose units.
                         $unitsPerCase = $item->units_per_case ?? 1;
-                        $cases = $item->case_ordered_quantity ?? 0;
-                        $looseUnits = $item->unit_ordered_quantity ?? 0;
+                        $deliveredUnits = $item->invoice_delivered_quantity ?? 0;
 
-                        // Calculate case units (same logic for OOS and delivered items)
-                        if ($unitsPerCase > 1 && $cases > 0) {
-                            if ($looseUnits > 0) {
-                                // Mixed order (cases + loose units) - treat as units for legacy
-                                $syncCaseUnits = 1;
-                                $syncMyOrder = ($cases * $unitsPerCase) + $looseUnits;
-                            } else {
-                                // Full case order - use actual case units
-                                $syncCaseUnits = $unitsPerCase;
-                                $syncMyOrder = $cases;
-                            }
+                        if ($unitsPerCase > 1 && $deliveredUnits > 0 && $deliveredUnits % $unitsPerCase === 0) {
+                            // Full cases delivered - preserve case structure
+                            $syncCaseUnits = $unitsPerCase;
+                            $syncMyOrder = intdiv($deliveredUnits, $unitsPerCase);
                         } else {
-                            // Unit-based order or no case info
+                            // Loose / partial-case delivery - store as units
                             $syncCaseUnits = 1;
-                            $syncMyOrder = $item->ordered_quantity;
+                            $syncMyOrder = $deliveredUnits;
                         }
                     }
 
