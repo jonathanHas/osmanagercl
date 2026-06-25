@@ -33,6 +33,7 @@ use App\Http\Controllers\TestScraperController;
 use App\Http\Controllers\TillProductBrowserController;
 use App\Http\Controllers\UdeaDiagnosticsController;
 use App\Http\Controllers\UserManagementController;
+use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\WasteController;
 use App\Http\Controllers\ZebraLabelController;
 use Illuminate\Support\Facades\Route;
@@ -966,6 +967,20 @@ Route::middleware('auth')->group(function () {
             ->name('customers.statement');
         Route::get('customers/{customer}/statement.pdf', [CustomerStatementController::class, 'downloadPdf'])
             ->name('customers.statement.pdf');
+    });
+
+    // Voucher Management
+    Route::middleware('permission:vouchers.manage')->group(function () {
+        Route::get('vouchers', [VoucherController::class, 'index'])->name('vouchers.index');
+        Route::post('vouchers/lookup', [VoucherController::class, 'lookup'])->name('vouchers.lookup');
+        Route::post('vouchers/activate', [VoucherController::class, 'activate'])->name('vouchers.activate');
+        Route::post('vouchers/deduct', [VoucherController::class, 'deduct'])->name('vouchers.deduct');
+        Route::get('vouchers/generate', [VoucherController::class, 'generateForm'])->name('vouchers.generate');
+        Route::post('vouchers/generate', [VoucherController::class, 'generate'])->name('vouchers.generate.store');
+        Route::get('vouchers/print', [VoucherController::class, 'print'])->name('vouchers.print');
+        Route::post('vouchers/print', [VoucherController::class, 'printZebra'])->name('vouchers.print.send');
+        Route::get('vouchers/list', [VoucherController::class, 'list'])->name('vouchers.list');
+        Route::get('vouchers/{voucher}/transactions', [VoucherController::class, 'transactions'])->name('vouchers.transactions');
     });
 });
 

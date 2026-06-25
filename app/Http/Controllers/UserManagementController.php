@@ -10,11 +10,35 @@ use Illuminate\Support\Facades\Hash;
 
 class UserManagementController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $users = User::with('role')->paginate(15);
+        $sortableColumns = [
+            'name' => 'users.name',
+            'email' => 'users.email',
+            'username' => 'users.username',
+            'role' => 'roles.display_name',
+            'created_at' => 'users.created_at',
+        ];
 
-        return view('users.index', compact('users'));
+        $sort = $request->input('sort', 'name');
+        if (! array_key_exists($sort, $sortableColumns)) {
+            $sort = 'name';
+        }
+
+        $direction = strtolower($request->input('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
+
+        $query = User::with('role')->select('users.*');
+
+        if ($sort === 'role') {
+            $query->leftJoin('roles', 'users.role_id', '=', 'roles.id');
+        }
+
+        $users = $query
+            ->orderBy($sortableColumns[$sort], $direction)
+            ->paginate(15)
+            ->withQueryString();
+
+        return view('users.index', compact('users', 'sort', 'direction'));
     }
 
     public function create()

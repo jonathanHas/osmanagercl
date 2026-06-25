@@ -30,7 +30,8 @@
             stockOpen: localStorage.getItem('nav_stockOpen') === 'true',
             systemToolsOpen: localStorage.getItem('nav_systemToolsOpen') === 'true',
             adminOpen: localStorage.getItem('nav_adminOpen') === 'true',
-            customerOpen: localStorage.getItem('nav_customerOpen') === 'true'
+            customerOpen: localStorage.getItem('nav_customerOpen') === 'true',
+            voucherOpen: localStorage.getItem('nav_voucherOpen') === 'true'
         }"
         x-init="
             $watch('sidebarCollapsed', val => localStorage.setItem('sidebarCollapsed', val));
@@ -44,6 +45,7 @@
             $watch('systemToolsOpen', val => localStorage.setItem('nav_systemToolsOpen', val));
             $watch('adminOpen', val => localStorage.setItem('nav_adminOpen', val));
             $watch('customerOpen', val => localStorage.setItem('nav_customerOpen', val));
+            $watch('voucherOpen', val => localStorage.setItem('nav_voucherOpen', val));
         "
         class="flex h-screen bg-gray-100">
             <!-- Sidebar -->
@@ -230,6 +232,45 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h.01M11 15h2m6 5H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2z"/>
                                 </svg>
                                 Customer Payments
+                            </a>
+                        </div>
+                        @endif
+
+                        <!-- VOUCHER SECTION -->
+                        @if(auth()->user()->can('vouchers.manage'))
+                        <div class="px-2 pt-4">
+                            <button @click="voucherOpen = !voucherOpen"
+                                    class="w-full flex items-center justify-between text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-300 py-2">
+                                <span>Vouchers</span>
+                                <svg class="w-4 h-4 transition-transform duration-200" :class="voucherOpen ? 'rotate-90' : 'rotate-0'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div x-show="voucherOpen" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-1">
+                            <a href="{{ route('vouchers.index') }}"
+                               class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('vouchers.index') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                                <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4"/>
+                                </svg>
+                                Scan / Redeem
+                            </a>
+
+                            <a href="{{ route('vouchers.list') }}"
+                               class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('vouchers.list') || request()->routeIs('vouchers.transactions') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                                <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                                </svg>
+                                All Vouchers
+                            </a>
+
+                            <a href="{{ route('vouchers.generate') }}"
+                               class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('vouchers.generate') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                                <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                </svg>
+                                Generate
                             </a>
                         </div>
                         @endif

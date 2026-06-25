@@ -230,6 +230,14 @@ class RolesAndPermissionsSeeder extends Seeder
                 'module' => 'Customer Invoicing',
             ],
 
+            // Voucher Management
+            [
+                'name' => 'vouchers.manage',
+                'display_name' => 'Manage Vouchers',
+                'description' => 'Generate, activate, redeem and view gift vouchers',
+                'module' => 'Voucher Management',
+            ],
+
             // System Settings
             [
                 'name' => 'settings.view',
@@ -296,6 +304,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'categories.manage',
             'users.view',
             'customer-invoices.manage',
+            'vouchers.manage',
         ]);
 
         foreach ($managerPermissions as $permission) {

@@ -22,23 +22,36 @@
                 <div class="p-6 text-gray-900">
                     <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
+                            @php
+                                $columns = [
+                                    'name' => 'Name',
+                                    'email' => 'Email',
+                                    'username' => 'Username',
+                                    'role' => 'Role',
+                                    'created_at' => 'Created',
+                                ];
+                            @endphp
                             <thead class="bg-gray-50">
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Name
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Email
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Username
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Role
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Created
-                                    </th>
+                                    @foreach($columns as $key => $label)
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            <a href="{{ route('users.index', ['sort' => $key, 'direction' => ($sort === $key && $direction === 'asc') ? 'desc' : 'asc']) }}"
+                                               class="group inline-flex items-center hover:text-gray-700">
+                                                {{ $label }}
+                                                <span class="ml-1">
+                                                    @if($sort === $key)
+                                                        @if($direction === 'asc')
+                                                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd"/></svg>
+                                                        @else
+                                                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 011.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                                                        @endif
+                                                    @else
+                                                        <svg class="w-3 h-3 text-gray-300 group-hover:text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path d="M10 3l4 5H6l4-5zM10 17l-4-5h8l-4 5z"/></svg>
+                                                    @endif
+                                                </span>
+                                            </a>
+                                        </th>
+                                    @endforeach
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Actions
                                     </th>
