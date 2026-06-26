@@ -8,6 +8,7 @@ This document provides a comprehensive overview of all features in the OSManager
 - [Kitchen Management](#kitchen-management)
 - [Supplier Management](#supplier-management)
 - [Order Management](#order-management)
+- [Voucher Management](#voucher-management)
 - [Financial Systems](#financial-systems)
 - [Analytics & Reporting](#analytics--reporting)
 - [POS Integration](#pos-integration)
@@ -508,6 +509,22 @@ Interactive review interface with inline editing and approval workflow.
 - **Approval Workflow**: Complete orders when ready, mark items for adjustment
 - **Export to CSV**: Download order for external processing
 - **Multiple Layout Options**: A2, A2 Dense, Grid View for different preferences
+
+---
+
+## Voucher Management
+
+### Gift Vouchers (NEW! 2026-06)
+Gift-voucher system with scannable barcodes, server-tracked balances and a full audit trail, redeemable at the till.
+- **Unique Barcodes**: App-generated, randomised, non-sequential CODE-128 codes (`GV` + 10 chars, CSPRNG) — printable on the Zebra small label (56×30mm)
+- **Lifecycle**: `inactive` (printed, not sold) → `active` (issued with a balance) → `exhausted`; plus admin `deactivated` (balance preserved)
+- **Till Redemption**: Mobile/tablet screen reusing the shared camera scanner (same as `/stocking`), with photo-decode and manual-entry fallbacks
+- **Double-Spend Safe**: `DB::transaction` + `lockForUpdate()` row locking re-validates the balance under lock; no overspend across concurrent tills
+- **Full Audit Log**: `voucher_transactions` records every issue/deduct/deactivate/activate with amount, balance-after, optional note, user and timestamp
+- **Admin Controls**: Edit modal to deactivate/reactivate a voucher (with reason); admin-only
+- **Tiered Access**: `vouchers.redeem` (employees redeem only), `vouchers.manage` (managers activate/generate/print), deactivate/reactivate (admin)
+
+📖 [Voucher Management Documentation](./features/voucher-management.md)
 
 ---
 

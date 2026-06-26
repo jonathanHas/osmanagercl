@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **🎟️ Gift Voucher Management** (2026-06-25)
+  - New **Voucher Management** system: gift vouchers with a unique, randomised, non-sequential CODE-128 barcode, a server-tracked balance, and a full transaction log — scannable and redeemable at the till to prevent forgery and double-spending
+  - **Lifecycle / statuses**: `inactive` (generated/printed, not sold) → `active` (issued with a balance) → `exhausted` (spent); plus `deactivated` (admin-disabled, balance preserved). Codes are app-generated (`GV` + 10 chars from an unambiguous charset, CSPRNG via `Voucher::generateUniqueCode()`)
+  - **Till screen** (`/vouchers`): minimal tablet/phone UI that **reuses the shared camera scanner** (`resources/js/barcode-scanner.js`, same as `/stocking`) with a photo-decode fallback and manual entry. Scan → activate (enter starting balance) / show balance + deduct / deactivated / exhausted
+  - **Double-spend protection**: `deduct()` and `activate()` use `DB::transaction` + `lockForUpdate()` row locking, re-validating the balance under the lock; status flips to `exhausted` at €0
+  - **Full audit log**: separate `voucher_transactions` table records every `issue` / `deduct` / `deactivate` / `activate` with amount, balance-after, optional note, user and timestamp (viewable per voucher)
+  - **Zebra label printing**: generate N vouchers → preview page (rendered via the in-browser `ZplPreview` emulator) → **Print to Zebra** on the small label (56×30mm). `Voucher::toZplLabel()` builds the CODE-128 ZPL; printing reuses the existing CUPS `lp` raw-print path and `config('services.zebra.*')`
+  - **Admin deactivate/reactivate**: admin-only Edit modal on the All Vouchers page to disable/re-enable a voucher with an optional reason; deactivated vouchers keep their balance and are blocked from redemption
+  - **Tiered access**: `vouchers.redeem` (employees + managers + admins — scan & deduct only), `vouchers.manage` (managers/admins — activate, generate, print, list), and deactivate/reactivate (`role:admin`). Enforced by route middleware and in the UI; employees get a cut-down till screen that can't activate/generate
+  - **New**: `app/Http/Controllers/VoucherController.php`, `app/Models/Voucher.php`, `app/Models/VoucherTransaction.php`, migrations `2026_06_24_120000_create_vouchers_table.php` / `..._120001_create_voucher_transactions_table.php` / `2026_06_25_120000_add_note_to_voucher_transactions_table.php`, `resources/views/vouchers/{index,list,generate,print,transactions}.blade.php`
+  - **Modified**: `routes/web.php`, `database/seeders/RolesAndPermissionsSeeder.php`, `resources/views/layouts/admin.blade.php`
+  - 📖 [Voucher Management Documentation](./docs/features/voucher-management.md)
+
 - **📄 IIHF (Independent) Goods Return Sheet Generator** (2026-06-16)
   - On the delivery match page (`/delivery-legacy/match`), Independent (IIHF, supplier 37) deliveries can now generate a **pre-filled "Goods Return Record" PDF** for short/missing items — the PDF counterpart to the Udea deviation report
   - Reuses the same desktop-only checkbox selection on the **Qty Mismatches** and **Missing – Not Scanned** tables; adds a **Generate Returns Sheet** button

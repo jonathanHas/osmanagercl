@@ -237,7 +237,7 @@
                         @endif
 
                         <!-- VOUCHER SECTION -->
-                        @if(auth()->user()->can('vouchers.manage'))
+                        @if(auth()->user()->can('vouchers.redeem'))
                         <div class="px-2 pt-4">
                             <button @click="voucherOpen = !voucherOpen"
                                     class="w-full flex items-center justify-between text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-300 py-2">
@@ -257,6 +257,7 @@
                                 Scan / Redeem
                             </a>
 
+                            @if(auth()->user()->can('vouchers.manage'))
                             <a href="{{ route('vouchers.list') }}"
                                class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('vouchers.list') || request()->routeIs('vouchers.transactions') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                                 <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -272,6 +273,7 @@
                                 </svg>
                                 Generate
                             </a>
+                            @endif
                         </div>
                         @endif
 

@@ -34,25 +34,38 @@
                         <th class="px-4 py-2 text-right">Amount</th>
                         <th class="px-4 py-2 text-right">Balance after</th>
                         <th class="px-4 py-2 text-left">By</th>
+                        <th class="px-4 py-2 text-left">Note</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-700 text-gray-200">
                     @forelse ($voucher->transactions as $tx)
+                        @php
+                            [$badge, $amountClass, $sign] = match ($tx->type) {
+                                'issue' => ['bg-green-800/50 text-green-300', 'text-green-400', '+'],
+                                'deduct' => ['bg-blue-800/50 text-blue-300', 'text-blue-300', '−'],
+                                'deactivate' => ['bg-red-800/50 text-red-300', 'text-gray-500', null],
+                                'activate' => ['bg-green-800/50 text-green-300', 'text-gray-500', null],
+                                default => ['bg-gray-700 text-gray-300', 'text-gray-400', null],
+                            };
+                        @endphp
                         <tr>
                             <td class="px-4 py-2 text-gray-400 text-xs">{{ $tx->created_at?->format('d M Y H:i') }}</td>
                             <td class="px-4 py-2">
-                                <span class="text-xs px-2 py-0.5 rounded {{ $tx->type === 'issue' ? 'bg-green-800/50 text-green-300' : 'bg-blue-800/50 text-blue-300' }}">
-                                    {{ ucfirst($tx->type) }}
-                                </span>
+                                <span class="text-xs px-2 py-0.5 rounded {{ $badge }}">{{ ucfirst($tx->type) }}</span>
                             </td>
-                            <td class="px-4 py-2 text-right {{ $tx->type === 'issue' ? 'text-green-400' : 'text-blue-300' }}">
-                                {{ $tx->type === 'issue' ? '+' : '−' }}€{{ number_format($tx->amount, 2) }}
+                            <td class="px-4 py-2 text-right {{ $amountClass }}">
+                                @if ($sign !== null)
+                                    {{ $sign }}€{{ number_format($tx->amount, 2) }}
+                                @else
+                                    —
+                                @endif
                             </td>
                             <td class="px-4 py-2 text-right">€{{ number_format($tx->balance_after, 2) }}</td>
                             <td class="px-4 py-2 text-gray-300">{{ $tx->user?->name ?? '—' }}</td>
+                            <td class="px-4 py-2 text-gray-400 text-xs">{{ $tx->note ?? '' }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No transactions yet.</td></tr>
+                        <tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">No transactions yet.</td></tr>
                     @endforelse
                 </tbody>
             </table>

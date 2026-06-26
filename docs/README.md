@@ -43,6 +43,9 @@ Detailed documentation for each major feature. See **[Features Index](./FEATURES
 - [Cash Reconciliation](./features/cash-reconciliation.md) - End-of-day cash management
 - Wages Management - Payroll import with P&L integration
 
+**Voucher Management**
+- [Voucher Management](./features/voucher-management.md) - Gift vouchers with barcodes, balances and till redemption
+
 **Analytics & Reporting**
 - [Sales Data Import](./features/sales-data-import.md) - Lightning-fast sales analytics
 - [Sales Accounting Report](./features/sales-accounting-report.md) - VAT-compliant sales analysis

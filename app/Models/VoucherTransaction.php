@@ -14,11 +14,16 @@ class VoucherTransaction extends Model
 
     const TYPE_DEDUCT = 'deduct';   // amount redeemed at the till
 
+    const TYPE_DEACTIVATE = 'deactivate'; // admin disabled the voucher
+
+    const TYPE_ACTIVATE = 'activate';     // admin re-enabled a disabled voucher
+
     protected $fillable = [
         'voucher_id',
         'type',
         'amount',
         'balance_after',
+        'note',
         'user_id',
     ];
 

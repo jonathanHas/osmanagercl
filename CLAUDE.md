@@ -158,6 +158,9 @@ For a complete list of all features with detailed descriptions, see **[Features 
 - VAT Returns & Dashboard
 - OSAccounts Integration
 
+**Voucher Management**
+- Gift Vouchers (barcoded, balance tracking, till redemption, Zebra label printing)
+
 **Analytics & Reporting**
 - Sales Accounting Reports
 - Bank Statement Analysis

@@ -1,13 +1,16 @@
 <x-admin-layout>
+    @php($canManage = auth()->user()->can('vouchers.manage'))
     <x-slot name="header">
         <div class="flex items-center justify-between">
             <h2 class="font-semibold text-lg text-gray-800 leading-tight py-1">
                 Vouchers
             </h2>
-            <div class="flex gap-2 text-sm">
-                <a href="{{ route('vouchers.generate') }}" class="text-blue-600 hover:text-blue-800">Generate</a>
-                <a href="{{ route('vouchers.list') }}" class="text-blue-600 hover:text-blue-800">All vouchers</a>
-            </div>
+            @if ($canManage)
+                <div class="flex gap-2 text-sm">
+                    <a href="{{ route('vouchers.generate') }}" class="text-blue-600 hover:text-blue-800">Generate</a>
+                    <a href="{{ route('vouchers.list') }}" class="text-blue-600 hover:text-blue-800">All vouchers</a>
+                </div>
+            @endif
         </div>
     </x-slot>
 
@@ -72,32 +75,44 @@
             </div>
 
             <!-- ACTIVATE: unknown or inactive voucher -->
-            <div x-show="mode === 'activate' && !loading" x-transition class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4 mb-3">
-                <div class="text-center">
-                    <p class="text-sm text-gray-500">New voucher</p>
-                    <p class="text-lg font-mono font-semibold text-gray-900 mb-4" x-text="code"></p>
-                    <p class="text-sm text-gray-600 mb-2">Enter starting balance to activate:</p>
-                    <div class="flex items-center justify-center gap-2 mb-4">
-                        <span class="text-2xl font-bold text-gray-700">€</span>
-                        <input type="number"
-                               x-model="startingBalance"
-                               min="0.01"
-                               step="0.01"
-                               inputmode="decimal"
-                               placeholder="0.00"
-                               class="w-40 text-center text-2xl py-3 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                    </div>
-                    <div class="flex gap-2 justify-center">
-                        <button @click="activate()"
-                                :disabled="processing || !startingBalance || startingBalance <= 0"
-                                class="px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg font-medium text-lg touch-manipulation">
-                            <span x-show="!processing">Activate</span>
-                            <span x-show="processing">Activating...</span>
-                        </button>
-                        <button @click="reset()" class="px-4 py-3 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium touch-manipulation">Cancel</button>
+            @if ($canManage)
+                <div x-show="mode === 'activate' && !loading" x-transition class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4 mb-3">
+                    <div class="text-center">
+                        <p class="text-sm text-gray-500">New voucher</p>
+                        <p class="text-lg font-mono font-semibold text-gray-900 mb-4" x-text="code"></p>
+                        <p class="text-sm text-gray-600 mb-2">Enter starting balance to activate:</p>
+                        <div class="flex items-center justify-center gap-2 mb-4">
+                            <span class="text-2xl font-bold text-gray-700">€</span>
+                            <input type="number"
+                                   x-model="startingBalance"
+                                   min="0.01"
+                                   step="0.01"
+                                   inputmode="decimal"
+                                   placeholder="0.00"
+                                   class="w-40 text-center text-2xl py-3 rounded-lg border-2 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        <div class="flex gap-2 justify-center">
+                            <button @click="activate()"
+                                    :disabled="processing || !startingBalance || startingBalance <= 0"
+                                    class="px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg font-medium text-lg touch-manipulation">
+                                <span x-show="!processing">Activate</span>
+                                <span x-show="processing">Activating...</span>
+                            </button>
+                            <button @click="reset()" class="px-4 py-3 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium touch-manipulation">Cancel</button>
+                        </div>
                     </div>
                 </div>
-            </div>
+            @else
+                <!-- Employees can't activate — vouchers must be activated by a manager -->
+                <div x-show="mode === 'activate' && !loading" x-transition class="bg-yellow-50 border border-yellow-200 overflow-hidden shadow-sm sm:rounded-lg p-6 mb-3">
+                    <div class="text-center">
+                        <p class="text-sm font-mono text-gray-500 mb-2" x-text="code"></p>
+                        <p class="text-2xl font-bold text-yellow-700">Voucher not active</p>
+                        <p class="text-sm text-yellow-600 mt-1">This voucher hasn't been activated. Please ask a manager.</p>
+                        <button @click="reset()" class="mt-4 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium touch-manipulation">Scan next</button>
+                    </div>
+                </div>
+            @endif
 
             <!-- ACTIVE: show balance + deduct -->
             <div x-show="mode === 'active' && !loading" x-transition class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-4 mb-3">
@@ -134,6 +149,16 @@
                             <button @click="reset()" class="px-4 py-3 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium touch-manipulation">Done</button>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- DEACTIVATED -->
+            <div x-show="mode === 'deactivated' && !loading" x-transition class="bg-red-50 border border-red-200 overflow-hidden shadow-sm sm:rounded-lg p-6 mb-3">
+                <div class="text-center">
+                    <p class="text-sm font-mono text-gray-500 mb-2" x-text="code"></p>
+                    <p class="text-2xl font-bold text-red-700">Voucher deactivated</p>
+                    <p class="text-sm text-red-500 mt-1">This voucher cannot be used. Please refer to a manager.</p>
+                    <button @click="reset()" class="mt-4 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium touch-manipulation">Scan next</button>
                 </div>
             </div>
 
@@ -300,6 +325,8 @@
                             this.balance = Number(data.current_balance);
                             this.deductAmount = '';
                             this.mode = 'active';
+                        } else if (data.status === 'deactivated') {
+                            this.mode = 'deactivated';
                         } else if (data.status === 'exhausted') {
                             this.mode = 'exhausted';
                         }

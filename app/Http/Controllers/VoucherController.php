@@ -143,6 +143,10 @@ class VoucherController extends Controller
                 return ['success' => false, 'message' => 'Voucher has not been activated.'];
             }
 
+            if ($voucher->status === Voucher::STATUS_DEACTIVATED) {
+                return ['success' => false, 'message' => 'Voucher has been deactivated.'];
+            }
+
             if ($voucher->status === Voucher::STATUS_EXHAUSTED || (float) $voucher->current_balance <= 0) {
                 return ['success' => false, 'message' => 'Voucher is exhausted.'];
             }
@@ -177,6 +181,82 @@ class VoucherController extends Controller
                 'status' => $voucher->status,
                 'new_balance' => (float) $voucher->current_balance,
             ];
+        });
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    /**
+     * Admin: deactivate an active voucher (preserves balance, blocks redemption).
+     */
+    public function deactivate(Request $request, Voucher $voucher): JsonResponse
+    {
+        return $this->changeStatus(
+            $request,
+            $voucher,
+            Voucher::STATUS_ACTIVE,
+            Voucher::STATUS_DEACTIVATED,
+            VoucherTransaction::TYPE_DEACTIVATE,
+            'Only active vouchers can be deactivated.',
+            'Voucher deactivated.'
+        );
+    }
+
+    /**
+     * Admin: reactivate a deactivated voucher (restores it to active with its balance).
+     */
+    public function reactivate(Request $request, Voucher $voucher): JsonResponse
+    {
+        return $this->changeStatus(
+            $request,
+            $voucher,
+            Voucher::STATUS_DEACTIVATED,
+            Voucher::STATUS_ACTIVE,
+            VoucherTransaction::TYPE_ACTIVATE,
+            'Only deactivated vouchers can be reactivated.',
+            'Voucher reactivated.'
+        );
+    }
+
+    /**
+     * Shared admin status-change flow with row locking and audit logging.
+     */
+    private function changeStatus(
+        Request $request,
+        Voucher $voucher,
+        string $requiredStatus,
+        string $newStatus,
+        string $logType,
+        string $invalidMessage,
+        string $successMessage
+    ): JsonResponse {
+        $data = $request->validate([
+            'note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $result = DB::transaction(function () use ($voucher, $requiredStatus, $newStatus, $logType, $invalidMessage, $successMessage, $data) {
+            $locked = Voucher::whereKey($voucher->getKey())->lockForUpdate()->first();
+
+            if (! $locked) {
+                return ['success' => false, 'message' => 'Voucher not found.'];
+            }
+
+            if ($locked->status !== $requiredStatus) {
+                return ['success' => false, 'message' => $invalidMessage];
+            }
+
+            $locked->status = $newStatus;
+            $locked->save();
+
+            $locked->transactions()->create([
+                'type' => $logType,
+                'amount' => 0,
+                'balance_after' => $locked->current_balance,
+                'note' => $data['note'] ?? null,
+                'user_id' => Auth::id(),
+            ]);
+
+            return ['success' => true, 'message' => $successMessage, 'status' => $locked->status];
         });
 
         return response()->json($result, $result['success'] ? 200 : 422);

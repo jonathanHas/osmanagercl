@@ -324,9 +324,14 @@ class DeliveryLegacyController extends Controller
 
         $rows = [];
         foreach ($selected as $value) {
-            [$source, $barcode] = array_pad(explode(':', (string) $value, 2), 2, null);
+            [$source, $barcode, $reasonRaw] = array_pad(explode(':', (string) $value, 3), 3, null);
             if ($barcode === null) {
                 continue;
+            }
+
+            $reason = strtoupper((string) ($reasonRaw ?? 'A'));
+            if (! in_array($reason, ['A', 'B', 'C', 'D', 'E', 'F'], true)) {
+                $reason = 'A';
             }
 
             if ($source === 'pending' && isset($pendingByBarcode[$barcode])) {
@@ -354,7 +359,7 @@ class DeliveryLegacyController extends Controller
                 'qty' => (string) $amount,
                 'value' => '€'.number_format($value, 2),
                 'vat' => $this->formatVatRate($item->RATE ?? null),
-                'reason' => 'A', // A: Not delivered
+                'reason' => $reason,
             ];
         }
 

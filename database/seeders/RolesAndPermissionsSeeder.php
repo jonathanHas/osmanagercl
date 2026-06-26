@@ -232,9 +232,15 @@ class RolesAndPermissionsSeeder extends Seeder
 
             // Voucher Management
             [
+                'name' => 'vouchers.redeem',
+                'display_name' => 'Redeem Vouchers',
+                'description' => 'Scan a voucher and deduct from its balance at the till',
+                'module' => 'Voucher Management',
+            ],
+            [
                 'name' => 'vouchers.manage',
                 'display_name' => 'Manage Vouchers',
-                'description' => 'Generate, activate, redeem and view gift vouchers',
+                'description' => 'Generate, activate and view gift vouchers',
                 'module' => 'Voucher Management',
             ],
 
@@ -285,6 +291,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'fruit_veg.manage',
             'coffee.manage',
             'kds.access',
+            'vouchers.redeem',
         ];
 
         foreach ($employeePermissions as $permission) {

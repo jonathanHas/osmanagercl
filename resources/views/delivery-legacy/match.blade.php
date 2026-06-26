@@ -1053,7 +1053,7 @@
                                             @if($isUdea || $isIndependent)
                                                 <td class="px-2 py-2 text-center">
                                                     @if(!empty($item->Barcode))
-                                                        <input type="checkbox" class="deviation-select rounded border-gray-300 text-purple-600 focus:ring-purple-500" value="mismatch:{{ $item->Barcode }}">
+                                                        <input type="checkbox" class="deviation-select rounded border-gray-300 text-purple-600 focus:ring-purple-500" value="mismatch:{{ $item->Barcode }}" data-description="{{ addslashes($item->dbProductName ?? $item->prodName ?? $item->supCode ?? '') }}">
                                                     @endif
                                                 </td>
                                             @endif
@@ -2109,7 +2109,7 @@
                                             @if($isUdea || $isIndependent)
                                                 <td class="px-2 py-2 text-center">
                                                     @if(!empty($item->Barcode))
-                                                        <input type="checkbox" class="deviation-select rounded border-gray-300 text-purple-600 focus:ring-purple-500" value="pending:{{ $item->Barcode }}">
+                                                        <input type="checkbox" class="deviation-select rounded border-gray-300 text-purple-600 focus:ring-purple-500" value="pending:{{ $item->Barcode }}" data-description="{{ addslashes($item->dbProductName ?? $item->prodName ?? $item->supCode ?? '') }}">
                                                     @endif
                                                 </td>
                                             @endif
@@ -2198,6 +2198,24 @@
         </div>
     </div>
 
+    {{-- IIHF Goods Return Sheet — per-item reason selection modal --}}
+    <div id="returnReasonModal" class="hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+        <div class="flex min-h-screen items-center justify-center p-4">
+            <div class="fixed inset-0 bg-gray-900/50" onclick="closeReturnReasonModal()"></div>
+            <div class="relative w-full max-w-2xl rounded-lg bg-white shadow-xl">
+                <div class="border-b border-gray-200 px-6 py-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Select Return Reason</h3>
+                    <p class="mt-1 text-sm text-gray-500">Choose a reason code for each item before generating the returns sheet.</p>
+                </div>
+                <div id="returnReasonList" class="max-h-96 overflow-y-auto px-6 py-3"></div>
+                <div class="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+                    <button type="button" onclick="closeReturnReasonModal()" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+                    <button type="button" onclick="submitGoodsReturnSheet()" class="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700">Download Returns Sheet</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Global reference to store the Alpine component instance
         window.deliveryMatchInstance = null;
@@ -2255,9 +2273,97 @@
             submitSelectedItems('{{ route('delivery-legacy.deviation-report') }}', 'deviation report');
         }
 
-        // Independent (IIHF) goods return sheet (PDF)
+        // Reason codes printed on the IIHF Goods Return Record form.
+        const IIHF_RETURN_REASONS = [
+            { code: 'A', label: 'Not delivered' },
+            { code: 'B', label: 'Damaged' },
+            { code: 'C', label: 'Short Date' },
+            { code: 'D', label: 'Incorrectly Ordered' },
+            { code: 'E', label: 'Delivered, not invoiced' },
+            { code: 'F', label: 'Other' },
+        ];
+
+        // Independent (IIHF) goods return sheet (PDF) — open a modal to pick a reason per item first.
         function generateGoodsReturnSheet() {
-            submitSelectedItems('{{ route('delivery-legacy.goods-return-sheet') }}', 'goods return sheet');
+            const checked = Array.from(document.querySelectorAll('.deviation-select:checked'));
+            if (checked.length === 0) {
+                alert('Please tick at least one item (in Qty Mismatches or Missing) to include in the goods return sheet.');
+                return;
+            }
+
+            const list = document.getElementById('returnReasonList');
+            list.innerHTML = '';
+
+            checked.forEach(function (cb, index) {
+                const description = cb.getAttribute('data-description') || cb.value;
+
+                const row = document.createElement('div');
+                row.className = 'flex items-center gap-3 py-2 border-b border-gray-100 last:border-0';
+
+                const label = document.createElement('div');
+                label.className = 'flex-1 text-sm text-gray-700 truncate';
+                label.title = description;
+                label.textContent = description;
+
+                const select = document.createElement('select');
+                select.className = 'return-reason-select w-56 rounded-md border-gray-300 text-sm focus:border-purple-500 focus:ring-purple-500';
+                select.setAttribute('data-item', cb.value);
+                IIHF_RETURN_REASONS.forEach(function (reason) {
+                    const option = document.createElement('option');
+                    option.value = reason.code;
+                    option.textContent = reason.code + ' — ' + reason.label;
+                    select.appendChild(option);
+                });
+
+                row.appendChild(label);
+                row.appendChild(select);
+                list.appendChild(row);
+            });
+
+            document.getElementById('returnReasonModal').classList.remove('hidden');
+        }
+
+        function closeReturnReasonModal() {
+            document.getElementById('returnReasonModal').classList.add('hidden');
+        }
+
+        // Build the POST form with "source:barcode:reason" items and download the PDF.
+        function submitGoodsReturnSheet() {
+            const selects = Array.from(document.querySelectorAll('#returnReasonList .return-reason-select'));
+            if (selects.length === 0) {
+                closeReturnReasonModal();
+                return;
+            }
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{{ route('delivery-legacy.goods-return-sheet') }}';
+            form.style.display = 'none';
+
+            const fields = {
+                '_token': '{{ csrf_token() }}',
+                'delID': '{{ $deliveryId }}',
+                'supplierID': '{{ $supplierId }}',
+            };
+            for (const [name, value] of Object.entries(fields)) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = name;
+                input.value = value;
+                form.appendChild(input);
+            }
+            selects.forEach(function (select) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'items[]';
+                input.value = select.getAttribute('data-item') + ':' + select.value;
+                form.appendChild(input);
+            });
+
+            document.body.appendChild(form);
+            form.submit();
+            form.remove();
+            closeReturnReasonModal();
         }
 
         function deliveryMatch() {

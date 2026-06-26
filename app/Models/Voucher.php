@@ -21,6 +21,8 @@ class Voucher extends Model
 
     const STATUS_EXHAUSTED = 'exhausted'; // balance fully spent
 
+    const STATUS_DEACTIVATED = 'deactivated'; // admin disabled (balance preserved, not redeemable)
+
     /**
      * Code generation: prefix + unambiguous uppercase charset (no 0/O/1/I).
      */
@@ -66,6 +68,11 @@ class Voucher extends Model
     public function isExhausted(): bool
     {
         return $this->status === self::STATUS_EXHAUSTED;
+    }
+
+    public function isDeactivated(): bool
+    {
+        return $this->status === self::STATUS_DEACTIVATED;
     }
 
     /**

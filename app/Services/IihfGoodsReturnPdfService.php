@@ -99,7 +99,7 @@ class IihfGoodsReturnPdfService
 
                 $reason = strtoupper((string) ($row['reason'] ?? 'A'));
                 if (isset(self::REASON_X[$reason])) {
-                    $pdf->SetFont('Helvetica', 'B', 10);
+                    $pdf->SetFont('Helvetica', 'B', 14);
                     $w = $pdf->GetStringWidth('X');
                     $pdf->Text(self::REASON_X[$reason] - $w / 2, $baseline, 'X');
                     $pdf->SetFont('Helvetica', '', 8);
