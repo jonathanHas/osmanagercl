@@ -412,6 +412,13 @@
                                 @if($file->page_count > 1) ⚠ Split @else Split @endif
                             </button>
                             @endif
+                            @if($file->status === 'parsing' || ($file->status === 'uploaded' && $batch->status === 'processing'))
+                            <button onclick="stopFile({{ $file->id }})"
+                                    class="px-3 py-1.5 text-xs rounded bg-gray-600 text-red-400 hover:bg-gray-500"
+                                    title="Stop processing this invoice">
+                                ⏹ Stop
+                            </button>
+                            @endif
                             @if($file->status === 'failed')
                             <button onclick="retryFile({{ $file->id }})"
                                     class="px-3 py-1.5 text-xs rounded bg-gray-600 text-amber-400 hover:bg-gray-500">
@@ -899,8 +906,15 @@
                                         @if($file->page_count > 1) ⚠ Split @else Split @endif
                                     </button>
                                     @endif
+                                    @if($file->status === 'parsing' || ($file->status === 'uploaded' && $batch->status === 'processing'))
+                                    <button onclick="stopFile({{ $file->id }})"
+                                            class="text-red-400 hover:text-red-300 text-sm mr-2"
+                                            title="Stop processing this invoice">
+                                        ⏹ Stop
+                                    </button>
+                                    @endif
                                     @if($file->status === 'failed')
-                                    <button onclick="retryFile({{ $file->id }})" 
+                                    <button onclick="retryFile({{ $file->id }})"
                                             class="text-amber-400 hover:text-amber-300 text-sm mr-2">
                                         🔄 Retry
                                     </button>
@@ -1420,6 +1434,27 @@
                         alert(data.error || 'Failed to cancel batch');
                     }
                 });
+            }
+        }
+
+        function stopFile(fileId) {
+            if (confirm('Stop processing this invoice?\n\nIt will be marked as Failed so you can Retry, Send to AI, or Remove it.')) {
+                fetch(`/invoices/bulk-upload/${batchId}/file/${fileId}/cancel`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        alert(data.error || 'Failed to stop invoice');
+                    }
+                })
+                .catch(() => alert('An error occurred while stopping the invoice'));
             }
         }
 

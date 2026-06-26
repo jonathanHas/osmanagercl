@@ -62,11 +62,33 @@ class ParseInvoiceFile implements ShouldQueue
                 'batch_id' => $this->file->bulk_upload_id,
             ]);
 
+            // Bail if the user stopped this file before the job started
+            $this->file->refresh();
+            if (! in_array($this->file->status, ['uploaded', 'failed'])) {
+                Log::info('Invoice parsing job skipped; file no longer queued', [
+                    'file_id' => $this->file->id,
+                    'status' => $this->file->status,
+                ]);
+
+                return;
+            }
+
             // Mark file as being parsed
             $this->file->markAsParsing();
 
             // Parse the file
             $result = $parser->parseFile($this->file);
+
+            // Discard the result if the user stopped this file mid-parse
+            $this->file->refresh();
+            if ($this->file->status !== 'parsing') {
+                Log::info('Invoice parse result discarded; file no longer parsing', [
+                    'file_id' => $this->file->id,
+                    'status' => $this->file->status,
+                ]);
+
+                return;
+            }
 
             // Process the output
             $parser->processParserOutput($this->file, $result);

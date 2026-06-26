@@ -347,10 +347,13 @@
             </div>{{-- /upload tab --}}
         </div>{{-- /tab switcher --}}
 
-        {{-- Recent Uploads --}}
-        @if($recentUploads->count() > 0)
+        {{-- Upload History --}}
+        @if($recentUploads->total() > 0)
         <div class="bg-gray-800 rounded-lg p-6">
-            <h3 class="text-lg font-semibold text-gray-100 mb-4">Recent Uploads</h3>
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-100">Upload History</h3>
+                <span class="text-gray-400 text-sm">{{ $recentUploads->total() }} {{ \Illuminate\Support\Str::plural('batch', $recentUploads->total()) }}</span>
+            </div>
             <div class="space-y-3">
                 @foreach($recentUploads as $upload)
                 <div class="bg-gray-700 rounded p-4">
@@ -388,6 +391,11 @@
                 </div>
                 @endforeach
             </div>
+            @if($recentUploads->hasPages())
+            <div class="mt-4">
+                {{ $recentUploads->links() }}
+            </div>
+            @endif
         </div>
         @endif
     </div>

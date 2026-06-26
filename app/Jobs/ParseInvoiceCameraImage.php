@@ -45,9 +45,31 @@ class ParseInvoiceCameraImage implements ShouldQueue
                 'feature_key' => $this->featureKey,
             ]);
 
+            // Bail if the user stopped this file before the job started
+            $this->file->refresh();
+            if (! in_array($this->file->status, ['uploaded', 'failed'])) {
+                Log::info('Gemini invoice parsing job skipped; file no longer queued', [
+                    'file_id' => $this->file->id,
+                    'status' => $this->file->status,
+                ]);
+
+                return;
+            }
+
             $this->file->markAsParsing();
 
             $result = $geminiParser->parseImage($this->file, $this->featureKey);
+
+            // Discard the result if the user stopped this file mid-parse
+            $this->file->refresh();
+            if ($this->file->status !== 'parsing') {
+                Log::info('Gemini invoice parse result discarded; file no longer parsing', [
+                    'file_id' => $this->file->id,
+                    'status' => $this->file->status,
+                ]);
+
+                return;
+            }
 
             $parser->processParserOutput($this->file, $result);
 

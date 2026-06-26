@@ -27,8 +27,7 @@ class InvoiceBulkUploadController extends Controller
                 $query->select('id', 'bulk_upload_id', 'status', 'original_filename');
             }])
             ->orderBy('created_at', 'desc')
-            ->take(5)
-            ->get();
+            ->paginate(10);
 
         return view('invoices.bulk-upload', [
             'recentUploads' => $recentUploads,
@@ -791,6 +790,50 @@ class InvoiceBulkUploadController extends Controller
                 'error' => 'Failed to retry file: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Stop a file that is stuck processing.
+     *
+     * Marks an in-flight file (uploaded/parsing) as failed so the batch can
+     * complete and the page stops polling. The file can then be retried,
+     * sent to AI, or removed. A guard in the parsing jobs discards the result
+     * of any worker that finishes after the user has stopped the file.
+     */
+    public function cancelFile($batchId, $fileId)
+    {
+        $batch = InvoiceBulkUpload::where('batch_id', $batchId)
+            ->where('user_id', auth()->id())
+            ->firstOrFail();
+
+        $file = InvoiceUploadFile::where('id', $fileId)
+            ->where('bulk_upload_id', $batch->id)
+            ->firstOrFail();
+
+        // Only files that are still being processed can be stopped
+        if (! in_array($file->status, ['uploaded', 'parsing'])) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Only a file that is still processing can be stopped. Current status: '.$file->status,
+            ], 400);
+        }
+
+        $file->markAsFailed('Processing stopped by user.');
+
+        // Recompute batch counters so the batch can complete and polling stops
+        $batch->updateStatistics();
+
+        Log::info('File processing stopped by user', [
+            'file_id' => $file->id,
+            'filename' => $file->original_filename,
+            'batch_id' => $batch->batch_id,
+            'stopped_by' => auth()->id(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Invoice processing stopped. You can retry, send to AI, or remove it.',
+        ]);
     }
 
     /**
