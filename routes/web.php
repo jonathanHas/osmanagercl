@@ -537,6 +537,9 @@ Route::middleware('auth')->group(function () {
         Route::patch('/update-case-units', [DeliveryLegacyController::class, 'updateCaseUnits'])->name('update-case-units');
         Route::post('/save-outer-barcode', [DeliveryLegacyController::class, 'saveOuterBarcode'])->name('save-outer-barcode');
         Route::post('/complete', [DeliveryLegacyController::class, 'completeDelivery'])->name('complete');
+        Route::post('/undo-complete', [DeliveryLegacyController::class, 'undoComplete'])
+            ->name('undo-complete')
+            ->middleware('permission:deliveries.manage');
         Route::post('/merge-sessions', [DeliveryLegacyController::class, 'mergeSessions'])->name('merge-sessions');
         Route::patch('/change-supplier', [DeliveryLegacyController::class, 'changeSupplier'])->name('change-supplier');
         Route::post('/resolve-images-batch', [DeliveryLegacyController::class, 'resolveImagesBatch'])->name('resolve-images-batch');

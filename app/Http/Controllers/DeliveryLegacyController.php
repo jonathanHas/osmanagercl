@@ -997,6 +997,73 @@ class DeliveryLegacyController extends Controller
     }
 
     /**
+     * Undo a completed delivery: remove the stock that was added and reopen the session.
+     *
+     * Mirrors completeDelivery() exactly but decrements STOCKCURRENT instead of incrementing
+     * and sets the session back to pending. Because completing a delivery does not modify the
+     * scan source data (deliveriesScanItems), re-running the same item queries reproduces the
+     * exact amounts that were added, so this is a precise inverse.
+     */
+    public function undoComplete(Request $request)
+    {
+        $validated = $request->validate([
+            'delID' => 'required|string',
+            'supplierID' => 'required|string',
+        ]);
+
+        $delID = $validated['delID'];
+        $supplierID = $validated['supplierID'];
+
+        // Guard: only a *completed* session can be undone (prevents double-decrement).
+        $session = DB::connection('pos')->table('deliveriesScan')->where('ID', $delID)->first();
+        if (! $session) {
+            return redirect()->route('delivery-legacy.index')->with('error', 'Session not found.');
+        }
+        if ($session->status != 1) {
+            return redirect()
+                ->route('delivery-legacy.match', ['delID' => $delID, 'supplierID' => $supplierID])
+                ->with('error', 'This delivery is not completed, so there is nothing to undo.');
+        }
+
+        // Recompute the same items the completion used so the amounts match exactly.
+        $matchedItems = $this->getMatchedItems($delID, $supplierID);
+        $extraItems = $this->getScannedNotOnInvoice($delID, $supplierID);
+
+        $undoResults = [
+            'productsReverted' => 0,
+            'productsSkipped' => 0,
+            'unitsRemoved' => 0,
+        ];
+
+        DB::connection('pos')->transaction(function () use ($matchedItems, $extraItems, $delID, &$undoResults) {
+            foreach (array_merge($matchedItems, $extraItems) as $item) {
+                if ($item->scanned !== null && $item->scanned > 0 && $item->productID) {
+                    $affected = DB::connection('pos')->table('STOCKCURRENT')
+                        ->where('PRODUCT', $item->productID)
+                        ->decrement('UNITS', $item->scanned);
+
+                    if ($affected > 0) {
+                        $undoResults['productsReverted']++;
+                        $undoResults['unitsRemoved'] += $item->scanned;
+                    } else {
+                        $undoResults['productsSkipped']++;
+                    }
+                }
+            }
+
+            // Reopen the scan session
+            DB::connection('pos')->table('deliveriesScan')
+                ->where('ID', $delID)
+                ->update(['status' => 0]);
+        });
+
+        return redirect()
+            ->route('delivery-legacy.match', ['delID' => $delID, 'supplierID' => $supplierID])
+            ->with('success', 'Stock update reversed. Delivery reopened — you can continue scanning.')
+            ->with('undoResults', $undoResults);
+    }
+
+    /**
      * Merge two scan sessions into one.
      */
     public function mergeSessions(Request $request)

@@ -499,6 +499,21 @@
                             @endif
                         </div>
                     @endif
+                    @if(auth()->user()->can('deliveries.manage'))
+                        <form method="POST" action="{{ route('delivery-legacy.undo-complete') }}" class="mt-3 ml-7"
+                              onsubmit="return confirm('This will REMOVE the stock that was added and reopen this delivery so you can keep scanning. Continue?')">
+                            @csrf
+                            <input type="hidden" name="delID" value="{{ $deliveryId }}">
+                            <input type="hidden" name="supplierID" value="{{ $supplierId }}">
+                            <button type="submit"
+                                    class="inline-flex items-center px-3 py-2 bg-amber-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-amber-700 gap-1.5 touch-manipulation">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a4 4 0 014 4v2m-4-6l4-4m-4 4l4 4"/>
+                                </svg>
+                                Undo Complete &amp; Reopen
+                            </button>
+                        </form>
+                    @endif
                 </div>
             @endif
 
