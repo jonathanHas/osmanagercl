@@ -6,6 +6,7 @@ use App\Models\Harvest;
 use App\Models\HarvestProductUnit;
 use App\Models\Product;
 use App\Models\SupplierLink;
+use App\Models\ZebraLabel;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -26,13 +27,24 @@ class HarvestController extends Controller
         // Saved per-product unit preference (kg|unit); defaults to kg when unset.
         $unitPrefs = HarvestProductUnit::pluck('unit', 'product_code');
 
+        $jonProducts = $this->jonProducts();
+
+        // Active Zebra labels for Jon's products, keyed by product code, so each
+        // row/available product can offer inline label printing after saving.
+        $labels = ZebraLabel::active()
+            ->whereNotNull('product_code')
+            ->whereIn('product_code', $jonProducts->pluck('CODE')->all())
+            ->get()
+            ->keyBy('product_code');
+
         // Lookup of Jon's products keyed by CODE.
-        $productLookup = $this->jonProducts()->mapWithKeys(fn ($p) => [
+        $productLookup = $jonProducts->mapWithKeys(fn ($p) => [
             $p->CODE => [
                 'code' => $p->CODE,
                 'name' => $p->NAME,
                 'category' => $p->CATEGORY,
                 'unit' => $unitPrefs->get($p->CODE, 'kg'),
+                'label' => $this->labelPayload($labels->get($p->CODE)),
             ],
         ]);
 
@@ -54,12 +66,13 @@ class HarvestController extends Controller
             ->filter(fn ($code) => $productLookup->has($code))
             ->values();
 
-        $recentRows = $rowCodes->map(fn ($code) => [
+        $rows = $rowCodes->map(fn ($code) => [
             'code' => $code,
             'name' => $productLookup[$code]['name'],
             'unit' => $productLookup[$code]['unit'],
-            'quantity' => optional($existingForDate->get($code))->quantity,
-        ]);
+            'logged' => (float) (optional($existingForDate->get($code))->quantity ?? 0),
+            'label' => $productLookup[$code]['label'],
+        ])->values();
 
         // Remaining Jon products available to add via the search dropdown.
         $availableProducts = $productLookup
@@ -68,77 +81,71 @@ class HarvestController extends Controller
 
         return view('fruit-veg.harvest', [
             'selectedDate' => $selectedDate,
-            'recentRows' => $recentRows,
+            'rows' => $rows,
             'availableProducts' => $availableProducts,
         ]);
     }
 
     /**
-     * Upsert the submitted rows for the date. A cleared/zero quantity removes
-     * that date's row.
+     * Add a single entered amount to a product's running total for the date.
+     *
+     * Saves accumulate: the submitted amount is added to whatever is already
+     * logged for that (date, product) rather than replacing it. Returns the new
+     * running total so the row's "Logged" column can update inline. Corrections
+     * to an over-logged amount are made by deleting the day's line in history.
      */
-    public function store(Request $request)
+    public function saveRow(Request $request)
     {
         $validated = $request->validate([
             'date' => 'required|date',
-            'items' => 'array',
-            'items.*' => 'nullable|numeric|min:0|max:99999.99',
-            'units' => 'array',
-            'units.*' => 'in:'.implode(',', HarvestProductUnit::UNITS),
-            'notes' => 'array',
-            'notes.*' => 'nullable|string|max:500',
+            'code' => 'required|string',
+            'amount' => 'required|numeric|min:0.01|max:99999.99',
+            'unit' => 'required|in:'.implode(',', HarvestProductUnit::UNITS),
+            'notes' => 'nullable|string|max:500',
         ]);
 
         $date = Carbon::parse($validated['date'])->toDateString();
-        $items = $validated['items'] ?? [];
-        $units = $request->input('units', []);
-        $notes = $request->input('notes', []);
+        $code = $validated['code'];
+        $amount = (float) $validated['amount'];
+        $unit = $validated['unit'];
 
-        // Restrict to Jon's products and snapshot name/unit at save time.
-        $jon = $this->jonProducts()->keyBy('CODE');
+        // Restrict to Jon's products and snapshot the name at save time.
+        $product = $this->jonProducts()->firstWhere('CODE', $code);
 
-        foreach ($items as $code => $qty) {
-            if (! $jon->has($code)) {
-                continue; // ignore anything not belonging to Jon
-            }
-
-            $unit = in_array($units[$code] ?? null, HarvestProductUnit::UNITS, true)
-                ? $units[$code]
-                : 'kg';
-
-            // Remember the per-product unit for future harvest logs.
-            HarvestProductUnit::updateOrCreate(
-                ['product_code' => $code],
-                ['unit' => $unit]
-            );
-
-            $qty = ($qty === null || $qty === '') ? 0.0 : (float) $qty;
-
-            if ($qty <= 0) {
-                Harvest::where('harvest_date', $date)
-                    ->where('product_code', $code)
-                    ->delete();
-
-                continue;
-            }
-
-            $product = $jon->get($code);
-
-            Harvest::updateOrCreate(
-                ['harvest_date' => $date, 'product_code' => $code],
-                [
-                    'product_name' => $product->NAME,
-                    'quantity' => $qty,
-                    'unit' => $unit,
-                    'notes' => $notes[$code] ?? null,
-                    'created_by' => Auth::id(),
-                ]
-            );
+        if (! $product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product does not belong to Jon.',
+            ], 422);
         }
 
-        return redirect()
-            ->route('fruit-veg.harvest', ['date' => $date])
-            ->with('success', 'Harvest log saved for '.Carbon::parse($date)->format('D j M Y').'.');
+        // Remember the per-product unit for future harvest logs.
+        HarvestProductUnit::updateOrCreate(
+            ['product_code' => $code],
+            ['unit' => $unit]
+        );
+
+        // Accumulate onto any existing line for the date (single-user store, so
+        // a plain read-add-save is safe).
+        $harvest = Harvest::firstOrNew([
+            'harvest_date' => $date,
+            'product_code' => $code,
+        ]);
+
+        $harvest->fill([
+            'product_name' => $product->NAME,
+            'quantity' => (float) ($harvest->quantity ?? 0) + $amount,
+            'unit' => $unit,
+            'notes' => $validated['notes'] ?? $harvest->notes,
+            'created_by' => Auth::id(),
+        ])->save();
+
+        return response()->json([
+            'success' => true,
+            'logged' => (float) $harvest->quantity,
+            'unit' => $unit,
+            'saved_amount' => $amount,
+        ]);
     }
 
     /**
@@ -190,5 +197,26 @@ class HarvestController extends Controller
             ->get()
             ->unique('CODE')
             ->values();
+    }
+
+    /**
+     * Compact label payload for the view (or null when no label). Dimensions are
+     * read from the ZPL, falling back to the stored width/height (same fallback
+     * the Zebra labels page uses).
+     */
+    private function labelPayload(?ZebraLabel $label): ?array
+    {
+        if (! $label) {
+            return null;
+        }
+
+        $dims = ZebraLabel::extractDimensions($label->zpl_content);
+
+        return [
+            'id' => $label->id,
+            'name' => $label->name,
+            'width_mm' => $dims['width_mm'] ?? $label->label_width_mm,
+            'height_mm' => $dims['height_mm'] ?? $label->label_height_mm,
+        ];
     }
 }

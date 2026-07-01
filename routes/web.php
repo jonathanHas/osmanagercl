@@ -392,7 +392,7 @@ Route::middleware('auth')->group(function () {
 
         // Harvest log (own-farm produce, records only)
         Route::get('/harvest', [HarvestController::class, 'index'])->name('harvest');
-        Route::post('/harvest', [HarvestController::class, 'store'])->name('harvest.store');
+        Route::post('/harvest/row', [HarvestController::class, 'saveRow'])->name('harvest.save-row');
         Route::get('/harvest/history', [HarvestController::class, 'history'])->name('harvest.history');
         Route::delete('/harvest/{harvest}', [HarvestController::class, 'destroy'])->name('harvest.destroy');
 
