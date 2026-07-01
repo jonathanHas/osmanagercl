@@ -140,6 +140,49 @@ class CashReconciliationController extends Controller
     }
 
     /**
+     * Force re-import of legacy POS data for a till/date.
+     *
+     * Handles days that were auto-created before the old POS system had written the
+     * day's cash count, leaving the reconciliation stuck with zero denominations.
+     */
+    public function sync(Request $request)
+    {
+        $request->validate([
+            'date' => 'required|date',
+            'till_id' => 'required|integer',
+        ]);
+
+        $date = Carbon::parse($request->input('date'));
+        $tillId = (int) $request->input('till_id');
+        $tills = $this->repository->getAvailableTills();
+        $tillName = $tills[$tillId] ?? $tills->first();
+
+        try {
+            $result = $this->repository->resyncFromLegacy($date, $tillId, $tillName);
+
+            $redirect = redirect()->route('cash-reconciliation.index', [
+                'date' => $date->format('Y-m-d'),
+                'till_id' => $tillId,
+            ]);
+
+            if ($result['status'] === 'no_legacy_data') {
+                return $redirect->with('error', 'The POS system has no cash count for this day yet — POS totals were refreshed.');
+            }
+
+            return $redirect->with('success', 'Synced cash figures from the POS system.');
+        } catch (\Exception $e) {
+            Log::error('Cash reconciliation sync error: '.$e->getMessage());
+
+            return redirect()
+                ->route('cash-reconciliation.index', [
+                    'date' => $date->format('Y-m-d'),
+                    'till_id' => $tillId,
+                ])
+                ->with('error', 'Failed to sync from POS: '.$e->getMessage());
+        }
+    }
+
+    /**
      * Get previous day's float via AJAX
      */
     public function getPreviousFloat(Request $request)

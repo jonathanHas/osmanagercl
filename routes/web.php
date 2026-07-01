@@ -786,6 +786,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/store', [\App\Http\Controllers\Management\CashReconciliationController::class, 'store'])
             ->middleware('permission:cash_reconciliation.create')
             ->name('store');
+        Route::post('/sync', [\App\Http\Controllers\Management\CashReconciliationController::class, 'sync'])
+            ->middleware('permission:cash_reconciliation.create')
+            ->name('sync');
         Route::get('/previous-float', [\App\Http\Controllers\Management\CashReconciliationController::class, 'getPreviousFloat'])->name('previous-float');
         Route::get('/reconciliation', [\App\Http\Controllers\Management\CashReconciliationController::class, 'getReconciliation'])->name('get-reconciliation');
         Route::get('/export', [\App\Http\Controllers\Management\CashReconciliationController::class, 'export'])

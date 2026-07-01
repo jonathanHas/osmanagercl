@@ -62,6 +62,21 @@
                         <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md text-sm">Go</button>
                     </form>
 
+                    @if(auth()->user()?->can('cash_reconciliation.create'))
+                    <form method="POST" action="{{ route('cash-reconciliation.sync') }}"
+                          onsubmit="return confirm('Re-import cash figures for this day from the POS system? This overwrites the current counts.');">
+                        @csrf
+                        <input type="hidden" name="date" value="{{ $selectedDate->format('Y-m-d') }}">
+                        <input type="hidden" name="till_id" value="{{ $tillId }}">
+                        <button type="submit"
+                                class="inline-flex items-center px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-md transition"
+                                title="Re-import this day's cash figures from the POS system">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                            Sync from POS
+                        </button>
+                    </form>
+                    @endif
+
                     <div class="flex-shrink-0">
                         @if($adjacentDates['next'])
                         <a href="{{ route('cash-reconciliation.index', ['date' => $adjacentDates['next'], 'till_id' => $tillId]) }}"

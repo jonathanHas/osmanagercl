@@ -16,8 +16,12 @@ class CashReconciliationRepository
     /**
      * Get or create reconciliation for a specific date and till
      */
-    public function getOrCreateReconciliation(Carbon $date, int $tillId, string $tillName): CashReconciliation
+    public function getOrCreateReconciliation(Carbon $date, int $tillId, ?string $tillName): CashReconciliation
     {
+        if ($tillName === null) {
+            throw new \Exception('No till is available for the selected period. The POS system has no recent till-close activity.');
+        }
+
         // Find the closed cash record for this date and till
         $closedCash = ClosedCash::where('HOST', $tillName)
             ->whereDate('DATEEND', $date)
@@ -56,45 +60,8 @@ class CashReconciliationRepository
             ]);
 
             // Import cash counts from legacy money table if they exist
-            // Legacy system stores TOTALS, not counts, so we need to convert
             if ($legacyMoney) {
-                $reconciliation->fill([
-                    'cash_50' => $legacyMoney->cash50 ? intval($legacyMoney->cash50 / 50) : 0,
-                    'cash_20' => $legacyMoney->cash20 ? intval($legacyMoney->cash20 / 20) : 0,
-                    'cash_10' => $legacyMoney->cash10 ? intval($legacyMoney->cash10 / 10) : 0,
-                    'cash_5' => $legacyMoney->cash5 ? intval($legacyMoney->cash5 / 5) : 0,
-                    'cash_2' => $legacyMoney->cash2 ? intval($legacyMoney->cash2 / 2) : 0,
-                    'cash_1' => $legacyMoney->cash1 ? intval($legacyMoney->cash1 / 1) : 0,
-                    'cash_50c' => $legacyMoney->cash50c ? (int) round($legacyMoney->cash50c / 0.5) : 0,
-                    'cash_20c' => $legacyMoney->cash20c ? (int) round($legacyMoney->cash20c / 0.2) : 0,
-                    'cash_10c' => $legacyMoney->cash10c ? (int) round($legacyMoney->cash10c / 0.1) : 0,
-                    'card' => $legacyMoney->card ?? 0,
-                    'cash_back' => $legacyMoney->cashBack ?? 0,
-                    'cheque' => $legacyMoney->cheque ?? 0,
-                    'debt' => $legacyMoney->debt ?? 0,
-                    'debt_paid_cash' => $legacyMoney->debtPaidCash ?? 0,
-                    'debt_paid_cheque' => $legacyMoney->debtPaidCheque ?? 0,
-                    'debt_paid_card' => $legacyMoney->debtPaidCard ?? 0,
-                    'free' => $legacyMoney->free ?? 0,
-                    'voucher_used' => $legacyMoney->voucherUsed ?? 0,
-                    'money_added' => $legacyMoney->moneyAdded ?? 0,
-                ]);
-
-                // Calculate total cash counted
-                $reconciliation->total_cash_counted = $reconciliation->calculateTotalCash();
-
-                // Get legacy supplier payment total for variance calculation
-                $legacyPayeeTotal = DB::connection('pos')->table('payeePayments')
-                    ->where('closedCashID', $closedCash->MONEY)
-                    ->sum('amount');
-
-                // Calculate variance (matches legacy: cash + cashback + supplier payments - prev float - money added)
-                $daysCashTakings = $reconciliation->total_cash_counted + ($legacyMoney->cashBack ?? 0) +
-                                  $legacyPayeeTotal -
-                                  ($previousFloat['notes'] + $previousFloat['coins']) -
-                                  ($legacyMoney->moneyAdded ?? 0);
-
-                $reconciliation->variance = $daysCashTakings - $reconciliation->pos_cash_total;
+                $this->applyLegacyMoney($reconciliation, $legacyMoney, $previousFloat, $closedCash->MONEY);
             }
 
             $reconciliation->save();
@@ -107,6 +74,119 @@ class CashReconciliationRepository
         }
 
         return $reconciliation->load(['payments', 'latestNote']);
+    }
+
+    /**
+     * Force re-import of the legacy POS money data for an existing (or missing) reconciliation.
+     *
+     * Used by the "Sync from POS" button for days that were auto-created before the old POS
+     * system had written that day's `money` row, so the reconciliation is stuck with zeros.
+     * The denomination/card fields are authoritative in the legacy system for historical days,
+     * so they are overwritten.
+     *
+     * @return array{status: 'synced'|'no_legacy_data'}
+     */
+    public function resyncFromLegacy(Carbon $date, int $tillId, ?string $tillName): array
+    {
+        if ($tillName === null) {
+            throw new \Exception('No till is available for the selected period. The POS system has no recent till-close activity.');
+        }
+
+        $closedCash = ClosedCash::where('HOST', $tillName)
+            ->whereDate('DATEEND', $date)
+            ->first();
+
+        if (! $closedCash) {
+            throw new \Exception("No closed cash record found for till {$tillName} on {$date->format('Y-m-d')}");
+        }
+
+        $reconciliation = CashReconciliation::firstOrNew([
+            'closed_cash_id' => $closedCash->MONEY,
+        ]);
+
+        if (! $reconciliation->exists) {
+            $reconciliation->fill([
+                'date' => $date,
+                'till_name' => $tillName,
+                'till_id' => $tillId,
+                'created_by' => auth()->id() ?? 1,
+            ]);
+        }
+
+        // Always refresh live POS totals
+        $posTotals = $this->calculatePosTotals($closedCash->MONEY);
+        $reconciliation->pos_cash_total = $posTotals['cash'];
+        $reconciliation->pos_card_total = $posTotals['card'];
+
+        $previousFloat = $this->getPreviousDayFloat($date, $tillId, $tillName);
+
+        $legacyMoney = DB::connection('pos')->table('money')
+            ->where('ID', $closedCash->MONEY)
+            ->first();
+
+        if (! $legacyMoney) {
+            // Old system still has no cash count for this day — just persist refreshed POS totals.
+            $reconciliation->save();
+
+            return ['status' => 'no_legacy_data'];
+        }
+
+        $this->applyLegacyMoney($reconciliation, $legacyMoney, $previousFloat, $closedCash->MONEY);
+        $reconciliation->save();
+
+        $this->importLegacyPayments($reconciliation, $closedCash->MONEY);
+        $this->importLegacyNotes($reconciliation, $closedCash->MONEY);
+
+        return ['status' => 'synced'];
+    }
+
+    /**
+     * Fill a reconciliation from a legacy POS `money` row.
+     *
+     * The legacy system stores denomination TOTALS, not counts, so we convert. Also recalculates
+     * total_cash_counted and variance. Does not persist — caller is responsible for saving.
+     */
+    private function applyLegacyMoney(CashReconciliation $reconciliation, object $legacyMoney, array $previousFloat, string $moneyId): void
+    {
+        $reconciliation->fill([
+            'cash_50' => $legacyMoney->cash50 ? intval($legacyMoney->cash50 / 50) : 0,
+            'cash_20' => $legacyMoney->cash20 ? intval($legacyMoney->cash20 / 20) : 0,
+            'cash_10' => $legacyMoney->cash10 ? intval($legacyMoney->cash10 / 10) : 0,
+            'cash_5' => $legacyMoney->cash5 ? intval($legacyMoney->cash5 / 5) : 0,
+            'cash_2' => $legacyMoney->cash2 ? intval($legacyMoney->cash2 / 2) : 0,
+            'cash_1' => $legacyMoney->cash1 ? intval($legacyMoney->cash1 / 1) : 0,
+            'cash_50c' => $legacyMoney->cash50c ? (int) round($legacyMoney->cash50c / 0.5) : 0,
+            'cash_20c' => $legacyMoney->cash20c ? (int) round($legacyMoney->cash20c / 0.2) : 0,
+            'cash_10c' => $legacyMoney->cash10c ? (int) round($legacyMoney->cash10c / 0.1) : 0,
+            'note_float' => $legacyMoney->noteFloat ?? $previousFloat['notes'],
+            'coin_float' => $legacyMoney->coinFloat ?? $previousFloat['coins'],
+            'card' => $legacyMoney->card ?? 0,
+            'cash_back' => $legacyMoney->cashBack ?? 0,
+            'cheque' => $legacyMoney->cheque ?? 0,
+            'debt' => $legacyMoney->debt ?? 0,
+            'debt_paid_cash' => $legacyMoney->debtPaidCash ?? 0,
+            'debt_paid_cheque' => $legacyMoney->debtPaidCheque ?? 0,
+            'debt_paid_card' => $legacyMoney->debtPaidCard ?? 0,
+            'free' => $legacyMoney->free ?? 0,
+            'voucher_used' => $legacyMoney->voucherUsed ?? 0,
+            'money_added' => $legacyMoney->moneyAdded ?? 0,
+        ]);
+
+        // Calculate total cash counted
+        $reconciliation->total_cash_counted = $reconciliation->calculateTotalCash();
+
+        // Get legacy supplier payment total for variance calculation
+        $legacyPayeeTotal = DB::connection('pos')->table('payeePayments')
+            ->where('closedCashID', $moneyId)
+            ->sum('amount');
+
+        // Calculate variance (matches legacy: cash + cashback + supplier payments - prev float - money added)
+        $daysCashTakings = $reconciliation->total_cash_counted + ($legacyMoney->cashBack ?? 0) +
+                          $legacyPayeeTotal -
+                          ($previousFloat['notes'] + $previousFloat['coins']) -
+                          ($legacyMoney->moneyAdded ?? 0);
+
+        $reconciliation->variance = $daysCashTakings - $reconciliation->pos_cash_total;
     }
 
     /**
