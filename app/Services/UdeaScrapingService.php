@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\UdeaProductCard;
 use Exception;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
@@ -11,6 +12,12 @@ use Illuminate\Support\Facades\Log;
 
 class UdeaScrapingService
 {
+    /**
+     * A persisted udea_product_cards row older than this is treated as stale and re-scraped
+     * the next time it is requested (or forced via the refresh triggers).
+     */
+    public const CACHE_STALE_DAYS = 30;
+
     private Client $client;
 
     private array $config;
@@ -77,6 +84,20 @@ class UdeaScrapingService
 
     private function scrapeProductData(string $productCode): ?array
     {
+        $html = $this->fetchSearchHtml($productCode);
+        if ($html === null) {
+            return null;
+        }
+
+        return $this->parseProductData($html, $productCode);
+    }
+
+    /**
+     * Authenticate (reusing the session) and return the raw search-results HTML for a product
+     * code, or null on auth/HTTP failure. Shared by scrapeProductData() and debugProductCard().
+     */
+    private function fetchSearchHtml(string $productCode): ?string
+    {
         try {
             if (! $this->ensureAuthenticated()) {
                 Log::warning('Udea scraping failed: Authentication failed');
@@ -128,7 +149,7 @@ class UdeaScrapingService
                 'english_detected' => $isEnglish,
             ]);
 
-            return $this->parseProductData($html, $productCode);
+            return $html;
 
         } catch (GuzzleException $e) {
             Log::error('Udea scraping failed: HTTP error', [
@@ -147,6 +168,98 @@ class UdeaScrapingService
 
             return null;
         }
+    }
+
+    /**
+     * Fetch a product's search card and return parsed data plus a raw HTML snippet of the
+     * isolated card. Intended for the case/single-unit pricing TEST PAGE.
+     *
+     * Parsed data is durably cached (write-through) in the udea_product_cards table keyed by
+     * supplier code — a fresh (< CACHE_STALE_DAYS old) record is returned instantly without
+     * hitting Udea. The raw card HTML is only kept ephemerally in the app cache (too large to
+     * persist) for the debug toggle, so it may be null on a durable-cache hit.
+     *
+     * @return array{data: ?array, card_html: ?string, from_cache: bool, scraped_at: ?string, debug: array}
+     */
+    public function debugProductCard(string $productCode, bool $forceRefresh = false): array
+    {
+        $rawKey = "udea_card_html_{$productCode}";
+        $this->resetDebug($productCode, $rawKey);
+
+        $record = UdeaProductCard::where('supplier_code', $productCode)->first();
+        $isFresh = $record
+            && ! $forceRefresh
+            && $record->scraped_at
+            && $record->scraped_at->gt(now()->subDays(self::CACHE_STALE_DAYS));
+
+        if ($isFresh) {
+            $this->addDebug('db_cache_hit', [
+                'supplier_code' => $productCode,
+                'scraped_at' => optional($record->scraped_at)->toIso8601String(),
+            ]);
+
+            return [
+                'data' => $record->not_found ? null : $record->toDataArray(),
+                'card_html' => Cache::get($rawKey),
+                'from_cache' => true,
+                'scraped_at' => optional($record->scraped_at)->toIso8601String(),
+                'debug' => $this->getLastDebugInfo(),
+            ];
+        }
+
+        $html = $this->fetchSearchHtml($productCode);
+        if ($html === null) {
+            // Fetch failed: fall back to any existing (even stale) record rather than nothing.
+            return [
+                'data' => $record && ! $record->not_found ? $record->toDataArray() : null,
+                'card_html' => null,
+                'from_cache' => (bool) $record,
+                'scraped_at' => optional($record?->scraped_at)->toIso8601String(),
+                'debug' => $this->getLastDebugInfo(),
+            ];
+        }
+
+        $data = $this->parseProductData($html, $productCode);
+        $cardHtml = $this->isolateFirstProductCard($html);
+
+        // Ephemeral raw HTML for the debug toggle; durable parsed data written through to DB.
+        Cache::put($rawKey, $cardHtml, $this->config['cache_ttl']);
+        $this->persistCard($productCode, $data);
+
+        return [
+            'data' => $data,
+            'card_html' => $cardHtml,
+            'from_cache' => false,
+            'scraped_at' => now()->toIso8601String(),
+            'debug' => $this->getLastDebugInfo(),
+        ];
+    }
+
+    /**
+     * Upsert parsed card data into the durable udea_product_cards table (write-through).
+     * A null $data records a not_found marker so we don't re-scrape it until it goes stale.
+     */
+    private function persistCard(string $productCode, ?array $data): void
+    {
+        if ($data === null) {
+            $attributes = ['not_found' => true, 'scraped_at' => now()];
+        } else {
+            $attributes = [
+                'not_found' => false,
+                'scraped_at' => now(),
+                'case_qty' => $data['case_qty'] ?? null,
+                'single_unit_available' => (bool) ($data['single_unit_available'] ?? false),
+                'single_unit_price' => $data['single_unit_price'] ?? null,
+                'per_unit_case_price' => $data['per_unit_case_price'] ?? null,
+                'case_price' => $data['case_price'] ?? null,
+                'unit_price' => $data['unit_price'] ?? null,
+                'units_per_case' => $data['units_per_case'] ?? null,
+                'description' => $data['description'] ? mb_substr($data['description'], 0, 255) : null,
+                'purchase_tiers' => $data['purchase_tiers'] ?? [],
+            ];
+        }
+
+        UdeaProductCard::updateOrCreate(['supplier_code' => $productCode], $attributes);
     }
 
     private function ensureAuthenticated(): bool
@@ -255,6 +368,12 @@ class UdeaScrapingService
             'is_discounted' => false,
             'customer_price' => null,
             'barcode' => null,
+            // Purchase-tier fields (single-unit vs case buy options, as shown on the webshop card)
+            'case_qty' => null,             // units-per-case according to the website's "x N" option
+            'single_unit_available' => false, // true when the card offers an "x 1" single-unit option
+            'single_unit_price' => null,    // price of the single-unit option (e.g. "1,60")
+            'per_unit_case_price' => null,  // per-unit price shown for the case option (e.g. "1,52")
+            'purchase_tiers' => [],         // raw parsed tiers: [['qty' => 6, 'line_price' => '9,12', 'unit_price' => '1,52'], ...]
         ];
 
         // NEW: Try to extract full product name using the .volume div structure first
@@ -423,6 +542,12 @@ class UdeaScrapingService
             return null;
         }
 
+        // Extract purchase tiers (single-unit vs case buy options) from the search-result card.
+        // Heuristic parser — the card markup is only partially known, so results should be
+        // validated against the raw HTML snippet exposed by debugProductCard().
+        $tiers = $this->extractPurchaseTiers($html);
+        $data = array_merge($data, $tiers);
+
         // Try to extract customer price from product detail page
         $data['customer_price'] = $this->extractCustomerPrice($html);
 
@@ -441,6 +566,147 @@ class UdeaScrapingService
         ]);
 
         return $data;
+    }
+
+    /**
+     * Extract purchase tiers (single-unit vs case buy options) from the search-result card.
+     *
+     * The webshop shows each product as a card that may offer one or two buy options, e.g.
+     * "x 1 = 1,60" (single unit) and "x 6 = 9,12 / 1,52 each" (case). The exact card markup
+     * is not fully known, so this is a best-effort heuristic: it isolates the first product
+     * card, finds every "x N" quantity token and the European-format prices near it, then
+     * derives the single-unit and case tiers. Validate output against the raw card HTML that
+     * debugProductCard() exposes on the test page, and tighten the regexes from there.
+     *
+     * @return array{case_qty: ?int, single_unit_available: bool, single_unit_price: ?string, per_unit_case_price: ?string, purchase_tiers: array}
+     */
+    private function extractPurchaseTiers(string $html): array
+    {
+        $result = [
+            'case_qty' => null,
+            'single_unit_available' => false,
+            'single_unit_price' => null,
+            'per_unit_case_price' => null,
+            'purchase_tiers' => [],
+        ];
+
+        // Narrow to the first product card so "x N" tokens from other products aren't picked up.
+        $card = $this->isolateFirstProductCard($html);
+
+        // Find every "x N" quantity token (allowing &nbsp; / whitespace between x and the number).
+        if (! preg_match_all('/\bx\s*(?:&nbsp;|\s)*(\d+)\b/i', $card, $qtyMatches, PREG_OFFSET_CAPTURE)) {
+            return $result;
+        }
+
+        $tiers = [];
+        $matches = $qtyMatches[1]; // matches are returned in document order (ascending offsets)
+        foreach ($matches as $i => $m) {
+            $qty = (int) $m[0];
+            $offset = $m[1];
+            if ($qty < 1) {
+                continue;
+            }
+
+            // Prices (European format "1,60") between this "x N" token and the next one belong to
+            // this buy option (line total and/or per-unit price sit next to the quantity). Bounding
+            // the window at the next quantity token stops one tier's prices bleeding into another.
+            $nextOffset = $matches[$i + 1][1] ?? ($offset + 400);
+            $length = min(400, max(0, $nextOffset - $offset));
+            $window = substr($card, $offset, $length);
+            preg_match_all('/(\d+,\d{2})/', $window, $priceMatches);
+            $prices = array_values(array_unique($priceMatches[1] ?? []));
+
+            // Keep the first occurrence of each quantity (closest to the buy control).
+            if (! isset($tiers[$qty])) {
+                $tiers[$qty] = ['qty' => $qty, 'prices' => $prices];
+            }
+        }
+
+        if (empty($tiers)) {
+            return $result;
+        }
+
+        // Single-unit tier: "x 1".
+        if (isset($tiers[1])) {
+            $result['single_unit_available'] = true;
+            $result['single_unit_price'] = $tiers[1]['prices'][0] ?? null;
+        }
+
+        // Case tier: the largest quantity greater than one.
+        $caseQtys = array_filter(array_keys($tiers), fn ($q) => $q > 1);
+        if (! empty($caseQtys)) {
+            $caseQty = max($caseQtys);
+            $result['case_qty'] = $caseQty;
+            // The smaller nearby price is the per-unit price; the larger is the case line total.
+            $result['per_unit_case_price'] = $this->smallestPrice($tiers[$caseQty]['prices']);
+        }
+
+        // Expose all parsed tiers (qty + derived unit/line price) for the debug/test page.
+        $result['purchase_tiers'] = array_values(array_map(function ($tier) {
+            return [
+                'qty' => $tier['qty'],
+                'unit_price' => $this->smallestPrice($tier['prices']),
+                'line_price' => $this->largestPrice($tier['prices']),
+                'prices' => $tier['prices'],
+            ];
+        }, $tiers));
+
+        return $result;
+    }
+
+    /**
+     * Isolate the HTML of the first product card within the search results so tier/price
+     * parsing does not bleed into adjacent products. Falls back to the productsLists region,
+     * then to the start of the document.
+     */
+    private function isolateFirstProductCard(string $html): string
+    {
+        $region = $html;
+        if (($pos = strpos($html, 'id="productsLists"')) !== false) {
+            $region = substr($html, $pos);
+        }
+
+        // Cards start at a ".volume" wrapper (also used for name/brand/size extraction).
+        if (preg_match('/<div[^>]*class="[^"]*\bvolume\b[^"]*"[^>]*>/i', $region, $m, PREG_OFFSET_CAPTURE)) {
+            return substr($region, $m[0][1], 4000);
+        }
+
+        return substr($region, 0, 4000);
+    }
+
+    /**
+     * Return the numerically smallest European-format price ("1,52") from a list, or null.
+     */
+    private function smallestPrice(array $prices): ?string
+    {
+        return $this->pickPrice($prices, true);
+    }
+
+    /**
+     * Return the numerically largest European-format price ("9,12") from a list, or null.
+     */
+    private function largestPrice(array $prices): ?string
+    {
+        return $this->pickPrice($prices, false);
+    }
+
+    private function pickPrice(array $prices, bool $smallest): ?string
+    {
+        if (empty($prices)) {
+            return null;
+        }
+
+        $best = null;
+        $bestVal = null;
+        foreach ($prices as $price) {
+            $val = (float) str_replace(',', '.', $price);
+            if ($bestVal === null || ($smallest ? $val < $bestVal : $val > $bestVal)) {
+                $bestVal = $val;
+                $best = $price;
+            }
+        }
+
+        return $best;
     }
 
     /**

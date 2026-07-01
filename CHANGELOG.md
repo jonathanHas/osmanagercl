@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **🖼️ Udea product images on order pages + case/single-unit pricing test** (2026-07-01)
+  - The order review table (`/orders/{id}`) now shows the Udea **product image** next to each line item, reusing the existing `x-product-image` component (barcode → Ekoplaza CDN) with hover/tap preview and graceful fallback. Applied to all line-item sections in `resources/views/orders/partials/review-table.blade.php`
+  - **New feasibility test page** (`/tools/udea-case-test/{order}`) that scrapes each Udea line item's webshop card and shows the parsed **buy tiers** — units-per-case per the site, single-unit availability and price, and per-unit case price — next to our stored `CaseUnits`, with a raw-HTML toggle for validating the parser. Verified against the live card for product 1118 (case 6 @ €9,12 / €1,52 unit, single @ €1,60)
+  - **Only single-unit products (case units = 1) are scraped** — the only ones where a case-buy option is worth discovering (`?all=1` also lists case products, image-only)
+  - **Progressive loading**: the page renders instantly and each row fills in real time via a background batch endpoint (`POST /tools/udea-case-test-scrape`), with per-row spinners and a progress bar — no more minute-long blocking loads on large orders
+  - **Durable cache**: parsed tier data is written through to a new `udea_product_cards` table keyed by supplier code (30-day staleness), so a product scraped once returns in ~2ms instead of ~4s and stays cached across orders (replaces the previous 1-hour app cache). Raw card HTML is kept only ephemerally for the debug toggle
+  - **Manual refresh**: a per-row ↻ button re-scrapes one product, the "Bypass cache" toggle re-scrapes a whole order, and `php artisan udea:refresh-tiers [--order=] [--force] [--limit=]` bulk-populates/refreshes the cache on demand
+  - **Modified**: `app/Services/UdeaScrapingService.php` (new `extractPurchaseTiers()` heuristic + `debugProductCard()` with DB write-through, exposing `case_qty` / `single_unit_available` / `single_unit_price` / `per_unit_case_price` / `purchase_tiers`), `routes/web.php`
+  - **Order-page integration**: single-unit line items on `/orders/{id}` now show a compact **“📦 Case ×N · €x/u (save y%)”** badge under the product code when Udea offers that product by the case (read instantly from the durable cache). Uncached single-unit products render an empty slot that a **background warmer** fills in live (and persists), so the page never blocks. New partial `resources/views/orders/partials/udea-case-badge.blade.php`
+  - **New**: `app/Http/Controllers/UdeaCaseTestController.php`, `resources/views/tools/udea-case-test.blade.php`, `resources/views/orders/partials/udea-case-badge.blade.php`, `app/Models/UdeaProductCard.php`, `app/Console/Commands/RefreshUdeaTiers.php`, migration `2026_07_01_000000_create_udea_product_cards_table.php`
+
 - **🎟️ Gift Voucher Management** (2026-06-25)
   - New **Voucher Management** system: gift vouchers with a unique, randomised, non-sequential CODE-128 barcode, a server-tracked balance, and a full transaction log — scannable and redeemable at the till to prevent forgery and double-spending
   - **Lifecycle / statuses**: `inactive` (generated/printed, not sold) → `active` (issued with a balance) → `exhausted` (spent); plus `deactivated` (admin-disabled, balance preserved). Codes are app-generated (`GV` + 10 chars from an unambiguous charset, CSPRNG via `Voucher::generateUniqueCode()`)

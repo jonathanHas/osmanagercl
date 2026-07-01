@@ -8,6 +8,7 @@
     'border' => true,         // Border styling
     'hover' => false,         // Enable hover preview
     'hoverSize' => 'w-64 h-64', // Size of hover preview
+    'fit' => 'cover',         // object-fit for the thumbnail: 'cover' (crop) or 'contain' (full image)
 ])
 
 @php
@@ -23,7 +24,8 @@
     $sizeClass = $sizeClasses[$size] ?? $sizeClasses['md'];
 
     // Build CSS classes
-    $imageClasses = $sizeClass . ' object-cover';
+    $objectFit = in_array($fit, ['cover', 'contain'], true) ? $fit : 'cover';
+    $imageClasses = $sizeClass . ' object-' . $objectFit;
 
     if ($rounded) {
         $imageClasses .= ' rounded';
@@ -117,7 +119,7 @@
                     onload="this.classList.remove('animate-pulse')"
                 @endif
                 onerror="this.style.display='none'; @if($fallback) this.parentElement.querySelector('.fallback-icon')?.style.display='flex'; @endif"
-                {{ $attributes->except(['product', 'supplierService', 'size', 'fallback', 'lazy', 'rounded', 'border', 'hover', 'hoverSize']) }}
+                {{ $attributes->except(['product', 'supplierService', 'size', 'fallback', 'lazy', 'rounded', 'border', 'hover', 'hoverSize', 'fit']) }}
             >
 
             {{-- Desktop: positioned hover preview --}}
@@ -200,7 +202,7 @@
                     onload="this.classList.remove('animate-pulse')"
                 @endif
                 onerror="this.style.display='none'; @if($fallback) this.parentElement.querySelector('.fallback-icon')?.style.display='flex'; @endif"
-                {{ $attributes->except(['product', 'supplierService', 'size', 'fallback', 'lazy', 'rounded', 'border', 'hover', 'hoverSize']) }}
+                {{ $attributes->except(['product', 'supplierService', 'size', 'fallback', 'lazy', 'rounded', 'border', 'hover', 'hoverSize', 'fit']) }}
             >
 
             @if($fallback)

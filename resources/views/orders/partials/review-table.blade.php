@@ -53,6 +53,23 @@
         })->values();
     }
 
+    // Load durable Udea case/single-unit tier data for single-unit products (case units == 1).
+    // Read-only + instant from the udea_product_cards cache; uncached products are warmed in the
+    // background by JS at the foot of this file. Keyed by supplier code (string keys are safe).
+    $udeaSingleCodes = collect($displayItems)->map(function ($item) {
+        $ctx = $item->context_data ?? [];
+        $cu = $ctx['case_units'] ?? optional(optional($item->product)->supplierLink)->CaseUnits ?? 1;
+        $sc = $ctx['supplier_code'] ?? optional(optional($item->product)->supplierLink)->SupplierCode;
+
+        return ((int) $cu === 1 && ! empty($sc)) ? (string) $sc : null;
+    })->filter()->unique()->values();
+
+    $udeaCards = $udeaSingleCodes->isEmpty()
+        ? collect()
+        : \App\Models\UdeaProductCard::whereIn('supplier_code', $udeaSingleCodes->all())
+            ->get()
+            ->keyBy('supplier_code');
+
     // Split items by category and case/unit type
     // Category IDs: Cheese = "032", Refrigerated = "002"
     $cheeseProducts = $displayItems->filter(function ($item) {
@@ -447,21 +464,31 @@
                         </div>
                     </td>
                     <td class="px-4 py-4">
-                        <div class="font-medium text-gray-900">
-                            @if(($product->ID ?? null) !== null)
-                                <a href="{{ route('products.edit', $product->ID) }}"
-                                   class="text-indigo-600 hover:text-indigo-800"
-                                   target="_blank"
-                                   rel="noopener"
-                                   title="Edit {{ $safeProductName }}">
-                                    {!! $safeProductName !!}
-                                </a>
-                            @else
-                                {!! $safeProductName !!}
-                            @endif
-                        </div>
-                        <div class="text-sm text-gray-500">
-                            Code: {{ $product->CODE ?? 'N/A' }}@if($caseUnits > 1) • {{ rtrim(rtrim(number_format($caseUnits, 2), '0'), '.') }} units/case @endif
+                        <div class="flex items-start gap-3">
+                            <x-product-image :product="$product" :supplierService="$supplierService ?? null" size="lg" fit="contain" :hover="true" class="flex-shrink-0" />
+                            <div class="min-w-0 flex-1">
+                                <div class="font-medium text-gray-900">
+                                    @if(($product->ID ?? null) !== null)
+                                        <a href="{{ route('products.edit', $product->ID) }}"
+                                           class="text-indigo-600 hover:text-indigo-800"
+                                           target="_blank"
+                                           rel="noopener"
+                                           title="Edit {{ $safeProductName }}">
+                                            {!! $safeProductName !!}
+                                        </a>
+                                    @else
+                                        {!! $safeProductName !!}
+                                    @endif
+                                </div>
+                                <div class="text-sm text-gray-500">
+                                    Code: {{ $product->CODE ?? 'N/A' }}@if($caseUnits > 1) • {{ rtrim(rtrim(number_format($caseUnits, 2), '0'), '.') }} units/case @endif
+                                </div>
+                                @include('orders.partials.udea-case-badge', [
+                                    'udeaCard' => ($caseUnits == 1 && $supplierCode) ? ($udeaCards[(string) $supplierCode] ?? null) : null,
+                                    'udeaCode' => $supplierCode,
+                                    'needsWarm' => ($caseUnits == 1 && $supplierCode && ! $udeaCards->has((string) $supplierCode)),
+                                ])
+                            </div>
                         </div>
                         @if($supplierCode)
                             <div class="mt-1 flex items-center gap-2 text-xs text-gray-500">
@@ -910,21 +937,31 @@
                         </div>
                     </td>
                     <td class="px-4 py-4">
-                        <div class="font-medium text-gray-900">
-                            @if(($product->ID ?? null) !== null)
-                                <a href="{{ route('products.edit', $product->ID) }}"
-                                   class="text-indigo-600 hover:text-indigo-800"
-                                   target="_blank"
-                                   rel="noopener"
-                                   title="Edit {{ $safeProductName }}">
-                                    {!! $safeProductName !!}
-                                </a>
-                            @else
-                                {!! $safeProductName !!}
-                            @endif
-                        </div>
-                        <div class="text-sm text-gray-500">
-                            Code: {{ $product->CODE ?? 'N/A' }}@if($caseUnits > 1) • {{ rtrim(rtrim(number_format($caseUnits, 2), '0'), '.') }} units/case @endif
+                        <div class="flex items-start gap-3">
+                            <x-product-image :product="$product" :supplierService="$supplierService ?? null" size="lg" fit="contain" :hover="true" class="flex-shrink-0" />
+                            <div class="min-w-0 flex-1">
+                                <div class="font-medium text-gray-900">
+                                    @if(($product->ID ?? null) !== null)
+                                        <a href="{{ route('products.edit', $product->ID) }}"
+                                           class="text-indigo-600 hover:text-indigo-800"
+                                           target="_blank"
+                                           rel="noopener"
+                                           title="Edit {{ $safeProductName }}">
+                                            {!! $safeProductName !!}
+                                        </a>
+                                    @else
+                                        {!! $safeProductName !!}
+                                    @endif
+                                </div>
+                                <div class="text-sm text-gray-500">
+                                    Code: {{ $product->CODE ?? 'N/A' }}@if($caseUnits > 1) • {{ rtrim(rtrim(number_format($caseUnits, 2), '0'), '.') }} units/case @endif
+                                </div>
+                                @include('orders.partials.udea-case-badge', [
+                                    'udeaCard' => ($caseUnits == 1 && $supplierCode) ? ($udeaCards[(string) $supplierCode] ?? null) : null,
+                                    'udeaCode' => $supplierCode,
+                                    'needsWarm' => ($caseUnits == 1 && $supplierCode && ! $udeaCards->has((string) $supplierCode)),
+                                ])
+                            </div>
                         </div>
                         @if($supplierCode)
                             <div class="mt-1 flex items-center gap-2 text-xs text-gray-500">
@@ -1285,21 +1322,31 @@
                         </div>
                     </td>
                     <td class="px-4 py-4">
-                        <div class="font-medium text-gray-900">
-                            @if(($product->ID ?? null) !== null)
-                                <a href="{{ route('products.edit', $product->ID) }}"
-                                   class="text-indigo-600 hover:text-indigo-800"
-                                   target="_blank"
-                                   rel="noopener"
-                                   title="Edit {{ $safeProductName }}">
-                                    {!! $safeProductName !!}
-                                </a>
-                            @else
-                                {!! $safeProductName !!}
-                            @endif
-                        </div>
-                        <div class="text-sm text-gray-500">
-                            Code: {{ $product->CODE ?? 'N/A' }}@if($caseUnits > 1) • {{ rtrim(rtrim(number_format($caseUnits, 2), '0'), '.') }} units/case @endif
+                        <div class="flex items-start gap-3">
+                            <x-product-image :product="$product" :supplierService="$supplierService ?? null" size="lg" fit="contain" :hover="true" class="flex-shrink-0" />
+                            <div class="min-w-0 flex-1">
+                                <div class="font-medium text-gray-900">
+                                    @if(($product->ID ?? null) !== null)
+                                        <a href="{{ route('products.edit', $product->ID) }}"
+                                           class="text-indigo-600 hover:text-indigo-800"
+                                           target="_blank"
+                                           rel="noopener"
+                                           title="Edit {{ $safeProductName }}">
+                                            {!! $safeProductName !!}
+                                        </a>
+                                    @else
+                                        {!! $safeProductName !!}
+                                    @endif
+                                </div>
+                                <div class="text-sm text-gray-500">
+                                    Code: {{ $product->CODE ?? 'N/A' }}@if($caseUnits > 1) • {{ rtrim(rtrim(number_format($caseUnits, 2), '0'), '.') }} units/case @endif
+                                </div>
+                                @include('orders.partials.udea-case-badge', [
+                                    'udeaCard' => ($caseUnits == 1 && $supplierCode) ? ($udeaCards[(string) $supplierCode] ?? null) : null,
+                                    'udeaCode' => $supplierCode,
+                                    'needsWarm' => ($caseUnits == 1 && $supplierCode && ! $udeaCards->has((string) $supplierCode)),
+                                ])
+                            </div>
                         </div>
                         @if($supplierCode)
                             <div class="mt-1 flex items-center gap-2 text-xs text-gray-500">
@@ -1660,21 +1707,31 @@
                         </div>
                     </td>
                     <td class="px-4 py-4">
-                        <div class="font-medium text-gray-900">
-                            @if(($product->ID ?? null) !== null)
-                                <a href="{{ route('products.edit', $product->ID) }}"
-                                   class="text-indigo-600 hover:text-indigo-800"
-                                   target="_blank"
-                                   rel="noopener"
-                                   title="Edit {{ $safeProductName }}">
-                                    {!! $safeProductName !!}
-                                </a>
-                            @else
-                                {!! $safeProductName !!}
-                            @endif
-                        </div>
-                        <div class="text-sm text-gray-500">
-                            Code: {{ $product->CODE ?? 'N/A' }}@if($caseUnits > 1) • {{ rtrim(rtrim(number_format($caseUnits, 2), '0'), '.') }} units/case @endif
+                        <div class="flex items-start gap-3">
+                            <x-product-image :product="$product" :supplierService="$supplierService ?? null" size="lg" fit="contain" :hover="true" class="flex-shrink-0" />
+                            <div class="min-w-0 flex-1">
+                                <div class="font-medium text-gray-900">
+                                    @if(($product->ID ?? null) !== null)
+                                        <a href="{{ route('products.edit', $product->ID) }}"
+                                           class="text-indigo-600 hover:text-indigo-800"
+                                           target="_blank"
+                                           rel="noopener"
+                                           title="Edit {{ $safeProductName }}">
+                                            {!! $safeProductName !!}
+                                        </a>
+                                    @else
+                                        {!! $safeProductName !!}
+                                    @endif
+                                </div>
+                                <div class="text-sm text-gray-500">
+                                    Code: {{ $product->CODE ?? 'N/A' }}@if($caseUnits > 1) • {{ rtrim(rtrim(number_format($caseUnits, 2), '0'), '.') }} units/case @endif
+                                </div>
+                                @include('orders.partials.udea-case-badge', [
+                                    'udeaCard' => ($caseUnits == 1 && $supplierCode) ? ($udeaCards[(string) $supplierCode] ?? null) : null,
+                                    'udeaCode' => $supplierCode,
+                                    'needsWarm' => ($caseUnits == 1 && $supplierCode && ! $udeaCards->has((string) $supplierCode)),
+                                ])
+                            </div>
                         </div>
                         @if($supplierCode)
                             <div class="mt-1 flex items-center gap-2 text-xs text-gray-500">
@@ -3538,3 +3595,70 @@
         initKitchenToggleButtons();
     });
 </script>
+
+@once
+<script>
+    // Background warmer for the Udea "buy by the case" badges. Single-unit products without a
+    // cached udea_product_cards row render an empty [data-udea-warm] slot; this quietly scrapes
+    // them via the shared endpoint (which writes through to the durable cache) and fills the
+    // badge in live. Cached products are already server-rendered, so this only runs for misses.
+    // Keep the badge markup below in sync with resources/views/orders/partials/udea-case-badge.blade.php
+    (function () {
+        const slots = Array.from(document.querySelectorAll('span[data-udea-warm]'));
+        if (!slots.length) return;
+
+        const URL = @json(route('tools.udea-case-test.scrape'));
+        const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const CHUNK = 4;
+        const POOL = 2;
+        const BADGE_CLASS = 'udea-case-badge mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-0.5 text-[11px] font-medium';
+
+        const parsePrice = p => (p ? parseFloat(String(p).replace(',', '.')) : null);
+
+        function fillSlot(slot, data) {
+            const caseQty = data && data.case_qty;
+            if (caseQty == null || caseQty <= 1) { slot.remove(); return; } // no case option offered
+            const single = parsePrice(data.single_unit_price);
+            const perU = parsePrice(data.per_unit_case_price);
+            const saving = (single && perU && single > perU) ? Math.round((single - perU) / single * 100) : null;
+            let txt = '📦 Case ×' + caseQty;
+            if (data.per_unit_case_price) txt += ' · €' + data.per_unit_case_price + '/u';
+            if (saving) txt += ' (save ' + saving + '%)';
+            slot.className = BADGE_CLASS;
+            slot.title = 'Udea offers this by the case (single is our current setup)';
+            slot.textContent = txt;
+        }
+
+        // De-dupe by code (a code can appear on more than one row); apply the result to every slot.
+        const byCode = {};
+        slots.forEach(s => { (byCode[s.dataset.udeaCode] = byCode[s.dataset.udeaCode] || []).push(s); });
+        const codes = Object.keys(byCode);
+        const chunks = [];
+        for (let i = 0; i < codes.length; i += CHUNK) chunks.push(codes.slice(i, i + CHUNK));
+        let next = 0;
+
+        async function worker() {
+            while (next < chunks.length) {
+                const chunk = chunks[next++];
+                let results = {};
+                try {
+                    const resp = await fetch(URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF },
+                        body: JSON.stringify({ codes: chunk }),
+                    });
+                    results = (await resp.json()).results || {};
+                } catch (e) {
+                    results = {};
+                }
+                chunk.forEach(code => {
+                    const r = results[code];
+                    if (r && r.data) (byCode[code] || []).forEach(slot => fillSlot(slot, r.data));
+                });
+            }
+        }
+
+        Promise.all(Array.from({ length: Math.min(POOL, chunks.length) }, () => worker()));
+    })();
+</script>
+@endonce
