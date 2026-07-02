@@ -775,8 +775,10 @@ Comprehensive end-of-day cash management with physical counting and variance tra
 - **Auto-Reconciliation**: Auto-creates records for POS till closes with legacy data on lodgement page load
 - **Unreconciled Days**: Shows days needing cash reconciliation with direct links
 - **Till Close Date**: Lodgements table shows POS till close date alongside lodgement date
+- **Sync from POS**: Manual button to force re-import of a day's legacy cash figures when the auto-import left them empty
 
 📖 [Cash Reconciliation Documentation](./features/cash-reconciliation.md)
+📖 [Sync from POS Documentation](./features/cash-reconciliation-pos-sync.md)
 
 ---
 

@@ -770,6 +770,11 @@
         const seenOrderIds = new Set([...document.querySelectorAll('[data-order-id]')]
             .map(el => el.dataset.orderId));
 
+        // Orders the user has just completed locally. Kept until the server
+        // confirms the completion (i.e. the order drops out of the active list),
+        // so a stale SSE/poll payload can't resurrect the card mid-fade.
+        const completedOrderIds = new Set();
+
         // Cached SSE payload + completed-panel state
         let lastCompleted = [];
         let donePanelOpen = false;
@@ -884,6 +889,20 @@
 
         function renderActive(orders) {
             const container = document.getElementById('orders-container');
+
+            // Reconcile the "just completed" suppression set against the server:
+            // any suppressed id the server no longer lists as active has been
+            // confirmed completed, so we stop suppressing it. Everything still
+            // listed as active (a stale payload) is filtered out below so the
+            // card the user just completed can't reappear.
+            if (completedOrderIds.size) {
+                const activeIds = new Set(orders.map(o => String(o.id)));
+                for (const id of completedOrderIds) {
+                    if (!activeIds.has(id)) completedOrderIds.delete(id);
+                }
+                orders = orders.filter(o => !completedOrderIds.has(String(o.id)));
+            }
+
             document.getElementById('open-count').textContent = orders.length;
 
             // Play notification sound for orders we've never seen
@@ -978,16 +997,24 @@
         };
 
         window.completeOrder = async function (orderId) {
-            const wrap = document.querySelector(`.order-wrap[data-order-id="${orderId}"]`);
+            const id = String(orderId);
+            const wrap = document.querySelector(`.order-wrap[data-order-id="${id}"]`);
             if (wrap) wrap.classList.add('order-wrap--leaving');
+            // Suppress immediately so an in-flight (stale) refresh can't re-add it.
+            completedOrderIds.add(id);
             try {
-                await fetch(`/kds/orders/${orderId}/status`, {
+                const res = await fetch(`/kds/orders/${id}/status`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF },
                     body: JSON.stringify({ status: 'completed' }),
                 });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
             } catch (e) {
                 console.error('Failed to complete order', e);
+                // Roll back: stop suppressing and restore the card.
+                completedOrderIds.delete(id);
+                if (wrap) wrap.classList.remove('order-wrap--leaving');
+                return;
             }
             setTimeout(() => wrap && wrap.remove(), 320);
         };

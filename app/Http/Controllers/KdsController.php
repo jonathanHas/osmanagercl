@@ -154,6 +154,8 @@ class KdsController extends Controller
     {
         return response()->stream(function () {
             $lastMonitorCheck = now();
+            $lastHeartbeat = now();
+            $lastSignature = null;
 
             while (true) {
                 // Check for new or updated orders
@@ -171,49 +173,75 @@ class KdsController extends Controller
                     ->limit(10)
                     ->get();
 
-                $data = json_encode([
-                    'orders' => $orders->map(function ($order) {
-                        return [
-                            'id' => $order->id,
-                            'ticket_number' => $order->ticket_number,
-                            'status' => $order->status,
-                            'order_time' => $order->order_time->format('H:i:s'),
-                            'waiting_time' => $order->waiting_time_formatted,
-                            'items' => $order->card_items,
-                            'compact_display' => $order->compact_display,
-                            'should_use_compact' => $order->shouldUseCompactDisplay(),
-                            'customer_info' => $order->customer_info,
-                            'person_name' => $order->person_name,
-                            'placed_at_ts' => $order->order_time->valueOf(),
-                        ];
-                    })->toArray(),
-                    'completed' => $completedOrders->map(function ($order) {
-                        return [
-                            'id' => $order->id,
-                            'ticket_number' => $order->ticket_number,
-                            'order_time' => $order->order_time->format('H:i:s'),
-                            'completed_time' => $order->completed_at ? $order->completed_at->format('H:i:s') : '',
-                            'items' => $order->items->map(function ($item) {
-                                return [
-                                    'product_name' => $item->display_name,
-                                    'quantity' => $item->formatted_quantity,
-                                    'kind' => $item->kind,
-                                ];
-                            })->toArray(),
-                            'person_name' => $order->person_name,
-                        ];
-                    })->toArray(),
-                ]);
+                $activePayload = $orders->map(function ($order) {
+                    return [
+                        'id' => $order->id,
+                        'ticket_number' => $order->ticket_number,
+                        'status' => $order->status,
+                        'order_time' => $order->order_time->format('H:i:s'),
+                        'waiting_time' => $order->waiting_time_formatted,
+                        'items' => $order->card_items,
+                        'compact_display' => $order->compact_display,
+                        'should_use_compact' => $order->shouldUseCompactDisplay(),
+                        'customer_info' => $order->customer_info,
+                        'person_name' => $order->person_name,
+                        'placed_at_ts' => $order->order_time->valueOf(),
+                    ];
+                })->toArray();
 
-                echo "data: {$data}\n\n";
-                ob_flush();
-                flush();
+                $completedPayload = $completedOrders->map(function ($order) {
+                    return [
+                        'id' => $order->id,
+                        'ticket_number' => $order->ticket_number,
+                        'order_time' => $order->order_time->format('H:i:s'),
+                        'completed_time' => $order->completed_at ? $order->completed_at->format('H:i:s') : '',
+                        'items' => $order->items->map(function ($item) {
+                            return [
+                                'product_name' => $item->display_name,
+                                'quantity' => $item->formatted_quantity,
+                                'kind' => $item->kind,
+                            ];
+                        })->toArray(),
+                        'person_name' => $order->person_name,
+                    ];
+                })->toArray();
 
-                // Wait 2 seconds before next update (was 3)
-                sleep(2);
+                // Signature of state that affects which cards are shown.
+                // Item id/quantity are captured so added/removed lines push; item
+                // tick state is client-only. waiting_time is excluded (changes
+                // every second; the client ticks its own timers) so we only push
+                // on real changes.
+                $signature = md5(json_encode([
+                    'active' => $orders->map(fn ($o) => [
+                        $o->id,
+                        $o->status,
+                        $o->items->map(fn ($i) => [$i->id, $i->formatted_quantity])->toArray(),
+                    ])->toArray(),
+                    'completed' => $completedOrders->pluck('id')->toArray(),
+                ]));
 
-                // Dispatch monitoring job every 3 seconds (was 5)
-                // Job is now optimized to run in ~100ms
+                // Push when state changed, or on a periodic heartbeat to keep the
+                // connection alive and the completed panel fresh.
+                $heartbeatDue = $lastHeartbeat->diffInSeconds(now()) >= 15;
+                if ($signature !== $lastSignature || $heartbeatDue) {
+                    $data = json_encode([
+                        'orders' => $activePayload,
+                        'completed' => $completedPayload,
+                    ]);
+
+                    echo "data: {$data}\n\n";
+                    ob_flush();
+                    flush();
+
+                    $lastSignature = $signature;
+                    $lastHeartbeat = now();
+                }
+
+                // Short poll so completions propagate to all devices in ~1s.
+                sleep(1);
+
+                // Dispatch monitoring job every 3 seconds.
+                // Job is now optimized to run in ~100ms.
                 if ($lastMonitorCheck->diffInSeconds(now()) >= 3) {
                     MonitorCoffeeOrdersJob::dispatch();
                     $lastMonitorCheck = now();

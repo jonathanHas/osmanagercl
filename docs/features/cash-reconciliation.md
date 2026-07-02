@@ -147,6 +147,7 @@ Variance = Day's Cash Taking - POS Cash Total
 ### Main Routes
 - `GET /cash-reconciliation` - Main interface
 - `POST /cash-reconciliation/store` - Save reconciliation
+- `POST /cash-reconciliation/sync` - Force re-import of a day's legacy POS data (see [Sync from POS](./cash-reconciliation-pos-sync.md))
 - `GET /cash-reconciliation/previous-float` - Get previous day's float
 - `GET /cash-reconciliation/reconciliation` - Get reconciliation data via AJAX
 - `GET /cash-reconciliation/export` - Export to CSV
@@ -163,12 +164,15 @@ Variance = Day's Cash Taking - POS Cash Total
 - **Cause**: Incorrect float or missing payments
 - **Solution**: Check previous day's float and supplier payments
 
-#### Missing Legacy Data
-- **Cause**: No entry in legacy `money` table
-- **Solution**: Data will be created fresh; enter counts manually
+#### Missing Legacy Data (POS totals show but cash counts are zero)
+- **Cause**: The page was opened before the old POS system wrote the day's `money` row, so the
+  reconciliation was auto-created with zero denomination counts and never re-pulled.
+- **Solution**: Use the **Sync from POS** button to force a re-import once the old system has the data.
+  See [Sync from POS](./cash-reconciliation-pos-sync.md).
 
 ## Related Systems
 
+- [Sync from POS](./cash-reconciliation-pos-sync.md) - Force re-import of a day's legacy POS cash figures when the automatic import left them empty
 - [Cash Closed (End-of-Day Overview)](./cash-closed.md) - How reconciliation fits into the full cash-to-bank pipeline, legacy migration details
 - [Cash Lodgements](../features/cash-closed.md#key-integration-reconciliation--lodgements) - Bank deposit tracking with side-by-side reconciliation comparison
 - [Till Review System](./till-review.md) - View receipts and transactions
