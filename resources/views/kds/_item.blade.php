@@ -4,14 +4,14 @@
         <div class="item__main">
             <span class="item__qty">{{ $item['quantity'] }}×</span>
             <span class="item__name">{{ $item['product_name'] }}</span>
+            @if(! empty($item['modifiers']))
+                <span class="item__mods">
+                    @foreach($item['modifiers'] as $m)
+                        <span class="item__mod">{{ $m }}</span>
+                    @endforeach
+                </span>
+            @endif
         </div>
-        @if(! empty($item['modifiers']))
-            <div class="item__mods">
-                @foreach($item['modifiers'] as $m)
-                    <span class="item__mod">{{ $m }}</span>
-                @endforeach
-            </div>
-        @endif
         @if(! empty($item['notes']))
             <div class="item__notes">Note: {{ $item['notes'] }}</div>
         @endif

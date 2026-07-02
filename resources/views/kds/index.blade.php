@@ -440,8 +440,9 @@
         .item__body { flex: 1; min-width: 0; }
         .item__main {
             display: flex;
-            align-items: baseline;
-            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px 8px;
             font-size: 16px;
             line-height: 1.2;
         }
@@ -465,23 +466,24 @@
             color: var(--muted);
         }
         .item__mods {
-            margin-top: 4px;
-            display: flex;
+            display: inline-flex;
+            align-items: center;
             flex-wrap: wrap;
-            gap: 4px 6px;
+            gap: 5px 6px;
         }
         .item__mod {
-            font-size: 11px;
-            padding: 2px 7px;
-            border-radius: 5px;
-            background: var(--bg-2);
-            color: var(--ink-2);
-            font-weight: 500;
-            border: 1px solid var(--line);
+            font-size: 14px;
+            padding: 3px 10px;
+            border-radius: 6px;
+            background: var(--accent);
+            color: var(--accent-fg);
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            border: 1px solid var(--accent);
             white-space: nowrap;
         }
         .item--done .item__mod {
-            opacity: 0.5;
+            opacity: 0.45;
             text-decoration: line-through;
         }
         .item__notes {
@@ -822,8 +824,8 @@
                         <div class="item__main">
                             <span class="item__qty">${escapeHtml(item.quantity)}×</span>
                             <span class="item__name">${escapeHtml(item.product_name)}</span>
+                            ${modifiersHtml(item.modifiers)}
                         </div>
-                        ${modifiersHtml(item.modifiers)}
                         ${item.notes ? `<div class="item__notes">Note: ${escapeHtml(item.notes)}</div>` : ''}
                     </div>
                 </li>`;
