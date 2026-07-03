@@ -27,15 +27,17 @@ def parse_invoice(text, filename):
             print("[DEBUG] Invoice date not found.", file=sys.stderr)
 
         # === Total Amount Parsing ===
-        # Primary: "Subtotal (excl. VAT) € 1.53"
+        # Hetzner invoices can span multiple projects/billing periods, each with its own
+        # "Subtotal (excl. VAT) € X" line. Sum them all so multi-period invoices are not
+        # under-reported (re.search would only grab the first subtotal).
         amount = None
-        sub_match = re.search(r'Subtotal\s*\(excl\.\s*VAT\)\s*€\s*([0-9.,]+)', text)
-        if sub_match:
-            amount = sub_match.group(1).replace(',', '')
-            print(f"[DEBUG] Total Amount Found (subtotal): {amount}", file=sys.stderr)
+        subtotals = re.findall(r'Subtotal\s*\(excl\.\s*VAT\)\s*€\s*([0-9.,]+)', text)
+        if subtotals:
+            amount = f"{sum(float(s.replace(',', '')) for s in subtotals):.2f}"
+            print(f"[DEBUG] Total Amount Found (sum of {len(subtotals)} subtotal(s)): {amount}", file=sys.stderr)
         else:
-            # Fallback: tax-summary row "Total ... € 1.53 € 0.00 € 1.53"
-            fallback = re.search(r'Total\s+€\s*([0-9.,]+)\s+€\s*0\.00', text)
+            # Fallback: grand-total summary row "Total € 10.58 € 0.00 € 10.58"
+            fallback = re.search(r'Total\s+€\s*([0-9.,]+)\s+€\s*[0-9.,]+\s+€\s*[0-9.,]+', text)
             if fallback:
                 amount = fallback.group(1).replace(',', '')
                 print(f"[DEBUG] Total Amount Found (fallback): {amount}", file=sys.stderr)
