@@ -3,6 +3,7 @@
 namespace App\Repositories;
 
 use App\Models\CashReconciliation;
+use App\Models\CustomerPayment;
 use App\Models\POS\ClosedCash;
 use App\Models\POS\Payment;
 use App\Models\Supplier;
@@ -186,7 +187,39 @@ class CashReconciliationRepository
                           ($previousFloat['notes'] + $previousFloat['coins']) -
                           ($legacyMoney->moneyAdded ?? 0);
 
-        $reconciliation->variance = $daysCashTakings - $reconciliation->pos_cash_total;
+        // Customer-invoice payments taken through this till are real cash the POS
+        // never recorded, so they raise the expected cash side of the variance.
+        $customerTotals = $this->getCustomerTillPaymentTotals(
+            $reconciliation->date, $reconciliation->till_id, $reconciliation->till_name);
+
+        $reconciliation->variance = $daysCashTakings - $reconciliation->pos_cash_total - $customerTotals['cash'];
+    }
+
+    /**
+     * Cash and card totals for non-void customer-invoice payments taken through
+     * a till on a date. These are real drawer/terminal money the POS never
+     * records as a sale, so they belong on the expected side of the variance.
+     *
+     * @return array{cash: float, card: float}
+     */
+    public function getCustomerTillPaymentTotals($date, $tillId, ?string $tillName): array
+    {
+        $payments = CustomerPayment::query()
+            ->whereDate('payment_date', $date)
+            ->where(function ($q) use ($tillId, $tillName) {
+                $q->where('till_id', (string) $tillId);
+                if ($tillName) {
+                    $q->orWhere('till_name', $tillName);
+                }
+            })
+            ->whereIn('method', [CustomerPayment::METHOD_CARD_TILL, CustomerPayment::METHOD_CASH_TILL])
+            ->notVoid()
+            ->get(['method', 'amount']);
+
+        return [
+            'cash' => (float) $payments->where('method', CustomerPayment::METHOD_CASH_TILL)->sum('amount'),
+            'card' => (float) $payments->where('method', CustomerPayment::METHOD_CARD_TILL)->sum('amount'),
+        ];
     }
 
     /**
@@ -330,7 +363,12 @@ class CashReconciliationRepository
                               ($previousFloat['notes'] + $previousFloat['coins']) -
                               ($data['money_added'] ?? 0);
 
-            $reconciliation->variance = $daysCashTakings - $reconciliation->pos_cash_total;
+            // Customer-invoice payments taken through this till are real cash the POS
+            // never recorded, so they raise the expected cash side of the variance.
+            $customerTotals = $this->getCustomerTillPaymentTotals(
+                $reconciliation->date, $reconciliation->till_id, $reconciliation->till_name);
+
+            $reconciliation->variance = $daysCashTakings - $reconciliation->pos_cash_total - $customerTotals['cash'];
 
             $reconciliation->save();
 

@@ -115,7 +115,7 @@
                 </div>
             </div>
 
-            {{-- Customer-invoice payments through this till — informational, not in variance maths --}}
+            {{-- Customer-invoice payments through this till — folded into the expected side of the variance below --}}
             @if (! empty($customerInvoicePayments) && $customerInvoicePayments->count() > 0)
                 @php
                     $cardPayments = $customerInvoicePayments->where('method', 'card_till');
@@ -128,9 +128,9 @@
                         <div>
                             <h3 class="text-sm font-semibold text-blue-800 dark:text-blue-200 uppercase tracking-wide">Customer-invoice payments</h3>
                             <p class="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                                These payments hit the card terminal / cash drawer but were NOT entered as till sales,
-                                so they explain extra revenue compared with the POS totals above. Variance maths are not adjusted —
-                                the operator just needs to know they happened.
+                                These payments hit the card terminal / cash drawer but were NOT entered as till sales.
+                                They are added to the expected cash / card side of the variance below (shown as
+                                &ldquo;Customer payments&rdquo; lines), so the day still balances despite the POS not knowing about them.
                             </p>
                         </div>
                         <a href="{{ route('customer-payments.index', ['from' => $selectedDate->toDateString(), 'to' => $selectedDate->toDateString()]) }}"
@@ -482,6 +482,14 @@
                                     <span>POS Cash Total</span>
                                     <span>€{{ number_format($reconciliation->pos_cash_total, 2) }}</span>
                                 </div>
+                                <div x-show="customerCashTotal > 0" class="flex justify-between text-gray-600 dark:text-gray-400">
+                                    <span>+ Customer payments (cash)</span>
+                                    <span>+€<span x-text="customerCashTotal.toFixed(2)"></span></span>
+                                </div>
+                                <div x-show="customerCashTotal > 0" class="flex justify-between font-medium text-gray-800 dark:text-gray-200">
+                                    <span>Expected cash</span>
+                                    <span>€<span x-text="(posCashTotal + customerCashTotal).toFixed(2)"></span></span>
+                                </div>
 
                                 <!-- Cash Variance -->
                                 <div class="border-t dark:border-gray-700 pt-3 mt-1">
@@ -505,6 +513,14 @@
                                         <span>POS Card</span>
                                         <span>€{{ number_format($reconciliation->pos_card_total, 2) }}</span>
                                     </div>
+                                    <div x-show="customerCardTotal > 0" class="flex justify-between text-gray-600 dark:text-gray-400">
+                                        <span>+ Customer payments (card)</span>
+                                        <span>+€<span x-text="customerCardTotal.toFixed(2)"></span></span>
+                                    </div>
+                                    <div x-show="customerCardTotal > 0" class="flex justify-between font-medium text-gray-800 dark:text-gray-200">
+                                        <span>Expected card</span>
+                                        <span>€<span x-text="(posCardTotal + customerCardTotal).toFixed(2)"></span></span>
+                                    </div>
                                     @php $posCard = $reconciliation->pos_card_total; @endphp
                                     <div class="flex justify-between items-baseline">
                                         <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Card Variance</span>
@@ -525,6 +541,10 @@
                                     <div class="flex justify-between text-gray-600 dark:text-gray-400">
                                         <span>Total Sales (POS)</span>
                                         <span>€{{ number_format($reconciliation->pos_cash_total + $reconciliation->pos_card_total, 2) }}</span>
+                                    </div>
+                                    <div x-show="(customerCashTotal + customerCardTotal) > 0" class="flex justify-between text-gray-600 dark:text-gray-400">
+                                        <span>+ Customer payments</span>
+                                        <span>+€<span x-text="(customerCashTotal + customerCardTotal).toFixed(2)"></span></span>
                                     </div>
                                     <div class="flex justify-between items-baseline">
                                         <span class="text-base font-bold text-gray-800 dark:text-gray-200">Total Variance</span>
@@ -596,6 +616,8 @@
                 totalVariance: 0,
                 posCashTotal: {{ $reconciliation->pos_cash_total ?? 0 }},
                 posCardTotal: {{ $reconciliation->pos_card_total ?? 0 }},
+                customerCashTotal: {{ $customerCashTotal ?? 0 }},
+                customerCardTotal: {{ $customerCardTotal ?? 0 }},
 
                 init() {
                     // Preserve a previously-saved manual coin float. If the value loaded
@@ -647,8 +669,8 @@
 
                     this.totalCash = this.totalNotes + this.totalCoins;
                     this.daysCashTaking = this.totalCash + parseFloat(this.cashBack || 0) + this.totalPayments - this.previousFloat - parseFloat(this.moneyAdded || 0);
-                    this.variance = this.daysCashTaking - this.posCashTotal;
-                    this.cardVariance = (parseFloat(this.card || 0) - parseFloat(this.cashBack || 0)) - this.posCardTotal;
+                    this.variance = this.daysCashTaking - (this.posCashTotal + this.customerCashTotal);
+                    this.cardVariance = (parseFloat(this.card || 0) - parseFloat(this.cashBack || 0)) - (this.posCardTotal + this.customerCardTotal);
                     this.totalVariance = this.variance + this.cardVariance;
                 },
 

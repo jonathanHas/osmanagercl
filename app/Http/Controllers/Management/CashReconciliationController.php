@@ -55,6 +55,10 @@ class CashReconciliationController extends Controller
                 ->orderBy('id')
                 ->get();
 
+            // Sums fed into the reconciliation variance (expected cash/card side).
+            $customerCashTotal = (float) $customerInvoicePayments->where('method', CustomerPayment::METHOD_CASH_TILL)->sum('amount');
+            $customerCardTotal = (float) $customerInvoicePayments->where('method', CustomerPayment::METHOD_CARD_TILL)->sum('amount');
+
             return view('management.cash-reconciliation.index', compact(
                 'reconciliation',
                 'selectedDate',
@@ -64,7 +68,9 @@ class CashReconciliationController extends Controller
                 'suppliers',
                 'history',
                 'adjacentDates',
-                'customerInvoicePayments'
+                'customerInvoicePayments',
+                'customerCashTotal',
+                'customerCardTotal'
             ));
         } catch (\Exception $e) {
             Log::error('Cash reconciliation error: '.$e->getMessage());
@@ -80,6 +86,8 @@ class CashReconciliationController extends Controller
                 'reconciliation' => null,
                 'adjacentDates' => ['prev' => null, 'next' => null],
                 'customerInvoicePayments' => collect(),
+                'customerCashTotal' => 0.0,
+                'customerCardTotal' => 0.0,
             ]);
         }
     }
