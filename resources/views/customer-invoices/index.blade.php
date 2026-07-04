@@ -47,6 +47,7 @@
                         <th class="px-4 py-2 text-left">Customer</th>
                         <th class="px-4 py-2 text-right">Total</th>
                         <th class="px-4 py-2 text-right">Outstanding</th>
+                        <th class="px-4 py-2 text-left">Paid</th>
                         <th class="px-4 py-2 text-left">Status</th>
                         <th class="px-4 py-2"></th>
                     </tr>
@@ -61,6 +62,13 @@
                             <td class="px-4 py-2 text-right">
                                 @if ($invoice->status !== 'void' && $invoice->outstanding_amount > 0.005)
                                     <span class="text-yellow-400 font-mono">€{{ number_format($invoice->outstanding_amount, 2) }}</span>
+                                @else
+                                    <span class="text-gray-600">—</span>
+                                @endif
+                            </td>
+                            <td class="px-4 py-2 whitespace-nowrap">
+                                @if ($invoice->status !== 'void' && $invoice->last_payment_date)
+                                    {{ $invoice->last_payment_date->format('Y-m-d') }}
                                 @else
                                     <span class="text-gray-600">—</span>
                                 @endif
@@ -101,7 +109,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="px-4 py-8 text-center text-gray-500">No invoices yet.</td>
+                            <td colspan="8" class="px-4 py-8 text-center text-gray-500">No invoices yet.</td>
                         </tr>
                     @endforelse
                 </tbody>

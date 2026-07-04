@@ -67,7 +67,8 @@
                 <thead class="bg-gray-900 text-gray-400">
                     <tr>
                         <th class="px-4 py-2 text-left">Invoice</th>
-                        <th class="px-4 py-2 text-left">Date</th>
+                        <th class="px-4 py-2 text-left">Invoice date</th>
+                        <th class="px-4 py-2 text-left">Paid</th>
                         <th class="px-4 py-2 text-right">Invoice total</th>
                         <th class="px-4 py-2 text-right">Applied</th>
                     </tr>
@@ -80,17 +81,18 @@
                                    class="text-blue-400 hover:text-blue-300">{{ $a->invoice->invoice_number ?? '(draft)' }}</a>
                             </td>
                             <td class="px-4 py-2">{{ $a->invoice->issue_date?->format('Y-m-d') }}</td>
+                            <td class="px-4 py-2">{{ $payment->payment_date->format('Y-m-d') }}</td>
                             <td class="px-4 py-2 text-right font-mono">€{{ number_format($a->invoice->total, 2) }}</td>
                             <td class="px-4 py-2 text-right font-mono">€{{ number_format($a->amount, 2) }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="4" class="px-4 py-6 text-center text-gray-500">No invoice allocations — recorded as on-account credit.</td></tr>
+                        <tr><td colspan="5" class="px-4 py-6 text-center text-gray-500">No invoice allocations — recorded as on-account credit.</td></tr>
                     @endforelse
                 </tbody>
                 @if ($payment->unallocated_amount > 0.005)
                     <tfoot class="bg-gray-900 text-gray-300 text-sm">
                         <tr>
-                            <td colspan="3" class="px-4 py-2 text-right">On-account credit:</td>
+                            <td colspan="4" class="px-4 py-2 text-right">On-account credit:</td>
                             <td class="px-4 py-2 text-right font-mono text-blue-300">€{{ number_format($payment->unallocated_amount, 2) }}</td>
                         </tr>
                     </tfoot>

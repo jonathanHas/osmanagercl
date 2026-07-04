@@ -212,6 +212,19 @@ class CustomerInvoice extends Model
     }
 
     /**
+     * Date of the most recent non-void payment applied to this invoice, or null
+     * if unpaid. Relies on the void-filtered `allocations` relationship; eager
+     * load `allocations.payment` to avoid N+1 when using this in a list.
+     */
+    public function getLastPaymentDateAttribute(): ?\Illuminate\Support\Carbon
+    {
+        return $this->allocations
+            ->map(fn ($a) => $a->payment?->payment_date)
+            ->filter()
+            ->max();
+    }
+
+    /**
      * Outstanding (positive). Clamped at 0 — overpayments don't make this negative;
      * the overpayment surfaces on the customer's account-credit balance instead.
      */
