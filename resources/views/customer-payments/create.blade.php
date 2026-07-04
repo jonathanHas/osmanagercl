@@ -39,7 +39,8 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('customer-payments.store') }}" class="space-y-4">
+        <form method="POST" action="{{ route('customer-payments.store') }}" class="space-y-4"
+              @submit="confirmPaymentDate($event)">
             @csrf
             <input type="hidden" name="customer_id" :value="customer.id ?? ''">
 
@@ -252,6 +253,7 @@
                 customerSearchTerm: '',
                 customerResults: [],
                 paymentDate: new Date().toISOString().slice(0, 10),
+                defaultDate: new Date().toISOString().slice(0, 10),
                 amount: config.preselectInvoice ? config.preselectInvoice.outstanding : 0,
                 method: 'card_till',
                 tillId: '',
@@ -274,6 +276,24 @@
                 tillNameForId(id) {
                     const t = this.tills.find(t => t.id === String(id));
                     return t ? t.name : '';
+                },
+
+                /**
+                 * Guard against silently saving a back-dated payment against today.
+                 * If the date is still the untouched default, ask the operator to
+                 * confirm before the form submits.
+                 */
+                confirmPaymentDate(event) {
+                    if (this.paymentDate === this.defaultDate) {
+                        const ok = window.confirm(
+                            `The payment date hasn't been changed from today's default (${this.paymentDate}).\n\n` +
+                            `If this payment was made on a different day, click Cancel and update the date first.\n\n` +
+                            `Save with this date?`
+                        );
+                        if (! ok) {
+                            event.preventDefault();
+                        }
+                    }
                 },
 
                 async runCustomerSearch() {
