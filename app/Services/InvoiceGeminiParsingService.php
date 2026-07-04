@@ -392,6 +392,33 @@ class InvoiceGeminiParsingService
             }
         }
 
+        // 1b. Normalized match -- ignore spacing/punctuation differences
+        //     e.g. "Sean O' Farrell" vs "Sean OFarrell" both -> "seanofarrell"
+        $aiNorm = $this->normalizeSupplierName($aiName);
+        if ($aiNorm !== '') {
+            $bestMatch = null;
+            $bestLen = 0;
+            foreach ($knownSuppliers as $known) {
+                $knownNorm = $this->normalizeSupplierName($known);
+                if ($knownNorm === '') {
+                    continue;
+                }
+                // Exact normalized match, or containment when both are long enough
+                // to avoid tiny-name false positives.
+                $contains = strlen($aiNorm) >= 4 && strlen($knownNorm) >= 4
+                    && (str_contains($aiNorm, $knownNorm) || str_contains($knownNorm, $aiNorm));
+                if ($knownNorm === $aiNorm || $contains) {
+                    if (strlen($known) > $bestLen) {
+                        $bestMatch = $known;
+                        $bestLen = strlen($known);
+                    }
+                }
+            }
+            if ($bestMatch) {
+                return [$bestMatch, $aiName];
+            }
+        }
+
         // 2. Substring containment -- prefer longest match
         $bestMatch = null;
         $bestLen = 0;
@@ -477,6 +504,15 @@ class InvoiceGeminiParsingService
     }
 
     /**
+     * Normalize a supplier name for punctuation/spacing-insensitive comparison.
+     * "Sean O' Farrell" and "Sean OFarrell" both become "seanofarrell".
+     */
+    protected function normalizeSupplierName(string $name): string
+    {
+        return preg_replace('/[^a-z0-9]/', '', strtolower($name));
+    }
+
+    /**
      * Extract significant words from a name, filtering out noise.
      */
     protected function extractSignificantWords(string $name): array
@@ -498,6 +534,14 @@ class InvoiceGeminiParsingService
     protected function formatOutput(array $data, array $knownSuppliers, string $provider, string $featureKey = 'invoice_parsing'): array
     {
         $warnings = $data['warnings'] ?? [];
+
+        // The PHP supplier matcher below is authoritative for supplier lookup (it checks
+        // the actual DB list), so drop any LLM-emitted "supplier not found" warnings here.
+        // The matcher re-adds the warning only when it genuinely can't resolve the name.
+        $warnings = array_values(array_filter(
+            $warnings,
+            fn ($w) => ! str_contains(strtolower($w), 'supplier not found')
+        ));
 
         // Collapse multiple per-line VAT warnings into a single warning
         $vatWarnings = array_filter($warnings, fn ($w) => str_contains(strtolower($w), 'vat'));
