@@ -34,6 +34,23 @@ class InvoiceGeminiParsingService
             ];
         }
 
+        // Office documents (odt/ods/doc/docx/xls/xlsx) can't be read by the OCR/vision
+        // providers directly. Convert them to PDF first (LibreOffice), reusing an
+        // already-converted PDF if one exists, then let the PDF branch handle them.
+        if ($file->isDocument()) {
+            $pdfPath = $file->getConvertedPdfPath()
+                ?? app(DocumentConversionService::class)->convertToPdf($fullPath, dirname($fullPath));
+
+            if (! $pdfPath || ! file_exists($pdfPath)) {
+                return [
+                    'success' => false,
+                    'errors' => [['message' => 'Could not convert the document to PDF for AI processing.']],
+                ];
+            }
+
+            $fullPath = $pdfPath;
+        }
+
         $isPdf = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION)) === 'pdf';
         $provider = AiSettingsService::get($featureKey, 'provider', 'mistral-ocr');
 

@@ -81,6 +81,19 @@ class CustomerPaymentController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        // Drop untouched allocation rows (amount blank or 0) so validation only
+        // sees invoices the user actually intends to pay. The create form always
+        // submits a row per open invoice, most with amount = 0.
+        $request->merge([
+            'allocations' => collect($request->input('allocations', []))
+                ->filter(fn ($row) => is_array($row)
+                    && isset($row['amount'])
+                    && $row['amount'] !== ''
+                    && (float) $row['amount'] > 0)
+                ->values()
+                ->all(),
+        ]);
+
         $data = $request->validate([
             'customer_id' => ['required', 'exists:App\Models\Customer,id'],
             'payment_date' => ['required', 'date'],
