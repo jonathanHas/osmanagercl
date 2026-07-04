@@ -25,6 +25,8 @@ class RepairablePdf implements ValidationRule
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'application/vnd.ms-excel',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.oasis.opendocument.text',
+            'application/vnd.oasis.opendocument.spreadsheet',
         ]);
     }
 
@@ -51,7 +53,7 @@ class RepairablePdf implements ValidationRule
         $extension = strtolower($value->getClientOriginalExtension());
         if ($extension !== 'pdf') {
             // Not a PDF extension, and not a valid MIME type
-            $fail('Only PDF, JPG, PNG, TIFF, DOC, DOCX, XLS, and XLSX files are allowed.');
+            $fail('Only PDF, JPG, PNG, TIFF, DOC, DOCX, XLS, XLSX, ODT, and ODS files are allowed.');
 
             return;
         }

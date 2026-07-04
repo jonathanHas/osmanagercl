@@ -1790,7 +1790,7 @@
 
         // Auto-refresh if batch is processing or has files still being parsed
         // Only refresh if there are actually files to process (prevents infinite reload loop on empty batches)
-        @if($files->count() > 0 && ($batch->status === 'processing' || $files->whereIn('status', ['uploaded', 'parsing'])->count() > 0))
+        @if($files->count() > 0 && ($batch->status === 'processing' || $files->whereIn('status', ['uploaded', 'parsing', 'parsed'])->count() > 0))
         let refreshInterval = setInterval(() => {
             fetch(`/invoices/bulk-upload/status/${batchId}`)
                 .then(response => {
@@ -1802,13 +1802,18 @@
                 })
                 .then(data => {
                     if (data) {
-                        // Check if all files are done processing
-                        const stillProcessing = data.files.some(file => 
-                            file.status === 'parsing' || file.status === 'uploaded'
+                        // Check if any file is still in a non-terminal state.
+                        // 'parsed' is transient: the ParseInvoiceFile job always resolves it
+                        // to completed/review/failed before finishing, so we must keep polling
+                        // through it rather than reloading mid-transition (a slow multi-page
+                        // Udea invoice widens this window and used to freeze on "Parsed").
+                        const stillProcessing = data.files.some(file =>
+                            ['pending', 'uploading', 'uploaded', 'parsing', 'parsed'].includes(file.status)
                         );
-                        
-                        // Reload if batch changed or no files still processing
-                        if (data.status !== '{{ $batch->status }}' || !stillProcessing) {
+
+                        // Reload only once every file has reached a terminal state
+                        // (completed / review / failed / rejected / cancelled / amazon_pending).
+                        if (!stillProcessing) {
                             clearInterval(refreshInterval);
                             window.location.reload();
                         }

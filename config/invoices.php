@@ -22,7 +22,7 @@ return [
         'max_total_size_mb' => env('INVOICE_MAX_TOTAL_SIZE_MB', 500),
 
         // Allowed file extensions
-        'allowed_extensions' => ['pdf', 'jpg', 'jpeg', 'png', 'tiff', 'tif', 'doc', 'docx', 'xls', 'xlsx', 'ods'],
+        'allowed_extensions' => ['pdf', 'jpg', 'jpeg', 'png', 'tiff', 'tif', 'doc', 'docx', 'xls', 'xlsx', 'odt', 'ods'],
 
         // Allowed MIME types
         'allowed_mime_types' => [
@@ -37,6 +37,7 @@ return [
             'application/vnd.ms-excel',
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             // LibreOffice/OpenDocument formats
+            'application/vnd.oasis.opendocument.text',
             'application/vnd.oasis.opendocument.spreadsheet',
         ],
 

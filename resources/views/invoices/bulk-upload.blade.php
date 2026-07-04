@@ -217,7 +217,7 @@
                         Browse Files
                     </label>
                     <input id="file-input" type="file" class="hidden" multiple 
-                           accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.doc,.docx,.xls,.xlsx"
+                           accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.doc,.docx,.xls,.xlsx,.odt,.ods"
                            @change="handleFileSelect($event)">
                 </div>
 
