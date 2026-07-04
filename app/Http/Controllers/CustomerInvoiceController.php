@@ -120,6 +120,17 @@ class CustomerInvoiceController extends Controller
         return redirect()->route('customer-invoices.show', $customerInvoice)->with('status', 'Invoice voided.');
     }
 
+    public function unvoid(CustomerInvoice $customerInvoice, Request $request)
+    {
+        abort_unless($request->user()->isAdmin(), 403, 'Only admins can unvoid an invoice.');
+        abort_unless($customerInvoice->isVoid(), 422, 'Only a voided invoice can be unvoided.');
+
+        $this->service->unvoid($customerInvoice);
+
+        return redirect()->route('customer-invoices.show', $customerInvoice)
+            ->with('status', 'Invoice unvoided — restored to Issued.');
+    }
+
     public function downloadPdf(CustomerInvoice $customerInvoice)
     {
         $customerInvoice->load('items', 'customer');

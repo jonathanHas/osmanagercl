@@ -58,6 +58,16 @@
                         <button class="bg-red-700 hover:bg-red-800 text-white px-4 py-2 rounded">Void</button>
                     </form>
                 @endif
+                @if ($invoice->isVoid() && auth()->user()->isAdmin())
+                    <form action="{{ route('customer-invoices.unvoid', $invoice) }}" method="POST" class="inline"
+                          onsubmit="return confirm('Unvoid this invoice? It will be restored to Issued. Admin-only and logged.');">
+                        @csrf
+                        <button class="bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded"
+                                title="Admin override — restores the invoice to Issued and clears the void">
+                            Unvoid (admin)
+                        </button>
+                    </form>
+                @endif
             </div>
         </div>
 

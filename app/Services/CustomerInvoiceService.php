@@ -135,6 +135,28 @@ class CustomerInvoiceService
     }
 
     /**
+     * Reverse a void, returning the invoice to the Issued state. Mirror of void():
+     * void only ever changes status/voided_at/voided_by and is only reachable from
+     * Issued, so restoring those fields fully undoes it. Payment allocations were
+     * never touched, so paymentStatus()/outstanding self-correct once status flips.
+     */
+    public function unvoid(CustomerInvoice $invoice): CustomerInvoice
+    {
+        if ($invoice->status !== CustomerInvoice::STATUS_VOID) {
+            return $invoice;
+        }
+
+        $invoice->status = CustomerInvoice::STATUS_ISSUED;
+        $invoice->voided_at = null;
+        $invoice->voided_by = null;
+        $invoice->last_edited_at = now();
+        $invoice->last_edited_by = Auth::id();
+        $invoice->save();
+
+        return $invoice;
+    }
+
+    /**
      * Allocate the next invoice number for a given year.
      * MUST be called inside a DB transaction. Uses lockForUpdate to be concurrency-safe.
      */

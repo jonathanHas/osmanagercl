@@ -949,6 +949,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('customer-invoices/{customer_invoice}', [CustomerInvoiceController::class, 'destroy'])->name('customer-invoices.destroy');
         Route::post('customer-invoices/{customer_invoice}/issue', [CustomerInvoiceController::class, 'issue'])->name('customer-invoices.issue');
         Route::post('customer-invoices/{customer_invoice}/void', [CustomerInvoiceController::class, 'void'])->name('customer-invoices.void');
+        Route::post('customer-invoices/{customer_invoice}/unvoid', [CustomerInvoiceController::class, 'unvoid'])->name('customer-invoices.unvoid');
         Route::get('customer-invoices/{customer_invoice}/pdf', [CustomerInvoiceController::class, 'downloadPdf'])->name('customer-invoices.pdf');
 
         Route::prefix('api/customer-invoices')->name('customer-invoices.api.')->group(function () {
