@@ -101,6 +101,7 @@
     $reviewCount = $displayItems->where('review_priority', 'review')->count();
     $standardCount = $displayItems->where('review_priority', 'standard')->count();
     $safeCount = $displayItems->where('review_priority', 'safe')->count();
+    $addedCount = $displayItems->where('added_via_search', true)->count();
     $totalItems = $displayItems->count();
     $hiddenCount = $showAll ? 0 : ($sortedItems->count() - $displayItems->count());
     $currentQuery = request()->query();
@@ -209,6 +210,16 @@
         </button>
         <button
             type="button"
+            class="priority-filter-button px-4 py-2 rounded-lg font-medium text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
+            data-priority-filter="added"
+            data-active-classes="bg-purple-600 text-white shadow-sm hover:bg-purple-700"
+            data-inactive-classes="bg-gray-100 text-gray-700 hover:bg-gray-200"
+            aria-pressed="false"
+        >
+            ➕ Added (<span data-priority-count="added">{{ $addedCount }}</span>)
+        </button>
+        <button
+            type="button"
             class="priority-filter-button px-4 py-2 rounded-lg font-medium text-sm bg-indigo-600 text-white shadow-sm hover:bg-indigo-700 transition"
             data-priority-filter="all"
             data-active-classes="bg-indigo-600 text-white shadow-sm hover:bg-indigo-700"
@@ -219,6 +230,70 @@
         </button>
     </div>
     <div class="flex items-center space-x-3">
+        <div class="relative" x-data="orderProductSearch({ searchUrl: '{{ route('orders.product-search', $orderSession) }}', addUrl: '{{ route('orders.add-product', $orderSession) }}', editable: {{ $orderSession->isEditable() ? 'true' : 'false' }} })" @click.outside="showResults = false">
+            <div class="relative">
+                <input
+                    type="search"
+                    x-model="query"
+                    @input.debounce.300ms="search()"
+                    @focus="if (results.length) showResults = true"
+                    placeholder="Search supplier catalogue…"
+                    class="w-64 border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500 pr-8"
+                >
+                <span class="absolute inset-y-0 right-2 flex items-center text-gray-400" x-show="loading">…</span>
+            </div>
+            <div
+                x-show="showResults"
+                x-transition
+                class="absolute z-30 mt-1 w-96 right-0 bg-white border border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto"
+                style="display: none;"
+            >
+                <template x-if="!loading && results.length === 0 && query.length >= 2">
+                    <div class="p-4 text-sm text-gray-500 text-center">No matching products for this supplier.</div>
+                </template>
+                <template x-for="item in results" :key="item.product_id">
+                    <div class="p-3 border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                        <div class="flex items-start justify-between">
+                            <div class="min-w-0 pr-2">
+                                <div class="text-sm font-medium text-gray-900 truncate" x-text="item.name"></div>
+                                <div class="text-xs text-gray-500">
+                                    <span x-text="'Code ' + item.code"></span>
+                                    <template x-if="item.supplier_code"><span x-text="' · Sup ' + item.supplier_code"></span></template>
+                                </div>
+                            </div>
+                            <template x-if="item.order_item_id">
+                                <span class="shrink-0 text-[10px] font-semibold uppercase tracking-wide bg-green-100 text-green-700 px-2 py-0.5 rounded-full">On order</span>
+                            </template>
+                        </div>
+                        <div class="mt-1 flex items-center gap-3 text-xs text-gray-600">
+                            <span>Stock: <span class="font-medium" x-text="item.current_stock"></span></span>
+                            <span>Last mo: <span class="font-medium" x-text="item.last_month_sales"></span></span>
+                            <span>Cost: <span class="font-medium" x-text="'€' + Number(item.unit_cost).toFixed(2)"></span></span>
+                            <template x-if="item.is_case_product"><span class="text-indigo-600" x-text="'×' + item.case_units + '/case'"></span></template>
+                        </div>
+                        <div class="mt-2 flex items-center gap-2">
+                            <label class="text-xs text-gray-500" x-text="item.is_case_product ? 'Cases' : 'Units'"></label>
+                            <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                x-model="item._qty"
+                                :disabled="!editable || item._saving"
+                                class="w-20 border-gray-300 rounded-md text-sm py-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                @keydown.enter.prevent="applyQty(item)"
+                            >
+                            <button
+                                type="button"
+                                @click="applyQty(item)"
+                                :disabled="!editable || item._saving"
+                                class="px-3 py-1 text-sm rounded-md bg-indigo-600 text-white font-medium hover:bg-indigo-700 disabled:opacity-50"
+                                x-text="item.order_item_id ? (item._saving ? 'Saving…' : 'Update') : (item._saving ? 'Adding…' : 'Add')"
+                            ></button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
         <a href="{{ $toggleUrl }}"
            class="px-3 py-2 rounded-md border {{ $showAll ? 'border-indigo-500 text-indigo-600' : 'border-gray-300 text-gray-600' }} text-sm hover:bg-gray-100">
             {{ $showAll ? 'Hide unordered' : 'Show unordered'.($hiddenCount > 0 ? ' ('.$hiddenCount.')' : '') }}
@@ -445,7 +520,7 @@
                     $stockColor = $currentPct < 50 ? 'red' : ($currentPct < 100 ? 'yellow' : 'green');
                 @endphp
 
-                <tr data-order-item-id="{{ $item->id }}" data-priority="{{ $item->review_priority }}" class="hover:bg-{{ $stockColor }}-50 border-l-4 {{ $borderColor }}" style="height: 180px;">
+                <tr data-order-item-id="{{ $item->id }}" data-priority="{{ $item->review_priority }}" data-added="{{ $item->added_via_search ? '1' : '0' }}" class="hover:bg-{{ $stockColor }}-50 border-l-4 {{ $borderColor }}" style="height: 180px;">
                     <td class="px-4 py-4">
                         <div data-priority-indicator="{{ $item->id }}" class="w-8 h-8 {{ $iconBg }} rounded-full flex items-center justify-center">
                             <span data-priority-symbol="{{ $item->id }}" class="font-bold text-sm">
@@ -918,7 +993,7 @@
                     $stockColor = $currentPct < 50 ? 'red' : ($currentPct < 100 ? 'yellow' : 'green');
                 @endphp
 
-                <tr data-order-item-id="{{ $item->id }}" data-priority="{{ $item->review_priority }}" class="hover:bg-{{ $stockColor }}-50 border-l-4 {{ $borderColor }}" style="height: 180px;">
+                <tr data-order-item-id="{{ $item->id }}" data-priority="{{ $item->review_priority }}" data-added="{{ $item->added_via_search ? '1' : '0' }}" class="hover:bg-{{ $stockColor }}-50 border-l-4 {{ $borderColor }}" style="height: 180px;">
                     <td class="px-4 py-4">
                         <div data-priority-indicator="{{ $item->id }}" class="w-8 h-8 {{ $iconBg }} rounded-full flex items-center justify-center">
                             <span data-priority-symbol="{{ $item->id }}" class="font-bold text-sm">
@@ -1303,7 +1378,7 @@
                     $stockColor = $currentPct < 50 ? 'red' : ($currentPct < 100 ? 'yellow' : 'green');
                 @endphp
 
-                <tr data-order-item-id="{{ $item->id }}" data-priority="{{ $item->review_priority }}" class="hover:bg-{{ $stockColor }}-50 border-l-4 {{ $borderColor }}" style="height: 180px;">
+                <tr data-order-item-id="{{ $item->id }}" data-priority="{{ $item->review_priority }}" data-added="{{ $item->added_via_search ? '1' : '0' }}" class="hover:bg-{{ $stockColor }}-50 border-l-4 {{ $borderColor }}" style="height: 180px;">
                     <td class="px-4 py-4">
                         <div data-priority-indicator="{{ $item->id }}" class="w-8 h-8 {{ $iconBg }} rounded-full flex items-center justify-center">
                             <span data-priority-symbol="{{ $item->id }}" class="font-bold text-sm">
@@ -1688,7 +1763,7 @@
                     $stockColor = $currentPct < 50 ? 'red' : ($currentPct < 100 ? 'yellow' : 'green');
                 @endphp
 
-                <tr data-order-item-id="{{ $item->id }}" data-priority="{{ $item->review_priority }}" class="hover:bg-{{ $stockColor }}-50 border-l-4 {{ $borderColor }}" style="height: 180px;">
+                <tr data-order-item-id="{{ $item->id }}" data-priority="{{ $item->review_priority }}" data-added="{{ $item->added_via_search ? '1' : '0' }}" class="hover:bg-{{ $stockColor }}-50 border-l-4 {{ $borderColor }}" style="height: 180px;">
                     <td class="px-4 py-4">
                         <div data-priority-indicator="{{ $item->id }}" class="w-8 h-8 {{ $iconBg }} rounded-full flex items-center justify-center">
                             <span data-priority-symbol="{{ $item->id }}" class="font-bold text-sm">
@@ -2581,6 +2656,7 @@
                 review: 0,
                 standard: 0,
                 safe: 0,
+                added: 0,
                 all: rows.length,
             };
 
@@ -2588,9 +2664,17 @@
 
             rows.forEach(row => {
                 const rowPriority = row.dataset.priority || 'standard';
+                const isAdded = row.dataset.added === '1';
                 counts[rowPriority] = (counts[rowPriority] ?? 0) + 1;
+                if (isAdded) {
+                    counts.added += 1;
+                }
 
-                const matches = filter === 'all' || rowPriority === filter;
+                const matches = filter === 'all'
+                    ? true
+                    : filter === 'added'
+                        ? isAdded
+                        : rowPriority === filter;
                 row.classList.toggle('hidden', !matches);
 
                 if (matches) {
@@ -3595,6 +3679,87 @@
         initKitchenToggleButtons();
     });
 </script>
+
+@once
+<script>
+    // Alpine factory for the supplier-catalogue product search on the order page.
+    // Searches the supplier's full catalogue, shows product details, and adds/updates
+    // an order item via the idempotent add-product endpoint (reloads to reflect the table).
+    function orderProductSearch(config) {
+        return {
+            query: '',
+            results: [],
+            showResults: false,
+            loading: false,
+            editable: config.editable,
+            searchUrl: config.searchUrl,
+            addUrl: config.addUrl,
+            csrf: document.querySelector('meta[name="csrf-token"]')?.content || '',
+
+            async search() {
+                const q = this.query.trim();
+                if (q.length < 2) {
+                    this.results = [];
+                    this.showResults = false;
+                    return;
+                }
+                this.loading = true;
+                this.showResults = true;
+                try {
+                    const resp = await fetch(`${this.searchUrl}?q=${encodeURIComponent(q)}`, {
+                        headers: { 'Accept': 'application/json' },
+                    });
+                    const data = await resp.json();
+                    this.results = (data.results || []).map(r => ({
+                        ...r,
+                        _qty: r.is_case_product ? (r.current_cases ?? '') : (r.current_quantity ?? ''),
+                        _saving: false,
+                    }));
+                } catch (e) {
+                    console.error('Product search failed', e);
+                    this.results = [];
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            async applyQty(item) {
+                if (!this.editable || item._saving) return;
+                const qty = parseFloat(item._qty);
+                if (isNaN(qty) || qty < 0) {
+                    alert('Enter a valid quantity.');
+                    return;
+                }
+                item._saving = true;
+                try {
+                    const resp = await fetch(this.addUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': this.csrf,
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            product_id: item.product_id,
+                            quantity: qty,
+                            is_cases: item.is_case_product,
+                        }),
+                    });
+                    if (!resp.ok) {
+                        const err = await resp.json().catch(() => ({}));
+                        throw new Error(err.error || `HTTP ${resp.status}`);
+                    }
+                    // Reload so the table, totals, and Added filter reflect the change.
+                    window.location.reload();
+                } catch (e) {
+                    item._saving = false;
+                    alert('Failed to save: ' + e.message);
+                }
+            },
+        };
+    }
+</script>
+@endonce
 
 @once
 <script>

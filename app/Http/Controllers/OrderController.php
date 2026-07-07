@@ -4,7 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\OrderItem;
 use App\Models\OrderSession;
+use App\Models\Product;
+use App\Models\StockCurrent;
 use App\Models\Supplier;
+use App\Models\SupplierLink;
+use App\Repositories\ProductRepository;
+use App\Repositories\SalesRepository;
 use App\Services\OrderService;
 use App\Services\SalesDataSyncService;
 use App\Services\SupplierService;
@@ -26,11 +31,17 @@ class OrderController extends Controller
 
     protected SupplierService $supplierService;
 
-    public function __construct(OrderService $orderService, SalesDataSyncService $salesDataSyncService, SupplierService $supplierService)
+    protected ProductRepository $productRepository;
+
+    protected SalesRepository $salesRepository;
+
+    public function __construct(OrderService $orderService, SalesDataSyncService $salesDataSyncService, SupplierService $supplierService, ProductRepository $productRepository, SalesRepository $salesRepository)
     {
         $this->orderService = $orderService;
         $this->salesDataSyncService = $salesDataSyncService;
         $this->supplierService = $supplierService;
+        $this->productRepository = $productRepository;
+        $this->salesRepository = $salesRepository;
     }
 
     /**
@@ -662,6 +673,132 @@ class OrderController extends Controller
             'order_totals' => [
                 'total_items' => $updatedItem->orderSession->total_items,
                 'total_value' => $updatedItem->orderSession->total_value,
+            ],
+        ]);
+    }
+
+    /**
+     * Search the supplier's full catalogue for products to add to the order (AJAX).
+     *
+     * Returns lightweight product details plus whether each product is already on
+     * this order, so the review page can surface "unordered" products without
+     * rendering the entire catalogue.
+     */
+    public function searchProducts(Request $request, OrderSession $order): JsonResponse
+    {
+        $query = trim((string) $request->input('q', ''));
+
+        if (mb_strlen($query) < 2) {
+            return response()->json(['results' => []]);
+        }
+
+        $supplierId = (string) $order->supplier_id;
+
+        // Fast supplier-scoped search (two-phase supplier_link lookup under the hood).
+        $products = $this->productRepository->searchProducts(
+            search: $query,
+            supplierId: $supplierId,
+            perPage: 15,
+            withSuppliers: true,
+        )->getCollection();
+
+        if ($products->isEmpty()) {
+            return response()->json(['results' => []]);
+        }
+
+        $productIds = $products->pluck('ID')->all();
+        $codes = $products->pluck('CODE')->all();
+
+        // Which of these are already on the order (O(1) lookup, no N+1).
+        $existingItems = $order->items()
+            ->whereIn('product_id', $productIds)
+            ->get(['id', 'product_id', 'final_quantity', 'final_cases', 'case_units'])
+            ->keyBy('product_id');
+
+        // Supplier-specific link (correct cost/code even for multi-supplier products).
+        $supplierLinks = SupplierLink::where('SupplierID', $supplierId)
+            ->whereIn('Barcode', $codes)
+            ->get()
+            ->keyBy('Barcode');
+
+        // Bulk sales + stock so the cards can show recent demand without per-row queries.
+        $salesStats = $this->salesRepository->getBulkProductSalesStatistics($productIds);
+        $stockLevels = StockCurrent::whereIn('PRODUCT', $productIds)
+            ->get(['PRODUCT', 'UNITS'])
+            ->keyBy('PRODUCT');
+
+        $editable = $order->isEditable();
+
+        $results = $products->map(function (Product $product) use ($existingItems, $supplierLinks, $salesStats, $stockLevels, $editable) {
+            $link = $supplierLinks->get($product->CODE);
+            $caseUnits = (int) ($link?->CaseUnits ?? 1);
+            $existing = $existingItems->get($product->ID);
+            $stats = $salesStats->get($product->ID);
+
+            return [
+                'product_id' => $product->ID,
+                'name' => $product->NAME,
+                'code' => $product->CODE,
+                'supplier_code' => $link?->SupplierCode,
+                'unit_cost' => (float) ($link?->Cost ?? $product->PRICEBUY ?? 0),
+                'case_units' => $caseUnits,
+                'is_case_product' => $caseUnits > 1,
+                'current_stock' => (float) ($stockLevels->get($product->ID)->UNITS ?? 0),
+                'last_month_sales' => (float) ($stats['last_month_sales'] ?? 0),
+                'avg_monthly_sales' => (float) ($stats['avg_monthly_sales'] ?? 0),
+                'order_item_id' => $existing?->id,
+                'current_quantity' => $existing ? (float) $existing->final_quantity : null,
+                'current_cases' => $existing ? (float) $existing->final_cases : null,
+                'editable' => $editable,
+            ];
+        })->values();
+
+        return response()->json(['results' => $results]);
+    }
+
+    /**
+     * Add a supplier catalogue product to the order (AJAX).
+     *
+     * Materialises an OrderItem on demand (marked as added via search) so it can
+     * then be adjusted through the normal quantity endpoints.
+     */
+    public function addProduct(Request $request, OrderSession $order): JsonResponse
+    {
+        $request->validate([
+            'product_id' => 'required',
+            'quantity' => 'nullable|numeric|min:0',
+            'is_cases' => 'nullable|boolean',
+        ]);
+
+        if (! $order->isEditable()) {
+            return response()->json(['error' => 'Order is not editable'], 403);
+        }
+
+        try {
+            $item = $this->orderService->addProductToOrder(
+                $order,
+                (string) $request->input('product_id'),
+                $request->filled('quantity') ? (float) $request->input('quantity') : null,
+                $request->boolean('is_cases'),
+            );
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+
+        $order->refresh();
+
+        return response()->json([
+            'success' => true,
+            'item' => [
+                'id' => $item->id,
+                'final_quantity' => $item->final_quantity,
+                'final_cases' => $item->final_cases,
+                'case_units' => $item->case_units,
+                'total_cost' => $item->total_cost,
+            ],
+            'order_totals' => [
+                'total_items' => $order->total_items,
+                'total_value' => $order->total_value,
             ],
         ]);
     }

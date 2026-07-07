@@ -20,6 +20,7 @@ class OrderItem extends Model
         'review_priority',
         'adjustment_reason',
         'auto_approved',
+        'added_via_search',
         'context_data',
     ];
 
@@ -32,6 +33,7 @@ class OrderItem extends Model
         'suggested_cases' => 'decimal:3',
         'final_cases' => 'decimal:3',
         'auto_approved' => 'boolean',
+        'added_via_search' => 'boolean',
         'context_data' => 'array',
     ];
 

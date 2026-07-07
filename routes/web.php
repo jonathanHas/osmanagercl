@@ -574,6 +574,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/orders/{order}/christmas-review', [OrderController::class, 'showChristmasReview'])->name('orders.christmas-review');
     Route::get('/orders/{order}/statistics', [OrderController::class, 'statistics'])->name('orders.statistics');
     Route::patch('/orders/{order}/coverage-overrides', [OrderController::class, 'updateCategoryCoverage'])->name('orders.coverage-overrides');
+    Route::get('/orders/{order}/product-search', [OrderController::class, 'searchProducts'])->name('orders.product-search');
+    Route::post('/orders/{order}/add-product', [OrderController::class, 'addProduct'])->name('orders.add-product');
     Route::patch('/order-items/{orderItem}/quantity', [OrderController::class, 'updateQuantity'])->name('order-items.update-quantity');
     Route::patch('/order-items/{orderItem}/cases', [OrderController::class, 'updateCaseQuantity'])->name('order-items.update-cases');
     Route::patch('/order-items/{orderItem}/cost', [OrderController::class, 'updateItemCost'])->name('order-items.update-cost');

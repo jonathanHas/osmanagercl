@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Models\ProductOrderSetting;
 use App\Models\SalesDailySummary;
 use App\Models\StockCurrent;
+use App\Models\SupplierLink;
 use App\Repositories\SalesRepository;
 use App\Support\SpecialOrderCategories;
 use Carbon\Carbon;
@@ -927,6 +928,85 @@ class OrderService
     /**
      * Update order item quantity and track adjustment.
      */
+    /**
+     * Add a supplier catalogue product to an order on demand.
+     *
+     * Materialises an OrderItem using the same suggestion logic as generation,
+     * marked as added via search. Idempotent: if the product is already on the
+     * order the existing item is returned (and optionally re-quantified).
+     *
+     * @throws \InvalidArgumentException when the order is locked or the product
+     *                                   does not belong to the order's supplier.
+     */
+    public function addProductToOrder(OrderSession $order, string $productId, ?float $quantity = null, bool $isCases = false): OrderItem
+    {
+        if (! $order->isEditable()) {
+            throw new \InvalidArgumentException('Order is not editable.');
+        }
+
+        $product = Product::findOrFail($productId);
+
+        // Ensure the product is actually offered by this order's supplier.
+        $belongsToSupplier = SupplierLink::where('Barcode', $product->CODE)
+            ->where('SupplierID', $order->supplier_id)
+            ->exists();
+
+        if (! $belongsToSupplier) {
+            throw new \InvalidArgumentException('Product does not belong to this supplier.');
+        }
+
+        // Idempotency: never create a duplicate row for the same product.
+        $existing = OrderItem::where('order_session_id', $order->id)
+            ->where('product_id', $product->ID)
+            ->first();
+
+        if ($existing) {
+            if ($quantity !== null) {
+                return $isCases
+                    ? $this->updateOrderItemCases($existing, $quantity)
+                    : $this->updateOrderItemQuantity($existing, $quantity);
+            }
+
+            return $existing;
+        }
+
+        $suggestion = $this->calculateProductSuggestion($product);
+        $caseUnits = (int) ($suggestion['case_units'] ?? 1);
+        $unitCost = (float) ($suggestion['unit_cost'] ?? 0);
+
+        if ($quantity === null) {
+            $finalQuantity = (float) $suggestion['suggested_quantity'];
+            $finalCases = (float) $suggestion['suggested_cases'];
+        } elseif ($caseUnits > 1) {
+            // Case-ordered products always round up to whole cases.
+            $finalCases = $isCases ? ceil($quantity) : ceil($quantity / $caseUnits);
+            $finalQuantity = $finalCases * $caseUnits;
+        } else {
+            $finalQuantity = $quantity;
+            $finalCases = $quantity;
+        }
+
+        $item = OrderItem::create([
+            'order_session_id' => $order->id,
+            'product_id' => $product->ID,
+            'suggested_quantity' => $suggestion['suggested_quantity'],
+            'final_quantity' => $finalQuantity,
+            'case_units' => $caseUnits,
+            'suggested_cases' => $suggestion['suggested_cases'],
+            'final_cases' => $finalCases,
+            'unit_cost' => $unitCost,
+            'total_cost' => $finalQuantity * $unitCost,
+            'review_priority' => $suggestion['review_priority'],
+            'auto_approved' => $suggestion['auto_approved'] ? 1 : 0,
+            'added_via_search' => true,
+            'context_data' => $suggestion['context_data'],
+        ]);
+
+        $order->updateTotals();
+
+        return $item->fresh();
+    }
+
     public function updateOrderItemQuantity(OrderItem $orderItem, float $newQuantity, ?string $reason = null): OrderItem
     {
         $originalQuantity = $orderItem->final_quantity;
@@ -952,8 +1032,10 @@ class OrderService
             ]);
         }
 
-        // Track adjustment for learning
-        if (abs($orderItem->final_quantity - $orderItem->suggested_quantity) > 0.001) {
+        // Track adjustment for learning. Skip when there is no suggested baseline:
+        // the adjustment factor (final / suggested) is undefined for a zero suggestion,
+        // would overflow adjustment_factor decimal(5,4), and would poison the learning average.
+        if ($orderItem->suggested_quantity > 0 && abs($orderItem->final_quantity - $orderItem->suggested_quantity) > 0.001) {
             OrderAdjustment::create([
                 'product_id' => $orderItem->product_id,
                 'user_id' => Auth::id(),
@@ -991,8 +1073,10 @@ class OrderService
             'adjustment_reason' => $reason,
         ]);
 
-        // Track adjustment for learning
-        if (abs($orderItem->final_quantity - $orderItem->suggested_quantity) > 0.001) {
+        // Track adjustment for learning. Skip when there is no suggested baseline:
+        // the adjustment factor (final / suggested) is undefined for a zero suggestion,
+        // would overflow adjustment_factor decimal(5,4), and would poison the learning average.
+        if ($orderItem->suggested_quantity > 0 && abs($orderItem->final_quantity - $orderItem->suggested_quantity) > 0.001) {
             OrderAdjustment::create([
                 'product_id' => $orderItem->product_id,
                 'user_id' => Auth::id(),
