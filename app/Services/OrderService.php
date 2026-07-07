@@ -474,7 +474,21 @@ class OrderService
             : $this->salesRepository->getProductWeeklySales($product->ID, $salesHistoryWeeks);
         $weeklyUnits = array_map(static fn ($week) => (float) ($week['units'] ?? 0), $weeklySales);
         $weeksWindow = count($weeklyUnits);
-        $avgWeeklySalesFromHistory = $weeksWindow > 0 ? array_sum($weeklyUnits) / $weeksWindow : null;
+
+        // Weeks since the product first sold within the window. The weekly series is zero-filled and
+        // oldest-first, so leading zeros are weeks before the product existed and must not dilute the
+        // average (otherwise a new product that sold 7 units last week averages 7/8 ≈ 0.9 and never reorders).
+        // Internal zero weeks (a genuine no-sale week after launch) are kept.
+        $firstActiveIndex = null;
+        foreach ($weeklyUnits as $i => $units) {
+            if ($units > 0) {
+                $firstActiveIndex = $i;
+                break;
+            }
+        }
+        $activeWeeks = $firstActiveIndex === null ? $weeksWindow : ($weeksWindow - $firstActiveIndex);
+
+        $avgWeeklySalesFromHistory = $activeWeeks > 0 ? array_sum($weeklyUnits) / $activeWeeks : null;
         $avgWeeklySales = $avgWeeklySalesFromHistory ?? ($salesStats['avg_monthly_sales'] / 4.33);
         $peakWeeklySales = ! empty($weeklyUnits) ? max($weeklyUnits) : 0;
         if ($peakWeeklySales <= 0 && $avgWeeklySales > 0) {
