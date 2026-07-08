@@ -3136,6 +3136,7 @@
 
                 // Update visual chart immediately
                 updateStockVisuals(itemId);
+                applyCaseMatch(this);
 
                 // Save to server with debounce
                 debouncedSave(itemId, quantity);
@@ -3154,6 +3155,7 @@
 
                     // Update visual chart immediately
                     updateStockVisuals(itemId);
+                    applyCaseMatch(input);
 
                     // Save immediately (no debounce for buttons)
                     saveQuantityToServer(itemId, newValue);
@@ -3172,6 +3174,7 @@
 
                     // Update visual chart immediately
                     updateStockVisuals(itemId);
+                    applyCaseMatch(input);
 
                     // Save immediately (no debounce for buttons)
                     saveQuantityToServer(itemId, newValue);
@@ -3184,6 +3187,21 @@
         // Exposed on window so the async badge warmer can build buttons for rows scraped after load.
         const SNAP_ON  = 'udea-case-snap-btn px-2 py-0.5 rounded text-[11px] font-semibold border bg-emerald-600 text-white border-emerald-600';
         const SNAP_OFF = 'udea-case-snap-btn px-2 py-0.5 rounded text-[11px] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100';
+        // Persistent whole-case indicator: green surround when the order qty is a multiple of the
+        // Udea case size, red when it isn't. Painted with an inline box-shadow (build-independent,
+        // and it never fights the border-based save flash which only toggles border/bg classes).
+        window.applyCaseMatch = function (input) {
+            if (!input) return;
+            input.style.boxShadow = '';
+            const caseQty = parseInt(input.dataset.udeaCaseQty || '0', 10);
+            if (!caseQty || caseQty <= 1) return;
+            const val = Math.round(parseFloat(input.value) || 0);
+            if (val <= 0) return; // nothing ordered yet -> neutral
+            input.style.boxShadow = (val % caseQty === 0)
+                ? '0 0 0 3px rgba(16,185,129,0.65)'   // emerald: whole case
+                : '0 0 0 3px rgba(248,113,113,0.75)'; // red: not a whole case
+        };
+
         window.renderCaseSnap = function (container) {
             const caseQty = parseInt(container.dataset.udeaCaseQty || '0', 10);
             const itemId = container.dataset.itemId;
@@ -3191,6 +3209,8 @@
             if (!caseQty || caseQty <= 1) return;
 
             const input = document.getElementById(`qty-input-${itemId}`);
+            // Tag the input with the case size and paint the initial match ring.
+            if (input) { input.dataset.udeaCaseQty = caseQty; applyCaseMatch(input); }
             // Anchor on the AI suggestion (stable labels); fall back to the current order quantity
             // when there is no suggestion (e.g. manually-added items), so buttons still appear.
             const anchor = suggested > 0
@@ -3220,6 +3240,7 @@
                     updateStockVisuals(itemId);
                     saveQuantityToServer(itemId, t);
                     highlight();
+                    applyCaseMatch(input);
                 });
                 container.appendChild(btn);
             });
