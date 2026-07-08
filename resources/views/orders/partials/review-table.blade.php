@@ -478,6 +478,14 @@
                     if (is_string($supplierCode)) {
                         $supplierCode = trim($supplierCode);
                     }
+                    // Udea "buy by the case" size for single-unit products (mirrors the case badge lookup).
+                    $udeaCaseQty = null;
+                    if ($caseUnits == 1 && $supplierCode) {
+                        $udeaCardForSnap = $udeaCards[(string) $supplierCode] ?? null;
+                        if ($udeaCardForSnap && $udeaCardForSnap->case_qty && $udeaCardForSnap->case_qty > 1) {
+                            $udeaCaseQty = (int) $udeaCardForSnap->case_qty;
+                        }
+                    }
                     $suggestedUnits = (float) ($item->suggested_quantity ?? 0);
                     $suggestedCases = $caseUnits > 1
                         ? (float) ($item->suggested_cases ?? ($caseUnits > 0 ? $suggestedUnits / $caseUnits : 0))
@@ -762,6 +770,15 @@
                                 Order: <span id="units-label-{{ $item->id }}">{{ number_format($finalUnits, 0) }}</span> units
                                 <span class="text-gray-400">(<span id="order-quantity-display-{{ $item->id }}">{{ $orderDisplayText }}</span> {{ $quantityLabel }})</span>
                             </div>
+                            @if($caseUnits == 1 && $supplierCode)
+                                {{-- Snap-to-Udea-case buttons: populated on load (cached) or by the badge warmer (uncached). --}}
+                                <div class="udea-case-snap flex flex-wrap items-center justify-center gap-1"
+                                     data-case-snap="{{ $item->id }}"
+                                     data-udea-code="{{ $supplierCode }}"
+                                     data-item-id="{{ $item->id }}"
+                                     data-suggested-units="{{ (int) round($suggestedUnits) }}"
+                                     @if($udeaCaseQty) data-udea-case-qty="{{ $udeaCaseQty }}" @endif></div>
+                            @endif
                             @if(abs($finalUnits - $suggestedUnits) > 0.001)
                                 <div class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-600">
                                     Adjusted from {{ $suggestedDisplayText }} {{ $quantityLabel }}
@@ -951,6 +968,14 @@
                     if (is_string($supplierCode)) {
                         $supplierCode = trim($supplierCode);
                     }
+                    // Udea "buy by the case" size for single-unit products (mirrors the case badge lookup).
+                    $udeaCaseQty = null;
+                    if ($caseUnits == 1 && $supplierCode) {
+                        $udeaCardForSnap = $udeaCards[(string) $supplierCode] ?? null;
+                        if ($udeaCardForSnap && $udeaCardForSnap->case_qty && $udeaCardForSnap->case_qty > 1) {
+                            $udeaCaseQty = (int) $udeaCardForSnap->case_qty;
+                        }
+                    }
                     $suggestedUnits = (float) ($item->suggested_quantity ?? 0);
                     $suggestedCases = $caseUnits > 1
                         ? (float) ($item->suggested_cases ?? ($caseUnits > 0 ? $suggestedUnits / $caseUnits : 0))
@@ -1235,6 +1260,15 @@
                                 Order: <span id="units-label-{{ $item->id }}">{{ number_format($finalUnits, 0) }}</span> units
                                 <span class="text-gray-400">(<span id="order-quantity-display-{{ $item->id }}">{{ $orderDisplayText }}</span> {{ $quantityLabel }})</span>
                             </div>
+                            @if($caseUnits == 1 && $supplierCode)
+                                {{-- Snap-to-Udea-case buttons: populated on load (cached) or by the badge warmer (uncached). --}}
+                                <div class="udea-case-snap flex flex-wrap items-center justify-center gap-1"
+                                     data-case-snap="{{ $item->id }}"
+                                     data-udea-code="{{ $supplierCode }}"
+                                     data-item-id="{{ $item->id }}"
+                                     data-suggested-units="{{ (int) round($suggestedUnits) }}"
+                                     @if($udeaCaseQty) data-udea-case-qty="{{ $udeaCaseQty }}" @endif></div>
+                            @endif
                             @if(abs($finalUnits - $suggestedUnits) > 0.001)
                                 <div class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-600">
                                     Adjusted from {{ $suggestedDisplayText }} {{ $quantityLabel }}
@@ -1336,6 +1370,14 @@
                     if (is_string($supplierCode)) {
                         $supplierCode = trim($supplierCode);
                     }
+                    // Udea "buy by the case" size for single-unit products (mirrors the case badge lookup).
+                    $udeaCaseQty = null;
+                    if ($caseUnits == 1 && $supplierCode) {
+                        $udeaCardForSnap = $udeaCards[(string) $supplierCode] ?? null;
+                        if ($udeaCardForSnap && $udeaCardForSnap->case_qty && $udeaCardForSnap->case_qty > 1) {
+                            $udeaCaseQty = (int) $udeaCardForSnap->case_qty;
+                        }
+                    }
                     $suggestedUnits = (float) ($item->suggested_quantity ?? 0);
                     $suggestedCases = $caseUnits > 1
                         ? (float) ($item->suggested_cases ?? ($caseUnits > 0 ? $suggestedUnits / $caseUnits : 0))
@@ -1620,6 +1662,15 @@
                                 Order: <span id="units-label-{{ $item->id }}">{{ number_format($finalUnits, 0) }}</span> units
                                 <span class="text-gray-400">(<span id="order-quantity-display-{{ $item->id }}">{{ $orderDisplayText }}</span> {{ $quantityLabel }})</span>
                             </div>
+                            @if($caseUnits == 1 && $supplierCode)
+                                {{-- Snap-to-Udea-case buttons: populated on load (cached) or by the badge warmer (uncached). --}}
+                                <div class="udea-case-snap flex flex-wrap items-center justify-center gap-1"
+                                     data-case-snap="{{ $item->id }}"
+                                     data-udea-code="{{ $supplierCode }}"
+                                     data-item-id="{{ $item->id }}"
+                                     data-suggested-units="{{ (int) round($suggestedUnits) }}"
+                                     @if($udeaCaseQty) data-udea-case-qty="{{ $udeaCaseQty }}" @endif></div>
+                            @endif
                             @if(abs($finalUnits - $suggestedUnits) > 0.001)
                                 <div class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-600">
                                     Adjusted from {{ $suggestedDisplayText }} {{ $quantityLabel }}
@@ -1721,6 +1772,14 @@
                     if (is_string($supplierCode)) {
                         $supplierCode = trim($supplierCode);
                     }
+                    // Udea "buy by the case" size for single-unit products (mirrors the case badge lookup).
+                    $udeaCaseQty = null;
+                    if ($caseUnits == 1 && $supplierCode) {
+                        $udeaCardForSnap = $udeaCards[(string) $supplierCode] ?? null;
+                        if ($udeaCardForSnap && $udeaCardForSnap->case_qty && $udeaCardForSnap->case_qty > 1) {
+                            $udeaCaseQty = (int) $udeaCardForSnap->case_qty;
+                        }
+                    }
                     $suggestedUnits = (float) ($item->suggested_quantity ?? 0);
                     $suggestedCases = $caseUnits > 1
                         ? (float) ($item->suggested_cases ?? ($caseUnits > 0 ? $suggestedUnits / $caseUnits : 0))
@@ -2005,6 +2064,15 @@
                                 Order: <span id="units-label-{{ $item->id }}">{{ number_format($finalUnits, 0) }}</span> units
                                 <span class="text-gray-400">(<span id="order-quantity-display-{{ $item->id }}">{{ $orderDisplayText }}</span> {{ $quantityLabel }})</span>
                             </div>
+                            @if($caseUnits == 1 && $supplierCode)
+                                {{-- Snap-to-Udea-case buttons: populated on load (cached) or by the badge warmer (uncached). --}}
+                                <div class="udea-case-snap flex flex-wrap items-center justify-center gap-1"
+                                     data-case-snap="{{ $item->id }}"
+                                     data-udea-code="{{ $supplierCode }}"
+                                     data-item-id="{{ $item->id }}"
+                                     data-suggested-units="{{ (int) round($suggestedUnits) }}"
+                                     @if($udeaCaseQty) data-udea-case-qty="{{ $udeaCaseQty }}" @endif></div>
+                            @endif
                             @if(abs($finalUnits - $suggestedUnits) > 0.001)
                                 <div class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-600">
                                     Adjusted from {{ $suggestedDisplayText }} {{ $quantityLabel }}
@@ -3111,6 +3179,56 @@
             });
         });
 
+        // Snap-to-Udea-case buttons: for single-unit products Udea sells by the case, offer the two
+        // case multiples bracketing the AI suggestion (e.g. suggested 14, case 10 -> "10" / "20").
+        // Exposed on window so the async badge warmer can build buttons for rows scraped after load.
+        const SNAP_ON  = 'udea-case-snap-btn px-2 py-0.5 rounded text-[11px] font-semibold border bg-emerald-600 text-white border-emerald-600';
+        const SNAP_OFF = 'udea-case-snap-btn px-2 py-0.5 rounded text-[11px] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100';
+        window.renderCaseSnap = function (container) {
+            const caseQty = parseInt(container.dataset.udeaCaseQty || '0', 10);
+            const itemId = container.dataset.itemId;
+            const suggested = parseFloat(container.dataset.suggestedUnits) || 0;
+            if (!caseQty || caseQty <= 1) return;
+
+            const input = document.getElementById(`qty-input-${itemId}`);
+            // Anchor on the AI suggestion (stable labels); fall back to the current order quantity
+            // when there is no suggestion (e.g. manually-added items), so buttons still appear.
+            const anchor = suggested > 0
+                ? suggested
+                : (input ? Math.round(parseFloat(input.value) || 0) : 0);
+            const lower = Math.floor(anchor / caseQty) * caseQty;
+            const upper = Math.ceil(anchor / caseQty) * caseQty;
+            const targets = [...new Set([lower, upper])].filter(v => v > 0);
+            if (!targets.length) return;
+
+            const highlight = () => {
+                const current = input ? Math.round(parseFloat(input.value) || 0) : null;
+                container.querySelectorAll('.udea-case-snap-btn').forEach(b => {
+                    b.className = (parseInt(b.dataset.target, 10) === current) ? SNAP_ON : SNAP_OFF;
+                });
+            };
+
+            container.innerHTML = '';
+            targets.forEach(t => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.dataset.target = t;
+                btn.textContent = `📦 ${t}`;
+                btn.title = `Order ${t} units (${t / caseQty} × case of ${caseQty})`;
+                btn.addEventListener('click', () => {
+                    if (input) input.value = t;
+                    updateStockVisuals(itemId);
+                    saveQuantityToServer(itemId, t);
+                    highlight();
+                });
+                container.appendChild(btn);
+            });
+            highlight();
+        };
+
+        // Build buttons for rows whose Udea case size is already cached (server-rendered attribute).
+        document.querySelectorAll('[data-case-snap][data-udea-case-qty]').forEach(window.renderCaseSnap);
+
         document.querySelectorAll('.reset-stock-button').forEach(button => {
             button.addEventListener('click', function() {
                 if (this.dataset.loading === '1') {
@@ -3818,7 +3936,17 @@
                 }
                 chunk.forEach(code => {
                     const r = results[code];
-                    if (r && r.data) (byCode[code] || []).forEach(slot => fillSlot(slot, r.data));
+                    if (!r || !r.data) return;
+                    (byCode[code] || []).forEach(slot => fillSlot(slot, r.data));
+                    // Build snap-to-case buttons for this freshly-scraped row (see window.renderCaseSnap).
+                    const caseQty = r.data.case_qty;
+                    if (caseQty && caseQty > 1 && window.renderCaseSnap) {
+                        const sel = (window.CSS && CSS.escape) ? CSS.escape(code) : code;
+                        document.querySelectorAll(`[data-case-snap][data-udea-code="${sel}"]`).forEach(c => {
+                            c.dataset.udeaCaseQty = caseQty;
+                            window.renderCaseSnap(c);
+                        });
+                    }
                 });
             }
         }

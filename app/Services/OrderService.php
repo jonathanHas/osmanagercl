@@ -976,9 +976,22 @@ class OrderService
 
         if ($existing) {
             if ($quantity !== null) {
-                return $isCases
+                // Surfacing a previously-unordered row via search and giving it a quantity is
+                // effectively "adding" it — tag it so it lands in the Added group. A row that was
+                // already actively ordered and just adjusted stays a generated item.
+                $wasUnordered = (float) $existing->final_quantity <= 0;
+
+                $updated = $isCases
                     ? $this->updateOrderItemCases($existing, $quantity)
                     : $this->updateOrderItemQuantity($existing, $quantity);
+
+                if ($wasUnordered && (float) $updated->final_quantity > 0 && ! $updated->added_via_search) {
+                    $updated->forceFill(['added_via_search' => true])->save();
+
+                    return $updated->fresh();
+                }
+
+                return $updated;
             }
 
             return $existing;
