@@ -194,6 +194,7 @@ class LabelAreaController extends Controller
                 'label_size' => $t->label_size,
                 'created_at' => $t->created_at->format('M j, Y'),
                 'user_name' => $t->user?->name ?? '',
+                'auto_print' => $t->auto_print,
             ];
         }
 

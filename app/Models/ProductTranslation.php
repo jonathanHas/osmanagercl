@@ -17,6 +17,7 @@ class ProductTranslation extends Model
         'font_scale',
         'original_photos',
         'zpl_content',
+        'auto_print',
         'created_by',
     ];
 
@@ -24,6 +25,7 @@ class ProductTranslation extends Model
         'label_data' => 'json',
         'original_photos' => 'json',
         'font_scale' => 'float',
+        'auto_print' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

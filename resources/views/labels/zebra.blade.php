@@ -264,12 +264,14 @@
                                             <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Label Size</th>
                                             <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                                             <th class="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">By</th>
+                                            <th class="px-4 py-2.5 text-center text-xs font-medium text-gray-500 uppercase">Auto-print</th>
                                             <th class="w-28 px-4 py-2.5 text-center text-xs font-medium text-gray-500 uppercase">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-200">
                                         @foreach ($translations as $t)
-                                            <tr class="hover:bg-gray-50">
+                                            <tr x-data="{ autoPrint: {{ $t['auto_print'] ? 'true' : 'false' }} }"
+                                                class="hover:bg-gray-50" :class="{ 'opacity-50': !autoPrint }">
                                                 <td class="px-4 py-3">
                                                     <div class="flex items-center gap-3">
                                                         @if ($t['product_code'] && isset($translationProducts[$t['product_code']]))
@@ -294,6 +296,17 @@
                                                 <td class="px-4 py-3 text-sm text-gray-600">{{ $t['label_size'] }}</td>
                                                 <td class="px-4 py-3 text-sm text-gray-500">{{ $t['created_at'] }}</td>
                                                 <td class="px-4 py-3 text-sm text-gray-500">{{ $t['user_name'] }}</td>
+                                                <td class="px-4 py-3 text-center">
+                                                    <button type="button"
+                                                            title="Auto-print this label with deliveries"
+                                                            @click="const next = !autoPrint; autoPrint = next; toggleAutoPrint({{ $t['id'] }}, next).catch(() => autoPrint = !next)"
+                                                            class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                                                            :class="autoPrint ? 'bg-green-600' : 'bg-gray-300'">
+                                                        <span class="sr-only">Toggle auto-print</span>
+                                                        <span :class="autoPrint ? 'translate-x-6' : 'translate-x-1'"
+                                                              class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"></span>
+                                                    </button>
+                                                </td>
                                                 <td class="px-4 py-3 text-center">
                                                     <div class="flex items-center justify-center gap-1">
                                                         <a href="{{ route('labels.translate', ['edit' => $t['id'], 'from' => 'zebra']) }}"
@@ -497,6 +510,17 @@
                         this.printModal.success = false;
                     }
                     this.printModal.printing = false;
+                },
+
+                // Toggle whether a translation is included in delivery auto-printing.
+                // Throws on failure so the caller can revert the optimistic switch state.
+                async toggleAutoPrint(id, autoPrint) {
+                    const res = await fetch('/labels/translate/' + id + '/auto-print', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                        body: JSON.stringify({ auto_print: autoPrint }),
+                    });
+                    if (!res.ok) throw new Error('toggle failed');
                 },
 
                 async fixMismatch(type) {

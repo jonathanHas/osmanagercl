@@ -200,6 +200,7 @@ class DeliveryLegacyController extends Controller
 
         // Latest translation per scanned barcode (one query, keep newest per code).
         $translations = \App\Models\ProductTranslation::whereIn('product_code', $scannedQuantities->keys()->all())
+            ->where('auto_print', true)
             ->orderByDesc('created_at')
             ->get()
             ->groupBy('product_code')
@@ -284,6 +285,7 @@ class DeliveryLegacyController extends Controller
 
         // Latest translation per scanned barcode (avoid N+1: one query, keep newest per code).
         $translations = \App\Models\ProductTranslation::whereIn('product_code', $scannedQuantities->keys()->all())
+            ->where('auto_print', true)
             ->orderByDesc('created_at')
             ->get()
             ->groupBy('product_code')

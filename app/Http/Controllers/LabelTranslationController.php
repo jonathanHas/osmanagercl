@@ -360,4 +360,19 @@ class LabelTranslationController extends Controller
             'output' => trim($output ?? 'No output'),
         ], $success ? 200 : 500);
     }
+
+    /**
+     * Toggle whether this translation is included in delivery auto-printing.
+     */
+    public function toggleAutoPrint(Request $request, ProductTranslation $translation): JsonResponse
+    {
+        $request->validate(['auto_print' => 'required|boolean']);
+
+        $translation->update(['auto_print' => $request->boolean('auto_print')]);
+
+        return response()->json([
+            'success' => true,
+            'auto_print' => $translation->auto_print,
+        ]);
+    }
 }
