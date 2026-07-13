@@ -157,7 +157,7 @@ class DeliveryLegacyController extends Controller
         // drive the "Print Translated Labels" button and its review modal. Barcodes
         // physically scanned live in the POS deliveriesScanItems table; translations are
         // matched by product_code = barcode.
-        $translatableProducts = $this->getTranslatableScannedProducts($deliveryId);
+        $translatableProducts = $this->getTranslatableScannedProducts($deliveryId, $supplierId);
         $translatableCount = count($translatableProducts);
 
         return view('delivery-legacy.match', compact(
@@ -181,10 +181,12 @@ class DeliveryLegacyController extends Controller
 
     /**
      * Return the scanned/received products in a delivery that have a translated label,
-     * as a list of ['barcode', 'name', 'scanned'] rows. Used for both the button count
-     * and the review modal. Only products with usable ZPL content are included.
+     * as a list of ['barcode', 'name', 'scanned', 'image'] rows. Used for both the button
+     * count and the review modal. Only products with usable ZPL content are included.
+     * The name is the POS database product name; the image is the supplier's product image
+     * (via SupplierService) when the supplier has an external image integration.
      */
-    private function getTranslatableScannedProducts(string $deliveryId): array
+    private function getTranslatableScannedProducts(string $deliveryId, string $supplierId): array
     {
         $scannedQuantities = DB::connection('pos')->table('deliveriesScanItems')
             ->where('delID', $deliveryId)
@@ -203,10 +205,12 @@ class DeliveryLegacyController extends Controller
             ->groupBy('product_code')
             ->map(fn ($group) => $group->first());
 
-        // POS product names as a fallback when the translation has no product_name.
+        // POS database product names, keyed by barcode (PRODUCTS.CODE).
         $posNames = DB::connection('pos')->table('PRODUCTS')
             ->whereIn('CODE', $translations->keys()->all())
             ->pluck('NAME', 'CODE');
+
+        $hasImages = $this->supplierService->hasExternalIntegration((int) $supplierId);
 
         $products = [];
         foreach ($translations as $barcode => $translation) {
@@ -214,14 +218,17 @@ class DeliveryLegacyController extends Controller
                 continue;
             }
 
-            $name = $translation->label_data['product_name']
-                ?? $posNames[$barcode]
-                ?? $barcode;
+            $barcode = (string) $barcode;
 
             $products[] = [
-                'barcode' => (string) $barcode,
-                'name' => $name,
+                'barcode' => $barcode,
+                // Prefer the POS database name; fall back to the translation name then the barcode.
+                'name' => $posNames[$barcode]
+                    ?? ($translation->label_data['product_name'] ?? $barcode),
                 'scanned' => max(1, min(99, (int) $scannedQuantities->get($barcode))),
+                'image' => $hasImages
+                    ? $this->supplierService->getExternalImageUrlByBarcode((int) $supplierId, $barcode)
+                    : null,
             ];
         }
 

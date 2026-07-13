@@ -2248,8 +2248,16 @@
             <div class="fixed inset-0 bg-gray-900/50" onclick="closeTranslationPrintModal()"></div>
             <div class="relative w-full max-w-2xl rounded-lg bg-white shadow-xl">
                 <div class="border-b border-gray-200 px-6 py-4">
-                    <h3 class="text-lg font-semibold text-gray-900">Print Translated Labels</h3>
-                    <p class="mt-1 text-sm text-gray-500">These scanned products have a translated label. One label prints per unit scanned. Untick any you don't want to print.</p>
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900">Print Translated Labels</h3>
+                            <p class="mt-1 text-sm text-gray-500">These scanned products have a translated label. One label prints per unit scanned. Untick any you don't want to print.</p>
+                        </div>
+                        <div class="flex flex-shrink-0 gap-2">
+                            <button type="button" onclick="setAllTranslationSelections(true)" class="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Select all</button>
+                            <button type="button" onclick="setAllTranslationSelections(false)" class="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Deselect all</button>
+                        </div>
+                    </div>
                 </div>
                 <div id="translationPrintList" class="max-h-96 overflow-y-auto px-6 py-3" onchange="updateTranslationPrintCount()"></div>
                 <div class="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
@@ -2335,6 +2343,21 @@
                 checkbox.value = product.barcode;
                 checkbox.checked = true;
 
+                // Product image thumbnail (falls back to a placeholder icon).
+                const thumb = document.createElement('div');
+                thumb.className = 'w-10 h-10 flex-shrink-0 rounded border border-gray-200 bg-white flex items-center justify-center overflow-hidden';
+                if (product.image) {
+                    const img = document.createElement('img');
+                    img.src = product.image;
+                    img.alt = product.name;
+                    img.loading = 'lazy';
+                    img.className = 'w-full h-full object-contain';
+                    img.onerror = function () { this.remove(); thumb.appendChild(placeholderIcon()); };
+                    thumb.appendChild(img);
+                } else {
+                    thumb.appendChild(placeholderIcon());
+                }
+
                 const name = document.createElement('div');
                 name.className = 'flex-1 text-sm text-gray-700 truncate';
                 name.title = product.name;
@@ -2345,6 +2368,7 @@
                 qty.textContent = product.scanned + (product.scanned === 1 ? ' label' : ' labels');
 
                 row.appendChild(checkbox);
+                row.appendChild(thumb);
                 row.appendChild(name);
                 row.appendChild(qty);
                 list.appendChild(row);
@@ -2352,6 +2376,21 @@
 
             updateTranslationPrintCount();
             document.getElementById('translationPrintModal').classList.remove('hidden');
+        }
+
+        // SVG placeholder shown when a product has no image.
+        function placeholderIcon() {
+            const span = document.createElement('span');
+            span.innerHTML = '<svg class="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>';
+            return span.firstChild;
+        }
+
+        // Tick or untick every product in the review modal.
+        function setAllTranslationSelections(checked) {
+            document.querySelectorAll('.translation-print-select').forEach(function (cb) {
+                cb.checked = checked;
+            });
+            updateTranslationPrintCount();
         }
 
         function closeTranslationPrintModal() {
