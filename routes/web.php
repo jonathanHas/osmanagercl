@@ -547,6 +547,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/resolve-images-batch', [DeliveryLegacyController::class, 'resolveImagesBatch'])->name('resolve-images-batch');
         Route::post('/deviation-report', [DeliveryLegacyController::class, 'deviationReport'])->name('deviation-report');
         Route::post('/goods-return-sheet', [DeliveryLegacyController::class, 'goodsReturnSheet'])->name('goods-return-sheet');
+        Route::post('/print-translations', [DeliveryLegacyController::class, 'printTranslations'])->name('print-translations');
     });
 
     // Order Management mockup routes (for UI testing)

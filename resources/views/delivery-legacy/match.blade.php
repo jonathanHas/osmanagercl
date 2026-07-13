@@ -63,6 +63,17 @@
                         Generate Returns Sheet
                     </button>
                 @endif
+                @if(($translatableCount ?? 0) > 0)
+                    <button type="button" id="printTranslationsBtn" onclick="printTranslatedLabels()"
+                            class="inline-flex items-center px-3 py-2 bg-teal-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-teal-700 gap-1.5 touch-manipulation disabled:opacity-50">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                        </svg>
+                        <span class="hidden sm:inline">Print Translated Labels ({{ $translatableCount }})</span>
+                        <span class="sm:hidden">Labels ({{ $translatableCount }})</span>
+                    </button>
+                @endif
                 <a href="{{ route('delivery-legacy.index') }}"
                    class="inline-flex items-center px-3 py-2 bg-gray-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-gray-700 touch-manipulation">
                     <span class="hidden sm:inline">Back to Selection</span>
@@ -2231,6 +2242,24 @@
         </div>
     </div>
 
+    {{-- Review modal: lists scanned products that have a translated label before printing. --}}
+    <div id="translationPrintModal" class="hidden fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+        <div class="flex min-h-screen items-center justify-center p-4">
+            <div class="fixed inset-0 bg-gray-900/50" onclick="closeTranslationPrintModal()"></div>
+            <div class="relative w-full max-w-2xl rounded-lg bg-white shadow-xl">
+                <div class="border-b border-gray-200 px-6 py-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Print Translated Labels</h3>
+                    <p class="mt-1 text-sm text-gray-500">These scanned products have a translated label. One label prints per unit scanned. Untick any you don't want to print.</p>
+                </div>
+                <div id="translationPrintList" class="max-h-96 overflow-y-auto px-6 py-3" onchange="updateTranslationPrintCount()"></div>
+                <div class="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+                    <button type="button" onclick="closeTranslationPrintModal()" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+                    <button type="button" id="submitTranslationsBtn" onclick="submitTranslatedLabels()" class="rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50">Print</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Global reference to store the Alpine component instance
         window.deliveryMatchInstance = null;
@@ -2286,6 +2315,99 @@
         // Udea deviation report (Excel)
         function generateDeviationReport() {
             submitSelectedItems('{{ route('delivery-legacy.deviation-report') }}', 'deviation report');
+        }
+
+        // Scanned products that have a translated label available (barcode, name, scanned qty).
+        const TRANSLATABLE_PRODUCTS = @js($translatableProducts ?? []);
+
+        // Open a review modal listing the products whose translated labels will print.
+        function printTranslatedLabels() {
+            const list = document.getElementById('translationPrintList');
+            list.innerHTML = '';
+
+            TRANSLATABLE_PRODUCTS.forEach(function (product) {
+                const row = document.createElement('label');
+                row.className = 'flex items-center gap-3 py-2 border-b border-gray-100 last:border-0 cursor-pointer';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'translation-print-select rounded border-gray-300 text-teal-600 focus:ring-teal-500';
+                checkbox.value = product.barcode;
+                checkbox.checked = true;
+
+                const name = document.createElement('div');
+                name.className = 'flex-1 text-sm text-gray-700 truncate';
+                name.title = product.name;
+                name.textContent = product.name;
+
+                const qty = document.createElement('div');
+                qty.className = 'text-xs font-medium text-gray-500 whitespace-nowrap';
+                qty.textContent = product.scanned + (product.scanned === 1 ? ' label' : ' labels');
+
+                row.appendChild(checkbox);
+                row.appendChild(name);
+                row.appendChild(qty);
+                list.appendChild(row);
+            });
+
+            updateTranslationPrintCount();
+            document.getElementById('translationPrintModal').classList.remove('hidden');
+        }
+
+        function closeTranslationPrintModal() {
+            document.getElementById('translationPrintModal').classList.add('hidden');
+        }
+
+        // Update the footer button label with the running selected label total.
+        function updateTranslationPrintCount() {
+            const checked = Array.from(document.querySelectorAll('.translation-print-select:checked'));
+            let labels = 0;
+            checked.forEach(function (cb) {
+                const product = TRANSLATABLE_PRODUCTS.find(function (p) { return p.barcode === cb.value; });
+                if (product) labels += product.scanned;
+            });
+            const btn = document.getElementById('submitTranslationsBtn');
+            btn.disabled = checked.length === 0;
+            btn.textContent = checked.length === 0
+                ? 'Print'
+                : 'Print ' + labels + (labels === 1 ? ' Label' : ' Labels');
+        }
+
+        // Send the selected translated labels to the Zebra in a single job.
+        function submitTranslatedLabels() {
+            const checked = Array.from(document.querySelectorAll('.translation-print-select:checked'));
+            if (checked.length === 0) {
+                return;
+            }
+            const barcodes = checked.map(function (cb) { return cb.value; });
+
+            const btn = document.getElementById('submitTranslationsBtn');
+            btn.disabled = true;
+
+            fetch('{{ route('delivery-legacy.print-translations') }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                },
+                body: JSON.stringify({
+                    delID: '{{ $deliveryId }}',
+                    supplierID: '{{ $supplierId }}',
+                    barcodes: barcodes,
+                }),
+            })
+                .then(function (response) { return response.json().then(function (data) { return { ok: response.ok, data: data }; }); })
+                .then(function (result) {
+                    alert(result.data.message || (result.ok ? 'Print job sent.' : 'Print failed.'));
+                    if (result.ok) closeTranslationPrintModal();
+                })
+                .catch(function (error) {
+                    alert('Print request failed: ' + error);
+                })
+                .finally(function () {
+                    updateTranslationPrintCount();
+                });
         }
 
         // Reason codes printed on the IIHF Goods Return Record form.

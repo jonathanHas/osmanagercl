@@ -153,6 +153,13 @@ class DeliveryLegacyController extends Controller
             $unresolvedCodes = $allCodes->diff($cachedCodes)->values();
         }
 
+        // Build the list of scanned products that have a translated label available, to
+        // drive the "Print Translated Labels" button and its review modal. Barcodes
+        // physically scanned live in the POS deliveriesScanItems table; translations are
+        // matched by product_code = barcode.
+        $translatableProducts = $this->getTranslatableScannedProducts($deliveryId);
+        $translatableCount = count($translatableProducts);
+
         return view('delivery-legacy.match', compact(
             'matchedItems',
             'scannedNotOnInvoice',
@@ -166,8 +173,162 @@ class DeliveryLegacyController extends Controller
             'stockPreview',
             'isCompleted',
             'syncedDelivery',
-            'unresolvedCodes'
+            'unresolvedCodes',
+            'translatableCount',
+            'translatableProducts'
         ))->with('supplierService', $this->supplierService);
+    }
+
+    /**
+     * Return the scanned/received products in a delivery that have a translated label,
+     * as a list of ['barcode', 'name', 'scanned'] rows. Used for both the button count
+     * and the review modal. Only products with usable ZPL content are included.
+     */
+    private function getTranslatableScannedProducts(string $deliveryId): array
+    {
+        $scannedQuantities = DB::connection('pos')->table('deliveriesScanItems')
+            ->where('delID', $deliveryId)
+            ->select('barcode', DB::raw('SUM(quantity) as scanned'))
+            ->groupBy('barcode')
+            ->pluck('scanned', 'barcode');
+
+        if ($scannedQuantities->isEmpty()) {
+            return [];
+        }
+
+        // Latest translation per scanned barcode (one query, keep newest per code).
+        $translations = \App\Models\ProductTranslation::whereIn('product_code', $scannedQuantities->keys()->all())
+            ->orderByDesc('created_at')
+            ->get()
+            ->groupBy('product_code')
+            ->map(fn ($group) => $group->first());
+
+        // POS product names as a fallback when the translation has no product_name.
+        $posNames = DB::connection('pos')->table('PRODUCTS')
+            ->whereIn('CODE', $translations->keys()->all())
+            ->pluck('NAME', 'CODE');
+
+        $products = [];
+        foreach ($translations as $barcode => $translation) {
+            if (empty($translation->zpl_content)) {
+                continue;
+            }
+
+            $name = $translation->label_data['product_name']
+                ?? $posNames[$barcode]
+                ?? $barcode;
+
+            $products[] = [
+                'barcode' => (string) $barcode,
+                'name' => $name,
+                'scanned' => max(1, min(99, (int) $scannedQuantities->get($barcode))),
+            ];
+        }
+
+        // Sort by name for a readable review modal.
+        usort($products, fn ($a, $b) => strcasecmp($a['name'], $b['name']));
+
+        return $products;
+    }
+
+    /**
+     * Print a translated label for every scanned/received product in the delivery that
+     * has a translation, in a single Zebra job. One label per unit scanned.
+     *
+     * Mirrors the single-label print flow in LabelTranslationController::print(): each
+     * translation's stored ZPL has its ^PQ quantity set, and all blocks are concatenated
+     * into one raw ZPL job (multiple ^XA…^XZ blocks print sequentially).
+     */
+    public function printTranslations(Request $request)
+    {
+        $deliveryId = $request->input('delID');
+        $supplierId = $request->input('supplierID');
+
+        if (! $deliveryId || ! $supplierId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Missing delivery or supplier.',
+            ], 422);
+        }
+
+        // Optional subset of barcodes selected in the review modal. When absent, print all.
+        $selectedBarcodes = $request->input('barcodes');
+        $selectedBarcodes = is_array($selectedBarcodes)
+            ? array_map('strval', $selectedBarcodes)
+            : null;
+
+        // Scanned barcode => total quantity scanned in this delivery.
+        $query = DB::connection('pos')->table('deliveriesScanItems')
+            ->where('delID', $deliveryId);
+        if ($selectedBarcodes !== null) {
+            $query->whereIn('barcode', $selectedBarcodes);
+        }
+        $scannedQuantities = $query
+            ->select('barcode', DB::raw('SUM(quantity) as scanned'))
+            ->groupBy('barcode')
+            ->pluck('scanned', 'barcode');
+
+        if ($scannedQuantities->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No scanned items found for this delivery.',
+            ], 422);
+        }
+
+        // Latest translation per scanned barcode (avoid N+1: one query, keep newest per code).
+        $translations = \App\Models\ProductTranslation::whereIn('product_code', $scannedQuantities->keys()->all())
+            ->orderByDesc('created_at')
+            ->get()
+            ->groupBy('product_code')
+            ->map(fn ($group) => $group->first());
+
+        $zplBlocks = [];
+        $productCount = 0;
+        $labelCount = 0;
+
+        foreach ($translations as $barcode => $translation) {
+            if (empty($translation->zpl_content)) {
+                continue;
+            }
+
+            $copies = max(1, min(99, (int) $scannedQuantities->get($barcode, 1)));
+            $zplBlocks[] = \App\Models\ZebraLabel::setZplQuantity($translation->zpl_content, $copies);
+            $productCount++;
+            $labelCount += $copies;
+        }
+
+        if (empty($zplBlocks)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No translated labels found for scanned products.',
+            ], 422);
+        }
+
+        $zpl = implode("\n", $zplBlocks);
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'zpl_');
+        file_put_contents($tmpFile, $zpl);
+
+        $host = config('services.zebra.host', '10.42.1.71');
+        $port = config('services.zebra.port', '631');
+        $printer = config('services.zebra.name', 'ZTC-GX430t');
+
+        $command = "lp -h {$host}:{$port}/version=1.1 -d {$printer} -o raw {$tmpFile} 2>&1";
+        $output = shell_exec($command);
+
+        unlink($tmpFile);
+
+        $success = $output && str_contains($output, 'request id');
+
+        return response()->json([
+            'success' => $success,
+            'message' => $success
+                ? "Print job sent: {$labelCount} ".($labelCount === 1 ? 'label' : 'labels')." across {$productCount} ".($productCount === 1 ? 'product' : 'products')
+                : 'Print failed',
+            'printed' => $productCount,
+            'labels' => $labelCount,
+            'output' => trim($output ?? 'No output'),
+        ], $success ? 200 : 500);
     }
 
     /**
