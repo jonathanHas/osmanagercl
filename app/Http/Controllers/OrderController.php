@@ -15,6 +15,7 @@ use App\Services\SalesDataSyncService;
 use App\Services\SupplierService;
 use App\Support\SpecialOrderCategories;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -331,6 +332,9 @@ class OrderController extends Controller
 
     /**
      * Compare two order sessions, highlighting products absent from each.
+     *
+     * Intended for trimming an oversized order: generate a smaller order, then
+     * drop the products the smaller order does without.
      */
     public function compare(Request $request): View
     {
@@ -339,25 +343,28 @@ class OrderController extends Controller
             'b' => ['required', 'exists:App\Models\OrderSession,id'],
         ]);
 
-        $orderA = OrderSession::with(['supplier', 'user', 'items.product'])->findOrFail($validated['a']);
-        $orderB = OrderSession::with(['supplier', 'user', 'items.product'])->findOrFail($validated['b']);
+        $orderA = OrderSession::with(['supplier', 'user', 'items.product.supplierLinks'])->findOrFail($validated['a']);
+        $orderB = OrderSession::with(['supplier', 'user', 'items.product.supplierLinks'])->findOrFail($validated['b']);
 
-        // product_id is a string key (PRODUCTS.ID), so keyBy is safe here.
-        $itemsA = $orderA->items->keyBy('product_id');
-        $itemsB = $orderB->items->keyBy('product_id');
+        // A session carries a row for every candidate product, most at quantity
+        // zero: session #1 holds 1,504 rows but only 353 actual orders. Presence
+        // must mean "actually ordered", or the zero rows bury the comparison.
+        $itemsA = $this->orderedItemsByProduct($orderA);
+        $itemsB = $this->orderedItemsByProduct($orderB);
 
-        $sortByName = fn ($items) => $items->sortBy(fn ($item) => strtoupper($item->product->NAME ?? 'Unknown Product'))->values();
+        $rowsFor = fn ($items, $session) => $items
+            ->map(fn (OrderItem $item) => $this->compareRow($item, $session))
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
 
-        $onlyInA = $sortByName($itemsA->diffKeys($itemsB));
-        $onlyInB = $sortByName($itemsB->diffKeys($itemsA));
+        $onlyInA = $rowsFor($itemsA->diffKeys($itemsB), $orderA);
+        $onlyInB = $rowsFor($itemsB->diffKeys($itemsA), $orderB);
 
         $inBoth = $itemsA->intersectByKeys($itemsB)
-            ->map(function (OrderItem $a) use ($itemsB) {
+            ->map(function (OrderItem $a) use ($itemsB, $orderA) {
                 $b = $itemsB[$a->product_id];
 
-                return [
-                    'product' => $a->product,
-                    'a' => $a,
+                return $this->compareRow($a, $orderA) + [
                     'b' => $b,
                     // final_quantity (units) is the source of truth: case_units is
                     // snapshotted per session and can drift between the two orders.
@@ -365,11 +372,11 @@ class OrderController extends Controller
                     'caseUnitsDiffer' => (int) $a->case_units !== (int) $b->case_units,
                 ];
             })
-            ->sortBy(fn ($row) => strtoupper($row['product']->NAME ?? 'Unknown Product'))
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
             ->values();
 
         // Products ordered at an identical quantity are noise against the "what
-        // changed / what is missing" question, and on a large order they bury it.
+        // changed / what can be dropped" question, so collapse them out of the way.
         [$changed, $unchanged] = $inBoth->partition(fn ($row) => abs($row['delta']) >= 0.001);
 
         return view('orders.compare', [
@@ -381,6 +388,40 @@ class OrderController extends Controller
             'unchanged' => $unchanged->values(),
             'suppliersDiffer' => $orderA->supplier_id !== $orderB->supplier_id,
         ]);
+    }
+
+    /**
+     * Items actually being ordered in a session, keyed by product.
+     *
+     * product_id is a string column (PRODUCTS.ID), so keyBy is safe here.
+     */
+    private function orderedItemsByProduct(OrderSession $session): Collection
+    {
+        return $session->items
+            ->filter(fn (OrderItem $item) => (float) $item->final_quantity > 0)
+            ->keyBy('product_id');
+    }
+
+    /**
+     * Flatten an order item into the fields the comparison view displays.
+     */
+    private function compareRow(OrderItem $item, OrderSession $session): array
+    {
+        $product = $item->product;
+
+        // Same resolution the CSV export uses: the link for this order's supplier,
+        // falling back to the product's own barcode.
+        $supplierLink = $product?->supplierLinks
+            ->where('SupplierID', $session->supplier_id)
+            ->first();
+
+        return [
+            'a' => $item,
+            'product' => $product,
+            'name' => $product->NAME ?? 'Unknown Product',
+            'supplierCode' => $supplierLink?->SupplierCode ?: ($product->CODE ?? 'N/A'),
+            'stock' => $item->context_data['current_stock'] ?? null,
+        ];
     }
 
     /**

@@ -1,16 +1,16 @@
 {{-- Compares two order sessions, focused on what is absent from each. --}}
-{{-- Expects: $orderA, $orderB (OrderSession), $onlyInA, $onlyInB (Collection<OrderItem>), --}}
-{{-- $inBoth (Collection<array{product, a, b, delta, caseUnitsDiffer}>), $suppliersDiffer (bool) --}}
+{{-- Rows cover only products actually ordered (final_quantity > 0) in that session. --}}
+{{-- Expects: $orderA, $orderB (OrderSession), $onlyInA, $onlyInB, $changed, $unchanged --}}
+{{-- (Collections of array{a, product, name, supplierCode, stock, ...}), $suppliersDiffer (bool) --}}
 @php
-    $qtyLabel = function ($item) {
-        $qty = rtrim(rtrim(number_format((float) $item->final_quantity, 3, '.', ''), '0'), '.');
-        if ($item->isOrderedByCases()) {
-            $cases = rtrim(rtrim(number_format((float) $item->final_cases, 3, '.', ''), '0'), '.');
+    $num = fn ($v) => rtrim(rtrim(number_format((float) $v, 3, '.', ''), '0'), '.');
 
-            return "{$cases} cases ({$qty} units)";
-        }
+    $qtyLabel = function ($item) use ($num) {
+        $qty = $num($item->final_quantity);
 
-        return "{$qty} units";
+        return $item->isOrderedByCases()
+            ? $num($item->final_cases).' cases ('.$qty.' units)'
+            : $qty.' units';
     };
 @endphp
 
@@ -72,8 +72,10 @@
                                     <span class="text-gray-700">{{ $o->created_at->format('M j, Y') }}</span>
                                 </div>
                                 <div class="flex justify-between">
-                                    <span class="text-gray-600">Items</span>
-                                    <span class="text-gray-700">{{ $o->items->count() }}</span>
+                                    <span class="text-gray-600">Products ordered</span>
+                                    <span class="text-gray-700">
+                                        {{ $o->items->filter(fn ($i) => (float) $i->final_quantity > 0)->count() }}
+                                    </span>
                                 </div>
                                 <div class="flex justify-between">
                                     <span class="text-gray-600">Total value</span>
@@ -85,11 +87,11 @@
                 </div>
             </div>
 
-            {{-- The headline: what is absent from each --}}
+            {{-- The headline: ordered in one, not the other --}}
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 @foreach([
-                    ['title' => 'Only in Order A', 'subtitle' => 'Missing from Order B', 'items' => $onlyInA, 'order' => $orderA, 'tone' => 'red'],
-                    ['title' => 'Only in Order B', 'subtitle' => 'Missing from Order A', 'items' => $onlyInB, 'order' => $orderB, 'tone' => 'green'],
+                    ['title' => 'Only in Order A', 'subtitle' => 'Not ordered in Order B', 'rows' => $onlyInA, 'order' => $orderA, 'tone' => 'red'],
+                    ['title' => 'Only in Order B', 'subtitle' => 'Not ordered in Order A', 'rows' => $onlyInB, 'order' => $orderB, 'tone' => 'green'],
                 ] as $panel)
                     @php
                         $tone = $panel['tone'];
@@ -106,34 +108,43 @@
                                     </p>
                                 </div>
                                 <span class="inline-flex rounded-full px-2 py-1 text-xs font-semibold {{ $countClass }}">
-                                    {{ $panel['items']->count() }}
+                                    {{ $panel['rows']->count() }}
                                 </span>
                             </div>
                         </div>
 
-                        @if($panel['items']->isEmpty())
+                        @if($panel['rows']->isEmpty())
                             <p class="px-6 py-8 text-center text-sm text-gray-500">
-                                Nothing here &mdash; every product in this order also appears in the other.
+                                Nothing here &mdash; everything ordered here is ordered in the other too.
                             </p>
                         @else
-                            <ul class="divide-y divide-gray-200">
-                                @foreach($panel['items'] as $item)
-                                    @php $product = $item->product; @endphp
-                                    <li class="flex items-center justify-between px-6 py-3">
-                                        <div class="min-w-0 pr-4">
-                                            <div class="truncate text-sm font-medium text-gray-900">
-                                                {{ $product->NAME ?? 'Unknown Product' }}
-                                            </div>
-                                            <div class="text-xs text-gray-500">
-                                                Code: {{ $product->CODE ?? 'N/A' }}
-                                            </div>
-                                        </div>
-                                        <div class="whitespace-nowrap text-sm text-gray-700">
-                                            {{ $qtyLabel($item) }}
-                                        </div>
-                                    </li>
-                                @endforeach
-                            </ul>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Product</th>
+                                            <th class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Stock</th>
+                                            <th class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Ordered</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200">
+                                        @foreach($panel['rows'] as $row)
+                                            <tr class="hover:bg-gray-50">
+                                                <td class="px-4 py-2">
+                                                    <div class="text-sm font-medium text-gray-900">{{ $row['name'] }}</div>
+                                                    <div class="text-xs text-gray-500">{{ $row['supplierCode'] }}</div>
+                                                </td>
+                                                <td class="whitespace-nowrap px-4 py-2 text-right">
+                                                    <x-order-compare-stock :stock="$row['stock']" />
+                                                </td>
+                                                <td class="whitespace-nowrap px-4 py-2 text-right text-sm text-gray-700">
+                                                    {{ $qtyLabel($row['a']) }}
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
                         @endif
                     </div>
                 @endforeach
@@ -163,6 +174,7 @@
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Product</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Stock</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Order A</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Order B</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Change</th>
@@ -171,18 +183,16 @@
                             <tbody class="divide-y divide-gray-200 bg-white">
                                 @foreach($changed as $row)
                                     @php
-                                        $product = $row['product'];
                                         $delta = $row['delta'];
-                                        $deltaText = rtrim(rtrim(number_format(abs($delta), 3, '.', ''), '0'), '.');
+                                        $deltaText = $num(abs($delta));
                                     @endphp
                                     <tr class="hover:bg-gray-50">
                                         <td class="px-6 py-3">
-                                            <div class="text-sm font-medium text-gray-900">
-                                                {{ $product->NAME ?? 'Unknown Product' }}
-                                            </div>
-                                            <div class="text-xs text-gray-500">
-                                                Code: {{ $product->CODE ?? 'N/A' }}
-                                            </div>
+                                            <div class="text-sm font-medium text-gray-900">{{ $row['name'] }}</div>
+                                            <div class="text-xs text-gray-500">{{ $row['supplierCode'] }}</div>
+                                        </td>
+                                        <td class="whitespace-nowrap px-6 py-3 text-right">
+                                            <x-order-compare-stock :stock="$row['stock']" />
                                         </td>
                                         <td class="whitespace-nowrap px-6 py-3 text-sm text-gray-700">
                                             {{ $qtyLabel($row['a']) }}
@@ -235,10 +245,15 @@
                             @foreach($unchanged as $row)
                                 <li class="flex items-center justify-between px-6 py-2">
                                     <div class="min-w-0 pr-4">
-                                        <span class="text-sm text-gray-900">{{ $row['product']->NAME ?? 'Unknown Product' }}</span>
-                                        <span class="ml-2 text-xs text-gray-500">{{ $row['product']->CODE ?? 'N/A' }}</span>
+                                        <span class="text-sm text-gray-900">{{ $row['name'] }}</span>
+                                        <span class="ml-2 text-xs text-gray-500">{{ $row['supplierCode'] }}</span>
                                     </div>
-                                    <span class="whitespace-nowrap text-sm text-gray-500">{{ $qtyLabel($row['a']) }}</span>
+                                    <div class="flex items-center gap-4 whitespace-nowrap">
+                                        <span class="text-xs text-gray-500">
+                                            stock <x-order-compare-stock :stock="$row['stock']" />
+                                        </span>
+                                        <span class="text-sm text-gray-500">{{ $qtyLabel($row['a']) }}</span>
+                                    </div>
                                 </li>
                             @endforeach
                         </ul>
