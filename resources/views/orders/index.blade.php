@@ -75,10 +75,22 @@
                     </div>
                     
                     @if($orders->count() > 0)
+                    <div x-data="{
+                            selected: [],
+                            toggle(id) {
+                                const i = this.selected.indexOf(id);
+                                if (i > -1) { this.selected.splice(i, 1); return; }
+                                if (this.selected.length === 2) { this.selected.shift(); }
+                                this.selected.push(id);
+                            }
+                         }">
                         <div class="overflow-x-auto">
                             <table class="min-w-full divide-y divide-gray-200">
                                 <thead class="bg-gray-50">
                                     <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                                            <span class="sr-only">Select for comparison</span>
+                                        </th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Order Details
                                         </th>
@@ -104,7 +116,15 @@
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
                                     @foreach($orders as $order)
-                                        <tr class="hover:bg-gray-50">
+                                        <tr class="hover:bg-gray-50"
+                                            :class="selected.includes('{{ $order->id }}') && 'bg-indigo-50'">
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <input type="checkbox"
+                                                       :checked="selected.includes('{{ $order->id }}')"
+                                                       @change="toggle('{{ $order->id }}')"
+                                                       aria-label="Select order #{{ $order->id }} for comparison"
+                                                       class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                            </td>
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <div class="text-sm font-medium text-gray-900">
                                                     Order #{{ $order->id }}
@@ -198,6 +218,29 @@
                         <div class="mt-4">
                             {{ $orders->links() }}
                         </div>
+
+                        <!-- Compare selection bar -->
+                        <div x-show="selected.length > 0"
+                             x-cloak
+                             class="sticky bottom-0 mt-4 flex items-center justify-between border-t border-gray-200 bg-white px-6 py-3 shadow-lg">
+                            <span class="text-sm text-gray-600">
+                                <span class="font-medium" x-text="selected.length"></span> of 2 orders selected
+                                <span x-show="selected.length === 1" class="text-gray-400">&mdash; pick one more to compare</span>
+                            </span>
+                            <div class="flex items-center gap-3">
+                                <button type="button"
+                                        @click="selected = []"
+                                        class="text-sm text-gray-500 underline hover:text-gray-700">
+                                    Clear
+                                </button>
+                                <a x-show="selected.length === 2"
+                                   :href="'{{ route('orders.compare') }}?a=' + selected[0] + '&b=' + selected[1]"
+                                   class="inline-flex items-center rounded bg-blue-500 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700">
+                                    Compare
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                     @else
                         <div class="text-center py-12">
                             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">

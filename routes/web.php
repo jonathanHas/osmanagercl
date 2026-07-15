@@ -566,6 +566,8 @@ Route::middleware('auth')->group(function () {
 
     // Order Management routes
     Route::post('/orders/generate-stream', [OrderController::class, 'storeWithProgress'])->name('orders.generate-stream');
+    // Must stay above Route::resource: orders/{order} would otherwise match "compare".
+    Route::get('/orders/compare', [OrderController::class, 'compare'])->name('orders.compare');
     Route::resource('orders', OrderController::class);
     Route::post('/orders/{order}/complete', [OrderController::class, 'complete'])->name('orders.complete');
     Route::post('/orders/{order}/duplicate', [OrderController::class, 'duplicate'])->name('orders.duplicate');

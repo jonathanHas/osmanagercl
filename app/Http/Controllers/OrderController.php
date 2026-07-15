@@ -330,6 +330,60 @@ class OrderController extends Controller
     }
 
     /**
+     * Compare two order sessions, highlighting products absent from each.
+     */
+    public function compare(Request $request): View
+    {
+        $validated = $request->validate([
+            'a' => ['required', 'different:b', 'exists:App\Models\OrderSession,id'],
+            'b' => ['required', 'exists:App\Models\OrderSession,id'],
+        ]);
+
+        $orderA = OrderSession::with(['supplier', 'user', 'items.product'])->findOrFail($validated['a']);
+        $orderB = OrderSession::with(['supplier', 'user', 'items.product'])->findOrFail($validated['b']);
+
+        // product_id is a string key (PRODUCTS.ID), so keyBy is safe here.
+        $itemsA = $orderA->items->keyBy('product_id');
+        $itemsB = $orderB->items->keyBy('product_id');
+
+        $sortByName = fn ($items) => $items->sortBy(fn ($item) => strtoupper($item->product->NAME ?? 'Unknown Product'))->values();
+
+        $onlyInA = $sortByName($itemsA->diffKeys($itemsB));
+        $onlyInB = $sortByName($itemsB->diffKeys($itemsA));
+
+        $inBoth = $itemsA->intersectByKeys($itemsB)
+            ->map(function (OrderItem $a) use ($itemsB) {
+                $b = $itemsB[$a->product_id];
+
+                return [
+                    'product' => $a->product,
+                    'a' => $a,
+                    'b' => $b,
+                    // final_quantity (units) is the source of truth: case_units is
+                    // snapshotted per session and can drift between the two orders.
+                    'delta' => (float) $b->final_quantity - (float) $a->final_quantity,
+                    'caseUnitsDiffer' => (int) $a->case_units !== (int) $b->case_units,
+                ];
+            })
+            ->sortBy(fn ($row) => strtoupper($row['product']->NAME ?? 'Unknown Product'))
+            ->values();
+
+        // Products ordered at an identical quantity are noise against the "what
+        // changed / what is missing" question, and on a large order they bury it.
+        [$changed, $unchanged] = $inBoth->partition(fn ($row) => abs($row['delta']) >= 0.001);
+
+        return view('orders.compare', [
+            'orderA' => $orderA,
+            'orderB' => $orderB,
+            'onlyInA' => $onlyInA,
+            'onlyInB' => $onlyInB,
+            'changed' => $changed->values(),
+            'unchanged' => $unchanged->values(),
+            'suppliersDiffer' => $orderA->supplier_id !== $orderB->supplier_id,
+        ]);
+    }
+
+    /**
      * Display the order review interface using the A2 layout experiment.
      */
     public function showLayoutA2(OrderSession $order): View|RedirectResponse
