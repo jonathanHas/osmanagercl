@@ -12,6 +12,12 @@
             ? $num($item->final_cases).' cases ('.$qty.' units)'
             : $qty.' units';
     };
+
+    // Each session snapshots its sales history over whatever window was configured when
+    // it was generated, so the two panels' sparklines can span different periods.
+    $weeksA = count($onlyInA->first()['weeklySales'] ?? []);
+    $weeksB = count($onlyInB->first()['weeklySales'] ?? []);
+    $windowsDiffer = $weeksA > 0 && $weeksB > 0 && $weeksA !== $weeksB;
 @endphp
 
 <x-admin-layout>
@@ -40,6 +46,21 @@
                             <span class="font-medium">These orders are from different suppliers.</span>
                             Their product ranges barely overlap, so almost everything will appear as
                             &ldquo;only in&rdquo; one order. Comparing orders from the same supplier is usually more useful.
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+            @if($windowsDiffer)
+                <div class="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                    <div class="flex">
+                        <svg class="h-5 w-5 flex-shrink-0 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                        <div class="ml-3 text-sm text-amber-800">
+                            <span class="font-medium">The sales sparklines cover different periods.</span>
+                            Order A snapshotted {{ $weeksA }} weeks of history, Order B {{ $weeksB }}.
+                            Compare the shapes within a panel, not across the two.
                         </div>
                     </div>
                 </div>
@@ -97,6 +118,9 @@
                         $tone = $panel['tone'];
                         $headClass = $tone === 'red' ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200';
                         $countClass = $tone === 'red' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800';
+                        // The snapshot window is frozen per session, so each panel labels its
+                        // own. $windowsDiffer warns when the two are not like-for-like.
+                        $panelWeeks = count($panel['rows']->first()['weeklySales'] ?? []);
                     @endphp
                     <div class="overflow-hidden rounded-lg bg-white shadow-sm">
                         <div class="border-b {{ $headClass }} px-6 py-3">
@@ -123,6 +147,9 @@
                                     <thead class="bg-gray-50">
                                         <tr>
                                             <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Product</th>
+                                            <th class="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                                                Sales @if($panelWeeks)<span class="normal-case">({{ $panelWeeks }}wk)</span>@endif
+                                            </th>
                                             <th class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Stock</th>
                                             <th class="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Ordered</th>
                                         </tr>
@@ -133,6 +160,9 @@
                                                 <td class="px-4 py-2">
                                                     <div class="text-sm font-medium text-gray-900">{{ $row['name'] }}</div>
                                                     <div class="text-xs text-gray-500">{{ $row['supplierCode'] }}</div>
+                                                </td>
+                                                <td class="px-4 py-2">
+                                                    <x-sales-sparkline :weeks="$row['weeklySales']" :avg="$row['avgWeeklySales']" />
                                                 </td>
                                                 <td class="whitespace-nowrap px-4 py-2 text-right">
                                                     <x-order-compare-stock :stock="$row['stock']" />

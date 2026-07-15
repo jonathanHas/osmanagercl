@@ -421,6 +421,11 @@ class OrderController extends Controller
             'name' => $product->NAME ?? 'Unknown Product',
             'supplierCode' => $supplierLink?->SupplierCode ?: ($product->CODE ?? 'N/A'),
             'stock' => $item->context_data['current_stock'] ?? null,
+            // Sales snapshot frozen when the order was generated, the same source the
+            // review page charts. Its window is whatever sales_history_weeks was set to
+            // at generation, which can differ from the session's current value.
+            'weeklySales' => $item->context_data['weekly_sales'] ?? [],
+            'avgWeeklySales' => (float) ($item->context_data['avg_weekly_sales'] ?? 0),
         ];
     }
 
