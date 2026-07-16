@@ -895,8 +895,8 @@
                             $itemSupplierCode = $item->supplier_code ?? $item->product?->supplierLink?->SupplierCode;
 
                             if ($supplierOos) {
-                                $borderColor = 'border-red-400';
-                                $cardBg = 'bg-red-50 dark:bg-red-900/20';
+                                $borderColor = 'border-gray-400';
+                                $cardBg = 'bg-gray-100 dark:bg-gray-800/60 opacity-50 grayscale';
                             } elseif ($partialDelivery) {
                                 $borderColor = 'border-orange-400';
                                 $cardBg = 'bg-orange-50 dark:bg-orange-900/20';
@@ -1158,7 +1158,7 @@
 
                                     // Determine row background class based on status
                                     if ($supplierOos) {
-                                        $rowClass = 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30';
+                                        $rowClass = 'bg-gray-100 dark:bg-gray-800/60 hover:bg-gray-200 dark:hover:bg-gray-700 opacity-50 grayscale';
                                     } elseif ($partialDelivery) {
                                         $rowClass = 'bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30';
                                     } elseif ($item->is_new_product) {
