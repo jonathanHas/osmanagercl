@@ -893,7 +893,10 @@
                             this.scanner.stockUpdated = true;
                             setTimeout(() => this.scanner.stockUpdated = false, 2000);
                         }
-                    } catch (err) {}
+                    } catch (err) {
+                    } finally {
+                        this.$nextTick(() => this.$refs.scannerInput?.focus());
+                    }
                 }
             };
         }
