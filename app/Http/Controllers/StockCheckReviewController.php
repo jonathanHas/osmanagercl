@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\StockLastChecked;
+use App\Models\StockReviewCategorySetting;
 use App\Models\StockZeroAudit;
 use App\Services\StockCheckReviewService;
 use App\Services\SupplierService;
@@ -28,6 +29,7 @@ class StockCheckReviewController extends Controller
             ->get();
 
         $reviewData = null;
+        $overview = null;
         $categoryId = $request->get('category');
         $referenceDate = $request->get('reference_date', now()->toDateString());
         $filter = $request->get('filter', 'all');
@@ -40,15 +42,40 @@ class StockCheckReviewController extends Controller
                 $filter === 'stocked',
                 $sortBy,
             );
+        } else {
+            // Landing state: show the category overview (oldest checked first).
+            $overview = $this->reviewService->getCategoryOverview($categories);
         }
 
         return view('stock-review.index', [
             'categories' => $categories,
             'reviewData' => $reviewData,
+            'overview' => $overview,
+            'canToggle' => $request->user()->hasAnyRole(['admin', 'manager']),
             'selectedCategory' => $categoryId,
             'referenceDate' => $referenceDate,
             'filter' => $filter,
             'sortBy' => $sortBy,
+        ]);
+    }
+
+    /**
+     * Toggle whether a category is included in or excluded from the review list.
+     * Shared/global state; gated to managers and admins via route middleware.
+     */
+    public function toggleCategory(Request $request)
+    {
+        $request->validate([
+            'category' => 'required|string',
+        ]);
+
+        $setting = StockReviewCategorySetting::firstOrNew(['category_id' => $request->category]);
+        $setting->excluded = ! $setting->excluded;
+        $setting->save();
+
+        return response()->json([
+            'category_id' => $setting->category_id,
+            'excluded' => $setting->excluded,
         ]);
     }
 

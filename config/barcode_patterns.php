@@ -95,6 +95,10 @@ return [
 
         // Default fallback starting code for new categories
         'default_start' => 1000,
+
+        // Starting code for categories with no configured range. Kept above every
+        // configured range (max 7999) so generated codes never collide with them.
+        'generic_start' => 9000,
     ],
 
 ];

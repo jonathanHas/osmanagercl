@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **🔢 On-demand product code auto-generate on Create Product** (2026-07-18)
+  - Added an **"Auto-generate code"** link below the Product Code/Barcode field on `/products/create`. Previously the auto-barcode suggestion only ran server-side when the page was opened with `?category=<id>`; now it works for the normal flow after picking a category from the dropdown
+  - **No category selected** → prompts the user to select a category first (and focuses the select)
+  - **Configured category** (the 8 in `config/barcode_patterns.php`) → reuses the existing per-category range logic (`getNextAvailableBarcodeForCategory`)
+  - **Any other category** → generates the first free code at/after a generic start (`9000`, above every configured 1000–7999 range) so it never collides with the configured bands
+  - The generated code is written into the field and immediately re-validated by the existing duplicate check
+  - **New**: `POST /api/products/suggest-barcode` (`ProductController@suggestBarcode` + `getNextGenericBarcode` helper), `generic_start` setting in `config/barcode_patterns.php`
+  - **Modified**: `resources/views/products/create.blade.php` (button + JS), `routes/web.php`
+
 - **🖼️ Udea product images on order pages + case/single-unit pricing test** (2026-07-01)
   - The order review table (`/orders/{id}`) now shows the Udea **product image** next to each line item, reusing the existing `x-product-image` component (barcode → Ekoplaza CDN) with hover/tap preview and graceful fallback. Applied to all line-item sections in `resources/views/orders/partials/review-table.blade.php`
   - **New feasibility test page** (`/tools/udea-case-test/{order}`) that scrapes each Udea line item's webshop card and shows the parsed **buy tiers** — units-per-case per the site, single-unit availability and price, and per-unit case price — next to our stored `CaseUnits`, with a raw-HTML toggle for validating the parser. Verified against the live card for product 1118 (case 6 @ €9,12 / €1,52 unit, single @ €1,60)

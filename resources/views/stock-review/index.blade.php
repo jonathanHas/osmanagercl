@@ -20,7 +20,8 @@
                 </div>
             @endif
 
-            {{-- ===== CONTROLS: collapsible on mobile, always visible on desktop ===== --}}
+            {{-- ===== CONTROLS: shown once a category is selected (review view) ===== --}}
+            @unless($overview)
             <div class="bg-white shadow-sm sm:rounded-lg mb-3 overflow-hidden">
                 {{-- Mobile: compact header showing category + toggle --}}
                 <div class="md:hidden">
@@ -116,6 +117,115 @@
                 </div>
             </div>
 
+            @endunless
+
+            {{-- ===== OVERVIEW LANDING (no category selected) ===== --}}
+            @if($overview)
+                @php
+                    $included = $overview['included'];
+                    $excluded = $overview['excluded'];
+                @endphp
+
+                <div class="bg-white shadow-sm sm:rounded-lg overflow-hidden mb-3">
+                    <div class="px-3 sm:px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
+                        <h3 class="text-sm font-semibold text-gray-800">Categories to review</h3>
+                        <span class="text-xs text-gray-400">Oldest checked first</span>
+                    </div>
+
+                    @if($included->isEmpty())
+                        <div class="px-4 py-6 text-center text-sm text-gray-400">No categories to review.</div>
+                    @else
+                        <ul class="divide-y divide-gray-100" id="included-list">
+                            @foreach($included as $cat)
+                                <li class="flex items-center gap-3 px-3 sm:px-4 py-2.5 hover:bg-gray-50" data-category-id="{{ $cat->id }}">
+                                    <a href="{{ route('stock-review.index', ['category' => $cat->id]) }}" class="flex-1 min-w-0 flex items-center gap-3">
+                                        <div class="flex-1 min-w-0">
+                                            <div class="text-sm font-medium text-gray-900 truncate">{{ $cat->name }}</div>
+                                            <div class="text-xs text-gray-400">{{ $cat->product_count }} products</div>
+                                        </div>
+                                        <div class="text-right flex-shrink-0">
+                                            @if($cat->last_checked)
+                                                <div class="text-xs text-gray-600">{{ $cat->last_checked_human }}</div>
+                                                <div class="text-[11px] text-gray-400">{{ $cat->last_checked->format('d/m/Y') }}</div>
+                                            @else
+                                                <span class="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-100 text-red-700">Never checked</span>
+                                            @endif
+                                        </div>
+                                    </a>
+                                    @if($canToggle)
+                                        <button type="button" title="Exclude from list"
+                                                onclick="toggleStockCategory('{{ $cat->id }}', this)"
+                                                class="flex-shrink-0 text-gray-300 hover:text-red-500 p-1 rounded">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                                        </button>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </div>
+
+                {{-- Excluded categories (muted, collapsible) --}}
+                @if($excluded->isNotEmpty() || $canToggle)
+                    <div class="bg-gray-50 border border-gray-200 sm:rounded-lg overflow-hidden mb-3" x-data="{ open: false }">
+                        <button type="button" @click="open = !open" class="w-full flex items-center justify-between px-3 sm:px-4 py-2.5 text-left">
+                            <span class="text-sm font-medium text-gray-500">Excluded categories ({{ $excluded->count() }})</span>
+                            <svg class="w-4 h-4 text-gray-400 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        </button>
+                        <div x-show="open" x-transition x-cloak class="border-t border-gray-200">
+                            @if($excluded->isEmpty())
+                                <div class="px-4 py-4 text-center text-xs text-gray-400">No excluded categories.</div>
+                            @else
+                                <ul class="divide-y divide-gray-100" id="excluded-list">
+                                    @foreach($excluded as $cat)
+                                        <li class="flex items-center gap-3 px-3 sm:px-4 py-2 hover:bg-white" data-category-id="{{ $cat->id }}">
+                                            <a href="{{ route('stock-review.index', ['category' => $cat->id]) }}" class="flex-1 min-w-0 flex items-center gap-3">
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="text-sm text-gray-600 truncate">{{ $cat->name }}</div>
+                                                    <div class="text-xs text-gray-400">{{ $cat->product_count }} products</div>
+                                                </div>
+                                                <div class="text-xs text-gray-400 flex-shrink-0">{{ $cat->last_checked_human }}</div>
+                                            </a>
+                                            @if($canToggle)
+                                                <button type="button" title="Add back to list"
+                                                        onclick="toggleStockCategory('{{ $cat->id }}', this)"
+                                                        class="flex-shrink-0 text-gray-300 hover:text-green-600 p-1 rounded">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                                </button>
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
+                    </div>
+                @endif
+
+                @if($canToggle)
+                    <script>
+                        function toggleStockCategory(categoryId, btn) {
+                            btn.disabled = true;
+                            fetch('{{ route('stock-review.toggle-category') }}', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                    'Accept': 'application/json',
+                                },
+                                body: JSON.stringify({ category: categoryId }),
+                            }).then(function (res) {
+                                if (!res.ok) throw new Error('Toggle failed');
+                                // Re-partition on the server for a consistent, correctly-sorted list.
+                                window.location.reload();
+                            }).catch(function () {
+                                btn.disabled = false;
+                                alert('Could not update the list. Please try again.');
+                            });
+                        }
+                    </script>
+                @endif
+            @endif
+
             @if($reviewData)
                 @php
                     $summary = $reviewData['summary'];
@@ -125,6 +235,12 @@
                     $needsAttention = $products->whereIn('status', ['danger', 'warning']);
                     $verified = $products->whereIn('status', ['verified', 'ok']);
                 @endphp
+
+                {{-- Back to overview --}}
+                <a href="{{ route('stock-review.index') }}" class="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 mb-3">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                    All categories
+                </a>
 
                 {{-- Summary Cards + Scan Button --}}
                 <div class="grid grid-cols-4 gap-2 sm:gap-3 mb-3">

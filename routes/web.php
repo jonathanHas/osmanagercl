@@ -117,6 +117,7 @@ Route::middleware('auth')->group(function () {
     // Product AJAX API routes (for real-time validation)
     Route::post('/api/products/check-barcode-duplicate', [ProductController::class, 'checkBarcodeDuplicate'])->name('api.products.check-barcode-duplicate');
     Route::post('/api/products/check-supplier-link-duplicate', [ProductController::class, 'checkSupplierLinkDuplicate'])->name('api.products.check-supplier-link-duplicate');
+    Route::post('/api/products/suggest-barcode', [ProductController::class, 'suggestBarcode'])->name('api.products.suggest-barcode');
 
     // Stocking scanner routes
     Route::get('/stocking', [StockingController::class, 'index'])->name('stocking.index');
@@ -128,6 +129,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/stock-review', [StockCheckReviewController::class, 'index'])->name('stock-review.index');
     Route::post('/stock-review/stock-check', [StockCheckReviewController::class, 'stockCheck'])->name('stock-review.stock-check');
     Route::post('/stock-review/set-to-zero', [StockCheckReviewController::class, 'setToZero'])->name('stock-review.set-to-zero');
+    Route::post('/stock-review/toggle-category', [StockCheckReviewController::class, 'toggleCategory'])->name('stock-review.toggle-category')->middleware('role:admin,manager');
     Route::get('/stock-review/sales-data', [StockCheckReviewController::class, 'salesData'])->name('stock-review.sales-data');
     Route::get('/stock-review/history', [StockCheckReviewController::class, 'history'])->name('stock-review.history');
     Route::get('/stock-review/audit-log', [StockCheckReviewController::class, 'auditLog'])->name('stock-review.audit-log');

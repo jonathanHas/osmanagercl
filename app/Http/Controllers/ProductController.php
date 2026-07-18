@@ -989,6 +989,54 @@ class ProductController extends Controller
     }
 
     /**
+     * Suggest the next available product code for the selected category.
+     *
+     * Configured categories use their range logic; any other category falls
+     * back to a generic code above every configured range.
+     */
+    public function suggestBarcode(Request $request)
+    {
+        $categoryId = $request->input('category');
+
+        if (! $categoryId) {
+            return response()->json(['error' => 'no_category'], 422);
+        }
+
+        $barcode = $this->getNextAvailableBarcodeForCategory($categoryId)
+            ?? $this->getNextGenericBarcode();
+
+        return response()->json(['barcode' => $barcode]);
+    }
+
+    /**
+     * Find the next available numeric code for categories that have no
+     * configured range. Codes start at the generic_start setting (kept above
+     * every configured range) and are globally unique across PRODUCTS.CODE.
+     */
+    private function getNextGenericBarcode(): string
+    {
+        $settings = config('barcode_patterns.settings');
+        $start = $settings['generic_start'];
+        $max = $settings['max_internal_code'];
+
+        // Existing numeric codes at/above the generic start, as a lookup set.
+        $used = Product::pluck('CODE')
+            ->filter(fn ($code) => is_numeric($code) && (int) $code >= $start && (int) $code <= $max)
+            ->map(fn ($code) => (int) $code)
+            ->flip();
+
+        // First unused code at/after the generic start.
+        for ($i = $start; $i <= $max; $i++) {
+            if (! $used->has($i)) {
+                return (string) $i;
+            }
+        }
+
+        // Fallback (band exhausted): one past the start.
+        return (string) $start;
+    }
+
+    /**
      * Show the form for creating a new product.
      */
     public function create(Request $request): View

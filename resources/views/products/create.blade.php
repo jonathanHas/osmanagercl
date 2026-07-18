@@ -226,6 +226,19 @@
                                             </p>
                                         </div>
 
+                                        <!-- Auto-generate code -->
+                                        <div class="mt-2 flex items-center gap-2">
+                                            <button type="button"
+                                                    id="auto-generate-code"
+                                                    class="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+                                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                                </svg>
+                                                Auto-generate code
+                                            </button>
+                                            <span id="auto-generate-msg" class="hidden text-sm text-orange-600 dark:text-orange-400"></span>
+                                        </div>
+
                                         @if($categoryConfig && $suggestedBarcode)
                                             <div class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:border-blue-800">
                                                 <div class="flex items-center">
@@ -1725,7 +1738,60 @@
         document.addEventListener('DOMContentLoaded', function() {
             initializeBarcodeCheck();
             initializeSupplierLinkDuplicateCheck();
+            initializeAutoGenerateCode();
         });
+
+        function initializeAutoGenerateCode() {
+            const button = document.getElementById('auto-generate-code');
+            if (!button) {
+                return;
+            }
+
+            button.addEventListener('click', async () => {
+                const categoryField = document.getElementById('category');
+                const msg = document.getElementById('auto-generate-msg');
+                const category = categoryField ? categoryField.value : '';
+
+                // Require a category before generating
+                if (!category) {
+                    msg.textContent = 'Please select a category first.';
+                    msg.classList.remove('hidden');
+                    if (categoryField) {
+                        categoryField.focus();
+                    }
+                    return;
+                }
+                msg.classList.add('hidden');
+
+                try {
+                    const response = await fetch('/api/products/suggest-barcode', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify({ category: category }),
+                    });
+
+                    const data = await response.json();
+
+                    if (data.barcode) {
+                        const codeField = document.getElementById('code');
+                        codeField.value = data.barcode;
+                        // Re-trigger the existing duplicate check + field styling
+                        codeField.dispatchEvent(new Event('input'));
+                    } else {
+                        msg.textContent = 'Could not generate a code for this category.';
+                        msg.classList.remove('hidden');
+                    }
+                } catch (error) {
+                    console.error('Error generating barcode:', error);
+                    msg.textContent = 'Error generating code. Please try again.';
+                    msg.classList.remove('hidden');
+                }
+            });
+        }
 
         function initializeBarcodeCheck() {
             const barcodeField = document.getElementById('code');

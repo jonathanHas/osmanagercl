@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Category;
 use App\Models\StockAdjustment;
 use App\Models\StockCurrent;
+use App\Models\StockReviewCategorySetting;
 use App\Models\StockZeroAudit;
 use App\Repositories\ProductRepository;
 use Carbon\Carbon;
@@ -18,6 +19,70 @@ class StockCheckReviewService
         protected ProductRepository $productRepository,
         protected SupplierService $supplierService,
     ) {}
+
+    /**
+     * Build the category overview for the stock-review landing page.
+     *
+     * A category's "last checked" date is its most recent set-to-zero event,
+     * taken as the newest of the legacy POS catSetZero record and the newer
+     * Laravel stock_zero_audits record. Categories with neither are treated as
+     * never checked and sorted to the top of the included list.
+     *
+     * @param  \Illuminate\Support\Collection  $categories  Categories with products_count loaded.
+     * @return array{included: Collection, excluded: Collection}
+     */
+    public function getCategoryOverview(Collection $categories): array
+    {
+        // Legacy POS set-to-zero dates (max per category).
+        $posDates = DB::connection('pos')
+            ->table('catSetZero')
+            ->selectRaw('catID, MAX(dateUpdated) as last_date')
+            ->groupBy('catID')
+            ->pluck('last_date', 'catID');
+
+        // Newer Laravel set-to-zero audit dates (max per category).
+        $auditDates = StockZeroAudit::selectRaw('category_id, MAX(created_at) as last_date')
+            ->groupBy('category_id')
+            ->pluck('last_date', 'category_id');
+
+        // Category IDs currently excluded from the main list (shared/global).
+        $excludedIds = StockReviewCategorySetting::where('excluded', true)
+            ->pluck('category_id')
+            ->flip();
+
+        $rows = $categories->map(function ($category) use ($posDates, $auditDates) {
+            $dates = array_filter([
+                $posDates[$category->ID] ?? null,
+                $auditDates[$category->ID] ?? null,
+            ]);
+
+            $lastChecked = empty($dates)
+                ? null
+                : collect($dates)->map(fn ($d) => Carbon::parse($d))->max();
+
+            return (object) [
+                'id' => $category->ID,
+                'name' => $category->NAME,
+                'product_count' => $category->products_count,
+                'last_checked' => $lastChecked,
+                'last_checked_human' => $lastChecked ? $lastChecked->diffForHumans() : 'Never',
+            ];
+        });
+
+        [$excluded, $included] = $rows->partition(fn ($row) => $excludedIds->has($row->id));
+
+        // Oldest checked first; never-checked (null) sorts to the very top.
+        $included = $included
+            ->sortBy(fn ($row) => $row->last_checked?->timestamp ?? -1)
+            ->values();
+
+        $excluded = $excluded->sortBy('name')->values();
+
+        return [
+            'included' => $included,
+            'excluded' => $excluded,
+        ];
+    }
 
     /**
      * Get all products in a category with their review status.
