@@ -129,6 +129,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/stock-review', [StockCheckReviewController::class, 'index'])->name('stock-review.index');
     Route::post('/stock-review/stock-check', [StockCheckReviewController::class, 'stockCheck'])->name('stock-review.stock-check');
     Route::post('/stock-review/set-to-zero', [StockCheckReviewController::class, 'setToZero'])->name('stock-review.set-to-zero');
+    Route::post('/stock-review/mark-checked', [StockCheckReviewController::class, 'markChecked'])->name('stock-review.mark-checked');
     Route::post('/stock-review/toggle-category', [StockCheckReviewController::class, 'toggleCategory'])->name('stock-review.toggle-category')->middleware('role:admin,manager');
     Route::get('/stock-review/sales-data', [StockCheckReviewController::class, 'salesData'])->name('stock-review.sales-data');
     Route::get('/stock-review/history', [StockCheckReviewController::class, 'history'])->name('stock-review.history');

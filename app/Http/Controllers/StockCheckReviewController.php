@@ -107,6 +107,30 @@ class StockCheckReviewController extends Controller
     }
 
     /**
+     * Mark a category as reviewed when there is nothing to set to zero.
+     */
+    public function markChecked(Request $request)
+    {
+        $request->validate([
+            'category' => 'required|string',
+            'reference_date' => 'required|date',
+        ]);
+
+        $this->reviewService->markCategoryChecked(
+            $request->category,
+            $request->reference_date,
+            $request->user()->id,
+        );
+
+        return redirect()
+            ->route('stock-review.index', [
+                'category' => $request->category,
+                'reference_date' => $request->reference_date,
+            ])
+            ->with('success', 'Category marked as checked.');
+    }
+
+    /**
      * Get sales history data via AJAX.
      */
     public function salesData(Request $request)

@@ -260,6 +260,32 @@ class StockCheckReviewService
     }
 
     /**
+     * Mark a category as reviewed without changing any stock.
+     *
+     * Writes a zero-count StockZeroAudit record so the category picks up a
+     * fresh "last checked" date on the overview page. Used when every product
+     * is already checked/in stock and there is nothing to set to zero.
+     */
+    public function markCategoryChecked(
+        string $categoryId,
+        string $referenceDate,
+        int $userId,
+    ): StockZeroAudit {
+        $refDate = Carbon::parse($referenceDate)->startOfDay();
+        $category = Category::find($categoryId);
+
+        return StockZeroAudit::create([
+            'category_id' => $categoryId,
+            'category_name' => $category?->NAME ?? 'Unknown',
+            'reference_date' => $refDate->toDateString(),
+            'products_zeroed' => 0,
+            'total_stock_value_zeroed' => 0,
+            'product_details' => [],
+            'user_id' => $userId,
+        ]);
+    }
+
+    /**
      * Get sales history for products in a category (last 5 months).
      */
     public function getSalesHistory(string $categoryId): array
