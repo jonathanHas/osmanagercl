@@ -49,6 +49,8 @@ class AccountingSupplier extends Model
         // Enhanced fields from migration
         'external_pos_id',
         'is_pos_linked',
+        'send_daily_sales_email',
+        'include_sales_values',
         'is_order_managed',
         'order_manager_threshold',
         'external_osaccounts_id',
@@ -87,6 +89,8 @@ class AccountingSupplier extends Model
         'payment_terms_days' => 'integer',
         // Enhanced field casts
         'is_pos_linked' => 'boolean',
+        'send_daily_sales_email' => 'boolean',
+        'include_sales_values' => 'boolean',
         'is_order_managed' => 'boolean',
         'order_manager_threshold' => 'integer',
         'total_spent' => 'decimal:2',
@@ -204,6 +208,19 @@ class AccountingSupplier extends Model
     public function scopeOrderManaged($query)
     {
         return $query->where('is_order_managed', true)
+            ->where('is_pos_linked', true);
+    }
+
+    /**
+     * Scope for suppliers that should receive the same-day sales email.
+     * Requires the opt-in flag, a destination email address, and a POS link
+     * (so their products can be resolved via supplier_link).
+     */
+    public function scopeReceivesDailySalesEmail($query)
+    {
+        return $query->where('send_daily_sales_email', true)
+            ->whereNotNull('email')
+            ->where('email', '!=', '')
             ->where('is_pos_linked', true);
     }
 

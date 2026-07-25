@@ -276,6 +276,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/suppliers/{supplier}/toggle-organic', [\App\Http\Controllers\OrganicTrustReportController::class, 'toggleOrganic'])->name('suppliers.toggle-organic');
     Route::post('/suppliers/{supplier}/update-organic-fields', [\App\Http\Controllers\OrganicTrustReportController::class, 'updateOrganicFields'])->name('suppliers.update-organic-fields');
     Route::post('/suppliers/organic-trust-report/options', [\App\Http\Controllers\OrganicTrustReportController::class, 'updateOptions'])->name('suppliers.organic-trust-report.options');
+    // Daily sales email preview (see exactly what opted-in suppliers would receive, without sending)
+    Route::get('/suppliers/daily-sales-preview', [\App\Http\Controllers\AccountingSuppliersController::class, 'dailySalesPreviewIndex'])->name('suppliers.daily-sales-preview');
+    Route::post('/suppliers/daily-sales-preview/refresh', [\App\Http\Controllers\AccountingSuppliersController::class, 'dailySalesPreviewRefresh'])->name('suppliers.daily-sales-preview.refresh');
+    Route::get('/suppliers/{supplier}/daily-sales-preview', [\App\Http\Controllers\AccountingSuppliersController::class, 'dailySalesPreview'])->name('suppliers.daily-sales-preview.show');
+    Route::get('/suppliers/{supplier}/daily-sales-preview/csv', [\App\Http\Controllers\AccountingSuppliersController::class, 'dailySalesPreviewCsv'])->name('suppliers.daily-sales-preview.csv');
+    Route::post('/suppliers/{supplier}/daily-sales-preview/send', [\App\Http\Controllers\AccountingSuppliersController::class, 'dailySalesPreviewSend'])->name('suppliers.daily-sales-preview.send');
     Route::resource('suppliers', \App\Http\Controllers\AccountingSuppliersController::class);
 
     // Order Manager routes

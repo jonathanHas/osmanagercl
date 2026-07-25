@@ -23,6 +23,10 @@
                    class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded text-sm">
                     <i class="fas fa-leaf mr-2"></i>Organic Trust
                 </a>
+                <a href="{{ route('suppliers.daily-sales-preview') }}"
+                   class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded text-sm">
+                    <i class="fas fa-envelope-open-text mr-2"></i>Sales Email Preview
+                </a>
                 <a href="{{ route('invoices.index') }}" 
                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded text-sm">
                     <i class="fas fa-file-invoice mr-2"></i>View Invoices

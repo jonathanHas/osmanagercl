@@ -13,9 +13,10 @@ class ImportDailySales extends Command
      *
      * @var string
      */
-    protected $signature = 'sales:import-daily 
+    protected $signature = 'sales:import-daily
                           {--start-date= : Start date (YYYY-MM-DD)}
                           {--end-date= : End date (YYYY-MM-DD)}
+                          {--today : Import today\'s data (same-day, partial)}
                           {--yesterday : Import yesterday\'s data}
                           {--last-week : Import last 7 days}';
 
@@ -31,7 +32,9 @@ class ImportDailySales extends Command
      */
     public function handle(SalesImportService $importService)
     {
-        if ($this->option('yesterday')) {
+        if ($this->option('today')) {
+            $startDate = $endDate = Carbon::today();
+        } elseif ($this->option('yesterday')) {
             $startDate = $endDate = Carbon::yesterday();
         } elseif ($this->option('last-week')) {
             $startDate = Carbon::now()->subDays(7);

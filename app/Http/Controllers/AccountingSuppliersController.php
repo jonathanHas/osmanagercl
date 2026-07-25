@@ -2,11 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\SupplierDailySalesMail;
 use App\Models\AccountingSupplier;
+use App\Services\SalesImportService;
+use App\Services\SupplierSalesReportService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 
 class AccountingSuppliersController extends Controller
@@ -205,6 +210,8 @@ class AccountingSuppliersController extends Controller
             'phone_secondary' => 'nullable|string|max:20',
             'fax' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:255',
+            'send_daily_sales_email' => 'boolean',
+            'include_sales_values' => 'boolean',
             'website' => 'nullable|url|max:255',
             'contact_person' => 'nullable|string|max:255',
             'vat_number' => 'nullable|string|max:50',
@@ -244,6 +251,10 @@ class AccountingSuppliersController extends Controller
         } else {
             $validated['tags'] = null;
         }
+
+        // Checkbox is absent from the request when unchecked; coerce explicitly.
+        $validated['send_daily_sales_email'] = $request->boolean('send_daily_sales_email');
+        $validated['include_sales_values'] = $request->boolean('include_sales_values');
 
         // Set audit fields
         $validated['created_by'] = Auth::id();
@@ -345,6 +356,8 @@ class AccountingSuppliersController extends Controller
             'phone_secondary' => 'nullable|string|max:20',
             'fax' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:255',
+            'send_daily_sales_email' => 'boolean',
+            'include_sales_values' => 'boolean',
             'website' => 'nullable|url|max:255',
             'contact_person' => 'nullable|string|max:255',
             'vat_number' => 'nullable|string|max:50',
@@ -379,6 +392,10 @@ class AccountingSuppliersController extends Controller
         if (! isset($validated['payment_terms_days']) || is_null($validated['payment_terms_days'])) {
             $validated['payment_terms_days'] = 30; // Default 30 days
         }
+
+        // Checkbox is absent from the request when unchecked; coerce explicitly.
+        $validated['send_daily_sales_email'] = $request->boolean('send_daily_sales_email');
+        $validated['include_sales_values'] = $request->boolean('include_sales_values');
 
         // Update audit fields
         $validated['updated_by'] = Auth::id();
@@ -630,6 +647,153 @@ class AccountingSuppliersController extends Controller
                 'success' => false,
                 'message' => 'Failed to update RTD classification. Please try again.',
             ], 422);
+        }
+    }
+
+    /**
+     * Preview page: list opted-in suppliers with their sales for a date and
+     * links to preview the exact email each would receive (nothing is sent).
+     */
+    public function dailySalesPreviewIndex(Request $request, SupplierSalesReportService $reportService)
+    {
+        $date = $this->resolvePreviewDate($request);
+
+        $suppliers = AccountingSupplier::receivesDailySalesEmail()
+            ->orderBy('name')
+            ->get();
+
+        $rows = $suppliers->map(function (AccountingSupplier $supplier) use ($reportService, $date) {
+            $report = $reportService->buildReport($supplier, $date->copy());
+
+            return [
+                'supplier' => $supplier,
+                'has_sales' => $report !== null,
+                'totals' => $report['totals'] ?? null,
+            ];
+        });
+
+        return view('suppliers.daily-sales-preview', [
+            'date' => $date,
+            'rows' => $rows,
+        ]);
+    }
+
+    /**
+     * Render the exact email a supplier would receive for the given date.
+     * Returning the Mailable lets Laravel render its HTML in the browser.
+     */
+    public function dailySalesPreview(Request $request, AccountingSupplier $supplier, SupplierSalesReportService $reportService)
+    {
+        $date = $this->resolvePreviewDate($request);
+
+        $report = $reportService->buildReport($supplier, $date->copy());
+
+        if ($report === null) {
+            return response(
+                'No sales recorded for '.e($supplier->name).' on '.$date->format('D j M Y').'. '
+                .'Pick another date, or refresh today\'s sales from the preview list.',
+                200
+            )->header('Content-Type', 'text/plain; charset=UTF-8');
+        }
+
+        return new SupplierDailySalesMail($report);
+    }
+
+    /**
+     * Download the CSV a supplier's email would attach for the given date.
+     */
+    public function dailySalesPreviewCsv(Request $request, AccountingSupplier $supplier, SupplierSalesReportService $reportService)
+    {
+        $date = $this->resolvePreviewDate($request);
+
+        $report = $reportService->buildReport($supplier, $date->copy());
+
+        if ($report === null) {
+            return back()->with('error', "No sales recorded for {$supplier->name} on ".$date->format('D j M Y').'.');
+        }
+
+        $csv = $reportService->toCsv($report);
+        $filename = 'sales-'.$date->format('Y-m-d').'.csv';
+
+        return response($csv, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    /**
+     * Send the supplier's daily email for the selected date, now (synchronous).
+     * Used from the preview page to test real SMTP delivery — errors surface.
+     */
+    public function dailySalesPreviewSend(Request $request, AccountingSupplier $supplier, SupplierSalesReportService $reportService)
+    {
+        $date = $this->resolvePreviewDate($request);
+        $back = redirect()->route('suppliers.daily-sales-preview', ['date' => $date->format('Y-m-d')]);
+
+        if (! $supplier->email) {
+            return $back->with('error', "{$supplier->name} has no email address on file.");
+        }
+
+        $report = $reportService->buildReport($supplier, $date->copy());
+
+        if ($report === null) {
+            return $back->with('error', "No sales for {$supplier->name} on ".$date->format('D j M Y').' — nothing to send.');
+        }
+
+        try {
+            // sendNow() forces immediate delivery even though the Mailable is
+            // ShouldQueue, so SMTP errors surface here instead of being queued.
+            Mail::to($supplier->email)->sendNow(new SupplierDailySalesMail($report));
+
+            return $back->with('success', "Sent {$supplier->name}'s report to {$supplier->email}.");
+        } catch (\Throwable $e) {
+            Log::error('Daily sales preview: test send failed', [
+                'supplier_id' => $supplier->id,
+                'email' => $supplier->email,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $back->with('error', 'Send failed: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Refresh the sales summary for the selected date (today's data doesn't
+     * exist until the 20:00 import), then return to the preview list.
+     */
+    public function dailySalesPreviewRefresh(Request $request, SalesImportService $importService)
+    {
+        $date = $this->resolvePreviewDate($request);
+
+        try {
+            $importService->importDailySales($date->copy(), $date->copy());
+
+            return redirect()
+                ->route('suppliers.daily-sales-preview', ['date' => $date->format('Y-m-d')])
+                ->with('success', 'Sales refreshed for '.$date->format('D j M Y').'.');
+        } catch (\Throwable $e) {
+            Log::warning('Daily sales preview: refresh failed', [
+                'date' => $date->toDateString(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()
+                ->route('suppliers.daily-sales-preview', ['date' => $date->format('Y-m-d')])
+                ->with('error', 'Could not refresh sales: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Parse the preview `date` param (YYYY-MM-DD), defaulting to today.
+     */
+    private function resolvePreviewDate(Request $request): Carbon
+    {
+        try {
+            return $request->filled('date')
+                ? Carbon::parse($request->input('date'))->startOfDay()
+                : Carbon::today();
+        } catch (\Throwable $e) {
+            return Carbon::today();
         }
     }
 

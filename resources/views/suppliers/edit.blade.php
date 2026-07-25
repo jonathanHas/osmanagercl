@@ -196,8 +196,30 @@
                             @error('email')
                                 <p class="text-red-400 text-xs mt-1">{{ $message }}</p>
                             @enderror
+
+                            <label class="flex items-center mt-2 text-sm text-gray-300">
+                                <input type="checkbox" name="send_daily_sales_email" value="1"
+                                       {{ old('send_daily_sales_email', $supplier->send_daily_sales_email) ? 'checked' : '' }}
+                                       class="rounded bg-gray-700 border-gray-600 text-indigo-500 focus:ring-indigo-500 mr-2">
+                                Email this supplier a same-day sales report each evening
+                            </label>
+                            <p class="text-gray-500 text-xs mt-1">
+                                Requires a valid email address and a POS link. Sent at ~20:15 daily.
+                                @if ($supplier->is_pos_linked)
+                                    <a href="{{ route('suppliers.daily-sales-preview.show', $supplier) }}" target="_blank"
+                                       class="text-indigo-400 hover:text-indigo-300 ml-1">Preview this email &rarr;</a>
+                                @endif
+                            </p>
+
+                            <label class="flex items-center mt-3 ml-6 text-sm text-gray-300">
+                                <input type="checkbox" name="include_sales_values" value="1"
+                                       {{ old('include_sales_values', $supplier->include_sales_values) ? 'checked' : '' }}
+                                       class="rounded bg-gray-700 border-gray-600 text-indigo-500 focus:ring-indigo-500 mr-2">
+                                Include sales values (money) in their report
+                            </label>
+                            <p class="text-gray-500 text-xs mt-1 ml-6">Untick to send units and trends only, hiding all € figures.</p>
                         </div>
-                        
+
                         <div>
                             <label class="block text-sm font-medium text-gray-400 mb-1">Phone</label>
                             <input type="text" name="phone" value="{{ old('phone', $supplier->phone) }}"
