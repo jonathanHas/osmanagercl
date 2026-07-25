@@ -93,12 +93,14 @@ class SendSupplierSalesEmails extends Command
             }
 
             try {
-                Mail::to($supplier->email)->queue(new SupplierDailySalesMail($report));
+                // sendNow() (not queue()) so delivery happens under the 20:15 cron
+                // with no queue worker required, and SMTP errors surface here.
+                Mail::to($supplier->email)->sendNow(new SupplierDailySalesMail($report));
                 $sent++;
-                $this->line("  - {$supplier->name} <{$supplier->email}>: queued");
+                $this->line("  - {$supplier->name} <{$supplier->email}>: sent");
             } catch (\Throwable $e) {
-                $this->error("  - {$supplier->name}: failed to queue — ".$e->getMessage());
-                Log::error('Supplier daily email: queue failed', [
+                $this->error("  - {$supplier->name}: failed to send — ".$e->getMessage());
+                Log::error('Supplier daily email: send failed', [
                     'supplier_id' => $supplier->id,
                     'error' => $e->getMessage(),
                 ]);
@@ -107,7 +109,7 @@ class SendSupplierSalesEmails extends Command
 
         $this->info(sprintf(
             '%s %d supplier email(s); skipped %d with no sales.',
-            $dryRun ? 'Would send' : 'Queued',
+            $dryRun ? 'Would send' : 'Sent',
             $sent,
             $skipped
         ));
