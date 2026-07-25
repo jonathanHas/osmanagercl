@@ -6,6 +6,7 @@
     $items = $report['items'];
     $totals = $report['totals'];
     $showValues = $report['show_values'] ?? true;
+    $attachCsv = $report['attach_csv'] ?? true;
 
     $money = fn ($v) => '&euro;' . number_format((float) $v, 2);
     $units = fn ($v) => rtrim(rtrim(number_format((float) $v, 2), '0'), '.');
@@ -36,7 +37,7 @@
                     <tr>
                         <td style="padding:24px 28px 8px 28px; font-size:14px; line-height:1.5; color:#374151;">
                             <p style="margin:0 0 12px 0;">Hi {{ $supplier->contact_person ?: $supplier->name }},</p>
-                            <p style="margin:0;">Here is how your products sold with us today. A CSV of the same figures is attached.</p>
+                            <p style="margin:0;">Here is how your products sold with us today.@if ($attachCsv) A CSV of the same figures is attached.@endif</p>
                         </td>
                     </tr>
 
@@ -120,6 +121,9 @@
                     <tr>
                         <td style="padding:16px 28px 28px 28px; border-top:1px solid #e5e7eb;">
                             <p style="margin:0; font-size:12px; color:#9ca3af; line-height:1.5;">
+                                This lists every product of yours sold so far this month; the "Units"@if ($showValues) and "Sales"@endif column@if ($showValues)s show@else shows@endif {{ $date->format('j M') }}'s figures (0 if none sold that day).
+                            </p>
+                            <p style="margin:8px 0 0 0; font-size:12px; color:#9ca3af; line-height:1.5;">
                                 @if ($showValues)Sales figures are retail values excluding VAT. @endif"Week" and "Month" show your units sold so far this week and this calendar month; "Avg/mo" is the average monthly units over the last 12 months.
                             </p>
                             <p style="margin:12px 0 0 0; font-size:12px; color:#9ca3af;">

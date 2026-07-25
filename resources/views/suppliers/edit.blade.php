@@ -218,6 +218,14 @@
                                 Include sales values (money) in their report
                             </label>
                             <p class="text-gray-500 text-xs mt-1 ml-6">Untick to send units and trends only, hiding all € figures.</p>
+
+                            <label class="flex items-center mt-3 ml-6 text-sm text-gray-300">
+                                <input type="checkbox" name="attach_sales_csv" value="1"
+                                       {{ old('attach_sales_csv', $supplier->attach_sales_csv) ? 'checked' : '' }}
+                                       class="rounded bg-gray-700 border-gray-600 text-indigo-500 focus:ring-indigo-500 mr-2">
+                                Attach a CSV of the figures to their email
+                            </label>
+                            <p class="text-gray-500 text-xs mt-1 ml-6">Untick to send the summary in the email body only, with no attachment.</p>
                         </div>
 
                         <div>

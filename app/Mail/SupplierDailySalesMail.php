@@ -44,6 +44,11 @@ class SupplierDailySalesMail extends Mailable implements ShouldQueue
      */
     public function attachments(): array
     {
+        // The supplier can opt out of the CSV attachment.
+        if (! ($this->report['attach_csv'] ?? true)) {
+            return [];
+        }
+
         $date = $this->report['date'] instanceof Carbon
             ? $this->report['date']
             : Carbon::parse($this->report['date']);

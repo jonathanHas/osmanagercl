@@ -212,6 +212,7 @@ class AccountingSuppliersController extends Controller
             'email' => 'nullable|email|max:255',
             'send_daily_sales_email' => 'boolean',
             'include_sales_values' => 'boolean',
+            'attach_sales_csv' => 'boolean',
             'website' => 'nullable|url|max:255',
             'contact_person' => 'nullable|string|max:255',
             'vat_number' => 'nullable|string|max:50',
@@ -255,6 +256,7 @@ class AccountingSuppliersController extends Controller
         // Checkbox is absent from the request when unchecked; coerce explicitly.
         $validated['send_daily_sales_email'] = $request->boolean('send_daily_sales_email');
         $validated['include_sales_values'] = $request->boolean('include_sales_values');
+        $validated['attach_sales_csv'] = $request->boolean('attach_sales_csv');
 
         // Set audit fields
         $validated['created_by'] = Auth::id();
@@ -358,6 +360,7 @@ class AccountingSuppliersController extends Controller
             'email' => 'nullable|email|max:255',
             'send_daily_sales_email' => 'boolean',
             'include_sales_values' => 'boolean',
+            'attach_sales_csv' => 'boolean',
             'website' => 'nullable|url|max:255',
             'contact_person' => 'nullable|string|max:255',
             'vat_number' => 'nullable|string|max:50',
@@ -396,6 +399,7 @@ class AccountingSuppliersController extends Controller
         // Checkbox is absent from the request when unchecked; coerce explicitly.
         $validated['send_daily_sales_email'] = $request->boolean('send_daily_sales_email');
         $validated['include_sales_values'] = $request->boolean('include_sales_values');
+        $validated['attach_sales_csv'] = $request->boolean('attach_sales_csv');
 
         // Update audit fields
         $validated['updated_by'] = Auth::id();

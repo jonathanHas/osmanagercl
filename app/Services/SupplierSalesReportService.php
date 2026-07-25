@@ -41,7 +41,8 @@ class SupplierSalesReportService
             return null;
         }
 
-        // Step 2: today's per-product sales for those barcodes.
+        // Step 2: the report date's per-product sales. This is the gate — we
+        // still skip suppliers who sold nothing that day (see return null).
         $todayRows = SalesDailySummary::whereIn('product_code', $barcodes)
             ->whereDate('sale_date', $date)
             ->get();
@@ -50,9 +51,19 @@ class SupplierSalesReportService
             return null;
         }
 
-        // Step 3: running context (this month / avg monthly / 12-month / trend),
-        // keyed by product_id, reusing the order-system bulk query.
-        $productIds = $todayRows->pluck('product_id')->unique()->values()->all();
+        // Step 3: the product set is every product this supplier sold *this
+        // calendar month* (up to the report date), so the email shows the
+        // month's range — not only the day's sellers. Aggregate month units +
+        // identity per product from the summary table.
+        $monthStart = $date->copy()->startOfMonth();
+        $monthProducts = SalesDailySummary::whereIn('product_code', $barcodes)
+            ->whereBetween('sale_date', [$monthStart, $date])
+            ->selectRaw('product_id, MAX(product_code) as product_code, MAX(product_name) as product_name, SUM(total_units) as month_units')
+            ->groupBy('product_id')
+            ->get();
+
+        // Running context (avg monthly / 12-month / trend) for the whole set.
+        $productIds = $monthProducts->pluck('product_id')->unique()->values()->all();
         $stats = $this->salesRepository->getBulkProductSalesStatistics($productIds);
 
         // This-week units, straight from the summary table (cheap aggregate).
@@ -63,33 +74,43 @@ class SupplierSalesReportService
             ->groupBy('product_id')
             ->pluck('units', 'product_id');
 
-        // Step 4: assemble line items (one per product sold today).
-        $items = $todayRows
-            ->sortByDesc(fn ($row) => (float) $row->total_revenue)
-            ->map(function ($row) use ($stats, $weekUnits) {
+        // The report date's rows keyed by product, for quick lookup (a product
+        // in the month set may have had no sale on the report date → 0 for the day).
+        $todayByProduct = $todayRows->keyBy('product_id');
+
+        // Step 4: one line item per product sold this month; the day's figures
+        // are 0 where the product didn't sell on the report date.
+        $items = $monthProducts
+            ->map(function ($row) use ($stats, $weekUnits, $todayByProduct) {
                 $context = $stats[$row->product_id] ?? [];
+                $today = $todayByProduct->get($row->product_id);
 
                 return [
                     'barcode' => $row->product_code,
                     'name' => $row->product_name,
-                    'units' => (float) $row->total_units,
-                    'revenue' => (float) $row->total_revenue,
-                    'transactions' => (int) $row->transaction_count,
+                    'units' => $today ? (float) $today->total_units : 0.0,
+                    'revenue' => $today ? (float) $today->total_revenue : 0.0,
+                    'transactions' => $today ? (int) $today->transaction_count : 0,
                     'week_units' => (float) ($weekUnits[$row->product_id] ?? 0),
-                    'month_units' => (float) ($context['this_month_sales'] ?? 0),
+                    'month_units' => (float) $row->month_units,
                     'avg_monthly_units' => (float) ($context['avg_monthly_sales'] ?? 0),
                     'total_12m_units' => (float) ($context['total_sales_12m'] ?? 0),
                     'trend' => $context['trend'] ?? 'stable',
                 ];
             })
+            // The day's sellers first (by day revenue, then day units), then the
+            // rest of the month's products by month volume.
+            ->sortByDesc(fn ($item) => [$item['revenue'], $item['units'], $item['month_units']])
             ->values()
             ->all();
 
+        // Totals reflect the report DATE only — the extra month rows contribute
+        // 0 to the day's units/revenue; "lines" = products that sold that day.
         $totals = [
             'units' => array_sum(array_column($items, 'units')),
             'revenue' => array_sum(array_column($items, 'revenue')),
             'transactions' => array_sum(array_column($items, 'transactions')),
-            'lines' => count($items),
+            'lines' => $todayRows->pluck('product_id')->unique()->count(),
         ];
 
         return [
@@ -98,6 +119,7 @@ class SupplierSalesReportService
             'items' => $items,
             'totals' => $totals,
             'show_values' => (bool) $supplier->include_sales_values,
+            'attach_csv' => (bool) $supplier->attach_sales_csv,
         ];
     }
 

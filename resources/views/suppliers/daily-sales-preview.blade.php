@@ -88,6 +88,10 @@
                                         <span class="inline-block bg-gray-700 text-amber-300 rounded px-2 py-0.5 text-xs ml-1"
                                               title="This supplier's email hides all € values">€ hidden from supplier</span>
                                     @endunless
+                                    @unless ($supplier->attach_sales_csv)
+                                        <span class="inline-block bg-gray-700 text-sky-300 rounded px-2 py-0.5 text-xs ml-1"
+                                              title="This supplier's email has no CSV attachment">no CSV</span>
+                                    @endunless
                                 </td>
                                 <td class="px-4 py-3 text-sm text-gray-400">{{ $supplier->email }}</td>
                                 @if ($row['has_sales'])
