@@ -17,6 +17,7 @@ class StockValuationSnapshot extends Model
         'status',
         'calculated_total',
         'adjusted_total',
+        'diagnostics',
         'notes',
         'created_by',
         'finalized_by',
@@ -27,6 +28,7 @@ class StockValuationSnapshot extends Model
         'valuation_date' => 'date',
         'calculated_total' => 'decimal:2',
         'adjusted_total' => 'decimal:2',
+        'diagnostics' => 'array',
         'finalized_at' => 'datetime',
     ];
 

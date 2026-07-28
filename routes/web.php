@@ -941,6 +941,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/', [\App\Http\Controllers\Management\StockValuationController::class, 'index'])->name('index');
             Route::get('/live', [\App\Http\Controllers\Management\StockValuationController::class, 'live'])->name('live');
             Route::get('/live/category/{category}', [\App\Http\Controllers\Management\StockValuationController::class, 'liveCategory'])->name('live.category');
+            Route::post('/adjust-cost', [\App\Http\Controllers\Management\StockValuationController::class, 'adjustCost'])->name('adjust-cost');
             Route::get('/create', [\App\Http\Controllers\Management\StockValuationController::class, 'create'])->name('create');
             Route::post('/', [\App\Http\Controllers\Management\StockValuationController::class, 'store'])->name('store');
             Route::get('/{snapshot}', [\App\Http\Controllers\Management\StockValuationController::class, 'show'])->name('show');

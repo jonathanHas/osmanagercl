@@ -49,6 +49,38 @@ class StockValuationController extends Controller
     }
 
     /**
+     * Divide a product's cost price down to a per-unit figure.
+     *
+     * Reached from the cost anomaly panel on the live valuation, where a case
+     * or bulk-container cost has been entered against a per-unit sell price.
+     */
+    public function adjustCost(Request $request)
+    {
+        $validated = $request->validate([
+            'product_id' => 'required|string',
+            'divisor' => 'required|numeric|min:0.0001|max:10000',
+        ]);
+
+        try {
+            $result = $this->valuationService->adjustCostPrice(
+                $validated['product_id'],
+                (float) $validated['divisor'],
+                auth()->id()
+            );
+        } catch (\Exception $e) {
+            return back()->with('error', 'Could not update cost price: '.$e->getMessage());
+        }
+
+        return back()->with('success', sprintf(
+            'Cost price for %s updated from %s to %s (divided by %s).',
+            $result['product_name'],
+            number_format($result['old_cost'], 4),
+            number_format($result['new_cost'], 4),
+            rtrim(rtrim(number_format((float) $validated['divisor'], 4), '0'), '.')
+        ));
+    }
+
+    /**
      * Show the form for creating a new snapshot.
      */
     public function create()

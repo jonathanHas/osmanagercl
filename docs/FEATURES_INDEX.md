@@ -736,6 +736,23 @@ Complete invoice and supplier data migration from legacy OSAccounts system.
 
 ## Analytics & Reporting
 
+### Stock Valuation
+Point-in-time valuation of stock on hand, for accounts and internal reporting (`/management/stock-valuation`).
+- **Live View**: current value of all stock by category, with drill-down to individual products
+- **Basis**: cost price (`PRODUCTS.PRICEBUY`) × units on hand, **ex-VAT** — a replacement-cost basis, not FIFO or lower-of-cost-and-NRV
+- **Positive-Stock Flooring** (FIX 2026-07-28): products must be net-positive across all locations to count. Previously the total summed negative stock too and reported **−€86,074.74**; it now reports **€56,840.22**
+- **Excluded Lines Reported**: 365 permanently-negative lines (made-to-order coffee, quiche, loose eggs/fruit/veg — sold at the till but never booked in) are listed separately with their notional value rather than silently dropped
+- **Cost Price Anomalies**: flags stocked products whose cost exceeds sell price (usually a case cost entered against a unit price) — included in the total but surfaced for correction
+- **In-Place Cost Correction** (2026-07-28): a "divide cost by" box on each anomaly line converts a bulk/case cost to a per-unit cost, with a live preview of the resulting cost, margin and stock value before committing. Suggested divisors come from `supplier_link.CaseUnits` or the pack size in the product name, and are always click-to-apply rather than automatic
+- **Cost Change Audit**: every adjustment is recorded in `cost_price_adjustments` (old cost, new cost, divisor, user) — the POS keeps no price history, so this is the only way back from a mistaken change. The audit and the POS write are atomic across both databases
+- **Snapshots**: named point-in-time valuations (e.g. "Year End 2026") with draft → finalized workflow; finalized snapshots are locked against refresh, override and delete
+- **Category Overrides**: manual value override per category with a recorded reason, for stocktake adjustments
+- **Exact Reconciliation**: header total, category summary and every detail line tie to the cent, and survive finalization
+- **Audit Trail**: `diagnostics` JSON on each snapshot records what was excluded at the time the valuation was taken
+- **CSV Export**: category summary, full product detail, plus excluded-lines and anomaly blocks
+- **Performance**: single aggregate query on the POS connection (~260ms) with batched snapshot writes
+- **Role-based Access**: Admin and Manager only
+
 ### Sales Accounting Report System
 VAT-compliant sales analysis with proper revenue/transfer separation and comprehensive export capabilities.
 - **Accurate Revenue Calculation**: Excludes voucher sales to provide true customer revenue figures

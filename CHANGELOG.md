@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **📦 Stock Valuation now reports a usable figure and is reachable from the menu** (2026-07-28)
+  - The stock valuation feature (`/management/stock-valuation`, added 2026-01-02) had **never been usable**: it had **no navigation link anywhere** — only reachable by typing the URL — and it **totalled to a negative number** (−€86,074.74 live; the sole saved snapshot read −€99,842)
+  - **Root cause**: the valuation summed *every* `STOCKCURRENT` row including negative stock. 365 lines carry permanently negative stock (`co Cappuccino` −5,066.7 units, `co Americano` −4,381.1, `Latte` −2,717, plus quiche, loose eggs, loose fruit & veg) — made-to-order and loose lines that are sold at the till but never booked in. Their −€142,914.96 swamped the +€56,840.22 of real stock
+  - **Fix**: stock is now floored at zero — a product must be **net-positive across all locations** to be counted (`SUM(UNITS)` grouped per product, `HAVING SUM(UNITS) > 0`). Live valuation now reports **€56,840.22**
+  - **Excluded lines are reported, not hidden**: a new amber *"Excluded — Negative Stock"* panel on the live view lists the worst offenders with counts and notional value, so the headline figure is never read without its caveat. Mirrored as an `EXCLUDED - NEGATIVE STOCK` block in the CSV export
+  - **New "Cost Price Anomalies" panel**: flags the 19 stocked products whose `PRICEBUY` exceeds `PRICESELL` (€4,713.62 of the total) — typically a case cost entered against a unit price, mostly bulk Refills lines. These *are* included in the total and may inflate it, so they are surfaced for correction rather than silently absorbed
+  - **Exact reconciliation**: line values are rounded at source so category subtotals and the grand total are exact sums of the printed detail — header total, category summary and 2,626 detail lines all tie to €56,840.22, and the figure survives `finalize()` (previously the per-category `decimal(12,2)` rounding left the finalized total 2c adrift from its own detail)
+  - **Performance**: `calculateLiveValuation()` replaced a full-catalogue `Product::with(['stockCurrent','category'])->get()` + PHP aggregation with a single aggregate query on the `pos` connection (~260ms). Snapshot items now batch-insert in chunks of 500 instead of ~2,626 individual `create()` calls
+  - **Audit trail**: new nullable `diagnostics` JSON column on `stock_valuation_snapshots` records what was excluded *at the time the valuation was taken*, so a finalized snapshot stays defensible after the underlying data moves on
+  - **CSV export hardened**: switched from hand-rolled `sprintf('"%s",…')` quoting to `fputcsv`, which previously produced a broken file for any product or category name containing a `"`
+  - **Navigation**: *Stock Valuation* added to the **Stock** sidebar section, gated `@if(auth()->user()->hasAnyRole(['admin','manager']))` to match the route's `role:admin,manager` middleware (the section itself only excludes baristas)
+  - **Basis note for accounts**: stock at cost, **ex-VAT**, at current `PRICEBUY` — a replacement-cost basis, not FIFO or lower-of-cost-and-NRV. Fine for management accounts; confirm with your accountant before using a finalized snapshot in statutory year-end figures. `supplier_link.Cost` was evaluated as an alternative basis and rejected — it covers only 94 stocked products and moves the total by ~€49
+  - **New**: migration `2026_07_28_100000_add_diagnostics_to_stock_valuation_snapshots_table.php`
+  - **Modified**: `app/Services/StockValuationService.php`, `app/Models/StockValuationSnapshot.php`, `resources/views/management/stock-valuation/live.blade.php`, `resources/views/layouts/admin.blade.php`
+  - ⚠️ **Underlying data issue remains**: those 365 negative lines mean stock movement genuinely isn't tracked for those products. Excluding them makes the valuation correct, but booking them in properly (or marking them non-stock) is the real fix
+
+- **🔧 Fix bulk/case cost prices directly from the anomaly panel** (2026-07-28)
+  - Each line in the **Cost Price Anomalies** panel now has a **"divide cost by"** box and an **Update cost** button, for the common case where a bulk-container or case cost has been entered against a per-unit sell price (e.g. *TruEco Laundry Detergent Bulk 20L* at €57.35 cost vs €4.01 sell — the cost is for the 20L drum, the sell is per litre)
+  - **Live preview before committing**: typing a divisor immediately shows the resulting per-unit cost, the **resulting margin**, and the effect on that line's stock value (`€1,319.05 → €65.95`). Margins above 60% are flagged amber (*"unusually high, check the divisor"*) and negative margins red, so a wrong divisor is visible before it is applied
+  - **Suggested divisors**: a click-to-apply chip drawn from `supplier_link.CaseUnits` (where above 1) or the pack size parsed from the product name (`20L`, `10L`, `5L`, `30Bags`, `x12`). Covers **12 of the 19** current anomalies. Deliberately **never auto-applied** — both sources are unreliable (`CaseUnits` is 0 or 1 for several bulk lines), so a human confirms every change. `ml` sizes are intentionally not parsed: a 400ml bottle sold as one bottle needs no divisor
+  - **Full audit trail**: new `cost_price_adjustments` table records product, **old and new cost**, sell price, divisor, source and user. The POS keeps no price history of its own, so this is the only route back from a mistaken adjustment
+  - **Atomic across two databases**: the audit row (Laravel connection) is written *first* inside a transaction, then `PRICEBUY` (POS connection). A failed POS write rolls the audit back; a failed audit leaves the POS untouched — a cost price can never change without a record of what it was. Verified in both directions
+  - **Bounded input**: divisor validated `0.0001–10000` at the controller *and* in the service, with a floor on the resulting cost. (The service-level bounds were added after testing found a divisor of 1,000,000 wrote `PRICEBUY = 0.0001` and *then* failed the audit insert — leaving a corrupted price with no record. Fixed by the transaction ordering above plus `MAX_DIVISOR`/`MIN_COST`)
+  - Confirmation dialog names the product and both prices; the panel stays open after an update so the next line can be worked straight away; the live view now renders flash messages (it previously had none, so redirects were silent)
+  - **New**: `app/Models/CostPriceAdjustment.php`, migration `2026_07_28_110000_create_cost_price_adjustments_table.php`, route `management.stock-valuation.adjust-cost`
+  - **Modified**: `app/Services/StockValuationService.php` (`suggestDivisor()`, `adjustCostPrice()`), `app/Http/Controllers/Management/StockValuationController.php` (`adjustCost()`), `resources/views/management/stock-valuation/live.blade.php`, `routes/web.php`
+  - ⚠️ **Check stock units too**: dividing the cost assumes `STOCKCURRENT.UNITS` is already counted in the *selling* unit (litres, not drums). Where that isn't true the stock quantity needs correcting as well — this tool only fixes the cost side
+
 ### Added
 
 - **📧 Daily supplier sales email** (2026-07-24)
