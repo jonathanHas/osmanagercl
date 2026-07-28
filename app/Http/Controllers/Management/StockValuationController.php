@@ -67,17 +67,100 @@ class StockValuationController extends Controller
                 (float) $validated['divisor'],
                 auth()->id()
             );
+        } catch (\InvalidArgumentException $e) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+
+            return back()->with('error', 'Could not update cost price: '.$e->getMessage());
+        } catch (\RuntimeException $e) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->getMessage()], 404);
+            }
+
+            return back()->with('error', 'Could not update cost price: '.$e->getMessage());
         } catch (\Exception $e) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->getMessage()], 500);
+            }
+
             return back()->with('error', 'Could not update cost price: '.$e->getMessage());
         }
 
-        return back()->with('success', sprintf(
+        $message = sprintf(
             'Cost price for %s updated from %s to %s (divided by %s).',
             $result['product_name'],
             number_format($result['old_cost'], 4),
             number_format($result['new_cost'], 4),
             rtrim(rtrim(number_format((float) $validated['divisor'], 4), '0'), '.')
-        ));
+        );
+
+        if ($request->expectsJson()) {
+            return response()->json(array_merge($result, ['message' => $message]));
+        }
+
+        return back()->with('success', $message);
+    }
+
+    /**
+     * The highest-value stock lines, for review.
+     *
+     * Loaded on demand rather than with the page: the sales-velocity lookup it
+     * needs costs about half a second, which would undo the live view's load time.
+     */
+    public function highValue()
+    {
+        return response()->json($this->valuationService->getHighValueLines());
+    }
+
+    /**
+     * Correct a product's stock quantity.
+     */
+    public function adjustStock(Request $request)
+    {
+        $validated = $request->validate([
+            'product_id' => 'required|string',
+            'units' => 'required|numeric|min:0|max:1000000',
+        ]);
+
+        try {
+            $result = $this->valuationService->adjustStockQuantity(
+                $validated['product_id'],
+                (float) $validated['units'],
+                auth()->id()
+            );
+        } catch (\InvalidArgumentException $e) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+
+            return back()->with('error', 'Could not update stock: '.$e->getMessage());
+        } catch (\RuntimeException $e) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->getMessage()], 404);
+            }
+
+            return back()->with('error', 'Could not update stock: '.$e->getMessage());
+        } catch (\Exception $e) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->getMessage()], 500);
+            }
+
+            return back()->with('error', 'Could not update stock: '.$e->getMessage());
+        }
+
+        $message = sprintf(
+            'Stock for %s updated from %s to %s units.',
+            $result['product_name'],
+            rtrim(rtrim(number_format($result['old_units'], 2), '0'), '.'),
+            rtrim(rtrim(number_format($result['new_units'], 2), '0'), '.')
+        );
+
+        if ($request->expectsJson()) {
+            return response()->json(array_merge($result, ['message' => $message]));
+        }
+
+        return back()->with('success', $message);
     }
 
     /**

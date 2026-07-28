@@ -5,6 +5,9 @@ namespace App\Services;
 use App\Models\Category;
 use App\Models\CostPriceAdjustment;
 use App\Models\Product;
+use App\Models\StockAdjustment;
+use App\Models\StockCurrent;
+use App\Models\StockDiary;
 use App\Models\StockValuationCategory;
 use App\Models\StockValuationItem;
 use App\Models\StockValuationSnapshot;
@@ -35,6 +38,26 @@ class StockValuationService
     protected const MAX_DIVISOR = 10000;
 
     protected const MIN_COST = 0.0001;
+
+    /**
+     * Upper bound on a manually entered stock quantity.
+     */
+    protected const MAX_UNITS = 1000000;
+
+    /**
+     * How many of the highest-value stock lines to surface for review.
+     */
+    protected const HIGH_VALUE_LIMIT = 50;
+
+    /**
+     * Window used to work out how fast a product sells.
+     */
+    protected const VELOCITY_DAYS = 90;
+
+    /**
+     * Cached most-recent sale date; several lookups share it.
+     */
+    protected ?string $latestSaleDate = null;
 
     /**
      * Calculate live valuation from current POS data (no snapshot).
@@ -206,19 +229,19 @@ class StockValuationService
 
         $notionalValue = 0.0;
         foreach ($rows as $row) {
-            $notionalValue += (float) $row->LINE_VALUE;
+            $notionalValue += round((float) $row->LINE_VALUE, 2);
         }
 
         return [
             'line_count' => count($rows),
-            'notional_value' => $notionalValue,
+            'notional_value' => round($notionalValue, 2),
             'items' => array_map(fn ($row) => [
                 'product_code' => $row->CODE,
                 'product_name' => $row->NAME,
                 'category_name' => $row->CATEGORY_NAME ?? 'Uncategorized',
                 'unit_cost' => (float) $row->PRICEBUY,
                 'stock_units' => (float) $row->UNITS,
-                'line_value' => (float) $row->LINE_VALUE,
+                'line_value' => round((float) $row->LINE_VALUE, 2),
             ], array_slice($rows, 0, self::DIAGNOSTIC_LIMIT)),
             'truncated' => count($rows) > self::DIAGNOSTIC_LIMIT,
         ];
@@ -239,29 +262,32 @@ class StockValuationService
                     c.NAME AS CATEGORY_NAME,
                     p.PRICEBUY,
                     p.PRICESELL,
-                    sl.CaseUnits,
                     SUM(sc.UNITS) AS UNITS,
                     SUM(sc.UNITS) * p.PRICEBUY AS LINE_VALUE
              FROM STOCKCURRENT sc
              JOIN PRODUCTS p ON p.ID = sc.PRODUCT
              LEFT JOIN CATEGORIES c ON c.ID = p.CATEGORY
-             LEFT JOIN supplier_link sl ON sl.Barcode = p.CODE
              WHERE p.PRICEBUY > p.PRICESELL
-             GROUP BY p.ID, p.CODE, p.NAME, c.NAME, p.PRICEBUY, p.PRICESELL, sl.CaseUnits
+             GROUP BY p.ID, p.CODE, p.NAME, c.NAME, p.PRICEBUY, p.PRICESELL
              HAVING SUM(sc.UNITS) > 0
              ORDER BY LINE_VALUE DESC'
         );
 
+        $caseUnits = $this->fetchCaseUnits(array_column($rows, 'CODE'));
+
+        // Rounded per line, matching calculateLiveValuation() -- the panel's
+        // total has to stay consistent with the per-adjustment deltas the
+        // client applies to it, which are themselves cent-rounded.
         $value = 0.0;
         foreach ($rows as $row) {
-            $value += (float) $row->LINE_VALUE;
+            $value += round((float) $row->LINE_VALUE, 2);
         }
 
         return [
             'line_count' => count($rows),
-            'value' => $value,
-            'items' => array_map(function ($row) {
-                $suggestion = $this->suggestDivisor($row->NAME, $row->CaseUnits ?? null);
+            'value' => round($value, 2),
+            'items' => array_map(function ($row) use ($caseUnits) {
+                $suggestion = $this->suggestDivisor($row->NAME, $caseUnits[$row->CODE] ?? null);
 
                 return [
                     'product_id' => $row->ID,
@@ -271,13 +297,170 @@ class StockValuationService
                     'unit_cost' => (float) $row->PRICEBUY,
                     'sell_price' => (float) $row->PRICESELL,
                     'stock_units' => (float) $row->UNITS,
-                    'line_value' => (float) $row->LINE_VALUE,
+                    'line_value' => round((float) $row->LINE_VALUE, 2),
                     'suggested_divisor' => $suggestion['divisor'],
                     'suggestion_source' => $suggestion['source'],
                 ];
             }, array_slice($rows, 0, self::DIAGNOSTIC_LIMIT)),
             'truncated' => count($rows) > self::DIAGNOSTIC_LIMIT,
         ];
+    }
+
+    /**
+     * The highest-value stock lines, for review.
+     *
+     * Cost anomalies are excluded -- they have their own panel, and their value
+     * is inflated by a wrong cost rather than a wrong quantity. What is left is
+     * money tied up in stock, where an implausible figure usually means the
+     * quantity is wrong.
+     *
+     * Days of cover (units divided by recent daily sales) is what separates a
+     * large holding of a fast seller from a quantity that cannot be right.
+     */
+    public function getHighValueLines(int $limit = self::HIGH_VALUE_LIMIT): array
+    {
+        $rows = DB::connection('pos')->select(
+            'SELECT p.ID,
+                    p.CODE,
+                    p.NAME,
+                    c.NAME AS CATEGORY_NAME,
+                    p.PRICEBUY,
+                    p.PRICESELL,
+                    SUM(sc.UNITS) AS UNITS,
+                    SUM(sc.UNITS) * p.PRICEBUY AS LINE_VALUE
+             FROM STOCKCURRENT sc
+             JOIN PRODUCTS p ON p.ID = sc.PRODUCT
+             LEFT JOIN CATEGORIES c ON c.ID = p.CATEGORY
+             WHERE p.PRICEBUY <= p.PRICESELL
+             GROUP BY p.ID, p.CODE, p.NAME, c.NAME, p.PRICEBUY, p.PRICESELL
+             HAVING SUM(sc.UNITS) > 0
+             ORDER BY LINE_VALUE DESC
+             LIMIT '.(int) $limit
+        );
+
+        $velocity = $this->fetchSalesVelocity(array_column($rows, 'ID'));
+
+        $items = array_map(function ($row) use ($velocity) {
+            $units = (float) $row->UNITS;
+            $sold = (float) ($velocity[$row->ID] ?? 0);
+            $perDay = $sold / self::VELOCITY_DAYS;
+
+            return [
+                'product_id' => $row->ID,
+                'product_code' => $row->CODE,
+                'product_name' => $row->NAME,
+                'category_name' => $row->CATEGORY_NAME ?? 'Uncategorized',
+                'unit_cost' => (float) $row->PRICEBUY,
+                'sell_price' => (float) $row->PRICESELL,
+                'stock_units' => $units,
+                'line_value' => round((float) $row->LINE_VALUE, 2),
+                'units_sold' => $sold,
+                // Null means nothing sold in the window -- "never sold", which is
+                // a stronger signal than any number of days.
+                'days_cover' => $perDay > 0 ? (int) round($units / $perDay) : null,
+            ];
+        }, $rows);
+
+        return [
+            'line_count' => count($items),
+            'value' => round(array_sum(array_column($items, 'line_value')), 2),
+            'velocity_days' => self::VELOCITY_DAYS,
+            'velocity_to' => $this->latestSaleDate(),
+            'items' => $items,
+        ];
+    }
+
+    /**
+     * Units sold per product over the velocity window.
+     *
+     * The window ends at the most recent sale in the POS rather than today, so
+     * the figure stays meaningful against a database snapshot that has stopped
+     * receiving sales. On a live POS the two are the same day.
+     *
+     * @param  array<int, string>  $productIds
+     * @return array<string, float> product id => units sold
+     */
+    protected function fetchSalesVelocity(array $productIds): array
+    {
+        $productIds = array_values(array_filter(array_unique($productIds)));
+
+        if (empty($productIds)) {
+            return [];
+        }
+
+        $latest = $this->latestSaleDate();
+
+        if ($latest === null) {
+            return [];
+        }
+
+        $from = Carbon::parse($latest)->subDays(self::VELOCITY_DAYS)->toDateTimeString();
+        $placeholders = implode(',', array_fill(0, count($productIds), '?'));
+
+        $rows = DB::connection('pos')->select(
+            'SELECT PRODUCT, SUM(ABS(UNITS)) AS SOLD
+             FROM STOCKDIARY
+             WHERE REASON = '.StockDiary::REASON_SALE."
+               AND PRODUCT IN ({$placeholders})
+               AND DATENEW >= ?
+             GROUP BY PRODUCT",
+            array_merge($productIds, [$from])
+        );
+
+        $velocity = [];
+        foreach ($rows as $row) {
+            $velocity[$row->PRODUCT] = (float) $row->SOLD;
+        }
+
+        return $velocity;
+    }
+
+    /**
+     * The most recent stock movement recorded in the POS.
+     *
+     * Intentionally unfiltered by REASON: there is an index on DATENEW but not
+     * on REASON, so adding the filter turns a 1ms index lookup into a ~600ms
+     * full scan for the same answer -- the latest movement is a sale in any
+     * trading business.
+     */
+    protected function latestSaleDate(): ?string
+    {
+        return $this->latestSaleDate ??= DB::connection('pos')
+            ->selectOne('SELECT MAX(DATENEW) AS D FROM STOCKDIARY')
+            ?->D;
+    }
+
+    /**
+     * Look up supplier case units for a specific set of barcodes.
+     *
+     * Deliberately a second query rather than a join: joining supplier_link
+     * across the whole PRODUCTS x STOCKCURRENT set to decorate a handful of
+     * rows costs ~750ms, against ~8ms for this lookup.
+     *
+     * @param  array<int, string>  $codes
+     * @return array<string, mixed> barcode => case units
+     */
+    protected function fetchCaseUnits(array $codes): array
+    {
+        $codes = array_values(array_filter(array_unique($codes)));
+
+        if (empty($codes)) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($codes), '?'));
+
+        $links = DB::connection('pos')->select(
+            "SELECT Barcode, CaseUnits FROM supplier_link WHERE Barcode IN ({$placeholders})",
+            $codes
+        );
+
+        $caseUnits = [];
+        foreach ($links as $link) {
+            $caseUnits[$link->Barcode] = $link->CaseUnits;
+        }
+
+        return $caseUnits;
     }
 
     /**
@@ -353,19 +536,29 @@ class StockValuationService
             throw new \InvalidArgumentException('That divisor would reduce the cost price to effectively zero.');
         }
 
+        // Units on hand, so the caller can adjust a displayed valuation by the
+        // exact delta instead of recomputing the whole thing.
+        $units = (float) (DB::connection('pos')
+            ->selectOne('SELECT SUM(UNITS) AS UNITS FROM STOCKCURRENT WHERE PRODUCT = ?', [$product->ID])
+            ?->UNITS ?? 0);
+
+        $sellPrice = (float) $product->PRICESELL;
+        $oldLineValue = round($units * $oldCost, 2);
+        $newLineValue = round($units * $newCost, 2);
+
         // The audit lives on the Laravel connection and the price on the POS
         // connection, so one transaction cannot cover both. Writing the audit
         // first inside a transaction means a failed POS write rolls the audit
         // back, and a failed audit leaves the POS untouched -- a price can
         // never change without a record of what it was.
-        return DB::transaction(function () use ($product, $oldCost, $newCost, $divisor, $userId) {
+        return DB::transaction(function () use ($product, $oldCost, $newCost, $divisor, $userId, $units, $sellPrice, $oldLineValue, $newLineValue) {
             CostPriceAdjustment::create([
                 'product_id' => $product->ID,
                 'product_code' => $product->CODE,
                 'product_name' => $product->NAME,
                 'old_cost' => $oldCost,
                 'new_cost' => $newCost,
-                'sell_price' => $product->PRICESELL,
+                'sell_price' => $sellPrice,
                 'divisor' => $divisor,
                 'source' => 'valuation_anomaly',
                 'user_id' => $userId,
@@ -375,9 +568,18 @@ class StockValuationService
             $product->save();
 
             return [
+                'product_id' => $product->ID,
                 'product_name' => $product->NAME,
                 'old_cost' => $oldCost,
                 'new_cost' => $newCost,
+                'sell_price' => $sellPrice,
+                'stock_units' => $units,
+                'old_line_value' => $oldLineValue,
+                'new_line_value' => $newLineValue,
+                'delta' => round($newLineValue - $oldLineValue, 2),
+                // A divisor that was too small leaves the product still costing
+                // more than it sells for, so it stays in the anomaly list.
+                'still_anomaly' => $newCost > $sellPrice,
             ];
         });
     }
@@ -495,6 +697,77 @@ class StockValuationService
                 'items' => $liveData['cost_anomalies']['items'],
             ],
         ];
+    }
+
+    /**
+     * Set a product's stock quantity to a corrected figure.
+     *
+     * Writes STOCKCURRENT.UNITS in the POS and records the movement in
+     * stock_adjustments, the same audit table the stock review uses. Unlike a
+     * cost price, a stock figure has no other source to recover it from, so the
+     * record is the only way back.
+     *
+     * @return array{product_name: string, old_units: float, new_units: float, delta: float}
+     */
+    public function adjustStockQuantity(string $productId, float $newUnits, int $userId): array
+    {
+        if ($newUnits < 0) {
+            throw new \InvalidArgumentException('Stock quantity cannot be negative.');
+        }
+
+        if ($newUnits > self::MAX_UNITS) {
+            throw new \InvalidArgumentException('Stock quantity must be '.number_format(self::MAX_UNITS).' or less.');
+        }
+
+        $product = Product::find($productId);
+
+        if (! $product) {
+            throw new \RuntimeException('Product not found.');
+        }
+
+        $current = DB::connection('pos')
+            ->selectOne('SELECT SUM(UNITS) AS UNITS FROM STOCKCURRENT WHERE PRODUCT = ?', [$product->ID]);
+
+        if ($current === null || $current->UNITS === null) {
+            throw new \RuntimeException('No stock record exists for this product.');
+        }
+
+        $oldUnits = (float) $current->UNITS;
+        $newUnits = round($newUnits, 2);
+        $cost = (float) $product->PRICEBUY;
+
+        $oldLineValue = round($oldUnits * $cost, 2);
+        $newLineValue = round($newUnits * $cost, 2);
+
+        // Audit first inside a transaction, then the POS write -- the two live
+        // on different connections, so this ordering is what guarantees a stock
+        // figure can never change without a record of what it was.
+        return DB::transaction(function () use ($product, $oldUnits, $newUnits, $cost, $oldLineValue, $newLineValue, $userId) {
+            StockAdjustment::create([
+                'barcode' => $product->CODE,
+                'product_id' => $product->ID,
+                'old_stock' => $oldUnits,
+                'new_stock' => $newUnits,
+                'adjustment' => round($newUnits - $oldUnits, 2),
+                'user_id' => $userId,
+                'source' => 'valuation_high_value',
+            ]);
+
+            StockCurrent::where('PRODUCT', $product->ID)->update(['UNITS' => $newUnits]);
+
+            return [
+                'product_id' => $product->ID,
+                'product_name' => $product->NAME,
+                'unit_cost' => $cost,
+                'old_units' => $oldUnits,
+                'new_units' => $newUnits,
+                'old_line_value' => $oldLineValue,
+                'new_line_value' => $newLineValue,
+                'delta' => round($newLineValue - $oldLineValue, 2),
+                // Zero stock drops the product out of the valuation entirely.
+                'still_stocked' => $newUnits > 0,
+            ];
+        });
     }
 
     /**
