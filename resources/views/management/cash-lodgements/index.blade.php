@@ -383,7 +383,19 @@
                     @forelse($lodgements as $lodgement)
                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                         <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">{{ $lodgement->lodgement_date->format('D, M j, Y') }}</td>
-                        <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ $lodgement->closedCash?->DATEEND?->format('D, M j, Y') ?? '-' }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                            @php $coveredDates = $lodgement->covered_dates; @endphp
+                            @if($coveredDates->count() > 1)
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-300">
+                                    {{ $coveredDates->count() }} days
+                                </span>
+                                <span class="ml-1">{{ $coveredDates->first()->format('M j') }} &ndash; {{ $coveredDates->last()->format('M j, Y') }}</span>
+                            @elseif($coveredDates->count() === 1)
+                                {{ $coveredDates->first()->format('D, M j, Y') }}
+                            @else
+                                {{ $lodgement->closedCash?->DATEEND?->format('D, M j, Y') ?? '-' }}
+                            @endif
+                        </td>
                         <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ $lodgement->till_name ?: '-' }}</td>
                         <td class="px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-white">€{{ number_format($lodgement->total_amount, 2) }}</td>
                         <td class="px-4 py-3 text-sm">

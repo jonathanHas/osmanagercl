@@ -14,6 +14,12 @@
                     <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Cash Lodgement Details</h1>
                     <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
                         Lodged on {{ $lodgement->lodgement_date->format('F j, Y') }}
+                        @php $coveredDates = $lodgement->covered_dates; @endphp
+                        @if($coveredDates->count() > 1)
+                            <span class="text-gray-500 dark:text-gray-500">&middot;</span>
+                            covers {{ $coveredDates->count() }} trading days
+                            ({{ $coveredDates->first()->format('M j') }} &ndash; {{ $coveredDates->last()->format('M j, Y') }})
+                        @endif
                         @if($lodgement->imported_from_legacy)
                             <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 ml-2">
                                 Imported from Legacy
@@ -92,6 +98,14 @@
                     @endif
                 </div>
             </div>
+
+            <!-- Days Included (per-bag breakdown) -->
+            @if($bagVerifications->count() > 0)
+                @include('management.cash-lodgements.partials.days-included', [
+                    'bagVerifications' => $bagVerifications,
+                    'lodgement' => $lodgement,
+                ])
+            @endif
 
             <!-- Match Status -->
             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
@@ -320,12 +334,23 @@
                         </p>
                     </div>
                     <div class="p-4 space-y-3">
-                        @foreach($relatedReconciliations as $reconciliation)
-                            @include('management.cash-lodgements.partials.reconciliation-comparison', [
-                                'reconciliation' => $reconciliation,
-                                'lodgement' => $lodgement,
-                            ])
-                        @endforeach
+                        @if($bagVerifications->count() > 0)
+                            @foreach($bagVerifications as $verification)
+                                @continue(! $verification->reconciliation)
+                                @include('management.cash-lodgements.partials.reconciliation-comparison', [
+                                    'reconciliation' => $verification->reconciliation,
+                                    'lodgement' => $lodgement,
+                                    'verification' => $verification,
+                                ])
+                            @endforeach
+                        @else
+                            @foreach($relatedReconciliations as $reconciliation)
+                                @include('management.cash-lodgements.partials.reconciliation-comparison', [
+                                    'reconciliation' => $reconciliation,
+                                    'lodgement' => $lodgement,
+                                ])
+                            @endforeach
+                        @endif
                     </div>
                 </div>
             @endif

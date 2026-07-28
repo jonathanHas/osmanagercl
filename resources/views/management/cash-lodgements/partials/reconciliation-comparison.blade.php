@@ -1,11 +1,15 @@
 {{-- Reconciliation vs Lodgement Comparison Panel --}}
 {{-- Expects: $reconciliation (CashReconciliation), $lodgement (CashLodgement) --}}
+{{-- Optional: $verification (CashBagVerification) - the bag banked for THIS day. When a
+     lodgement spans several days, comparing the whole lodgement total against one day's
+     available-to-lodge produces a meaningless variance, so compare the day's bag instead. --}}
 @php
+    $verification = $verification ?? null;
     $totalCash = $reconciliation->calculateTotalCash();
     $totalFloat = $reconciliation->total_float;
     $supplierPayments = $reconciliation->total_supplier_payments;
     $availableToLodge = $reconciliation->calculateAvailableToLodge();
-    $lodgedAmount = $lodgement->cash_amount;
+    $lodgedAmount = $verification ? (float) $verification->counted_total : (float) $lodgement->cash_amount;
     $variance = $lodgedAmount - $availableToLodge;
     $absVariance = abs($variance);
     $varianceClass = $absVariance < 1
@@ -49,35 +53,48 @@
                         <span>Float retained</span>
                         <span>-€{{ number_format($totalFloat, 2) }}</span>
                     </div>
-                    <div class="flex justify-between text-gray-500 dark:text-gray-500">
-                        <span>Supplier payments</span>
-                        <span>-€{{ number_format($supplierPayments, 2) }}</span>
-                    </div>
                     <div class="border-t dark:border-gray-700 pt-1.5 flex justify-between font-bold text-indigo-700 dark:text-indigo-400">
                         <span>Available to Lodge</span>
                         <span>€{{ number_format($availableToLodge, 2) }}</span>
                     </div>
+                    @if($supplierPayments > 0)
+                    {{-- Informational only: supplier payments are already out of the drawer,
+                         so calculateAvailableToLodge() does not subtract them again. --}}
+                    <div class="flex justify-between text-xs text-gray-500 dark:text-gray-500 pt-0.5">
+                        <span>Supplier payments (already out of drawer)</span>
+                        <span>€{{ number_format($supplierPayments, 2) }}</span>
+                    </div>
+                    @endif
                 </div>
             </div>
 
             {{-- Lodgement Side --}}
             <div>
-                <h5 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Lodgement</h5>
+                <h5 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                    {{ $verification ? 'Bag Banked This Day' : 'Lodgement' }}
+                </h5>
                 <div class="space-y-1.5 text-sm">
                     <div class="flex justify-between">
                         <span class="text-gray-600 dark:text-gray-400">Cash Lodged</span>
-                        <span class="font-medium text-gray-900 dark:text-white">€{{ number_format($lodgement->cash_amount, 2) }}</span>
+                        <span class="font-medium text-gray-900 dark:text-white">€{{ number_format($lodgedAmount, 2) }}</span>
                     </div>
-                    @if($lodgement->cheque_amount > 0)
-                    <div class="flex justify-between">
-                        <span class="text-gray-600 dark:text-gray-400">Cheque Lodged</span>
-                        <span class="text-gray-700 dark:text-gray-300">€{{ number_format($lodgement->cheque_amount, 2) }}</span>
+                    @if($verification)
+                    <div class="text-xs text-gray-500 dark:text-gray-500">
+                        Part of a €{{ number_format($lodgement->total_amount, 2) }} lodgement
+                        banked on {{ $lodgement->lodgement_date->format('M j, Y') }}
                     </div>
+                    @else
+                        @if($lodgement->cheque_amount > 0)
+                        <div class="flex justify-between">
+                            <span class="text-gray-600 dark:text-gray-400">Cheque Lodged</span>
+                            <span class="text-gray-700 dark:text-gray-300">€{{ number_format($lodgement->cheque_amount, 2) }}</span>
+                        </div>
+                        @endif
+                        <div class="flex justify-between">
+                            <span class="text-gray-600 dark:text-gray-400">Total Lodged</span>
+                            <span class="font-medium text-gray-900 dark:text-white">€{{ number_format($lodgement->total_amount, 2) }}</span>
+                        </div>
                     @endif
-                    <div class="flex justify-between">
-                        <span class="text-gray-600 dark:text-gray-400">Total Lodged</span>
-                        <span class="font-medium text-gray-900 dark:text-white">€{{ number_format($lodgement->total_amount, 2) }}</span>
-                    </div>
                 </div>
             </div>
         </div>

@@ -29,7 +29,7 @@ class CashLodgementController extends Controller
 
         // Get cash lodgements with pagination
         $query = CashLodgement::whereBetween('lodgement_date', [$startDate, $endDate])
-            ->with(['matches.cashReconciliation', 'closedCash']);
+            ->with(['matches.cashReconciliation', 'closedCash', 'bagVerifications.reconciliation']);
 
         // Filter by till if specified
         if ($request->filled('till')) {
@@ -176,15 +176,28 @@ class CashLodgementController extends Controller
     {
         $lodgement->load([
             'matches.cashReconciliation.payments',
+            'bagVerifications.reconciliation.payments',
+            'bagVerifications.reconciliation.notes',
+            'bagVerifications.verifier',
             'bankTransaction',
             'creator',
             'updater',
         ]);
 
-        // Get related reconciliations for context
-        $relatedReconciliations = CashReconciliation::where('closed_cash_id', $lodgement->money_id)
-            ->with(['payments', 'notes'])
-            ->get();
+        // The verified bags are the source of truth for which trading days this
+        // lodgement covers - a lodgement can span several days, but money_id only
+        // ever holds the first bag's till close.
+        $bagVerifications = $lodgement->bagVerifications
+            ->sortBy(fn ($verification) => $verification->reconciliation?->date)
+            ->values();
+
+        // Get related reconciliations for context, falling back to the single
+        // money_id lookup for legacy imports which have no bag verifications.
+        $relatedReconciliations = $bagVerifications->isNotEmpty()
+            ? $bagVerifications->map(fn ($verification) => $verification->reconciliation)->filter()->values()
+            : CashReconciliation::where('closed_cash_id', $lodgement->money_id)
+                ->with(['payments', 'notes'])
+                ->get();
 
         // Get potential matches if unmatched
         $potentialMatches = [];
@@ -221,6 +234,7 @@ class CashLodgementController extends Controller
 
         return view('management.cash-lodgements.show', compact(
             'lodgement',
+            'bagVerifications',
             'relatedReconciliations',
             'potentialMatches'
         ));

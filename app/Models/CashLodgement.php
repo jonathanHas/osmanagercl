@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 class CashLodgement extends Model
 {
@@ -78,6 +79,17 @@ class CashLodgement extends Model
     }
 
     /**
+     * Get the verified cash bags that make up this lodgement.
+     *
+     * Each bag is one day/till reconciliation, so this is the source of truth
+     * for which trading days a lodgement covers. Legacy imports have none.
+     */
+    public function bagVerifications(): HasMany
+    {
+        return $this->hasMany(CashBagVerification::class);
+    }
+
+    /**
      * Get the bank transaction if matched
      */
     public function bankTransaction(): BelongsTo
@@ -139,6 +151,18 @@ class CashLodgement extends Model
     public function scopeFromLegacy($query)
     {
         return $query->where('imported_from_legacy', true);
+    }
+
+    /**
+     * Get the trading dates covered by this lodgement's verified bags, ascending.
+     */
+    public function getCoveredDatesAttribute(): Collection
+    {
+        return $this->bagVerifications
+            ->map(fn ($verification) => $verification->reconciliation?->date)
+            ->filter()
+            ->sortBy(fn ($date) => $date->timestamp)
+            ->values();
     }
 
     /**
