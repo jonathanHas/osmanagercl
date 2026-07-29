@@ -423,7 +423,7 @@
                                                        x-model="newPrice"
                                                        step="0.01"
                                                        @keyup.enter="savePrice()"
-                                                       class="w-16 text-sm border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
+                                                       class="w-24 text-sm border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
                                                        x-ref="priceInput">
                                                 <button @click="savePrice()"
                                                         class="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition">
@@ -809,7 +809,7 @@
                                                        x-model="newPrice"
                                                        step="0.01"
                                                        @keyup.enter="savePrice()"
-                                                       class="w-20 text-base border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
+                                                       class="w-28 text-base border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
                                                        x-ref="priceInput">
                                                 <button @click="savePrice()"
                                                         class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition">
