@@ -6,10 +6,12 @@ use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateBarcodeRequest;
 use App\Http\Requests\UpdateProductRequest;
 use App\Models\Category;
+use App\Models\Country;
 use App\Models\LabelLog;
 use App\Models\LabelTemplate;
 use App\Models\OrderItem;
 use App\Models\OrderSession;
+use App\Models\PosUnit;
 use App\Models\Product;
 use App\Models\ProductMetadata;
 use App\Models\ProductOrderSetting;
@@ -18,7 +20,9 @@ use App\Models\Supplier;
 use App\Models\SupplierLink;
 use App\Models\Tax;
 use App\Models\TaxCategory;
+use App\Models\VegClass;
 use App\Models\VegDetails;
+use App\Models\VegPrintQueue;
 use App\Repositories\CategoryRepository;
 use App\Repositories\ProductRepository;
 use App\Repositories\SalesRepository;
@@ -41,6 +45,14 @@ use Intervention\Image\ImageManager;
 
 class ProductController extends Controller
 {
+    /**
+     * POS categories that make a product a fruit & veg line.
+     *
+     * These get the extra origin/class/unit fields on the edit form, and their
+     * price changes are mirrored into veg_price_history and the label print queue.
+     */
+    private const FRUIT_VEG_CATEGORIES = ['SUB1', 'SUB2', 'SUB3'];
+
     /**
      * The product repository instance.
      */
@@ -1206,6 +1218,26 @@ class ProductController extends Controller
         // Check if product is a kitchen product
         $isKitchenProduct = \App\Models\KitchenProduct::where('product_id', $product->ID)->exists();
 
+        // Fruit & Veg products get an extra origin/class/unit card plus price history
+        $isFruitVeg = in_array($product->CATEGORY, self::FRUIT_VEG_CATEGORIES, true);
+        $vegDetails = null;
+        $countries = collect();
+        $vegClasses = collect();
+        $vegUnits = collect();
+        $priceHistory = collect();
+
+        if ($isFruitVeg) {
+            $vegDetails = VegDetails::where('product', $product->CODE)->first();
+            $countries = Country::orderBy('name')->get();
+            $vegClasses = VegClass::orderBy('ID')->get();
+            $vegUnits = PosUnit::orderBy('ID')->get();
+            $priceHistory = DB::table('veg_price_history')
+                ->where('product_code', $product->CODE)
+                ->orderBy('changed_at', 'desc')
+                ->limit(10)
+                ->get();
+        }
+
         // Context information for navigation
         $fromDelivery = $request->query('from_delivery');
         $fromContext = $request->query('from');
@@ -1226,7 +1258,13 @@ class ProductController extends Controller
             'isKitchenProduct',
             'supplierService',
             'fromDelivery',
-            'fromContext'
+            'fromContext',
+            'isFruitVeg',
+            'vegDetails',
+            'countries',
+            'vegClasses',
+            'vegUnits',
+            'priceHistory'
         ));
     }
 
@@ -1475,6 +1513,11 @@ class ProductController extends Controller
             // PRICESELL should be stored ex-VAT as it's used in getGrossPrice() calculation
             $priceExVat = $vatRate > 0 ? $request->price_sell / (1 + $vatRate) : $request->price_sell;
 
+            // Capture the pre-update state the F&V sync needs to detect real changes
+            $isFruitVeg = in_array($product->CATEGORY, self::FRUIT_VEG_CATEGORIES, true);
+            $oldGrossPrice = $product->getGrossPrice();
+            $oldDisplay = $product->DISPLAY;
+
             // Update the product's basic information
             $productData = [
                 'NAME' => $request->name,
@@ -1650,6 +1693,11 @@ class ProductController extends Controller
                 }
             }
 
+            // Mirror F&V changes into price history, vegDetails and the label print queue
+            if ($isFruitVeg) {
+                $this->syncFruitVegDetails($request, $product, $oldGrossPrice, $oldDisplay);
+            }
+
             // Log the update
             \Log::info('Product updated via edit form', [
                 'product_id' => $product->ID,
@@ -1677,6 +1725,88 @@ class ProductController extends Controller
             return back()
                 ->withInput()
                 ->withErrors(['error' => 'Failed to update product: '.$e->getMessage()]);
+        }
+    }
+
+    /**
+     * Keep the F&V bookkeeping in step after a product update.
+     *
+     * The manage screen's per-field endpoints (FruitVegController::updatePrice,
+     * updateDisplay, updateCountry, updateUnit, updateClass) each log to
+     * veg_price_history and/or queue a label reprint. The edit form saves
+     * everything in one POST, so it has to do the same work here or F&V price
+     * sync and label reprints silently stop happening.
+     *
+     * The POS write has already succeeded by this point, so a failure here is
+     * logged rather than thrown - losing a queue entry is far better than
+     * rolling back a saved product.
+     */
+    private function syncFruitVegDetails(
+        UpdateProductRequest $request,
+        Product $product,
+        float $oldGrossPrice,
+        ?string $oldDisplay
+    ): void {
+        try {
+            $newGrossPrice = (float) $request->price_sell;
+
+            // Price: PRICESELL was already written by update(), so only the history
+            // row and the print queue entry are outstanding.
+            if (round($newGrossPrice, 2) !== round($oldGrossPrice, 2)) {
+                DB::table('veg_price_history')->insert([
+                    'product_code' => $product->CODE,
+                    'old_price' => $oldGrossPrice,
+                    'new_price' => $newGrossPrice,
+                    'changed_by' => Auth::id(),
+                    'changed_at' => now(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                VegPrintQueue::addToQueue($product->CODE, 'price_change');
+            }
+
+            if ($request->display_name !== $oldDisplay) {
+                VegPrintQueue::addToQueue($product->CODE, 'display_updated');
+            }
+
+            // Origin / class / unit all live on the same vegDetails row
+            $existing = VegDetails::where('product', $product->CODE)->first();
+
+            $vegFields = [
+                'countryCode' => ['value' => $request->country_id, 'reason' => 'country_updated'],
+                'classId' => ['value' => $request->class_id, 'reason' => 'class_updated'],
+                'unitId' => ['value' => $request->unit_id, 'reason' => 'unit_updated'],
+            ];
+
+            $changes = [];
+            $reasons = [];
+
+            foreach ($vegFields as $column => $field) {
+                if ($field['value'] === null) {
+                    continue;
+                }
+
+                $changes[$column] = (int) $field['value'];
+
+                if ((int) ($existing?->{$column}) !== (int) $field['value']) {
+                    $reasons[] = $field['reason'];
+                }
+            }
+
+            if ($changes !== []) {
+                VegDetails::upsertForProduct($product->CODE, $changes);
+            }
+
+            foreach ($reasons as $reason) {
+                VegPrintQueue::addToQueue($product->CODE, $reason);
+            }
+        } catch (\Exception $e) {
+            \Log::warning('Failed to sync fruit & veg details after product update', [
+                'product_id' => $product->ID,
+                'product_code' => $product->CODE,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 

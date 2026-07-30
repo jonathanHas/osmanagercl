@@ -333,9 +333,9 @@
                                     
                                     <!-- Product Info -->
                                     <td class="px-4 py-4">
-                                        <div class="text-sm font-medium text-blue-600 hover:text-blue-800 cursor-pointer" 
-                                             @click="window.location.href = '/fruit-veg/product/' + product.CODE"
-                                             x-text="product.NAME"></div>
+                                        <a class="block text-sm font-medium text-blue-600 hover:text-blue-800"
+                                           :href="'/products/' + product.ID + '/edit?from=fruit-veg'"
+                                           x-text="product.NAME"></a>
                                         <div class="text-xs text-gray-500" x-text="product.CODE"></div>
                                         <div class="text-xs text-gray-400" x-text="product.category?.NAME"></div>
                                     </td>
@@ -720,9 +720,9 @@
                                     </div>
                                     
                                     <div class="flex-1 min-w-0">
-                                        <div class="text-base font-medium text-blue-600 hover:text-blue-800 cursor-pointer" 
-                                             @click="window.location.href = '/fruit-veg/product/' + product.CODE"
-                                             x-text="product.NAME"></div>
+                                        <a class="block text-base font-medium text-blue-600 hover:text-blue-800"
+                                           :href="'/products/' + product.ID + '/edit?from=fruit-veg'"
+                                           x-text="product.NAME"></a>
                                         <div class="text-sm text-gray-500" x-text="product.CODE"></div>
                                         <div class="text-sm text-gray-400" x-text="product.category?.NAME"></div>
                                     </div>

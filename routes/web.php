@@ -387,7 +387,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/search', [FruitVegController::class, 'searchProducts'])->name('search');
         Route::get('/quick-search', [FruitVegController::class, 'quickSearch'])->name('quick-search');
         Route::get('/product/{code}', [FruitVegController::class, 'editProduct'])->name('product.edit');
-        Route::get('/product/{code}/sales-data', [FruitVegController::class, 'salesData'])->name('product.sales-data');
         Route::post('/product/{code}/update-image', [FruitVegController::class, 'updateProductImage'])->name('product.update-image');
         Route::get('/product-image/{code}', [FruitVegController::class, 'productImage'])->name('product-image');
         Route::get('/sales', [FruitVegController::class, 'sales'])->name('sales');

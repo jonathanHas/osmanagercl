@@ -72,6 +72,11 @@ class UpdateProductRequest extends FormRequest
             // Short-Dated Product Settings
             'is_short_dated' => 'boolean',
             'shelf_life_days' => 'nullable|integer|min:0|max:999',
+
+            // Fruit & Veg Details (only present for SUB1/SUB2/SUB3 products)
+            'country_id' => 'nullable|integer|exists:App\Models\Country,id',
+            'class_id' => 'nullable|integer|exists:App\Models\VegClass,ID',
+            'unit_id' => 'nullable|integer|exists:App\Models\PosUnit,ID',
         ];
     }
 
@@ -105,6 +110,9 @@ class UpdateProductRequest extends FormRequest
             'tax_category' => 'tax category',
             'initial_stock' => 'initial stock quantity',
             'display_name' => 'display name',
+            'country_id' => 'country of origin',
+            'class_id' => 'class',
+            'unit_id' => 'unit',
         ];
     }
 

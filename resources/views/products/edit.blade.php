@@ -44,6 +44,9 @@
                 } elseif ($fromContext === 'coffee') {
                     $backAction['route'] = 'coffee.products';
                     $backAction['label'] = 'Back to Coffee Products';
+                } elseif ($fromContext === 'fruit-veg') {
+                    $backAction['route'] = 'fruit-veg.manage';
+                    $backAction['label'] = 'Back to F&V Manage';
                 } else {
                     $backAction['route'] = 'products.index';
                     $backAction['label'] = 'Back to Products';
@@ -567,6 +570,91 @@
                                 </div>
                             </div>
                         </div>
+
+                        @if($isFruitVeg)
+                            <!-- Fruit & Veg Details Section -->
+                            <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+                                <div class="border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
+                                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Fruit &amp; Veg Details</h3>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                        Shown on shelf labels. Changing any of these re-queues the product for a label print.
+                                    </p>
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <x-form-group
+                                        name="country_id"
+                                        label="Country of Origin"
+                                        type="select"
+                                        placeholder="Not set"
+                                        :value="$vegDetails?->countryCode"
+                                        :options="$countries->pluck('name', 'id')->toArray()" />
+
+                                    <x-form-group
+                                        name="class_id"
+                                        label="Class"
+                                        type="select"
+                                        placeholder="Not set"
+                                        :value="$vegDetails?->classId"
+                                        :options="$vegClasses->mapWithKeys(fn ($class) => [$class->ID => 'Class '.$class->name])->toArray()" />
+
+                                    <x-form-group
+                                        name="unit_id"
+                                        label="Unit"
+                                        type="select"
+                                        placeholder="Not set"
+                                        :value="$vegDetails?->unitId"
+                                        :options="$vegUnits->pluck('abbreviation', 'ID')->toArray()" />
+                                </div>
+
+                                <!-- Price History -->
+                                <div class="mt-2">
+                                    <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Price History</h4>
+
+                                    @if($priceHistory->isEmpty())
+                                        <p class="text-sm text-gray-500 dark:text-gray-400">No price changes recorded yet.</p>
+                                    @else
+                                        <div class="overflow-x-auto">
+                                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                                <thead>
+                                                    <tr>
+                                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                                                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Old</th>
+                                                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">New</th>
+                                                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Change</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                                    @foreach($priceHistory as $change)
+                                                        @php
+                                                            $oldPrice = (float) $change->old_price;
+                                                            $newPrice = (float) $change->new_price;
+                                                            $difference = $newPrice - $oldPrice;
+                                                            $percentage = $oldPrice > 0 ? ($difference / $oldPrice) * 100 : 0;
+                                                        @endphp
+                                                        <tr>
+                                                            <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                                                {{ \Carbon\Carbon::parse($change->changed_at)->format('d M Y H:i') }}
+                                                            </td>
+                                                            <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-900 dark:text-gray-100">
+                                                                €{{ number_format($oldPrice, 2) }}
+                                                            </td>
+                                                            <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-gray-900 dark:text-gray-100">
+                                                                €{{ number_format($newPrice, 2) }}
+                                                            </td>
+                                                            <td class="px-3 py-2 whitespace-nowrap text-sm text-right font-medium {{ $difference > 0 ? 'text-red-600 dark:text-red-400' : ($difference < 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400') }}">
+                                                                {{ $difference > 0 ? '+' : '' }}€{{ number_format($difference, 2) }}
+                                                                <span class="text-xs">({{ $difference > 0 ? '+' : '' }}{{ number_format($percentage, 1) }}%)</span>
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
                     </div>
 
                     <!-- Right Column -->

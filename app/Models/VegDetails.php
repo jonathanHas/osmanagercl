@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class VegDetails extends Model
 {
@@ -70,6 +71,43 @@ class VegDetails extends Model
         'class_name',
         'unit_name',
     ];
+
+    /**
+     * Update the veg details for a product, creating the row if it does not exist yet.
+     *
+     * ID is a varchar(36) with no auto-increment, so it has to be supplied. The
+     * table is uniCenta's, and every row it created holds a UUID - the same
+     * convention PRODUCTS.ID uses - so new rows get one too.
+     *
+     * Missing columns fall back to the POS defaults (Ireland / Class I / kg) so a
+     * partially filled form never writes a null into an FK-constrained column.
+     *
+     * Updates are keyed on `product` (the table's only unique index) rather than
+     * on ID: an earlier ID generator produced the literal "1" for every row it
+     * created, so several rows can share an ID and an ID-keyed update would write
+     * to all of them at once.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    public static function upsertForProduct(string $productCode, array $attributes): self
+    {
+        $detail = static::where('product', $productCode)->first();
+
+        if ($detail) {
+            static::where('product', $productCode)->update($attributes);
+            $detail->forceFill($attributes);
+
+            return $detail;
+        }
+
+        return static::create(array_merge([
+            'ID' => (string) Str::uuid(),
+            'product' => $productCode,
+            'countryCode' => 1,
+            'classId' => 1,
+            'unitId' => 1,
+        ], $attributes));
+    }
 
     /**
      * Get the product that owns the veg details.

@@ -12,7 +12,6 @@ use App\Models\VegLabelPrintBatch;
 use App\Models\VegPrintQueue;
 use App\Models\ZebraLabel;
 use App\Repositories\OptimizedSalesRepository;
-use App\Repositories\SalesRepository;
 use App\Services\SalesDataSyncService;
 use App\Services\TillVisibilityService;
 use Carbon\Carbon;
@@ -28,11 +27,6 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class FruitVegController extends Controller
 {
     /**
-     * The sales repository instance.
-     */
-    protected SalesRepository $salesRepository;
-
-    /**
      * The optimized sales repository instance for blazing-fast queries.
      */
     protected OptimizedSalesRepository $optimizedSalesRepository;
@@ -47,9 +41,8 @@ class FruitVegController extends Controller
     /**
      * Create a new controller instance.
      */
-    public function __construct(SalesRepository $salesRepository, OptimizedSalesRepository $optimizedSalesRepository, TillVisibilityService $tillVisibilityService, SalesDataSyncService $salesDataSyncService)
+    public function __construct(OptimizedSalesRepository $optimizedSalesRepository, TillVisibilityService $tillVisibilityService, SalesDataSyncService $salesDataSyncService)
     {
-        $this->salesRepository = $salesRepository;
         $this->optimizedSalesRepository = $optimizedSalesRepository;
         $this->tillVisibilityService = $tillVisibilityService;
         $this->salesDataSyncService = $salesDataSyncService;
@@ -683,24 +676,7 @@ class FruitVegController extends Controller
             'country_id' => 'required|integer|exists:App\Models\Country,id',
         ]);
 
-        // Update or create vegDetails record
-        $existingDetail = VegDetails::where('product', $request->product_code)->first();
-
-        if ($existingDetail) {
-            $existingDetail->update(['countryCode' => $request->country_id]);
-        } else {
-            // Generate new ID for vegDetails
-            $maxId = VegDetails::max('ID');
-            $newId = $maxId ? ((int) $maxId + 1) : 1;
-
-            VegDetails::create([
-                'ID' => (string) $newId,
-                'product' => $request->product_code,
-                'countryCode' => $request->country_id,
-                'classId' => 1, // Default class
-                'unitId' => 1,   // Default unit (kg)
-            ]);
-        }
+        VegDetails::upsertForProduct($request->product_code, ['countryCode' => $request->country_id]);
 
         // Add to print queue since origin changed
         VegPrintQueue::addToQueue($request->product_code, 'country_updated');
@@ -718,24 +694,7 @@ class FruitVegController extends Controller
             'unit_id' => 'required|integer|exists:App\Models\PosUnit,ID',
         ]);
 
-        // Update or create vegDetails record
-        $existingDetail = VegDetails::where('product', $request->product_code)->first();
-
-        if ($existingDetail) {
-            $existingDetail->update(['unitId' => $request->unit_id]);
-        } else {
-            // Generate new ID for vegDetails
-            $maxId = VegDetails::max('ID');
-            $newId = $maxId ? ((int) $maxId + 1) : 1;
-
-            VegDetails::create([
-                'ID' => (string) $newId,
-                'product' => $request->product_code,
-                'countryCode' => 1, // Default country
-                'classId' => 1,     // Default class
-                'unitId' => $request->unit_id,
-            ]);
-        }
+        VegDetails::upsertForProduct($request->product_code, ['unitId' => $request->unit_id]);
 
         // Add to print queue since unit changed
         VegPrintQueue::addToQueue($request->product_code, 'unit_updated');
@@ -753,24 +712,7 @@ class FruitVegController extends Controller
             'class_id' => 'required|integer|exists:App\Models\VegClass,ID',
         ]);
 
-        // Update or create vegDetails record
-        $existingDetail = VegDetails::where('product', $request->product_code)->first();
-
-        if ($existingDetail) {
-            $existingDetail->update(['classId' => $request->class_id]);
-        } else {
-            // Generate new ID for vegDetails
-            $maxId = VegDetails::max('ID');
-            $newId = $maxId ? ((int) $maxId + 1) : 1;
-
-            VegDetails::create([
-                'ID' => (string) $newId,
-                'product' => $request->product_code,
-                'countryCode' => 1, // Default country
-                'classId' => $request->class_id,
-                'unitId' => 1,       // Default unit (kg)
-            ]);
-        }
+        VegDetails::upsertForProduct($request->product_code, ['classId' => $request->class_id]);
 
         // Add to print queue since class changed
         VegPrintQueue::addToQueue($request->product_code, 'class_updated');
@@ -1089,86 +1031,21 @@ class FruitVegController extends Controller
     }
 
     /**
-     * Display product edit page.
+     * Send F&V products to the full product edit form.
+     *
+     * The dedicated F&V edit page was retired in favour of products.edit, which
+     * carries the same origin/class/unit fields plus cost price, VAT, supplier
+     * and margin. This route is kept so old links and bookmarks still resolve.
      */
     public function editProduct($code)
     {
         $product = Product::where('CODE', $code)->firstOrFail();
 
-        // Get F&V categories to verify this is a F&V product
-        $fruitCategory = Category::where('ID', 'SUB1')->first();
-        $vegCategories = Category::whereIn('ID', ['SUB2', 'SUB3'])->pluck('ID');
-
-        $validCategories = array_merge(
-            [$fruitCategory->ID ?? 0],
-            $vegCategories->toArray()
-        );
-
-        if (! in_array($product->CATEGORY, $validCategories)) {
+        if (! in_array($product->CATEGORY, ['SUB1', 'SUB2', 'SUB3'], true)) {
             abort(404, 'Product is not a fruit or vegetable.');
         }
 
-        // Load relationships
-        $product->load(['category', 'vegDetails.country', 'vegDetails.vegUnit', 'vegDetails.vegClass']);
-
-        // Get till visibility status
-        $product->is_visible_on_till = $this->tillVisibilityService->isVisibleOnTill($product->ID);
-        $product->is_available = $product->is_visible_on_till; // Maintain compatibility
-
-        // Get current price from price history or product
-        $lastPriceRecord = DB::table('veg_price_history')
-            ->where('product_code', $code)
-            ->orderBy('changed_at', 'desc')
-            ->first();
-
-        $product->current_price = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
-
-        // Get all countries for dropdown
-        $countries = Country::orderBy('name')->get();
-
-        // Get price history for this product
-        $priceHistory = DB::table('veg_price_history')
-            ->where('product_code', $code)
-            ->orderBy('changed_at', 'desc')
-            ->limit(10)
-            ->get();
-
-        // Get sales data using the repository (keep original for individual products)
-        $salesHistory = $this->salesRepository->getProductSalesHistory($product->ID, 4); // Last 4 months
-        $salesStats = $this->salesRepository->getProductSalesStatistics($product->ID);
-
-        return view('fruit-veg.product-edit', compact(
-            'product',
-            'countries',
-            'priceHistory',
-            'salesHistory',
-            'salesStats'
-        ));
-    }
-
-    /**
-     * Get sales data for AJAX requests.
-     */
-    public function salesData(Request $request, string $code)
-    {
-        $product = Product::where('CODE', $code)->firstOrFail();
-
-        $period = $request->get('period', '4');
-
-        // Determine the number of months based on period
-        $months = match ($period) {
-            'ytd' => (int) date('n'), // Current month number
-            default => (int) $period
-        };
-
-        // Get sales history and statistics
-        $salesHistory = $this->salesRepository->getProductSalesHistory($product->ID, $months);
-        $salesStats = $this->salesRepository->getProductSalesStatistics($product->ID);
-
-        return response()->json([
-            'salesHistory' => array_values($salesHistory),
-            'salesStats' => $salesStats,
-        ]);
+        return redirect()->route('products.edit', ['id' => $product->ID, 'from' => 'fruit-veg']);
     }
 
     /**

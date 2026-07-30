@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **🥬 F&V products now open the full product edit form** (2026-07-29)
+  - Clicking a product name on `/fruit-veg/manage` opened a separate, thinner edit page that offered only **display name, country of origin and price**, each saved by its own AJAX call. The "Create Product" links at the top of the same page have always gone to the **generic** product form (`products.create?category=SUB1|SUB2|SUB3`) — so creating a product gave you far more than editing one
+  - Product names now link to `/products/{ID}/edit?from=fruit-veg`, the existing full mirror of that create form. F&V lines gain **cost price, VAT category, supplier + supplier code + units per case, outer barcode, live margin breakdown, till button preview, inline stock editing, min-stock override, alternate barcodes** and the supplier-link duplicate check — none of which the old page had
+  - **New "Fruit & Veg Details" card** on the edit form, rendered only for `SUB1`/`SUB2`/`SUB3`: **Country of Origin, Class and Unit** selects plus the read-only **price history** table. Class and Unit were previously editable *only* from the manage grid, never on the product's own page
+  - **The single-form save replicates every side effect the per-field endpoints had**, which is the part that had to be right: a changed price writes a `veg_price_history` row (old/new **gross**, `changed_by`) and queues `price_change`; changed display name, country, class or unit each queue their own reason on `veg_print_queue`. Without this, F&V price sync and label reprints would have gone quiet with nothing to show for it. The POS write happens first and a bookkeeping failure is logged rather than thrown — losing a queue entry beats rolling back a saved product
+  - `/fruit-veg/product/{CODE}` is **kept as a 302** to the new page so bookmarks and the F&V orders review table still resolve. The back button reads "Back to F&V Manage"
+  - **Note**: `veg_print_queue` holds one row per product, so when several fields change in one save only the last reason is recorded. The product is still queued, which is what drives the reprint
+  - **Modified**: `app/Http/Controllers/ProductController.php` (new `syncFruitVegDetails()`), `app/Http/Controllers/FruitVegController.php`, `app/Http/Requests/UpdateProductRequest.php`, `app/Models/VegDetails.php`, `resources/views/products/edit.blade.php`, `resources/views/fruit-veg/manage.blade.php`, `routes/web.php`
+  - **Removed**: `resources/views/fruit-veg/product-edit.blade.php` and the now-unused `FruitVegController::salesData()` + its route. `fruit-veg.product-image` and `product.update-image` are retained (still used by manage, availability, index, sales, waste, order-table, and covered by `FruitVegProductImageTest`)
+
 ### Added
 
 - **📊 Highest Value Stock Lines review, with in-place quantity correction** (2026-07-28)
@@ -23,6 +35,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - ⚠️ Correcting a quantity fixes the valuation but not the cause — a line showing years of cover usually means stock is not being decremented correctly at the till, which will drift again
 
 ### Fixed
+
+- **🐞 Setting origin/class/unit on one F&V product could silently change three others** (2026-07-29)
+  - Found while consolidating the three near-identical `vegDetails` create blocks in `FruitVegController` into `VegDetails::upsertForProduct()`
+  - `vegDetails.ID` is a `varchar(36)` holding UUIDs, but new rows were given `(int) VegDetails::max('ID') + 1`. `MAX()` over UUID strings returns something like `ffdefbcc-bc78-11eb-…`, which casts to **0** — so every row the app ever created was assigned the literal ID **`1`**. Four rows currently share it: products `000000000212`, `2305`, `2306` and `2307`
+  - Because `ID` is the model's primary key, `$detail->update([...])` issued `WHERE ID = '1'` — **writing to all four rows at once**. Setting the country on `2305` also changed it on `2306`, `2307` and `000000000212`. There is no PK constraint on the column (only `UNIQUE(product)`), so nothing ever errored
+  - **Two fixes**: new rows get a real `Str::uuid()`, matching uniCenta's own convention for the table; and updates are keyed on **`product`** (the table's only unique index) rather than on `ID`, so the existing colliding rows are safe without a data migration
+  - ⚠️ **The four existing rows still share `ID = '1'`** on both dev and production. Nothing in the app now writes by that key, but a manual `UPDATE ... WHERE ID` against `vegDetails` would still hit all four
+  - **Modified**: `app/Models/VegDetails.php`, `app/Http/Controllers/FruitVegController.php` (`updateCountry`, `updateUnit`, `updateClass`)
 
 - **⚡ Cost corrections apply without a page reload, and the page loads 4x faster** (2026-07-28)
   - Each cost correction previously did a **full page reload** — ~1,000 ms of server time and a **460 KB** payload, re-running the entire 2,626-product valuation to change one number. Working through the 19 anomaly lines meant 19 reloads, each losing your place in the list
