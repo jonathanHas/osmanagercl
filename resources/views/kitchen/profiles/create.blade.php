@@ -174,7 +174,7 @@
                                             class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                         <optgroup label="Weight">
                                             <option value="kg" {{ old('purchase_unit') == 'kg' ? 'selected' : '' }}>Kilograms (kg)</option>
-                                            <option value="g" {{ old('purchase_unit') == 'g' ? 'selected' : '' }}>Grams (g)</option>
+                                            <option value="g" {{ old('purchase_unit', 'g') == 'g' ? 'selected' : '' }}>Grams (g)</option>
                                         </optgroup>
                                         <optgroup label="Volume">
                                             <option value="L" {{ old('purchase_unit') == 'L' ? 'selected' : '' }}>Litres (L)</option>
@@ -183,7 +183,7 @@
                                             <option value="tsp" {{ old('purchase_unit') == 'tsp' ? 'selected' : '' }}>Teaspoons (tsp)</option>
                                         </optgroup>
                                         <optgroup label="Count">
-                                            <option value="unit" {{ old('purchase_unit', 'unit') == 'unit' ? 'selected' : '' }}>Units</option>
+                                            <option value="unit" {{ old('purchase_unit') == 'unit' ? 'selected' : '' }}>Units</option>
                                             <option value="dozen" {{ old('purchase_unit') == 'dozen' ? 'selected' : '' }}>Dozen (12)</option>
                                             <option value="pack" {{ old('purchase_unit') == 'pack' ? 'selected' : '' }}>Pack</option>
                                         </optgroup>
@@ -295,7 +295,7 @@
                 manualCost: {{ old('manual_cost', 0) }},
                 profileName: '{{ old('name', $prefillProduct?->NAME ?? '') }}',
                 purchaseQuantity: {{ old('purchase_quantity', 1) }},
-                purchaseUnit: '{{ old('purchase_unit', 'unit') }}',
+                purchaseUnit: '{{ old('purchase_unit', 'g') }}',
                 density: {{ old('density', 0) }},
                 applyDeliveryMarkup: {{ old('apply_delivery_markup') ? 'true' : 'false' }},
                 deliveryMarkupPercent: {{ old('delivery_markup_percent', 15) }},

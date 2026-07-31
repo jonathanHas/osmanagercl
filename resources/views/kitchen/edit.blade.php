@@ -427,7 +427,7 @@
                                             <select name="unit_type" id="unit_type" required
                                                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                                 @foreach($unitTypes as $key => $label)
-                                                    <option value="{{ $key }}">{{ $label }}</option>
+                                                    <option value="{{ $key }}" {{ $key === 'g' ? 'selected' : '' }}>{{ $label }}</option>
                                                 @endforeach
                                             </select>
                                         </div>
@@ -1026,7 +1026,7 @@
                 profileForm: {
                     name: '',
                     purchase_quantity: 1,
-                    purchase_unit: 'kg',
+                    purchase_unit: 'g',
                     notes: ''
                 },
                 profileSaving: false,
@@ -1089,7 +1089,7 @@
                 openProfileModal() {
                     this.profileForm.name = this.selectedName;
                     this.profileForm.purchase_quantity = 1;
-                    this.profileForm.purchase_unit = 'kg';
+                    this.profileForm.purchase_unit = 'g';
                     this.profileForm.notes = '';
                     this.profileError = '';
                     this.showProfileModal = true;
