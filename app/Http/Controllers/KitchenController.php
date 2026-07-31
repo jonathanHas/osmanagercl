@@ -281,16 +281,28 @@ class KitchenController extends Controller
         $recipe = $this->repository->findById($recipe->id);
 
         $multiplier = $validated['recipe_multiplier'];
+        $labourFactor = $validated['labour_factor'];
+        $electricityFactor = $validated['electricity_factor'];
+
+        // Apply the factors to the times, which is what actually drives cost:
+        // prep time is pure labour, cook time drives electricity (and a slice
+        // of labour via the supervision factor). Copying the times unchanged
+        // would make the saved recipe recompute at 1x and contradict the
+        // preview the user based their decision on.
+        $scaledPrepTime = (int) round(($recipe->prep_time ?? 0) * $labourFactor);
+        $scaledCookTime = (int) round(($recipe->cook_time ?? 0) * $electricityFactor);
 
         // Build notes with scaling info
-        $notes = "Scaled from '{$recipe->name}' ({$multiplier}x batch). Labour factor: {$validated['labour_factor']}x, Electricity factor: {$validated['electricity_factor']}x.";
+        $notes = "Scaled from '{$recipe->name}' ({$multiplier}x batch). "
+            ."Prep {$recipe->prep_time} → {$scaledPrepTime} min (labour factor {$labourFactor}x), "
+            ."cook {$recipe->cook_time} → {$scaledCookTime} min (electricity factor {$electricityFactor}x).";
 
         // Create the new scaled recipe
         $newRecipe = $this->repository->create([
             'name' => $validated['name'],
             'description' => $recipe->description,
-            'prep_time' => $recipe->prep_time,
-            'cook_time' => $recipe->cook_time,
+            'prep_time' => $scaledPrepTime,
+            'cook_time' => $scaledCookTime,
             'portions_produced' => (int) round($recipe->portions_produced * $multiplier),
             'pos_product_id' => $recipe->pos_product_id,
             'is_active' => true,

@@ -20,6 +20,7 @@ use App\Http\Controllers\KdsProductController;
 use App\Http\Controllers\KitchenController;
 use App\Http\Controllers\KitchenIngredientProfileController;
 use App\Http\Controllers\KitchenProductController;
+use App\Http\Controllers\KitchenWholesaleController;
 use App\Http\Controllers\LabelAreaController;
 use App\Http\Controllers\LabelTranslationController;
 use App\Http\Controllers\OrderController;
@@ -458,6 +459,12 @@ Route::middleware('auth')->group(function () {
             Route::delete('/{profile}', [KitchenIngredientProfileController::class, 'destroy'])->name('destroy');
             Route::post('/recalculate-all', [KitchenIngredientProfileController::class, 'recalculateAll'])->name('recalculate-all');
             Route::post('/{profile}/recalculate', [KitchenIngredientProfileController::class, 'recalculate'])->name('recalculate');
+        });
+
+        // Wholesale pricing (must be before {recipe} wildcard)
+        Route::prefix('wholesale')->name('wholesale.')->group(function () {
+            Route::get('/', [KitchenWholesaleController::class, 'index'])->name('index');
+            Route::post('/{recipe}', [KitchenWholesaleController::class, 'store'])->name('store');
         });
 
         // AJAX API endpoints (must be before {recipe} wildcard)

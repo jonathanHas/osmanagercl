@@ -11,6 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // supplier_link lives in the external uniCenta database. The test
+        // suite builds only the POS tables a test needs, so skip if absent.
+        if (! Schema::connection('pos')->hasTable('supplier_link')) {
+            return;
+        }
+
         Schema::connection('pos')->table('supplier_link', function (Blueprint $table) {
             $table->index('Barcode', 'idx_barcode');
         });
@@ -21,6 +27,12 @@ return new class extends Migration
      */
     public function down(): void
     {
+        // supplier_link lives in the external uniCenta database. The test
+        // suite builds only the POS tables a test needs, so skip if absent.
+        if (! Schema::connection('pos')->hasTable('supplier_link')) {
+            return;
+        }
+
         Schema::connection('pos')->table('supplier_link', function (Blueprint $table) {
             $table->dropIndex('idx_barcode');
         });

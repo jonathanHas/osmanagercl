@@ -3,6 +3,7 @@
 use App\Services\TillVisibilityService;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -11,6 +12,12 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // One-off data migration against the live POS database. The test suite
+        // builds an empty POS schema, so there is nothing to migrate there.
+        if (! Schema::connection('pos')->hasTable('PRODUCTS')) {
+            return;
+        }
+
         $service = app(TillVisibilityService::class);
 
         try {

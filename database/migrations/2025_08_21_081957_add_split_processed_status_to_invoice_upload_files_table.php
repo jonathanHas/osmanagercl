@@ -10,6 +10,12 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Widening an ENUM is MySQL-only DDL. SQLite (used by the test
+        // suite) stores these columns as text, so there is nothing to do.
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
         // Add 'split_processed' to the status enum
         DB::statement("ALTER TABLE invoice_upload_files MODIFY COLUMN status ENUM('pending', 'uploading', 'uploaded', 'parsing', 'parsed', 'review', 'completed', 'failed', 'rejected', 'amazon_pending', 'split_processed') NOT NULL DEFAULT 'pending'");
     }
@@ -19,6 +25,12 @@ return new class extends Migration
      */
     public function down(): void
     {
+        // Widening an ENUM is MySQL-only DDL. SQLite (used by the test
+        // suite) stores these columns as text, so there is nothing to do.
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
         // Remove 'split_processed' from the status enum
         DB::statement("ALTER TABLE invoice_upload_files MODIFY COLUMN status ENUM('pending', 'uploading', 'uploaded', 'parsing', 'parsed', 'review', 'completed', 'failed', 'rejected', 'amazon_pending') NOT NULL DEFAULT 'pending'");
     }

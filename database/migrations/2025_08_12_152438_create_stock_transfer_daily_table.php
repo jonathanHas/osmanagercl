@@ -24,7 +24,9 @@ return new class extends Migration
 
             // Indexes for fast queries
             $table->index(['transfer_date', 'department'], 'idx_date_department');
-            $table->index(['transfer_date', 'vat_rate'], 'idx_date_vat');
+            // Named per-table: SQLite scopes index names to the whole database,
+            // so a bare idx_date_vat clashes with sales_accounting_daily.
+            $table->index(['transfer_date', 'vat_rate'], 'idx_transfer_date_vat');
             $table->index(['department', 'transfer_date'], 'idx_department_date');
             $table->index('transfer_date', 'idx_transfer_date');
 

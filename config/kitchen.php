@@ -26,4 +26,8 @@ return [
     // over it - so only a fraction of cook time is charged as direct labour.
     // The full cook time is still charged as electricity.
     'cook_supervision_factor' => env('KITCHEN_COOK_SUPERVISION_FACTOR', 0.10),
+
+    // Default margin (%) the wholesale pricing page suggests prices against.
+    // Per-recipe targets, once set, override this.
+    'wholesale_target_margin' => env('KITCHEN_WHOLESALE_TARGET_MARGIN', 35),
 ];

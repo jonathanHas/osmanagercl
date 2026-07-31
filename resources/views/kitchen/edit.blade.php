@@ -676,6 +676,7 @@
                                                            class="w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 pr-6">
                                                     <span class="absolute right-2 top-2 text-xs text-gray-400">x</span>
                                                 </div>
+                                                <p class="text-xs text-gray-400 mt-1">Prep <span x-text="baseCosts.prep_time"></span> → <span x-text="scaledPrepTime"></span> min</p>
                                             </div>
                                             <div>
                                                 <label class="block text-xs font-medium text-gray-500 mb-1">Electricity Factor</label>
@@ -684,9 +685,13 @@
                                                            class="w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 pr-6">
                                                     <span class="absolute right-2 top-2 text-xs text-gray-400">x</span>
                                                 </div>
+                                                <p class="text-xs text-gray-400 mt-1">Cook <span x-text="baseCosts.cook_time"></span> → <span x-text="scaledCookTime"></span> min</p>
                                             </div>
                                         </div>
 
+                                        <p class="text-xs text-gray-400">
+                                            The factors scale the recipe's prep and cook times, which is what the saved recipe stores — so the figures below are exactly what you'll get.
+                                        </p>
                                     </div>
 
                                     <!-- Comparison Table -->
@@ -704,6 +709,16 @@
                                                     <td class="py-1.5 text-gray-600">Portions</td>
                                                     <td class="py-1.5 text-right" x-text="baseCosts.portions_produced"></td>
                                                     <td class="py-1.5 text-right font-medium" x-text="scaledPortions"></td>
+                                                </tr>
+                                                <tr x-show="baseCosts.prep_time > 0">
+                                                    <td class="py-1.5 text-gray-600">Prep time</td>
+                                                    <td class="py-1.5 text-right"><span x-text="baseCosts.prep_time"></span> min</td>
+                                                    <td class="py-1.5 text-right font-medium"><span x-text="scaledPrepTime"></span> min</td>
+                                                </tr>
+                                                <tr x-show="baseCosts.cook_time > 0">
+                                                    <td class="py-1.5 text-gray-600">Cook time</td>
+                                                    <td class="py-1.5 text-right"><span x-text="baseCosts.cook_time"></span> min</td>
+                                                    <td class="py-1.5 text-right font-medium"><span x-text="scaledCookTime"></span> min</td>
                                                 </tr>
                                                 <tr>
                                                     <td class="py-1.5 text-gray-600">Ingredients</td>
@@ -894,12 +909,26 @@
                     return this.baseCosts.ingredient_cost * this.getMultiplierValue();
                 },
 
+                // The factors are applied to the times, matching exactly what
+                // saveScaledRecipe() persists - so this preview is what you get.
+                get scaledPrepTime() {
+                    return Math.round(this.baseCosts.prep_time * this.labourFactor);
+                },
+
+                get scaledCookTime() {
+                    return Math.round(this.baseCosts.cook_time * this.electricityFactor);
+                },
+
+                get scaledLabourMinutes() {
+                    return this.scaledPrepTime + this.scaledCookTime * this.baseCosts.cook_supervision_factor;
+                },
+
                 get scaledLabourCost() {
-                    return this.baseCosts.labour_cost * this.labourFactor;
+                    return (this.scaledLabourMinutes / 60) * this.baseCosts.labour_rate;
                 },
 
                 get scaledElectricityCost() {
-                    return this.baseCosts.electricity_cost * this.electricityFactor;
+                    return (this.scaledCookTime / 60) * this.baseCosts.cooking_power * this.baseCosts.electricity_rate;
                 },
 
                 get scaledPackagingCost() {

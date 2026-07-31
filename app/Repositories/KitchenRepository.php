@@ -21,6 +21,25 @@ class KitchenRepository
     }
 
     /**
+     * Get all recipes for the wholesale pricing page.
+     *
+     * Carries the same eager-load spine as getAllRecipes() - calculateRecipeCost()
+     * calls loadMissing() on exactly these, so dropping any of them turns into a
+     * query per ingredient per recipe - plus the wholesale product itself.
+     */
+    public function getRecipesForWholesale(): Collection
+    {
+        return KitchenRecipe::with([
+            'ingredients.product.supplierLink',
+            'ingredients.profile.product.supplierLink',
+            'product',
+            'wholesaleProduct',
+        ])
+            ->orderBy('name')
+            ->get();
+    }
+
+    /**
      * Get active recipes.
      */
     public function getActiveRecipes(): Collection

@@ -12,8 +12,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // First, modify the enum to include 'barcode_change' and keep 'requeue_label'
-        DB::statement("ALTER TABLE label_logs MODIFY COLUMN event_type ENUM('new_product', 'price_update', 'label_print', 'requeue_label', 'barcode_change')");
+        // First, modify the enum to include 'barcode_change' and keep 'requeue_label'.
+        // MySQL-only DDL - SQLite stores the column as text, so it is skipped there.
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE label_logs MODIFY COLUMN event_type ENUM('new_product', 'price_update', 'label_print', 'requeue_label', 'barcode_change')");
+        }
 
         // Add metadata column for storing additional information
         Schema::table('label_logs', function (Blueprint $table) {
@@ -32,6 +35,8 @@ return new class extends Migration
         });
 
         // Revert enum back to original values (including requeue_label which was added later)
-        DB::statement("ALTER TABLE label_logs MODIFY COLUMN event_type ENUM('new_product', 'price_update', 'label_print', 'requeue_label')");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE label_logs MODIFY COLUMN event_type ENUM('new_product', 'price_update', 'label_print', 'requeue_label')");
+        }
     }
 };

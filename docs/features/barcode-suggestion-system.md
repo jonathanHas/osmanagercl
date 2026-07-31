@@ -123,9 +123,13 @@ The barcode suggestion algorithm follows these steps:
 
 ### Key Methods
 
-**ProductController Methods:**
-- `getNextAvailableBarcodeForCategory($categoryId)`: Main suggestion logic
-- `isCodeAvailableInRange($code, $ranges)`: Range validation helper
+**`App\Services\BarcodeGeneratorService`** (`app/Services/BarcodeGeneratorService.php`):
+- `nextForCategory($categoryId)`: Suggestion for a category, falling back to the generic band when the category has no configured range. This is the entry point most callers want
+- `nextForConfiguredCategory($categoryId)`: Main suggestion logic; returns `null` for an unconfigured category
+- `nextGeneric()`: First free code at/above `generic_start`
+- `isCodeInRange($code, $ranges)`: Range validation helper
+
+> These lived as private `ProductController` methods until 2026-07-31. They were extracted so the kitchen wholesale pricing page could reuse them — barcode uniqueness is a global invariant across `PRODUCTS.CODE`, and a second implementation would drift into duplicate codes that break scanning at the till. `ProductController` keeps thin private wrappers (`getNextAvailableBarcodeForCategory()`, `isCodeAvailableInRange()`, `getNextGenericBarcode()`) that delegate to the service, so existing call sites are unchanged.
 
 **Algorithm Logic:**
 ```php
@@ -278,8 +282,8 @@ When categories share ranges (like Coffee Fresh and Bakery both using 4000s):
 ```bash
 # Test barcode suggestion for specific category
 php artisan tinker
-$controller = app(\App\Http\Controllers\ProductController::class);
-$result = $controller->getNextAvailableBarcodeForCategory('081');
+$generator = app(\App\Services\BarcodeGeneratorService::class);
+$result = $generator->nextForCategory('081');
 echo "Suggested: " . $result;
 
 # Verify barcode availability

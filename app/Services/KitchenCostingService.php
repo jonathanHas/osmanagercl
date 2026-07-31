@@ -102,6 +102,16 @@ class KitchenCostingService
             'margin_status' => $this->getMarginStatus($margin),
             'profit_per_portion' => $profit !== null ? round($profit, 2) : null,
             'portions_produced' => $recipe->portions_produced,
+            // Times and effective rates, so the batch scaling calculator can
+            // recompute costs from scaled times instead of scaling the cost
+            // figures - the saved recipe stores times, so the preview has to
+            // model them to match what it will actually produce.
+            'prep_time' => $recipe->prep_time ?? 0,
+            'cook_time' => $recipe->cook_time ?? 0,
+            'labour_rate' => $recipe->getLabourRate(),
+            'electricity_rate' => $recipe->getElectricityRate(),
+            'cooking_power' => $recipe->getCookingPower(),
+            'cook_supervision_factor' => $recipe->getCookSupervisionFactor(),
             'has_linked_product' => $recipe->hasLinkedProduct(),
             'ingredient_costs' => $ingredientCosts,
             'profiled_ingredients' => $profiledCount,
@@ -193,6 +203,11 @@ class KitchenCostingService
 
         return KitchenRecipeCostHistory::create([
             'recipe_id' => $recipe->id,
+            'ingredient_cost' => $costs['ingredient_cost'],
+            'labour_cost' => $costs['labour_cost'],
+            'labour_minutes' => $costs['labour_minutes'],
+            'electricity_cost' => $costs['electricity_cost'],
+            'packaging_cost' => $costs['packaging_cost'],
             'total_cost' => $costs['total_cost'],
             'cost_per_portion' => $costs['cost_per_portion'],
             'sell_price' => $costs['sell_price'],
@@ -232,6 +247,12 @@ class KitchenCostingService
             'total_costs' => $history->pluck('total_cost')->toArray(),
             'cost_per_portions' => $history->pluck('cost_per_portion')->toArray(),
             'margins' => $history->pluck('margin_percentage')->toArray(),
+            // Component series are null for snapshots taken before the
+            // breakdown columns existed - chart them as gaps, not zeroes.
+            'ingredient_costs' => $history->pluck('ingredient_cost')->toArray(),
+            'labour_costs' => $history->pluck('labour_cost')->toArray(),
+            'electricity_costs' => $history->pluck('electricity_cost')->toArray(),
+            'packaging_costs' => $history->pluck('packaging_cost')->toArray(),
         ];
     }
 

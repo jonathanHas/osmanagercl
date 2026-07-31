@@ -7,7 +7,10 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement("ALTER TABLE kds_products MODIFY COLUMN trigger_mode ENUM('primary','companion','excluder') NOT NULL DEFAULT 'primary'");
+        // MySQL-only DDL - SQLite stores the column as text.
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE kds_products MODIFY COLUMN trigger_mode ENUM('primary','companion','excluder') NOT NULL DEFAULT 'primary'");
+        }
 
         // Seed the Served Already marker product as an excluder.
         try {
@@ -44,6 +47,9 @@ return new class extends Migration
     public function down(): void
     {
         DB::table('kds_products')->where('trigger_mode', 'excluder')->delete();
-        DB::statement("ALTER TABLE kds_products MODIFY COLUMN trigger_mode ENUM('primary','companion') NOT NULL DEFAULT 'primary'");
+
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE kds_products MODIFY COLUMN trigger_mode ENUM('primary','companion') NOT NULL DEFAULT 'primary'");
+        }
     }
 };

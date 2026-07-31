@@ -23,6 +23,9 @@ class KitchenRecipe extends Model
         'electricity_rate_override',
         'cooking_power_override',
         'packaging_cost_per_portion',
+        'wholesale_pos_product_id',
+        'wholesale_target_margin',
+        'wholesale_priced_at',
     ];
 
     protected $casts = [
@@ -34,6 +37,8 @@ class KitchenRecipe extends Model
         'electricity_rate_override' => 'decimal:4',
         'cooking_power_override' => 'decimal:2',
         'packaging_cost_per_portion' => 'decimal:2',
+        'wholesale_target_margin' => 'decimal:2',
+        'wholesale_priced_at' => 'datetime',
     ];
 
     /**
@@ -42,6 +47,14 @@ class KitchenRecipe extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class, 'pos_product_id', 'ID');
+    }
+
+    /**
+     * Get the POS product sold as a full wholesale batch of this recipe.
+     */
+    public function wholesaleProduct(): BelongsTo
+    {
+        return $this->belongsTo(Product::class, 'wholesale_pos_product_id', 'ID');
     }
 
     /**
@@ -119,6 +132,14 @@ class KitchenRecipe extends Model
     public function hasLinkedProduct(): bool
     {
         return ! empty($this->pos_product_id);
+    }
+
+    /**
+     * Check if recipe has a linked wholesale POS product.
+     */
+    public function hasWholesaleProduct(): bool
+    {
+        return ! empty($this->wholesale_pos_product_id);
     }
 
     /**

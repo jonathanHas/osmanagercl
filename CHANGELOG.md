@@ -7,7 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **💰 Wholesale pricing for kitchen recipes** (2026-07-31)
+  - Recipes could only be costed against the retail price of their linked POS product. Selling a **full batch** to a wholesale buyer meant creating the product by hand in uniCenta, with no cost basis, no margin review and no link back to the recipe
+  - New page at `/kitchen/wholesale`, reached from a **Wholesale** button on `/kitchen` and a sidebar entry. Lists every recipe with its full-batch cost; entering a price creates or updates a POS product named `"<recipe name> Wholesale"`
+  - **One wholesale unit is one full batch** — the cost basis is `calculateRecipeCost()['total_cost']` (ingredients + labour + electricity + packaging for the whole yield), *not* `cost_per_portion`. Pricing a batch against a per-portion cost would undercost it by the portion count, so a test pins `PRICEBUY == total_cost`
+  - Prices are entered **including VAT**; `PRODUCTS.PRICESELL` is stored ex-VAT, so every price crosses through the same `inc / (1 + rate)` conversion the products page uses. Ex-VAT price and margin update live in the browser with no round trip
+  - **Category and VAT are inherited** from the recipe's linked retail product. Recipes with no linked product are still pricable — the row shows category and VAT dropdowns, and the save is rejected until both are chosen. VAT never silently defaults to 0%, which would store a 23% item's gross price as its net price
+  - **Re-pricing updates the existing product rather than duplicating it.** If the link column is ever lost, a name lookup adopts the orphaned product instead of creating a second one; a link pointing at a product deleted in uniCenta clears itself and recreates
+  - A price **below batch cost saves with a warning, not an error** — a loss-leader wholesale price is a legitimate decision, and blocking it would just push the work into uniCenta
+  - Review aids per row: a target-margin helper (page-wide default plus per-row override) that fills the price hitting that margin, portions and cost-per-portion beside the batch cost, an expandable ingredients/labour/electricity/packaging breakdown, and a **Cost changed** badge when the current batch cost has drifted more than 1% from the cost the price was set against
+  - The wholesale product is **not renamed** when the recipe is renamed — `PRODUCTS.NAME` is unique and till button layouts reference it. The row shows the actual POS product name so the drift is visible
+  - **Added**: `app/Services/KitchenWholesaleService.php`, `app/Http/Controllers/KitchenWholesaleController.php`, `app/Http/Requests/StoreWholesalePriceRequest.php`, `resources/views/kitchen/wholesale.blade.php`, `database/migrations/2026_07_31_120000_add_wholesale_to_kitchen_recipes_table.php`, `tests/Unit/KitchenWholesaleMarginTest.php`, `tests/Feature/KitchenWholesalePricingTest.php`, `tests/Feature/KitchenWholesalePageTest.php`
+  - **Modified**: `app/Models/KitchenRecipe.php`, `app/Repositories/KitchenRepository.php`, `routes/web.php`, `config/kitchen.php`, `resources/views/kitchen/index.blade.php`, `resources/views/layouts/admin.blade.php`
+
+- **🔢 Barcode generation extracted into a service** (2026-07-31)
+  - Behaviour-preserving refactor. The next-available-barcode logic was private to `ProductController`, so the wholesale pricing page had no way to reuse it. Barcode uniqueness is a global invariant across `PRODUCTS.CODE` — a second copy would drift, and the failure mode is a duplicate code that breaks scanning at the till
+  - Bodies moved **verbatim** into `BarcodeGeneratorService`; the three private `ProductController` methods remain as one-line delegations so no call site changed. `nextForCategory()` folds in the generic-band fallback that `suggestBarcode()` spelled out
+  - **Added**: `app/Services/BarcodeGeneratorService.php`, `tests/Feature/BarcodeGeneratorServiceTest.php`
+  - **Modified**: `app/Http/Controllers/ProductController.php`
+
 ### Changed
+
+- **🍳 Batch-scaled recipes now save the scaling you previewed** (2026-07-31)
+  - `saveScaledRecipe()` copied `prep_time` and `cook_time` **verbatim** and recorded the labour/electricity factors only in a notes string. Because recipe cost is derived from the times, the saved recipe recomputed at 1x and **contradicted the preview the decision was based on** — a 3x Mincemeat batch previewed €16.13 of labour and then opened showing €8.25
+  - The factors are now applied to the times, which is what actually drives cost: **labour factor scales prep time, electricity factor scales cook time**. The saved recipe recomputes to exactly the previewed figures
+  - The preview was rebuilt to match: instead of multiplying the *cost* figures, it derives prep/cook times from the factors and recomputes labour and electricity with the same formulas the server uses. `calculateRecipeCost()` now returns `prep_time`, `cook_time`, `labour_rate`, `electricity_rate`, `cooking_power` and `cook_supervision_factor` so the calculator has the inputs to do this
+  - The comparison table gained **Prep time** and **Cook time** rows, and each factor input shows its effect inline (*"Prep 30 → 60 min"*), so the scaling is visible before saving. Notes now record the actual times rather than bare factors
+  - Note the factors interact as the cost model does: cook time drives electricity in full **and** a slice of labour via the supervision factor, so raising the electricity factor nudges labour up slightly. That is the real relationship, not an artefact
+  - **Modified**: `app/Http/Controllers/KitchenController.php`, `app/Services/KitchenCostingService.php`, `resources/views/kitchen/edit.blade.php`, `docs/features/kitchen-recipe-costing.md`
+
+- **📉 Recipe cost history now records the component breakdown** (2026-07-31)
+  - `kitchen_recipe_cost_history` stored only `total_cost`, `cost_per_portion`, `sell_price` and `margin_percentage`, so a snapshot showed *what* a recipe cost but never *why* — there was no way to see whether a rise came from ingredients, labour or energy, and no way to chart labour against energy over time
+  - Adds `ingredient_cost`, `labour_cost`, `labour_minutes`, `electricity_cost` and `packaging_cost`. `getCostTrends()` returns the matching series alongside the existing totals
+  - **Columns are nullable and existing rows are left alone** — a historical snapshot cannot be broken down after the fact, so a null means "not captured" rather than zero. `KitchenRecipeCostHistory::hasBreakdown()` distinguishes the two; charts should render legacy rows as gaps, not as zeroes. `overhead_cost` (labour + electricity) returns null for those rows rather than a misleading €0.00
+  - **Added**: `database/migrations/2026_07_31_090000_add_cost_breakdown_to_kitchen_recipe_cost_history_table.php`, `tests/Feature/KitchenRecipeScalingTest.php` (covers both this and the scaling fix)
+  - **Modified**: `app/Models/KitchenRecipeCostHistory.php`, `app/Services/KitchenCostingService.php`, `docs/features/kitchen-recipe-costing.md`
 
 - **👨‍🍳 Kitchen recipe labour no longer charges cook time at the full hourly rate** (2026-07-31)
   - Labour was `(prep_time + cook_time) / 60 × rate`, so the *same* cook time was billed twice — once as a chef's time and again as electricity. A 45 minute oven bake was charged as 45 minutes of direct labour even though nobody stands over the oven, overstating the cost of every cooked recipe and understating its margin

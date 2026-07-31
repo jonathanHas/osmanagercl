@@ -111,8 +111,10 @@ The scaling calculator helps analyze cost efficiencies when producing larger bat
 
 **Scaling Factors:**
 - **Recipe Multiplier**: Scale ingredient quantities (2x, 3x, 5x, 10x, or custom)
-- **Labour Factor**: Independent scaling for labour (e.g., 2x batch might only need 1.5x labour)
-- **Electricity Factor**: Independent scaling for electricity (e.g., same oven time for larger batch)
+- **Labour Factor**: Scales **prep time** (e.g., a 2x batch might only need 1.5x the prep)
+- **Electricity Factor**: Scales **cook time** (e.g., the same oven time for a larger batch)
+
+The factors are applied to the recipe's **times**, because times are what a saved recipe stores and what the cost is computed from. Cook time drives electricity in full, plus a slice of labour via the supervision factor — so raising the electricity factor also nudges labour up slightly. The comparison table shows the resulting prep and cook times so the effect is visible before you save.
 
 **Smart Defaults:**
 When you change the recipe multiplier, suggested factors are automatically set:
@@ -123,21 +125,56 @@ When you change the recipe multiplier, suggested factors are automatically set:
 | 10x+ | 3.0x | 2.0x |
 
 **Features:**
-- Real-time comparison table showing original vs scaled costs
+- Real-time comparison table showing original vs scaled times and costs
 - Per-portion cost comparison with savings percentage
 - **Save as New Recipe**: Create a scaled version as a separate recipe
 
 **Scaling Calculation:**
 ```
+scaled_prep_time = round(prep_time × labour_factor)
+scaled_cook_time = round(cook_time × electricity_factor)
+
 scaled_ingredients = original_ingredients × recipe_multiplier
-scaled_labour = original_labour × labour_factor
-scaled_electricity = original_electricity × electricity_factor
+scaled_labour = (scaled_prep_time + scaled_cook_time × cook_supervision_factor) / 60 × labour_rate
+scaled_electricity = scaled_cook_time / 60 × cooking_power × electricity_rate
 scaled_packaging = packaging_per_portion × (portions × recipe_multiplier)
 scaled_total = scaled_ingredients + scaled_labour + scaled_electricity + scaled_packaging
-scaled_portions = original_portions × recipe_multiplier
+scaled_portions = round(original_portions × recipe_multiplier)
 scaled_cost_per_portion = scaled_total / scaled_portions
 savings_percent = ((original_cost_per_portion - scaled_cost_per_portion) / original_cost_per_portion) × 100
 ```
+
+> **The preview is what you get.** The calculator derives its figures from the scaled times using exactly the same formulas as the server, so *Save as New Recipe* produces a recipe whose recomputed costs match the preview. This requires `prep_time`, `cook_time` and the effective rates to be present in the costs payload — they are returned by `calculateRecipeCost()` for that purpose.
+
+### Wholesale Pricing
+
+`/kitchen/wholesale` prices **full batches** of each recipe for wholesale buyers and keeps a matching POS product in step. Reached from the **Wholesale** button on `/kitchen` or the sidebar.
+
+**One wholesale unit is one full batch.** The cost basis is `calculateRecipeCost()['total_cost']` — the whole yield, not `cost_per_portion`. Pricing a batch against a per-portion cost would undercost it by the portion count, so `PRICEBUY` is written to the batch figure and a test pins it there.
+
+**Prices are entered including VAT.** `PRODUCTS.PRICESELL` is stored ex-VAT, so every price crosses through the same conversion the products page uses:
+
+```
+ex_vat  = vat_rate > 0 ? inc_vat / (1 + vat_rate) : inc_vat
+margin% = ex_vat > 0 ? (ex_vat - batch_cost) / ex_vat × 100 : null
+target  = batch_cost / (1 - target%/100) × (1 + vat_rate)     // suggested inc-VAT price
+```
+
+The price is **never stored in Laravel** — it is always rebuilt from the product's own `PRICESELL` and `TAXCAT`, so a price edited directly in uniCenta still displays truthfully. What *is* stored is the target margin, because ingredient costs move with every delivery and without it the page could only show today's margin, not that a recipe had slipped below the margin that was agreed.
+
+**Classification** is resolved most-explicit-first: an explicit request value → the existing wholesale product → the linked retail product. It never falls back to a 0% rate, which would store a 23% item's gross price as its net price. Recipes with no linked retail product are still pricable — the row renders category and VAT dropdowns and the save is rejected until both are chosen.
+
+**Create vs update.** Setting a price on a recipe that already has a wholesale product **updates** it (`PRICESELL` and `PRICEBUY`) rather than creating a second one. `resolveExistingProduct()` checks the link column, then falls back to a name lookup so a product orphaned by a partial failure is adopted rather than duplicated; a link pointing at a product deleted in uniCenta clears itself and recreates.
+
+**Name collisions.** `PRODUCTS.NAME` is unique. If `"<recipe> Wholesale"` is already taken by a *different* product, the name becomes `"<recipe> Wholesale [<code>]"`, unique by construction since codes are globally unique.
+
+**The product is never renamed when the recipe is renamed** — the unique index and till button layouts both reference the name. The row displays the actual POS product name so the drift is visible rather than hidden. This is deliberate.
+
+A price **below batch cost warns rather than blocks** (`price_below_cost`), as does a margin under target (`margin_below_target`). A loss-leader wholesale price is a legitimate business decision; blocking it would only push the work into uniCenta.
+
+New products get the same treatment as a hand-created one: generated `CODE` (via `BarcodeGeneratorService`) with `REFERENCE = CODE`, a zero-unit `STOCKCURRENT` row, till visibility, `ProductMetadata` tagged `source: kitchen_wholesale`, and a `LabelLog` entry.
+
+> **If you ever need more than one wholesale SKU per recipe** (half batch, tray, case), the 1:1 columns on `kitchen_recipes` stop being enough — that is the point to migrate to a `kitchen_wholesale_prices` table.
 
 ## Configuration
 
@@ -186,6 +223,9 @@ return [
 | electricity_rate_override | decimal(8,4) | Override electricity rate |
 | cooking_power_override | decimal(8,2) | Override cooking power |
 | packaging_cost_per_portion | decimal(8,2) | Packaging cost per portion |
+| wholesale_pos_product_id | varchar | Linked wholesale POS product ID (one full batch). No FK — different connection |
+| wholesale_target_margin | decimal(5,2) | Margin % the wholesale price was set to hit |
+| wholesale_priced_at | timestamp | When the wholesale price was last set |
 | created_at | timestamp | Created timestamp |
 | updated_at | timestamp | Updated timestamp |
 
@@ -224,11 +264,18 @@ return [
 |--------|------|-------------|
 | id | bigint | Primary key |
 | recipe_id | bigint | Foreign key to recipes |
+| ingredient_cost | decimal | Ingredient cost at time (nullable) |
+| labour_cost | decimal | Labour cost at time (nullable) |
+| labour_minutes | decimal | Chargeable labour minutes at time (nullable) |
+| electricity_cost | decimal | Electricity cost at time (nullable) |
+| packaging_cost | decimal | Packaging cost at time (nullable) |
 | total_cost | decimal | Total recipe cost |
 | cost_per_portion | decimal | Per-portion cost |
 | sell_price | decimal | Sell price at time |
 | margin_percentage | decimal | Margin at time |
 | recorded_at | timestamp | When recorded |
+
+The component columns are **nullable**: snapshots taken before they existed hold totals only and cannot be broken down after the fact. A null means "not captured", not zero — use `$history->hasBreakdown()` to tell the two apart, and chart the component series from `getCostTrends()` as gaps rather than zeroes.
 
 ## API Endpoints
 
@@ -244,6 +291,15 @@ return [
 | PUT | `/kitchen/{recipe}` | Update recipe |
 | DELETE | `/kitchen/{recipe}` | Delete recipe |
 | POST | `/kitchen/{recipe}/scale` | Save scaled recipe as new |
+
+### Wholesale
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/kitchen/wholesale` | Wholesale pricing page for all recipes |
+| POST | `/kitchen/wholesale/{recipe}` | Create or update the wholesale product (JSON upsert) |
+
+> Both **must** stay registered before the `/kitchen/{recipe}` wildcard in `routes/web.php`, or `GET /kitchen/wholesale` binds `{recipe} = 'wholesale'` and 404s. `KitchenWholesalePageTest` guards this.
 
 ### Ingredients
 
@@ -296,16 +352,21 @@ Margin = (€3.31 / €6.50) × 100 = 50.9% (Excellent)
 Using the batch scaling calculator with 2x multiplier, 1.5x labour, 1.0x electricity:
 
 ```
-Scaled Ingredients = €12.50 × 2 = €25.00
-Scaled Labour = €8.63 × 1.5 = €12.94
-Scaled Electricity = €0.38 × 1.0 = €0.38
-Scaled Packaging = €0.50 × 16 = €8.00
-Scaled Total = €25.00 + €12.94 + €0.38 + €8.00 = €46.32
-Scaled Portions = 8 × 2 = 16
-Scaled Per Portion = €46.32 / 16 = €2.90
+Scaled Prep = 30 × 1.5 = 45 min
+Scaled Cook = 45 × 1.0 = 45 min
 
-Savings = €3.19 - €2.90 = €0.29/portion (9.1% savings)
+Scaled Ingredients = €12.50 × 2 = €25.00
+Scaled Labour = (45 + 45 × 10%) / 60 × €15 = 49.5/60 × €15 = €12.38
+Scaled Electricity = 45 / 60 × 2.0 kW × €0.25 = €0.38
+Scaled Packaging = €0.50 × 16 = €8.00
+Scaled Total = €25.00 + €12.38 + €0.38 + €8.00 = €45.76
+Scaled Portions = 8 × 2 = 16
+Scaled Per Portion = €45.76 / 16 = €2.86
+
+Savings = €3.19 - €2.86 = €0.33/portion (10.3% savings)
 ```
+
+Saving this as a new recipe stores **prep 45 / cook 45**, so reopening it recomputes to exactly the figures above.
 
 ## Files
 
@@ -317,16 +378,29 @@ Savings = €3.19 - €2.90 = €0.29/portion (9.1% savings)
 
 ### Services
 - `app/Services/KitchenCostingService.php` - Cost calculation service
+- `app/Services/KitchenWholesaleService.php` - Wholesale batch pricing and POS product upsert
+- `app/Services/BarcodeGeneratorService.php` - Next-available product code (shared with the products page)
 
 ### Controllers
 - `app/Http/Controllers/KitchenController.php` - Recipe CRUD
 - `app/Http/Controllers/KitchenProfileController.php` - Profile management
+- `app/Http/Controllers/KitchenWholesaleController.php` - Wholesale pricing page
+
+### Requests
+- `app/Http/Requests/StoreWholesalePriceRequest.php` - Wholesale price validation
 
 ### Views
 - `resources/views/kitchen/index.blade.php` - Recipe listing
 - `resources/views/kitchen/create.blade.php` - Create form
 - `resources/views/kitchen/edit.blade.php` - Edit form with cost breakdown
 - `resources/views/kitchen/show.blade.php` - Recipe details
+- `resources/views/kitchen/wholesale.blade.php` - Wholesale pricing grid
+
+### Tests
+- `tests/Unit/KitchenWholesaleMarginTest.php` - Price/margin arithmetic (no DB)
+- `tests/Feature/KitchenWholesalePricingTest.php` - Product create/update, inheritance, warnings
+- `tests/Feature/KitchenWholesalePageTest.php` - Route ordering and auth
+- `tests/Feature/BarcodeGeneratorServiceTest.php` - Barcode generation regression net
 
 ### Configuration
 - `config/kitchen.php` - Default rates configuration

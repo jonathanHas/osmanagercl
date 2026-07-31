@@ -11,6 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // supplier_link lives in the external uniCenta database. The test
+        // suite builds only the POS tables a test needs, so skip if absent.
+        if (! Schema::connection('pos')->hasTable('supplier_link')) {
+            return;
+        }
+
         // Remove new fields from supplier_link table
         Schema::connection('pos')->table('supplier_link', function (Blueprint $table) {
             $table->dropColumn(['units_per_retail_package', 'retail_packages_per_case']);
@@ -27,6 +33,12 @@ return new class extends Migration
      */
     public function down(): void
     {
+        // supplier_link lives in the external uniCenta database. The test
+        // suite builds only the POS tables a test needs, so skip if absent.
+        if (! Schema::connection('pos')->hasTable('supplier_link')) {
+            return;
+        }
+
         // Re-add fields to supplier_link if needed to rollback
         Schema::connection('pos')->table('supplier_link', function (Blueprint $table) {
             $table->integer('units_per_retail_package')->nullable()->after('CaseUnits');

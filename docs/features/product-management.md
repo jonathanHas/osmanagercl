@@ -1159,9 +1159,10 @@ The system is configured via `config/barcode_patterns.php`:
 
 #### Technical Implementation
 
-**Core Methods:**
-- `getNextAvailableBarcodeForCategory($categoryId)` - Main suggestion logic
-- `isCodeAvailableInRange($code, $ranges)` - Range validation
+**Core Methods** (`App\Services\BarcodeGeneratorService`, shared with the kitchen wholesale page):
+- `nextForCategory($categoryId)` - Suggestion with generic-band fallback
+- `nextForConfiguredCategory($categoryId)` - Main suggestion logic
+- `isCodeInRange($code, $ranges)` - Range validation
 - Configuration-driven approach for easy extensibility
 
 **Algorithm:**

@@ -15,12 +15,16 @@ return new class extends Migration
 
         // Backfill: items whose product is mapped to 'companion' in kds_products
         // are bakery; everything else stays as the default 'drink'.
-        DB::statement("
-            UPDATE kds_order_items i
-            INNER JOIN kds_products p ON p.product_id = i.product_id
-            SET i.kind = 'bakery'
-            WHERE p.trigger_mode = 'companion'
-        ");
+        // Multi-table UPDATE JOIN is MySQL syntax, and there is nothing to
+        // backfill on the empty database the test suite builds.
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("
+                UPDATE kds_order_items i
+                INNER JOIN kds_products p ON p.product_id = i.product_id
+                SET i.kind = 'bakery'
+                WHERE p.trigger_mode = 'companion'
+            ");
+        }
     }
 
     public function down(): void

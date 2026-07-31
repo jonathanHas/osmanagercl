@@ -250,6 +250,20 @@ Audit trail for destock/restock actions with intelligent restock suggestions bas
 
 ## Kitchen Management
 
+### Kitchen Wholesale Pricing (NEW! 2026-07-31)
+Price full batches of each recipe for wholesale buyers, with a POS product created and kept in step automatically.
+- **Batch pricing page**: `/kitchen/wholesale`, reached from the Wholesale button on `/kitchen` or the sidebar
+- **One unit = one full batch**: costed against the recipe's whole-yield `total_cost`, not cost per portion
+- **Inc-VAT entry, ex-VAT storage**: type the price customers pay; the ex-VAT `PRICESELL` and live margin are derived automatically
+- **Automatic POS product**: creates `"<recipe name> Wholesale"` with a generated barcode, stock record, till visibility and metadata
+- **Category and VAT inherited** from the recipe's linked retail product; unlinked recipes get dropdowns instead of being locked out
+- **Re-pricing updates, never duplicates** — with a name-lookup fallback that adopts an orphaned product and self-healing for links broken in uniCenta
+- **Target margin helper**: set a page-wide or per-row target and fill the price that hits it, individually or across all unpriced recipes
+- **Review aids**: expandable ingredients/labour/electricity/packaging breakdown, portions and cost per portion, and a *Cost changed* badge when ingredient costs have drifted since the price was set
+- **Below-cost prices warn rather than block** — a loss-leader is a business decision, not an error
+
+📖 [Kitchen Recipe Costing Documentation](./features/kitchen-recipe-costing.md)
+
 ### Kitchen Products Management (NEW! 2026-01-21)
 Manage products that regularly go to the kitchen with quick flagging and ingredient profile creation.
 - **Kitchen Products List**: Dedicated page at `/kitchen/products` showing all flagged kitchen products
