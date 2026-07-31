@@ -200,6 +200,39 @@ class KitchenIngredientProfileController extends Controller
     }
 
     /**
+     * Recalculate costs for every product-linked profile.
+     */
+    public function recalculateAll(): RedirectResponse
+    {
+        $profiles = KitchenIngredientProfile::whereNotNull('pos_product_id')
+            ->with('product.supplierLink')
+            ->get();
+
+        $updated = 0;
+
+        foreach ($profiles as $profile) {
+            $old = (float) $profile->cost_per_base_unit;
+            $new = $profile->calculateCostPerBaseUnit();
+
+            // decimal:6 cast - anything below that rounds away to no visible change
+            if (round($old, 6) === round($new, 6)) {
+                continue;
+            }
+
+            $profile->recalculateCost();
+            $updated++;
+        }
+
+        $message = $updated === 0
+            ? 'All '.$profiles->count().' product-linked profiles were already up to date.'
+            : "Recalculated {$updated} of {$profiles->count()} product-linked profiles.";
+
+        return redirect()
+            ->route('kitchen.profiles.index')
+            ->with('success', $message);
+    }
+
+    /**
      * Search profiles (AJAX).
      */
     public function search(Request $request): JsonResponse

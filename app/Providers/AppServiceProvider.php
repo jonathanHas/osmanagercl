@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Models\InvoiceAttachment;
+use App\Models\Product;
+use App\Observers\ProductObserver;
 use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -33,5 +35,8 @@ class AppServiceProvider extends ServiceProvider
         Route::bind('attachment', function (string $value) {
             return InvoiceAttachment::findOrFail($value);
         });
+
+        // Keep kitchen ingredient profile costs in step with product cost prices
+        Product::observe(ProductObserver::class);
     }
 }

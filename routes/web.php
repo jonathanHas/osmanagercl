@@ -456,6 +456,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/{profile}/edit', [KitchenIngredientProfileController::class, 'edit'])->name('edit');
             Route::put('/{profile}', [KitchenIngredientProfileController::class, 'update'])->name('update');
             Route::delete('/{profile}', [KitchenIngredientProfileController::class, 'destroy'])->name('destroy');
+            Route::post('/recalculate-all', [KitchenIngredientProfileController::class, 'recalculateAll'])->name('recalculate-all');
             Route::post('/{profile}/recalculate', [KitchenIngredientProfileController::class, 'recalculate'])->name('recalculate');
         });
 
