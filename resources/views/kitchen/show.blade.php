@@ -127,9 +127,16 @@
                                 </div>
 
                                 @if($costs['labour_cost'] > 0)
-                                <div class="flex justify-between items-center py-2 border-b">
-                                    <span class="text-gray-600">Labour ({{ $recipe->total_time }} min)</span>
-                                    <span class="font-medium">€{{ number_format($costs['labour_cost'], 2) }}</span>
+                                <div class="py-2 border-b">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-gray-600">Labour ({{ $costs['labour_minutes'] }} min)</span>
+                                        <span class="font-medium">€{{ number_format($costs['labour_cost'], 2) }}</span>
+                                    </div>
+                                    @if($recipe->cook_time > 0)
+                                    <p class="text-xs text-gray-400 mt-0.5">
+                                        {{ $recipe->prep_time ?? 0 }} min prep + {{ round($recipe->getCookSupervisionFactor() * 100) }}% of {{ $recipe->cook_time }} min cook
+                                    </p>
+                                    @endif
                                 </div>
                                 @endif
 

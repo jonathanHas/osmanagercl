@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **👨‍🍳 Kitchen recipe labour no longer charges cook time at the full hourly rate** (2026-07-31)
+  - Labour was `(prep_time + cook_time) / 60 × rate`, so the *same* cook time was billed twice — once as a chef's time and again as electricity. A 45 minute oven bake was charged as 45 minutes of direct labour even though nobody stands over the oven, overstating the cost of every cooked recipe and understating its margin
+  - Cook time now contributes labour at a **10% supervision factor**: `(prep_time + cook_time × 0.10) / 60 × rate`. A 40 minute cook becomes 4 minutes of labour. **Electricity is unchanged** and still charges the full cook time, which is correct — the oven really is drawing power for all of it
+  - Configurable globally via `KITCHEN_COOK_SUPERVISION_FACTOR` (`config/kitchen.php`), alongside the existing labour, electricity and cooking-power rates. Raise it if your recipes are typically hands-on stovetop work rather than oven bakes
+  - **Recipe costs are computed on every page load and nothing is stored**, so every recipe picks this up immediately — labour costs fall and margins rise on anything with cook time. Prep-only recipes are unaffected. The worked Apple Pie example in the docs moves from €4.45/portion at 31.5% margin to €3.19/portion at 50.9%
+  - The Cost Summary rows previously labelled themselves `Labour (75 min)` using prep + cook; they now show the chargeable minutes with a subtext explaining the split (*"30 min prep + 10% of 45 min cook"*). `total_time` and `formatted_total_time` are untouched — they still mean "how long this recipe takes to make"
+  - **Modified**: `config/kitchen.php`, `app/Models/KitchenRecipe.php` (new `labour_minutes` accessor + `getCookSupervisionFactor()`), `app/Services/KitchenCostingService.php` (now returns `labour_minutes` in the costs array consumed by `kitchen.api.costs`), `resources/views/kitchen/edit.blade.php`, `resources/views/kitchen/show.blade.php`, `docs/features/kitchen-recipe-costing.md`
+  - **Added**: `tests/Unit/KitchenCostingServiceTest.php` — the labour and electricity calculations previously had no test coverage at all
+
 - **🥬 F&V products now open the full product edit form** (2026-07-29)
   - Clicking a product name on `/fruit-veg/manage` opened a separate, thinner edit page that offered only **display name, country of origin and price**, each saved by its own AJAX call. The "Create Product" links at the top of the same page have always gone to the **generic** product form (`products.create?category=SUB1|SUB2|SUB3`) — so creating a product gave you far more than editing one
   - Product names now link to `/products/{ID}/edit?from=fruit-veg`, the existing full mirror of that create form. F&V lines gain **cost price, VAT category, supplier + supplier code + units per case, outer barcode, live margin breakdown, till button preview, inline stock editing, min-stock override, alternate barcodes** and the supplier-link duplicate check — none of which the old page had

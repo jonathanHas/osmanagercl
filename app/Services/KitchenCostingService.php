@@ -90,6 +90,7 @@ class KitchenCostingService
         return [
             'ingredient_cost' => round($ingredientCost, 2),
             'labour_cost' => round($labourCost, 2),
+            'labour_minutes' => round($recipe->labour_minutes, 1),
             'electricity_cost' => round($electricityCost, 2),
             'overhead_cost' => round($overheadCost, 2),
             'packaging_cost' => round($packagingCost, 2),
@@ -111,19 +112,23 @@ class KitchenCostingService
     }
 
     /**
-     * Calculate labour cost based on prep + cook time.
+     * Calculate labour cost based on prep time plus supervised cook time.
+     *
+     * Cooking is largely unattended, so only the supervision factor of the
+     * cook time is charged as direct labour. The full cook time is still
+     * charged as electricity in calculateElectricityCost().
      */
     public function calculateLabourCost(KitchenRecipe $recipe): float
     {
-        $totalMinutes = $recipe->total_time;
+        $labourMinutes = $recipe->labour_minutes;
 
-        if ($totalMinutes <= 0) {
+        if ($labourMinutes <= 0) {
             return 0;
         }
 
         $hourlyRate = $recipe->getLabourRate();
 
-        return ($totalMinutes / 60) * $hourlyRate;
+        return ($labourMinutes / 60) * $hourlyRate;
     }
 
     /**

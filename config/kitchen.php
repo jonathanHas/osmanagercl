@@ -20,4 +20,10 @@ return [
     // Average cooking power consumption (kW)
     // Typical: Oven ~2.5kW, Hob ~1.5kW, Average ~2.0kW
     'avg_cooking_power' => env('KITCHEN_AVG_COOKING_POWER', 2.0),
+
+    // Portion of cook time that counts as attended labour (0.10 = 10%)
+    // Cooking is largely unattended - the oven runs without a chef standing
+    // over it - so only a fraction of cook time is charged as direct labour.
+    // The full cook time is still charged as electricity.
+    'cook_supervision_factor' => env('KITCHEN_COOK_SUPERVISION_FACTOR', 0.10),
 ];

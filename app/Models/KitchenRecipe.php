@@ -69,6 +69,18 @@ class KitchenRecipe extends Model
     }
 
     /**
+     * Get the chargeable labour time in minutes.
+     *
+     * Prep time is fully attended. Cook time is largely unattended, so only
+     * the supervision factor (default 10%) is charged as direct labour - the
+     * full cook time is still charged as electricity.
+     */
+    public function getLabourMinutesAttribute(): float
+    {
+        return ($this->prep_time ?? 0) + (($this->cook_time ?? 0) * $this->getCookSupervisionFactor());
+    }
+
+    /**
      * Get the formatted total time.
      */
     public function getFormattedTotalTimeAttribute(): string
@@ -131,6 +143,14 @@ class KitchenRecipe extends Model
     public function getCookingPower(): float
     {
         return $this->cooking_power_override ?? config('kitchen.avg_cooking_power', 2.0);
+    }
+
+    /**
+     * Get the portion of cook time charged as attended labour.
+     */
+    public function getCookSupervisionFactor(): float
+    {
+        return (float) config('kitchen.cook_supervision_factor', 0.10);
     }
 
     /**

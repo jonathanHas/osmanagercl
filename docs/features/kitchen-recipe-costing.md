@@ -37,10 +37,16 @@ Define reusable ingredient costing profiles:
 Labour costs are calculated automatically from recipe times:
 
 ```
-labour_cost = (prep_time + cook_time) / 60 × labour_rate_per_hour
+labour_cost = (prep_time + cook_time × cook_supervision_factor) / 60 × labour_rate_per_hour
 ```
 
+Prep time is fully attended work. Cook time is largely **unattended** — the dish is in the oven and nobody is standing over it — so only a fraction of it is charged as direct labour. With the default 10% factor, a 40 minute cook contributes 4 minutes of labour.
+
+The full cook time is still charged as electricity, because the oven really is drawing power for all of it.
+
 **Default Rate**: €15.00/hour (configurable via `KITCHEN_LABOUR_RATE` env variable)
+
+**Default Supervision Factor**: 10% (configurable via `KITCHEN_COOK_SUPERVISION_FACTOR` env variable). Raise it globally if your recipes are typically hands-on stovetop work rather than oven bakes.
 
 ### Electricity Cost Calculation
 
@@ -143,6 +149,7 @@ Add to your `.env` file:
 KITCHEN_LABOUR_RATE=15.00
 KITCHEN_ELECTRICITY_RATE=0.25
 KITCHEN_AVG_COOKING_POWER=2.0
+KITCHEN_COOK_SUPERVISION_FACTOR=0.10
 ```
 
 ### Config File
@@ -154,8 +161,11 @@ return [
     'labour_rate' => env('KITCHEN_LABOUR_RATE', 15.00),
     'electricity_rate' => env('KITCHEN_ELECTRICITY_RATE', 0.25),
     'avg_cooking_power' => env('KITCHEN_AVG_COOKING_POWER', 2.0),
+    'cook_supervision_factor' => env('KITCHEN_COOK_SUPERVISION_FACTOR', 0.10),
 ];
 ```
+
+> **Note**: `cook_supervision_factor` is a global house rule, not a per-recipe override. Recipe costs are computed on every page load and nothing is stored, so changing it moves the numbers on every recipe immediately. Run `php artisan config:clear` after changing it in production.
 
 ## Database Schema
 
@@ -265,17 +275,20 @@ return [
 
 **Calculation:**
 ```
-Labour = (30 + 45) / 60 × €15 = 1.25 × €15 = €18.75
+Labour minutes = 30 prep + (45 cook × 10%) = 30 + 4.5 = 34.5 min
+Labour = 34.5 / 60 × €15 = €8.63
 Electricity = 45 / 60 × 2.0 kW × €0.25 = 0.75 × 2.0 × €0.25 = €0.38
 Packaging = €0.50 × 8 = €4.00
-Total = €12.50 + €18.75 + €0.38 + €4.00 = €35.63
-Per portion = €35.63 / 8 = €4.45
+Total = €12.50 + €8.63 + €0.38 + €4.00 = €25.51
+Per portion = €25.51 / 8 = €3.19
 ```
+
+Note that the 45 minutes in the oven costs €4.50 of labour less than the 45 minutes charged before the supervision factor was introduced, while the electricity charge is untouched.
 
 If linked to a product selling at €6.50:
 ```
-Profit = €6.50 - €4.45 = €2.05
-Margin = (€2.05 / €6.50) × 100 = 31.5% (Good)
+Profit = €6.50 - €3.19 = €3.31
+Margin = (€3.31 / €6.50) × 100 = 50.9% (Excellent)
 ```
 
 ### Scaling Example
@@ -284,14 +297,14 @@ Using the batch scaling calculator with 2x multiplier, 1.5x labour, 1.0x electri
 
 ```
 Scaled Ingredients = €12.50 × 2 = €25.00
-Scaled Labour = €18.75 × 1.5 = €28.13
+Scaled Labour = €8.63 × 1.5 = €12.94
 Scaled Electricity = €0.38 × 1.0 = €0.38
 Scaled Packaging = €0.50 × 16 = €8.00
-Scaled Total = €25.00 + €28.13 + €0.38 + €8.00 = €61.51
+Scaled Total = €25.00 + €12.94 + €0.38 + €8.00 = €46.32
 Scaled Portions = 8 × 2 = 16
-Scaled Per Portion = €61.51 / 16 = €3.84
+Scaled Per Portion = €46.32 / 16 = €2.90
 
-Savings = €4.45 - €3.84 = €0.61/portion (13.7% savings)
+Savings = €3.19 - €2.90 = €0.29/portion (9.1% savings)
 ```
 
 ## Files
