@@ -510,20 +510,88 @@
                             @endif
                         </div>
                     @endif
-                    @if(auth()->user()->can('deliveries.manage'))
-                        <form method="POST" action="{{ route('delivery-legacy.undo-complete') }}" class="mt-3 ml-7"
-                              onsubmit="return confirm('This will REMOVE the stock that was added and reopen this delivery so you can keep scanning. Continue?')">
-                            @csrf
-                            <input type="hidden" name="delID" value="{{ $deliveryId }}">
-                            <input type="hidden" name="supplierID" value="{{ $supplierId }}">
-                            <button type="submit"
-                                    class="inline-flex items-center px-3 py-2 bg-amber-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-amber-700 gap-1.5 touch-manipulation">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    @if(auth()->user()->can('deliveries.manage') && $undoPreview)
+                        <div class="mt-4 ml-7 pt-3 border-t border-green-200">
+                            <h4 class="font-medium text-gray-800 mb-2 flex items-center gap-1.5 text-sm">
+                                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a4 4 0 014 4v2m-4-6l4-4m-4 4l4 4"/>
                                 </svg>
-                                Undo Complete &amp; Reopen
-                            </button>
-                        </form>
+                                Undo Preview
+                            </h4>
+                            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm max-w-xs mb-3">
+                                <div class="text-gray-600">Products to revert:</div>
+                                <div class="font-medium text-gray-800">{{ $undoPreview['productsToRevert'] }}</div>
+                                <div class="text-gray-600">Total units to remove:</div>
+                                <div class="font-medium text-gray-800">{{ number_format($undoPreview['totalUnitsToRemove'], 2) }}</div>
+                                <div class="text-gray-600">Current stock total:</div>
+                                <div class="font-medium text-gray-800">{{ number_format($undoPreview['currentStockTotal'], 2) }}</div>
+                                <div class="text-gray-600">Expected after undo:</div>
+                                <div class="font-medium text-amber-600">{{ number_format($undoPreview['expectedStockTotal'], 2) }}</div>
+                            </div>
+
+                            @if(count($undoPreview['negatives']) > 0)
+                                <div class="mb-3 p-3 bg-yellow-50 border border-yellow-300 rounded text-sm max-w-2xl">
+                                    <div class="font-medium text-yellow-800 mb-1">
+                                        {{ count($undoPreview['negatives']) }} product(s) would go negative
+                                    </div>
+                                    <p class="text-yellow-700 text-xs mb-2">
+                                        Stock has been sold since this delivery was completed, or it was already low.
+                                        This is expected if the goods really were never received &mdash; check before continuing.
+                                    </p>
+                                    <ul class="text-xs text-yellow-800 space-y-0.5">
+                                        @foreach($undoPreview['negatives'] as $n)
+                                            <li>
+                                                <span class="font-medium">{{ $n['name'] }}</span>
+                                                &mdash; stock {{ number_format($n['current'], 2) }},
+                                                removing {{ number_format($n['toRemove'], 2) }}
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
+
+                            @if($undoPreview['isExact'])
+                                <p class="text-xs text-gray-600 mb-3 max-w-2xl">
+                                    Verified against the scan record &mdash; these amounts match exactly what completing
+                                    this delivery added, so the undo is a precise reverse.
+                                </p>
+                                <form method="POST" action="{{ route('delivery-legacy.undo-complete') }}"
+                                      onsubmit="return confirm('This will REMOVE the stock that was added and reopen this delivery so you can keep scanning. Continue?')">
+                                    @csrf
+                                    <input type="hidden" name="delID" value="{{ $deliveryId }}">
+                                    <input type="hidden" name="supplierID" value="{{ $supplierId }}">
+                                    <button type="submit"
+                                            class="inline-flex items-center px-3 py-2 bg-amber-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-amber-700 gap-1.5 touch-manipulation">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a4 4 0 014 4v2m-4-6l4-4m-4 4l4 4"/>
+                                        </svg>
+                                        Undo Complete &amp; Reopen
+                                    </button>
+                                </form>
+                            @else
+                                <div class="p-3 bg-red-50 border border-red-300 rounded text-sm max-w-2xl">
+                                    <div class="font-medium text-red-800 mb-1">
+                                        Undo unavailable &mdash; amounts no longer match the scan record
+                                    </div>
+                                    <p class="text-red-700 text-xs mb-2">
+                                        Undoing would remove the wrong quantities for
+                                        {{ count($undoPreview['discrepancies']) }} product(s). This normally means another
+                                        invoice has been synced to the legacy delivery table since this delivery was
+                                        completed, so the figures can no longer be reproduced. Correct the stock for these
+                                        products manually instead.
+                                    </p>
+                                    <ul class="text-xs text-red-800 space-y-0.5">
+                                        @foreach($undoPreview['discrepancies'] as $d)
+                                            <li>
+                                                <span class="font-medium">{{ $d['name'] }}</span>
+                                                &mdash; undo would remove {{ number_format($d['planned'], 2) }},
+                                                but scans record {{ number_format($d['expected'], 2) }}
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
+                        </div>
                     @endif
                 </div>
             @endif

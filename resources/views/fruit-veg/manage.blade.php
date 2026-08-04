@@ -304,7 +304,11 @@
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                            <template x-for="product in (products || [])" :key="product.CODE">
+                            {{-- Only one of the desktop/mobile loops builds rows. The
+                                 wrappers below are CSS-only (hidden md:block / md:hidden),
+                                 so without this gate Alpine instantiated every product
+                                 twice. --}}
+                            <template x-for="product in (isDesktop ? (products || []) : [])" :key="product.CODE">
                                 <tr :class="{ 'bg-amber-50 border-l-4 border-l-amber-400': product.in_print_queue, 'bg-gray-50': !product.in_print_queue && selectedProducts.includes(product.CODE), 'opacity-40': recentlyToggledOff.includes(product.CODE) }">
                                     <!-- Checkbox -->
                                     <td class="px-3 py-4">
@@ -442,7 +446,6 @@
                                                 editing: false, 
                                                 originalCountryId: product.veg_details?.country_id || null,
                                                 selectedCountryId: product.veg_details?.country_id || null,
-                                                countries: [],
                                                 async saveCountry() {
                                                     // Convert both to integers for proper comparison
                                                     const selectedId = parseInt(this.selectedCountryId);
@@ -469,7 +472,7 @@
                                                     this.editing = false;
                                                 }
                                              }"
-                                             x-init="$nextTick(() => fetch('/fruit-veg/countries').then(response => response.json()).then(data => countries = data))">
+                                             >
                                             <div x-show="!editing" 
                                                  @click="editing = true; selectedCountryId = product.veg_details?.country_id || null;" 
                                                  class="cursor-pointer text-xs text-gray-600 hover:text-gray-800 hover:bg-gray-100 px-1 py-1 rounded">
@@ -496,7 +499,6 @@
                                                 editing: false, 
                                                 originalClassId: product.veg_details?.class_id || null,
                                                 selectedClassId: product.veg_details?.class_id || null,
-                                                classes: [],
                                                 async saveClass() {
                                                     // Convert both to integers for proper comparison
                                                     const selectedId = parseInt(this.selectedClassId);
@@ -523,7 +525,7 @@
                                                     this.editing = false;
                                                 }
                                              }"
-                                             x-init="$nextTick(() => fetch('/fruit-veg/classes').then(response => response.json()).then(data => classes = data))">
+                                             >
                                             <div x-show="!editing" 
                                                  @click="editing = true; selectedClassId = product.veg_details?.class_id || null;" 
                                                  class="cursor-pointer text-xs text-gray-600 hover:text-gray-800 hover:bg-gray-100 px-1 py-1 rounded">
@@ -574,7 +576,6 @@
                                                 editing: false, 
                                                 originalUnitId: product.veg_details?.unit_id || null,
                                                 selectedUnitId: product.veg_details?.unit_id || null,
-                                                units: [],
                                                 async saveUnit() {
                                                     // Convert both to integers for proper comparison
                                                     const selectedId = parseInt(this.selectedUnitId);
@@ -601,7 +602,7 @@
                                                     this.editing = false;
                                                 }
                                              }"
-                                             x-init="$nextTick(() => fetch('/fruit-veg/units').then(response => response.json()).then(data => units = data))">
+                                             >
                                             <div x-show="!editing" 
                                                  @click="editing = true; selectedUnitId = product.veg_details?.unit_id || null;" 
                                                  class="cursor-pointer text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 px-1 py-1 rounded">
@@ -695,7 +696,7 @@
                 <div class="md:hidden bg-gray-100 p-4">
                     <!-- Mobile Products -->
                     <div x-show="products.length > 0" class="space-y-4">
-                        <template x-for="product in (products || [])" :key="product.CODE">
+                        <template x-for="product in (isDesktop ? [] : (products || []))" :key="product.CODE">
                             <div class="rounded-lg shadow-sm border p-4 space-y-4" :class="{ 'bg-amber-50 border-amber-400': product.in_print_queue, 'bg-white border-gray-200': !product.in_print_queue, 'bg-gray-50': !product.in_print_queue && selectedProducts.includes(product.CODE), 'opacity-40': recentlyToggledOff.includes(product.CODE) }">
                                 
                                 <!-- Header: Checkbox, Image, Product Name -->
@@ -828,7 +829,6 @@
                                             editing: false, 
                                             originalCountryId: product.veg_details?.country_id || null,
                                             selectedCountryId: product.veg_details?.country_id || null,
-                                            countries: [],
                                             async saveCountry() {
                                                 const selectedId = parseInt(this.selectedCountryId);
                                                 const originalId = parseInt(this.originalCountryId);
@@ -852,7 +852,7 @@
                                                 this.editing = false;
                                             }
                                          }"
-                                         x-init="$nextTick(() => fetch('/fruit-veg/countries').then(response => response.json()).then(data => countries = data))">
+                                         >
                                         <div class="flex items-center justify-between">
                                             <span class="text-sm font-medium text-gray-700">Origin:</span>
                                             <div x-show="!editing" 
@@ -881,7 +881,6 @@
                                             editing: false, 
                                             originalClassId: product.veg_details?.class_id || null,
                                             selectedClassId: product.veg_details?.class_id || null,
-                                            classes: [],
                                             async saveClass() {
                                                 const selectedId = parseInt(this.selectedClassId);
                                                 const originalId = parseInt(this.originalClassId);
@@ -905,7 +904,7 @@
                                                 this.editing = false;
                                             }
                                          }"
-                                         x-init="$nextTick(() => fetch('/fruit-veg/classes').then(response => response.json()).then(data => classes = data))">
+                                         >
                                         <div class="flex items-center justify-between">
                                             <span class="text-sm font-medium text-gray-700">Class:</span>
                                             <div x-show="!editing" 
@@ -963,7 +962,6 @@
                                             editing: false, 
                                             originalUnitId: product.veg_details?.unit_id || null,
                                             selectedUnitId: product.veg_details?.unit_id || null,
-                                            units: [],
                                             async saveUnit() {
                                                 const selectedId = parseInt(this.selectedUnitId);
                                                 const originalId = parseInt(this.originalUnitId);
@@ -987,7 +985,7 @@
                                                 this.editing = false;
                                             }
                                          }"
-                                         x-init="$nextTick(() => fetch('/fruit-veg/units').then(response => response.json()).then(data => units = data))">
+                                         >
                                         <div class="flex items-center justify-between">
                                             <span class="text-sm font-medium text-gray-700">Unit:</span>
                                             <div x-show="!editing" 
@@ -1077,7 +1075,23 @@
                         <p class="mt-1 text-sm text-gray-500">Try adjusting your search or filter criteria.</p>
                     </div>
                 </div>
-                
+
+                {{-- End-of-list marker. Without this a list truncated by the browser
+                     is indistinguishable from a complete one. --}}
+                <div x-show="!searching && products.length > 0"
+                     class="border-t border-gray-200 px-4 py-4 text-center">
+                    <p x-show="products.length >= totalMatching" class="text-sm text-gray-500">
+                        <span x-text="'Showing all ' + products.length + ' product' + (products.length === 1 ? '' : 's')"></span>
+                        &mdash; end of list
+                    </p>
+                    <div x-show="products.length < totalMatching" x-cloak
+                         class="rounded-md bg-amber-50 border border-amber-300 px-4 py-3 text-sm text-amber-800">
+                        <span class="font-medium"
+                              x-text="'Showing the first ' + products.length + ' of ' + totalMatching + ' products.'"></span>
+                        Narrow the search or filters to see the rest.
+                    </div>
+                </div>
+
             {{-- Print Label Modal --}}
             <div x-show="printModal.open" x-cloak
                  class="fixed inset-0 z-50 overflow-y-auto"
@@ -1167,6 +1181,15 @@
         function managementSystem() {
             return {
                 products: {!! json_encode($products ?? []) !!},
+                // Dropdown lookups live on the root component and are inherited by
+                // every row's scope. Previously each row fetched these itself, which
+                // meant 6 XHRs per product and could stall the page on slow machines.
+                countries: {!! json_encode($countries ?? []) !!},
+                units: {!! json_encode($units ?? []) !!},
+                classes: {!! json_encode($classes ?? []) !!},
+                totalMatching: {{ (int) ($totalMatching ?? 0) }},
+                productLimit: {{ (int) ($productLimit ?? 0) }},
+                isDesktop: window.matchMedia('(min-width: 768px)').matches,
                 selectedProducts: [],
                 recentlyToggledOff: [],
                 selectAll: false,
@@ -1191,9 +1214,21 @@
                 },
                 
                 init() {
+                    // Keep the desktop/mobile row gate in step with the breakpoint so
+                    // resizing across it re-renders into the other layout.
+                    const desktopQuery = window.matchMedia('(min-width: 768px)');
+                    this.isDesktop = desktopQuery.matches;
+                    const onBreakpointChange = (event) => { this.isDesktop = event.matches; };
+                    if (desktopQuery.addEventListener) {
+                        desktopQuery.addEventListener('change', onBreakpointChange);
+                    } else {
+                        // Older browsers (e.g. the shop's Firefox) only have addListener
+                        desktopQuery.addListener(onBreakpointChange);
+                    }
+
                     // Restore saved filters from localStorage
                     this.restoreFilters();
-                    
+
                     // Listen for product availability changes from quick search
                     window.addEventListener('productAvailabilityChanged', (event) => {
                         const { productCode, isAvailable, productData } = event.detail;
@@ -1304,9 +1339,20 @@
                             this.searchTerm = filters.searchTerm || '';
                             this.categoryFilter = filters.categoryFilter || 'all';
                             this.availabilityFilter = filters.availabilityFilter || 'available';
-                            
-                            // Perform search with restored filters if any are set
-                            if (this.searchTerm || this.categoryFilter !== 'all' || this.availabilityFilter !== 'all') {
+
+                            // Only refetch when the restored filters differ from the ones
+                            // the server already rendered with. The old check compared
+                            // availabilityFilter against 'all', but the default is
+                            // 'available' — so every load re-rendered the whole list twice.
+                            const serverRendered = {
+                                searchTerm: {!! json_encode(request('search') ?? '') !!},
+                                categoryFilter: {!! json_encode(request('category') ?? 'all') !!},
+                                availabilityFilter: {!! json_encode(request('availability') ?? 'available') !!},
+                            };
+
+                            if (this.searchTerm !== serverRendered.searchTerm ||
+                                this.categoryFilter !== serverRendered.categoryFilter ||
+                                this.availabilityFilter !== serverRendered.availabilityFilter) {
                                 this.performSearch();
                             }
                         } catch (e) {
@@ -1355,6 +1401,7 @@
                         const data = await response.json();
 
                         this.products = data.products || [];
+                        this.totalMatching = data.total ?? this.products.length;
                         this.selectedProducts = [];
                         this.recentlyToggledOff = [];
                         this.selectAll = false;
@@ -1369,8 +1416,10 @@
                 clearFilters() {
                     this.searchTerm = '';
                     this.categoryFilter = 'all';
-                    this.availabilityFilter = 'all';
-                    
+                    // Reset to the page default ('available'), not 'all' — 'all' pulls the
+                    // entire F&V catalogue including everything off the till.
+                    this.availabilityFilter = 'available';
+
                     // Clear saved filters from localStorage
                     localStorage.removeItem('fruitVegManageFilters');
                     
@@ -1389,12 +1438,15 @@
                         if (!matchesSearch) return false;
                     }
                     
-                    // Check category filter
+                    // Check category filter. These IDs must match
+                    // TillVisibilityService::mapFilterToCategory() — they were '001',
+                    // '002' and '126', which matched nothing, so a product toggled on
+                    // while a category filter was active never appeared in the table.
                     if (this.categoryFilter !== 'all') {
                         const categoryId = product.CATEGORY || (product.category && product.category.ID);
-                        if (this.categoryFilter === 'fruit' && categoryId !== '001') return false;
-                        if (this.categoryFilter === 'vegetables' && categoryId !== '002') return false;
-                        if (this.categoryFilter === 'veg_barcoded' && categoryId !== '126') return false;
+                        if (this.categoryFilter === 'fruit' && categoryId !== 'SUB1') return false;
+                        if (this.categoryFilter === 'vegetables' && categoryId !== 'SUB2') return false;
+                        if (this.categoryFilter === 'veg_barcoded' && categoryId !== 'SUB3') return false;
                     }
                     
                     // Check availability filter

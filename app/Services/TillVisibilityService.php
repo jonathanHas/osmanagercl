@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductActivityLog;
 use App\Models\ProductsCat;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -82,14 +83,65 @@ class TillVisibilityService
      */
     public function getProductsWithVisibility(string $categoryType, array $filters = [], ?int $limit = null, int $offset = 0): EloquentCollection
     {
-        $categoryIds = self::CATEGORY_MAPPINGS[$categoryType] ?? [];
+        $query = $this->buildVisibilityQuery($categoryType, $filters);
 
-        if (empty($categoryIds)) {
+        if ($query === null) {
             return collect();
         }
 
-        $query = Product::whereIn('CATEGORY', $categoryIds)
-            ->with(['category', 'vegDetails.country']);
+        // 'tax' is eager loaded because Product::getGrossPrice() resolves it for
+        // every row; without this it is one extra POS query per product.
+        $query->with(['category', 'vegDetails.country', 'tax']);
+
+        // Apply pagination if limit is specified
+        if ($limit !== null) {
+            $query->skip($offset)->take($limit);
+        }
+
+        // Get products
+        $products = $query->orderBy('NAME')->get();
+
+        // Get visible product IDs for all products (needed for UI state)
+        $visibleProductIds = ProductsCat::whereIn('PRODUCT', $products->pluck('ID'))
+            ->pluck('PRODUCT')
+            ->toArray();
+
+        // Add visibility status to each product
+        $products->each(function ($product) use ($visibleProductIds) {
+            $product->is_visible_on_till = in_array($product->ID, $visibleProductIds);
+        });
+
+        return $products;
+    }
+
+    /**
+     * Count the products a given filter set matches, ignoring limit/offset.
+     *
+     * Used to report "showing X of Y" so a capped list is never mistaken for
+     * the complete range.
+     */
+    public function countProductsWithVisibility(string $categoryType, array $filters = []): int
+    {
+        $query = $this->buildVisibilityQuery($categoryType, $filters);
+
+        return $query === null ? 0 : $query->count();
+    }
+
+    /**
+     * Build the filtered product query shared by getProductsWithVisibility()
+     * and countProductsWithVisibility().
+     *
+     * Returns null when the category type is unknown.
+     */
+    private function buildVisibilityQuery(string $categoryType, array $filters = []): ?Builder
+    {
+        $categoryIds = self::CATEGORY_MAPPINGS[$categoryType] ?? [];
+
+        if (empty($categoryIds)) {
+            return null;
+        }
+
+        $query = Product::whereIn('CATEGORY', $categoryIds);
 
         // Apply search filter
         if (! empty($filters['search'])) {
@@ -130,25 +182,7 @@ class TillVisibilityService
             }
         }
 
-        // Apply pagination if limit is specified
-        if ($limit !== null) {
-            $query->skip($offset)->take($limit);
-        }
-
-        // Get products
-        $products = $query->orderBy('NAME')->get();
-
-        // Get visible product IDs for all products (needed for UI state)
-        $visibleProductIds = ProductsCat::whereIn('PRODUCT', $products->pluck('ID'))
-            ->pluck('PRODUCT')
-            ->toArray();
-
-        // Add visibility status to each product
-        $products->each(function ($product) use ($visibleProductIds) {
-            $product->is_visible_on_till = in_array($product->ID, $visibleProductIds);
-        });
-
-        return $products;
+        return $query;
     }
 
     /**

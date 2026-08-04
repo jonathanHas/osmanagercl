@@ -27,6 +27,16 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class FruitVegController extends Controller
 {
     /**
+     * Maximum products rendered on the manage page in one go.
+     *
+     * Every row is built client-side, so an unbounded list can exhaust an older
+     * browser mid-render and truncate silently. The default "available" view is
+     * well under this; the cap only bites on the "all" view, which reports the
+     * true total alongside it.
+     */
+    public const MANAGE_PRODUCT_LIMIT = 500;
+
+    /**
      * The optimized sales repository instance for blazing-fast queries.
      */
     protected OptimizedSalesRepository $optimizedSalesRepository;
@@ -289,7 +299,11 @@ class FruitVegController extends Controller
                           ($availability === 'unavailable' ? 'hidden' : 'all'),
         ];
 
-        $products = $this->tillVisibilityService->getProductsWithVisibility('fruit_veg', $filters);
+        // The page renders every row client-side, so an unbounded set can exhaust
+        // the browser on slower machines and truncate the list silently. Cap it and
+        // always report the true total so a partial list is visible as partial.
+        $totalMatching = $this->tillVisibilityService->countProductsWithVisibility('fruit_veg', $filters);
+        $products = $this->tillVisibilityService->getProductsWithVisibility('fruit_veg', $filters, self::MANAGE_PRODUCT_LIMIT);
 
         // Batch load all price records to avoid N+1 queries
         $productCodes = $products->pluck('CODE')->toArray();
@@ -387,15 +401,29 @@ class FruitVegController extends Controller
             ];
         });
 
+        // Dropdown lookups are small, static and identical for every row. Sending
+        // them once with the page replaces one XHR per row per dropdown.
+        $countries = Country::orderBy('name')->get();
+        $units = PosUnit::orderBy('ID')->get();
+        $classes = VegClass::orderBy('classNum')->get();
+
         // For AJAX requests, return JSON
         if ($request->wantsJson()) {
 
             return response()->json([
                 'products' => $products->values(),
+                'total' => $totalMatching,
+                'limit' => self::MANAGE_PRODUCT_LIMIT,
             ]);
         }
 
-        return view('fruit-veg.manage', compact('products'));
+        return view('fruit-veg.manage', compact(
+            'products',
+            'totalMatching',
+            'countries',
+            'units',
+            'classes'
+        ))->with('productLimit', self::MANAGE_PRODUCT_LIMIT);
     }
 
     /**

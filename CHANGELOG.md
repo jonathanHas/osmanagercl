@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **🍳 Wholesale kitchen products are no longer put on the till when created** (2026-08-01)
+  - Pricing a recipe for wholesale created its POS product and immediately added it to `PRODUCTS_CAT`, so a full-batch line appeared on the till alongside retail items and could be rung up by mistake
+  - A wholesale batch is sold off-till by invoice, so the product is now created hidden. Till visibility can still be turned on per product the usual way if a batch genuinely needs to be sellable at the counter
+  - Existing wholesale products are unaffected — this only changes what happens at creation. Re-pricing an existing product never touched visibility
+  - **Modified**: `app/Services/KitchenWholesaleService.php`
+
+### Fixed
+
+- **📦 "Undo Complete & Reopen" could silently remove the wrong stock** (2026-08-04)
+  - Completing a legacy delivery writes **no audit trail** — no `STOCKDIARY` row, no `stock_adjustments` row, no model events. It only increments `STOCKCURRENT.UNITS` and sets `deliveriesScan.status = 1`. So `undoComplete()` had to *recompute* what to remove by re-running `getMatchedItems()` / `getScannedNotOnInvoice()`, on the assumption that this reproduces the original amounts exactly
+  - That assumption held only for `deliveriesScanItems`. Those queries **also read the POS `delivery` table, a global scratch table with no delivery-id column** that `DeliveryController::syncToLegacy()` truncates and repopulates on *every* legacy sync. And because `getMatchedItems()` groups by `supCode` with each row carrying the same `scanned` value, **one barcode reachable from two supplier codes produces two rows and so a doubled quantity**. Sync a different invoice between completing and undoing, and the undo removes a different amount than completion added — with no warning and no way to notice afterwards
+  - Reproduced on the dev POS snapshot against a real completed delivery: adding a second supplier code for an already-scanned barcode made the undo plan to remove **12 units where the scan record says 6** (22 → 28 units overall)
+  - New `calculateUndoPreview()` compares what the undo is about to decrement against `deliveriesScanItems`, which is scoped to the `delID` and is never touched by completion and is therefore the ground truth. The completed-delivery banner now shows products to revert, units to remove, and stock before/after, plus a per-product breakdown of any disagreement
+  - **When the amounts disagree the button is removed, not disabled**, and `undoComplete()` refuses server-side as well — the route is a plain POST and a rendered preview can be stale by the time it is submitted. It **blocks rather than auto-corrects**: on a mismatch there is no way to tell whether completion added the planned figure or the scanned one, so picking either silently could leave stock quietly wrong
+  - Products that would be driven negative are flagged as a warning but do not block — that is expected when the goods genuinely were never received
+  - The preview reuses the controller's own item queries rather than reimplementing them, so it cannot drift from the action it checks. It is computed only for completed sessions
+  - **Modified**: `app/Http/Controllers/DeliveryLegacyController.php`, `resources/views/delivery-legacy/match.blade.php`
+
+- **🥬 `/fruit-veg/manage` silently truncated its product list on slower machines** (2026-08-01)
+  - On an older, slower shop PC the list rendered alphabetically and simply **stopped part-way** — it reached "Raspberries" and ended, with no error and no end-of-list cue. The page has no footer, so a partial list was indistinguishable from a complete one, and staff were making availability and pricing decisions against a range that was quietly missing items. A faster PC loaded the same page fully
+  - The truncation was **client-side**. The whole product set is inlined as JSON and Alpine builds every row in the browser; a short server response would have produced malformed JSON and *zero* rows, so a partial list meant the render loop ran out of time or memory part-way and left behind what it had already inserted. Where it died depended on the machine, which is why it looked machine-specific
+  - **Every product was rendered twice.** The mobile card block is wrapped in `md:hidden`, which is **CSS-only** — Alpine still instantiated the entire mobile subtree for every product on a desktop browser. Both loops are now gated on a `matchMedia('(min-width: 768px)')` flag, so only one builds DOM
+  - **Each row fetched the country, class and unit dropdown lists itself** — three `x-init` fetches per row, doubled by the mobile loop, for lists that are global, static and identical everywhere. Measured in headless Chrome: **534 XHRs on the default view and 4,008 on "All"**, against a browser limit of 6 concurrent connections per host, with each request a full authenticated Laravel boot including a database session write. The three lookups are now sent once with the page and inherited through Alpine's scope chain — **0 XHRs**
+  - **The list is now capped and always reports its true total.** `getProductsWithVisibility()` already accepted `$limit`/`$offset` but `manage()` passed neither; it now passes `MANAGE_PRODUCT_LIMIT` (500) alongside a new `countProductsWithVisibility()`. The bottom of the table shows either *"Showing all N products — end of list"* or an amber *"Showing the first 500 of N"* banner. **This is the change that would have made the original bug self-evident**, and it guards against any future truncation
+  - Measured before → after at desktop width: default view **534 → 0** lookup XHRs, 896 → 451 Alpine components; "All" view **4,008 → 0** XHRs, 105,994 → 58,955 DOM elements, 6,686 → 2,506 Alpine components
+  - **Fixed alongside**, all in the same file: `clearFilters()` reset `availabilityFilter` to `'all'`, pulling the entire 668-product catalogue including everything off the till — it now resets to the page default `'available'`. `restoreFilters()` compared against `'all'` while the default is `'available'`, so once `localStorage.fruitVegManageFilters` existed **every page load rendered the full list twice**; it now refetches only when the restored filters differ from what the server rendered. `productMatchesFilters()` compared category IDs against `'001'`/`'002'`/`'126'` while the server uses `SUB1`/`SUB2`/`SUB3`, so a product toggled on via quick-search never reappeared while a category filter was active
+  - **N+1 removed**: `getGrossPrice()` resolves the `tax` `hasOneThrough` for every row and it was never eager-loaded — one extra POS query per product. Page load went from **210 to 44 queries**
+  - Note that filters live in `localStorage`, not the URL or session — they are per browser profile, so two people on the same login can still see different filter states
+  - **Modified**: `app/Http/Controllers/FruitVegController.php`, `app/Services/TillVisibilityService.php`, `resources/views/fruit-veg/manage.blade.php`
+
 ### Added
 
 - **💰 Wholesale pricing for kitchen recipes** (2026-07-31)

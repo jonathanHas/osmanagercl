@@ -126,6 +126,9 @@ class DeliveryLegacyController extends Controller
             ->first();
         $isCompleted = $scanSession && $scanSession->status == 1;
 
+        // Only completed sessions can be undone, so only they need the undo preview.
+        $undoPreview = $isCompleted ? $this->calculateUndoPreview($deliveryId, $supplierId) : null;
+
         // Get synced delivery with documents (if any)
         // Using database table instead of cache to survive cache clears during deployment
         $syncedDelivery = null;
@@ -172,6 +175,7 @@ class DeliveryLegacyController extends Controller
             'financials',
             'stockPreview',
             'isCompleted',
+            'undoPreview',
             'syncedDelivery',
             'unresolvedCodes',
             'translatableCount',
@@ -802,6 +806,113 @@ class DeliveryLegacyController extends Controller
     }
 
     /**
+     * Work out what undoComplete() would remove, and whether that is actually correct.
+     *
+     * Completing a delivery leaves no record of what it added, so the undo has to recompute the
+     * amounts from getMatchedItems()/getScannedNotOnInvoice(). Those read the POS `delivery`
+     * table, which is a global scratch table with no delivery id: DeliveryController::syncToLegacy()
+     * truncates and repopulates it on every sync. If that has happened since completion, a barcode
+     * reachable from two supplier codes can yield a different number of rows than it did before —
+     * and since getMatchedItems() groups by supCode with each row carrying the same scanned value,
+     * the undo would decrement a different amount than the completion incremented.
+     *
+     * So we compare the planned decrements against deliveriesScanItems, which is scoped to this
+     * delID and is never touched by completion, and is therefore the ground truth for what should
+     * have been added. Equal means the undo is a precise inverse; unequal means it is not safe.
+     */
+    private function calculateUndoPreview(string $deliveryId, string $supplierId): array
+    {
+        // What undoComplete() will actually decrement — same source methods and same filter as
+        // its loop, so the preview cannot drift from the action it is checking.
+        $planned = [];
+        foreach (array_merge($this->getMatchedItems($deliveryId, $supplierId),
+            $this->getScannedNotOnInvoice($deliveryId, $supplierId)) as $item) {
+            if ($item->scanned !== null && $item->scanned > 0 && $item->productID) {
+                $planned[$item->productID] = ($planned[$item->productID] ?? 0) + $item->scanned;
+            }
+        }
+
+        // Ground truth from the immutable scan rows. STOCKCURRENT is deliberately not joined here:
+        // a product with rows at several locations would multiply SUM(quantity).
+        $expected = [];
+        $names = [];
+        $expectedRows = DB::connection('pos')->select(
+            'SELECT PRODUCTS.ID AS productID, PRODUCTS.NAME AS name, SUM(dsi.quantity) AS scanned
+             FROM deliveriesScanItems dsi
+             JOIN PRODUCTS ON PRODUCTS.CODE = dsi.barcode
+             WHERE dsi.delID = ?
+             GROUP BY PRODUCTS.ID, PRODUCTS.NAME',
+            [$deliveryId]
+        );
+        foreach ($expectedRows as $row) {
+            $expected[$row->productID] = (float) $row->scanned;
+            $names[$row->productID] = $row->name;
+        }
+
+        $productIds = array_values(array_unique(array_merge(array_keys($planned), array_keys($expected))));
+
+        // Current stock per product, grouped so multi-location products are summed once.
+        $stock = [];
+        if (! empty($productIds)) {
+            foreach (DB::connection('pos')->table('STOCKCURRENT')
+                ->whereIn('PRODUCT', $productIds)
+                ->select('PRODUCT', DB::raw('SUM(UNITS) as units'))
+                ->groupBy('PRODUCT')
+                ->get() as $row) {
+                $stock[$row->PRODUCT] = (float) $row->units;
+            }
+
+            // Fill in names for anything only the planned side knows about.
+            $missingNames = array_diff($productIds, array_keys($names));
+            if (! empty($missingNames)) {
+                foreach (DB::connection('pos')->table('PRODUCTS')
+                    ->whereIn('ID', $missingNames)
+                    ->pluck('NAME', 'ID') as $id => $name) {
+                    $names[$id] = $name;
+                }
+            }
+        }
+
+        $discrepancies = [];
+        $negatives = [];
+        foreach ($productIds as $productId) {
+            $plannedQty = $planned[$productId] ?? 0;
+            $expectedQty = $expected[$productId] ?? 0;
+
+            // Float quantities: compare with a tolerance rather than ==.
+            if (abs($plannedQty - $expectedQty) > 0.001) {
+                $discrepancies[] = [
+                    'name' => $names[$productId] ?? $productId,
+                    'planned' => $plannedQty,
+                    'expected' => $expectedQty,
+                ];
+            }
+
+            $currentUnits = $stock[$productId] ?? 0;
+            if ($plannedQty > 0 && $currentUnits < $plannedQty) {
+                $negatives[] = [
+                    'name' => $names[$productId] ?? $productId,
+                    'current' => $currentUnits,
+                    'toRemove' => $plannedQty,
+                ];
+            }
+        }
+
+        $totalUnitsToRemove = array_sum($planned);
+        $currentStockTotal = array_sum($stock);
+
+        return [
+            'isExact' => count($discrepancies) === 0,
+            'productsToRevert' => count($planned),
+            'totalUnitsToRemove' => $totalUnitsToRemove,
+            'currentStockTotal' => $currentStockTotal,
+            'expectedStockTotal' => $currentStockTotal - $totalUnitsToRemove,
+            'discrepancies' => $discrepancies,
+            'negatives' => $negatives,
+        ];
+    }
+
+    /**
      * Update the scanned quantity for a specific barcode in a delivery scan session.
      */
     public function updateScannedQuantity(Request $request)
@@ -1170,9 +1281,16 @@ class DeliveryLegacyController extends Controller
      * Undo a completed delivery: remove the stock that was added and reopen the session.
      *
      * Mirrors completeDelivery() exactly but decrements STOCKCURRENT instead of incrementing
-     * and sets the session back to pending. Because completing a delivery does not modify the
-     * scan source data (deliveriesScanItems), re-running the same item queries reproduces the
-     * exact amounts that were added, so this is a precise inverse.
+     * and sets the session back to pending. Completion does not modify the scan source data
+     * (deliveriesScanItems), so re-running the same item queries normally reproduces the exact
+     * amounts that were added.
+     *
+     * "Normally" is not "always": those queries also read the POS `delivery` scratch table, which
+     * is truncated and repopulated by every legacy sync, so a re-import between complete and undo
+     * can change the amounts. calculateUndoPreview() detects that, and we refuse rather than
+     * decrement the wrong figures — see its docblock for the mechanism. The same check drives the
+     * preview shown on the page, but this one is what actually enforces it, since the route is a
+     * plain POST and the rendered preview can be stale by the time it is submitted.
      */
     public function undoComplete(Request $request)
     {
@@ -1193,6 +1311,20 @@ class DeliveryLegacyController extends Controller
             return redirect()
                 ->route('delivery-legacy.match', ['delID' => $delID, 'supplierID' => $supplierID])
                 ->with('error', 'This delivery is not completed, so there is nothing to undo.');
+        }
+
+        // Guard: refuse unless the amounts we are about to remove still match the scan record.
+        // Blocking rather than auto-correcting is deliberate — on a mismatch we cannot tell whether
+        // completion added the planned figure or the scanned one, so silently picking either could
+        // leave stock quietly wrong. Surface it and let a human decide.
+        $preview = $this->calculateUndoPreview($delID, $supplierID);
+        if (! $preview['isExact']) {
+            return redirect()
+                ->route('delivery-legacy.match', ['delID' => $delID, 'supplierID' => $supplierID])
+                ->with('error', 'Undo blocked: the stock amounts no longer match the scan record for '
+                    .count($preview['discrepancies']).' product(s), so undoing would remove the wrong '
+                    .'quantities. This usually means another invoice has been synced to the legacy '
+                    .'delivery table since this delivery was completed. See the details on this page.');
         }
 
         // Recompute the same items the completion used so the amounts match exactly.

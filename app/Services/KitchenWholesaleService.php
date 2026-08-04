@@ -31,7 +31,6 @@ class KitchenWholesaleService
     public function __construct(
         protected KitchenCostingService $costingService,
         protected BarcodeGeneratorService $barcodeGenerator,
-        protected TillVisibilityService $tillVisibilityService,
     ) {}
 
     /**
@@ -238,8 +237,9 @@ class KitchenWholesaleService
                 ]);
             }
 
-            // A wholesale batch is a sellable line, so it belongs on the till.
-            $this->tillVisibilityService->setVisibility($product->ID, true, 'category');
+            // Deliberately NOT added to PRODUCTS_CAT. A wholesale batch is sold
+            // off-till by invoice, so it stays hidden until someone explicitly
+            // turns till visibility on for it.
 
             ProductMetadata::createForProduct($product->ID, $product->CODE, Auth::id(), [
                 'source' => 'kitchen_wholesale',
