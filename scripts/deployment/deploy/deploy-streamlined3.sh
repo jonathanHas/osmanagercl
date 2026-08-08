@@ -22,6 +22,19 @@
 #   5. sudo availability is probed before the chown/chmod block. The post-deploy ssh runs with
 #      no tty, so if jon does not have passwordless sudo on the server those commands fail
 #      silently. Now it says so, loudly, instead of pretending the permissions were set.
+#
+# 2026-08-08 — the ownership model itself was wrong:
+#   6. The post-deploy `chown -R www-data:www-data . && chmod -R 755 .` handed the entire tree to a
+#      user this script is not. The moment it actually ran, the NEXT rsync could not create its temp
+#      files ("mkstemp ... Permission denied", exit 23, nothing transferred) and every remaining
+#      post-deploy step — composer install, config/route/view:cache, migrate — lost write access too.
+#      It had only ever appeared harmless because sudo was unavailable and it silently did nothing.
+#      Replaced with the standard Laravel layout: the tree is owned by $PROD_USER with group
+#      www-data, and only storage/ and bootstrap/cache/ are group-writable, because those are the
+#      only paths the web server writes. Ownership is now one-time setup, not a per-deploy action.
+#   7. check_production_permissions() runs before rsync and aborts with the exact repair commands if
+#      the tree is not writable, instead of failing mid-transfer with one mkstemp line per file.
+#   8. A genuine exit 23 now explains itself when the cause is mkstemp/Permission denied.
 # =============================================================================
 
 # === CONFIGURE THESE ===
@@ -78,6 +91,60 @@ check_host_connectivity() {
     fi
 
     success "$PROD_HOST is reachable."
+}
+
+# Print the one-time repair for a production tree the deploying user cannot write.
+#
+# The web server only needs to READ application code — the only paths Laravel writes at runtime are
+# storage/ and bootstrap/cache/. So the tree belongs to $PROD_USER with group www-data, not to
+# www-data outright. Chowning everything to www-data is what locks the deploying user out.
+print_permission_repair() {
+    echo "     sudo chown -R $PROD_USER:www-data $PROD_PATH"
+    echo "     sudo find $PROD_PATH -type d -exec chmod 755 {} +"
+    echo "     sudo find $PROD_PATH -type f -exec chmod 644 {} +"
+    echo "     sudo chmod -R 775 $PROD_PATH/storage $PROD_PATH/bootstrap/cache"
+    echo "     sudo find $PROD_PATH/storage $PROD_PATH/bootstrap/cache -type d -exec chmod g+s {} +"
+    echo "     sudo chmod +x $PROD_PATH/artisan"
+}
+
+# Verify the deploying user can actually write to production BEFORE rsync starts.
+#
+# Without this, a tree owned by www-data:www-data with mode 755 produces one "mkstemp ... Permission
+# denied" line per file and exit 23 — which looks like the benign attribute noise this script already
+# tolerates, but means nothing transferred. Every post-deploy step is affected too: composer install,
+# config:cache, view:cache and migrate all run as $PROD_USER and all need to write.
+check_production_permissions() {
+    log "🔐 Checking production write access..."
+
+    local unwritable
+    unwritable=$(ssh "$PROD_USER@$PROD_HOST" bash -s -- "$PROD_PATH" << 'EOF'
+        PROD_PATH="$1"
+        for dir in "$PROD_PATH" "$PROD_PATH/public/build/assets" "$PROD_PATH/vendor/composer" \
+                   "$PROD_PATH/storage/framework/views" "$PROD_PATH/bootstrap/cache"; do
+            [ -d "$dir" ] || continue
+            [ -w "$dir" ] || echo "$dir"
+        done
+EOF
+    )
+    local probe_status=$?
+
+    if [[ $probe_status -ne 0 ]]; then
+        error "Could not check production permissions (ssh exited $probe_status). Aborting."
+        exit 1
+    fi
+
+    if [[ -n "$unwritable" ]]; then
+        error "$PROD_USER cannot write to these production directories:"
+        echo "$unwritable" | sed 's/^/       /'
+        echo ""
+        echo "   rsync would fail with \"mkstemp ... Permission denied\" and nothing would transfer."
+        echo "   This is what a 'chown -R www-data:www-data' over the whole tree does. Repair it once"
+        echo "   on the server (interactive, so sudo can prompt for a password):"
+        print_permission_repair
+        exit 1
+    fi
+
+    success "Production tree is writable by $PROD_USER."
 }
 
 # Copy and validate environment file
@@ -157,8 +224,9 @@ main() {
     log "🚀 Starting OS Manager streamlined deployment to $PROD_HOST..."
     log "📝 Deployment log will be saved to: $DEPLOY_LOG"
 
-    # Step 1: Check connectivity
+    # Step 1: Check connectivity and that we can actually write to production
     check_host_connectivity
+    check_production_permissions
 
     # Step 2: Detect current branch
     log "🌿 Detecting current git branch..."
@@ -309,11 +377,10 @@ main() {
     # that lives only on production (venv, the storage symlink) MUST be excluded or it is destroyed
     # on every run.
     #
-    # --no-perms/--no-owner/--no-group/--omit-dir-times: the post-deploy step chowns to www-data and
-    # chmods the whole tree, so rsync has no business managing attributes. Everything on production
-    # is owned by www-data, and jon can neither chmod nor set an explicit mtime on paths it does not
-    # own — each attempt is an "Operation not permitted" line and a bump to exit code 23. File
-    # contents always transferred fine; the noise buried real errors and made the exit code useless.
+    # --no-perms/--no-owner/--no-group/--omit-dir-times: production manages its own ownership and
+    # modes (see check_production_permissions), so rsync has no business setting attributes. Any path
+    # it does not own produces an "Operation not permitted" line and a bump to exit code 23 — file
+    # contents transfer fine, but the noise buried real errors and made the exit code useless.
     # File mtimes are still preserved (rsync writes a temp file it owns, then renames), so
     # incremental syncs stay fast. Only directory times are skipped.
     RSYNC_ERR=$(mktemp)
@@ -352,6 +419,16 @@ main() {
         warning "rsync exit 23 was attribute-only (file contents transferred) — continuing."
     elif [[ $RSYNC_STATUS -ne 0 ]]; then
         error "rsync failed with exit code $RSYNC_STATUS. Aborting before post-deployment tasks."
+        # "mkstemp ... Permission denied" is not attribute noise — rsync could not create its temp
+        # file, so those files did not transfer at all. It means the destination directories are not
+        # writable by $PROD_USER, almost always because something chowned the tree to www-data.
+        if grep -q 'mkstemp.*Permission denied' "$RSYNC_ERR"; then
+            echo ""
+            echo "   Those 'mkstemp ... Permission denied' lines mean $PROD_USER cannot create files"
+            echo "   in the destination directories — the listed files did NOT transfer. Repair once"
+            echo "   on the server (interactive, so sudo can prompt):"
+            print_permission_repair
+        fi
         rm -f "$RSYNC_ERR"
         exit 1
     fi
@@ -401,40 +478,41 @@ main() {
         fi
         cd "$PROD_PATH"
 
-        # This ssh session has no tty, so a sudo that wants a password cannot prompt — it just
-        # fails. Probing first turns a silent no-op into a visible warning.
-        echo "🔐 Setting file permissions..."
-        if sudo -n true 2>/dev/null; then
-            sudo chown -R www-data:www-data .
-            sudo chmod -R 755 .
-            sudo chmod -R 775 storage bootstrap/cache
-            SUDO_OK=1
-            echo "✅ Ownership and permissions set"
+        # NOT a chown to www-data:www-data. That is what broke the deploy on 2026-08-08: it hands the
+        # whole tree to a user this script is not, so the next rsync cannot create its temp files
+        # ("mkstemp ... Permission denied") and every step below here — composer install, the artisan
+        # caches, migrate — loses write access too. It only ever appeared to work because sudo was
+        # unavailable and the block silently did nothing.
+        #
+        # The web server needs to READ code and WRITE only storage/ and bootstrap/cache/. So the tree
+        # stays owned by the deploying user with group www-data, and only those two paths are
+        # group-writable. Ownership is a one-time setup (see print_permission_repair); all this does
+        # per-deploy is re-assert group-write on the two runtime paths, which rsync can clear on
+        # newly created files.
+        echo "🔐 Ensuring runtime paths are writable by the web server..."
+        if chmod -R g+w storage bootstrap/cache 2>/dev/null; then
+            echo "✅ storage and bootstrap/cache are group-writable"
         else
-            SUDO_OK=0
-            echo "⚠️  Passwordless sudo is not available in this non-interactive session."
-            echo "   SKIPPED chown/chmod. Run manually on the server:"
-            echo "     sudo chown -R www-data:www-data $PROD_PATH"
-            echo "     sudo chmod -R 755 $PROD_PATH && sudo chmod -R 775 $PROD_PATH/storage $PROD_PATH/bootstrap/cache"
+            echo "❌ Could not set group-write on storage / bootstrap/cache."
+            echo "   The web server will fail to write sessions, caches and compiled views."
+            echo "   Repair on the server:"
+            echo "     sudo chown -R $(id -un):www-data $PROD_PATH"
+            echo "     sudo chmod -R 775 $PROD_PATH/storage $PROD_PATH/bootstrap/cache"
         fi
 
-        # public/storage is now excluded from the rsync so it survives deploys, but recreate it if
-        # it is genuinely missing. It has to be done with sudo and AFTER the chown: public/ is owned
-        # by www-data, so `php artisan storage:link` running as jon gets "symlink(): Permission
-        # denied". v2 hid that behind `2>/dev/null || true`, so the symlink silently never existed.
+        # public/storage is excluded from the rsync so it survives deploys, but recreate it if it is
+        # genuinely missing. With public/ owned by the deploying user this no longer needs sudo — v2
+        # required it only because the chown had handed public/ to www-data, and hid the resulting
+        # "symlink(): Permission denied" behind `2>/dev/null || true` so the link silently never existed.
         echo "🔗 Ensuring storage link exists..."
         if [ -L public/storage ] || [ -d public/storage ]; then
             echo "✅ public/storage already present"
-        elif [ "$SUDO_OK" = "1" ]; then
-            sudo ln -sfn "$PROD_PATH/storage/app/public" public/storage
-            sudo chown -h www-data:www-data public/storage
-            if [ -L public/storage ]; then
-                echo "✅ public/storage symlink created"
-            else
-                echo "❌ Failed to create public/storage — uploaded files will 404"
-            fi
+        elif ln -sfn "$PROD_PATH/storage/app/public" public/storage 2>/dev/null; then
+            echo "✅ public/storage symlink created"
+        elif sudo -n ln -sfn "$PROD_PATH/storage/app/public" public/storage 2>/dev/null; then
+            echo "✅ public/storage symlink created (via sudo)"
         else
-            echo "❌ public/storage is MISSING and sudo is unavailable — uploaded files will 404."
+            echo "❌ public/storage is MISSING and could not be created — uploaded files will 404."
             echo "   Run manually: sudo ln -sfn $PROD_PATH/storage/app/public $PROD_PATH/public/storage"
         fi
 
