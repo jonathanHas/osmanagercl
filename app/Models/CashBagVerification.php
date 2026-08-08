@@ -27,6 +27,8 @@ class CashBagVerification extends Model
         'cash_lodgement_id',
         'verified_by',
         'verified_at',
+        'last_edited_by',
+        'last_edited_at',
     ];
 
     protected $casts = [
@@ -43,6 +45,7 @@ class CashBagVerification extends Model
         'expected_total' => 'decimal:2',
         'variance' => 'decimal:2',
         'verified_at' => 'datetime',
+        'last_edited_at' => 'datetime',
     ];
 
     public function calculateTotal(): float
@@ -66,6 +69,15 @@ class CashBagVerification extends Model
     public function verifier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'verified_by');
+    }
+
+    /**
+     * Who last corrected the count, if it has been corrected. Null on a bag still holding
+     * its original figures — verifier() is always the person who first counted it.
+     */
+    public function lastEditor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'last_edited_by');
     }
 
     public function lodgement(): BelongsTo

@@ -276,7 +276,14 @@ main() {
     log "📡 Syncing files to production..."
     # WARNING: --delete flag removes files on destination that don't exist in source
     # This can delete production-only files like venv, so we exclude them
-    rsync -avz --no-group --delete \
+    #
+    # --no-perms/--no-owner/--no-group: the post-deploy step below chowns to www-data and chmods
+    # the whole tree, so rsync has no reason to manage permissions. Without these it tries to
+    # chmod files it does not own (they belong to www-data from the previous deploy's chown) and
+    # emits a thousand "failed to set permissions: Operation not permitted" lines, then exits 23.
+    # File contents always transferred fine — the noise was purely the ownership mismatch, but it
+    # buried real errors and made the exit code useless.
+    rsync -avz --no-perms --no-owner --no-group --delete \
         --exclude='.env' \
         --exclude='.git' \
         --exclude='node_modules' \
@@ -288,28 +295,51 @@ main() {
         --exclude='storage/framework/views/*' \
         --exclude='bootstrap/cache/*' \
         --exclude='scripts/invoice-parser/venv' \
-        --exclude='scripts/invoice-parser/__pycache__' \
+        --exclude='__pycache__/' \
         --exclude='*.pyc' \
         --exclude='*.log' \
         --exclude='*.sqlite' \
         "$DEPLOY_DIR/" "$PROD_USER@$PROD_HOST:$PROD_PATH"
-    
+    RSYNC_STATUS=$?
+
+    # Previously the exit code was ignored entirely, so a failed sync still went on to run
+    # migrations against a half-updated tree. 24 (source files vanished mid-transfer) is benign;
+    # anything else non-zero is not.
+    if [[ $RSYNC_STATUS -eq 24 ]]; then
+        warning "rsync reported vanished source files (exit 24) — continuing."
+    elif [[ $RSYNC_STATUS -ne 0 ]]; then
+        error "rsync failed with exit code $RSYNC_STATUS. Aborting before post-deployment tasks."
+        exit 1
+    fi
+
     success "Files synced to production."
     
     # Step 9: Run post-deployment tasks on server
     log "⚙️ Running post-deployment tasks on production server..."
     
-    ssh "$PROD_USER@$PROD_HOST" << EOF
-        cd $PROD_PATH
+    # The commit hash of what we are actually shipping. It has to be computed HERE: production
+    # has no .git (the rsync above excludes it), so `git rev-parse` on the server would find
+    # nothing.
+    BUILD_HASH=$(git -C "$DEPLOY_DIR" rev-parse --short HEAD 2>/dev/null)
+    if [[ -z "$BUILD_HASH" ]]; then
+        BUILD_HASH=$(date +%Y%m%d%H%M%S)
+    fi
+
+    # NOTE: the delimiter is quoted ('EOF') so this block is sent to the server verbatim. With an
+    # unquoted delimiter the local shell expanded everything first, which silently gutted the
+    # build-version step below: $dir and $value inside the single-quoted php -r were substituted
+    # away locally, leaving "php -r ' = getcwd()...'" — a parse error on every single deploy — and
+    # DEPLOY_BUILD_VERSION arrived empty so the marker only ever got a timestamp, never the hash.
+    # Values that must come from this machine are passed as positional arguments instead.
+    ssh "$PROD_USER@$PROD_HOST" bash -s -- "$PROD_PATH" "$BUILD_HASH" << 'EOF'
+        PROD_PATH="$1"
+        BUILD_HASH="$2"
+        cd "$PROD_PATH"
 
         echo "📦 Installing composer dependencies on production..."
         composer install --no-dev --optimize-autoloader --no-interaction
 
         echo "🏷️ Recording build version..."
-        BUILD_HASH=$(git rev-parse --short HEAD 2>/dev/null)
-        if [[ -z "$BUILD_HASH" ]]; then
-            BUILD_HASH=$(date +%Y%m%d%H%M%S)
-        fi
         export DEPLOY_BUILD_VERSION="$BUILD_HASH"
         php -r '$dir = getcwd()."/storage/app";
             if (!is_dir($dir)) { mkdir($dir, 0775, true); }
@@ -324,7 +354,7 @@ main() {
         if [ -d "venv" ]; then
             venv/bin/pip install -r requirements.txt --quiet
         fi
-        cd $PROD_PATH
+        cd "$PROD_PATH"
 
         echo "🔐 Setting file permissions..."
         sudo chown -R www-data:www-data .
@@ -364,14 +394,26 @@ EOF
     # Step 10: Final verification including label templates
     log "🔍 Running final verification..."
     
-    ssh "$PROD_USER@$PROD_HOST" << EOF
-        cd $PROD_PATH
-        
+    ssh "$PROD_USER@$PROD_HOST" bash -s -- "$PROD_PATH" "$BUILD_HASH" "$CURRENT_BRANCH" << 'EOF'
+        PROD_PATH="$1"
+        BUILD_HASH="$2"
+        CURRENT_BRANCH="$3"
+        cd "$PROD_PATH"
+
         echo "📋 Production server verification:"
-        echo "Current git branch: \$(git branch --show-current 2>/dev/null || echo 'Not a git repo')"
-        echo "Latest commit: \$(git log --oneline -1 2>/dev/null || echo 'No git history')"
-        echo "Application environment: \$(php artisan env 2>/dev/null || echo 'Unknown')"
-        
+        # Production is not a git checkout (the rsync excludes .git), so the branch and commit are
+        # reported from the deploying machine and confirmed against the build-version marker that
+        # was just written. That marker is the only on-server record of what code is live.
+        echo "Deployed branch: ${CURRENT_BRANCH}"
+        echo "Deployed commit: ${BUILD_HASH}"
+        echo "Build version marker: $(cat storage/app/build-version 2>/dev/null || echo 'MISSING')"
+        if [[ "$(cat storage/app/build-version 2>/dev/null)" == "$BUILD_HASH" ]]; then
+            echo "✅ Build version marker matches the deployed commit"
+        else
+            echo "❌ Build version marker does not match — check the build version step above"
+        fi
+        echo "Application environment: $(php artisan env 2>/dev/null || echo 'Unknown')"
+
         echo "Testing database connectivity..."
         if php artisan tinker --execute="DB::connection()->getPdo(); echo 'Database: OK';" 2>/dev/null; then
             echo "✅ Database connection successful"

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **💰 A verified cash bag can now be recounted before it is lodged** (2026-08-07)
+  - Counting a bag on `/management/cash-lodgements` was a one-way door. The `CashBagVerification` row's *existence* is the verified state — there is no status flag — so the day dropped straight out of "Pending Bags" into the read-only "Verified Bags — Ready to Lodge" table with no denomination inputs and no way back. `verifyBag()` refuses a second attempt and `cash_reconciliation_id` is `unique`, so **a mistyped denomination could only be fixed with a manual DELETE in the database**
+  - Each verified bag row now has an **Edit count** button that opens the same denomination form pre-filled with the saved figures, with the same live counted/expected/variance readout as the original count. Saving recomputes `counted_total`, `expected_total` and `variance` in place; the bag stays in the verified list rather than going back to zero
+  - **A bag already rolled into a lodgement stays locked** — the lodgement's `cash_amount` and any bank match were derived from that count. The button is not rendered for lodged bags, and `updateBag()` re-checks server-side, because the route is a plain POST and a rendered page can be stale by the time it is submitted
+  - `expected_total` is **re-derived on save rather than carried over**. `verifyBag()` snapshots it at verify time, but the underlying reconciliation stays editable afterwards (`saveReconciliation()` overwrites the denominations with no verification check), so keeping the old snapshot would leave the stored variance measuring a new count against a figure that no longer exists. When the two disagree the edit form says so and names both figures, rather than silently changing the variance
+  - Corrections are stamped with `last_edited_by` / `last_edited_at` — the same two columns `customer_invoices` uses — leaving `verified_by` / `verified_at` as the record of who first counted the bag. The verified-bags list shows an `(edited)` marker naming the editor and time
+  - The nine denomination fields and their validation rules are now a shared constant on the controller, so `verifyBag()` and `updateBag()` cannot drift apart — a field added to one but not the other would silently save as zero
+  - **Added**: `database/migrations/2026_08_07_100000_add_edit_audit_to_cash_bag_verifications.php`, `tests/Feature/CashBagVerificationEditTest.php`
+  - **Modified**: `app/Http/Controllers/Management/CashLodgementController.php`, `app/Models/CashBagVerification.php`, `routes/web.php`, `resources/views/management/cash-lodgements/index.blade.php`
+
 ### Changed
 
 - **🍳 Wholesale kitchen products are no longer put on the till when created** (2026-08-01)
@@ -16,6 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Modified**: `app/Services/KitchenWholesaleService.php`
 
 ### Fixed
+
+- **🚀 Deploy script: build version never recorded, and 1,100 lines of rsync noise per deploy** (2026-08-04)
+  - `scripts/deployment/deploy/deploy-streamlined2.sh` sent its post-deployment block through an **unquoted heredoc** (`<< EOF`), so the local shell expanded it before it ever reached the server. The `$dir` and `$value` variables inside the single-quoted `php -r` were substituted away locally — heredoc expansion ignores inner quoting — leaving `php -r ' = getcwd()...'`. **Every deploy logged `PHP Parse error: syntax error, unexpected token "="`**, and `$BUILD_HASH` expanded to empty so the log read `Build version set to ` with no hash
+  - Net effect: `storage/app/build-version` was **never written**. Since the rsync excludes `.git`, production is not a git checkout, so that marker is the *only* on-server record of what code is live — and it was empty. Answering "what is actually deployed?" was impossible
+  - Fixed by quoting the delimiter (`<< 'EOF'`) so the block is sent verbatim, and passing the values that must come from the deploying machine (`PROD_PATH`, `BUILD_HASH`, `CURRENT_BRANCH`) as positional arguments via `ssh … bash -s -- …`. The hash is computed from the staging clone, since production has no git history to read. Verified by simulating both versions locally: the old one reproduces the exact parse error and writes nothing, the new one writes the hash
+  - The verification step now prints the deployed branch and commit and **asserts the marker matches**, instead of printing "Not a git repo / No git history" as it did on every deploy
+  - **rsync noise**: the sync ran without `--no-perms`, so it tried to `chmod` files owned by `www-data` from the previous deploy's `chown` and emitted **1,129 `failed to set permissions: Operation not permitted` lines**, then exited 23. File contents always transferred correctly — but the exit code was **ignored entirely**, so a genuinely failed sync would still have gone on to run `migrate --force` against a half-updated tree. Added `--no-perms --no-owner` (the post-deploy step chowns and chmods the whole tree anyway, so rsync has no reason to manage permissions) and an explicit exit-code check that aborts on real failures while tolerating 24
+  - Also replaced the `scripts/invoice-parser/__pycache__` exclude with a general `__pycache__/`, which was leaving `cannot delete non-empty directory` on nested parser caches
+  - **Modified**: `scripts/deployment/deploy/deploy-streamlined2.sh`
 
 - **📦 "Undo Complete & Reopen" could silently remove the wrong stock** (2026-08-04)
   - Completing a legacy delivery writes **no audit trail** — no `STOCKDIARY` row, no `stock_adjustments` row, no model events. It only increments `STOCKCURRENT.UNITS` and sets `deliveriesScan.status = 1`. So `undoComplete()` had to *recompute* what to remove by re-running `getMatchedItems()` / `getScannedNotOnInvoice()`, on the assumption that this reproduces the original amounts exactly

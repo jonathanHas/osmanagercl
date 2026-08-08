@@ -14,6 +14,14 @@ use Illuminate\Support\Facades\DB;
 class CashLodgementController extends Controller
 {
     /**
+     * The denomination fields on a bag count. Shared by verifyBag() and updateBag() so the two
+     * cannot drift apart — a field added to one but not the other would silently save as zero.
+     */
+    private const DENOMINATIONS = [
+        'cash_50', 'cash_20', 'cash_10', 'cash_5', 'cash_2', 'cash_1', 'cash_50c', 'cash_20c', 'cash_10c',
+    ];
+
+    /**
      * Display the cash lodgements management page
      */
     public function index(Request $request)
@@ -134,7 +142,7 @@ class CashLodgementController extends Controller
 
         // Verified bags: bag verifications not yet included in a lodgement
         $verifiedBags = CashBagVerification::whereNull('cash_lodgement_id')
-            ->with(['reconciliation', 'verifier'])
+            ->with(['reconciliation', 'verifier', 'lastEditor'])
             ->orderBy('verified_at', 'desc')
             ->get();
 
@@ -339,19 +347,11 @@ class CashLodgementController extends Controller
     {
         $validated = $request->validate([
             'cash_reconciliation_id' => 'required|uuid|exists:cash_reconciliations,id',
-            'cash_50' => 'nullable|integer|min:0',
-            'cash_20' => 'nullable|integer|min:0',
-            'cash_10' => 'nullable|integer|min:0',
-            'cash_5' => 'nullable|integer|min:0',
-            'cash_2' => 'nullable|integer|min:0',
-            'cash_1' => 'nullable|integer|min:0',
-            'cash_50c' => 'nullable|integer|min:0',
-            'cash_20c' => 'nullable|integer|min:0',
-            'cash_10c' => 'nullable|integer|min:0',
+            ...$this->denominationRules(),
         ]);
 
         // Treat empty/null denomination fields as 0
-        foreach (['cash_50', 'cash_20', 'cash_10', 'cash_5', 'cash_2', 'cash_1', 'cash_50c', 'cash_20c', 'cash_10c'] as $field) {
+        foreach (self::DENOMINATIONS as $field) {
             $validated[$field] = $validated[$field] ?? 0;
         }
 
@@ -398,6 +398,77 @@ class CashLodgementController extends Controller
         }
 
         return back()->with($flashData);
+    }
+
+    /**
+     * Correct the count on a bag that has been verified but not yet lodged.
+     *
+     * There is no "unverified" state to fall back to — the existence of the CashBagVerification row
+     * IS the verified state, and cash_reconciliation_id is unique, so the fix has to be an in-place
+     * update rather than a delete-and-recount.
+     *
+     * expected_total is deliberately re-derived rather than carried over. verifyBag() snapshots it
+     * at verify time, but the underlying reconciliation stays editable afterwards
+     * (CashReconciliationRepository::saveReconciliation() overwrites the denominations with no
+     * verification check), so keeping the old snapshot would leave the stored variance measuring the
+     * new count against a figure that no longer exists. The edit form shows the live expected figure
+     * for the same reason.
+     */
+    public function updateBag(Request $request)
+    {
+        $validated = $request->validate([
+            'verification_id' => 'required|uuid|exists:cash_bag_verifications,id',
+            ...$this->denominationRules(),
+        ]);
+
+        foreach (self::DENOMINATIONS as $field) {
+            $validated[$field] = $validated[$field] ?? 0;
+        }
+
+        $verification = CashBagVerification::with('reconciliation')->findOrFail($validated['verification_id']);
+
+        // Guard: a lodged bag is locked, because the lodgement's cash_amount and any bank match were
+        // derived from this count. Re-checked here rather than trusting the page, which only hides the
+        // button at render time and can be stale by the time it is submitted.
+        if ($verification->is_lodged) {
+            return back()->with('error', 'This bag is already part of a lodgement and can no longer be edited.');
+        }
+
+        if (! $verification->reconciliation) {
+            return back()->with('error', 'This bag has no reconciliation attached, so it cannot be recounted.');
+        }
+
+        $previousTotal = (float) $verification->counted_total;
+
+        $verification->fill($validated);
+        $countedTotal = $verification->calculateTotal();
+        $expectedTotal = $verification->reconciliation->calculateAvailableToLodge();
+
+        $verification->fill([
+            'counted_total' => $countedTotal,
+            'expected_total' => $expectedTotal,
+            'variance' => $countedTotal - $expectedTotal,
+            'last_edited_by' => auth()->id(),
+            'last_edited_at' => now(),
+        ]);
+
+        $verification->save();
+
+        return back()->with('success', sprintf(
+            'Bag count corrected: €%.2f → €%.2f (expected €%.2f, variance €%.2f)',
+            $previousTotal,
+            $countedTotal,
+            $expectedTotal,
+            $countedTotal - $expectedTotal
+        ));
+    }
+
+    /**
+     * Validation rules for the nine denomination fields, shared by verifyBag() and updateBag().
+     */
+    private function denominationRules(): array
+    {
+        return array_fill_keys(self::DENOMINATIONS, 'nullable|integer|min:0');
     }
 
     /**

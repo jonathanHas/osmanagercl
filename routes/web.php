@@ -936,6 +936,7 @@ Route::middleware('auth')->group(function () {
         Route::prefix('cash-lodgements')->name('cash-lodgements.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Management\CashLodgementController::class, 'index'])->name('index');
             Route::post('/verify-bag', [\App\Http\Controllers\Management\CashLodgementController::class, 'verifyBag'])->name('verify-bag');
+            Route::post('/update-bag', [\App\Http\Controllers\Management\CashLodgementController::class, 'updateBag'])->name('update-bag');
             Route::post('/create-lodgement', [\App\Http\Controllers\Management\CashLodgementController::class, 'createLodgement'])->name('create-lodgement');
             Route::get('/diagnostic', [\App\Http\Controllers\Management\CashLodgementDiagnosticController::class, 'index'])->name('diagnostic');
             Route::get('/diagnostic/export', [\App\Http\Controllers\Management\CashLodgementDiagnosticController::class, 'export'])->name('diagnostic.export');
