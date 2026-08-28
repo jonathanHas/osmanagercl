@@ -208,6 +208,8 @@ class VatReturnController extends Controller
             $formattedStartDate = $startDate->format('Y m d');
             $formattedEndDate = $endDate->format('Y m d');
 
+            // Sales totals do not need the PAYMENTS join at all — joining it would
+            // repeat each ticket line once per payment row on split-payment receipts.
             $salesQuery = "
                 SELECT
                     TAXES.RATE as vat_rate,
@@ -216,7 +218,6 @@ class VatReturnController extends Controller
                 FROM TICKETLINES
                 JOIN TICKETS ON TICKETLINES.TICKET = TICKETS.ID
                 JOIN RECEIPTS ON TICKETS.ID = RECEIPTS.ID
-                JOIN PAYMENTS ON RECEIPTS.ID = PAYMENTS.RECEIPT
                 JOIN TAXES ON TICKETLINES.TAXID = TAXES.ID
                 LEFT JOIN CUSTOMERS ON TICKETS.CUSTOMER = CUSTOMERS.ID
                 WHERE DATE_FORMAT(RECEIPTS.DATENEW, '%Y %m %d') BETWEEN ? AND ?
@@ -227,22 +228,45 @@ class VatReturnController extends Controller
             $salesData = DB::connection('pos')
                 ->select($salesQuery, [$formattedStartDate, $formattedEndDate]);
 
-            // Calculate paperin (gift voucher redemption) total from POS
+            // Calculate paperin (gift voucher redemption) total from POS.
+            // The voucher's share of the receipt is apportioned by payment amount, so a
+            // part-voucher/part-cash receipt only deducts the voucher portion, and a voucher
+            // worth more than the goods only deducts the goods value (the rest is breakage,
+            // never counted as revenue a second time).
             $paperinQuery = "
-                SELECT COALESCE(SUM(TICKETLINES.PRICE * TICKETLINES.UNITS * (1 + TAXES.RATE)), 0) AS total_gross
+                SELECT COALESCE(SUM(
+                    TICKETLINES.PRICE * TICKETLINES.UNITS * (pay.paid / tot.total) * (1 + TAXES.RATE)
+                ), 0) AS total_gross
                 FROM TICKETLINES
                 JOIN TICKETS ON TICKETLINES.TICKET = TICKETS.ID
                 JOIN RECEIPTS ON TICKETS.ID = RECEIPTS.ID
-                JOIN PAYMENTS ON RECEIPTS.ID = PAYMENTS.RECEIPT
                 JOIN TAXES ON TICKETLINES.TAXID = TAXES.ID
+                JOIN (
+                    SELECT p.RECEIPT, p.PAYMENT, SUM(p.TOTAL) AS paid
+                    FROM PAYMENTS p
+                    JOIN RECEIPTS r2 ON p.RECEIPT = r2.ID
+                    WHERE DATE_FORMAT(r2.DATENEW, '%Y %m %d') BETWEEN ? AND ?
+                    GROUP BY p.RECEIPT, p.PAYMENT
+                ) pay ON pay.RECEIPT = RECEIPTS.ID
+                JOIN (
+                    SELECT p.RECEIPT, SUM(p.TOTAL) AS total
+                    FROM PAYMENTS p
+                    JOIN RECEIPTS r3 ON p.RECEIPT = r3.ID
+                    WHERE DATE_FORMAT(r3.DATENEW, '%Y %m %d') BETWEEN ? AND ?
+                    GROUP BY p.RECEIPT
+                    HAVING SUM(p.TOTAL) <> 0
+                ) tot ON tot.RECEIPT = RECEIPTS.ID
                 LEFT JOIN CUSTOMERS ON TICKETS.CUSTOMER = CUSTOMERS.ID
                 WHERE DATE_FORMAT(RECEIPTS.DATENEW, '%Y %m %d') BETWEEN ? AND ?
-                AND PAYMENTS.PAYMENT = 'paperin'
+                AND pay.PAYMENT = 'paperin'
                 AND (CUSTOMERS.NAME IS NULL OR CUSTOMERS.NAME NOT IN ('Kitchen', 'Coffee'))
             ";
 
-            $paperinResult = DB::connection('pos')
-                ->select($paperinQuery, [$formattedStartDate, $formattedEndDate]);
+            $paperinResult = DB::connection('pos')->select($paperinQuery, [
+                $formattedStartDate, $formattedEndDate,
+                $formattedStartDate, $formattedEndDate,
+                $formattedStartDate, $formattedEndDate,
+            ]);
             $paperinTotal = (float) ($paperinResult[0]->total_gross ?? 0);
 
             $totalNet = collect($salesData)->sum('total_net');

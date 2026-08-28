@@ -71,10 +71,10 @@ Detailed documentation for each major feature. See **[Features Index](./FEATURES
 ### Development
 Guides for developers working on the project.
 
-- **[Setup Guide](./development/setup.md)** - Complete development environment setup
+- **[Fresh Install Guide](./development/fresh-install-guide.md)** - Complete development environment setup on a new machine
 - **[Quick Start Guide](./development/quick-start-guide.md)** - Get started quickly
-- **[Testing Guide](./development/testing.md)** - Testing strategies and examples
-- **[Coding Standards](./development/coding-standards.md)** - Code style and best practices
+- **[System Requirements](./development/system-requirements.md)** - Versions and dependencies
+- **[Coding Standards](../CONTRIBUTING.md)** - Code style and best practices
 - **[Performance Optimization Guide](./development/performance-optimization-guide.md)** - Apply 100x+ performance improvements
 - **[Troubleshooting](./troubleshooting/index.md)** - Common issues and solutions
 
@@ -105,8 +105,8 @@ Documentation templates for consistency.
 
 ### For New Developers
 1. Start with [Architecture Overview](./architecture/overview.md)
-2. Follow the [Setup Guide](./development/setup.md)
-3. Review [Coding Standards](./development/coding-standards.md)
+2. Follow the [Fresh Install Guide](./development/fresh-install-guide.md)
+3. Review [Coding Standards](../CONTRIBUTING.md)
 4. Read about key features you'll work on
 
 ### For System Administrators

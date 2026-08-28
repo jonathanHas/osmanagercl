@@ -79,20 +79,10 @@ class ProfitLossController extends Controller
         $rangeEnd = $endDate->copy()->addDay()->startOfDay()->format('Y-m-d H:i:s');
 
         // Use TICKETLINES approach (same as sales-accounting) for accurate calculations
-        $mainSalesQuery = "
-            SELECT TAXES.RATE, SUM(PRICE * UNITS) AS Net, PAYMENTS.PAYMENT
-            FROM TICKETLINES
-            JOIN TICKETS ON TICKETLINES.TICKET = TICKETS.ID
-            JOIN RECEIPTS ON TICKETS.ID = RECEIPTS.ID
-            JOIN PAYMENTS ON RECEIPTS.ID = PAYMENTS.RECEIPT
-            JOIN TAXES ON TICKETLINES.TAXID = TAXES.ID
-            LEFT JOIN CUSTOMERS ON TICKETS.CUSTOMER = CUSTOMERS.ID
-            WHERE DATENEW >= ? AND DATENEW < ?
-            AND (CUSTOMERS.NAME IS NULL OR CUSTOMERS.NAME NOT IN ('Kitchen', 'Coffee'))
-            GROUP BY PAYMENTS.PAYMENT, TAXES.RATE
-        ";
-
-        $mainSales = DB::connection('pos')->select($mainSalesQuery, [$rangeStart, $rangeEnd]);
+        $mainSales = app(SalesAccountingImportService::class)->getApportionedSales(
+            $startDate->copy()->startOfDay(),
+            $endDate->copy()->addDay()->startOfDay()
+        );
 
         // Process the results to calculate totals and VAT breakdown
         $paymentTotals = [
@@ -306,24 +296,11 @@ class ProfitLossController extends Controller
         if ($prevRevenueData['total_revenue'] !== null) {
             $previousRevenue = $prevRevenueData['total_revenue'];
         } else {
-            // POS fallback only if no aggregated data (sargable datetime range)
-            $rangeStart = $previousStart->copy()->startOfDay()->format('Y-m-d H:i:s');
-            $rangeEnd = $previousEnd->copy()->addDay()->startOfDay()->format('Y-m-d H:i:s');
-
-            $prevSalesQuery = "
-                SELECT TAXES.RATE, SUM(PRICE * UNITS) AS Net, PAYMENTS.PAYMENT
-                FROM TICKETLINES
-                JOIN TICKETS ON TICKETLINES.TICKET = TICKETS.ID
-                JOIN RECEIPTS ON TICKETS.ID = RECEIPTS.ID
-                JOIN PAYMENTS ON RECEIPTS.ID = PAYMENTS.RECEIPT
-                JOIN TAXES ON TICKETLINES.TAXID = TAXES.ID
-                LEFT JOIN CUSTOMERS ON TICKETS.CUSTOMER = CUSTOMERS.ID
-                WHERE DATENEW >= ? AND DATENEW < ?
-                AND (CUSTOMERS.NAME IS NULL OR CUSTOMERS.NAME NOT IN ('Kitchen', 'Coffee'))
-                GROUP BY PAYMENTS.PAYMENT, TAXES.RATE
-            ";
-
-            $prevSales = DB::connection('pos')->select($prevSalesQuery, [$rangeStart, $rangeEnd]);
+            // POS fallback only if no aggregated data
+            $prevSales = app(SalesAccountingImportService::class)->getApportionedSales(
+                $previousStart->copy()->startOfDay(),
+                $previousEnd->copy()->addDay()->startOfDay()
+            );
 
             $prevTotalNet = 0;
             $prevPaperinGross = 0;

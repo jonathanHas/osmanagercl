@@ -97,25 +97,40 @@ class SalesImportService
         return $log;
     }
 
+    /**
+     * Sourced from TICKETLINES rather than STOCKDIARY so that internal stock transfers
+     * to the Kitchen and Coffee departments can be excluded — STOCKDIARY carries no
+     * ticket/customer reference. Both sources yield identical revenue once that filter
+     * is removed; the customer link is the only reason for the join chain.
+     *
+     * Revenue here is NET of VAT (TICKETLINES.PRICE is the ex-VAT unit price), matching
+     * the basis used by VAT returns and the sales accounting report.
+     */
     private function getPOSSalesData(Carbon $startDate, Carbon $endDate)
     {
         return DB::connection('pos')
-            ->table('STOCKDIARY as s')
-            ->join('PRODUCTS as p', 's.PRODUCT', '=', 'p.ID')
-            ->where('s.REASON', -1) // Sales only
-            ->whereBetween('s.DATENEW', [$startDate->startOfDay(), $endDate->endOfDay()])
+            ->table('TICKETLINES as tl')
+            ->join('TICKETS as tk', 'tl.TICKET', '=', 'tk.ID')
+            ->join('RECEIPTS as r', 'tk.ID', '=', 'r.ID')
+            ->join('PRODUCTS as p', 'tl.PRODUCT', '=', 'p.ID')
+            ->leftJoin('CUSTOMERS as c', 'tk.CUSTOMER', '=', 'c.ID')
+            ->whereBetween('r.DATENEW', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
+            ->where(function ($query) {
+                $query->whereNull('c.NAME')
+                    ->orWhereNotIn('c.NAME', ['Kitchen', 'Coffee']);
+            })
             // Import all product categories (removed F&V filter for full store analytics)
             ->select(
-                's.PRODUCT as product_id',
+                'tl.PRODUCT as product_id',
                 'p.CODE as product_code',
                 'p.NAME as product_name',
                 'p.CATEGORY as category_id',
-                DB::raw('DATE(s.DATENEW) as sale_date'),
-                DB::raw('SUM(ABS(s.UNITS)) as total_units'),
-                DB::raw('SUM(ABS(s.UNITS) * s.PRICE) as total_revenue'),
+                DB::raw('DATE(r.DATENEW) as sale_date'),
+                DB::raw('SUM(tl.UNITS) as total_units'),
+                DB::raw('SUM(tl.PRICE * tl.UNITS) as total_revenue'),
                 DB::raw('COUNT(*) as transaction_count')
             )
-            ->groupBy('s.PRODUCT', 'p.CODE', 'p.NAME', 'p.CATEGORY', 'sale_date')
+            ->groupBy('tl.PRODUCT', 'p.CODE', 'p.NAME', 'p.CATEGORY', 'sale_date')
             ->orderBy('sale_date')
             ->get();
     }

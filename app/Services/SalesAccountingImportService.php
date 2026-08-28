@@ -71,29 +71,68 @@ class SalesAccountingImportService
     }
 
     /**
+     * Net sales by payment type and VAT rate, excluding Kitchen/Coffee customers.
+     *
+     * Ticket line values are apportioned across a receipt's payment types by each
+     * payment's share of the receipt total. A plain JOIN on PAYMENTS repeats every
+     * ticket line once per payment row, inflating net/VAT on split-payment receipts
+     * (part cash / part card). Single-payment receipts get a share of 1 and are
+     * unaffected, so only split receipts change. Receipts whose payments net to zero
+     * (debt settlements) are excluded — they carry no ticket lines.
+     *
+     * Shared by the daily import, the sales accounting report and the P&L so the four
+     * call sites cannot drift apart. See docs/features/vat-returns.md.
+     *
+     * @param  Carbon  $endExclusive  Upper bound, exclusive.
+     * @return array<int, object> Rows of {RATE, PAYMENT, Net, TransactionCount}
+     */
+    public function getApportionedSales(Carbon $start, Carbon $endExclusive): array
+    {
+        $from = $start->format('Y-m-d H:i:s');
+        $to = $endExclusive->format('Y-m-d H:i:s');
+
+        return DB::connection('pos')->select("
+            SELECT
+                TAXES.RATE,
+                pay.PAYMENT,
+                SUM(TICKETLINES.PRICE * TICKETLINES.UNITS * (pay.paid / tot.total)) AS Net,
+                COUNT(DISTINCT RECEIPTS.ID) AS TransactionCount
+            FROM TICKETLINES
+            JOIN TICKETS ON TICKETLINES.TICKET = TICKETS.ID
+            JOIN RECEIPTS ON TICKETS.ID = RECEIPTS.ID
+            JOIN TAXES ON TICKETLINES.TAXID = TAXES.ID
+            JOIN (
+                SELECT p.RECEIPT, p.PAYMENT, SUM(p.TOTAL) AS paid
+                FROM PAYMENTS p
+                JOIN RECEIPTS r2 ON p.RECEIPT = r2.ID
+                WHERE r2.DATENEW >= ? AND r2.DATENEW < ?
+                GROUP BY p.RECEIPT, p.PAYMENT
+            ) pay ON pay.RECEIPT = RECEIPTS.ID
+            JOIN (
+                SELECT p.RECEIPT, SUM(p.TOTAL) AS total
+                FROM PAYMENTS p
+                JOIN RECEIPTS r3 ON p.RECEIPT = r3.ID
+                WHERE r3.DATENEW >= ? AND r3.DATENEW < ?
+                GROUP BY p.RECEIPT
+                HAVING SUM(p.TOTAL) <> 0
+            ) tot ON tot.RECEIPT = RECEIPTS.ID
+            LEFT JOIN CUSTOMERS ON TICKETS.CUSTOMER = CUSTOMERS.ID
+            WHERE RECEIPTS.DATENEW >= ? AND RECEIPTS.DATENEW < ?
+            AND (CUSTOMERS.NAME IS NULL OR CUSTOMERS.NAME NOT IN ('Kitchen', 'Coffee'))
+            GROUP BY pay.PAYMENT, TAXES.RATE
+            ORDER BY pay.PAYMENT ASC, TAXES.RATE ASC
+        ", [$from, $to, $from, $to, $from, $to]);
+    }
+
+    /**
      * Import main sales data for a day (excluding Kitchen/Coffee customers).
      */
     public function importMainSalesData(Carbon $date): array
     {
-        $dayStart = $date->format('Y-m-d 00:00:00');
-        $dayEnd = $date->copy()->addDay()->format('Y-m-d 00:00:00');
-
-        $salesData = DB::connection('pos')->select("
-            SELECT
-                TAXES.RATE,
-                SUM(PRICE * UNITS) AS Net,
-                PAYMENTS.PAYMENT,
-                COUNT(DISTINCT RECEIPTS.ID) as TransactionCount
-            FROM TICKETLINES
-            JOIN TICKETS ON TICKETLINES.TICKET = TICKETS.ID
-            JOIN RECEIPTS ON TICKETS.ID = RECEIPTS.ID
-            JOIN PAYMENTS ON RECEIPTS.ID = PAYMENTS.RECEIPT
-            JOIN TAXES ON TICKETLINES.TAXID = TAXES.ID
-            LEFT JOIN CUSTOMERS ON TICKETS.CUSTOMER = CUSTOMERS.ID
-            WHERE DATENEW >= ? AND DATENEW < ?
-            AND (CUSTOMERS.NAME IS NULL OR CUSTOMERS.NAME NOT IN ('Kitchen', 'Coffee'))
-            GROUP BY PAYMENTS.PAYMENT, TAXES.RATE
-        ", [$dayStart, $dayEnd]);
+        $salesData = $this->getApportionedSales(
+            $date->copy()->startOfDay(),
+            $date->copy()->addDay()->startOfDay()
+        );
 
         $inserted = 0;
         $updated = 0;

@@ -33,6 +33,48 @@ The VAT Returns Management System provides comprehensive functionality for creat
 
 ## System Architecture
 
+### Sales Calculation Basis
+
+Sales VAT is derived from POS `TICKETLINES`. `TICKETLINES.PRICE` is the **ex-VAT unit
+price**, so `PRICE * UNITS` is net and gross requires `* (1 + TAXES.RATE)`.
+
+Two filters distinguish these figures from raw till totals:
+
+- **Kitchen/Coffee excluded** — stock issued to internal departments is a transfer, not a
+  sale. Those rows go to `stock_transfer_daily` instead.
+- **Gift voucher (`paperin`) adjustment** — a voucher is revenue when *sold*, so its value
+  is deducted when *redeemed* to avoid counting it twice. VAT is unaffected; voucher sales
+  are 0%.
+
+#### ⚠️ Payment-type apportionment (changed 11 August 2026)
+
+Attributing sales to a payment type must **not** be done with a plain
+`JOIN PAYMENTS ON RECEIPTS.ID = PAYMENTS.RECEIPT`. A receipt paid part cash / part card
+has multiple `PAYMENTS` rows, and the join repeats every ticket line once per row —
+inflating net and VAT.
+
+`SalesAccountingImportService::getApportionedSales()` is the **single source of truth** for
+this query. It apportions each ticket line across the receipt's payment types by that
+payment's share of the receipt total:
+
+```
+share = SUM(PAYMENTS.TOTAL) for that payment type / SUM(PAYMENTS.TOTAL) for the receipt
+```
+
+Single-payment receipts get a share of `1`. Receipts whose payments sum to zero (debt
+settlements) are excluded — they carry no ticket lines. Use this method from any new
+report rather than rewriting the join.
+
+Apportionment also gives the **correct voucher deduction**: only the voucher's share of
+the receipt is deducted, and where a voucher exceeds the goods value the deduction is
+capped at the goods (the remainder is breakage, never earned twice).
+
+> **Reconciling against filed returns:** `sales_accounting_daily` was rebuilt for
+> 2022-12-31 → 2025-09-11 when this was fixed, so **live figures no longer match returns
+> filed before 11 August 2026** (net was overstated ~0.45%). Submitted returns keep their
+> own `total_net` / `sales_vat_data` snapshot and were not altered. A dated note on the
+> VAT return show page explains this to users.
+
 ### Bi-Monthly VAT Periods
 
 Irish VAT returns use bi-monthly periods:

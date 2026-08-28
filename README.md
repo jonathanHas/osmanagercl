@@ -20,7 +20,7 @@ OSManager CL is a Laravel-based application designed to streamline retail operat
 
 - **Backend**: Laravel 12, PHP 8.2+
 - **Frontend**: Blade templates, Tailwind CSS, Alpine.js
-- **Database**: SQLite (primary), MySQL (POS integration)
+- **Database**: MySQL/MariaDB (application), MySQL 5.7 (uniCenta POS + OSAccounts)
 - **Build Tools**: Vite, npm
 - **Testing**: PHPUnit
 - **Authentication**: Laravel Breeze
@@ -40,14 +40,15 @@ npm install
 cp .env.example .env
 php artisan key:generate
 
-# Setup database
-touch database/database.sqlite
+# Setup database (create the MySQL/MariaDB database first, then set DB_* in .env)
 php artisan migrate
+php artisan db:seed --class=RolesAndPermissionsSeeder   # must run before AdminUserSeeder
 php artisan db:seed --class=AdminUserSeeder
 
-# Configure POS database connection in .env
+# Configure the POS connection in .env — note port 3307, not 3306
 # POS_DB_HOST=127.0.0.1
-# POS_DB_DATABASE=unicenta
+# POS_DB_PORT=3307
+# POS_DB_DATABASE=unicenta2016
 # POS_DB_USERNAME=your_username
 # POS_DB_PASSWORD=your_password
 
@@ -84,7 +85,7 @@ osmanagercl/
 Comprehensive documentation is available in the `docs/` directory:
 
 - **[Documentation Index](./docs/README.md)** - Complete documentation overview
-- **[Development Setup](./docs/development/setup.md)** - Detailed setup instructions
+- **[Fresh Install Guide](./docs/development/fresh-install-guide.md)** - Set up a development machine from scratch
 - **[Architecture Overview](./docs/architecture/overview.md)** - System design and patterns
 - **[API Documentation](./docs/api/endpoints.md)** - REST API reference
 
@@ -112,7 +113,8 @@ php artisan optimize:clear
 php artisan route:list
 ```
 
-For detailed development instructions, see [Development Guide](./docs/development/setup.md).
+For detailed development instructions, see the [Quick Start Guide](./docs/development/quick-start-guide.md).
+To set up a new machine, see the [Fresh Install Guide](./docs/development/fresh-install-guide.md).
 
 ## Contributing
 

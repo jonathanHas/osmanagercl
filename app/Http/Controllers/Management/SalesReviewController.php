@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Management;
 
 use App\Http\Controllers\Controller;
+use App\Models\StockTransferDaily;
 use App\Repositories\OptimizedSalesRepository;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -35,6 +36,14 @@ class SalesReviewController extends Controller
         // Calculate year-over-year changes
         $yoyChanges = $this->calculateYoyChanges($stats, $lastYearStats);
 
+        // Internal stock transfers (Kitchen/Coffee) — excluded from the revenue figures
+        // above, surfaced separately so the value stays visible.
+        $transfers = $this->getTransferTotals($startDate, $endDate);
+        $lastYearTransfers = $this->getTransferTotals($lastYearStart, $lastYearEnd);
+        $yoyChanges['transfers'] = $lastYearTransfers['net'] > 0
+            ? (($transfers['net'] - $lastYearTransfers['net']) / $lastYearTransfers['net']) * 100
+            : 0;
+
         // Top sellers
         $topByVolume = $this->salesRepository->getTopAllProducts($startDate, $endDate, 10)
             ->sortByDesc('total_units')
@@ -55,8 +64,25 @@ class SalesReviewController extends Controller
             'yoyChanges',
             'topByVolume',
             'topByRevenue',
+            'transfers',
             'lastUpdated'
         ));
+    }
+
+    /**
+     * Net and by-department totals for internal Kitchen/Coffee stock transfers.
+     */
+    private function getTransferTotals(Carbon $startDate, Carbon $endDate): array
+    {
+        $rows = StockTransferDaily::forDateRange($startDate, $endDate)
+            ->selectRaw('department, SUM(net_amount) as net')
+            ->groupBy('department')
+            ->get();
+
+        return [
+            'net' => (float) $rows->sum('net'),
+            'by_department' => $rows->mapWithKeys(fn ($r) => [$r->department => (float) $r->net]),
+        ];
     }
 
     private function calculateYoyChanges(array $currentStats, array $lastYearStats): array

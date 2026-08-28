@@ -221,6 +221,33 @@
                             * Gift voucher adjustment of €{{ number_format($salesData['paperin_adjustment'], 2) }} has been deducted from net/gross sales to prevent double-counting of voucher redemptions.
                         </p>
                     @endif
+
+                    <div class="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-md">
+                        <h4 class="text-sm font-semibold text-amber-900">
+                            Calculation change &mdash; 11 August 2026
+                        </h4>
+                        <p class="mt-1 text-xs text-amber-800">
+                            Sales figures above are recalculated live from the POS and <strong>will not match
+                            returns filed before this date</strong>. Two defects were corrected:
+                        </p>
+                        <ul class="mt-2 text-xs text-amber-800 list-disc list-inside space-y-1">
+                            <li>
+                                Ticket lines on split-payment receipts (part cash / part card) were counted
+                                once per payment row, <strong>overstating net sales and VAT</strong>.
+                            </li>
+                            <li>
+                                Gift voucher redemptions deducted the whole receipt rather than the voucher's
+                                share, <strong>over-deducting</strong> where a voucher covered only part of a
+                                sale or exceeded the goods value.
+                            </li>
+                        </ul>
+                        <p class="mt-2 text-xs text-amber-800">
+                            Combined, these overstated net sales by roughly 0.45%. Returns already submitted
+                            keep the figures as filed &mdash; those are stored on the return itself and are not
+                            affected by this change. Expect a small discrepancy when reconciling any period
+                            filed before 11 August 2026 against this page.
+                        </p>
+                    </div>
                 </div>
             </div>
             @endif

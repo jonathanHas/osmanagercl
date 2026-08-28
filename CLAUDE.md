@@ -58,6 +58,7 @@ Comprehensive documentation is organized in the `docs/` folder:
 - **[Architecture](./docs/architecture/overview.md)** - System design and patterns
 - **[Features](./docs/features/)** - Detailed feature documentation
 - **[Development](./docs/development/)** - Setup and development guides
+- **[Fresh Install Guide](./docs/development/fresh-install-guide.md)** - Set up a new dev machine (three databases across two engines — read before touching DB config)
 - **[API Reference](./docs/api/)** - API documentation
 
 ## Planning
@@ -68,7 +69,8 @@ Comprehensive documentation is organized in the `docs/` folder:
 
 ## Essential Development Commands
 
-For complete development setup and commands, see **[Quick Start Guide](./docs/development/quick-start-guide.md)**.
+For day-to-day commands, see **[Quick Start Guide](./docs/development/quick-start-guide.md)**.
+To set up a machine from scratch, see **[Fresh Install Guide](./docs/development/fresh-install-guide.md)**.
 
 ### Quick Reference
 ```bash

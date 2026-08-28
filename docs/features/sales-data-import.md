@@ -194,10 +194,27 @@ Enable Laravel scheduler via cron:
 ## Data Flow
 
 1. **POS Sales** → Products sold in uniCenta POS system
-2. **Daily Import** → `sales:import-daily` extracts and aggregates from POS `STOCKDIARY` table
+2. **Daily Import** → `sales:import-daily` extracts and aggregates from POS `TICKETLINES`
 3. **Local Storage** → Pre-aggregated data stored in optimized `sales_daily_summary` table
 4. **Monthly Summaries** → `sales:import-monthly` creates monthly aggregations
 5. **Analytics Queries** → `OptimizedSalesRepository` serves lightning-fast analytics
+
+### What `total_revenue` means
+
+`total_revenue` is **net of VAT** — `TICKETLINES.PRICE` is the ex-VAT unit price. To
+compare against gross till totals, multiply by `(1 + TAXES.RATE)`.
+
+Since **11 August 2026** the import excludes internal stock transfers to the `Kitchen` and
+`Coffee` departments, matching VAT returns and the sales accounting report. That value is
+reported separately from `stock_transfer_daily` (see `StockTransferDaily`).
+
+The import reads `TICKETLINES` rather than `STOCKDIARY` purely because `STOCKDIARY` has no
+ticket or customer reference, so transfers cannot be identified from it. Both sources
+produce identical revenue when the customer filter is removed.
+
+> If you change this filter, **delete the affected rows before re-importing**. The import
+> matches on `product_id` + `sale_date` and updates in place, so a product that no longer
+> qualifies keeps its old row and its old value.
 
 ## Query Examples
 

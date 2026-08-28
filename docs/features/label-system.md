@@ -330,7 +330,7 @@ Templates are stored in the database and can be managed through:
 
 - [POS Integration](./pos-integration.md) - Product data source
 - [Architecture Overview](../architecture/overview.md) - System structure
-- [Development Setup](../development/setup.md) - Local development
+- [Fresh Install Guide](../development/fresh-install-guide.md) - Local development setup
 
 ---
 

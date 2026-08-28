@@ -79,11 +79,11 @@
             </div>
 
             {{-- KPI Cards --}}
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
                 {{-- Total Revenue --}}
                 <div class="bg-white rounded-lg shadow p-6">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-sm font-medium text-gray-500">Total Revenue</h3>
+                        <h3 class="text-sm font-medium text-gray-500">Total Revenue (ex-VAT)</h3>
                         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $yoyChanges['revenue'] >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
                             {{ $yoyChanges['revenue'] >= 0 ? '+' : '' }}{{ number_format($yoyChanges['revenue'], 1) }}%
                         </span>
@@ -93,6 +93,32 @@
                     </p>
                     <p class="mt-1 text-sm text-gray-500">
                         vs &euro;{{ number_format($lastYearStats['total_revenue'], 2) }} last year
+                    </p>
+                    <p class="mt-1 text-xs text-gray-400">
+                        Net of VAT, excludes Kitchen/Coffee transfers
+                    </p>
+                </div>
+
+                {{-- Internal Transfers --}}
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-medium text-gray-500">Internal Transfers</h3>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $yoyChanges['transfers'] >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
+                            {{ $yoyChanges['transfers'] >= 0 ? '+' : '' }}{{ number_format($yoyChanges['transfers'], 1) }}%
+                        </span>
+                    </div>
+                    <p class="mt-2 text-3xl font-semibold text-gray-900">
+                        &euro;{{ number_format($transfers['net'], 2) }}
+                    </p>
+                    <p class="mt-1 text-sm text-gray-500">
+                        @forelse($transfers['by_department'] as $department => $net)
+                            {{ $department }} &euro;{{ number_format($net, 2) }}@if(!$loop->last) &middot; @endif
+                        @empty
+                            No transfers in period
+                        @endforelse
+                    </p>
+                    <p class="mt-1 text-xs text-gray-400">
+                        Stock to Kitchen/Coffee &mdash; not customer sales
                     </p>
                 </div>
 

@@ -18,8 +18,12 @@ This guide provides all the commands and procedures you need to get started with
 - PHP 8.2+
 - Composer
 - Node.js and npm
-- SQLite (or MySQL/PostgreSQL)
+- MySQL or MariaDB (application database), plus a MySQL 5.7 instance for uniCenta POS
 - Git
+
+> Setting up a machine from scratch? Follow the
+> [Fresh Install Guide](./fresh-install-guide.md) instead — it covers the full three-database
+> layout, the POS container, and loading real data.
 
 ### Required PHP Extensions
 
@@ -51,13 +55,11 @@ cp .env.example .env
 # Generate application key
 php artisan key:generate
 
-# Create database file (SQLite)
-touch database/database.sqlite
-
-# Run migrations
+# Create the MySQL/MariaDB database and set DB_* in .env, then:
 php artisan migrate
 
-# Seed database with test admin account (optional)
+# Seed roles first — AdminUserSeeder needs the admin role to exist
+php artisan db:seed --class=RolesAndPermissionsSeeder
 php artisan db:seed --class=AdminUserSeeder
 
 # Start development server
@@ -186,17 +188,27 @@ php artisan tinker
 
 ### Database Configuration
 
-The application uses **SQLite by default**. The database file is located at `database/database.sqlite`.
+The application uses **three databases across two engines**. `.env.example` still ships SQLite
+defaults — do not rely on them.
 
 #### Primary Database
-- SQLite by default (`database/database.sqlite`)
-- Can be configured for MySQL/PostgreSQL in `.env`
-- See `.env.example` for configuration
+- MySQL/MariaDB on port **3306** (`osmanagercl` in dev, `osmanager` in production)
+- `config/database.php` sets the `default` connection fallback to `mysql`
+- `database/database.sqlite` is an unused 0-byte placeholder
 
 #### POS Database (uniCenta)
-- Secondary connection for read-only POS data
-- Configure POS_DB_* variables in `.env`
+- `unicenta2016` on port **3307** — in dev, a pinned `mysql:5.7.33` Docker container
+- Not read-only: F&V price sync writes `PRICESELL` back to the POS
+- Configure `POS_DB_*` in `.env`
 - See [POS Integration Documentation](../features/pos-integration.md) for details
+
+#### OSAccounts Database
+- `OSAccounts` on port **3307**, same container as the POS — legacy supplier invoices
+- Configure `INV_DB_*` in `.env`
+
+> ⚠️ Passing `-P 3307` to `mysql`/`mysqldump` without `-h 127.0.0.1` silently connects to the
+> local socket (MariaDB) instead. See the
+> [Fresh Install Guide](./fresh-install-guide.md#5-pos--osaccounts-database-container).
 
 ---
 
@@ -290,17 +302,28 @@ APP_ENV=local
 APP_DEBUG=true
 APP_URL=http://localhost
 
-# Database (Primary)
-DB_CONNECTION=sqlite
-DB_DATABASE=/absolute/path/to/database.sqlite
+# Database (Primary) — MariaDB/MySQL on 3306
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=osmanagercl
+DB_USERNAME=osmanager
+DB_PASSWORD=
 
-# POS Database (uniCenta)
+# POS Database (uniCenta) — MySQL 5.7 container on 3307
 POS_DB_CONNECTION=mysql
 POS_DB_HOST=127.0.0.1
 POS_DB_PORT=3307
-POS_DB_DATABASE=unicentaopos
-POS_DB_USERNAME=root
+POS_DB_DATABASE=unicenta2016
+POS_DB_USERNAME=unicenta_user
 POS_DB_PASSWORD=
+
+# OSAccounts Database — same container, 3307
+INV_DB_HOST=127.0.0.1
+INV_DB_PORT=3307
+INV_DB_DATABASE=OSAccounts
+INV_DB_USERNAME=osaccounts_user
+INV_DB_PASSWORD=
 
 # Mail (for development)
 MAIL_MAILER=log
@@ -345,7 +368,7 @@ MAIL_MAILER=log
 - **Authentication**: Laravel Breeze provides login, registration, password reset, and email verification
 - **User Management**: Profile editing and account deletion functionality
 - **Dual Database Support**:
-  - Primary database (SQLite/MySQL) for application data and configuration
+  - Primary database (MySQL/MariaDB) for application data and configuration
   - Secondary POS connection for uniCenta product data (read-only)
   - Cross-database relationships for seamless data integration
 - **Product Management**: ProductRepository provides clean interface to POS products

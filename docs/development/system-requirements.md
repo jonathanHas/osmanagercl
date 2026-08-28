@@ -10,8 +10,17 @@ OSManager CL system requirements for development and production environments.
 - **Composer**: Latest stable version
 
 ### Database Systems
-- **SQLite**: Primary database (development)
-- **MySQL**: 8.0+ (production, POS integration)
+
+The application needs **three databases across two engines**. See the
+[Fresh Install Guide](./fresh-install-guide.md) for setup.
+
+- **MySQL / MariaDB**: the Laravel application database (`osmanagercl` in dev, `osmanager` in
+  production) on port **3306**. MariaDB 10.11 on the reference machines
+- **MySQL 5.7**: `unicenta2016` (uniCenta POS) and `OSAccounts`, both on port **3307**. In
+  development these run in a pinned `mysql:5.7.33` Docker container — uniCenta's legacy schema
+  does not load cleanly on MySQL 8 or MariaDB
+- **SQLite**: not used. `database/database.sqlite` is a leftover 0-byte placeholder, and
+  `config/database.php` sets the `default` connection fallback to `mysql`
 
 ### Frontend Assets
 - **Node.js**: 18.x or higher
@@ -69,8 +78,7 @@ npm install
 cp .env.example .env
 php artisan key:generate
 
-# Database setup
-touch database/database.sqlite
+# Database setup (create the MySQL/MariaDB database and set DB_* in .env first)
 php artisan migrate
 
 # Build assets

@@ -21,7 +21,7 @@ We are committed to providing a welcoming and inclusive environment. Please be r
 
 1. Fork the repository
 2. Clone your fork locally
-3. Set up the development environment following the [setup guide](./docs/development/setup.md)
+3. Set up the development environment following the [fresh install guide](./docs/development/fresh-install-guide.md)
 4. Create a new branch for your feature/fix
 5. Make your changes
 6. Submit a pull request

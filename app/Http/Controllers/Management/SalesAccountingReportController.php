@@ -148,23 +148,11 @@ class SalesAccountingReportController extends Controller
             ->values()
             ->toArray();
 
-        // Main sales query (excluding Kitchen and Coffee customers)
-        $mainSalesQuery = "
-            SELECT TAXES.RATE, SUM(PRICE * UNITS) AS Net, PAYMENTS.PAYMENT
-            FROM TICKETLINES
-            JOIN TICKETS ON TICKETLINES.TICKET = TICKETS.ID
-            JOIN RECEIPTS ON TICKETS.ID = RECEIPTS.ID
-            JOIN PAYMENTS ON RECEIPTS.ID = PAYMENTS.RECEIPT
-            JOIN TAXES ON TICKETLINES.TAXID = TAXES.ID
-            LEFT JOIN CUSTOMERS ON TICKETS.CUSTOMER = CUSTOMERS.ID
-            WHERE DATE_FORMAT(DATENEW, '%Y %m %d') BETWEEN ? AND ?
-            AND (CUSTOMERS.NAME IS NULL OR CUSTOMERS.NAME NOT IN ('Kitchen', 'Coffee'))
-            GROUP BY PAYMENTS.PAYMENT, TAXES.RATE
-            ORDER BY PAYMENTS.PAYMENT ASC, TAXES.RATE ASC
-        ";
-
-        $mainSales = DB::connection('pos')
-            ->select($mainSalesQuery, [$formattedStartDate, $formattedEndDate]);
+        // Main sales, apportioned across payment types (excluding Kitchen and Coffee customers)
+        $mainSales = app(SalesAccountingImportService::class)->getApportionedSales(
+            $startDate->copy()->startOfDay(),
+            $endDate->copy()->addDay()->startOfDay()
+        );
 
         // Stock transfers query (Kitchen and Coffee customers only)
         $transfersQuery = "
