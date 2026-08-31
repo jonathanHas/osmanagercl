@@ -85,7 +85,12 @@ rsync_errors_are_attr_only() {
 check_host_connectivity() {
     log "🌐 Checking if $PROD_HOST is reachable..."
 
-    if ! ssh -o ConnectTimeout=5 "$PROD_USER@$PROD_HOST" 'exit' 2>/dev/null; then
+    # -n is load-bearing: without it ssh inherits this script's stdin and reads it to EOF, which
+    # swallows every later `read` answer (branch confirmation, commit message). Typing the answers
+    # by hand hides it — the prompt appears before you type, so there is nothing buffered to steal —
+    # but it makes the script impossible to drive from a pipe and eats any type-ahead. The other ssh
+    # calls are safe already: each supplies its own stdin via a heredoc.
+    if ! ssh -n -o ConnectTimeout=5 "$PROD_USER@$PROD_HOST" 'exit' 2>/dev/null; then
         error "Cannot connect to $PROD_HOST via SSH. Aborting deployment."
         exit 1
     fi
