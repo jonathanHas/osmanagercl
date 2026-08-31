@@ -579,8 +579,9 @@ INVOICE_PARSER_PATH=/path/to/invoice_parser.py
 PYTHON_EXECUTABLE=/usr/bin/python3
 
 # Queue for parsing
-QUEUE_CONNECTION=redis
-INVOICE_PARSING_QUEUE=invoice-parsing
+# Requires a worker on this queue: php artisan queue:work --queue=invoices
+QUEUE_CONNECTION=database
+INVOICE_PARSING_QUEUE=invoices
 ```
 
 ## Testing Strategy
@@ -589,6 +590,17 @@ INVOICE_PARSING_QUEUE=invoice-parsing
 - Test parsing service methods
 - Test data validation
 - Test error handling
+
+Supplier parsers are pure `parse_invoice(text, filename)` functions, so they are tested directly
+against committed fixtures of extracted invoice text (bank details redacted) under
+`scripts/invoice-parser/tests/fixtures/<supplier>/`:
+
+```bash
+scripts/invoice-parser/venv/bin/python -m pytest scripts/invoice-parser/tests/ -v
+```
+
+When a supplier changes layout, add a fixture for the new layout **and keep the old one** — both
+tend to stay in circulation across the archive.
 
 ### Integration Tests
 - Test Python script execution
@@ -672,6 +684,66 @@ See [Udea Invoice Parser Documentation](./udea-invoice-parser.md) for full detai
 The `scripts/invoice-parser/parsers/delivery_udea.py` parser handles Udea delivery PDFs for the delivery verification system.
 
 See [Delivery System Documentation](./delivery-system.md) for details.
+
+### BreaDelicious Invoice Parser
+
+`scripts/invoice-parser/parsers/breadelicious.py` handles **two layouts**, because BreaDelicious
+changed invoicing software between 2026-06-28 and 2026-07-06. Both remain in the archive, so the
+parser dispatches on the text: `Issue date:` means the legacy layout, otherwise the current one.
+
+| | Fakturownia (to 2026-06-28) | Xero (from 2026-07-06) |
+|---|---|---|
+| Date | `Issue date: 2025-12-28` | `InvoiceDate` with `9Aug2026` on the next line |
+| Invoice number | `2026/0829` | `INV-0180` |
+| Line amounts | net | **VAT-inclusive** |
+| VAT | explicit `Net / Rate / VAT / Gross` summary table | stated once as `INCLUDES SALES ON TAX 13.5%` |
+| Total | `Total gross price EUR` | `TOTAL EUR` |
+
+Points that matter when this layout changes again:
+
+- On the Xero layout the tax column reads `13.5%` for VAT-bearing lines, `Tax on Sales` for
+  zero-rated bread (which wraps, so only `Taxon` lands on the item line once pdfplumber strips
+  intra-word spaces), and is **absent entirely** on zero-quantity lines.
+- Credit lines are parenthesised: `(4.80)` means −4.80.
+- Because every line amount is gross, the buckets must sum to `TOTAL EUR`. The parser asserts this
+  and, on a mismatch, assigns the difference to 0% and emits a `Parse_Warnings` entry, which drops
+  confidence to 0.50 so the file lands in review rather than importing silently.
+
+### VAT-inclusive layouts: the `VAT Amounts` and `Total` contract
+
+`invoice_parser_laravel.py` normally derives VAT as `round(net × rate, 2)`. That is wrong for
+invoices whose issuer rounds VAT **per line**: BU-2026-001216 states €2.86 of VAT where the
+aggregate calculation gives €2.85, and BU-2026-001100 states €6.62 against €6.61.
+
+A parser may therefore return two optional keys, which the dispatcher honours:
+
+- `'VAT Amounts'` — `{'0': 0.0, '9': 0.0, '13.5': 2.86, '23': 0.0}`, the VAT the invoice itself
+  states per rate. Each present rate overwrites the computed `vat_breakdown[...]['vat']`.
+- `'Total'` — the invoice's printed total. Used in place of the computed
+  `Σ net × (1 + rate)` when the two differ by no more than €0.05; a larger gap is reported as a
+  warning and the computed value is kept.
+
+Both are opt-in, so parsers that do not return them are unaffected. `InvoiceCreationService`
+writes `total_amount` as `subtotal + vat_amount`, so honouring the stated VAT is what makes the
+stored invoice tie out to the paper one.
+
+Parsers may also return `'Invoice Number'`, which the dispatcher maps to `invoice_number` →
+`invoice_upload_files.parsed_invoice_number` → `invoices.supplier_invoice_reference`.
+
+### Re-parsing stored invoices
+
+`php artisan invoice:reparse` re-runs the parser against an invoice's stored attachment and prints
+a before/after table. It is a dry run unless `--apply` is given, and it refuses to write to any
+invoice that carries a `vat_return_id` or whose date falls inside a finalized VAT return period.
+
+```bash
+php artisan invoice:reparse BU-2026-001216                       # one invoice, dry run
+php artisan invoice:reparse --supplier=135 --from=2026-07-01     # every invoice since a layout change
+php artisan invoice:reparse --supplier=135 --from=2026-07-01 --apply
+```
+
+This is the tool to reach for when a supplier changes layout: fix the parser, dry-run the
+supplier's back catalogue to confirm no regression on the old layout, then apply.
 
 ## Next Steps
 

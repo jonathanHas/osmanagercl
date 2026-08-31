@@ -99,7 +99,7 @@ PYTHON_VENV_PATH=/var/www/html/osmanagercl/scripts/invoice-parser/venv
 INVOICE_PARSER_SCRIPT=/var/www/html/osmanagercl/scripts/invoice-parser/invoice_parser_laravel.py
 INVOICE_PARSER_TIMEOUT=60
 INVOICE_PARSER_ENABLE_OCR=true
-INVOICE_PARSING_QUEUE=default
+INVOICE_PARSING_QUEUE=invoices
 ```
 
 ### 3. Test Configuration

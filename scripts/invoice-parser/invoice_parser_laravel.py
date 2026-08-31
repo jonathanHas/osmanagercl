@@ -63,7 +63,7 @@ def detect_supplier(text):
         return oxigen, "Oxigen"
     elif "KELLYS CENTRAL EDUCATIONAL" in upper_text:
         return kellys, "Kellys"
-    elif "BREADELICIOUS" in upper_text or "BREAD" in upper_text:
+    elif "BREADELICIOUS" in upper_text:
         return breadelicious, "Breadelicious"
     elif "KLEE PAPER" in upper_text or "ECOLAND" in upper_text:
         return kleepaper, "Klee Paper"
@@ -258,7 +258,7 @@ def process_invoice(file_path):
             
             # Format the data for Laravel
             formatted_data = {
-                'invoice_number': None,  # Parser doesn't extract this yet
+                'invoice_number': data.get('Invoice Number') if data.get('Invoice Number') not in (None, 'Not found', '') else None,
                 'invoice_date': format_invoice_date(data.get('Invoice Date')),
                 'supplier_name': data.get('Supplier', 'Unknown'),
                 'is_tax_free': data.get('Tax Free', False),
@@ -288,7 +288,38 @@ def process_invoice(file_path):
                     float(data.get('VAT 23%', '0.00')) * 1.23  # Net + 23% VAT
                 ])
             }
-            
+
+            # Parsers for VAT-inclusive layouts can supply the VAT the invoice itself
+            # states, which is rounded per line and so does not always equal
+            # round(net * rate, 2) on the aggregate. Honour it when given.
+            stated_vat = data.get('VAT Amounts')
+            if isinstance(stated_vat, dict):
+                for rate, key in [('0', 'vat_0'), ('9', 'vat_9'), ('13.5', 'vat_13_5'), ('23', 'vat_23')]:
+                    if rate in stated_vat:
+                        formatted_data['vat_breakdown'][key]['vat'] = round(float(stated_vat[rate]), 2)
+
+                # The same per-line rounding applies to the total, so prefer the
+                # invoice's own figure when it only differs by rounding.
+                stated_total = data.get('Total')
+                if stated_total is not None:
+                    try:
+                        stated_total = float(stated_total)
+                        if abs(stated_total - formatted_data['total_amount']) <= 0.05:
+                            formatted_data['total_amount'] = stated_total
+                        else:
+                            response['warnings'].append(
+                                f"Invoice total \u20ac{stated_total:.2f} differs from the VAT breakdown "
+                                f"sum \u20ac{formatted_data['total_amount']:.2f}"
+                            )
+                            has_anomalies = True
+                    except (TypeError, ValueError):
+                        pass
+
+            # Surface any reconciliation problems the parser flagged
+            for parser_warning in data.get('Parse_Warnings', []) or []:
+                response['warnings'].append(parser_warning)
+                has_anomalies = True
+
             # Cross-check calculated VAT against invoice's stated Total VAT
             invoice_total_vat = data.get('Total_VAT')
             if invoice_total_vat is not None:

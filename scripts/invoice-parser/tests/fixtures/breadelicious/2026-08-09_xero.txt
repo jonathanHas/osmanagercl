@@ -1,0 +1,35 @@
+InvoiceDate BreaDeliciousOrganic
+INVOICE
+9Aug2026
+Bakery
+InvoiceNumber 24RadharcanMhuilinn
+OrganicStore INV-0180 Rathwire
+MAINSTREET
+Co.Westmeath
+CO.OFFALY
+N91E970
+BIRRCO.OFFALYR42TY29
+IRELAND
+IRL
+Description Quantity UnitPrice Tax AmountEUR
+OrganicMultigrainSourdoughBread600g 6.00 4.80 Taxon 28.80
+Sales
+OrganicRyeSourdoughBread600g 2.00 4.80 Taxon 9.60
+Sales
+OrganicSpeltSourdoughBread580g 1.00 4.80 Taxon 4.80
+Sales
+OrganicWhiteSourdoughBread600g 3.00 4.80 Taxon 14.40
+Sales
+OrganicHempSeedsSourdoughBread600g 2.00 4.80 Taxon 9.60
+Sales
+OrganicPumpkinSeedsSourdoughBread600g 1.00 4.80 Taxon 4.80
+Sales
+OrganicBriocheLoaf480g 3.00 5.20 13.5% 15.60
+OrganicBriocheBuns180g 3.00 2.80 13.5% 8.40
+INCLUDES SALESONTAX13.5% 2.86
+TOTALEUR 96.00
+DueDate:16Aug2026
+BankAccount:
+AIB
+IE00XXXX00000000000000
+CompanyRegistrationNo: IE3757130PH. RegisteredOffice:24RadharcanMhuilinn,Rathwire,N91E970,Ireland.

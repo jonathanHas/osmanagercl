@@ -79,6 +79,7 @@ class TestInvoiceParser extends Command
                 // Display parsed data
                 $this->info('Parsed Data:');
                 $this->line('Supplier: '.($data['supplier_name'] ?? 'Unknown'));
+                $this->line('Invoice Number: '.($data['invoice_number'] ?? 'Not found'));
                 $this->line('Invoice Date: '.($data['invoice_date'] ?? 'Not found'));
                 $this->line('Total Amount: €'.number_format($data['total_amount'] ?? 0, 2));
                 $this->line('Tax Free: '.($data['is_tax_free'] ? 'Yes' : 'No'));
@@ -88,18 +89,17 @@ class TestInvoiceParser extends Command
                     $this->newLine();
                     $this->info('VAT Breakdown:');
                     $vat = $data['vat_breakdown'];
-                    if ($vat['vat_0'] > 0) {
-                        $this->line('  0%: €'.number_format($vat['vat_0'], 2));
+                    $rows = [];
+                    foreach (['0%' => 'vat_0', '9%' => 'vat_9', '13.5%' => 'vat_13_5', '23%' => 'vat_23'] as $label => $key) {
+                        // Parsers emit ['net' => x, 'vat' => y]; older output was a bare net float
+                        $net = is_array($vat[$key] ?? null) ? ($vat[$key]['net'] ?? 0) : ($vat[$key] ?? 0);
+                        $amount = is_array($vat[$key] ?? null) ? ($vat[$key]['vat'] ?? 0) : 0;
+                        if ($net == 0 && $amount == 0) {
+                            continue;
+                        }
+                        $rows[] = [$label, number_format($net, 2), number_format($amount, 2), number_format($net + $amount, 2)];
                     }
-                    if ($vat['vat_9'] > 0) {
-                        $this->line('  9%: €'.number_format($vat['vat_9'], 2));
-                    }
-                    if ($vat['vat_13_5'] > 0) {
-                        $this->line('  13.5%: €'.number_format($vat['vat_13_5'], 2));
-                    }
-                    if ($vat['vat_23'] > 0) {
-                        $this->line('  23%: €'.number_format($vat['vat_23'], 2));
-                    }
+                    $this->table(['Rate', 'Net', 'VAT', 'Gross'], $rows);
                 }
 
                 if (! empty($result['result']['warnings'])) {

@@ -135,34 +135,26 @@ sudo ./scripts/deployment/setup/setup-invoice-parser-production.sh /var/www/html
 ```
 
 ### **Step 5: Set Up Queue Workers (One-Time)**
-```bash
-# Copy supervisor configuration
-sudo cp osmanager-queue-worker.conf /etc/supervisor/conf.d/
 
-# Update supervisor
-sudo supervisorctl reread
-sudo supervisorctl update
+> ⚠️ **Do not install `osmanager-queue-worker.conf`.** It is the old single-worker config and its
+> `queue:work` has no `--queue` flag, so it consumes `default` only. With
+> `INVOICE_PARSING_QUEUE=invoices` (the current setting) invoice jobs are never picked up and
+> uploaded batches hang at status `processing` forever. Use Step 6 instead — it is now the only
+> supported setup.
 
-# Start workers
-sudo supervisorctl start osmanager-queue-worker:*
-
-# Verify workers are running
-sudo supervisorctl status
-```
-
-### **Step 6: Set Up Dedicated Queue Workers (RECOMMENDED)**
+### **Step 6: Set Up Dedicated Queue Workers (REQUIRED)**
 
 **For true independence between coffee orders and invoice processing:**
 
-```bash
-# Copy the dedicated worker files to your server
-scp osmanager-test-dedicated-workers.conf server:/path/to/app/
-scp scripts/deployment/setup/setup-dedicated-workers.sh server:/path/to/app/
+The script generates the supervisor config from the path you give it, so nothing needs copying
+first — just run it on the machine, from the application directory:
 
-# SSH to server and run setup
-ssh user@server
+```bash
 cd /var/www/html/osmanager
 sudo ./scripts/deployment/setup/setup-dedicated-workers.sh /var/www/html/osmanager
+
+# Optionally override the worker user and process count:
+#   sudo ./scripts/deployment/setup/setup-dedicated-workers.sh /path/to/app www-data 4
 ```
 
 **What this does:**
@@ -215,10 +207,10 @@ tail -f storage/logs/invoice-worker.log &    # Invoice jobs
 **If parser tests fail:**
 ```bash
 # Use the debug script to identify specific issues
-./debug-parser-test.sh /var/www/html/osmanager
+scripts/deployment/debug/debug-parser-test.sh /var/www/html/osmanager
 
 # Check queue processing issues (now with dedicated workers)
-./debug-queue-processing.sh /var/www/html/osmanager
+scripts/deployment/debug/debug-queue-processing.sh /var/www/html/osmanager
 ```
 
 ---
@@ -323,7 +315,7 @@ tail -f storage/logs/laravel.log
 tail -f storage/logs/queue-worker.log
 
 # Debug queue issues specifically
-./debug-queue-processing.sh /var/www/html/osmanager
+scripts/deployment/debug/debug-queue-processing.sh /var/www/html/osmanager
 ```
 
 ### **Issue 8: Parser Files Not Syncing During Deployment**

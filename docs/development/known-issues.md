@@ -11,6 +11,7 @@ This document tracks known issues that have been identified and resolved in the 
 - [Validation Issues](#validation-issues)
 - [VAT & Tax Issues](#vat--tax-issues)
 - [Invoice Parsing Issues](#invoice-parsing-issues)
+- [Queue Worker Issues](#bulk-upload-batch-stuck-at-processing-forever)
 
 ---
 
@@ -422,6 +423,55 @@ If the 0.0% row net + paperin adjustment = what the 0.0% row should show, or if 
 ---
 
 ## Invoice Parsing Issues
+
+### Bulk Upload Batch Stuck at "Processing" Forever
+**Status:** Fixed (2026-08-31)
+
+#### Problem
+An uploaded batch sat at status `processing` with its files at `uploaded`, the progress bar reading
+100%, and the page spinner never finishing. Nothing appeared in the logs after the upload itself.
+
+#### Root Cause
+No queue worker was consuming the `invoices` queue. `.env` sets `INVOICE_PARSING_QUEUE=invoices`
+(so invoice parsing cannot be blocked by coffee/KDS jobs), but this machine had **no supervisor
+programs at all** — `/etc/supervisor/conf.d/` was empty. The `ParseInvoiceFile` job was written to
+the `jobs` table and never picked up.
+
+Note that `composer run dev` does **not** cover this: it runs `queue:listen` with no `--queue` flag,
+so it only serves `default`.
+
+The UI cannot recover from this state on its own — `startProcessing()` refuses a batch already in
+`processing`, `retryFile()` only accepts `failed`, and Stop → Retry just re-queues onto the same
+unconsumed queue.
+
+#### Diagnosis
+```bash
+ps aux | grep queue:work                     # any workers at all?
+ls /etc/supervisor/conf.d/                   # any supervisor programs?
+php artisan tinker --execute="foreach(DB::table('jobs')->select('queue', DB::raw('count(*) as c'))->groupBy('queue')->get() as \$r) echo \$r->queue.' => '.\$r->c.PHP_EOL;"
+```
+Jobs piled up on `invoices` with `attempts=0` confirms it.
+
+#### Solution
+Run the already-queued job — re-running `ParseInvoiceFile` on a file at `uploaded` is explicitly
+safe (see the status guard in `app/Jobs/ParseInvoiceFile.php`), so no DB surgery is needed:
+
+```bash
+php artisan queue:work --queue=invoices --once   # one job
+php artisan queue:work --queue=invoices          # drain the queue
+```
+
+To stop it recurring, install the dedicated workers so they start at boot:
+
+```bash
+scripts/deployment/setup/setup-dedicated-workers.sh /var/www/html/osmanagercl
+```
+
+#### Related
+A worker started on `default` will also pick up any accumulated backlog. In this instance ~3.9M
+stale `MonitorCoffeeOrdersJob` rows had built up since 2025-10 with nothing draining them; they were
+purged before starting the coffee worker. Check `jobs` grouped by queue before starting a worker
+that has been off for a long time.
 
 ### Delivery Invoice Total Parsed Incorrectly (UK/US Number Format)
 **Status:** Fixed 2026-02-05

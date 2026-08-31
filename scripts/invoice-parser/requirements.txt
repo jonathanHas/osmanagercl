@@ -24,6 +24,9 @@ odfpy==1.4.1
 pandas==2.2.3
 numpy==2.2.4
 
+# Testing
+pytest==8.3.4
+
 # System Dependencies (install via apt)
 # tesseract-ocr
 # poppler-utils
