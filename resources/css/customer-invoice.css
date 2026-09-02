@@ -477,6 +477,7 @@
     width: 100%; padding: 4px 6px; border-radius: 5px;
     font-family: var(--mono); font-variant-numeric: tabular-nums;
 }
+.invoice-composer .num-input.strong { font-weight: 500; }
 .invoice-composer .num-input:hover { border-color: var(--line); }
 .invoice-composer .num-input:focus { background: var(--bg-2); border-color: var(--line-strong); }
 .invoice-composer .vat-select {
@@ -709,6 +710,14 @@
 }
 .invoice-composer .m-line-name:focus { background: var(--bg-2); border-radius: 4px; padding: 4px 6px; }
 .invoice-composer .m-line-gross { font-size: 14px; color: var(--text); font-weight: 600; }
+.invoice-composer .m-gross-edit { display: inline-flex; align-items: center; gap: 1px; }
+.invoice-composer .m-gross-edit input {
+    background: var(--bg-2); border: 1px solid var(--line);
+    color: var(--text); font-size: 14px; font-weight: 600; text-align: right;
+    width: 72px; padding: 3px 5px; border-radius: 5px;
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+}
+.invoice-composer .m-gross-edit input:focus { border-color: var(--line-strong); outline: none; }
 .invoice-composer .m-line-bot {
     display: flex; align-items: center; justify-content: space-between;
     margin-top: 10px;

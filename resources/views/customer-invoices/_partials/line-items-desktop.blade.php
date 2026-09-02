@@ -52,7 +52,19 @@
                         </select>
                     </div>
                     <div class="num mono" x-text="'€' + lineNet(item).toFixed(2)"></div>
-                    <div class="num mono strong" x-text="'€' + lineGross(item).toFixed(2)"></div>
+                    <div class="num mono strong">
+                        {{-- Ad-hoc lines can be priced gross-first; the net is back-calculated. --}}
+                        <template x-if="isAdHoc(item)">
+                            <input type="number" step="0.01" min="0" inputmode="decimal" class="num-input mono strong"
+                                   :value="item._grossFocused ? item._grossDraft : lineGross(item).toFixed(2)"
+                                   @focus="item._grossFocused = true; item._grossDraft = lineGross(item).toFixed(2)"
+                                   @input="item._grossDraft = $event.target.value; applyLineGross(item, $event.target.value)"
+                                   @blur="item._grossFocused = false">
+                        </template>
+                        <template x-if="! isAdHoc(item)">
+                            <span>€<span x-text="lineGross(item).toFixed(2)"></span></span>
+                        </template>
+                    </div>
                     <button type="button" class="row-x" aria-label="Remove" @click="removeItem(idx)">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
                     </button>

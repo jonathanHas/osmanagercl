@@ -183,7 +183,18 @@
                             <div class="m-line">
                                 <div class="m-line-top">
                                     <input type="text" class="m-line-name" x-model="item.description">
-                                    <div class="m-line-gross mono">€<span x-text="lineGross(item).toFixed(2)"></span></div>
+                                    <div class="m-line-gross mono">
+                                        <template x-if="isAdHoc(item)">
+                                            <span class="m-gross-edit">€<input type="number" step="0.01" min="0" inputmode="decimal"
+                                                   :value="item._grossFocused ? item._grossDraft : lineGross(item).toFixed(2)"
+                                                   @focus="item._grossFocused = true; item._grossDraft = lineGross(item).toFixed(2)"
+                                                   @input="item._grossDraft = $event.target.value; applyLineGross(item, $event.target.value)"
+                                                   @blur="item._grossFocused = false"></span>
+                                        </template>
+                                        <template x-if="! isAdHoc(item)">
+                                            <span>€<span x-text="lineGross(item).toFixed(2)"></span></span>
+                                        </template>
+                                    </div>
                                 </div>
                                 <div class="m-line-bot">
                                     <div class="m-stepper">
@@ -503,6 +514,8 @@
                         quantity: 1,
                         unit_price: 0,
                         vat_rate: 0.23,
+                        _grossFocused: false,
+                        _grossDraft: '',
                     });
                 },
 
@@ -525,6 +538,24 @@
                 },
                 lineGross(item) {
                     return Math.round((this.lineNet(item) + this.lineVat(item)) * 100) / 100;
+                },
+
+                /** Ad-hoc lines carry no POS product, so their gross is safe to type into. */
+                isAdHoc(item) {
+                    return ! item.pos_product_id;
+                },
+
+                /**
+                 * Back-calculate the unit net from a typed LINE gross (qty included).
+                 * Kept at 4 dp to match the decimal:4 unit_price column, so that the
+                 * server's round(qty * unit_price, 2) reproduces the gross that was typed.
+                 */
+                applyLineGross(item, raw) {
+                    const g = parseFloat(raw);
+                    const q = parseFloat(item.quantity) || 0;
+                    const r = parseFloat(item.vat_rate) || 0;
+                    if (! isFinite(g) || q <= 0) return;
+                    item.unit_price = Math.round(((g / (1 + r)) / q) * 10000) / 10000;
                 },
 
                 discountFactor() {
