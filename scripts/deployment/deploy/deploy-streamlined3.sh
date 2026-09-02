@@ -282,9 +282,20 @@ main() {
     if [[ -f "$DEV_DIR/.env" ]]; then
         NEW_VERSION=$(git rev-parse --short HEAD)
         if grep -q "^APP_VERSION=" "$DEV_DIR/.env"; then
-            sed -i.bak -E "s/^APP_VERSION=.*/APP_VERSION=${NEW_VERSION}/" "$DEV_DIR/.env"
-            rm -f "$DEV_DIR/.env.bak"
-            log "Updated APP_VERSION in .env to $NEW_VERSION"
+            # Rewrite .env in place WITHOUT replacing its inode. `sed -i` writes a
+            # temp file and renames it over the original; it restores the mode but
+            # its chgrp back to www-data silently fails when the deploying user is
+            # not a www-data member. .env then ends up jon:jon 0640, Apache can no
+            # longer read it, and every page 500s with MissingAppKeyException.
+            # Truncating the existing file with `>` keeps owner, group and mode.
+            ENV_TMP=$(mktemp)
+            if sed -E "s/^APP_VERSION=.*/APP_VERSION=${NEW_VERSION}/" "$DEV_DIR/.env" > "$ENV_TMP" && [[ -s "$ENV_TMP" ]]; then
+                cat "$ENV_TMP" > "$DEV_DIR/.env"
+                log "Updated APP_VERSION in .env to $NEW_VERSION"
+            else
+                error "Failed to rewrite APP_VERSION in .env; leaving it unchanged."
+            fi
+            rm -f "$ENV_TMP"
         else
             echo "APP_VERSION=${NEW_VERSION}" >> "$DEV_DIR/.env"
             log "Appended APP_VERSION=${NEW_VERSION} to .env"

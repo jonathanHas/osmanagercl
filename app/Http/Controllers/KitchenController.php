@@ -6,9 +6,12 @@ use App\Models\KitchenRecipe;
 use App\Models\KitchenRecipeIngredient;
 use App\Repositories\KitchenRepository;
 use App\Services\KitchenCostingService;
+use App\Services\KitchenOrganicRegistrationService;
+use App\Services\OrganicRegistrationPdfService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class KitchenController extends Controller
@@ -21,7 +24,7 @@ class KitchenController extends Controller
     /**
      * Display recipes listing.
      */
-    public function index(Request $request): View
+    public function index(Request $request, KitchenOrganicRegistrationService $registrationService): View
     {
         $search = $request->get('search');
         $recipes = $this->repository->getPaginatedRecipes(15, $search);
@@ -39,6 +42,7 @@ class KitchenController extends Controller
             'recipes' => $recipesWithCosts,
             'search' => $search,
             'stats' => $stats,
+            'organicReadiness' => $registrationService->summarise($recipesWithCosts->getCollection()),
         ]);
     }
 
@@ -81,7 +85,7 @@ class KitchenController extends Controller
     /**
      * Display a recipe.
      */
-    public function show(KitchenRecipe $recipe): View
+    public function show(KitchenRecipe $recipe, KitchenOrganicRegistrationService $registrationService): View
     {
         $recipe = $this->repository->findById($recipe->id);
         $costs = $this->costingService->calculateRecipeCost($recipe);
@@ -91,6 +95,28 @@ class KitchenController extends Controller
             'recipe' => $recipe,
             'costs' => $costs,
             'trends' => $trends,
+            'organicWarnings' => $registrationService->build($recipe)['warnings'],
+        ]);
+    }
+
+    /**
+     * Download the Organic Trust "Multi-Ingredient Product Registration Form" for a recipe,
+     * filled in from the recipe's ingredients and their suppliers' certification details.
+     */
+    public function organicRegistrationForm(
+        KitchenRecipe $recipe,
+        KitchenOrganicRegistrationService $registrationService,
+        OrganicRegistrationPdfService $pdfService
+    ) {
+        $form = $registrationService->build($recipe);
+
+        $pdf = $pdfService->generate($form['product_name'], $form['rows']);
+
+        $filename = 'organic-registration-'.Str::slug($recipe->name).'.pdf';
+
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 

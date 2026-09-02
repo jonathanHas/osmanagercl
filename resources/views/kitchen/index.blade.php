@@ -21,8 +21,24 @@
         </div>
     </x-slot>
 
-    <div class="py-12">
+    <div class="py-12"
+         x-data="{ showOrganicForms: localStorage.getItem('kitchen.showOrganicForms') === '1' }"
+         x-init="$watch('showOrganicForms', value => localStorage.setItem('kitchen.showOrganicForms', value ? '1' : '0'))">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            <!-- Organic registration forms are only needed occasionally, so they stay out of the way until asked for. -->
+            <div class="mb-4 flex justify-end">
+                <button type="button" role="switch" :aria-checked="showOrganicForms.toString()"
+                        @click="showOrganicForms = ! showOrganicForms"
+                        class="inline-flex items-center gap-3 text-sm text-gray-600 hover:text-gray-900">
+                    <span class="relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors"
+                          :class="showOrganicForms ? 'bg-green-600' : 'bg-gray-300'">
+                        <span class="inline-block h-5 w-5 mt-0.5 transform rounded-full bg-white shadow transition-transform"
+                              :class="showOrganicForms ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                    </span>
+                    Organic registration forms
+                </button>
+            </div>
+
             @if (session('success'))
                 <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
                     {{ session('success') }}
@@ -224,6 +240,18 @@
                                             @endif
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            @php $readiness = $organicReadiness[$recipe->id] ?? null; @endphp
+                                            <span x-show="showOrganicForms" x-cloak class="inline-flex items-center mr-3">
+                                                <a href="{{ route('kitchen.organic-form', $recipe) }}" class="text-green-700 hover:text-green-900" title="Download the Organic Trust registration form for this product">Organic Form</a>
+                                                @if ($readiness && $readiness['incomplete'] > 0)
+                                                    <span class="ml-1 text-amber-500" title="{{ $readiness['incomplete'] }} of {{ $readiness['total'] }} ingredients have no % weight worked out - open the recipe to see what is missing.">
+                                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                                        </svg>
+                                                        <span class="sr-only">Incomplete percentages</span>
+                                                    </span>
+                                                @endif
+                                            </span>
                                             <a href="{{ route('kitchen.edit', $recipe) }}" class="text-indigo-600 hover:text-indigo-900 mr-3">Edit</a>
                                             <form action="{{ route('kitchen.destroy', $recipe) }}" method="POST" class="inline" onsubmit="return confirm('Delete this recipe?');">
                                                 @csrf

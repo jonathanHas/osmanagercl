@@ -17,6 +17,20 @@
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            @if (! empty($organicWarnings))
+                <div class="mb-6 bg-amber-50 border border-amber-300 rounded-lg p-4">
+                    <h3 class="text-sm font-semibold text-amber-900">Organic registration form is incomplete</h3>
+                    <p class="mt-1 text-sm text-amber-800">
+                        The form still downloads, but these gaps are left blank on it:
+                    </p>
+                    <ul class="mt-2 list-disc list-inside space-y-1 text-sm text-amber-800">
+                        @foreach ($organicWarnings as $warning)
+                            <li>{{ $warning }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <!-- Main Content -->
                 <div class="lg:col-span-2 space-y-6">
@@ -227,6 +241,9 @@
                             <div class="space-y-3">
                                 <a href="{{ route('kitchen.edit', $recipe) }}" class="block w-full text-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
                                     Edit Recipe
+                                </a>
+                                <a href="{{ route('kitchen.organic-form', $recipe) }}" class="block w-full text-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+                                    Organic Registration Form
                                 </a>
                                 <form action="{{ route('kitchen.destroy', $recipe) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this recipe?');">
                                     @csrf

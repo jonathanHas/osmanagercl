@@ -144,6 +144,11 @@ return [
         'email' => 'accounts@organicstore.ie',
         'vat' => '4390864GH',
         'organic_cert_image' => 'images/organic-cert.png',
+
+        // Organic certification details, used on Organic Trust registration forms.
+        'legal_name' => 'Mossfield Organic Store Ltd',
+        'organic_licence_no' => '1139',
+        'organic_responsible_person' => 'Jessika Roeske',
     ],
 
 ];

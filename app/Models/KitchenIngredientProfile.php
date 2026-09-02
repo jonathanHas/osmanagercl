@@ -19,6 +19,8 @@ class KitchenIngredientProfile extends Model
         'cost_per_base_unit',
         'base_unit',
         'density',
+        'organic_status',
+        'unit_weight_grams',
         'apply_delivery_markup',
         'delivery_markup_percent',
         'notes',
@@ -29,6 +31,7 @@ class KitchenIngredientProfile extends Model
         'cost_per_base_unit' => 'decimal:6',
         'manual_cost' => 'decimal:2',
         'density' => 'decimal:4',
+        'unit_weight_grams' => 'decimal:3',
         'apply_delivery_markup' => 'boolean',
         'delivery_markup_percent' => 'decimal:2',
     ];
@@ -61,6 +64,12 @@ class KitchenIngredientProfile extends Model
     ];
 
     /**
+     * Organic status as declared on the Organic Trust registration form.
+     * Defaults to organic - non-organic inputs (salt, baking powder, etc.) are marked by hand.
+     */
+    public const ORGANIC_STATUSES = ['organic', 'non_organic'];
+
+    /**
      * Unit type categories for validation and UI.
      */
     public const UNIT_CATEGORIES = [
@@ -91,6 +100,22 @@ class KitchenIngredientProfile extends Model
     public function hasDensity(): bool
     {
         return $this->density !== null && $this->density > 0;
+    }
+
+    /**
+     * Check if a per-unit weight is recorded, needed to weigh count-based ingredients ("2 eggs").
+     */
+    public function hasUnitWeight(): bool
+    {
+        return $this->unit_weight_grams !== null && $this->unit_weight_grams > 0;
+    }
+
+    /**
+     * Whether this ingredient is declared organic on registration forms.
+     */
+    public function isOrganic(): bool
+    {
+        return $this->organic_status !== 'non_organic';
     }
 
     /**

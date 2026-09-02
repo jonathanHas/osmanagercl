@@ -250,6 +250,43 @@
                             </div>
                         </div>
 
+
+                        <!-- Organic Registration (Organic Trust form) -->
+                        <div class="mb-6 border-t border-gray-200 pt-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Organic status
+                            </label>
+                            <p class="text-xs text-gray-500 mb-2">
+                                Printed on the Organic Trust Multi-Ingredient Product Registration Form. Most inputs
+                                are organic; mark exceptions such as salt or baking powder as non-organic.
+                            </p>
+                            <select name="organic_status" x-model="organicStatus"
+                                    class="w-56 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="organic">Organic</option>
+                                <option value="non_organic">Non-organic</option>
+                            </select>
+
+                            <div class="mt-4" x-show="showUnitWeightSection()" x-transition>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">
+                                    Weight per unit (optional)
+                                </label>
+                                <p class="text-xs text-gray-500 mb-2">
+                                    Counted ingredients have no weight of their own, so the registration form cannot
+                                    work out their share of the product without this.
+                                </p>
+                                <div class="flex items-center gap-3">
+                                    <input type="number" name="unit_weight_grams" x-model="unitWeightGrams"
+                                           step="0.001" min="0"
+                                           class="w-32 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                           placeholder="e.g., 60">
+                                    <span class="text-sm text-gray-600">g per unit</span>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-2">
+                                    Common: Egg ~60, Garlic clove ~5, Lemon ~100
+                                </p>
+                            </div>
+                        </div>
+
                         <!-- Notes -->
                         <div class="mb-6">
                             <label for="notes" class="block text-sm font-medium text-gray-700 mb-1">
@@ -317,6 +354,8 @@
                 purchaseQuantity: {{ old('purchase_quantity', $profile->purchase_quantity) }},
                 purchaseUnit: '{{ old('purchase_unit', $profile->purchase_unit) }}',
                 density: {{ old('density', $profile->density ?? 0) }},
+                organicStatus: '{{ old('organic_status', $profile->organic_status ?? 'organic') }}',
+                unitWeightGrams: '{{ old('unit_weight_grams', $profile->unit_weight_grams) }}',
                 applyDeliveryMarkup: {{ old('apply_delivery_markup', $profile->apply_delivery_markup) ? 'true' : 'false' }},
                 deliveryMarkupPercent: {{ old('delivery_markup_percent', $profile->delivery_markup_percent ?? 15) }},
                 notes: `{{ old('notes', $profile->notes ?? '') }}`,
@@ -432,6 +471,11 @@
                     } else {
                         return hasName && hasQuantity && parseFloat(this.manualCost) > 0;
                     }
+                },
+
+                showUnitWeightSection() {
+                    // Counted units are the only ones with no weight equivalent of their own.
+                    return ['unit', 'dozen', 'pack'].includes(this.purchaseUnit);
                 },
 
                 showDensitySection() {

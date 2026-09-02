@@ -480,6 +480,7 @@ Route::middleware('auth')->group(function () {
 
         // Recipe wildcard routes (must be last)
         Route::get('/{recipe}', [KitchenController::class, 'show'])->name('show');
+        Route::get('/{recipe}/organic-form', [KitchenController::class, 'organicRegistrationForm'])->name('organic-form');
         Route::get('/{recipe}/edit', [KitchenController::class, 'edit'])->name('edit');
         Route::put('/{recipe}', [KitchenController::class, 'update'])->name('update');
         Route::delete('/{recipe}', [KitchenController::class, 'destroy'])->name('destroy');
