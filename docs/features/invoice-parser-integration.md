@@ -812,6 +812,41 @@ Points that matter when this layout changes:
   email is `meadowandmossfarm@gmail.com` — `MOSSFARM`, not `MOSSFIELD` — so the two do not clash,
   but any future broadening of either token needs checking against the other.
 
+### Independent Invoice Parser
+
+`scripts/invoice-parser/parsers/independent.py` handles Independent Irish Health Foods — the
+highest-volume supplier in the archive. Invoices run to several pages of product lines followed by
+a VAT summary block on the last page:
+
+```
+Tax Code Rate Taxable Tax  DRS Totals        Gross Total: 2,241.03
+0   0.00  1,354.42  0.00   DRS 15c 15 2.25   Tax:           181.70
+1  23.00    652.44 150.09  DRS 25c  0 0.00
+2  13.50    234.17  31.61                    Total:       2,422.73
+```
+
+Points that matter when this layout changes:
+
+- **Independent round VAT per line**, so the stated Tax column does not equal
+  `round(net x rate, 2)` on the aggregate — `round(652.44 x 0.23, 2)` is 150.06 against the 150.09
+  printed. The parser therefore returns the stated figures as `VAT Amounts` / `Total_VAT` (see the
+  contract section below). Measured across the archive, 82 of 144 invoices differ from the
+  recomputed figure, always by 5c or less. All 144 reconcile exactly against the stated column.
+- **Never whitelist the rate.** One invoice (2025-07-23, IN439078) prints its standard row as
+  `22.50` while charging 23% (€37.90 on €164.75). The parser used to match only
+  `0.00|9.00|13.50|23.00` and dropped the row silently, reporting a €201.93 total against the
+  invoice's €404.58 at full confidence. Any unrecognised rate is now snapped onto the nearest
+  known rate using `tax / taxable`, with a `Parse_Warnings` entry so it lands in review.
+- The row scan is bounded to the summary block (from the `Tax Code ... Rate ... Taxable` header to
+  `VAT Reg No`). That is what makes it safe for the row regex to accept any rate: several hundred
+  product lines sit above the header and can never be mistaken for a summary row.
+- `Gross Total:` ends in `Total:`, so the grand total needs `(?<!Gross )\bTotal:` — a naive match
+  picks up the net figure instead.
+- Amounts use UK/US thousands separators (`1,354.42`); see the delivery-parser entry in
+  `docs/development/known-issues.md` for the separator-ambiguity bug this once caused.
+- The parser cross-checks its rows against all three printed totals (`Gross Total`, `Tax`,
+  `Total`) and warns on any mismatch, dropping confidence to 0.50.
+
 ### VAT-inclusive layouts: the `VAT Amounts` and `Total` contract
 
 `invoice_parser_laravel.py` normally derives VAT as `round(net × rate, 2)`. That is wrong for

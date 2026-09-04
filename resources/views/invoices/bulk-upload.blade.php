@@ -219,6 +219,34 @@
                     <input id="file-input" type="file" class="hidden" multiple 
                            accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.doc,.docx,.xls,.xlsx,.odt,.ods"
                            @change="handleFileSelect($event)">
+
+                    {{-- Folder mode: read the invoices straight out of a folder on this PC so the
+                         processed originals can be moved to Processed/ afterwards. --}}
+                    <template x-if="folderSupported">
+                        <div class="mt-4">
+                            <button type="button" @click="selectFolder()"
+                                    class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M3 7a2 2 0 012-2h4l2 2h6a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
+                                </svg>
+                                Select Folder
+                            </button>
+                            <p class="text-gray-500 text-xs mt-2 max-w-lg mx-auto">
+                                Picking a folder lets this page move the invoices it successfully creates into a
+                                <span class="font-mono text-gray-400">Processed</span> subfolder when you are done,
+                                so you don't have to shuffle them by hand.
+                            </p>
+                        </div>
+                    </template>
+
+                    <template x-if="!folderSupported">
+                        <p class="text-gray-500 text-xs mt-4 max-w-lg mx-auto">
+                            Automatic folder tidy-up isn't available in this browser. It needs Chrome or Edge with
+                            <span class="font-mono text-gray-400">{{ config('app.url') }}</span> added under
+                            <span class="font-mono text-gray-400">chrome://flags/#unsafely-treat-insecure-origin-as-secure</span>.
+                        </p>
+                    </template>
                 </div>
 
                 {{-- File List --}}
@@ -226,6 +254,9 @@
                     <div class="flex justify-between items-center mb-4">
                         <h4 class="text-gray-200 font-medium">
                             Selected Files (<span x-text="files.length"></span>/{{ $maxFiles }})
+                            <span x-show="folderName" class="block text-xs font-normal text-emerald-400 mt-1">
+                                from folder <span class="font-mono" x-text="folderName"></span>
+                            </span>
                         </h4>
                         <button @click="clearFiles()" 
                                 class="text-sm text-red-400 hover:text-red-300">
@@ -400,6 +431,8 @@
         @endif
     </div>
 
+    @include('invoices.partials.folder-sync-script')
+
     @push('scripts')
     <script>
         function bulkUpload() {
@@ -414,6 +447,11 @@
                 allowedExtensions: @json($allowedExtensions),
                 maxImageDimension: 2000,
                 imageQuality: 0.7,
+
+                // Folder mode (File System Access API, Chrome/Edge in a secure context only)
+                folderSupported: window.InvoiceFolderSync ? window.InvoiceFolderSync.isSupported() : false,
+                dirHandle: null,
+                folderName: '',
 
                 get hasFiles() {
                     return this.files.length > 0;
@@ -433,6 +471,48 @@
                     const selectedFiles = Array.from(event.target.files);
                     this.addFiles(selectedFiles);
                     event.target.value = ''; // Reset input
+                },
+
+                // Read the invoices out of a folder on this machine, keeping the directory
+                // handle so the preview page can move the processed originals afterwards.
+                async selectFolder() {
+                    this.errors = [];
+                    this.successMessage = '';
+
+                    try {
+                        const handle = await window.InvoiceFolderSync.pickFolder();
+                        if (!handle) {
+                            return; // user cancelled
+                        }
+
+                        const files = await window.InvoiceFolderSync.listFiles(handle, this.allowedExtensions);
+
+                        if (files.length === 0) {
+                            this.errors.push(`No ${this.allowedExtensions.join(', ').toUpperCase()} files found in "${handle.name}".`);
+                            return;
+                        }
+
+                        // A real invoice folder can hold more than one batch. Take what fits
+                        // rather than refusing the lot, and say what's left for the next pass.
+                        const room = this.maxFiles - this.files.length;
+                        const batch = files.slice(0, room);
+                        const remaining = files.length - batch.length;
+
+                        if (batch.length === 0) {
+                            this.errors.push(`You already have ${this.maxFiles} files selected. Upload those first.`);
+                            return;
+                        }
+
+                        this.dirHandle = handle;
+                        this.folderName = handle.name;
+                        this.addFiles(batch);
+
+                        if (remaining > 0) {
+                            this.successMessage = `Added ${batch.length} of ${files.length} files (${this.maxFiles} per batch). Select the folder again after uploading to do the remaining ${remaining}.`;
+                        }
+                    } catch (error) {
+                        this.errors.push('Could not read that folder: ' + error.message);
+                    }
                 },
 
                 compressImage(file, entryIndex) {
@@ -551,6 +631,8 @@
                 },
                 
                 clearFiles() {
+                    this.dirHandle = null;
+                    this.folderName = '';
                     this.files = [];
                     this.errors = [];
                     this.successMessage = '';
@@ -606,6 +688,20 @@
                                 fileObj.progress = 100;
                             });
                             
+                            // Remember the source folder against this batch so the preview page
+                            // can move the created invoices into Processed/ afterwards.
+                            if (this.dirHandle && data.batch_id) {
+                                try {
+                                    await window.InvoiceFolderSync.remember(
+                                        data.batch_id,
+                                        this.dirHandle,
+                                        this.files.map(f => f.name)
+                                    );
+                                } catch (error) {
+                                    console.warn('Could not remember source folder', error);
+                                }
+                            }
+
                             // Redirect to preview page after a short delay
                             if (data.redirect_url) {
                                 setTimeout(() => {

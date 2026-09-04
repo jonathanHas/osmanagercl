@@ -424,6 +424,55 @@ If the 0.0% row net + paperin adjustment = what the 0.0% row should show, or if 
 
 ## Invoice Parsing Issues
 
+### Independent Parser Dropped Unrecognised VAT Rates and Recomputed VAT
+**Status:** Fixed 2026-09-04
+
+#### Problem
+Two faults in `scripts/invoice-parser/parsers/independent.py`, both silent:
+
+1. **Totals a few cents short.** IN482326 imported as €2,422.70 against the invoice's €2,422.73.
+   Measured across the archive, 82 of 144 stored invoices were affected, always by 5c or less.
+2. **A whole VAT row discarded.** IN439078 (2025-07-23) imported as €201.93 against the invoice's
+   €404.58 — a €202.65 shortfall at confidence 0.85 with no warnings, so it would auto-create.
+
+#### Root Cause
+1. The parser read only the *Taxable* column of the VAT summary and discarded the *Tax* column.
+   With no `VAT Amounts` key in its return, `invoice_parser_laravel.py` fell back to computing VAT
+   as `round(net x rate, 2)` on the aggregate. Independent round VAT **per line**, so the two
+   differ: `round(652.44 x 0.23, 2)` is 150.06 where the invoice states 150.09.
+2. The row regex whitelisted the rate as `(0\.00|9\.00|13\.50|23\.00)`. IN439078 prints its
+   standard-rate row as `22.50` (an Independent typo — the stated €37.90 on €164.75 is 23%), so
+   the row matched nothing and was skipped without comment, taking its net and VAT with it.
+
+#### Solution
+- Capture the Tax column and return the invoice's own figures as `VAT Amounts` / `Total_VAT` /
+  `Total`, which the dispatcher already honours. `InvoiceCreationService` stores
+  `total_amount = subtotal + vat_amount` from `vat_breakdown[*]['vat']`, so this is what makes the
+  stored invoice tie to the paper one.
+- Drop the rate whitelist. Bound the row scan to the summary block instead (from the
+  `Tax Code ... Rate ... Taxable` header to `VAT Reg No`), which is what keeps several hundred
+  product lines from being mistaken for summary rows. An unrecognised rate is snapped onto the
+  nearest known one using `tax / taxable` and raises a `Parse_Warnings` entry, so the money is
+  kept and a human sees it.
+- Cross-check the rows against all three printed totals; any mismatch warns and drops confidence
+  to 0.50, routing the file to review.
+
+#### How to Detect
+Compare an invoice's stored `total_amount` against the `Total:` printed in its PDF summary block.
+More generally, a parser that returns net amounts but no `VAT Amounts` will be a few cents out
+whenever the supplier rounds VAT per line.
+
+#### Files Modified
+- `scripts/invoice-parser/parsers/independent.py`
+- `scripts/invoice-parser/tests/test_independent.py` and `tests/fixtures/independent/` (new)
+
+#### Note
+No back-catalogue reparse was run: 618 of the 628 stored Independent invoices sit inside finalized
+VAT returns, which `invoice:reparse` refuses by design.
+
+---
+
+
 ### Bulk Upload Batch Stuck at "Processing" Forever
 **Status:** Fixed (2026-08-31)
 

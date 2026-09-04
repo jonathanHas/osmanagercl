@@ -137,6 +137,8 @@ Tracks individual files within a batch:
 2. **Select Files**
    - Drag and drop multiple files onto the upload zone
    - Or click "Browse Files" to select using file dialog
+   - Or click "Select Folder" to read straight from a folder on your PC — see
+     [Source Folder Sync](#source-folder-sync) below
    - Files are validated immediately
 
 3. **Review Selection**
@@ -206,10 +208,66 @@ Configuration is stored in `config/invoices.php`:
 ## File Storage
 
 Files are temporarily stored in:
-- **Location**: `storage/app/temp/invoices/{batch_id}/`
+- **Location**: `storage/app/private/temp/invoices/{batch_id}/`
 - **Naming**: UUID-based filenames to prevent conflicts
-- **Cleanup**: Automatic cleanup after 24 hours (configurable)
+- **Cleanup**: **None today.** `config/invoices.php` declares
+  `bulk_upload.temp_file_lifetime` (24 hours) but nothing in the codebase reads that
+  key — there is no scheduled task, artisan command or job that prunes this directory.
+  Temp files are only removed when a batch is cancelled or an individual file is
+  deleted from the preview page. Creating an invoice **copies** the file to
+  `invoices/{year}/{month}/{invoice_id}/` and leaves the temp original in place, so
+  this directory grows without bound.
 - **Security**: Private disk, not web-accessible
+
+## Source Folder Sync
+
+Invoices usually arrive as a pile of PDFs in a folder on the user's own PC (scans,
+supplier email downloads). Before this feature the user had to move those originals
+out by hand after processing, or risk uploading the same invoices again next time.
+
+That folder is **not reachable from the server** — there is no mount or share — so a
+watch folder or an artisan command cannot solve it. The only thing that can move a
+file there is the browser, via the File System Access API.
+
+### How it works
+
+1. On `/invoices/bulk-upload`, **Select Folder** calls `showDirectoryPicker()` and reads
+   the top-level files whose extension is allowed (the `Processed` subfolder is skipped).
+   The resulting `File` objects go through the same `addFiles()` validation as
+   drag-and-drop, so size limits, dedupe and image compression are unchanged.
+2. On successful upload, the `FileSystemDirectoryHandle` is stored in **IndexedDB**
+   (database `invoice-folder-sync`, store `handles`) keyed by batch id, alongside the
+   list of uploaded filenames. A handle cannot go in `localStorage`; IndexedDB is what
+   lets it survive the navigation to the preview page. Entries are pruned after 7 days.
+3. On the preview page, if a handle is remembered for this batch, a **Move to Processed
+   folder** panel appears. It polls the existing `/status/{batchId}` endpoint and offers
+   to move only the files whose status is `completed` or `split_processed`.
+4. Clicking the button (a user gesture is *required* — `requestPermission()` is rejected
+   without one) moves those files into `Processed/YYYY-MM/` inside the same folder.
+   Name collisions become `invoice (2).pdf`. Files in `review`, `parsed`, `failed` or
+   `amazon_pending` are deliberately left in the inbox.
+
+The implementation lives in `resources/views/invoices/partials/folder-sync-script.blade.php`
+(`window.InvoiceFolderSync`), included by both bulk-upload views. **No server-side code is
+involved** — no controller, model, migration or config changes.
+
+### Browser requirements
+
+| Requirement | Detail |
+|---|---|
+| Browser | Chrome or Edge desktop. Firefox and Safari do not implement the API. |
+| Context | Must be a **secure context** (HTTPS or localhost). |
+
+This app is served over plain HTTP (`http://osmanager.local`, HTTP-only Apache vhost),
+so **the folder picker will not appear until the origin is allowlisted**:
+
+1. Open `chrome://flags/#unsafely-treat-insecure-origin-as-secure`
+2. Set it to **Enabled** and add `http://osmanager.local`
+3. Restart the browser
+
+This is a one-time setting per PC. Where it isn't done — or in an unsupported browser —
+the upload page detects it, hides the folder button, and shows these instructions inline.
+Drag-and-drop continues to work exactly as before; the folder feature is purely additive.
 
 ## Security Considerations
 
@@ -220,7 +278,7 @@ Files are temporarily stored in:
    - File size limits
 3. **User Isolation**: Users can only access their own batches
 4. **Hash Verification**: SHA256 hashing for integrity
-5. **Temporary Storage**: Files cleaned up automatically
+5. **Temporary Storage**: Private disk, not web-accessible (note: not auto-pruned — see [File Storage](#file-storage))
 6. **SQL Injection Prevention**: Parameterized queries throughout
 
 ## Error Handling

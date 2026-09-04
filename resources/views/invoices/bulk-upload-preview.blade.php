@@ -1172,6 +1172,24 @@
                 </p>
             </div>
             @endif
+
+            {{-- Source folder tidy-up. Only revealed by JS once the browser confirms it still
+                 holds the handle for the folder this batch was uploaded from. --}}
+            <div id="folderSyncPanel" class="hidden mt-4 p-4 bg-emerald-900/30 border border-emerald-700 rounded">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                        <p class="text-emerald-300 font-medium">
+                            Uploaded from <span class="font-mono" id="folderSyncName"></span>
+                        </p>
+                        <p class="text-emerald-400/70 text-sm mt-1" id="folderSyncHint"></p>
+                    </div>
+                    <button id="folderSyncButton" onclick="moveProcessedToFolder()"
+                            class="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm py-2 px-4 rounded whitespace-nowrap">
+                        Move to Processed folder
+                    </button>
+                </div>
+                <p id="folderSyncResult" class="hidden text-sm mt-3"></p>
+            </div>
         </div>
         
         {{-- Parsed Data Modal --}}
@@ -1374,6 +1392,8 @@
             </div>
         </div>
     </div>
+
+    @include('invoices.partials.folder-sync-script')
 
     @push('scripts')
     <script>
@@ -2528,6 +2548,150 @@
                 saveBtn.disabled = false;
                 saveBtn.textContent = 'Apply Fix';
             });
+        }
+
+        // ------------------------------------------------------------------
+        // Source folder tidy-up
+        //
+        // When this batch was uploaded via "Select Folder", the browser kept a
+        // handle to that folder in IndexedDB. Once invoices have been created we
+        // can move the originals into Processed/YYYY-MM so the inbox folder empties
+        // itself. Files still in review, failed or awaiting payment stay put.
+        // ------------------------------------------------------------------
+        const FOLDER_DONE_STATUSES = ['completed', 'split_processed'];
+        let folderSyncState = { dirHandle: null, filenames: [], folderName: '' };
+
+        async function initFolderSync() {
+            if (!window.InvoiceFolderSync || !window.InvoiceFolderSync.isSupported()) {
+                return;
+            }
+
+            const remembered = await window.InvoiceFolderSync.recall(batchId);
+            if (!remembered || !remembered.dirHandle) {
+                return;
+            }
+
+            folderSyncState.dirHandle = remembered.dirHandle;
+            folderSyncState.folderName = remembered.folderName || remembered.dirHandle.name;
+            folderSyncState.filenames = remembered.filenames || [];
+
+            document.getElementById('folderSyncName').textContent = folderSyncState.folderName;
+            document.getElementById('folderSyncPanel').classList.remove('hidden');
+
+            await refreshFolderSyncPanel();
+        }
+
+        // Filenames this batch turned into invoices that are still sitting in the folder.
+        async function pendingFolderMoves() {
+            if (folderSyncState.filenames.length === 0) {
+                return [];
+            }
+
+            const response = await fetch(`/invoices/bulk-upload/status/${batchId}`, {
+                headers: { 'Accept': 'application/json' },
+            });
+
+            if (!response.ok) {
+                return [];
+            }
+
+            const data = await response.json();
+            const done = new Set(
+                (data.files || [])
+                    .filter(file => FOLDER_DONE_STATUSES.includes(file.status))
+                    .map(file => file.filename)
+            );
+
+            return folderSyncState.filenames.filter(name => done.has(name));
+        }
+
+        async function refreshFolderSyncPanel() {
+            const hint = document.getElementById('folderSyncHint');
+            const button = document.getElementById('folderSyncButton');
+            if (!hint || !button) {
+                return;
+            }
+
+            const pending = await pendingFolderMoves();
+
+            if (pending.length === 0) {
+                hint.textContent = 'Nothing to move yet. Files move once their invoices have been created.';
+                button.disabled = true;
+                button.textContent = 'Move to Processed folder';
+                return;
+            }
+
+            hint.textContent = pending.length === folderSyncState.filenames.length
+                ? 'All uploaded files are ready to be filed away.'
+                : `${folderSyncState.filenames.length - pending.length} file(s) still need attention and will be left in the folder.`;
+            button.disabled = false;
+            button.textContent = `Move ${pending.length} file(s) to Processed folder`;
+        }
+
+        function showFolderSyncResult(message, tone) {
+            const result = document.getElementById('folderSyncResult');
+            result.textContent = message;
+            result.className = 'text-sm mt-3 ' + (tone === 'error' ? 'text-red-400' : 'text-emerald-300');
+        }
+
+        async function moveProcessedToFolder() {
+            const button = document.getElementById('folderSyncButton');
+            button.disabled = true;
+
+            try {
+                // requestPermission() only works inside a user gesture, hence the button.
+                const granted = await window.InvoiceFolderSync.ensurePermission(folderSyncState.dirHandle);
+                if (!granted) {
+                    showFolderSyncResult('Permission to write to that folder was denied, so nothing was moved.', 'error');
+                    return;
+                }
+
+                const names = await pendingFolderMoves();
+                if (names.length === 0) {
+                    showFolderSyncResult('No files are ready to move yet.', 'error');
+                    return;
+                }
+
+                const outcome = await window.InvoiceFolderSync.moveToProcessed(folderSyncState.dirHandle, names);
+
+                let message = `Moved ${outcome.moved.length} file(s) to ${outcome.destination}.`;
+                if (outcome.skipped.length > 0) {
+                    message += ` ${outcome.skipped.length} were already gone.`;
+                }
+                if (outcome.failed.length > 0) {
+                    message += ' Could not move: ' + outcome.failed.map(f => `${f.name} (${f.reason})`).join(', ');
+                }
+                showFolderSyncResult(message, outcome.failed.length > 0 ? 'error' : 'ok');
+
+                // Keep tracking only what is still in the folder.
+                const attempted = new Set(names);
+                const failed = new Set(outcome.failed.map(f => f.name));
+                folderSyncState.filenames = folderSyncState.filenames
+                    .filter(name => !attempted.has(name) || failed.has(name));
+
+                if (folderSyncState.filenames.length === 0) {
+                    await window.InvoiceFolderSync.forget(batchId);
+                    document.getElementById('folderSyncHint').textContent = 'This folder is now clear.';
+                    button.classList.add('hidden');
+                    return;
+                }
+
+                await window.InvoiceFolderSync.remember(
+                    batchId,
+                    folderSyncState.dirHandle,
+                    folderSyncState.filenames
+                );
+            } catch (error) {
+                showFolderSyncResult('Could not move the files: ' + error.message, 'error');
+            } finally {
+                await refreshFolderSyncPanel();
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initFolderSync);
+        } else {
+            initFolderSync();
         }
     </script>
     @endpush
