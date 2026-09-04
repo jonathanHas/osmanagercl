@@ -1,0 +1,22 @@
+INVOICE InvoiceDate BeechlawnOrganicFarmLtd
+20Apr2026
+Ballinasloe,CoGalway.
+InvoiceNumber H53K753
+BirrOrganicStore INV-30024
+www.beechlawnorganicfarm.i
+Attention:JonathanHaslam BeechlawnOrganicFa e
+MainStreet 3388928JH
+T:0909646713/0861799007
+BIRROFFALYR42TY29
+IRELAND
+Description Quantity UnitPrice Tax AmountEUR
+KALE,GREEN(1kg) 2.00 6.00 ZeroRated 12.00
+SALADLEAF(1kg) 1.00 20.00 ZeroRated 20.00
+Subtotal 32.00
+TOTALEUR 32.00
+DueDate:20May2026
+BankofIreland,MainStreet,Ballinasloe,Co,Galway.
+BIC:BOFIIE2DIBAN:IE00XXXX00000000000000
+ALLPRODUCESUPPLIEDBYBEECHLAWNORGANICFARMISCERTIFIEDORGANIC-IE-ORG-02-4556
+GAEILGEAGUSFÁILTE!
+CompanyRegistrationNo: 569781. RegisteredOffice:BeechlawnOrganicFarmLtd,Beechlawn,Ballinasloe,Co.Galway,H53K753,Ireland.

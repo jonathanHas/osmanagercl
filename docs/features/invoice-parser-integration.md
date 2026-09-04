@@ -709,6 +709,109 @@ Points that matter when this layout changes again:
   and, on a mismatch, assigns the difference to 0% and emits a `Parse_Warnings` entry, which drops
   confidence to 0.50 so the file lands in review rather than importing silently.
 
+### Beechlawn Invoice Parser
+
+`scripts/invoice-parser/parsers/beechlawn.py` handles **two layouts**, because Beechlawn changed
+Xero invoice template between 2026-07-27 and 2026-08-31. Both remain in the archive, so the parser
+dispatches on the text: a `TOTAL EUR` line means the legacy layout, otherwise the current one.
+
+| | Legacy (to 2026-07-27) | Current (from 2026-08-31) |
+|---|---|---|
+| pdfplumber spacing | intra-word spaces **stripped** (`InvoiceDate`, `TOTALEUR`) | spaces **preserved** |
+| Date | `InvoiceDate` label with `27Jul2026` on the next line | `Issue date` column, `31 Aug 2026` |
+| Invoice number | `InvoiceNumber` + `INV-31546` | `Invoice number` + `INV-32108` |
+| Columns | `Description Quantity UnitPrice Tax AmountEUR` | `Description Quantity Price Amount` — **no Tax column** |
+| Tax label | literal `ZeroRated` per line | absent |
+| Totals | `Subtotal` / `TOTAL EUR` | `Subtotal` / `Total` / `Amount due` |
+| Quantity | always 2dp (`8.00`) | bare or 1dp (`8`, `2.7`) |
+
+Points that matter when this layout changes again:
+
+- Beechlawn supplies certified organic produce only, so every line on every archived invoice is
+  zero-rated and both layouts price their lines **net**. The whole invoice lands in the 0% bucket
+  and the parser returns an all-zero `VAT Amounts` with `Total_VAT: 0.0`, which makes the
+  dispatcher use the invoice's own printed total verbatim.
+- If a VAT-bearing line ever appears, `Subtotal` and `Total` diverge. The parser cannot tell from
+  the template alone whether Xero printed the line amounts net or gross, so it emits a
+  `Parse_Warnings` entry instead of guessing; confidence drops to 0.50 and the file lands in
+  review. Resolve that by looking at a real example before changing the arithmetic.
+- The current layout prints the **due** date as `20 Sept 2026`. `datetime`'s `%b` only accepts the
+  three-letter form, so the parser uses its own month map keyed on the first three letters. The
+  issue date is selected as the last date preceding the `INV-`/`CN-` reference, with the earliest
+  date in the document as a fallback.
+- The line regex anchors on the trailing pair of 2dp numbers rather than the first number it
+  meets, which is what lets descriptions carrying their own digits parse — `KALE, CURLY (1kg) -
+  B146`, `SALAD LEAF (1 kg) - B204`, `Prepacked Red Beetroot Bunch 650g`.
+
+### Bean2Cup Invoice Parser
+
+`scripts/invoice-parser/parsers/bean2cup.py` handles bean2cup tech support limited — coffee
+machine parts and servicing. One layout, unchanged across the whole archive (2025-09-18 to
+2026-09-01), and unrelated to the Xero templates the produce suppliers use.
+
+Parts are charged at 23% and call-out/labour at 13.5%, so most invoices span two rates.
+
+| | |
+|---|---|
+| Date | `Invoice Date 14/07/2026`, already `DD/MM/YYYY`. `Due Date` is printed adjacent to it and is usually identical — take the labelled invoice date, not whichever comes first. |
+| Invoice number | `Invoice Number INV-14869` |
+| Line columns | `Code Description Qty/Hrs Price/Rate [Discount] VAT % Net` — the **Discount column only appears when a line carries one** |
+| VAT summary | `Standard 23.00% (23.00%) € 206.70 € 47.54`, one row per rate, giving net and VAT directly |
+| Totals | `Total Net` / `Total VAT` / `TOTAL €` |
+
+Points that matter when this layout changes:
+
+- **The VAT summary table is the source of truth**, not the line items. It states net and VAT per
+  rate, so the parser returns them as `VAT Amounts` rather than recomputing. Line items are only a
+  fallback, and using them raises a `Parse_Warnings` entry so the file lands in review.
+- The right-hand totals block is interleaved onto the same extracted lines as the summary rows
+  (`... € 206.70 € 47.54 Total VAT 47.54`), and `TOTAL € 623.00` sometimes shares a line with the
+  Standard row and sometimes does not. Match the summary *row*, not the whole line.
+- `TOTAL` is distinguished from `Total Net` and `Total VAT` only by the `€` that follows it.
+- Amounts carry thousands separators once they pass €1,000 (`€ 1,076.00`).
+- The Code column wraps over several lines (`CAFETTO` / `MFC` / `GREEN` / `MILK` / ...), so the
+  item table has many continuation lines that carry no figures. The fallback bounds its scan
+  between the `Code Description` header row and the `VAT Rate` row.
+- A fully discounted line nets to `0.00` and must not reach any bucket — INV-14996 prices a call
+  out at 90.00 with a 90.00 discount.
+- The parser cross-checks its own figures against all three printed totals and warns on any
+  mismatch, which drops confidence to 0.50 and routes the file to review.
+
+### Meadow & Moss Invoice Parser
+
+`scripts/invoice-parser/parsers/meadow_moss.py` handles Meadow & Moss — cut flower bouquets
+delivered weekly. One layout, unchanged since 2026-07-23.
+
+| | |
+|---|---|
+| Date | `Invoice Date: 31/08/2026`, sharing an extracted line with `Payment Due:` |
+| Invoice number | `Invoice No: 005` — a bare sequence number, not an `INV-` reference, sharing a line with `Payment Terms:` |
+| Line columns | `Item Delivery Date Qty Unit Price Line Total` |
+| Amounts | euro-signed with the minus ahead of the sign: `€9.16`, `-€35.24` |
+| Totals | `Subtotal` / `Tax` / `Total`, interleaved onto the payment-details lines |
+
+Points that matter when this layout changes:
+
+- **The supplier is not VAT registered.** No VAT number appears on the invoice, the `Tax` row is
+  printed with no amount at all, and `Subtotal` equals `Total`. The parser therefore returns
+  `Tax Free: True` with the whole amount in the 0% bucket, following the convention stated for the
+  AI parser in `InvoiceGeminiParsingService` ("if no VAT is charged at all, set `is_tax_free` to
+  true and put the full amount under `vat_0`") and matching `coolnagrower.py`. If a `Tax` amount
+  ever appears, or Subtotal diverges from Total, the parser warns instead of guessing a rate.
+- **Negative lines are not credit notes.** Returned bouquets appear as `Credit Lrg Bouq ... -1
+  €17.62 -€17.62` inside an otherwise ordinary invoice, so `Credit Note` keys off a negative
+  invoice *total*, never off the word "Credit" appearing in a line description.
+- The totals block is interleaved with the payment details (`Payment Methods  Subtotal €360.80`,
+  `IBAN ...  Total €360.80`), so the total regexes match the label wherever it falls rather than
+  anchoring to the start of a line. `\bTotal` is what keeps `Total` from matching inside
+  `Subtotal`, and the header's `Line Total` carries no amount so it cannot match either.
+- Delivery dates are inconsistently zero-padded (`6 August 2026` against `02 July 2026`). The line
+  regex anchors on the trailing pair of euro amounts and absorbs the date into the description, so
+  the formatting does not matter.
+- **Name collision:** the `MOSSFIELD` branch sits earlier in `detect_supplier`. Meadow & Moss's
+  email is `meadowandmossfarm@gmail.com` — `MOSSFARM`, not `MOSSFIELD` — so the two do not clash,
+  but any future broadening of either token needs checking against the other.
+
 ### VAT-inclusive layouts: the `VAT Amounts` and `Total` contract
 
 `invoice_parser_laravel.py` normally derives VAT as `round(net × rate, 2)`. That is wrong for

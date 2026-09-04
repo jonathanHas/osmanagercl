@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CustomerInvoiceRequest;
 use App\Models\CustomerInvoice;
 use App\Services\CustomerInvoiceService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -42,9 +43,9 @@ class CustomerInvoiceController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(CustomerInvoiceRequest $request)
     {
-        $data = $this->validateInvoice($request);
+        $data = $request->invoicePayload();
         $invoice = $this->service->createDraft($data['invoice'], $data['items']);
 
         if ($request->boolean('issue')) {
@@ -78,14 +79,14 @@ class CustomerInvoiceController extends Controller
         ]);
     }
 
-    public function update(Request $request, CustomerInvoice $customerInvoice)
+    public function update(CustomerInvoiceRequest $request, CustomerInvoice $customerInvoice)
     {
         $user = $request->user();
         $isAdminEdit = ! $customerInvoice->isEditable() && $customerInvoice->isAdminEditable() && $user->isAdmin();
 
         abort_unless($customerInvoice->isEditable() || $isAdminEdit, 403, 'This invoice cannot be edited.');
 
-        $data = $this->validateInvoice($request);
+        $data = $request->invoicePayload();
 
         $customerInvoice->update($data['invoice']);
         $this->service->syncItems($customerInvoice, $data['items'], force: $isAdminEdit);
@@ -150,32 +151,5 @@ class CustomerInvoiceController extends Controller
         $customerInvoice->delete();
 
         return redirect()->route('customer-invoices.index')->with('status', 'Draft deleted.');
-    }
-
-    private function validateInvoice(Request $request): array
-    {
-        $validated = $request->validate([
-            'customer_id' => ['nullable', 'exists:App\Models\Customer,id'],
-            'customer_name' => ['required', 'string', 'max:255'],
-            'customer_address' => ['nullable', 'string', 'max:1000'],
-            'customer_vat_number' => ['nullable', 'string', 'max:64'],
-            'customer_email' => ['nullable', 'email', 'max:255'],
-            'issue_date' => ['required', 'date'],
-            'due_date' => ['nullable', 'date', 'after_or_equal:issue_date'],
-            'discount_percent' => ['nullable', 'numeric', 'gte:0', 'lte:100'],
-            'notes' => ['nullable', 'string', 'max:5000'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.pos_product_id' => ['nullable', 'string', 'max:64'],
-            'items.*.pos_product_code' => ['nullable', 'string', 'max:64'],
-            'items.*.description' => ['required', 'string', 'max:255'],
-            'items.*.quantity' => ['required', 'numeric', 'gt:0'],
-            'items.*.unit_price' => ['required', 'numeric', 'gte:0'],
-            'items.*.vat_rate' => ['required', 'numeric', 'gte:0', 'lte:1'],
-        ]);
-
-        $invoiceData = collect($validated)->except('items')->all();
-        $items = collect($validated['items'])->values()->all();
-
-        return ['invoice' => $invoiceData, 'items' => $items];
     }
 }

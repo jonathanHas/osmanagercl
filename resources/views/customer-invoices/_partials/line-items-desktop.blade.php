@@ -28,23 +28,23 @@
                 <div></div>
             </div>
             <template x-for="(item, idx) in items" :key="`d-${idx}`">
-                <div class="line-row">
+                <div class="line-row" :class="{ 'line-invalid': serverItemErrors.has(idx) || clientItemErrors.has(idx) }">
                     <div class="line-desc">
-                        <input type="text" class="line-name-input" x-model="item.description">
+                        <input type="text" class="line-name-input" :data-item-idx="idx" data-field="description" x-model="item.description">
                         <div class="line-sku" x-show="item.pos_product_code" x-cloak>SKU · <span x-text="item.pos_product_code"></span></div>
                     </div>
                     <div class="num">
                         <div class="qty-stepper">
                             <button type="button" @click="item.quantity = Math.max(0, (parseFloat(item.quantity) || 0) - 1)">−</button>
-                            <input type="number" step="0.001" min="0" inputmode="decimal" x-model.number="item.quantity">
+                            <input type="number" step="0.001" min="0" inputmode="decimal" :data-item-idx="idx" data-field="quantity" x-model.number="item.quantity">
                             <button type="button" @click="item.quantity = (parseFloat(item.quantity) || 0) + 1">+</button>
                         </div>
                     </div>
                     <div class="num">
-                        <input type="number" step="0.01" min="0" inputmode="decimal" class="num-input mono" x-model.number="item.unit_price">
+                        <input type="number" step="0.01" min="0" inputmode="decimal" class="num-input mono" :data-item-idx="idx" data-field="unit_price" x-model.number="item.unit_price">
                     </div>
                     <div class="num">
-                        <select class="vat-select" x-model.number="item.vat_rate">
+                        <select class="vat-select" :data-item-idx="idx" data-field="vat_rate" x-model.number="item.vat_rate">
                             <option value="0">0.0%</option>
                             <option value="0.09">9.0%</option>
                             <option value="0.135">13.5%</option>

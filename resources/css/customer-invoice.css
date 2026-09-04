@@ -584,6 +584,18 @@
     font-size: 13px;
 }
 .invoice-composer .errors ul { margin: 0; padding-left: 20px; }
+.invoice-composer .errors strong { display: block; margin-bottom: 6px; }
+
+/* Client-side guard: each entry jumps to the offending field. */
+.invoice-composer .client-errors .client-error-item { cursor: pointer; }
+.invoice-composer .client-errors .client-error-item:hover { text-decoration: underline; }
+
+/* Rejected line items, desktop and mobile. */
+.invoice-composer .line-row.line-invalid,
+.invoice-composer .m-line.line-invalid {
+    background: oklch(0.72 0.15 25 / 0.08);
+    box-shadow: inset 2px 0 0 var(--danger);
+}
 
 /* Scan toast */
 .invoice-composer .scan-toast {

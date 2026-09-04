@@ -13,23 +13,70 @@
         $invoiceNumber = $isEdit && $invoice->invoice_number ? $invoice->invoice_number : 'INV-'.now()->year.'-DRAFT';
         $isDraft = ! $isEdit || $invoice->isEditable();
         $adminEdit = $adminEdit ?? false;
+
+        // A failed save must never cost the user their invoice. Laravel flashes the
+        // input on a validation bounce; this view previously ignored it and re-seeded
+        // the composer from the model (or from nothing, on create), which is why the
+        // page came back blank. Old input wins wholesale when present.
+        //
+        // Deliberately all-or-nothing rather than per-field old('x', $invoice->x):
+        // on an edit bounce, per-field fallback would silently restore DB values for
+        // any field the user had deliberately cleared.
+        $hasOld = session()->hasOldInput();
+
+        // Keep non-numeric values raw so the user sees exactly what they typed (e.g.
+        // the 0 quantity that failed gt:0); cast when numeric so x-model.number and
+        // the VAT <select> bind correctly.
+        $num = fn ($v) => is_numeric($v) ? (float) $v : ($v ?? '');
+
+        // Items come back from items_json, not old('items'): the FormRequest merges
+        // the decoded array into its *own* instance, but Laravel flashes the original
+        // request's input, so old('items') is empty. items_json is flashed verbatim.
+        $oldItems = $hasOld
+            ? (json_decode((string) old('items_json', ''), true) ?: old('items', []))
+            : [];
+
+        $seedItems = $hasOld
+            ? collect($oldItems)->map(fn ($i) => [
+                'pos_product_id' => ($i['pos_product_id'] ?? '') ?: null,
+                'pos_product_code' => ($i['pos_product_code'] ?? '') ?: null,
+                'description' => $i['description'] ?? '',
+                'quantity' => $num($i['quantity'] ?? null),
+                'unit_price' => $num($i['unit_price'] ?? null),
+                'vat_rate' => $num($i['vat_rate'] ?? null),
+            ])->values()
+            : $existingItems;
+
+        $seedInvoice = $hasOld ? [
+            'customer_id' => old('customer_id') ?: null,
+            'customer_name' => old('customer_name', ''),
+            'customer_address' => old('customer_address', ''),
+            'customer_vat_number' => old('customer_vat_number', ''),
+            'customer_email' => old('customer_email', ''),
+            'issue_date' => old('issue_date', ''),
+            'due_date' => old('due_date', ''),
+            'discount_percent' => $num(old('discount_percent', 0)),
+            'notes' => old('notes', ''),
+        ] : ($isEdit ? [
+            'customer_id' => $invoice->customer_id,
+            'customer_name' => $invoice->customer_name,
+            'customer_address' => $invoice->customer_address,
+            'customer_vat_number' => $invoice->customer_vat_number,
+            'customer_email' => $invoice->customer_email,
+            'issue_date' => optional($invoice->issue_date)->toDateString(),
+            'due_date' => optional($invoice->due_date)?->toDateString(),
+            'discount_percent' => (float) $invoice->discount_percent,
+            'notes' => $invoice->notes,
+        ] : null);
     @endphp
 
     <div class="invoice-composer"
          x-data="customerInvoiceForm({{ \Illuminate\Support\Js::from([
              'isEdit' => $isEdit,
-             'invoice' => $isEdit ? [
-                 'customer_id' => $invoice->customer_id,
-                 'customer_name' => $invoice->customer_name,
-                 'customer_address' => $invoice->customer_address,
-                 'customer_vat_number' => $invoice->customer_vat_number,
-                 'customer_email' => $invoice->customer_email,
-                 'issue_date' => optional($invoice->issue_date)->toDateString(),
-                 'due_date' => optional($invoice->due_date)?->toDateString(),
-                 'discount_percent' => (float) $invoice->discount_percent,
-                 'notes' => $invoice->notes,
-             ] : null,
-             'items' => $existingItems,
+             'invoice' => $seedInvoice,
+             'items' => $seedItems,
+             'errorKeys' => array_keys($errors->messages()),
+             'limits' => ['maxItems' => 500],
              'urls' => [
                  'tillCategories' => route('customer-invoices.api.till.categories'),
                  'tillProducts' => route('customer-invoices.api.till.products'),
@@ -62,6 +109,7 @@
 
         @if ($errors->any())
             <div class="errors">
+                <strong>This invoice wasn't saved &mdash; your work has been kept below.</strong>
                 <ul>
                     @foreach ($errors->all() as $err)
                         <li>{{ $err }}</li>
@@ -69,6 +117,16 @@
                 </ul>
             </div>
         @endif
+
+        {{-- Client-side guard results: caught before submitting, so nothing is lost. --}}
+        <div class="errors client-errors" x-show="clientErrors.length" x-cloak>
+            <strong>Please fix these before saving:</strong>
+            <ul>
+                <template x-for="(e, i) in clientErrors" :key="i">
+                    <li class="client-error-item" @click="focusError(e)" x-text="e.message"></li>
+                </template>
+            </ul>
+        </div>
 
         @if ($adminEdit)
             <div class="errors" style="background: oklch(0.78 0.13 80 / 0.12); border-color: oklch(0.78 0.13 80 / 0.4); color: #f7c777;">
@@ -95,16 +153,14 @@
             <input type="hidden" name="notes" :value="invoice.notes">
             <input type="hidden" name="issue" :value="submitMode">
 
-            <template x-for="(item, idx) in items" :key="idx">
-                <div style="display:none">
-                    <input type="hidden" :name="`items[${idx}][pos_product_id]`" :value="item.pos_product_id ?? ''">
-                    <input type="hidden" :name="`items[${idx}][pos_product_code]`" :value="item.pos_product_code ?? ''">
-                    <input type="hidden" :name="`items[${idx}][description]`" :value="item.description">
-                    <input type="hidden" :name="`items[${idx}][quantity]`" :value="item.quantity">
-                    <input type="hidden" :name="`items[${idx}][unit_price]`" :value="item.unit_price">
-                    <input type="hidden" :name="`items[${idx}][vat_rate]`" :value="item.vat_rate">
-                </div>
-            </template>
+            {{-- Line items travel as one JSON field, not 6 inputs per line.
+                 The old per-item inputs hit PHP's max_input_vars ceiling (1000) at
+                 roughly 165 lines and PHP truncates *silently* — the tail never
+                 arrived, validation failed on a half-delivered item, and the user
+                 got a blank page. items_count lets the server detect any remaining
+                 truncation and say so instead of failing mysteriously. --}}
+            <input type="hidden" name="items_json" :value="serializedItems()">
+            <input type="hidden" name="items_count" :value="items.length">
 
             {{-- =========================== DESKTOP =========================== --}}
             <div class="desktop-only invoice-desktop">
@@ -180,9 +236,9 @@
                             </div>
                         </template>
                         <template x-for="(item, idx) in items" :key="`m-${idx}`">
-                            <div class="m-line">
+                            <div class="m-line" :class="{ 'line-invalid': serverItemErrors.has(idx) || clientItemErrors.has(idx) }">
                                 <div class="m-line-top">
-                                    <input type="text" class="m-line-name" x-model="item.description">
+                                    <input type="text" class="m-line-name" :data-item-idx="idx" data-field="description" x-model="item.description">
                                     <div class="m-line-gross mono">
                                         <template x-if="isAdHoc(item)">
                                             <span class="m-gross-edit">€<input type="number" step="0.01" min="0" inputmode="decimal"
@@ -199,12 +255,12 @@
                                 <div class="m-line-bot">
                                     <div class="m-stepper">
                                         <button type="button" @click="item.quantity = Math.max(0, (parseFloat(item.quantity) || 0) - 1)">−</button>
-                                        <input type="number" step="0.001" min="0" inputmode="decimal" x-model.number="item.quantity">
+                                        <input type="number" step="0.001" min="0" inputmode="decimal" :data-item-idx="idx" data-field="quantity" x-model.number="item.quantity">
                                         <button type="button" @click="item.quantity = (parseFloat(item.quantity) || 0) + 1">+</button>
                                     </div>
                                     <div class="m-line-meta">
                                         <span class="mono">€<span x-text="(parseFloat(item.unit_price) || 0).toFixed(2)"></span></span>
-                                        <select x-model.number="item.vat_rate">
+                                        <select :data-item-idx="idx" data-field="vat_rate" x-model.number="item.vat_rate">
                                             <option value="0">0%</option>
                                             <option value="0.09">9%</option>
                                             <option value="0.135">13.5%</option>
@@ -239,7 +295,7 @@
                         </div>
                         <div class="m-field">
                             <label>Customer name <span class="req">*</span></label>
-                            <input type="text" required x-model="customer.name">
+                            <input type="text" required data-field="customer_name" x-model="customer.name">
                         </div>
                         <div class="m-field">
                             <label>Email</label>
@@ -257,11 +313,11 @@
                         <div class="m-row-2">
                             <div class="m-field">
                                 <label>Issue</label>
-                                <input type="date" x-model="invoice.issue_date" required>
+                                <input type="date" data-field="issue_date" x-model="invoice.issue_date" required>
                             </div>
                             <div class="m-field">
                                 <label>Due</label>
-                                <input type="date" x-model="invoice.due_date">
+                                <input type="date" data-field="due_date" x-model="invoice.due_date">
                             </div>
                         </div>
                         <div class="m-field">
@@ -412,6 +468,23 @@
 
                 mobileTab: 'items',
                 submitMode: '0',
+
+                // Pre-submit guard state. The buttons are type="button" and we submit
+                // via form.submit(), which bypasses HTML5 constraint validation
+                // entirely — so the `required` attributes in the markup never fire
+                // and every mistake used to cost a full server round-trip.
+                clientErrors: [],
+                clientItemErrors: new Set(),
+                submitting: false,
+                maxItems: config.limits?.maxItems ?? 500,
+
+                // Line indices the server rejected, so a bounced save highlights them.
+                serverItemErrors: new Set(
+                    (config.errorKeys ?? [])
+                        .map(k => k.match(/^items\.(\d+)\./))
+                        .filter(Boolean)
+                        .map(m => Number(m[1]))
+                ),
                 scanFeedback: null,
                 scanSuccess: true,
                 scanner: {
@@ -424,6 +497,14 @@
 
                 init() {
                     this.loadCategories();
+
+                    // A bounced save restores the form, so the error box is the only
+                    // thing telling the user why nothing happened — make sure they see it.
+                    if ((config.errorKeys ?? []).length) {
+                        this.$nextTick(() => {
+                            document.querySelector('.errors')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        });
+                    }
                 },
 
                 async loadCategories() {
@@ -517,6 +598,15 @@
                         _grossFocused: false,
                         _grossDraft: '',
                     });
+
+                    // A blank description is the single most common cause of a
+                    // rejected save — put the cursor there so it gets filled in.
+                    const idx = this.items.length - 1;
+                    this.$nextTick(() => {
+                        const el = [...document.querySelectorAll(`[data-item-idx="${idx}"][data-field="description"]`)]
+                            .find(e => e.offsetParent !== null);
+                        el?.focus();
+                    });
                 },
 
                 clearAllItems() {
@@ -609,8 +699,111 @@
                     return (parseFloat(this.invoice.discount_percent) || 0) > 0;
                 },
 
+                // Only the whitelisted keys travel to the server; _grossFocused and
+                // _grossDraft are view-only scratch state from addBlankItem().
+                serializedItems() {
+                    return JSON.stringify(this.items.map(i => ({
+                        pos_product_id: i.pos_product_id ?? null,
+                        pos_product_code: i.pos_product_code ?? null,
+                        description: i.description,
+                        quantity: i.quantity,
+                        unit_price: i.unit_price,
+                        vat_rate: i.vat_rate,
+                    })));
+                },
+
+                // Mirrors CustomerInvoiceRequest::rules() exactly — same gt/gte/lte
+                // semantics — so nothing that passes here can fail server-side.
+                validateBeforeSubmit() {
+                    const errs = [];
+                    const bad = new Set();
+                    const num = v => (v === '' || v === null || v === undefined || isNaN(parseFloat(v)))
+                        ? NaN
+                        : parseFloat(v);
+
+                    const name = String(this.customer.name ?? '').trim();
+                    if (! name) {
+                        errs.push({ field: 'customer_name', message: 'A customer name is required.' });
+                    } else if (name.length > 255) {
+                        errs.push({ field: 'customer_name', message: 'Customer name is too long (max 255 characters).' });
+                    }
+
+                    if (! this.invoice.issue_date) {
+                        errs.push({ field: 'issue_date', message: 'An issue date is required.' });
+                    }
+                    if (this.invoice.due_date && this.invoice.issue_date && this.invoice.due_date < this.invoice.issue_date) {
+                        errs.push({ field: 'due_date', message: 'The due date cannot be before the issue date.' });
+                    }
+
+                    const disc = num(this.invoice.discount_percent || 0);
+                    if (isNaN(disc) || disc < 0 || disc > 100) {
+                        errs.push({ field: 'discount_percent', message: 'Discount must be between 0 and 100%.' });
+                    }
+
+                    if (this.items.length === 0) {
+                        errs.push({ field: 'items', message: 'Add at least one line item before saving.' });
+                    }
+                    if (this.items.length > this.maxItems) {
+                        errs.push({ field: 'items', message: `This invoice has ${this.items.length} lines; the maximum is ${this.maxItems}. Please split it into two invoices.` });
+                    }
+
+                    this.items.forEach((it, idx) => {
+                        const push = (field, message) => {
+                            errs.push({ field, idx, message: `Line ${idx + 1} ${message}` });
+                            bad.add(idx);
+                        };
+                        const desc = String(it.description ?? '').trim();
+                        if (! desc) push('description', 'needs a description.');
+                        else if (desc.length > 255) push('description', 'has a description longer than 255 characters.');
+
+                        const q = num(it.quantity);
+                        const u = num(it.unit_price);
+                        const r = num(it.vat_rate);
+                        if (isNaN(q) || q <= 0) push('quantity', 'must have a quantity greater than 0.');
+                        if (isNaN(u) || u < 0) push('unit_price', 'cannot have a negative unit price.');
+                        if (isNaN(r) || r < 0 || r > 1) push('vat_rate', 'needs a valid VAT rate.');
+                    });
+
+                    this.clientErrors = errs;
+                    this.clientItemErrors = bad;
+
+                    if (errs.length) {
+                        this.focusError(errs[0]);
+                        return false;
+                    }
+                    return true;
+                },
+
+                // Desktop and mobile render the same fields; the hidden layout is
+                // display:none, so offsetParent === null identifies the dead copy.
+                focusError(err) {
+                    if (['customer_name', 'issue_date', 'due_date'].includes(err.field)) {
+                        this.mobileTab = 'customer';
+                    } else if (err.idx != null) {
+                        this.mobileTab = 'items';
+                    }
+
+                    this.$nextTick(() => {
+                        const sel = err.idx == null
+                            ? `[data-field="${err.field}"]`
+                            : `[data-item-idx="${err.idx}"][data-field="${err.field}"]`;
+                        const el = [...document.querySelectorAll(sel)].find(e => e.offsetParent !== null);
+
+                        if (el) {
+                            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            el.focus({ preventScroll: true });
+                        } else {
+                            document.querySelector('.client-errors, .errors')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    });
+                },
+
                 submitForm(mode) {
+                    if (this.submitting) return;          // also kills double-click duplicate drafts
+                    if (! this.validateBeforeSubmit()) return;
+
                     this.submitMode = mode;
+                    this.submitting = true;
                     this.$nextTick(() => document.getElementById('invoice-form').submit());
                 },
 

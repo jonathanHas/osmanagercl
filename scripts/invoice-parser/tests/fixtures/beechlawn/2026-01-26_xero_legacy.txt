@@ -1,0 +1,25 @@
+INVOICE InvoiceDate BeechlawnOrganicFarmLtd
+26Jan2026
+Ballinasloe,CoGalway.
+InvoiceNumber H53K753
+BirrOrganicStore INV-28632
+www.beechlawnorganicfarm.i
+Attention:JonathanHaslam BeechlawnOrganicFa e
+MainStreet 3388928JH
+T:0909646713/0861799007
+BIRROFFALYR42TY29
+IRELAND
+Description Quantity UnitPrice Tax AmountEUR
+BrusselSprouts(1kg) 6.00 5.00 ZeroRated 30.00
+CABBAGE,GREENSAVOYkg 6.00 2.50 ZeroRated 15.00
+Kale,Dark(kg) 2.10 5.50 ZeroRated 11.55
+KALE,CURLY(1kg)-B146 2.10 5.50 ZeroRated 11.55
+IRISHTURNIP(pc) 12.00 1.20 ZeroRated 14.40
+Subtotal 82.50
+TOTALEUR 82.50
+DueDate:20Feb2026
+BankofIreland,MainStreet,Ballinasloe,Co,Galway.
+BIC:BOFIIE2DIBAN:IE00XXXX00000000000000
+ALLPRODUCESUPPLIEDBYBEECHLAWNORGANICFARMISCERTIFIEDORGANIC-IE-ORG-02-4556
+GAEILGEAGUSFÁILTE!
+CompanyRegistrationNo: 569781. RegisteredOffice:BeechlawnOrganicFarmLtd,Beechlawn,Ballinasloe,Co.Galway,H53K753,Ireland.

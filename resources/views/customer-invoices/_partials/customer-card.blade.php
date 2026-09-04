@@ -25,7 +25,7 @@
     <div class="grid-2">
         <div class="field">
             <label>Name <span class="req">*</span></label>
-            <input type="text" required x-model="customer.name">
+            <input type="text" required data-field="customer_name" x-model="customer.name">
         </div>
         <div class="field">
             <label>Email</label>

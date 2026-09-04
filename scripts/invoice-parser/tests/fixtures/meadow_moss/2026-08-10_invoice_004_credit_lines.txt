@@ -1,0 +1,27 @@
+INVOICE
+Meadow & Moss
+Ballinasragh
+Lusmagh
+Co. Offaly
+R42 FY09
+Email: meadowandmossfarm@gmail.com
+Invoice No: 004 Payment Terms: 14 Day
+Invoice Date: 10/08/2026 Payment Due: 24/08/2026
+Bill To Organic Store Deliver To Organic Store,
+Main St Main St
+Townparks Townparks
+Birr, Birr
+Co. Offaly, R42 TY29 Co. Offaly, R42 TY29
+Item Delivery Date Qty Unit Price Line Total
+Small Bouquet 24 July 2026 4 €9.16 €36.64
+Large Bouquet 24 July 2026 4 €17.62 €70.48
+Credit Lrg Bouq 24 July 2026 -1 €17.62 -€17.62
+Small Bouquet 30 July 2026 5 €9.16 €45.80
+Large Bouquet 30 July 2026 4 €17.62 €70.48
+Credit Lrg Bouq 30 July 2026 -2 €17.62 -€35.24
+Small Bouquet 6 August 2026 6 €9.16 €54.96
+Large Bouquet 6 August 2026 3 €17.62 €52.86
+Payment Methods Subtotal €278.36
+Account Name Meadow and Moss Tax
+IBAN IE00 XXXX 0000 0000 0000 00 Total €278.36
+Swift/BIC AIBKIE2DXXX

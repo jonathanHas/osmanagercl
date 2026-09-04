@@ -51,25 +51,25 @@
             <span class="mono">€<span x-text="totalGross().toFixed(2)"></span></span>
         </div>
         <div class="totals-actions" x-show="!adminEdit">
-            <button type="button" class="btn ghost" @click="submitForm('0')">Save draft</button>
-            <button type="button" class="btn primary" @click="submitForm('1')">
-                Issue &amp; save
+            <button type="button" class="btn ghost" :disabled="submitting" @click="submitForm('0')" x-text="submitting ? 'Saving…' : 'Save draft'">Save draft</button>
+            <button type="button" class="btn primary" :disabled="submitting" @click="submitForm('1')">
+                <span x-text="submitting ? 'Saving…' : 'Issue & save'">Issue &amp; save</span>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
             </button>
         </div>
         <div class="totals-actions" x-show="adminEdit" x-cloak style="grid-template-columns: 1fr;">
-            <button type="button" class="btn primary" @click="submitForm('0')">
-                Save changes
+            <button type="button" class="btn primary" :disabled="submitting" @click="submitForm('0')">
+                <span x-text="submitting ? 'Saving…' : 'Save changes'">Save changes</span>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
             </button>
         </div>
     </div>
 @else
     <div class="m-actions" x-show="!adminEdit">
-        <button type="button" class="btn ghost" @click="submitForm('0')">Save draft</button>
-        <button type="button" class="btn primary" @click="submitForm('1')">Issue &amp; save</button>
+        <button type="button" class="btn ghost" :disabled="submitting" @click="submitForm('0')" x-text="submitting ? 'Saving…' : 'Save draft'">Save draft</button>
+        <button type="button" class="btn primary" :disabled="submitting" @click="submitForm('1')" x-text="submitting ? 'Saving…' : 'Issue & save'">Issue &amp; save</button>
     </div>
     <div class="m-actions" x-show="adminEdit" x-cloak style="grid-template-columns: 1fr;">
-        <button type="button" class="btn primary" @click="submitForm('0')">Save changes</button>
+        <button type="button" class="btn primary" :disabled="submitting" @click="submitForm('0')" x-text="submitting ? 'Saving…' : 'Save changes'">Save changes</button>
     </div>
 @endif

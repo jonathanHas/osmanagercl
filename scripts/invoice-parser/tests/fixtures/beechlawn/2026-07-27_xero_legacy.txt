@@ -1,0 +1,26 @@
+INVOICE InvoiceDate BeechlawnOrganicFarmLtd
+27Jul2026
+Ballinasloe,CoGalway.
+InvoiceNumber H53E9N4
+BirrOrganicStore INV-31546
+www.beechlawnorganicfarm.i
+Attention:JonathanHaslam BeechlawnOrganicFa e
+MainStreet 3388928JH
+T:0909646713/0861799007
+BIRROFFALYR42TY29
+IRELAND
+Description Quantity UnitPrice Tax AmountEUR
+BEETROOTBUNCH(pc) 8.00 2.00 ZeroRated 16.00
+BROCCOLI(kg)loose 5.00 4.50 ZeroRated 22.50
+Cabbage,Pointed(pc) 6.00 1.80 ZeroRated 10.80
+KALE,CURLY(1kg)-B146 1.50 6.50 ZeroRated 9.75
+Kale,Dark(kg) 1.50 6.50 ZeroRated 9.75
+ONIONBUNCH(750g) 10.00 1.90 ZeroRated 19.00
+Subtotal 87.80
+TOTALEUR 87.80
+DueDate:20Aug2026
+BankofIreland,MainStreet,Ballinasloe,Co,Galway.
+BIC:BOFIIE2DIBAN:IE00XXXX00000000000000
+ALLPRODUCESUPPLIEDBYBEECHLAWNORGANICFARMISCERTIFIEDORGANIC-IE-ORG-02-4556
+GAEILGEAGUSFÁILTE!
+CompanyRegistrationNo: 569781. RegisteredOffice:BeechlawnOrganicFarmLtd,Beechlawn,Ballinasloe,Co.Galway,H53K753,Ireland.

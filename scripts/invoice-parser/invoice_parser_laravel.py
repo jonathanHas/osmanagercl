@@ -23,7 +23,7 @@ from parsers import (
     mossfield, slievebloom, garryhinch, oxigen, kellys, udea, breadelicious,
     kleepaper, ardu, vico, loughboora, coolnagrower, merrymill, flogas,
     oldyard_organics, amazon, ecobike, dunany_flour, beechlawn, mentons, kilbeggan,
-    hetzner, default_parser
+    hetzner, bean2cup, meadow_moss, default_parser
 )
 
 # Configure logging
@@ -95,6 +95,13 @@ def detect_supplier(text):
         return kilbeggan, "Kilbeggan"
     elif "LOUGH BOORA" in upper_text:
         return loughboora, "Lough Boora"
+    elif "BEAN2CUP" in upper_text:
+        return bean2cup, "Bean2Cup"
+    # "MEADOWANDMOSS" catches the email address; note this must not collide with the
+    # Mossfield branch above, which requires the literal "MOSSFIELD".
+    elif ("MEADOW & MOSS" in upper_text or "MEADOW AND MOSS" in upper_text
+          or "MEADOWANDMOSS" in upper_text):
+        return meadow_moss, "Meadow & Moss"
     else:
         return default_parser, "Unknown"
 

@@ -4,14 +4,14 @@
         <div class="field">
             <label>Issue date <span class="req">*</span></label>
             <div class="date-input">
-                <input type="date" required x-model="invoice.issue_date">
+                <input type="date" required data-field="issue_date" x-model="invoice.issue_date">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
             </div>
         </div>
         <div class="field">
             <label>Due date</label>
             <div class="date-input">
-                <input type="date" x-model="invoice.due_date">
+                <input type="date" data-field="due_date" x-model="invoice.due_date">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
             </div>
         </div>
