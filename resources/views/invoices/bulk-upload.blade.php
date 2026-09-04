@@ -240,11 +240,22 @@
                         </div>
                     </template>
 
-                    <template x-if="!folderSupported">
+                    {{-- Two separate reasons the folder API can be missing; say which one applies. --}}
+                    <template x-if="!folderSupported && !secureContext">
                         <p class="text-gray-500 text-xs mt-4 max-w-lg mx-auto">
-                            Automatic folder tidy-up isn't available in this browser. It needs Chrome or Edge with
-                            <span class="font-mono text-gray-400">{{ config('app.url') }}</span> added under
-                            <span class="font-mono text-gray-400">chrome://flags/#unsafely-treat-insecure-origin-as-secure</span>.
+                            Automatic folder tidy-up needs a secure context, and this page is served over plain HTTP.
+                            In Chrome or Edge, open
+                            <span class="font-mono text-gray-400">chrome://flags/#unsafely-treat-insecure-origin-as-secure</span>,
+                            set the dropdown to <span class="text-gray-400 font-semibold">Enabled</span> (not just filling in the box),
+                            add <span class="font-mono text-gray-400">{{ config('app.url') }}</span>, then click
+                            <span class="text-gray-400 font-semibold">Relaunch</span>.
+                        </p>
+                    </template>
+
+                    <template x-if="!folderSupported && secureContext">
+                        <p class="text-gray-500 text-xs mt-4 max-w-lg mx-auto">
+                            Automatic folder tidy-up isn't available in this browser &mdash; it needs Chrome or Edge on
+                            desktop. Firefox and Safari don't implement the folder access API.
                         </p>
                     </template>
                 </div>
@@ -450,6 +461,7 @@
 
                 // Folder mode (File System Access API, Chrome/Edge in a secure context only)
                 folderSupported: window.InvoiceFolderSync ? window.InvoiceFolderSync.isSupported() : false,
+                secureContext: window.isSecureContext === true,
                 dirHandle: null,
                 folderName: '',
 

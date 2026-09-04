@@ -847,6 +847,43 @@ Points that matter when this layout changes:
 - The parser cross-checks its rows against all three printed totals (`Gross Total`, `Tax`,
   `Total`) and warns on any mismatch, dropping confidence to 0.50.
 
+### Dynamis Invoice Parser
+
+`scripts/invoice-parser/parsers/dynamis.py` handles **two layouts**, because Dynamis changed
+invoice template between 2026-08-03 and 2026-08-19. The parser dispatches on the text:
+`NET A PAYER` means the legacy layout, otherwise the current one.
+
+| | Legacy (to 2026-08-03) | Current (from 2026-08-19) |
+|---|---|---|
+| Header | `GROUPE DYNAMIS SAS`, French throughout | `DYNAMIS SAS`, English column labels |
+| Reference | `FACTURE N° 702771 DU 03/08/2026` | `INVOICE F C 1 0 0 0 0 0 7 6 dated 19/08/2026` (letter-spaced), and `Facture : FC10000076` at the foot |
+| Date | the same `FACTURE ... DU` line | `Date : 19/08/2026` at the foot, or `dated 19/08/2026` |
+| Total | `NET A PAYER EUR 1 908.62` | `Total Amount Incl. 1 844,32 €` |
+| VAT | `TOTAL TVA 0.00` | `Total VAT Amount 0,00 €` |
+| Exemption | `EXONERATION DE TVA, ARTICLE 262 TER I DU CGI.` | `« Exonération TVA, art. 262 ter-I ... »` |
+| **Decimal separator** | **period** — `1 908.62` | **comma** — `1 844,32` |
+
+Points that matter when this layout changes again:
+
+- **The decimal separator differs between the two layouts**, while both use a plain space for
+  thousands. `_amount()` decides per number, taking whichever of `.` or `,` appears last as the
+  decimal point — the rule documented for `delivery_independent.py` in
+  `docs/development/known-issues.md`. Reading `1 844,32` with the legacy rule yields 184432.
+- **The exemption wording changed**, so the check strips accents and tolerates the missing `DE`
+  (`EXONERATION\s+(?:DE\s+)?TVA`). A literal match on the old wording returns False on the new
+  layout and silently drops `Tax Free` after 529 invoices of True.
+- Dynamis supply Ireland from France under the intra-community exemption, so every invoice in the
+  archive carries no VAT and the whole amount goes to the 0% bucket. If `Total VAT Amount` is ever
+  non-zero the parser warns rather than guessing a rate, since no sample shows how one is laid out.
+- **Credit notes head with `AVOIR N° ... DU ...`**, not `FACTURE N° ...`. Matching only `FACTURE`
+  left both the reference and the date unparsed. The alternation is case-sensitive so the body
+  line `* * * Avoir sur Facture 691185` cannot win instead.
+- On a multi-page legacy invoice the totals labels repeat on every page **with no figures beside
+  them**, and only the last page carries the amounts — so the totals regexes match horizontal
+  whitespace only (`[^\S\n]`), never `\s`, which would run past the newline onto the next label.
+- Shipping fees on the current layout (`Shipping Fees 270,00 €`) are already inside
+  `Total Amount Incl.` and need no separate handling.
+
 ### VAT-inclusive layouts: the `VAT Amounts` and `Total` contract
 
 `invoice_parser_laravel.py` normally derives VAT as `round(net × rate, 2)`. That is wrong for
