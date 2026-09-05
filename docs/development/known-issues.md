@@ -424,6 +424,61 @@ If the 0.0% row net + paperin adjustment = what the 0.0% row should show, or if 
 
 ## Invoice Parsing Issues
 
+### Klee Paper Parser Truncated Amounts Over €1,000
+**Status:** Fixed 2026-09-05
+
+#### Problem
+WS061108 (2026-06-29) imported as **€342.80 against an invoice total of €1,572.82** — silently, at
+confidence 0.85 with no warnings, so it auto-created €1,230 short. One archived invoice
+(WS060038, 2026-03-31) was already corrupted the same way: a €1,238.68 invoice imported with a net
+of €7.05 and a total of €8.67, and was corrected by hand.
+
+#### Root Cause
+`scripts/invoice-parser/parsers/kleepaper.py` matched money as `(\d+\.\d{2})`, which cannot span
+a thousands separator. Against `Nett 1,278.70`:
+
+- `Nett\s+(\d+\.\d{2})` failed outright — `\d+` matched `1`, then the `,` was not a `.`.
+- The fallback VAT-summary regex then matched the fragment `278.70` out of the middle of the
+  number, and the parser reported that as the net.
+
+Nothing flagged, because `detect_anomalies` only looks for an all-zero VAT base and a missing
+date. **The bug bites only when `Nett` crosses €1,000, not when the total does**, which is why
+only 2 of 23 readable archived invoices carried a comma at all and just one was wrong.
+
+Two further faults in the same file, neither yet triggered: the VAT-summary regex required a
+literal `23.00`, so a row at any other rate would have been dropped silently, and `Nett` was
+banked at 23% regardless of rate.
+
+#### Solution
+- Match money as `[\d,]+\.\d{2}` throughout, with an `_amount()` that strips commas.
+- Capture the rate from each VAT-summary row instead of hardcoding it, bound the row scan to the
+  totals block (product lines above it also carry an `S23` code), and snap an unrecognised rate
+  onto the nearest known one via `vat / nett` with a warning rather than dropping the row.
+- Return the invoice's own figures as `VAT Amounts` / `Total_VAT` / `Total`. Klee Paper round VAT
+  per line, so 10 of 23 archived invoices state a VAT that differs from `round(net x 0.23, 2)` by
+  a cent or two.
+- Cross-check the rows against the Order Summary's `Nett`, `VAT` and `Total`; any mismatch warns
+  and drops confidence to 0.50, which is what would have caught WS060038.
+
+#### How to Detect
+Compare an invoice's stored `total_amount` against the `Total value of this invoice:` line in its
+PDF. A truncated amount is usually recognisable as the original with its leading digits missing.
+
+#### Files Modified
+- `scripts/invoice-parser/parsers/kleepaper.py`
+- `scripts/invoice-parser/tests/test_kleepaper.py` and `tests/fixtures/kleepaper/` (new)
+
+#### Note
+This is the third instance of the same family, after the `delivery_independent.py` separator
+ambiguity and the Independent recomputed-VAT entry. When writing a parser, assume amounts carry
+thousands separators and assume the supplier rounds VAT per line.
+
+No back-catalogue reparse was run: all 91 stored Klee Paper invoices sit inside finalized VAT
+returns, which `invoice:reparse` refuses by design.
+
+---
+
+
 ### Independent Parser Dropped Unrecognised VAT Rates and Recomputed VAT
 **Status:** Fixed 2026-09-04
 

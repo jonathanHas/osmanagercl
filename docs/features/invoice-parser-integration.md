@@ -884,6 +884,43 @@ Points that matter when this layout changes again:
 - Shipping fees on the current layout (`Shipping Fees 270,00 €`) are already inside
   `Total Amount Incl.` and need no separate handling.
 
+### Klee Paper Invoice Parser
+
+`scripts/invoice-parser/parsers/kleepaper.py` handles Klee Paper (ecoLand, Dublin). One layout
+throughout the archive. The totals block interleaves three side-by-side tables onto single
+extracted lines:
+
+```
+Package Summary          VAT Summary                     Order Summary
+Item Value               Code Nett Rate Total            Item Value
+Items 11.00              S23 1,278.70 23.00 294.12       Nett 1,278.70
+Weight Kgs 144.90                                        VAT 294.12
+                                                         Total 1,572.82
+Total value of this invoice: 1,572.82 Euro
+```
+
+Points that matter when this layout changes:
+
+- **Money must be matched with the thousands separator included** (`[\d,]+\.\d{2}`). The parser
+  previously used `(\d+\.\d{2})`, which cannot span the comma: against `Nett 1,278.70` the Nett
+  regex failed outright and the fallback matched the fragment `278.70` from the middle of the
+  number, importing a €1,572.82 invoice as €342.80 at full confidence. The bug bites only when
+  **Nett** crosses €1,000, not when the total does, which is why it survived so long.
+- **Klee Paper round VAT per line**, so the stated VAT is not `round(net x rate, 2)` on the
+  aggregate — 10 of the 23 readable archived invoices differ by a cent or two. The parser returns
+  the stated figures as `VAT Amounts` / `Total_VAT` (see the contract section below).
+- **Never hardcode the rate.** The VAT-summary regex used to require a literal `23.00`, so a row
+  at any other rate would have been dropped silently. The rate is now captured, and an
+  unrecognised one is snapped onto the nearest known rate via `vat / nett` with a warning.
+- The row scan is bounded to the totals block (from `Package Summary` / `VAT Summary` onward),
+  because every product line above it also carries an `S23` tax code.
+- `Total value of this invoice:` is the authoritative total; the Order Summary's `Nett`, `VAT` and
+  `Total` are cross-checked against the summary rows, and any mismatch warns and drops confidence
+  to 0.50.
+- **Credit-note detection keys off a negative total only.** The footer boilerplate reads "All
+  credit claims must be notified within 3 days", so matching the word "credit" would flag every
+  invoice.
+
 ### VAT-inclusive layouts: the `VAT Amounts` and `Total` contract
 
 `invoice_parser_laravel.py` normally derives VAT as `round(net × rate, 2)`. That is wrong for
