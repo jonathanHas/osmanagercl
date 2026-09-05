@@ -51,6 +51,9 @@
         thead { display: table-header-group; }
         tr { page-break-inside: avoid; }
         .num { text-align: right; }
+        /* Allocation detail under a ledger description. */
+        .alloc { font-size: 9.5px; color: #666; margin-top: 1px; }
+        .oncredit { color: #060; }
         .opening { background: #fafafa; font-style: italic; color: #555; }
         .overdue { color: #b00; }
         .muted { color: #888; }

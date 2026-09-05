@@ -7,6 +7,7 @@ use App\Http\Controllers\CoffeeMetadataController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerDebtorsController;
 use App\Http\Controllers\CustomerInvoiceController;
+use App\Http\Controllers\CustomerPaymentAllocationController;
 use App\Http\Controllers\CustomerPaymentController;
 use App\Http\Controllers\CustomerStatementController;
 use App\Http\Controllers\DeliveryController;
@@ -999,6 +1000,24 @@ Route::middleware('auth')->group(function () {
             ->name('customer-payments.api.tills');
         Route::get('api/customer-payments/customers/{customer}/open-invoices', [CustomerPaymentController::class, 'customerOpenInvoicesApi'])
             ->name('customer-payments.api.open-invoices');
+
+        // Matching recorded payments to invoices, after the fact. Deliberately not
+        // customer-payments.edit/update — the payment itself stays immutable, only
+        // its allocations change.
+        Route::get('customer-payments/{customer_payment}/allocations', [CustomerPaymentAllocationController::class, 'edit'])
+            ->name('customer-payments.allocations.edit');
+        Route::put('customer-payments/{customer_payment}/allocations', [CustomerPaymentAllocationController::class, 'update'])
+            ->name('customer-payments.allocations.update');
+        Route::post('customer-payments/{customer_payment}/allocations/auto', [CustomerPaymentAllocationController::class, 'auto'])
+            ->name('customer-payments.allocations.auto');
+        Route::get('api/customer-payments/{customer_payment}/allocatable-invoices', [CustomerPaymentAllocationController::class, 'allocatableInvoicesApi'])
+            ->name('customer-payments.api.allocatable-invoices');
+
+        // The same matching from the invoice side — draw on the customer's credit.
+        Route::get('customer-invoices/{customer_invoice}/apply-credit', [CustomerPaymentAllocationController::class, 'creditForm'])
+            ->name('customer-invoices.apply-credit');
+        Route::post('customer-invoices/{customer_invoice}/apply-credit', [CustomerPaymentAllocationController::class, 'applyCredit'])
+            ->name('customer-invoices.apply-credit.store');
 
         // Customer statements
         Route::get('customers/{customer}/statement', [CustomerStatementController::class, 'show'])

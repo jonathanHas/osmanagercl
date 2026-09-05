@@ -24,6 +24,8 @@
              ] : null,
              'preselectInvoice' => $preselectInvoiceData,
              'tills' => $tills->map(fn ($host, $id) => ['id' => (string) $id, 'name' => $host])->values(),
+             // The amount is an input here, so ticking an invoice may grow it.
+             'amountIsEditable' => true,
          ]) }})">
 
         <div class="flex justify-between items-center mb-6">
@@ -129,107 +131,7 @@
                 </div>
             </div>
 
-            {{-- Allocations block --}}
-            <div class="bg-gray-800 p-4 rounded">
-                <div class="flex flex-wrap justify-between items-center gap-2 mb-3">
-                    <h3 class="text-gray-200 font-semibold">Apply to invoices</h3>
-                    <div class="flex flex-wrap gap-2 text-sm">
-                        <button type="button" @click="autoAllocate()"
-                                :disabled="!customer.id || openInvoices.length === 0"
-                                :class="(!customer.id || openInvoices.length === 0) ? 'opacity-50 cursor-not-allowed' : ''"
-                                class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded inline-flex items-center gap-1"
-                                title="Fill the amount with the customer's outstanding total and apply oldest first">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                            </svg>
-                            Auto-allocate
-                        </button>
-                        <button type="button" @click="autoAllocateOldest()"
-                                :disabled="openInvoices.length === 0"
-                                :class="openInvoices.length === 0 ? 'opacity-50 cursor-not-allowed' : ''"
-                                class="bg-gray-700 hover:bg-gray-600 text-gray-100 px-3 py-1.5 rounded">
-                            Apply oldest first
-                        </button>
-                        <button type="button" @click="splitEqually()"
-                                :disabled="openInvoices.length === 0"
-                                :class="openInvoices.length === 0 ? 'opacity-50 cursor-not-allowed' : ''"
-                                class="bg-gray-700 hover:bg-gray-600 text-gray-100 px-3 py-1.5 rounded">
-                            Split equally
-                        </button>
-                        <button type="button" @click="clearAllocations()"
-                                class="text-gray-400 hover:text-gray-200 px-2">Clear</button>
-                    </div>
-                </div>
-
-                <template x-if="!customer.id">
-                    <div class="text-gray-500 text-sm">Pick a customer to load their open invoices.</div>
-                </template>
-
-                <template x-if="customer.id && loadingInvoices">
-                    <div class="text-gray-500 text-sm">Loading invoices…</div>
-                </template>
-
-                <template x-if="customer.id && !loadingInvoices && openInvoices.length === 0">
-                    <div class="text-gray-500 text-sm">
-                        This customer has no open invoices. The full €<span x-text="(amount || 0).toFixed(2)"></span> will be recorded as on-account credit.
-                    </div>
-                </template>
-
-                <template x-if="customer.id && !loadingInvoices && openInvoices.length > 0">
-                    <div>
-                        <table class="min-w-full text-sm">
-                            <thead class="text-gray-400 text-xs uppercase">
-                                <tr>
-                                    <th class="px-2 py-1 text-left">Invoice</th>
-                                    <th class="px-2 py-1 text-left">Date</th>
-                                    <th class="px-2 py-1 text-right">Total</th>
-                                    <th class="px-2 py-1 text-right">Outstanding</th>
-                                    <th class="px-2 py-1 text-right w-32">Apply</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <template x-for="(inv, idx) in openInvoices" :key="inv.id">
-                                    <tr class="border-t border-gray-700">
-                                        <td class="px-2 py-1 font-mono">
-                                            <input type="hidden" :name="`allocations[${idx}][customer_invoice_id]`" :value="inv.id">
-                                            <span x-text="inv.invoice_number || '(draft)'"></span>
-                                        </td>
-                                        <td class="px-2 py-1 text-gray-300" x-text="inv.issue_date"></td>
-                                        <td class="px-2 py-1 text-right font-mono">€<span x-text="inv.total.toFixed(2)"></span></td>
-                                        <td class="px-2 py-1 text-right font-mono text-yellow-400">€<span x-text="inv.outstanding.toFixed(2)"></span></td>
-                                        <td class="px-2 py-1 text-right">
-                                            <input type="number" step="0.01" min="0" inputmode="decimal"
-                                                   :name="`allocations[${idx}][amount]`"
-                                                   x-model.number="inv.allocate"
-                                                   :max="inv.outstanding"
-                                                   class="w-28 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100 text-right font-mono">
-                                        </td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-
-                        <div class="mt-3 flex justify-between items-center text-sm border-t border-gray-700 pt-3">
-                            <div class="text-gray-300">
-                                <span class="text-gray-500">Allocated:</span>
-                                <span class="font-mono">€<span x-text="totalAllocated().toFixed(2)"></span></span>
-                                <span class="text-gray-500"> / €<span x-text="(amount || 0).toFixed(2)"></span></span>
-                            </div>
-                            <div :class="overAllocated() ? 'text-red-400' : (unallocated() > 0.005 ? 'text-blue-300' : 'text-green-400')">
-                                <template x-if="overAllocated()">
-                                    <span>Over-allocated by €<span x-text="(totalAllocated() - amount).toFixed(2)"></span></span>
-                                </template>
-                                <template x-if="!overAllocated() && unallocated() > 0.005">
-                                    <span>€<span x-text="unallocated().toFixed(2)"></span> on-account credit</span>
-                                </template>
-                                <template x-if="!overAllocated() && unallocated() <= 0.005 && totalAllocated() > 0">
-                                    <span>Fully allocated</span>
-                                </template>
-                            </div>
-                        </div>
-                    </div>
-                </template>
-            </div>
+            <x-customer-payments.allocation-table />
 
             <div class="flex justify-end gap-2">
                 <a href="{{ route('customer-payments.index') }}"
@@ -244,12 +146,14 @@
         </form>
     </div>
 
+    @include('customer-payments._allocation-script')
+
     <script>
         function customerPaymentForm(config) {
             return {
-                urls: config.urls,
+                ...customerAllocationCore(config),
+
                 tills: config.tills,
-                customer: config.preselectCustomer ?? { id: null, name: '', email: '', phone: '' },
                 customerSearchTerm: '',
                 customerResults: [],
                 paymentDate: new Date().toISOString().slice(0, 10),
@@ -259,18 +163,16 @@
                 tillId: '',
                 reference: '',
                 notes: '',
-                openInvoices: [],
-                loadingInvoices: false,
 
                 init() {
-                    if (this.customer.id) {
-                        this.loadOpenInvoices().then(() => {
-                            if (config.preselectInvoice) {
-                                const target = this.openInvoices.find(i => i.id == config.preselectInvoice.id);
-                                if (target) target.allocate = Math.min(this.amount, target.outstanding);
-                            }
-                        });
-                    }
+                    this.initAllocations().then(() => {
+                        // Preselected invoice arrives via ?customer_invoice_id= and can
+                        // only be matched once the fetched rows exist.
+                        if (config.preselectInvoice) {
+                            const target = this.openInvoices.find(i => i.id == config.preselectInvoice.id);
+                            if (target) target.allocate = Math.min(this.amount, target.outstanding);
+                        }
+                    });
                 },
 
                 tillNameForId(id) {
@@ -314,65 +216,6 @@
                 resetCustomer() {
                     this.customer = { id: null, name: '', email: '', phone: '' };
                     this.openInvoices = [];
-                },
-
-                async loadOpenInvoices() {
-                    if (!this.customer.id) return;
-                    this.loadingInvoices = true;
-                    try {
-                        const url = this.urls.openInvoices.replace('__ID__', this.customer.id);
-                        const r = await fetch(url, { headers: { Accept: 'application/json' } });
-                        const j = await r.json();
-                        this.openInvoices = (j.data ?? []).map(inv => ({ ...inv, allocate: 0 }));
-                    } finally {
-                        this.loadingInvoices = false;
-                    }
-                },
-
-                totalAllocated() {
-                    return Math.round(
-                        this.openInvoices.reduce((s, i) => s + (parseFloat(i.allocate) || 0), 0) * 100
-                    ) / 100;
-                },
-                unallocated() {
-                    return Math.round(((this.amount || 0) - this.totalAllocated()) * 100) / 100;
-                },
-                overAllocated() {
-                    return this.totalAllocated() > (this.amount || 0) + 0.005;
-                },
-
-                autoAllocateOldest() {
-                    let remaining = this.amount || 0;
-                    for (const inv of this.openInvoices) {
-                        if (remaining <= 0.005) { inv.allocate = 0; continue; }
-                        const apply = Math.min(remaining, inv.outstanding);
-                        inv.allocate = Math.round(apply * 100) / 100;
-                        remaining = Math.round((remaining - apply) * 100) / 100;
-                    }
-                },
-
-                /**
-                 * One-click flow: set the amount to the customer's full outstanding total
-                 * and apply it oldest-first. Common case for "pay everything they owe".
-                 */
-                autoAllocate() {
-                    if (this.openInvoices.length === 0) return;
-                    const totalOutstanding = this.openInvoices
-                        .reduce((s, inv) => s + (parseFloat(inv.outstanding) || 0), 0);
-                    this.amount = Math.round(totalOutstanding * 100) / 100;
-                    this.autoAllocateOldest();
-                },
-
-                splitEqually() {
-                    if (this.openInvoices.length === 0) return;
-                    const each = Math.round(((this.amount || 0) / this.openInvoices.length) * 100) / 100;
-                    for (const inv of this.openInvoices) {
-                        inv.allocate = Math.min(each, inv.outstanding);
-                    }
-                },
-
-                clearAllocations() {
-                    for (const inv of this.openInvoices) inv.allocate = 0;
                 },
             };
         }

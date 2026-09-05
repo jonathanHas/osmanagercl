@@ -41,6 +41,13 @@
                     @if ($invoice->outstanding_amount > 0.005)
                         <a href="{{ route('customer-payments.create', ['customer_invoice_id' => $invoice->id, 'customer_id' => $invoice->customer_id]) }}"
                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">+ Record payment</a>
+                        @if (($availableCredit ?? 0) > 0.005)
+                            <a href="{{ route('customer-invoices.apply-credit', $invoice) }}"
+                               class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded"
+                               title="This customer has payments not yet applied to any invoice">
+                                Apply existing credit (€{{ number_format($availableCredit, 2) }})
+                            </a>
+                        @endif
                     @endif
                     <a href="{{ route('customer-invoices.pdf', $invoice) }}"
                        class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded">Download PDF</a>

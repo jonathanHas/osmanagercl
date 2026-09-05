@@ -30,8 +30,12 @@ class CustomerStatementMail extends Mailable implements ShouldQueue
 
     public function content(): Content
     {
+        // `with:` is required — a Mailable only exposes its public properties to
+        // the view, which here would be $ctx alone. The blade reads $customer,
+        // $aging, $open_invoices etc. directly, so unpack the context.
         return new Content(
             view: 'emails.customer-statement',
+            with: $this->ctx,
         );
     }
 

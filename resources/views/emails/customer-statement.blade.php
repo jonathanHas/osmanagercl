@@ -29,9 +29,24 @@
                 </p>
 
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e5e5; border-radius:4px; margin-bottom:18px;">
+                    @if (($unallocated_credit ?? 0) > 0.005)
+                        {{-- Without these two rows the headline (closing balance) and the
+                             invoice list below (which sums to the aged total) disagree,
+                             with nothing on the page explaining why. --}}
+                        <tr>
+                            <td style="padding:14px 16px; font-size:13px; color:#555;">Invoices outstanding</td>
+                            <td style="padding:14px 16px; font-size:14px; text-align:right;">€{{ number_format($aging['total'], 2) }}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:10px 16px; border-top:1px solid #eee; font-size:13px; color:#060;">Payments received on account</td>
+                            <td style="padding:10px 16px; border-top:1px solid #eee; font-size:14px; text-align:right; color:#060;">
+                                −€{{ number_format($unallocated_credit, 2) }}
+                            </td>
+                        </tr>
+                    @endif
                     <tr>
-                        <td style="padding:14px 16px; font-size:13px; color:#555;">Balance outstanding</td>
-                        <td style="padding:14px 16px; font-size:20px; font-weight:bold; text-align:right; color:{{ $closing_balance > 0.005 ? '#b00' : '#060' }};">
+                        <td style="padding:14px 16px; {{ ($unallocated_credit ?? 0) > 0.005 ? 'border-top:1px solid #eee; ' : '' }}font-size:13px; color:#555;">Balance outstanding</td>
+                        <td style="padding:14px 16px; {{ ($unallocated_credit ?? 0) > 0.005 ? 'border-top:1px solid #eee; ' : '' }}font-size:20px; font-weight:bold; text-align:right; color:{{ $closing_balance > 0.005 ? '#b00' : '#060' }};">
                             @if ($closing_balance < -0.005)
                                 €{{ number_format(abs($closing_balance), 2) }} credit
                             @else
@@ -50,11 +65,19 @@
                 </table>
 
                 @if (! empty($open_invoices))
+                    @php
+                        // Only widen the table when there is something to show —
+                        // an all-unpaid statement keeps its three columns.
+                        $showPaid = collect($open_invoices)->contains(fn ($r) => $r['paid'] > 0.005);
+                    @endphp
                     <div style="font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:#888; margin-bottom:6px;">Outstanding invoices</div>
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; font-size:13px; margin-bottom:18px;">
                         <tr style="background:#f7f7f7;">
                             <th align="left"  style="padding:6px 8px; border-bottom:1px solid #ddd; font-size:12px;">Invoice</th>
                             <th align="left"  style="padding:6px 8px; border-bottom:1px solid #ddd; font-size:12px;">Due</th>
+                            @if ($showPaid)
+                                <th align="right" style="padding:6px 8px; border-bottom:1px solid #ddd; font-size:12px;">Paid</th>
+                            @endif
                             <th align="right" style="padding:6px 8px; border-bottom:1px solid #ddd; font-size:12px;">Outstanding</th>
                         </tr>
                         @foreach ($open_invoices as $row)
@@ -66,10 +89,23 @@
                                         <span style="font-size:11px;">({{ $row['days_overdue'] }}d overdue)</span>
                                     @endif
                                 </td>
+                                @if ($showPaid)
+                                    <td align="right" style="padding:6px 8px; border-bottom:1px solid #f0f0f0; color:#060;">
+                                        @if ($row['paid'] > 0.005)€{{ number_format($row['paid'], 2) }}@else—@endif
+                                    </td>
+                                @endif
                                 <td align="right" style="padding:6px 8px; border-bottom:1px solid #f0f0f0;">€{{ number_format($row['outstanding'], 2) }}</td>
                             </tr>
                         @endforeach
                     </table>
+                @endif
+
+                @if (($unallocated_credit ?? 0) > 0.005)
+                    <p style="margin:0 0 12px; font-size:13px; color:#060; line-height:1.5;">
+                        The €{{ number_format($unallocated_credit, 2) }} received on account hasn't been applied to a
+                        specific invoice yet, so the invoice amounts above are before that credit.
+                        Reply if you'd like it put against a particular one.
+                    </p>
                 @endif
 
                 <p style="margin:0; font-size:13px; color:#555; line-height:1.5;">

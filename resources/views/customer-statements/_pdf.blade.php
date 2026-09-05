@@ -21,7 +21,13 @@
         th, td { padding: 5px 6px; border-bottom: 1px solid #ddd; font-size: 10.5px; }
         th { background: #f4f4f4; text-align: left; }
         thead { display: table-header-group; }
+        /* Ledger rows are now 2-3 lines tall; without this Dompdf splits one
+           across a page boundary. Mirrors print.blade.php. */
+        tr { page-break-inside: avoid; }
         .num { text-align: right; }
+        /* Allocation detail under a ledger description. */
+        .alloc { font-size: 9.5px; color: #666; margin-top: 1px; }
+        .oncredit { color: #060; }
         .opening { background: #fafafa; font-style: italic; color: #555; }
         .overdue { color: #b00; }
         .muted { color: #888; }

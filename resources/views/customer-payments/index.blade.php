@@ -12,6 +12,18 @@
             <div class="mb-4 rounded bg-green-700 text-white px-4 py-2">{{ session('status') }}</div>
         @endif
 
+        @if ($unappliedCreditTotal > 0.005)
+            <div class="mb-4 rounded bg-gray-800 border border-blue-800 px-4 py-3 text-sm flex flex-wrap justify-between items-center gap-2">
+                <span class="text-gray-200">
+                    <span class="font-mono text-blue-300">€{{ number_format($unappliedCreditTotal, 2) }}</span>
+                    received but not yet applied to any invoice, across
+                    {{ $unappliedCreditCustomers }} {{ Str::plural('customer', $unappliedCreditCustomers) }}.
+                </span>
+                <a href="{{ route('customer-payments.index', ['allocation' => 'unallocated']) }}"
+                   class="text-blue-400 hover:text-blue-300">Show unmatched payments →</a>
+            </div>
+        @endif
+
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
             {{-- Outstanding balances widget --}}
             <div class="lg:col-span-1 bg-gray-800 rounded p-4">
@@ -36,7 +48,7 @@
             </div>
 
             {{-- Filters --}}
-            <form method="GET" class="lg:col-span-2 bg-gray-800 rounded p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+            <form method="GET" class="lg:col-span-2 bg-gray-800 rounded p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                     <label class="block text-xs text-gray-400 mb-1">Method</label>
                     <select name="method" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100">
@@ -44,6 +56,14 @@
                         @foreach (\App\Models\CustomerPayment::METHODS as $val => $label)
                             <option value="{{ $val }}" @selected(request('method') === $val)>{{ $label }}</option>
                         @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">Matching</label>
+                    <select name="allocation" class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100">
+                        <option value="">All</option>
+                        <option value="unallocated" @selected(request('allocation') === 'unallocated')>Unmatched only</option>
+                        <option value="partial" @selected(request('allocation') === 'partial')>Partly matched</option>
                     </select>
                 </div>
                 <div>
@@ -57,6 +77,9 @@
                            class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100">
                 </div>
                 <div class="flex items-end gap-2">
+                    @if (request('customer_id'))
+                        <input type="hidden" name="customer_id" value="{{ request('customer_id') }}">
+                    @endif
                     <button type="submit" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-1 rounded">Filter</button>
                     <a href="{{ route('customer-payments.index') }}" class="text-gray-400 hover:text-gray-200 px-2 py-1">Reset</a>
                 </div>
@@ -73,6 +96,7 @@
                         <th class="px-4 py-2 text-left">Method</th>
                         <th class="px-4 py-2 text-left">Till / Ref</th>
                         <th class="px-4 py-2 text-left">Allocated to</th>
+                        <th class="px-4 py-2 text-right">Unapplied</th>
                         <th class="px-4 py-2"></th>
                     </tr>
                 </thead>
@@ -114,12 +138,27 @@
                                     <span class="text-gray-500">on-account credit</span>
                                 @endforelse
                             </td>
+                            <td class="px-4 py-2 text-right font-mono text-xs">
+                                @if ($payment->unallocated_amount > 0.005)
+                                    <a href="{{ route('customer-payments.allocations.edit', $payment) }}"
+                                       class="text-blue-300 hover:text-blue-200"
+                                       title="Match this payment to invoices">€{{ number_format($payment->unallocated_amount, 2) }}</a>
+                                @else
+                                    <span class="text-gray-600">—</span>
+                                @endif
+                            </td>
                             <td class="px-4 py-2 text-right">
                                 <a href="{{ route('customer-payments.show', $payment) }}" class="text-blue-400 hover:text-blue-300">View</a>
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">No payments recorded yet.</td></tr>
+                        <tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">
+                            @if (request('allocation'))
+                                No payments match this filter.
+                            @else
+                                No payments recorded yet.
+                            @endif
+                        </td></tr>
                     @endforelse
                 </tbody>
             </table>

@@ -43,7 +43,7 @@ class CustomerDebtorsController extends Controller
             fputcsv($out, array_merge(
                 ['Customer', 'Email', 'Balance'],
                 array_values($labels),
-                ['Total due', 'Open invoices', 'Oldest overdue (days)']
+                ['Total due', 'Open invoices', 'Oldest overdue (days)', 'Unapplied credit']
             ));
 
             foreach ($data['rows'] as $row) {
@@ -54,6 +54,7 @@ class CustomerDebtorsController extends Controller
                         number_format($row['aging']['total'], 2, '.', ''),
                         $row['open_count'],
                         $row['oldest_days'],
+                        number_format($row['unapplied_credit'], 2, '.', ''),
                     ]
                 ));
             }
@@ -61,7 +62,12 @@ class CustomerDebtorsController extends Controller
             fputcsv($out, array_merge(
                 ['TOTAL', '', number_format($data['totals']['balance'], 2, '.', '')],
                 array_map(fn ($k) => number_format($data['totals'][$k], 2, '.', ''), array_keys($labels)),
-                [number_format($data['totals']['total'], 2, '.', ''), '', '']
+                [
+                    number_format($data['totals']['total'], 2, '.', ''),
+                    '',
+                    '',
+                    number_format($data['totals']['credit'], 2, '.', ''),
+                ]
             ));
 
             fclose($out);

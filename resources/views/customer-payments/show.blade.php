@@ -16,6 +16,8 @@
             <div class="space-x-2">
                 <a href="{{ route('customer-payments.index') }}" class="text-gray-400 hover:text-gray-200">← All payments</a>
                 @if (! $payment->isVoid())
+                    <a href="{{ route('customer-payments.allocations.edit', $payment) }}"
+                       class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded inline-block">Edit allocations</a>
                     <form action="{{ route('customer-payments.destroy', $payment) }}" method="POST" class="inline"
                           onsubmit="return confirm('Void this payment? Outstanding balances will be recalculated.');">
                         @csrf @method('DELETE')
@@ -47,6 +49,11 @@
                     Recorded by {{ $payment->creator?->name ?? 'unknown' }}
                     on {{ $payment->created_at->format('Y-m-d H:i') }}
                 </div>
+                @if ($payment->last_matched_at)
+                    <div class="text-gray-400 text-sm mt-1">
+                        Allocations last edited {{ $payment->last_matched_at->format('Y-m-d H:i') }}@if ($payment->lastMatcher) by {{ $payment->lastMatcher->name }}@endif
+                    </div>
+                @endif
                 @if ($payment->isVoid())
                     <div class="text-red-400 text-sm mt-2">
                         Voided on {{ $payment->voided_at->format('Y-m-d H:i') }}
@@ -86,13 +93,28 @@
                             <td class="px-4 py-2 text-right font-mono">€{{ number_format($a->amount, 2) }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="px-4 py-6 text-center text-gray-500">No invoice allocations — recorded as on-account credit.</td></tr>
+                        <tr>
+                            <td colspan="5" class="px-4 py-6 text-center text-gray-500">
+                                No invoice allocations — recorded as on-account credit.
+                                @if (! $payment->isVoid())
+                                    <a href="{{ route('customer-payments.allocations.edit', $payment) }}"
+                                       class="text-blue-400 hover:text-blue-300 block mt-1">Match it to invoices →</a>
+                                @endif
+                            </td>
+                        </tr>
                     @endforelse
                 </tbody>
                 @if ($payment->unallocated_amount > 0.005)
                     <tfoot class="bg-gray-900 text-gray-300 text-sm">
                         <tr>
-                            <td colspan="4" class="px-4 py-2 text-right">On-account credit:</td>
+                            <td colspan="4" class="px-4 py-2 text-right">
+                                @if (! $payment->isVoid())
+                                    <a href="{{ route('customer-payments.allocations.edit', $payment) }}"
+                                       class="text-blue-400 hover:text-blue-300">On-account credit — apply to invoices →</a>
+                                @else
+                                    On-account credit:
+                                @endif
+                            </td>
                             <td class="px-4 py-2 text-right font-mono text-blue-300">€{{ number_format($payment->unallocated_amount, 2) }}</td>
                         </tr>
                     </tfoot>

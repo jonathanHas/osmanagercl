@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CustomerPaymentRequest;
 use App\Models\Customer;
 use App\Models\CustomerInvoice;
 use App\Models\CustomerPayment;
@@ -38,6 +39,18 @@ class CustomerPaymentController extends Controller
             $query->whereDate('payment_date', '<=', $to);
         }
 
+        // Unapplied credit — payments that were never matched to an invoice, or
+        // only partly matched. Filtered in SQL so paging stays correct.
+        $allocation = $request->query('allocation');
+        if ($allocation === 'unallocated') {
+            $query->withUnallocatedOver()->doesntHave('allocations');
+        } elseif ($allocation === 'partial') {
+            $query->partiallyAllocated();
+        }
+
+        // Header stat, independent of the current filters.
+        $creditTotals = $this->service->unappliedCreditTotals();
+
         $payments = $query->orderByDesc('payment_date')->orderByDesc('id')
             ->paginate(25)->withQueryString();
 
@@ -60,7 +73,12 @@ class CustomerPaymentController extends Controller
                 'balance' => round((float) ($c->invoiced_total ?? 0) - (float) ($c->paid_total ?? 0), 2),
             ]);
 
-        return view('customer-payments.index', compact('payments', 'outstandingCustomers'));
+        return view('customer-payments.index', [
+            'payments' => $payments,
+            'outstandingCustomers' => $outstandingCustomers,
+            'unappliedCreditTotal' => round(array_sum($creditTotals), 2),
+            'unappliedCreditCustomers' => count($creditTotals),
+        ]);
     }
 
     public function create(Request $request): View
@@ -83,34 +101,9 @@ class CustomerPaymentController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(CustomerPaymentRequest $request): RedirectResponse
     {
-        // Drop untouched allocation rows (amount blank or 0) so validation only
-        // sees invoices the user actually intends to pay. The create form always
-        // submits a row per open invoice, most with amount = 0.
-        $request->merge([
-            'allocations' => collect($request->input('allocations', []))
-                ->filter(fn ($row) => is_array($row)
-                    && isset($row['amount'])
-                    && $row['amount'] !== ''
-                    && (float) $row['amount'] > 0)
-                ->values()
-                ->all(),
-        ]);
-
-        $data = $request->validate([
-            'customer_id' => ['required', 'exists:App\Models\Customer,id'],
-            'payment_date' => ['required', 'date'],
-            'amount' => ['required', 'numeric', 'gt:0'],
-            'method' => ['required', 'in:card_till,cash_till,online'],
-            'till_id' => ['nullable', 'string', 'max:32'],
-            'till_name' => ['nullable', 'string', 'max:255'],
-            'reference' => ['nullable', 'string', 'max:255'],
-            'notes' => ['nullable', 'string', 'max:2000'],
-            'allocations' => ['nullable', 'array'],
-            'allocations.*.customer_invoice_id' => ['required_with:allocations.*.amount', 'integer', 'exists:App\Models\CustomerInvoice,id'],
-            'allocations.*.amount' => ['required_with:allocations.*.customer_invoice_id', 'numeric', 'gt:0'],
-        ]);
+        $data = $request->safe()->except('allocations');
 
         // Till payments must record the till; online payments must NOT.
         if (in_array($data['method'], ['card_till', 'cash_till'], true)) {
@@ -128,11 +121,8 @@ class CustomerPaymentController extends Controller
             $data['till_name'] = null;
         }
 
-        $allocations = $data['allocations'] ?? [];
-        unset($data['allocations']);
-
         try {
-            $payment = $this->service->recordPayment($data, $allocations);
+            $payment = $this->service->recordPayment($data, $request->allocations());
         } catch (\DomainException $e) {
             return back()->withInput()->withErrors(['allocations' => $e->getMessage()]);
         }
@@ -143,7 +133,7 @@ class CustomerPaymentController extends Controller
 
     public function show(CustomerPayment $customerPayment): View
     {
-        $customerPayment->load('customer', 'allocations.invoice', 'creator', 'voider');
+        $customerPayment->load('customer', 'allocations.invoice', 'creator', 'voider', 'lastMatcher');
 
         return view('customer-payments.show', ['payment' => $customerPayment]);
     }
@@ -171,25 +161,12 @@ class CustomerPaymentController extends Controller
     /**
      * JSON endpoint — open invoices for a customer (status != void, outstanding > 0).
      * Used by the create form to populate the allocations table after a customer is picked.
+     *
+     * Shares CustomerPaymentService::invoiceRowsFor() with autoAllocate() and the
+     * allocation validator so the three can never disagree about what is payable.
      */
     public function customerOpenInvoicesApi(Customer $customer): JsonResponse
     {
-        $invoices = $customer->invoices()
-            ->where('status', '!=', CustomerInvoice::STATUS_VOID)
-            ->with('allocations')
-            ->orderBy('issue_date')
-            ->orderBy('id')
-            ->get()
-            ->filter(fn ($inv) => $inv->outstanding_amount > 0.005)
-            ->map(fn ($inv) => [
-                'id' => $inv->id,
-                'invoice_number' => $inv->invoice_number,
-                'issue_date' => optional($inv->issue_date)->toDateString(),
-                'total' => (float) $inv->total,
-                'outstanding' => $inv->outstanding_amount,
-            ])
-            ->values();
-
-        return response()->json(['data' => $invoices]);
+        return response()->json(['data' => $this->service->invoiceRowsFor($customer)]);
     }
 }

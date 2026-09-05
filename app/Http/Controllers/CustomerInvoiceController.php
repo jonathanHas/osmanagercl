@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\CustomerInvoiceRequest;
 use App\Models\CustomerInvoice;
 use App\Services\CustomerInvoiceService;
+use App\Services\CustomerPaymentService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 
@@ -57,11 +58,18 @@ class CustomerInvoiceController extends Controller
         return redirect()->route('customer-invoices.show', $invoice)->with('status', 'Draft saved.');
     }
 
-    public function show(CustomerInvoice $customerInvoice)
+    public function show(CustomerInvoice $customerInvoice, CustomerPaymentService $payments)
     {
         $customerInvoice->load('items', 'customer', 'creator', 'voider');
 
-        return view('customer-invoices.show', ['invoice' => $customerInvoice]);
+        return view('customer-invoices.show', [
+            'invoice' => $customerInvoice,
+            // Drives the "Apply existing credit" action — resolved here rather
+            // than in the view so the page keeps its query count flat.
+            'availableCredit' => $customerInvoice->customer_id
+                ? ($payments->unappliedCreditTotals([$customerInvoice->customer_id])[$customerInvoice->customer_id] ?? 0.0)
+                : 0.0,
+        ]);
     }
 
     public function edit(CustomerInvoice $customerInvoice, Request $request)

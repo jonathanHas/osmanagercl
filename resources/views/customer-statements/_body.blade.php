@@ -1,7 +1,7 @@
 {{--
     Shared statement body for the print view and the Dompdf view. Both use the
-    same plain-table CSS class names (.num, .opening, .overdue, .summary, .aging)
-    which each parent defines in its own <style> block.
+    same plain-table CSS class names (.num, .opening, .overdue, .summary, .aging,
+    .alloc, .oncredit) which each parent defines in its own <style> block.
 --}}
 
 <h4 class="section">Account activity</h4>
@@ -27,7 +27,15 @@
         @forelse ($events as $e)
             <tr>
                 <td>{{ $e['date']->format('d M Y') }}</td>
-                <td>{{ $e['description'] }}</td>
+                <td>
+                    {{ $e['description'] }}
+                    @if ($e['allocation_summary'] !== '')
+                        <div class="alloc">{{ $e['allocation_summary'] }}</div>
+                    @endif
+                    @if ($e['unapplied'] > 0.005)
+                        <div class="alloc oncredit">€{{ number_format($e['unapplied'], 2) }} on account</div>
+                    @endif
+                </td>
                 <td class="num">@if ($e['debit'] > 0)€{{ number_format($e['debit'], 2) }}@endif</td>
                 <td class="num">@if ($e['credit'] > 0)€{{ number_format($e['credit'], 2) }}@endif</td>
                 <td class="num">€{{ number_format($e['balance'], 2) }}</td>
@@ -95,9 +103,53 @@
     </table>
 @endif
 
+{{--
+    Outside the open-invoices guard above: a customer can hold credit with no
+    open invoices at all, and that is exactly when they most need to see it.
+--}}
+@if (! empty($credit_payments))
+    <h4 class="section">Payments on account</h4>
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Method</th>
+                <th>Reference</th>
+                <th class="num">Payment</th>
+                <th class="num">Not yet applied</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach ($credit_payments as $p)
+                <tr>
+                    <td>{{ $p['date']->format('d M Y') }}</td>
+                    <td>{{ $p['method'] }}</td>
+                    <td>{{ $p['reference'] ?: '—' }}</td>
+                    <td class="num">€{{ number_format($p['amount'], 2) }}</td>
+                    <td class="num">€{{ number_format($p['unapplied'], 2) }}</td>
+                </tr>
+            @endforeach
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="4" class="num">Total on account</td>
+                <td class="num bucket-total">€{{ number_format($unallocated_credit, 2) }}</td>
+            </tr>
+        </tfoot>
+    </table>
+@endif
+
 @if (($unallocated_credit ?? 0) > 0.005)
+    {{-- The statement showing its own proof: this is the documented identity
+         aged total - unallocated credit == closing balance, in plain words. --}}
     <p style="font-size:10.5px; color:#060; margin:0 0 12px;">
-        Includes €{{ number_format($unallocated_credit, 2) }} received but not yet applied to a specific invoice.
+        €{{ number_format($aging['total'], 2) }} outstanding on invoices, less
+        €{{ number_format($unallocated_credit, 2) }} received on account, leaves
+        @if ($closing_balance < -0.005)
+            €{{ number_format(abs($closing_balance), 2) }} in your favour.
+        @else
+            a balance of €{{ number_format($closing_balance, 2) }}.
+        @endif
     </p>
 @endif
 

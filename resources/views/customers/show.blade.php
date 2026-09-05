@@ -86,6 +86,15 @@
                 <div class="text-xs text-gray-400">
                     Invoiced €{{ number_format($invoiced, 2) }} · Paid €{{ number_format($paid, 2) }}
                 </div>
+                @if (($unappliedCredit ?? 0) > 0.005)
+                    <div class="text-xs mt-1">
+                        <a href="{{ route('customer-payments.index', ['customer_id' => $customer->id, 'allocation' => 'unallocated']) }}"
+                           class="text-blue-300 hover:text-blue-200"
+                           title="Payments received but not yet applied to any invoice">
+                            €{{ number_format($unappliedCredit, 2) }} unapplied credit — match to invoices →
+                        </a>
+                    </div>
+                @endif
                 <div class="mt-3 flex gap-2">
                     <a href="{{ route('customers.statement', $customer) }}"
                        class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded">View statement</a>

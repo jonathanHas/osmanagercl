@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\CustomerInvoice;
+use App\Services\CustomerPaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -99,11 +100,14 @@ class CustomerController extends Controller
         return redirect()->route('customers.show', $customer)->with('status', 'Customer created.');
     }
 
-    public function show(Customer $customer): View
+    public function show(Customer $customer, CustomerPaymentService $payments): View
     {
         $customer->load(['invoices' => fn ($q) => $q->orderByDesc('issue_date')->orderByDesc('id')->limit(50)]);
 
-        return view('customers.show', compact('customer'));
+        return view('customers.show', [
+            'customer' => $customer,
+            'unappliedCredit' => $payments->unappliedCreditTotals([$customer->id])[$customer->id] ?? 0.0,
+        ]);
     }
 
     public function edit(Customer $customer): View

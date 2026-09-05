@@ -53,9 +53,9 @@
 
         <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4 text-sm">
             @foreach ($bucket_labels as $key => $label)
-                <div class="rounded p-3 {{ $key !== 'current' && $totals[$key] > 0.005 ? 'bg-red-900/30 border border-red-800/50' : 'bg-gray-800' }}">
-                    <div class="text-xs {{ $key !== 'current' && $totals[$key] > 0.005 ? 'text-red-300' : 'text-gray-500' }} uppercase">{{ $label }}</div>
-                    <div class="font-mono {{ $key !== 'current' && $totals[$key] > 0.005 ? 'text-red-300' : 'text-gray-100' }}">
+                <div class="rounded p-3 {{ $key !== 'current' && $totals[$key] > 0.005 ? 'bg-red-900 border border-red-700' : 'bg-gray-800' }}">
+                    <div class="text-xs {{ $key !== 'current' && $totals[$key] > 0.005 ? 'text-red-200' : 'text-gray-500' }} uppercase">{{ $label }}</div>
+                    <div class="font-mono {{ $key !== 'current' && $totals[$key] > 0.005 ? 'text-red-50 font-semibold' : 'text-gray-100' }}">
                         €{{ number_format($totals[$key], 2) }}
                     </div>
                 </div>
@@ -76,6 +76,7 @@
                             <th class="px-3 py-2 text-right whitespace-nowrap">{{ $label }}</th>
                         @endforeach
                         <th class="px-3 py-2 text-right">Open</th>
+                        <th class="px-3 py-2 text-right whitespace-nowrap" title="Payments received but not yet applied to any invoice">Credit</th>
                         <th class="px-4 py-2"></th>
                     </tr>
                 </thead>
@@ -106,13 +107,22 @@
                                 </td>
                             @endforeach
                             <td class="px-3 py-2 text-right text-gray-400">{{ $row['open_count'] }}</td>
+                            <td class="px-3 py-2 text-right font-mono">
+                                @if ($row['unapplied_credit'] > 0.005)
+                                    <a href="{{ route('customer-payments.index', ['customer_id' => $row['customer']->id, 'allocation' => 'unallocated']) }}"
+                                       class="text-blue-300 hover:text-blue-200"
+                                       title="Match these payments to invoices">€{{ number_format($row['unapplied_credit'], 2) }}</a>
+                                @else
+                                    <span class="text-gray-600">—</span>
+                                @endif
+                            </td>
                             <td class="px-4 py-2 text-right whitespace-nowrap space-x-2">
                                 <a href="{{ route('customers.statement', $row['customer']) }}" class="text-blue-400 hover:text-blue-300">Statement</a>
                                 <a href="{{ route('customers.statement.print', $row['customer']) }}" target="_blank" class="text-gray-400 hover:text-gray-200">Print</a>
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="{{ 4 + count($bucket_labels) }}" class="px-4 py-8 text-center text-gray-500">
+                        <tr><td colspan="{{ 5 + count($bucket_labels) }}" class="px-4 py-8 text-center text-gray-500">
                             No outstanding balances. 🎉
                         </td></tr>
                     @endforelse
@@ -125,7 +135,11 @@
                             @foreach ($bucket_labels as $key => $label)
                                 <td class="px-3 py-2 text-right font-mono">€{{ number_format($totals[$key], 2) }}</td>
                             @endforeach
-                            <td colspan="2"></td>
+                            <td></td>
+                            <td class="px-3 py-2 text-right font-mono text-blue-300">
+                                @if ($totals['credit'] > 0.005)€{{ number_format($totals['credit'], 2) }}@endif
+                            </td>
+                            <td></td>
                         </tr>
                     </tfoot>
                 @endif
