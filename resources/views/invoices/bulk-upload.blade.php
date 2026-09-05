@@ -187,7 +187,7 @@
             {{-- Upload Files Tab --}}
             <div x-show="activeTab === 'upload'">
         {{-- Upload Interface --}}
-        <div class="bg-gray-800 rounded-b-lg p-6" x-data="bulkUpload()">
+        <div class="bg-gray-800 rounded-b-lg p-6" x-data="bulkUpload()" x-init="initFolder()">
             <div class="mb-4">
                 <h3 class="text-lg font-semibold text-gray-100 mb-2">Upload Invoice Files</h3>
                 <p class="text-gray-400 text-sm">
@@ -222,7 +222,8 @@
 
                     {{-- Folder mode: read the invoices straight out of a folder on this PC so the
                          processed originals can be moved to Processed/ afterwards. --}}
-                    <template x-if="folderSupported">
+                    {{-- No folder remembered yet: pick one. --}}
+                    <template x-if="folderSupported && !inboxHandle">
                         <div class="mt-4">
                             <button type="button" @click="selectFolder()"
                                     class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded">
@@ -233,9 +234,47 @@
                                 Select Folder
                             </button>
                             <p class="text-gray-500 text-xs mt-2 max-w-lg mx-auto">
-                                Picking a folder lets this page move the invoices it successfully creates into a
-                                <span class="font-mono text-gray-400">Processed</span> subfolder when you are done,
-                                so you don't have to shuffle them by hand.
+                                Pick your invoice folder once. This page will remember it, and can move the
+                                invoices it creates into a <span class="font-mono text-gray-400">Processed</span>
+                                subfolder when you're done. Choose
+                                <span class="text-gray-400 font-semibold">Allow on every visit</span> if Chrome offers it.
+                            </p>
+                        </div>
+                    </template>
+
+                    {{-- Remembered, but Chrome dropped the grant: one click to reconnect. --}}
+                    <template x-if="folderSupported && inboxHandle && inboxPermission !== 'granted'">
+                        <div class="mt-4">
+                            <button type="button" @click="loadFromInbox()"
+                                    class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                </svg>
+                                Reconnect to "<span x-text="inboxName"></span>"
+                            </button>
+                            <p class="text-gray-500 text-xs mt-2 max-w-lg mx-auto">
+                                Chrome needs you to confirm access again. Pick
+                                <span class="text-gray-400 font-semibold">Allow on every visit</span> to stop it asking.
+                                <button type="button" @click="selectFolder()" class="underline hover:text-gray-300">Use a different folder</button>
+                            </p>
+                        </div>
+                    </template>
+
+                    {{-- Remembered and permitted, but the folder is empty (files auto-load otherwise). --}}
+                    <template x-if="folderSupported && inboxHandle && inboxPermission === 'granted'">
+                        <div class="mt-4">
+                            <button type="button" @click="loadFromInbox(false)"
+                                    class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                </svg>
+                                Recheck "<span x-text="inboxName"></span>"
+                            </button>
+                            <p class="text-gray-500 text-xs mt-2 max-w-lg mx-auto">
+                                No new invoices found in this folder.
+                                <button type="button" @click="selectFolder()" class="underline hover:text-gray-300">Use a different folder</button>
                             </p>
                         </div>
                     </template>
@@ -267,6 +306,8 @@
                             Selected Files (<span x-text="files.length"></span>/{{ $maxFiles }})
                             <span x-show="folderName" class="block text-xs font-normal text-emerald-400 mt-1">
                                 from folder <span class="font-mono" x-text="folderName"></span>
+                                <button type="button" @click="selectFolder()"
+                                        class="ml-2 underline text-gray-400 hover:text-gray-200">change</button>
                             </span>
                         </h4>
                         <button @click="clearFiles()" 
@@ -462,8 +503,13 @@
                 // Folder mode (File System Access API, Chrome/Edge in a secure context only)
                 folderSupported: window.InvoiceFolderSync ? window.InvoiceFolderSync.isSupported() : false,
                 secureContext: window.isSecureContext === true,
-                dirHandle: null,
+                dirHandle: null,      // where the CURRENT selection came from
                 folderName: '',
+                inboxHandle: null,    // the remembered default folder, survives Clear All
+                inboxName: '',
+                inboxPermission: null,
+                chunkMaxFiles: {{ $chunkMaxFiles }},
+                chunkMaxBytes: {{ $chunkMaxBytes }},
 
                 get hasFiles() {
                     return this.files.length > 0;
@@ -485,6 +531,57 @@
                     event.target.value = ''; // Reset input
                 },
 
+                // On page open, reuse the folder the user picked last time. When Chrome still
+                // holds permission ("Allow on every visit") we can list the folder with no
+                // prompt and no user gesture, so the invoices are simply already there.
+                async initFolder() {
+                    if (!this.folderSupported) {
+                        return;
+                    }
+
+                    const saved = await window.InvoiceFolderSync.recallInbox();
+                    if (!saved || !saved.dirHandle) {
+                        return;
+                    }
+
+                    this.inboxHandle = saved.dirHandle;
+                    this.inboxName = saved.folderName || saved.dirHandle.name;
+                    this.inboxPermission = await window.InvoiceFolderSync.permissionState(saved.dirHandle);
+
+                    if (this.inboxPermission === 'granted' && this.files.length === 0) {
+                        await this.loadFromInbox(true);
+                    }
+                },
+
+                // auto=true is the no-gesture path and must not call requestPermission().
+                async loadFromInbox(auto = false) {
+                    if (!this.inboxHandle) {
+                        return;
+                    }
+
+                    this.errors = [];
+                    this.successMessage = '';
+
+                    try {
+                        if (!auto) {
+                            const granted = await window.InvoiceFolderSync.ensurePermission(this.inboxHandle);
+                            this.inboxPermission = granted ? 'granted' : 'prompt';
+                            if (!granted) {
+                                this.errors.push(`Permission to read "${this.inboxName}" was denied.`);
+                                return;
+                            }
+                        }
+
+                        this.dirHandle = this.inboxHandle;
+                        this.folderName = this.inboxName;
+                        await this.addFilesFromFolder(this.inboxHandle);
+                    } catch (error) {
+                        if (!auto) {
+                            this.errors.push('Could not read that folder: ' + error.message);
+                        }
+                    }
+                },
+
                 // Read the invoices out of a folder on this machine, keeping the directory
                 // handle so the preview page can move the processed originals afterwards.
                 async selectFolder() {
@@ -497,33 +594,43 @@
                             return; // user cancelled
                         }
 
-                        const files = await window.InvoiceFolderSync.listFiles(handle, this.allowedExtensions);
-
-                        if (files.length === 0) {
-                            this.errors.push(`No ${this.allowedExtensions.join(', ').toUpperCase()} files found in "${handle.name}".`);
-                            return;
-                        }
-
-                        // A real invoice folder can hold more than one batch. Take what fits
-                        // rather than refusing the lot, and say what's left for the next pass.
-                        const room = this.maxFiles - this.files.length;
-                        const batch = files.slice(0, room);
-                        const remaining = files.length - batch.length;
-
-                        if (batch.length === 0) {
-                            this.errors.push(`You already have ${this.maxFiles} files selected. Upload those first.`);
-                            return;
-                        }
+                        this.inboxHandle = handle;
+                        this.inboxName = handle.name;
+                        this.inboxPermission = 'granted';
+                        await window.InvoiceFolderSync.rememberInbox(handle);
 
                         this.dirHandle = handle;
                         this.folderName = handle.name;
-                        this.addFiles(batch);
-
-                        if (remaining > 0) {
-                            this.successMessage = `Added ${batch.length} of ${files.length} files (${this.maxFiles} per batch). Select the folder again after uploading to do the remaining ${remaining}.`;
-                        }
+                        await this.addFilesFromFolder(handle);
                     } catch (error) {
                         this.errors.push('Could not read that folder: ' + error.message);
+                    }
+                },
+
+                // Shared by selectFolder() and loadFromInbox().
+                async addFilesFromFolder(handle) {
+                    const files = await window.InvoiceFolderSync.listFiles(handle, this.allowedExtensions);
+
+                    if (files.length === 0) {
+                        this.errors.push(`No ${this.allowedExtensions.join(', ').toUpperCase()} files found in "${handle.name}".`);
+                        return;
+                    }
+
+                    // A real invoice folder can hold more than one batch. Take what fits
+                    // rather than refusing the lot, and say what's left for the next pass.
+                    const room = this.maxFiles - this.files.length;
+                    const batch = files.slice(0, room);
+                    const remaining = files.length - batch.length;
+
+                    if (batch.length === 0) {
+                        this.errors.push(`You already have ${this.maxFiles} files selected. Upload those first.`);
+                        return;
+                    }
+
+                    this.addFiles(batch);
+
+                    if (remaining > 0) {
+                        this.successMessage = `Added ${batch.length} of ${files.length} files (${this.maxFiles} per batch). Load the folder again after uploading to do the remaining ${remaining}.`;
                     }
                 },
 
@@ -663,71 +770,136 @@
                     return size.toFixed(2) + ' ' + units[unitIndex];
                 },
                 
+                // PHP silently discards anything past max_file_uploads and rejects a POST
+                // over post_max_size, so a large selection goes up as several requests that
+                // all append to one batch. Ceilings come from the server, not guesswork.
+                buildChunks() {
+                    const chunks = [];
+                    let current = [];
+                    let currentBytes = 0;
+
+                    for (const fileObj of this.files) {
+                        const size = fileObj.file.size;
+                        const wouldExceed = current.length >= this.chunkMaxFiles
+                            || (current.length > 0 && currentBytes + size > this.chunkMaxBytes);
+
+                        if (wouldExceed) {
+                            chunks.push(current);
+                            current = [];
+                            currentBytes = 0;
+                        }
+
+                        current.push(fileObj);
+                        currentBytes += size;
+                    }
+
+                    if (current.length > 0) {
+                        chunks.push(current);
+                    }
+
+                    return chunks;
+                },
+
+                async uploadChunk(chunk, batchId) {
+                    const formData = new FormData();
+                    chunk.forEach(fileObj => formData.append('files[]', fileObj.file));
+                    if (batchId) {
+                        formData.append('batch_id', batchId);
+                    }
+
+                    const response = await fetch('{{ route("invoices.bulk-upload.upload") }}', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            'Accept': 'application/json',
+                        },
+                        body: formData
+                    });
+
+                    let data;
+                    try {
+                        data = await response.json();
+                    } catch (error) {
+                        // A PHP limit breach can return HTML or an empty body rather than JSON.
+                        throw new Error(`Server rejected the upload (HTTP ${response.status}). The files may be too large for one request.`);
+                    }
+
+                    if (!data.success) {
+                        throw new Error(data.error || (data.message ?? 'Upload failed'));
+                    }
+
+                    return data;
+                },
+
                 async uploadFiles() {
                     if (this.files.length === 0 || this.isUploading) return;
-                    
+
                     this.isUploading = true;
                     this.errors = [];
                     this.successMessage = '';
-                    
-                    // Prepare form data
-                    const formData = new FormData();
-                    this.files.forEach((fileObj, index) => {
-                        formData.append('files[]', fileObj.file);
-                        fileObj.uploading = true;
-                    });
-                    
+
+                    const chunks = this.buildChunks();
+                    let batchId = null;
+                    let uploadedCount = 0;
+                    let lastResponse = null;
+
                     try {
-                        // Send files to server
-                        const response = await fetch('{{ route("invoices.bulk-upload.upload") }}', {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                                'Accept': 'application/json',
-                            },
-                            body: formData
-                        });
-                        
-                        const data = await response.json();
-                        
-                        if (data.success) {
-                            this.successMessage = data.message;
-                            
-                            // Mark all files as uploaded
-                            this.files.forEach(fileObj => {
+                        for (const chunk of chunks) {
+                            chunk.forEach(fileObj => {
+                                fileObj.uploading = true;
+                                fileObj.progress = 0;
+                            });
+
+                            lastResponse = await this.uploadChunk(chunk, batchId);
+                            batchId = lastResponse.batch_id;
+                            uploadedCount += chunk.length;
+
+                            chunk.forEach(fileObj => {
                                 fileObj.uploading = false;
                                 fileObj.uploaded = true;
                                 fileObj.progress = 100;
                             });
-                            
-                            // Remember the source folder against this batch so the preview page
-                            // can move the created invoices into Processed/ afterwards.
-                            if (this.dirHandle && data.batch_id) {
-                                try {
-                                    await window.InvoiceFolderSync.remember(
-                                        data.batch_id,
-                                        this.dirHandle,
-                                        this.files.map(f => f.name)
-                                    );
-                                } catch (error) {
-                                    console.warn('Could not remember source folder', error);
-                                }
-                            }
 
-                            // Redirect to preview page after a short delay
-                            if (data.redirect_url) {
-                                setTimeout(() => {
-                                    window.location.href = data.redirect_url;
-                                }, 1500);
+                            if (chunks.length > 1) {
+                                this.successMessage = `Uploaded ${uploadedCount} of ${this.files.length} files...`;
                             }
-                        } else {
-                            throw new Error(data.error || 'Upload failed');
+                        }
+
+                        this.successMessage = `${uploadedCount} file(s) uploaded successfully. Ready for processing.`;
+
+                        // Remember the source folder against this batch so the preview page
+                        // can move the created invoices into Processed/ afterwards.
+                        if (this.dirHandle && batchId) {
+                            try {
+                                await window.InvoiceFolderSync.remember(
+                                    batchId,
+                                    this.dirHandle,
+                                    this.files.map(f => f.name)
+                                );
+                            } catch (error) {
+                                console.warn('Could not remember source folder', error);
+                            }
+                        }
+
+                        if (lastResponse && lastResponse.redirect_url) {
+                            setTimeout(() => {
+                                window.location.href = lastResponse.redirect_url;
+                            }, 1500);
                         }
                     } catch (error) {
+                        // Files from earlier chunks are already safely in the batch; say so
+                        // rather than implying the whole upload was lost.
                         this.errors.push(error.message);
+
+                        if (uploadedCount > 0) {
+                            this.errors.push(`${uploadedCount} of ${this.files.length} file(s) did upload. Open the batch from Upload History to continue with those.`);
+                        }
+
                         this.files.forEach(fileObj => {
                             fileObj.uploading = false;
-                            fileObj.error = 'Upload failed';
+                            if (!fileObj.uploaded) {
+                                fileObj.error = 'Not uploaded';
+                            }
                         });
                     } finally {
                         this.isUploading = false;

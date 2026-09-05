@@ -19,6 +19,9 @@
     const DB_VERSION = 1;
     const STORE = 'handles';
     const PROCESSED_DIR = 'Processed';
+    // The user's default invoice folder, remembered across sessions. Distinct from the
+    // per-batch records, which only exist so the preview page can move that batch's files.
+    const INBOX_KEY = '__inbox__';
     const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // prune remembered folders after a week
 
     function openDb() {
@@ -64,6 +67,9 @@
         const store = transaction.objectStore(STORE);
         const keys = await request(store.getAllKeys());
         for (const key of keys) {
+            if (key === INBOX_KEY) {
+                continue; // the default folder is kept until the user changes it
+            }
             const value = await request(store.get(key));
             if (!value || !value.pickedAt || value.pickedAt < cutoff) {
                 store.delete(key);
@@ -182,6 +188,51 @@
                 db.close();
             } catch (error) {
                 console.warn('InvoiceFolderSync: could not forget folder handle', error);
+            }
+        },
+
+        /**
+         * Remember this folder as the user's default invoice inbox, so later visits can
+         * reuse it without showing the directory picker again.
+         */
+        async rememberInbox(dirHandle) {
+            if (!dirHandle) {
+                return;
+            }
+            try {
+                const db = await openDb();
+                await tx(db, 'readwrite', store => store.put({
+                    dirHandle,
+                    folderName: dirHandle.name,
+                    pickedAt: Date.now(),
+                }, INBOX_KEY));
+                db.close();
+            } catch (error) {
+                console.warn('InvoiceFolderSync: could not remember inbox folder', error);
+            }
+        },
+
+        async recallInbox() {
+            return this.recall(INBOX_KEY);
+        },
+
+        async forgetInbox() {
+            return this.forget(INBOX_KEY);
+        },
+
+        /**
+         * 'granted' means we can read the folder with no prompt and no user gesture,
+         * which is what makes auto-loading on page open possible. Chrome only reports
+         * this when the user chose "Allow on every visit"; otherwise it is 'prompt'.
+         */
+        async permissionState(dirHandle) {
+            if (!dirHandle || typeof dirHandle.queryPermission !== 'function') {
+                return null;
+            }
+            try {
+                return await dirHandle.queryPermission({ mode: 'readwrite' });
+            } catch (error) {
+                return null;
             }
         },
 

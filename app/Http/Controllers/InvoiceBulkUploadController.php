@@ -29,12 +29,43 @@ class InvoiceBulkUploadController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate(10);
 
+        $maxFiles = config('invoices.bulk_upload.max_files_per_batch');
+
+        // PHP caps how much can arrive in a single request, and silently discards
+        // anything past max_file_uploads. Hand the real ceilings to the client so it
+        // can split a large selection into several requests against one batch.
+        $chunkMaxFiles = max(1, min((int) ini_get('max_file_uploads') - 2, $maxFiles));
+        $chunkMaxBytes = (int) ($this->iniBytes('post_max_size') * 0.8);
+
         return view('invoices.bulk-upload', [
             'recentUploads' => $recentUploads,
-            'maxFiles' => config('invoices.bulk_upload.max_files_per_batch'),
+            'maxFiles' => $maxFiles,
             'maxFileSize' => config('invoices.bulk_upload.max_file_size_mb'),
             'allowedExtensions' => config('invoices.bulk_upload.allowed_extensions'),
+            'chunkMaxFiles' => $chunkMaxFiles,
+            'chunkMaxBytes' => $chunkMaxBytes,
         ]);
+    }
+
+    /**
+     * Resolve a php.ini shorthand size ("8M", "1G", "512K") to bytes.
+     */
+    private function iniBytes(string $key): int
+    {
+        $value = trim((string) ini_get($key));
+
+        if ($value === '' || $value === '-1') {
+            return PHP_INT_MAX;
+        }
+
+        $number = (int) $value;
+
+        return match (strtolower(substr($value, -1))) {
+            'g' => $number * 1024 * 1024 * 1024,
+            'm' => $number * 1024 * 1024,
+            'k' => $number * 1024,
+            default => $number,
+        };
     }
 
     /**
@@ -56,19 +87,54 @@ class InvoiceBulkUploadController extends Controller
                 "max:{$maxSizeKB}",
                 new RepairablePdf,
             ],
+            // Set by the client when continuing a chunked upload into an existing batch.
+            'batch_id' => 'nullable|string',
         ], [
             'files.max' => "You can upload a maximum of {$maxFiles} files at once.",
             'files.*.max' => "Each file must be less than {$maxSizeMB}MB.",
         ]);
 
+        $incomingCount = count($request->file('files'));
+
+        // A selection larger than one request can hold arrives as several requests that
+        // all append to the same batch. The first has no batch_id; the rest carry the
+        // one we returned.
+        $existingBatch = null;
+
+        if ($request->filled('batch_id')) {
+            $existingBatch = InvoiceBulkUpload::where('batch_id', $request->input('batch_id'))
+                ->where('user_id', auth()->id())
+                ->whereIn('status', ['uploading', 'uploaded'])
+                ->first();
+
+            if (! $existingBatch) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'That upload batch is no longer accepting files. Please start a new upload.',
+                ], 422);
+            }
+
+            $alreadyUploaded = $existingBatch->files()->count();
+
+            if ($alreadyUploaded + $incomingCount > $maxFiles) {
+                return response()->json([
+                    'success' => false,
+                    'error' => "A batch can hold at most {$maxFiles} files. This batch already has {$alreadyUploaded}.",
+                ], 422);
+            }
+        }
+
+        // Tracked outside the transaction so the catch block can undo just this request.
+        $storedPathsThisRequest = [];
+
         DB::beginTransaction();
 
         try {
-            // Create bulk upload batch
-            $batch = InvoiceBulkUpload::create([
+            // Reuse the batch when continuing a chunked upload, otherwise start one.
+            $batch = $existingBatch ?: InvoiceBulkUpload::create([
                 'batch_id' => InvoiceBulkUpload::generateBatchId(),
                 'user_id' => auth()->id(),
-                'total_files' => count($request->file('files')),
+                'total_files' => 0,
                 'status' => 'uploading',
                 'metadata' => [
                     'ip_address' => $request->ip(),
@@ -76,11 +142,13 @@ class InvoiceBulkUploadController extends Controller
                 ],
             ]);
 
+            $batch->increment('total_files', $incomingCount);
+
             $uploadedFiles = [];
             $tempPath = config('invoices.bulk_upload.temp_path');
             $batchFolder = $tempPath.'/'.$batch->batch_id;
 
-            // Ensure the temp directory exists
+            // Ensure the temp directory exists (a no-op on later chunks)
             Storage::disk('local')->makeDirectory($batchFolder);
 
             // Fix permissions for the batch directory so queue worker can access it
@@ -100,6 +168,7 @@ class InvoiceBulkUploadController extends Controller
 
                 // Store the file temporarily - use 'local' disk which is now storage/app/private
                 $storedPath = $file->storeAs($batchFolder, $storedName, 'local');
+                $storedPathsThisRequest[] = $filePath;
 
                 // Debug logging to track file creation
                 $fullPath = Storage::disk('local')->path($filePath);
@@ -136,10 +205,10 @@ class InvoiceBulkUploadController extends Controller
                 $uploadedFiles[] = $uploadFile;
             }
 
-            // Update batch status
+            // Update batch status (started_at belongs to the first chunk only)
             $batch->update([
                 'status' => 'uploaded',
-                'started_at' => now(),
+                'started_at' => $batch->started_at ?: now(),
             ]);
 
             DB::commit();
@@ -188,8 +257,13 @@ class InvoiceBulkUploadController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
 
-            // Clean up any uploaded files
-            if (isset($batchFolder)) {
+            // Clean up only what this request wrote. Deleting the whole batch folder
+            // would destroy files stored by an earlier chunk of the same upload.
+            if ($existingBatch) {
+                foreach ($storedPathsThisRequest as $storedPath) {
+                    Storage::disk('local')->delete($storedPath);
+                }
+            } elseif (isset($batchFolder)) {
                 Storage::disk('local')->deleteDirectory($batchFolder);
             }
 

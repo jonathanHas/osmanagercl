@@ -68,9 +68,48 @@ The system now automatically detects and repairs corrupted PDF files during uplo
 
 ### File Limits
 
+Application limits (`config/invoices.php`):
+
 - **Files per batch**: 50 (configurable via `INVOICE_MAX_FILES_PER_BATCH`)
 - **Max file size**: 25MB per file (configurable via `INVOICE_MAX_FILE_SIZE_MB`)
 - **Total batch size**: 500MB (configurable via `INVOICE_MAX_TOTAL_SIZE_MB`)
+
+⚠️ **These are only real if PHP allows them.** PHP caps each *request*, and
+`max_file_uploads` in particular **silently discards** files past the limit before
+Laravel ever sees `$_FILES` — no error, no log entry. Required minimums in
+`/etc/php/8.3/apache2/php.ini` (Apache runs mod_php here; the CLI ini is separate
+and does not affect uploads):
+
+```ini
+upload_max_filesize = 25M     ; must be >= INVOICE_MAX_FILE_SIZE_MB
+post_max_size       = 120M    ; sizes one chunk, not the whole batch
+max_file_uploads    = 60      ; must exceed the per-request chunk size
+max_execution_time  = 300     ; the PDF page-count loop runs per file
+memory_limit        = 512M
+```
+
+Restart Apache after changing these (`sudo systemctl restart apache2`).
+
+### Chunked Upload
+
+Because one request cannot safely carry a whole batch, the browser splits a large
+selection into several requests that all append to **one** batch:
+
+- `index()` computes the true ceilings and passes them to the view as
+  `chunkMaxFiles` (`min(max_file_uploads - 2, max_files_per_batch)`) and
+  `chunkMaxBytes` (80% of `post_max_size`), using the `iniBytes()` helper to parse
+  php.ini shorthand like `"120M"`.
+- The client packs files greedily against both ceilings and POSTs each chunk.
+- The first request has no `batch_id`; every later one carries the id returned by
+  the first, and `upload()` appends to that batch (`total_files` is incremented,
+  `started_at` is set once, the batch folder is reused).
+- A chunk is rejected with 422 if the batch is not the user's, is no longer in
+  `uploading`/`uploaded`, or would push the batch over `max_files_per_batch`.
+- On failure, rollback deletes **only the files this request wrote** — deleting the
+  whole batch folder would destroy files an earlier chunk had already stored.
+
+Covered by `tests/Feature/InvoiceBulkUploadChunkedTest.php`, including a 35-file
+regression test that asserts nothing is silently dropped.
 
 ### System Requirements
 
@@ -250,6 +289,34 @@ file there is the browser, via the File System Access API.
 The implementation lives in `resources/views/invoices/partials/folder-sync-script.blade.php`
 (`window.InvoiceFolderSync`), included by both bulk-upload views. **No server-side code is
 involved** — no controller, model, migration or config changes.
+
+### Remembering the folder
+
+Browsing to the folder is a once-ever action. The picked handle is stored in
+IndexedDB under the fixed key `__inbox__` (separate from the per-batch records,
+and exempt from the 7-day prune that clears those).
+
+On page open, `initFolder()` calls `permissionState()` — a bare
+`queryPermission({mode:'readwrite'})`, which prompts nothing and needs no user
+gesture — and branches:
+
+| Permission | Behaviour |
+|---|---|
+| `granted` | The folder's invoices are **listed automatically**, no click, no prompt. |
+| `prompt` | A **Reconnect to "…"** button. One click runs `requestPermission()` and loads. |
+| none saved | The original **Select Folder** button. |
+
+Per [Chrome's persistent permissions](https://developer.chrome.com/blog/persistent-permissions-for-the-file-system-access-api)
+(Chrome 122+), restoring a handle from IndexedDB and calling `requestPermission()`
+shows a three-way prompt: *Allow this time* / **Allow on every visit** / *Cancel*.
+Choosing "Allow on every visit" makes `queryPermission()` return `granted` after a
+browser restart, which is what enables the zero-click path. Without it, access ends
+when the last tab of the origin closes and the user gets the one-click Reconnect
+button instead. Installed PWAs persist automatically — this app is not a PWA, and
+deliberately so.
+
+The remembered folder survives **Clear All** (which only clears the current
+selection); *Use a different folder* / *change* re-runs the picker and replaces it.
 
 ### Browser requirements
 
