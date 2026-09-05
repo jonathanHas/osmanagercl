@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Models\CustomerInvoice;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,6 +28,8 @@ class CustomerController extends Controller
             'country' => ['nullable', 'string', 'size:2'],
             'vat_number' => ['nullable', 'string', 'max:64'],
             'default_discount_percent' => ['nullable', 'numeric', 'gte:0', 'lte:100'],
+            'payment_terms_days' => ['nullable', 'integer', 'gte:0', 'lte:365'],
+            'send_statements' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ];
     }
@@ -35,7 +38,15 @@ class CustomerController extends Controller
 
     public function index(Request $request): View
     {
-        $query = Customer::query()->withCount('invoices');
+        // withSum aggregates rather than the Customer::$balance accessor, which
+        // fires two queries per row.
+        $query = Customer::query()
+            ->withCount('invoices')
+            ->withSum(
+                ['invoices as invoiced_total' => fn ($q) => $q->where('status', '!=', CustomerInvoice::STATUS_VOID)],
+                'total'
+            )
+            ->withSum('payments as paid_total', 'amount');
 
         if ($term = trim((string) $request->query('q', ''))) {
             $like = '%'.$term.'%';
@@ -52,7 +63,21 @@ class CustomerController extends Controller
             $query->where('default_discount_percent', '>', 0);
         }
 
-        $customers = $query->orderBy('name')->paginate(25)->withQueryString();
+        // Owing filter/sort work on the aggregate, not the accessor, so they stay
+        // in SQL and survive pagination.
+        $balanceExpr = '(COALESCE(invoiced_total, 0) - COALESCE(paid_total, 0))';
+
+        if ($request->boolean('owing')) {
+            $query->withBalanceOver();
+        }
+
+        if ($request->query('sort') === 'balance') {
+            $query->orderByRaw($balanceExpr.' DESC');
+        } else {
+            $query->orderBy('name');
+        }
+
+        $customers = $query->paginate(25)->withQueryString();
 
         return view('customers.index', compact('customers'));
     }
@@ -66,6 +91,7 @@ class CustomerController extends Controller
     {
         $data = $request->validate($this->rules());
         $data['country'] = $data['country'] ?? 'IE';
+        $data['send_statements'] = $request->boolean('send_statements');
         $data['created_by'] = Auth::id();
 
         $customer = Customer::create($data);
@@ -89,6 +115,7 @@ class CustomerController extends Controller
     {
         $data = $request->validate($this->rules($customer));
         $data['country'] = $data['country'] ?? $customer->country ?? 'IE';
+        $data['send_statements'] = $request->boolean('send_statements');
         $customer->update($data);
 
         return redirect()->route('customers.show', $customer)->with('status', 'Customer updated.');

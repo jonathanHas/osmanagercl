@@ -42,19 +42,23 @@ class CustomerPaymentController extends Controller
             ->paginate(25)->withQueryString();
 
         // Outstanding balances widget — top 10 customers with unpaid invoices.
+        // Aggregated in SQL: the previous version loaded every customer with
+        // their invoices and allocations, then fired two more queries per row
+        // via the balance accessor.
         $outstandingCustomers = Customer::query()
-            ->whereHas('invoices', fn ($q) => $q->where('status', '!=', CustomerInvoice::STATUS_VOID))
-            ->with(['invoices' => fn ($q) => $q->where('status', '!=', CustomerInvoice::STATUS_VOID)
-                ->with('allocations')])
+            ->withBalanceOver()
+            ->withSum(
+                ['invoices as invoiced_total' => fn ($q) => $q->where('status', '!=', CustomerInvoice::STATUS_VOID)],
+                'total'
+            )
+            ->withSum('payments as paid_total', 'amount')
+            ->orderByRaw('(COALESCE(invoiced_total, 0) - COALESCE(paid_total, 0)) DESC')
+            ->limit(10)
             ->get()
             ->map(fn ($c) => (object) [
                 'customer' => $c,
-                'balance' => $c->balance,
-            ])
-            ->filter(fn ($row) => $row->balance > 0.005)
-            ->sortByDesc('balance')
-            ->take(10)
-            ->values();
+                'balance' => round((float) ($c->invoiced_total ?? 0) - (float) ($c->paid_total ?? 0), 2),
+            ]);
 
         return view('customer-payments.index', compact('payments', 'outstandingCustomers'));
     }

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Customer;
 use App\Models\CustomerInvoice;
 use App\Models\Product;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -19,10 +20,25 @@ class CustomerInvoiceService
     public function createDraft(array $data, array $items = []): CustomerInvoice
     {
         return DB::transaction(function () use ($data, $items) {
+            $issueDate = $data['issue_date'] ?? now()->toDateString();
+
+            // The due date field is optional and usually left blank, which left
+            // statements with nothing to age against. Default it from the
+            // customer's payment terms so the data is real going forward.
+            $dueDate = $data['due_date'] ?? null;
+            if (! $dueDate) {
+                $terms = Customer::DEFAULT_PAYMENT_TERMS_DAYS;
+                if (! empty($data['customer_id']) && $customer = Customer::find($data['customer_id'])) {
+                    $terms = $customer->terms_days;
+                }
+                $dueDate = Carbon::parse($issueDate)->addDays($terms)->toDateString();
+            }
+
             $invoice = CustomerInvoice::create(array_merge($data, [
                 'status' => CustomerInvoice::STATUS_DRAFT,
                 'created_by' => Auth::id(),
-                'issue_date' => $data['issue_date'] ?? now()->toDateString(),
+                'issue_date' => $issueDate,
+                'due_date' => $dueDate,
             ]));
 
             foreach ($items as $position => $itemData) {

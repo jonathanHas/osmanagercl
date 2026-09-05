@@ -168,6 +168,111 @@ def format_invoice_date(date_str):
     # Return original if can't parse
     return date_str
 
+def format_parsed_invoice(data, filename):
+    """
+    Turn one parser record into the shape Laravel consumes.
+
+    Returns (formatted_data, has_anomalies, warnings). The caller decides what to do with
+    the anomaly flag, so that a file holding several records cannot have one clean record
+    hide the problems found in another.
+    """
+    has_anomalies, warnings = detect_anomalies(data, filename)
+
+    formatted_data = {
+        'invoice_number': data.get('Invoice Number') if data.get('Invoice Number') not in (None, 'Not found', '') else None,
+        'invoice_date': format_invoice_date(data.get('Invoice Date')),
+        'supplier_name': data.get('Supplier', 'Unknown'),
+        'is_tax_free': data.get('Tax Free', False),
+        'is_credit_note': data.get('Credit Note', False),
+        'vat_breakdown': {
+            'vat_0': {
+                'net': float(data.get('VAT 0%', '0.00')),
+                'vat': 0.00  # 0% VAT rate
+            },
+            'vat_9': {
+                'net': float(data.get('VAT 9%', '0.00')),
+                'vat': round(float(data.get('VAT 9%', '0.00')) * 0.09, 2) if float(data.get('VAT 9%', '0.00')) != 0 else 0.00
+            },
+            'vat_13_5': {
+                'net': float(data.get('VAT 13.5%', '0.00')),
+                'vat': round(float(data.get('VAT 13.5%', '0.00')) * 0.135, 2) if float(data.get('VAT 13.5%', '0.00')) != 0 else 0.00
+            },
+            'vat_23': {
+                'net': float(data.get('VAT 23%', '0.00')),
+                'vat': round(float(data.get('VAT 23%', '0.00')) * 0.23, 2) if float(data.get('VAT 23%', '0.00')) != 0 else 0.00
+            }
+        },
+        'total_amount': sum([
+            float(data.get('VAT 0%', '0.00')),  # Net amount for 0% VAT
+            float(data.get('VAT 9%', '0.00')) * 1.09,  # Net + 9% VAT
+            float(data.get('VAT 13.5%', '0.00')) * 1.135,  # Net + 13.5% VAT
+            float(data.get('VAT 23%', '0.00')) * 1.23  # Net + 23% VAT
+        ])
+    }
+
+    # Parsers for VAT-inclusive layouts can supply the VAT the invoice itself
+    # states, which is rounded per line and so does not always equal
+    # round(net * rate, 2) on the aggregate. Honour it when given.
+    stated_vat = data.get('VAT Amounts')
+    if isinstance(stated_vat, dict):
+        for rate, key in [('0', 'vat_0'), ('9', 'vat_9'), ('13.5', 'vat_13_5'), ('23', 'vat_23')]:
+            if rate in stated_vat:
+                formatted_data['vat_breakdown'][key]['vat'] = round(float(stated_vat[rate]), 2)
+
+        # The same per-line rounding applies to the total, so prefer the
+        # invoice's own figure when it only differs by rounding.
+        stated_total = data.get('Total')
+        if stated_total is not None:
+            try:
+                stated_total = float(stated_total)
+                if abs(stated_total - formatted_data['total_amount']) <= 0.05:
+                    formatted_data['total_amount'] = stated_total
+                else:
+                    warnings.append(
+                        f"Invoice total €{stated_total:.2f} differs from the VAT breakdown "
+                        f"sum €{formatted_data['total_amount']:.2f}"
+                    )
+                    has_anomalies = True
+            except (TypeError, ValueError):
+                pass
+
+    # Surface any reconciliation problems the parser flagged
+    for parser_warning in data.get('Parse_Warnings', []) or []:
+        warnings.append(parser_warning)
+        has_anomalies = True
+
+    # Cross-check calculated VAT against invoice's stated Total VAT
+    invoice_total_vat = data.get('Total_VAT')
+    if invoice_total_vat is not None:
+        calculated_vat = sum(
+            formatted_data['vat_breakdown'][k]['vat']
+            for k in ['vat_0', 'vat_9', 'vat_13_5', 'vat_23']
+        )
+        vat_diff = abs(calculated_vat - invoice_total_vat)
+        if vat_diff > 0.05:
+            warnings.append(
+                f"VAT mismatch: calculated €{calculated_vat:.2f} vs invoice €{invoice_total_vat:.2f} (diff: €{vat_diff:.2f})"
+            )
+
+    # Preserve all original parser data by merging with formatted data
+    # This ensures custom fields from individual parsers (like Amazon's EUR_VAT_Found) are preserved
+    for key, value in data.items():
+        # Don't overwrite the formatted Laravel fields
+        if key not in ['Invoice Date', 'Supplier', 'Tax Free', 'Credit Note', 'VAT 0%', 'VAT 9%', 'VAT 13.5%', 'VAT 23%']:
+            formatted_data[key] = value
+
+    # Specifically handle GBP amounts for Amazon invoices
+    if formatted_data.get('Supplier') == 'Amazon':
+        # Override total_amount with GBP total if available
+        if data.get('GBP_Total') is not None:
+            formatted_data['total_amount'] = float(data['GBP_Total'])
+            formatted_data['currency_displayed'] = 'GBP'
+        else:
+            formatted_data['currency_displayed'] = 'EUR'
+
+    return formatted_data, has_anomalies, warnings
+
+
 def process_invoice(file_path):
     """
     Process a single invoice file and return structured data
@@ -256,110 +361,39 @@ def process_invoice(file_path):
         if not isinstance(parsed_data, list):
             parsed_data = [parsed_data]
         
-        # Process each parsed invoice (usually just one)
+        # Process each parsed invoice. Usually there is just one, but Coolnagrower send a
+        # statement page and several invoices in a single PDF, so a parser may return more.
+        formatted_records = []
+        any_anomalies = False
+
         for data in parsed_data:
-            # Check for anomalies
-            has_anomalies, warnings = detect_anomalies(data, filename)
-            if warnings:
-                response['warnings'].extend(warnings)
-            
-            # Format the data for Laravel
-            formatted_data = {
-                'invoice_number': data.get('Invoice Number') if data.get('Invoice Number') not in (None, 'Not found', '') else None,
-                'invoice_date': format_invoice_date(data.get('Invoice Date')),
-                'supplier_name': data.get('Supplier', 'Unknown'),
-                'is_tax_free': data.get('Tax Free', False),
-                'is_credit_note': data.get('Credit Note', False),
-                'vat_breakdown': {
-                    'vat_0': {
-                        'net': float(data.get('VAT 0%', '0.00')),
-                        'vat': 0.00  # 0% VAT rate
-                    },
-                    'vat_9': {
-                        'net': float(data.get('VAT 9%', '0.00')),
-                        'vat': round(float(data.get('VAT 9%', '0.00')) * 0.09, 2) if float(data.get('VAT 9%', '0.00')) != 0 else 0.00
-                    },
-                    'vat_13_5': {
-                        'net': float(data.get('VAT 13.5%', '0.00')),
-                        'vat': round(float(data.get('VAT 13.5%', '0.00')) * 0.135, 2) if float(data.get('VAT 13.5%', '0.00')) != 0 else 0.00
-                    },
-                    'vat_23': {
-                        'net': float(data.get('VAT 23%', '0.00')),
-                        'vat': round(float(data.get('VAT 23%', '0.00')) * 0.23, 2) if float(data.get('VAT 23%', '0.00')) != 0 else 0.00
-                    }
-                },
-                'total_amount': sum([
-                    float(data.get('VAT 0%', '0.00')),  # Net amount for 0% VAT
-                    float(data.get('VAT 9%', '0.00')) * 1.09,  # Net + 9% VAT
-                    float(data.get('VAT 13.5%', '0.00')) * 1.135,  # Net + 13.5% VAT
-                    float(data.get('VAT 23%', '0.00')) * 1.23  # Net + 23% VAT
-                ])
-            }
+            formatted_data, has_anomalies, warnings = format_parsed_invoice(data, filename)
+            response['warnings'].extend(warnings)
+            any_anomalies = any_anomalies or has_anomalies
+            formatted_records.append(formatted_data)
 
-            # Parsers for VAT-inclusive layouts can supply the VAT the invoice itself
-            # states, which is rounded per line and so does not always equal
-            # round(net * rate, 2) on the aggregate. Honour it when given.
-            stated_vat = data.get('VAT Amounts')
-            if isinstance(stated_vat, dict):
-                for rate, key in [('0', 'vat_0'), ('9', 'vat_9'), ('13.5', 'vat_13_5'), ('23', 'vat_23')]:
-                    if rate in stated_vat:
-                        formatted_data['vat_breakdown'][key]['vat'] = round(float(stated_vat[rate]), 2)
-
-                # The same per-line rounding applies to the total, so prefer the
-                # invoice's own figure when it only differs by rounding.
-                stated_total = data.get('Total')
-                if stated_total is not None:
-                    try:
-                        stated_total = float(stated_total)
-                        if abs(stated_total - formatted_data['total_amount']) <= 0.05:
-                            formatted_data['total_amount'] = stated_total
-                        else:
-                            response['warnings'].append(
-                                f"Invoice total \u20ac{stated_total:.2f} differs from the VAT breakdown "
-                                f"sum \u20ac{formatted_data['total_amount']:.2f}"
-                            )
-                            has_anomalies = True
-                    except (TypeError, ValueError):
-                        pass
-
-            # Surface any reconciliation problems the parser flagged
-            for parser_warning in data.get('Parse_Warnings', []) or []:
-                response['warnings'].append(parser_warning)
-                has_anomalies = True
-
-            # Cross-check calculated VAT against invoice's stated Total VAT
-            invoice_total_vat = data.get('Total_VAT')
-            if invoice_total_vat is not None:
-                calculated_vat = sum(
-                    formatted_data['vat_breakdown'][k]['vat']
-                    for k in ['vat_0', 'vat_9', 'vat_13_5', 'vat_23']
-                )
-                vat_diff = abs(calculated_vat - invoice_total_vat)
-                if vat_diff > 0.05:
-                    response['warnings'].append(
-                        f"VAT mismatch: calculated \u20ac{calculated_vat:.2f} vs invoice \u20ac{invoice_total_vat:.2f} (diff: \u20ac{vat_diff:.2f})"
-                    )
-
-            # Preserve all original parser data by merging with formatted data
-            # This ensures custom fields from individual parsers (like Amazon's EUR_VAT_Found) are preserved
-            for key, value in data.items():
-                # Don't overwrite the formatted Laravel fields
-                if key not in ['Invoice Date', 'Supplier', 'Tax Free', 'Credit Note', 'VAT 0%', 'VAT 9%', 'VAT 13.5%', 'VAT 23%']:
-                    formatted_data[key] = value
-            
-            # Specifically handle GBP amounts for Amazon invoices
-            if formatted_data.get('Supplier') == 'Amazon':
-                # Override total_amount with GBP total if available
-                if data.get('GBP_Total') is not None:
-                    formatted_data['total_amount'] = float(data['GBP_Total'])
-                    formatted_data['currency_displayed'] = 'GBP'
-                else:
-                    formatted_data['currency_displayed'] = 'EUR'
-            
-            response['data'] = formatted_data
+        if formatted_records:
+            response['data'] = formatted_records[0]
             response['success'] = True
-            response['confidence'] = 0.85 if not has_anomalies else 0.50
-        
+
+            # A file can only ever become one invoice downstream, so anything holding more
+            # than one record has to be split by hand before it can be created. Keep every
+            # record on the response and force the file to review: this loop used to
+            # overwrite response['data'] each time round, so a four-record Coolnagrower
+            # statement worth \u20ac591.00 was imported as its last page alone, \u20ac187.00, and at
+            # full confidence because the last record happened to carry no anomaly.
+            if len(formatted_records) > 1:
+                response['data']['additional_invoices'] = formatted_records[1:]
+                combined = sum(record['total_amount'] for record in formatted_records)
+                response['warnings'].append(
+                    f"File contains {len(formatted_records)} invoices totalling \u20ac{combined:.2f}; "
+                    f"it needs splitting before any of them can be created"
+                )
+                any_anomalies = True
+
+            response['confidence'] = 0.85 if not any_anomalies else 0.50
+
+
         # Calculate processing time
         end_time = datetime.now()
         response['metadata']['processing_time'] = (end_time - start_time).total_seconds()

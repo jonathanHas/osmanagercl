@@ -2,10 +2,16 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-2xl font-bold text-gray-100">Customers</h2>
-            <a href="{{ route('customers.create') }}"
-               class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
-                + New Customer
-            </a>
+            <div class="flex items-center gap-2">
+                <a href="{{ route('customers.debtors') }}"
+                   class="bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded inline-flex items-center">
+                    Aged Debtors
+                </a>
+                <a href="{{ route('customers.create') }}"
+                   class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded inline-flex items-center">
+                    + New Customer
+                </a>
+            </div>
         </div>
 
         @if (session('status'))
@@ -28,6 +34,11 @@
                            class="bg-gray-900 border-gray-700 rounded mr-2">
                     Wholesale only
                 </label>
+                <label class="inline-flex items-center text-sm text-gray-300">
+                    <input type="checkbox" name="owing" value="1" @checked(request('owing'))
+                           class="bg-gray-900 border-gray-700 rounded mr-2">
+                    Owing only
+                </label>
                 <button type="submit" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded">Filter</button>
                 <a href="{{ route('customers.index') }}" class="text-gray-400 hover:text-gray-200 px-2 py-2">Reset</a>
             </div>
@@ -41,6 +52,12 @@
                         <th class="px-4 py-2 text-left">Contact</th>
                         <th class="px-4 py-2 text-left">City</th>
                         <th class="px-4 py-2 text-right">Discount</th>
+                        <th class="px-4 py-2 text-right">
+                            <a href="{{ route('customers.index', array_merge(request()->query(), ['sort' => request('sort') === 'balance' ? null : 'balance'])) }}"
+                               class="hover:text-gray-200 {{ request('sort') === 'balance' ? 'text-gray-200' : '' }}">
+                                Balance @if (request('sort') === 'balance')↓@endif
+                            </a>
+                        </th>
                         <th class="px-4 py-2 text-right">Invoices</th>
                         <th class="px-4 py-2"></th>
                     </tr>
@@ -70,14 +87,27 @@
                                     <span class="text-gray-600">—</span>
                                 @endif
                             </td>
+                            @php
+                                $bal = round((float) ($customer->invoiced_total ?? 0) - (float) ($customer->paid_total ?? 0), 2);
+                            @endphp
+                            <td class="px-4 py-2 text-right font-mono {{ $bal > 0.005 ? 'text-red-400' : ($bal < -0.005 ? 'text-green-400' : 'text-gray-500') }}">
+                                @if ($bal > 0.005)
+                                    €{{ number_format($bal, 2) }}
+                                @elseif ($bal < -0.005)
+                                    €{{ number_format(abs($bal), 2) }} <span class="text-xs">cr</span>
+                                @else
+                                    —
+                                @endif
+                            </td>
                             <td class="px-4 py-2 text-right text-gray-300">{{ $customer->invoices_count }}</td>
                             <td class="px-4 py-2 text-right space-x-2 whitespace-nowrap">
                                 <a href="{{ route('customers.show', $customer) }}" class="text-blue-400 hover:text-blue-300">View</a>
+                                <a href="{{ route('customers.statement', $customer) }}" class="text-purple-400 hover:text-purple-300">Statement</a>
                                 <a href="{{ route('customers.edit', $customer) }}" class="text-yellow-400 hover:text-yellow-300">Edit</a>
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">No customers yet.</td></tr>
+                        <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">No customers yet.</td></tr>
                     @endforelse
                 </tbody>
             </table>

@@ -19,3 +19,9 @@ Schedule::command('suppliers:send-daily-sales')
     ->dailyAt('20:15')
     ->onOneServer()
     ->withoutOverlapping(30);
+
+// Month-end customer statements: opted-in customers carrying a balance.
+Schedule::command('customers:send-statements')
+    ->monthlyOn(1, '07:00')
+    ->onOneServer()
+    ->withoutOverlapping(30);

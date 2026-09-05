@@ -5,6 +5,7 @@ use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\CoffeeController;
 use App\Http\Controllers\CoffeeMetadataController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\CustomerDebtorsController;
 use App\Http\Controllers\CustomerInvoiceController;
 use App\Http\Controllers\CustomerPaymentController;
 use App\Http\Controllers\CustomerStatementController;
@@ -1002,8 +1003,18 @@ Route::middleware('auth')->group(function () {
         // Customer statements
         Route::get('customers/{customer}/statement', [CustomerStatementController::class, 'show'])
             ->name('customers.statement');
+        Route::get('customers/{customer}/statement/print', [CustomerStatementController::class, 'print'])
+            ->name('customers.statement.print');
         Route::get('customers/{customer}/statement.pdf', [CustomerStatementController::class, 'downloadPdf'])
             ->name('customers.statement.pdf');
+        Route::post('customers/{customer}/statement/email', [CustomerStatementController::class, 'email'])
+            ->name('customers.statement.email');
+
+        // Aged debtors
+        Route::get('debtors', [CustomerDebtorsController::class, 'index'])->name('customers.debtors');
+        Route::get('debtors/export', [CustomerDebtorsController::class, 'export'])->name('customers.debtors.export');
+        Route::post('debtors/send-statements', [CustomerDebtorsController::class, 'sendStatements'])
+            ->name('customers.debtors.send');
     });
 
     // Voucher redemption — available to till staff (employees, managers, admins)

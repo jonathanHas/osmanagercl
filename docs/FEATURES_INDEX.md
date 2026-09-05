@@ -542,6 +542,23 @@ Gift-voucher system with scannable barcodes, server-tracked balances and a full 
 
 ---
 
+## Customer Accounts
+
+### Customer Statements (NEW! 2026-09-05)
+Statements of account for customers — on screen, on paper, as a PDF, by email, plus an aged-debtors report.
+- **Print**: A4 light-themed print view with repeating table headers and page-break control (the screen ledger is dark-themed and printed as a black page before this)
+- **Aging**: `current / 1–30 / 31–60 / 61–90 / 90+` buckets driven by an *effective* due date — `due_date` falls back to the customer's `payment_terms_days` (default 30), since the invoice due date is optional and was blank on every invoice
+- **Open items**: Outstanding-invoice list with per-invoice balance and days overdue, alongside the running-balance ledger
+- **Unallocated credit**: Reported separately so `aged total − unallocated credit == closing balance` always holds
+- **Email**: Opt-in per customer (`send_statements`), queued Mailable with the PDF attached, `statement_last_sent_at` tracking
+- **Aged debtors**: Balance column and "owing only" filter on the customer list, a bucketed debtors report with totals, and CSV export
+- **Bulk run**: `customers:send-statements` (with `--dry-run`), scheduled monthly on the 1st; the debtors-page button dispatches the same service method
+- **One source of truth**: `CustomerStatementService::build()` feeds every surface, so screen, paper, PDF and email cannot disagree
+
+📖 [Customer Statements Documentation](./features/customer-statements.md)
+
+---
+
 ## Financial Systems
 
 ### Invoice Bulk Upload System

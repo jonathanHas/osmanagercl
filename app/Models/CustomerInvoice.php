@@ -234,6 +234,34 @@ class CustomerInvoice extends Model
     }
 
     /**
+     * The date this invoice is actually due. `due_date` is optional on the form
+     * and in practice usually blank, so fall back to the customer's payment
+     * terms (or the house default) measured from the issue date. Aging keys off
+     * this rather than the raw column.
+     */
+    public function getEffectiveDueDateAttribute(): \Carbon\Carbon
+    {
+        if ($this->due_date) {
+            return $this->due_date;
+        }
+
+        $terms = $this->customer?->terms_days ?? Customer::DEFAULT_PAYMENT_TERMS_DAYS;
+
+        return $this->issue_date->copy()->addDays($terms);
+    }
+
+    /**
+     * Whole days past the effective due date as at $asOf; 0 when not yet due.
+     */
+    public function daysOverdue(?\Carbon\Carbon $asOf = null): int
+    {
+        $asOf = $asOf ?? \Carbon\Carbon::today();
+        $due = $this->effective_due_date;
+
+        return $due->lt($asOf) ? (int) $due->diffInDays($asOf) : 0;
+    }
+
+    /**
      * Derived payment status. void invoices report 'void' regardless of allocations.
      */
     public function paymentStatus(): string

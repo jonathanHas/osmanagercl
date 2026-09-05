@@ -82,6 +82,26 @@
                            class="w-32 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100 text-right">
                 </div>
                 <div class="md:col-span-2">
+                    <label class="block text-xs text-gray-400 mb-1">
+                        Payment terms (days)
+                        <span class="text-gray-500 ml-1">(used to age invoices that have no due date set)</span>
+                    </label>
+                    <input type="number" step="1" min="0" max="365" inputmode="numeric" name="payment_terms_days"
+                           value="{{ old('payment_terms_days', $customer?->payment_terms_days ?? \App\Models\Customer::DEFAULT_PAYMENT_TERMS_DAYS) }}"
+                           class="w-32 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100 text-right">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="inline-flex items-center text-sm text-gray-300">
+                        <input type="checkbox" name="send_statements" value="1"
+                               @checked(old('send_statements', $customer?->send_statements ?? false))
+                               class="bg-gray-900 border-gray-700 rounded mr-2">
+                        Email statements of account to this customer
+                    </label>
+                    <p class="text-xs text-gray-500 mt-1 ml-6">
+                        Included in the monthly statement run. Requires an email address.
+                    </p>
+                </div>
+                <div class="md:col-span-2">
                     <label class="block text-xs text-gray-400 mb-1">Notes</label>
                     <textarea name="notes" rows="3"
                               class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100">{{ old('notes', $customer?->notes) }}</textarea>
