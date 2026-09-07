@@ -133,7 +133,9 @@ class CustomerPaymentController extends Controller
 
     public function show(CustomerPayment $customerPayment): View
     {
-        $customerPayment->load('customer', 'allocations.invoice', 'creator', 'voider', 'lastMatcher');
+        // allAllocations so a row against a voided invoice is shown and explained
+        // rather than silently dropped; allocations drives the money maths.
+        $customerPayment->load('customer', 'allocations.invoice', 'allAllocations.invoice', 'creator', 'voider', 'lastMatcher');
 
         return view('customer-payments.show', ['payment' => $customerPayment]);
     }

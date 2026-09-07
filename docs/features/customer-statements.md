@@ -110,16 +110,24 @@ Per-invoice payment history is loaded in `build()`, **not** `openInvoices()`, be
 `debtors()` calls `openInvoices()` once per customer and would pay a query per debtor row.
 A query-count test pins this.
 
-### Known bug: void invoices swallow their payments
+### Voiding an invoice frees its payment
 
-`CustomerInvoiceService::void()` leaves allocation rows in place (deliberately, so `unvoid()`
-is a clean round trip), but `CustomerPayment::getTotalAllocatedAttribute()` counts them with
-no invoice-void filter. Void a fully-paid €100 invoice and the customer is €100 in credit,
-yet the statement, the debtors Credit column and the payments index all show zero — and the
-identity above gives `0 ≠ -100`. `CustomerStatementTest::test_a_payment_allocated_to_a_later_voided_invoice_still_counts_as_credit`
-is skipped with this reason. The fix is tracked separately because both remedies (deleting
-rows on void, or excluding void invoices from the payment-side sum) change balance maths
-outside the statement.
+`CustomerInvoiceService::void()` deliberately leaves allocation rows in place so `unvoid()`
+is a clean round trip. The payment side therefore excludes them:
+`CustomerPayment::allocations()` filters to non-void invoices — **the exact mirror of
+`CustomerInvoice::allocations()`**, which filters to non-void payments. Void a fully-paid
+€100 invoice and the €100 returns to on-account credit on every surface at once; unvoid it
+and the allocation comes back, losslessly.
+
+Use `allAllocations()` where you need every row regardless of the invoice's state: the
+payment page (which marks a freed row `invoice voided` and totals it as *Returned to credit
+by voided invoices* via the `voided_allocated` accessor, so the table still explains its own
+total) and `reallocate()` (which must clear stale rows, not merely stop counting them).
+
+The two raw-SQL paths — `CustomerPayment::scopeWithUnallocatedOver()` and
+`CustomerPaymentService::unappliedCreditTotals()` — carry the same filter by hand, since they
+bypass the relation. If they ever drift from `allocations()`, the payments-index filter and
+the debtors Credit column will disagree with the payment's own figure.
 
 ## Matching payments to invoices
 

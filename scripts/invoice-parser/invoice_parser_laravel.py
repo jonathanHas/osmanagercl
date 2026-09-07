@@ -23,7 +23,7 @@ from parsers import (
     mossfield, slievebloom, garryhinch, oxigen, kellys, udea, breadelicious,
     kleepaper, ardu, vico, loughboora, coolnagrower, merrymill, flogas,
     oldyard_organics, amazon, ecobike, dunany_flour, beechlawn, mentons, kilbeggan,
-    hetzner, bean2cup, meadow_moss, default_parser
+    hetzner, bean2cup, meadow_moss, berlin_packaging, default_parser
 )
 
 # Configure logging
@@ -102,6 +102,10 @@ def detect_supplier(text):
     elif ("MEADOW & MOSS" in upper_text or "MEADOW AND MOSS" in upper_text
           or "MEADOWANDMOSS" in upper_text):
         return meadow_moss, "Meadow & Moss"
+    # Trades as The Packstock. Distinct from "Birr Packaging Ltd", so match the full name.
+    elif ("BERLIN PACKAGING" in upper_text or "BERLINPACKAGING" in upper_text
+          or "THEPACKSTOCK" in upper_text):
+        return berlin_packaging, "Berlin Packaging Ltd"
     else:
         return default_parser, "Unknown"
 

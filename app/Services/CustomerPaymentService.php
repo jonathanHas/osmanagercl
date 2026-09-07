@@ -85,7 +85,9 @@ class CustomerPaymentService
                 lock: true,
             );
 
-            $payment->allocations()->delete();
+            // allAllocations(): clear every row, including any against a voided
+            // invoice, or a stale one would survive the replace.
+            $payment->allAllocations()->delete();
 
             foreach ($allocations as $alloc) {
                 $payment->allocations()->create([
@@ -217,9 +219,13 @@ class CustomerPaymentService
             return [];
         }
 
-        $allocated = DB::table('customer_payment_allocations')
-            ->selectRaw('customer_payment_id, SUM(amount) as allocated')
-            ->groupBy('customer_payment_id');
+        // Joined to invoices and filtered to live ones so this agrees with the
+        // allocations() relation: a voided invoice's row is not allocated money.
+        $allocated = DB::table('customer_payment_allocations as a')
+            ->join('customer_invoices as i', 'i.id', '=', 'a.customer_invoice_id')
+            ->where('i.status', '!=', CustomerInvoice::STATUS_VOID)
+            ->selectRaw('a.customer_payment_id as customer_payment_id, SUM(a.amount) as allocated')
+            ->groupBy('a.customer_payment_id');
 
         return DB::table('customer_payments as p')
             ->leftJoinSub($allocated, 'a', 'a.customer_payment_id', '=', 'p.id')
@@ -290,7 +296,7 @@ class CustomerPaymentService
 
                 // Increment an existing row rather than adding a second one for
                 // the same pair, so headroom maths stays one row per pair.
-                $existing = $payment->allocations()
+                $existing = $payment->allAllocations()
                     ->where('customer_invoice_id', $invoice->id)
                     ->lockForUpdate()
                     ->first();

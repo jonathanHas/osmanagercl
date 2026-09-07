@@ -921,6 +921,42 @@ Points that matter when this layout changes:
   credit claims must be notified within 3 days", so matching the word "credit" would flag every
   invoice.
 
+### Berlin Packaging Invoice Parser
+
+`scripts/invoice-parser/parsers/berlin_packaging.py` handles Berlin Packaging Ireland Ltd, trading
+as The Packstock. Line totals are VAT-inclusive; each line states its own rate and tax but never
+its net, so the buckets are built from the lines and cross-checked against the summary block.
+
+```
+ITEM DESCRIPTION QUANTITY UNIT PRICE VAT TAX AMOUNT TOTAL
+199ml (7/8oz) - Round 199.0 / Pack of 50 - SKU:  2  15.17  23%  €6.98  €37.32
+Shipping Ireland                                    15.60  23%  €3.59  €19.19
+SUBTOTAL €119.89
+TOTAL EXCL. VAT €97.47
+VAT (IE VAT) 23% €22.42
+TOTAL INCL. VAT €119.89
+```
+
+Points that matter when this layout changes:
+
+- **`SUBTOTAL` is the gross figure, not the net.** It equals `TOTAL INCL. VAT`; the net is
+  `TOTAL EXCL. VAT`. Reading `SUBTOTAL` as the net overstates it by the whole VAT. The parser
+  warns if the two ever stop agreeing, since that would mean the label has changed meaning.
+- **Net is gross less the stated tax, never quantity times unit price.** The unit price is rounded
+  for display — one line prints 70 x 0.27, which is 18.90, against a real net of 18.78.
+- The item rows are identified by the trailing `<rate>% €<tax> €<total>`, because descriptions
+  wrap onto a following line and the shipping row carries no quantity column at all.
+- **The issue date is AP-style**: `Issue Date Sept. 5, 2026` — a four-letter abbreviation with a
+  trailing period, and months like `March` written in full. `%b` parses neither, so the parser
+  uses a map keyed on the first three letters.
+- The parser returns `'Berlin Packaging Ltd'`, which is how `accounting_suppliers` records them
+  (id 256). The invoice heads **Berlin Packaging Ireland Ltd**; returning the letterhead name
+  would fail `findOrCreateSupplier()` and create a duplicate. They are also distinct from the
+  unrelated `Birr Packaging Ltd` (id 173).
+- The customer's own billing address reads "Mossfield Organic Store Limited". The `MOSSFIELD`
+  branch sits earlier in `detect_supplier` but additionally requires `ORGANIC FARM` and excludes
+  `ORGANIC STORE`, so it does not capture these invoices — verified against the sample.
+
 ### VAT-inclusive layouts: the `VAT Amounts` and `Total` contract
 
 `invoice_parser_laravel.py` normally derives VAT as `round(net × rate, 2)`. That is wrong for

@@ -602,4 +602,121 @@ class CustomerPaymentAllocationTest extends TestCase
         $this->assertStringContainsString('Unapplied credit', $csv);
         $this->assertStringContainsString('30.00', $csv);
     }
+
+    // -------------------------------------------- Voided invoices free credit
+
+    /**
+     * Voiding an invoice leaves its allocation rows in place so unvoid stays a
+     * clean round trip (CustomerInvoiceService::unvoid()). The payment side
+     * therefore has to exclude them, or the money is swallowed: it leaves the
+     * customer in credit while every credit surface reports zero.
+     */
+    public function test_voiding_an_invoice_returns_its_payment_to_on_account_credit(): void
+    {
+        $c = Customer::factory()->create();
+        $inv = $this->invoice($c, 100);
+        $payment = $this->payment($c, 100);
+        $payment->allocations()->create(['customer_invoice_id' => $inv->id, 'amount' => 100]);
+
+        $this->assertSame(0.0, $payment->fresh()->unallocated_amount);
+
+        $inv->update(['status' => CustomerInvoice::STATUS_VOID, 'voided_at' => now()]);
+
+        $payment = $payment->fresh();
+        $this->assertSame(0.0, $payment->total_allocated);
+        $this->assertSame(100.0, $payment->unallocated_amount);
+        $this->assertSame(100.0, $payment->voided_allocated);
+
+        // The row is kept, just not counted.
+        $this->assertDatabaseCount('customer_payment_allocations', 1);
+    }
+
+    public function test_every_credit_surface_agrees_after_an_invoice_is_voided(): void
+    {
+        $c = Customer::factory()->create();
+        $inv = $this->invoice($c, 100);
+        $payment = $this->payment($c, 100);
+        $payment->allocations()->create(['customer_invoice_id' => $inv->id, 'amount' => 100]);
+        $inv->update(['status' => CustomerInvoice::STATUS_VOID, 'voided_at' => now()]);
+
+        // Service aggregate, SQL scope and the statement must not disagree.
+        $this->assertSame([$c->id => 100.0], $this->service()->unappliedCreditTotals());
+        $this->assertSame(1, CustomerPayment::notVoid()->withUnallocatedOver()->count());
+        $this->assertSame(
+            100.0,
+            $this->service()->unappliedCreditFor($c->fresh())->sum('unapplied')
+        );
+
+        $this->actingAs($this->actor())
+            ->get(route('customer-payments.index', ['allocation' => 'unallocated']))
+            ->assertOk()
+            ->assertSee("customer-payments/{$payment->id}");
+    }
+
+    public function test_unvoiding_the_invoice_restores_the_allocation(): void
+    {
+        $c = Customer::factory()->create();
+        $inv = $this->invoice($c, 100);
+        $payment = $this->payment($c, 100);
+        $payment->allocations()->create(['customer_invoice_id' => $inv->id, 'amount' => 100]);
+
+        $inv->update(['status' => CustomerInvoice::STATUS_VOID, 'voided_at' => now()]);
+        $this->assertSame(100.0, $payment->fresh()->unallocated_amount);
+
+        // Non-destructive by design: the round trip is lossless.
+        $inv->update(['status' => CustomerInvoice::STATUS_ISSUED, 'voided_at' => null]);
+        $this->assertSame(0.0, $payment->fresh()->unallocated_amount);
+        $this->assertSame(0.0, $inv->fresh()->outstanding_amount);
+    }
+
+    public function test_the_freed_credit_can_be_applied_to_another_invoice(): void
+    {
+        $c = Customer::factory()->create();
+        $dead = $this->invoice($c, 100);
+        $live = $this->invoice($c, 80);
+        $payment = $this->payment($c, 100);
+        $payment->allocations()->create(['customer_invoice_id' => $dead->id, 'amount' => 100]);
+        $dead->update(['status' => CustomerInvoice::STATUS_VOID, 'voided_at' => now()]);
+
+        $result = $this->service()->applyCreditToInvoice($live->fresh());
+
+        $this->assertSame(80.0, $result['applied']);
+        $this->assertSame(0.0, $live->fresh()->outstanding_amount);
+        $this->assertSame(20.0, $payment->fresh()->unallocated_amount);
+    }
+
+    public function test_reallocating_clears_rows_left_by_a_voided_invoice(): void
+    {
+        $c = Customer::factory()->create();
+        $dead = $this->invoice($c, 100);
+        $live = $this->invoice($c, 100);
+        $payment = $this->payment($c, 100);
+        $payment->allocations()->create(['customer_invoice_id' => $dead->id, 'amount' => 100]);
+        $dead->update(['status' => CustomerInvoice::STATUS_VOID, 'voided_at' => now()]);
+
+        $this->service()->reallocate($payment, [
+            ['customer_invoice_id' => $live->id, 'amount' => 100],
+        ]);
+
+        // The stale row is gone, not merely uncounted.
+        $this->assertDatabaseCount('customer_payment_allocations', 1);
+        $this->assertSame(0.0, $payment->fresh()->voided_allocated);
+        $this->assertSame(0.0, $live->fresh()->outstanding_amount);
+    }
+
+    public function test_the_payment_page_shows_a_voided_invoice_row_rather_than_hiding_it(): void
+    {
+        $c = Customer::factory()->create();
+        $inv = $this->invoice($c, 100);
+        $payment = $this->payment($c, 100);
+        $payment->allocations()->create(['customer_invoice_id' => $inv->id, 'amount' => 100]);
+        $inv->update(['status' => CustomerInvoice::STATUS_VOID, 'voided_at' => now()]);
+
+        $this->actingAs($this->actor())
+            ->get(route('customer-payments.show', $payment))
+            ->assertOk()
+            ->assertSee($inv->invoice_number)
+            ->assertSee('invoice voided')
+            ->assertSee('Returned to credit by voided invoices');
+    }
 }

@@ -52,7 +52,26 @@ class CustomerPayment extends Model
         return $this->belongsTo(Customer::class);
     }
 
+    /**
+     * Allocations against live invoices only — rows pointing at a voided invoice
+     * are excluded from the payment's allocated total, so voiding an invoice
+     * returns its money to on-account credit instead of swallowing it.
+     *
+     * The exact mirror of CustomerInvoice::allocations(), which excludes rows
+     * belonging to voided payments. Use allAllocations() when you need every row
+     * the payment owns regardless of the invoice's state.
+     */
     public function allocations(): HasMany
+    {
+        return $this->hasMany(CustomerPaymentAllocation::class)
+            ->whereHas('invoice', fn ($q) => $q->where('status', '!=', CustomerInvoice::STATUS_VOID));
+    }
+
+    /**
+     * Every allocation row this payment owns, void invoices included. For
+     * display (so nothing is silently hidden) and for replacing the set wholesale.
+     */
+    public function allAllocations(): HasMany
     {
         return $this->hasMany(CustomerPaymentAllocation::class);
     }
@@ -87,9 +106,20 @@ class CustomerPayment extends Model
         return in_array($this->method, [self::METHOD_CARD_TILL, self::METHOD_CASH_TILL], true);
     }
 
+    /** Allocated to live invoices. Excludes rows against voided invoices. */
     public function getTotalAllocatedAttribute(): float
     {
         return round((float) $this->allocations->sum('amount'), 2);
+    }
+
+    /**
+     * Allocated to invoices that have since been voided — money that has come
+     * back to on-account credit. Shown on the payment page so the allocation
+     * list still explains its own total.
+     */
+    public function getVoidedAllocatedAttribute(): float
+    {
+        return round((float) $this->allAllocations->sum('amount') - $this->total_allocated, 2);
     }
 
     public function getUnallocatedAmountAttribute(): float
@@ -118,7 +148,10 @@ class CustomerPayment extends Model
     {
         $allocated = CustomerPaymentAllocation::query()
             ->selectRaw('COALESCE(SUM(amount), 0)')
-            ->whereColumn('customer_payment_allocations.customer_payment_id', 'customer_payments.id');
+            ->whereColumn('customer_payment_allocations.customer_payment_id', 'customer_payments.id')
+            // Mirrors the allocations() relation — a voided invoice's row is not
+            // allocated money, so this scope must agree with unallocated_amount.
+            ->whereHas('invoice', fn ($q) => $q->where('status', '!=', CustomerInvoice::STATUS_VOID));
 
         // The threshold is inlined rather than bound: SQLite binds a PHP float as
         // text, and text compares greater than every number, so a bound `> ?`

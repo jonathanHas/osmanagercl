@@ -627,19 +627,13 @@ class CustomerStatementTest extends TestCase
     }
 
     /**
-     * Voiding an invoice leaves its allocation rows in place, and
-     * CustomerPayment::getTotalAllocatedAttribute() counts them with no
-     * invoice-void filter — so the money vanishes instead of returning to
-     * on-account credit, and the documented identity fails.
-     *
-     * Tracked as its own fix: both candidate remedies (deleting rows on void,
-     * or excluding void invoices from the payment-side sum) change balance
-     * maths outside the statement.
+     * Voiding an invoice leaves its allocation rows in place (so unvoid stays a
+     * clean round trip), so the payment side must not count them — otherwise the
+     * money vanishes instead of returning to on-account credit and the identity
+     * fails.
      */
     public function test_a_payment_allocated_to_a_later_voided_invoice_still_counts_as_credit(): void
     {
-        $this->markTestSkipped('Known bug — see the void-invoice credit hole. Fix lands separately.');
-
         $c = Customer::factory()->create();
         $inv = $this->invoice($c, '2026-01-10', 100);
         $p = $this->payment($c, '2026-01-15', 100);

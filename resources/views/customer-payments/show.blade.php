@@ -81,16 +81,21 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-700 text-gray-200">
-                    @forelse ($payment->allocations as $a)
-                        <tr>
+                    @forelse ($payment->allAllocations as $a)
+                        @php $voidInvoice = $a->invoice?->status === \App\Models\CustomerInvoice::STATUS_VOID; @endphp
+                        <tr class="{{ $voidInvoice ? 'text-gray-500' : '' }}">
                             <td class="px-4 py-2 font-mono">
                                 <a href="{{ route('customer-invoices.show', $a->invoice) }}"
-                                   class="text-blue-400 hover:text-blue-300">{{ $a->invoice->invoice_number ?? '(draft)' }}</a>
+                                   class="{{ $voidInvoice ? 'text-gray-500 line-through hover:text-gray-300' : 'text-blue-400 hover:text-blue-300' }}">{{ $a->invoice->invoice_number ?? '(draft)' }}</a>
+                                @if ($voidInvoice)
+                                    <span class="ml-1 text-[10px] uppercase tracking-wide bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded"
+                                          title="This invoice was voided, so the amount has returned to on-account credit">invoice voided</span>
+                                @endif
                             </td>
                             <td class="px-4 py-2">{{ $a->invoice->issue_date?->format('Y-m-d') }}</td>
                             <td class="px-4 py-2">{{ $payment->payment_date->format('Y-m-d') }}</td>
                             <td class="px-4 py-2 text-right font-mono">€{{ number_format($a->invoice->total, 2) }}</td>
-                            <td class="px-4 py-2 text-right font-mono">€{{ number_format($a->amount, 2) }}</td>
+                            <td class="px-4 py-2 text-right font-mono {{ $voidInvoice ? 'line-through' : '' }}">€{{ number_format($a->amount, 2) }}</td>
                         </tr>
                     @empty
                         <tr>
@@ -104,8 +109,14 @@
                         </tr>
                     @endforelse
                 </tbody>
-                @if ($payment->unallocated_amount > 0.005)
+                @if ($payment->unallocated_amount > 0.005 || $payment->voided_allocated > 0.005)
                     <tfoot class="bg-gray-900 text-gray-300 text-sm">
+                        @if ($payment->voided_allocated > 0.005)
+                            <tr>
+                                <td colspan="4" class="px-4 py-2 text-right">Returned to credit by voided invoices:</td>
+                                <td class="px-4 py-2 text-right font-mono">€{{ number_format($payment->voided_allocated, 2) }}</td>
+                            </tr>
+                        @endif
                         <tr>
                             <td colspan="4" class="px-4 py-2 text-right">
                                 @if (! $payment->isVoid())
