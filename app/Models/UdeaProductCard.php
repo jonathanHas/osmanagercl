@@ -26,6 +26,9 @@ class UdeaProductCard extends Model
         'purchase_tiers',
         'not_found',
         'scraped_at',
+        'pallet_sve',
+        'pallet_unit_volume',
+        'pallet_scraped_at',
     ];
 
     protected $casts = [
@@ -35,6 +38,11 @@ class UdeaProductCard extends Model
         'not_found' => 'boolean',
         'purchase_tiers' => 'array',
         'scraped_at' => 'datetime',
+        // Cast to float, not decimal:4 - a decimal cast returns strings, which silently
+        // breaks the arithmetic in palletVolumeFor().
+        'pallet_sve' => 'float',
+        'pallet_unit_volume' => 'float',
+        'pallet_scraped_at' => 'datetime',
     ];
 
     /**
@@ -54,5 +62,30 @@ class UdeaProductCard extends Model
             'description' => $this->description,
             'purchase_tiers' => $this->purchase_tiers ?? [],
         ];
+    }
+
+    /**
+     * Whether pallet volume figures have been captured for this product.
+     */
+    public function hasPalletData(): bool
+    {
+        return $this->pallet_sve !== null && $this->pallet_unit_volume !== null;
+    }
+
+    /**
+     * Pallet volume consumed by ordering $qty of this product.
+     *
+     * Mirrors Udea's own calculation (js/orders/order.js:1556):
+     *     lineVolume = sve * volume * qty
+     *
+     * Returns null when the product has no captured pallet data.
+     */
+    public function palletVolumeFor(float $qty): ?float
+    {
+        if (! $this->hasPalletData()) {
+            return null;
+        }
+
+        return $this->pallet_sve * $this->pallet_unit_volume * $qty;
     }
 }

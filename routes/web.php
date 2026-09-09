@@ -116,6 +116,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/tools/ai-diagnostics', [\App\Http\Controllers\AiDiagnosticsController::class, 'index'])->middleware('role:admin')->name('tools.ai-diagnostics');
     Route::post('/tools/ai-diagnostics/test', [\App\Http\Controllers\AiDiagnosticsController::class, 'testConnection'])->middleware('role:admin')->name('tools.ai-diagnostics.test');
     Route::post('/tools/ai-diagnostics/settings', [\App\Http\Controllers\AiDiagnosticsController::class, 'saveSettings'])->middleware('role:admin')->name('tools.ai-diagnostics.settings');
+    Route::get('/tools/udea-pallet-volumes', [\App\Http\Controllers\UdeaPalletVolumeController::class, 'index'])->middleware('role:admin')->name('tools.udea-pallet-volumes');
+    Route::post('/tools/udea-pallet-volumes/sync', [\App\Http\Controllers\UdeaPalletVolumeController::class, 'sync'])->middleware('role:admin')->name('tools.udea-pallet-volumes.sync');
 
     // Product AJAX API routes (for real-time validation)
     Route::post('/api/products/check-barcode-duplicate', [ProductController::class, 'checkBarcodeDuplicate'])->name('api.products.check-barcode-duplicate');

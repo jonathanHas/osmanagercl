@@ -1,0 +1,1790 @@
+[
+ {
+  "supplier_code": "5004482",
+  "sve": 10.0,
+  "unit_volume": 0.65,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5005616",
+  "sve": 12.0,
+  "unit_volume": 0.33,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5008215",
+  "sve": 6.0,
+  "unit_volume": 0.5,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5011566",
+  "sve": 6.0,
+  "unit_volume": 0.11,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5005615",
+  "sve": 12.0,
+  "unit_volume": 0.37,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5001913",
+  "sve": 6.0,
+  "unit_volume": 0.11,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "6000758",
+  "sve": 12.0,
+  "unit_volume": 0.03,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5011627",
+  "sve": 10.0,
+  "unit_volume": 0.05,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5005262",
+  "sve": 8.0,
+  "unit_volume": 0.12,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5001652",
+  "sve": 24.0,
+  "unit_volume": 0.17,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "33649",
+  "sve": 1.0,
+  "unit_volume": 0.25,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "31897",
+  "sve": 1.0,
+  "unit_volume": 0.11,
+  "quantity": 12.0
+ },
+ {
+  "supplier_code": "82703",
+  "sve": 1.0,
+  "unit_volume": 0.0,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "6000404",
+  "sve": 1.0,
+  "unit_volume": 0.05,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "88803",
+  "sve": 1.0,
+  "unit_volume": 0.09,
+  "quantity": 4.0
+ },
+ {
+  "supplier_code": "48479",
+  "sve": 1.0,
+  "unit_volume": 0.12,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "42",
+  "sve": 8.0,
+  "unit_volume": 0.69,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "207",
+  "sve": 3.0,
+  "unit_volume": 0.83,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "209",
+  "sve": 3.0,
+  "unit_volume": 0.83,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "489",
+  "sve": 11.0,
+  "unit_volume": 0.5,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5006036",
+  "sve": 12.0,
+  "unit_volume": 0.33,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5015006",
+  "sve": 6.0,
+  "unit_volume": 0.36,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5018612",
+  "sve": 12.0,
+  "unit_volume": 0.38,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "31632",
+  "sve": 1.0,
+  "unit_volume": 0.13,
+  "quantity": 16.0
+ },
+ {
+  "supplier_code": "5000217",
+  "sve": 8.0,
+  "unit_volume": 0.13,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "6001384",
+  "sve": 12.0,
+  "unit_volume": 0.0,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "97394",
+  "sve": 14.0,
+  "unit_volume": 0.04,
+  "quantity": 8.0
+ },
+ {
+  "supplier_code": "32067",
+  "sve": 1.0,
+  "unit_volume": 0.21,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "70027",
+  "sve": 6.0,
+  "unit_volume": 1.33,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "3635",
+  "sve": 1.0,
+  "unit_volume": 0.04,
+  "quantity": 10.0
+ },
+ {
+  "supplier_code": "4760",
+  "sve": 1.0,
+  "unit_volume": 0.05,
+  "quantity": 7.0
+ },
+ {
+  "supplier_code": "51188",
+  "sve": 1.0,
+  "unit_volume": 9.55,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "90045",
+  "sve": 1.0,
+  "unit_volume": 0.2,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "1244",
+  "sve": 1.0,
+  "unit_volume": 0.21,
+  "quantity": 6.0
+ },
+ {
+  "supplier_code": "32358",
+  "sve": 2.5,
+  "unit_volume": 0.37,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "4471",
+  "sve": 4.5,
+  "unit_volume": 2.5,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "4289",
+  "sve": 4.0,
+  "unit_volume": 2.5,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "4598",
+  "sve": 1.0,
+  "unit_volume": 0.35,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "32760",
+  "sve": 2.5,
+  "unit_volume": 0.81,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "32369",
+  "sve": 1.44,
+  "unit_volume": 0.28,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "32376",
+  "sve": 4.0,
+  "unit_volume": 1.08,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5006938",
+  "sve": 6.0,
+  "unit_volume": 0.33,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "447",
+  "sve": 1.0,
+  "unit_volume": 0.28,
+  "quantity": 3.0
+ },
+ {
+  "supplier_code": "12055",
+  "sve": 1.0,
+  "unit_volume": 0.1,
+  "quantity": 6.0
+ },
+ {
+  "supplier_code": "11641",
+  "sve": 1.0,
+  "unit_volume": 0.34,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "427",
+  "sve": 1.5,
+  "unit_volume": 1.67,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "11655",
+  "sve": 1.0,
+  "unit_volume": 0.56,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "11605",
+  "sve": 1.0,
+  "unit_volume": 0.41,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "590",
+  "sve": 1.0,
+  "unit_volume": 0.51,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "11121",
+  "sve": 1.0,
+  "unit_volume": 0.25,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "53",
+  "sve": 10.0,
+  "unit_volume": 0.55,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "52",
+  "sve": 10.0,
+  "unit_volume": 0.55,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "307",
+  "sve": 5.0,
+  "unit_volume": 1.1,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "17116",
+  "sve": 10.0,
+  "unit_volume": 0.55,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "517",
+  "sve": 7.0,
+  "unit_volume": 0.5,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "285",
+  "sve": 5.0,
+  "unit_volume": 0.5,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "273",
+  "sve": 5.0,
+  "unit_volume": 0.5,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "115",
+  "sve": 6.0,
+  "unit_volume": 1.17,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "108",
+  "sve": 8.0,
+  "unit_volume": 0.69,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "77",
+  "sve": 12.0,
+  "unit_volume": 0.46,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "45006",
+  "sve": 0.22,
+  "unit_volume": 0.13,
+  "quantity": 30.0
+ },
+ {
+  "supplier_code": "97407",
+  "sve": 1.0,
+  "unit_volume": 0.18,
+  "quantity": 3.0
+ },
+ {
+  "supplier_code": "5016969",
+  "sve": 6.0,
+  "unit_volume": 0.19,
+  "quantity": 6.0
+ },
+ {
+  "supplier_code": "5016987",
+  "sve": 6.0,
+  "unit_volume": 0.1,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "91421",
+  "sve": 6.0,
+  "unit_volume": 0.24,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5017171",
+  "sve": 10.0,
+  "unit_volume": 0.54,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5014716",
+  "sve": 6.0,
+  "unit_volume": 0.23,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5007301",
+  "sve": 6.0,
+  "unit_volume": 0.23,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5013782",
+  "sve": 8.0,
+  "unit_volume": 0.28,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5003567",
+  "sve": 8.0,
+  "unit_volume": 0.18,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "94748",
+  "sve": 6.0,
+  "unit_volume": 0.42,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "91849",
+  "sve": 10.0,
+  "unit_volume": 0.07,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5015007",
+  "sve": 6.0,
+  "unit_volume": 0.36,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "6001389",
+  "sve": 10.0,
+  "unit_volume": 0.0,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "91621",
+  "sve": 6.0,
+  "unit_volume": 0.13,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5011763",
+  "sve": 5.0,
+  "unit_volume": 0.17,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5018610",
+  "sve": 12.0,
+  "unit_volume": 0.38,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "91717",
+  "sve": 6.0,
+  "unit_volume": 0.15,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5016715",
+  "sve": 6.0,
+  "unit_volume": 0.11,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "6000495",
+  "sve": 5.0,
+  "unit_volume": 0.1,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5018580",
+  "sve": 10.0,
+  "unit_volume": 0.04,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5011789",
+  "sve": 8.0,
+  "unit_volume": 0.15,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5017270",
+  "sve": 15.0,
+  "unit_volume": 0.02,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5006472",
+  "sve": 6.0,
+  "unit_volume": 0.23,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5016245",
+  "sve": 6.0,
+  "unit_volume": 0.14,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "91423",
+  "sve": 6.0,
+  "unit_volume": 0.21,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5016582",
+  "sve": 14.0,
+  "unit_volume": 0.79,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5008185",
+  "sve": 6.0,
+  "unit_volume": 0.1,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "92517",
+  "sve": 6.0,
+  "unit_volume": 0.18,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "92930",
+  "sve": 6.0,
+  "unit_volume": 0.34,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "92260",
+  "sve": 6.0,
+  "unit_volume": 0.31,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "6001591",
+  "sve": 12.0,
+  "unit_volume": 0.06,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5013020",
+  "sve": 15.0,
+  "unit_volume": 0.23,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5015352",
+  "sve": 8.0,
+  "unit_volume": 0.26,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5004487",
+  "sve": 10.0,
+  "unit_volume": 0.63,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "97181",
+  "sve": 6.0,
+  "unit_volume": 0.5,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5016754",
+  "sve": 6.0,
+  "unit_volume": 0.19,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5016667",
+  "sve": 6.0,
+  "unit_volume": 0.08,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5016475",
+  "sve": 6.0,
+  "unit_volume": 0.18,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "92510",
+  "sve": 6.0,
+  "unit_volume": 0.45,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "92285",
+  "sve": 6.0,
+  "unit_volume": 0.2,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5004485",
+  "sve": 15.0,
+  "unit_volume": 0.17,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5007307",
+  "sve": 6.0,
+  "unit_volume": 0.23,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5006830",
+  "sve": 8.0,
+  "unit_volume": 0.07,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5007462",
+  "sve": 6.0,
+  "unit_volume": 0.37,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "91032",
+  "sve": 6.0,
+  "unit_volume": 0.11,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "6000455",
+  "sve": 4.0,
+  "unit_volume": 0.13,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5011180",
+  "sve": 6.0,
+  "unit_volume": 0.22,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5016100",
+  "sve": 10.0,
+  "unit_volume": 0.47,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5009980",
+  "sve": 10.0,
+  "unit_volume": 0.04,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5015223",
+  "sve": 4.0,
+  "unit_volume": 0.42,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5015541",
+  "sve": 12.0,
+  "unit_volume": 0.02,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "6000346",
+  "sve": 6.0,
+  "unit_volume": 0.06,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "92490",
+  "sve": 6.0,
+  "unit_volume": 0.42,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "92293",
+  "sve": 6.0,
+  "unit_volume": 0.31,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5005243",
+  "sve": 12.0,
+  "unit_volume": 0.17,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5017181",
+  "sve": 6.0,
+  "unit_volume": 0.26,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5006487",
+  "sve": 6.0,
+  "unit_volume": 0.15,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "94760",
+  "sve": 12.0,
+  "unit_volume": 0.15,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "97550",
+  "sve": 6.0,
+  "unit_volume": 0.09,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5001513",
+  "sve": 10.0,
+  "unit_volume": 0.55,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "6001540",
+  "sve": 6.0,
+  "unit_volume": 0.05,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "97443",
+  "sve": 6.0,
+  "unit_volume": 0.42,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5016799",
+  "sve": 6.0,
+  "unit_volume": 0.11,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5013306",
+  "sve": 6.0,
+  "unit_volume": 0.07,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "91809",
+  "sve": 6.0,
+  "unit_volume": 0.09,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5017169",
+  "sve": 12.0,
+  "unit_volume": 0.35,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5008210",
+  "sve": 6.0,
+  "unit_volume": 0.22,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "94750",
+  "sve": 6.0,
+  "unit_volume": 0.42,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "97099",
+  "sve": 12.0,
+  "unit_volume": 0.09,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5007208",
+  "sve": 10.0,
+  "unit_volume": 0.2,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "6001497",
+  "sve": 16.0,
+  "unit_volume": 0.03,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5018863",
+  "sve": 6.0,
+  "unit_volume": 0.09,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "6000345",
+  "sve": 12.0,
+  "unit_volume": 0.03,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "6001392",
+  "sve": 10.0,
+  "unit_volume": 0.0,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5014138",
+  "sve": 12.0,
+  "unit_volume": 0.11,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "6001042",
+  "sve": 12.0,
+  "unit_volume": 0.35,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5011562",
+  "sve": 24.0,
+  "unit_volume": 0.01,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5005879",
+  "sve": 8.0,
+  "unit_volume": 0.02,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5014140",
+  "sve": 12.0,
+  "unit_volume": 0.11,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "6001470",
+  "sve": 1.0,
+  "unit_volume": 0.11,
+  "quantity": 10.0
+ },
+ {
+  "supplier_code": "97297",
+  "sve": 6.0,
+  "unit_volume": 0.24,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "97296",
+  "sve": 6.0,
+  "unit_volume": 0.24,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5011872",
+  "sve": 4.0,
+  "unit_volume": 0.13,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "91782",
+  "sve": 6.0,
+  "unit_volume": 0.07,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "91775",
+  "sve": 6.0,
+  "unit_volume": 0.07,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5005230",
+  "sve": 1.0,
+  "unit_volume": 0.07,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "93181",
+  "sve": 6.0,
+  "unit_volume": 0.18,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "94642",
+  "sve": 8.0,
+  "unit_volume": 0.1,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5001445",
+  "sve": 6.0,
+  "unit_volume": 0.1,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5002094",
+  "sve": 6.0,
+  "unit_volume": 0.11,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5008233",
+  "sve": 6.0,
+  "unit_volume": 0.18,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "91827",
+  "sve": 6.0,
+  "unit_volume": 0.09,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "6002569",
+  "sve": 20.0,
+  "unit_volume": 0.02,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5014834",
+  "sve": 6.0,
+  "unit_volume": 0.23,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "97223",
+  "sve": 4.0,
+  "unit_volume": 0.42,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "94645",
+  "sve": 6.0,
+  "unit_volume": 0.31,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "91770",
+  "sve": 6.0,
+  "unit_volume": 0.36,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "91729",
+  "sve": 8.0,
+  "unit_volume": 0.11,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "91711",
+  "sve": 6.0,
+  "unit_volume": 0.13,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5009633",
+  "sve": 6.0,
+  "unit_volume": 0.18,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "6000583",
+  "sve": 6.0,
+  "unit_volume": 0.16,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "6000101",
+  "sve": 6.0,
+  "unit_volume": 0.42,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "91699",
+  "sve": 6.0,
+  "unit_volume": 0.15,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5011846",
+  "sve": 10.0,
+  "unit_volume": 0.19,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "94614",
+  "sve": 6.0,
+  "unit_volume": 0.31,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5018888",
+  "sve": 24.0,
+  "unit_volume": 0.07,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5005721",
+  "sve": 3.0,
+  "unit_volume": 0.03,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5000159",
+  "sve": 6.0,
+  "unit_volume": 0.17,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "94771",
+  "sve": 6.0,
+  "unit_volume": 0.42,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5016901",
+  "sve": 6.0,
+  "unit_volume": 0.26,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5006852",
+  "sve": 8.0,
+  "unit_volume": 0.11,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "93432",
+  "sve": 6.0,
+  "unit_volume": 0.33,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5006460",
+  "sve": 6.0,
+  "unit_volume": 0.23,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5016630",
+  "sve": 6.0,
+  "unit_volume": 0.09,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5014503",
+  "sve": 6.0,
+  "unit_volume": 0.15,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5005345",
+  "sve": 10.0,
+  "unit_volume": 0.04,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "94773",
+  "sve": 12.0,
+  "unit_volume": 0.15,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5007380",
+  "sve": 3.0,
+  "unit_volume": 0.01,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5004206",
+  "sve": 12.0,
+  "unit_volume": 0.17,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5000430",
+  "sve": 6.0,
+  "unit_volume": 0.09,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5006867",
+  "sve": 6.0,
+  "unit_volume": 0.2,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5007136",
+  "sve": 15.0,
+  "unit_volume": 0.07,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5018880",
+  "sve": 6.0,
+  "unit_volume": 0.0,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5002093",
+  "sve": 6.0,
+  "unit_volume": 0.39,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "92234",
+  "sve": 6.0,
+  "unit_volume": 0.26,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5006007",
+  "sve": 14.0,
+  "unit_volume": 0.02,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "92238",
+  "sve": 6.0,
+  "unit_volume": 0.25,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5007341",
+  "sve": 6.0,
+  "unit_volume": 0.19,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5003438",
+  "sve": 6.0,
+  "unit_volume": 0.13,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "91248",
+  "sve": 12.0,
+  "unit_volume": 0.18,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5011976",
+  "sve": 12.0,
+  "unit_volume": 0.09,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5001444",
+  "sve": 6.0,
+  "unit_volume": 0.1,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5007209",
+  "sve": 10.0,
+  "unit_volume": 0.2,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5007860",
+  "sve": 6.0,
+  "unit_volume": 0.5,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "3631",
+  "sve": 1.0,
+  "unit_volume": 0.13,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "6001923",
+  "sve": 1.0,
+  "unit_volume": 0.03,
+  "quantity": 3.0
+ },
+ {
+  "supplier_code": "32201",
+  "sve": 1.0,
+  "unit_volume": 0.14,
+  "quantity": 10.0
+ },
+ {
+  "supplier_code": "6000465",
+  "sve": 1.0,
+  "unit_volume": 0.16,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "45153",
+  "sve": 1.0,
+  "unit_volume": 0.14,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "88773",
+  "sve": 1.0,
+  "unit_volume": 0.11,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "5002717",
+  "sve": 1.0,
+  "unit_volume": 1.35,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "88720",
+  "sve": 1.0,
+  "unit_volume": 0.03,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "45151",
+  "sve": 1.0,
+  "unit_volume": 0.14,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "2216",
+  "sve": 1.0,
+  "unit_volume": 0.35,
+  "quantity": 6.0
+ },
+ {
+  "supplier_code": "3785",
+  "sve": 1.0,
+  "unit_volume": 0.27,
+  "quantity": 10.0
+ },
+ {
+  "supplier_code": "1641",
+  "sve": 1.0,
+  "unit_volume": 0.08,
+  "quantity": 12.0
+ },
+ {
+  "supplier_code": "5015003",
+  "sve": 1.0,
+  "unit_volume": 0.06,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "46592",
+  "sve": 1.0,
+  "unit_volume": 0.18,
+  "quantity": 6.0
+ },
+ {
+  "supplier_code": "33808",
+  "sve": 1.0,
+  "unit_volume": 0.21,
+  "quantity": 10.0
+ },
+ {
+  "supplier_code": "48775",
+  "sve": 1.0,
+  "unit_volume": 0.11,
+  "quantity": 5.0
+ },
+ {
+  "supplier_code": "48774",
+  "sve": 1.0,
+  "unit_volume": 0.11,
+  "quantity": 4.0
+ },
+ {
+  "supplier_code": "48778",
+  "sve": 1.0,
+  "unit_volume": 0.11,
+  "quantity": 3.0
+ },
+ {
+  "supplier_code": "48675",
+  "sve": 1.0,
+  "unit_volume": 0.21,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "48673",
+  "sve": 1.0,
+  "unit_volume": 0.21,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5016278",
+  "sve": 1.0,
+  "unit_volume": 0.09,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "97289",
+  "sve": 1.0,
+  "unit_volume": 0.21,
+  "quantity": 6.0
+ },
+ {
+  "supplier_code": "48922",
+  "sve": 1.0,
+  "unit_volume": 0.02,
+  "quantity": 12.0
+ },
+ {
+  "supplier_code": "31147",
+  "sve": 1.0,
+  "unit_volume": 0.1,
+  "quantity": 6.0
+ },
+ {
+  "supplier_code": "84549",
+  "sve": 1.0,
+  "unit_volume": 0.14,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "6001557",
+  "sve": 1.0,
+  "unit_volume": 0.24,
+  "quantity": 14.0
+ },
+ {
+  "supplier_code": "83628",
+  "sve": 1.0,
+  "unit_volume": 0.07,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "45527",
+  "sve": 1.0,
+  "unit_volume": 0.16,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "31899",
+  "sve": 1.0,
+  "unit_volume": 0.06,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "45454",
+  "sve": 1.0,
+  "unit_volume": 0.09,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "31373",
+  "sve": 1.0,
+  "unit_volume": 0.02,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "33618",
+  "sve": 1.0,
+  "unit_volume": 0.18,
+  "quantity": 4.0
+ },
+ {
+  "supplier_code": "31968",
+  "sve": 1.0,
+  "unit_volume": 0.18,
+  "quantity": 12.0
+ },
+ {
+  "supplier_code": "32445",
+  "sve": 1.0,
+  "unit_volume": 0.09,
+  "quantity": 4.0
+ },
+ {
+  "supplier_code": "1421",
+  "sve": 1.0,
+  "unit_volume": 0.06,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5009036",
+  "sve": 1.0,
+  "unit_volume": 0.55,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "3844",
+  "sve": 1.0,
+  "unit_volume": 0.01,
+  "quantity": 4.0
+ },
+ {
+  "supplier_code": "80322",
+  "sve": 1.0,
+  "unit_volume": 0.02,
+  "quantity": 6.0
+ },
+ {
+  "supplier_code": "6000571",
+  "sve": 1.0,
+  "unit_volume": 0.62,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5011431",
+  "sve": 1.0,
+  "unit_volume": 0.14,
+  "quantity": 3.0
+ },
+ {
+  "supplier_code": "31376",
+  "sve": 1.0,
+  "unit_volume": 0.03,
+  "quantity": 3.0
+ },
+ {
+  "supplier_code": "97251",
+  "sve": 1.0,
+  "unit_volume": 0.06,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "97250",
+  "sve": 1.0,
+  "unit_volume": 0.06,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "12023",
+  "sve": 1.0,
+  "unit_volume": 0.1,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "2017",
+  "sve": 1.0,
+  "unit_volume": 0.04,
+  "quantity": 4.0
+ },
+ {
+  "supplier_code": "31778",
+  "sve": 1.0,
+  "unit_volume": 0.19,
+  "quantity": 6.0
+ },
+ {
+  "supplier_code": "32205",
+  "sve": 1.0,
+  "unit_volume": 0.01,
+  "quantity": 6.0
+ },
+ {
+  "supplier_code": "97287",
+  "sve": 1.0,
+  "unit_volume": 0.06,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "97291",
+  "sve": 1.0,
+  "unit_volume": 0.21,
+  "quantity": 3.0
+ },
+ {
+  "supplier_code": "32199",
+  "sve": 1.0,
+  "unit_volume": 0.28,
+  "quantity": 6.0
+ },
+ {
+  "supplier_code": "82316",
+  "sve": 1.0,
+  "unit_volume": 0.07,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "45762",
+  "sve": 1.0,
+  "unit_volume": 0.11,
+  "quantity": 6.0
+ },
+ {
+  "supplier_code": "31375",
+  "sve": 1.0,
+  "unit_volume": 0.03,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "97377",
+  "sve": 1.0,
+  "unit_volume": 0.1,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "6000814",
+  "sve": 1.0,
+  "unit_volume": 0.1,
+  "quantity": 6.0
+ },
+ {
+  "supplier_code": "1744",
+  "sve": 1.0,
+  "unit_volume": 0.26,
+  "quantity": 4.0
+ },
+ {
+  "supplier_code": "1161",
+  "sve": 1.0,
+  "unit_volume": 0.09,
+  "quantity": 10.0
+ },
+ {
+  "supplier_code": "45000",
+  "sve": 1.0,
+  "unit_volume": 0.12,
+  "quantity": 6.0
+ },
+ {
+  "supplier_code": "3771",
+  "sve": 1.0,
+  "unit_volume": 0.16,
+  "quantity": 3.0
+ },
+ {
+  "supplier_code": "45154",
+  "sve": 1.0,
+  "unit_volume": 0.14,
+  "quantity": 5.0
+ },
+ {
+  "supplier_code": "1164",
+  "sve": 1.0,
+  "unit_volume": 0.11,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "45087",
+  "sve": 1.0,
+  "unit_volume": 0.21,
+  "quantity": 8.0
+ },
+ {
+  "supplier_code": "6000784",
+  "sve": 1.0,
+  "unit_volume": 0.07,
+  "quantity": 6.0
+ },
+ {
+  "supplier_code": "1731",
+  "sve": 1.0,
+  "unit_volume": 0.25,
+  "quantity": 8.0
+ },
+ {
+  "supplier_code": "1178",
+  "sve": 1.0,
+  "unit_volume": 0.09,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "5851",
+  "sve": 1.0,
+  "unit_volume": 0.11,
+  "quantity": 5.0
+ },
+ {
+  "supplier_code": "97292",
+  "sve": 1.0,
+  "unit_volume": 0.21,
+  "quantity": 3.0
+ },
+ {
+  "supplier_code": "6000852",
+  "sve": 1.0,
+  "unit_volume": 0.06,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "5935",
+  "sve": 1.0,
+  "unit_volume": 0.16,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "42035",
+  "sve": 1.0,
+  "unit_volume": 0.11,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "6002123",
+  "sve": 1.0,
+  "unit_volume": 0.09,
+  "quantity": 3.0
+ },
+ {
+  "supplier_code": "97254",
+  "sve": 1.0,
+  "unit_volume": 0.06,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "5936",
+  "sve": 1.0,
+  "unit_volume": 0.16,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "5934",
+  "sve": 1.0,
+  "unit_volume": 0.16,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "3288",
+  "sve": 1.0,
+  "unit_volume": 0.05,
+  "quantity": 4.0
+ },
+ {
+  "supplier_code": "31372",
+  "sve": 1.0,
+  "unit_volume": 0.03,
+  "quantity": 5.0
+ },
+ {
+  "supplier_code": "81988",
+  "sve": 1.0,
+  "unit_volume": 0.04,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "45150",
+  "sve": 1.0,
+  "unit_volume": 0.14,
+  "quantity": 5.0
+ },
+ {
+  "supplier_code": "5015564",
+  "sve": 1.0,
+  "unit_volume": 0.29,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "32022",
+  "sve": 1.0,
+  "unit_volume": 0.06,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "80324",
+  "sve": 1.0,
+  "unit_volume": 0.02,
+  "quantity": 4.0
+ },
+ {
+  "supplier_code": "1888",
+  "sve": 1.0,
+  "unit_volume": 0.12,
+  "quantity": 12.0
+ },
+ {
+  "supplier_code": "46596",
+  "sve": 1.0,
+  "unit_volume": 0.18,
+  "quantity": 3.0
+ },
+ {
+  "supplier_code": "6002235",
+  "sve": 1.0,
+  "unit_volume": 0.08,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "6002618",
+  "sve": 1.0,
+  "unit_volume": 0.05,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5016590",
+  "sve": 1.0,
+  "unit_volume": 0.51,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "97294",
+  "sve": 1.0,
+  "unit_volume": 0.21,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "6000301",
+  "sve": 1.0,
+  "unit_volume": 0.21,
+  "quantity": 6.0
+ },
+ {
+  "supplier_code": "88792",
+  "sve": 1.0,
+  "unit_volume": 0.02,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "11997",
+  "sve": 1.0,
+  "unit_volume": 0.2,
+  "quantity": 5.0
+ },
+ {
+  "supplier_code": "32379",
+  "sve": 1.0,
+  "unit_volume": 0.04,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "6000261",
+  "sve": 1.0,
+  "unit_volume": 0.09,
+  "quantity": 4.0
+ },
+ {
+  "supplier_code": "1850",
+  "sve": 1.0,
+  "unit_volume": 0.19,
+  "quantity": 4.0
+ },
+ {
+  "supplier_code": "48709",
+  "sve": 1.0,
+  "unit_volume": 0.04,
+  "quantity": 6.0
+ },
+ {
+  "supplier_code": "48708",
+  "sve": 1.0,
+  "unit_volume": 0.04,
+  "quantity": 8.0
+ },
+ {
+  "supplier_code": "12066",
+  "sve": 1.0,
+  "unit_volume": 0.06,
+  "quantity": 2.0
+ },
+ {
+  "supplier_code": "1216",
+  "sve": 1.0,
+  "unit_volume": 0.38,
+  "quantity": 4.0
+ },
+ {
+  "supplier_code": "53206",
+  "sve": 1.0,
+  "unit_volume": 0.96,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "53573",
+  "sve": 1.0,
+  "unit_volume": 0.96,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "5016843",
+  "sve": 8.0,
+  "unit_volume": 0.23,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "45476",
+  "sve": 1.0,
+  "unit_volume": 0.06,
+  "quantity": 12.0
+ },
+ {
+  "supplier_code": "5015015",
+  "sve": 6.0,
+  "unit_volume": 0.14,
+  "quantity": 1.0
+ },
+ {
+  "supplier_code": "661",
+  "sve": 14.0,
+  "unit_volume": 0.7,
+  "quantity": 1.0
+ }
+]

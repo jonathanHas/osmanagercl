@@ -39,6 +39,17 @@ return [
             // Display name for the supplier
             'display_name' => 'Udea',
 
+            // Pallet capacities used by Udea's basket pallet calculator, in the same
+            // volume units as udea_product_cards.pallet_unit_volume. Read from
+            // <span id="pallet-data" data-volume-euro-pallet data-volume-block-pallet>
+            // on /orders/cart. These are cart-level constants, identical for every
+            // product, which is why they live here rather than in a per-product column.
+            // UdeaPalletVolumeService warns if the live page ever disagrees with these.
+            'pallet' => [
+                'euro' => 250,
+                'block' => 360,
+            ],
+
             // Enable/disable this integration
             'enabled' => true,
         ],
