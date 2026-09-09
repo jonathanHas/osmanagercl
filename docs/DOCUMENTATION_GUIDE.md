@@ -159,7 +159,7 @@ What type of information?
 ### 3. Cross-Reference
 ```markdown
 <!-- Good -->
-For details on price calculations, see [Pricing System](../features/pricing-system.md).
+For details on price calculations, see [Pricing System](./features/pricing-system.md).
 
 <!-- Bad -->
 For details on price calculations, see the pricing documentation.

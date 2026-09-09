@@ -147,13 +147,20 @@ class ZebraLabel extends Model
      */
     public static function setZplQuantity(string $zpl, int $copies): string
     {
+        // ^PQq,p,r,o — r is "replicates of each serial number" and defaults to 0.
+        // These labels carry no ^SN serialisation, so a non-zero r is meaningless at
+        // best and doubles the output on some GX-series firmware. It used to be 1.
+        $command = "^PQ{$copies},0,0,Y";
+
         if (preg_match('/\^PQ\d+[^\\^]*/i', $zpl)) {
-            // Replace existing ^PQ command
-            return preg_replace('/\^PQ\d+[^\\^]*/i', "^PQ{$copies},0,1,Y", $zpl);
+            // Replace the existing ^PQ command. Limited to the first match so a
+            // multi-block ZPL gets one deterministic rewrite rather than having every
+            // block's quantity silently overwritten.
+            return preg_replace('/\^PQ\d+[^\\^]*/i', $command, $zpl, 1);
         }
 
         // No ^PQ found — insert before final ^XZ
-        return preg_replace('/\^XZ\s*$/', "^PQ{$copies},0,1,Y^XZ", $zpl);
+        return preg_replace('/\^XZ\s*$/', "{$command}^XZ", $zpl);
     }
 
     /**

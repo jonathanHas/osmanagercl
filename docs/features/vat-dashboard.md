@@ -148,6 +148,6 @@ Planned features for future releases:
 ## Related Documentation
 
 - [VAT Returns Management](./vat-returns.md)
-- [Invoice Management](./invoice-management.md)
+- [Invoice Editing](./invoice-editing-system.md)
 - [OSAccounts Integration](./osaccounts-integration.md)
 - [Cash Reconciliation](./cash-reconciliation.md)

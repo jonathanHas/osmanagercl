@@ -324,7 +324,7 @@ Planned improvements:
 - [Sales Accounting Report](./sales-accounting-report.md)
 - [OSAccounts Integration](./osaccounts-integration.md)
 - [Performance Optimization Guide](../development/performance-optimization-guide.md)
-- [Invoice Management](./invoice-management.md)
+- [Invoice Editing](./invoice-editing-system.md)
 - [RTD System](./rtd-system.md) — Supplier RTD classifications that drive Retail/Non-Retail split
 
 ## VAT on Purchases Report

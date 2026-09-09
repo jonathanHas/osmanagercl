@@ -451,6 +451,6 @@ Route::post('/suppliers/organic-trust-report/options', [OrganicTrustReportContro
 
 - [Order Manager](./order-manager.md) - Stock monitoring for managed suppliers
 - [POS Integration](./pos-integration.md)
-- [Invoice Management](./invoice-management.md)
+- [Invoice Payment Management](./invoice-payment-management.md)
 - [OSAccounts Integration](./osaccounts-integration.md)
 - [Management Accounting System](./management-accounting-system.md)

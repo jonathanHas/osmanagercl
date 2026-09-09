@@ -87,7 +87,7 @@ Comprehensive documentation is available in the `docs/` directory:
 - **[Documentation Index](./docs/README.md)** - Complete documentation overview
 - **[Fresh Install Guide](./docs/development/fresh-install-guide.md)** - Set up a development machine from scratch
 - **[Architecture Overview](./docs/architecture/overview.md)** - System design and patterns
-- **[API Documentation](./docs/api/endpoints.md)** - REST API reference
+- **[API Documentation](./docs/api/)** - REST API reference
 
 ### Feature Documentation
 - [POS Integration](./docs/features/pos-integration.md)

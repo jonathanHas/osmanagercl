@@ -286,6 +286,11 @@ file there is the browser, via the File System Access API.
    Name collisions become `invoice (2).pdf`. Files in `review`, `parsed`, `failed` or
    `amazon_pending` are deliberately left in the inbox.
 
+   This is why a PDF holding several invoices (Coolnagrower) stays in the inbox: it is
+   always routed to `review` and has to be split before any invoice can be created. It
+   will keep reappearing in the panel's "not moved" set until that is done — correct
+   behaviour, not a sync failure.
+
 The implementation lives in `resources/views/invoices/partials/folder-sync-script.blade.php`
 (`window.InvoiceFolderSync`), included by both bulk-upload views. **No server-side code is
 involved** — no controller, model, migration or config changes.
@@ -559,7 +564,7 @@ Created automatic PDF repair system that:
 
 ## Related Documentation
 
-- [Invoice Management System](./invoice-management.md)
+- [Invoice Editing System](./invoice-editing-system.md)
 - [Invoice Attachments System](./invoice-attachments-system.md)
 - [Python Parser Integration Guide](./invoice-parser-integration.md) (To be created)
 - [VAT Processing](./vat-returns.md)

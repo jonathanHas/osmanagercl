@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\ProductTranslation;
 use App\Models\ZebraLabel;
 use App\Services\AiSettingsService;
+use App\Services\ZebraPrintService;
 use App\Services\ZplGeneratorService;
 use Gemini\Data\Blob;
 use Gemini\Enums\MimeType;
@@ -21,6 +22,7 @@ class LabelTranslationController extends Controller
 {
     public function __construct(
         protected ZplGeneratorService $zplGenerator,
+        protected ZebraPrintService $zebraPrint,
     ) {}
 
     /**
@@ -259,6 +261,7 @@ class LabelTranslationController extends Controller
             'product_id' => 'nullable|string|max:255',
             'product_code' => 'nullable|string|max:255',
             'translation_id' => 'nullable|integer',
+            'auto_print' => 'nullable|boolean',
         ]);
 
         $translationData = [
@@ -272,11 +275,19 @@ class LabelTranslationController extends Controller
             'created_by' => Auth::id(),
         ];
 
-        // Update existing or create new
+        // Update existing or create new. auto_print is deliberately kept out of
+        // $translationData so re-saving never clobbers the user's toggle.
         if ($request->input('translation_id')) {
             $translation = ProductTranslation::findOrFail($request->input('translation_id'));
             $translation->update($translationData);
         } else {
+            // A new translation inherits auto_print from the product's previous one.
+            // Without this it fell back to the column default (true), silently
+            // re-enabling delivery auto-printing for a product the user had turned off.
+            $translationData['auto_print'] = $request->has('auto_print')
+                ? $request->boolean('auto_print')
+                : $this->inheritedAutoPrint($request->input('product_code'));
+
             $translation = ProductTranslation::create($translationData);
         }
 
@@ -285,6 +296,21 @@ class LabelTranslationController extends Controller
             'message' => 'Translation saved.',
             'translation_id' => $translation->id,
         ]);
+    }
+
+    /**
+     * The auto_print setting a new translation should inherit: whatever the product's
+     * most recent existing translation used, defaulting to true for a first translation.
+     */
+    private function inheritedAutoPrint(?string $productCode): bool
+    {
+        if (! $productCode) {
+            return true;
+        }
+
+        $previous = ProductTranslation::latestForProduct($productCode);
+
+        return $previous ? (bool) $previous->auto_print : true;
     }
 
     /**
@@ -340,25 +366,15 @@ class LabelTranslationController extends Controller
 
         $zpl = ZebraLabel::setZplQuantity($zpl, $copies);
 
-        $tmpFile = tempnam(sys_get_temp_dir(), 'zpl_');
-        file_put_contents($tmpFile, $zpl);
-
-        $host = config('services.zebra.host', '10.42.1.71');
-        $port = config('services.zebra.port', '631');
-        $printer = config('services.zebra.name', 'ZTC-GX430t');
-
-        $command = "lp -h {$host}:{$port}/version=1.1 -d {$printer} -o raw {$tmpFile} 2>&1";
-        $output = shell_exec($command);
-
-        unlink($tmpFile);
-
-        $success = $output && str_contains($output, 'request id');
+        $result = $this->zebraPrint->sendRaw($zpl);
 
         return response()->json([
-            'success' => $success,
-            'message' => $success ? "Print job sent ({$copies} ".($copies === 1 ? 'copy' : 'copies').')' : 'Print failed',
-            'output' => trim($output ?? 'No output'),
-        ], $success ? 200 : 500);
+            'success' => $result->success,
+            'message' => $result->success
+                ? "Print job sent ({$copies} ".($copies === 1 ? 'copy' : 'copies').')'
+                : ($result->timedOut ? "Couldn't confirm the print job — the printer may not have responded." : 'Print failed'),
+            'output' => $result->output,
+        ], $result->success ? 200 : 500);
     }
 
     /**

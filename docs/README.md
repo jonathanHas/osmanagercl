@@ -14,8 +14,8 @@ Welcome to the comprehensive documentation for OSManager CL. This documentation 
 Core system architecture and design patterns.
 
 - **[Architecture Overview](./architecture/overview.md)** - System design, patterns, and principles
-- **[Database Design](./architecture/database-design.md)** - Schema design and relationships
-- **[API Design](./architecture/api-design.md)** - RESTful API principles and standards
+- **[Data Model & Hybrid Databases](./architecture/overview.md#data-model-architecture)** - Schema design, cross-database relationships
+- **[API Design](./architecture/overview.md#api-design)** - RESTful API principles and standards
 
 ### Features
 Detailed documentation for each major feature. See **[Features Index](./FEATURES_INDEX.md)** for the complete list.
@@ -33,6 +33,9 @@ Detailed documentation for each major feature. See **[Features Index](./FEATURES
 - [Supplier Integration](./features/supplier-integration.md) - Multi-supplier connectivity
 - [Supplier Management](./features/supplier-management.md) - Unified supplier management
 - [Order Manager](./features/order-manager.md) - Stock monitoring for managed suppliers
+
+**Customer Accounts**
+- [Customer Statements & Receivables](./features/customer-statements.md) - Customer invoicing, payment matching, statements and aged debtors
 
 **Financial Systems**
 - [Bank Reconciliation System](./features/bank-reconciliation-system.md) - AI-powered reconciliation
@@ -82,16 +85,17 @@ Guides for developers working on the project.
 Production deployment and operations.
 
 - **[Production Guide](./deployment/production-guide.md)** - Step-by-step deployment
-- **[Environment Configuration](./deployment/environment-config.md)** - Production settings
-- **[Monitoring](./deployment/monitoring.md)** - Application monitoring and alerts
+- **[Environment Configuration](./development/fresh-install-guide.md#7-configure-environment)** - `.env` setup across the three databases
+- **[Monitoring](./deployment/production-deployment-guide.md#monitoring-and-maintenance)** - Application monitoring and maintenance
 
 ### API Reference
 Complete API documentation.
 
-- **[API Endpoints](./api/endpoints.md)** - All available endpoints
 - **[Product Endpoints](./api/product-endpoints.md)** - Product management API
 - **[Delivery Endpoints](./api/delivery-endpoints.md)** - Delivery processing API
-- **[Authentication](./api/authentication.md)** - API authentication methods
+- **[F&V Endpoints](./api/fruit-veg-endpoints.md)** - Fruit & veg API
+- **[Till Visibility](./api/till-visibility.md)** - Till visibility API
+- **[Authentication & Permissions](./features/user-roles-permissions.md)** - Roles, permissions and route gating
 
 ### Templates
 Documentation templates for consistency.
@@ -111,14 +115,14 @@ Documentation templates for consistency.
 
 ### For System Administrators
 1. Review [Production Guide](./deployment/production-guide.md)
-2. Configure using [Environment Config](./deployment/environment-config.md)
-3. Set up [Monitoring](./deployment/monitoring.md)
+2. Configure using [Environment Config](./development/fresh-install-guide.md#7-configure-environment)
+3. Set up [Monitoring](./deployment/production-deployment-guide.md#monitoring-and-maintenance)
 4. Keep [Troubleshooting](./troubleshooting/index.md) handy
 
 ### For API Consumers
-1. Start with [API Design](./architecture/api-design.md)
-2. Set up [Authentication](./api/authentication.md)
-3. Explore [API Endpoints](./api/endpoints.md)
+1. Start with [API Design](./architecture/overview.md#api-design)
+2. Review [Authentication & Permissions](./features/user-roles-permissions.md)
+3. Explore the endpoint docs in [`docs/api/`](./api/)
 
 ---
 

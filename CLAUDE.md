@@ -163,6 +163,11 @@ For a complete list of all features with detailed descriptions, see **[Features 
 **Voucher Management**
 - Gift Vouchers (barcoded, balance tracking, till redemption, Zebra label printing)
 
+**Customer Accounts**
+- Customer Invoicing (draft → issue → void, PDF)
+- Payment Matching & On-Account Credit
+- Statements, Aged Debtors & Emailed Statements
+
 **Analytics & Reporting**
 - Sales Accounting Reports
 - Bank Statement Analysis
@@ -232,6 +237,7 @@ php artisan optimize:clear     # Clear caches
 **Where to Find Information:**
 - 🔥 **Performance**: [Sales Data Import Plan](./docs/features/sales-data-import-plan.md)
 - **AI Integration**: [AI Integration](./docs/features/ai-integration.md) - Multi-provider AI config, camera capture, diagnostics
+- **Customer Accounts**: [Customer Statements & Receivables](./docs/features/customer-statements.md) - Invoicing, payment matching, statements, aged debtors
 - **Features**: [Features Index](./docs/FEATURES_INDEX.md)
 - **Troubleshooting**: [Known Issues](./docs/development/known-issues.md)
 - **Development**: [Quick Start Guide](./docs/development/quick-start-guide.md)

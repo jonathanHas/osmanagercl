@@ -22,6 +22,37 @@
                 </a>
             </div>
 
+            {{-- Printer spool. This queue lives on the printer host, not on this machine,
+                 so clearing the local CUPS queue never affected stuck label jobs. --}}
+            <div class="mb-5 bg-white rounded-lg shadow-sm border border-gray-200" x-data="printerQueue()" x-init="load()">
+                <div class="flex items-center justify-between gap-3 px-5 py-3">
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-sm font-semibold text-gray-900">Printer Queue</h3>
+                        <span class="text-xs text-gray-500" x-text="host ? host + ' · ' + printer : ''"></span>
+                        <span x-show="!loading && jobs.length > 0" class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800" x-text="jobs.length + ' queued'"></span>
+                        <span x-show="!loading && jobs.length === 0 && loaded" class="text-xs text-green-600">Empty</span>
+                        <span x-show="loading" class="text-xs text-gray-400">Checking…</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="button" @click="load()" class="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Refresh</button>
+                        <button type="button" x-show="jobs.length > 0" @click="cancelAll()" class="rounded-md bg-red-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-red-700">Cancel all</button>
+                    </div>
+                </div>
+                <div x-show="jobs.length > 0" class="border-t border-gray-200 px-5 py-2">
+                    <template x-for="job in jobs" :key="job.job_id">
+                        <div class="flex items-center justify-between gap-3 py-1.5 text-xs border-b border-gray-100 last:border-0">
+                            <span class="font-mono text-gray-700" x-text="job.job_id"></span>
+                            <span class="text-gray-500" x-text="job.user"></span>
+                            <span class="flex-1 text-gray-400 truncate" x-text="job.submitted_at"></span>
+                            <button type="button" @click="cancelJob(job.job_id)" class="rounded border border-red-200 px-2 py-0.5 font-medium text-red-700 hover:bg-red-50">Cancel</button>
+                        </div>
+                    </template>
+                </div>
+                <div x-show="error" class="border-t border-gray-200 px-5 py-2">
+                    <p class="text-xs text-red-600" x-text="error"></p>
+                </div>
+            </div>
+
             @if ($view === 'zebra')
                 {{-- ==================== ZEBRA LABELS VIEW ==================== --}}
                 <div class="bg-white rounded-lg shadow-sm border border-gray-200">
@@ -425,6 +456,65 @@
     </div>
 
     <script>
+        // Live view of the CUPS spool on the printer host, with cancel.
+        function printerQueue() {
+            return {
+                jobs: [],
+                host: '',
+                printer: '',
+                loading: false,
+                loaded: false,
+                error: '',
+
+                load() {
+                    this.loading = true;
+                    this.error = '';
+                    fetch('{{ route('labels.printer-queue') }}', { headers: { 'Accept': 'application/json' } })
+                        .then(r => r.json())
+                        .then(data => {
+                            this.jobs = data.jobs || [];
+                            this.host = data.host || '';
+                            this.printer = data.printer || '';
+                            this.loaded = true;
+                            if (!data.success) {
+                                this.error = data.output || 'Could not read the printer queue.';
+                            }
+                        })
+                        .catch(e => { this.error = 'Could not reach the printer: ' + e; })
+                        .finally(() => { this.loading = false; });
+                },
+
+                cancelJob(jobId) {
+                    this.send({ job_id: jobId });
+                },
+
+                cancelAll() {
+                    if (!confirm('Cancel every queued job for this printer?')) return;
+                    this.send({ all: true });
+                },
+
+                send(payload) {
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+                    this.loading = true;
+                    fetch('{{ route('labels.printer-cancel') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                        },
+                        body: JSON.stringify(payload),
+                    })
+                        .then(r => r.json())
+                        .then(data => {
+                            if (!data.success) this.error = data.output || 'Cancel failed.';
+                        })
+                        .catch(e => { this.error = 'Cancel failed: ' + e; })
+                        .finally(() => { this.load(); });
+                },
+            };
+        }
+
         function zebraLabels() {
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 

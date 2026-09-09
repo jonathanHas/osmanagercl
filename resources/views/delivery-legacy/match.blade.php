@@ -63,15 +63,20 @@
                         Generate Returns Sheet
                     </button>
                 @endif
-                @if(($translatableCount ?? 0) > 0)
+                {{-- Always rendered (hidden at zero) so JS can update the outstanding
+                     count after printing or scanning without a page reload. --}}
+                @if(!empty($translatableProducts))
                     <button type="button" id="printTranslationsBtn" onclick="printTranslatedLabels()"
-                            class="inline-flex items-center px-3 py-2 bg-teal-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-teal-700 gap-1.5 touch-manipulation disabled:opacity-50">
+                            @class([
+                                'inline-flex items-center px-3 py-2 bg-teal-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-teal-700 gap-1.5 touch-manipulation disabled:opacity-50',
+                                'hidden' => ($translatableCount ?? 0) === 0,
+                            ])>
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
                         </svg>
-                        <span class="hidden sm:inline">Print Translated Labels ({{ $translatableCount }})</span>
-                        <span class="sm:hidden">Labels ({{ $translatableCount }})</span>
+                        <span class="hidden sm:inline">Print Translated Labels (<span class="translatable-count-value">{{ $translatableCount }}</span>)</span>
+                        <span class="sm:hidden">Labels (<span class="translatable-count-value">{{ $translatableCount }}</span>)</span>
                     </button>
                 @endif
                 <a href="{{ route('delivery-legacy.index') }}"
@@ -2319,7 +2324,7 @@
                     <div class="flex items-start justify-between gap-3">
                         <div>
                             <h3 class="text-lg font-semibold text-gray-900">Print Translated Labels</h3>
-                            <p class="mt-1 text-sm text-gray-500">These scanned products have a translated label. One label prints per unit scanned. Untick any you don't want to print.</p>
+                            <p class="mt-1 text-sm text-gray-500">These scanned products still have labels to print. One label prints per unit scanned that hasn't printed yet. Untick any you don't want to print.</p>
                         </div>
                         <div class="flex flex-shrink-0 gap-2">
                             <button type="button" onclick="setAllTranslationSelections(true)" class="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Select all</button>
@@ -2328,7 +2333,18 @@
                     </div>
                 </div>
                 <div id="translationPrintList" class="max-h-96 overflow-y-auto px-6 py-3" onchange="updateTranslationPrintCount()"></div>
-                <div class="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+
+                {{-- Shown when a print couldn't be confirmed. Deliberately offers Refresh
+                     rather than Retry: the job may already be at the printer. --}}
+                <div id="translationPrintWarning" class="hidden border-t border-amber-200 bg-amber-50 px-6 py-4">
+                    <p class="text-sm text-amber-800" id="translationPrintWarningText"></p>
+                    <div class="mt-3 flex gap-3">
+                        <button type="button" onclick="refreshTranslationPrintList()" class="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700">Refresh</button>
+                        <button type="button" onclick="closeTranslationPrintModal()" class="rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100">Close</button>
+                    </div>
+                </div>
+
+                <div id="translationPrintFooter" class="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
                     <button type="button" onclick="closeTranslationPrintModal()" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
                     <button type="button" id="submitTranslationsBtn" onclick="submitTranslatedLabels()" class="rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50">Print</button>
                 </div>
@@ -2393,57 +2409,180 @@
             submitSelectedItems('{{ route('delivery-legacy.deviation-report') }}', 'deviation report');
         }
 
-        // Scanned products that have a translated label available (barcode, name, scanned qty).
-        const TRANSLATABLE_PRODUCTS = @js($translatableProducts ?? []);
+        // Scanned products that have a translated label available. Each carries
+        // scanned / printed / outstanding — `outstanding` is what actually prints.
+        let TRANSLATABLE_PRODUCTS = @js($translatableProducts ?? []);
 
-        // Open a review modal listing the products whose translated labels will print.
-        function printTranslatedLabels() {
+        // One key per submit attempt, reused across retries so the server can recognise
+        // a repeat of the same attempt and refuse to print it twice.
+        let translationIdempotencyKey = null;
+
+        function newIdempotencyKey() {
+            if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+                return window.crypto.randomUUID();
+            }
+            return 'k-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+        }
+
+        // Build one row in the review list.
+        function buildTranslationRow(product, checked) {
+            const row = document.createElement('label');
+            row.className = 'flex items-center gap-3 py-2 border-b border-gray-100 last:border-0 cursor-pointer';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'translation-print-select rounded border-gray-300 text-teal-600 focus:ring-teal-500';
+            checkbox.value = product.barcode;
+            checkbox.checked = checked;
+
+            // Product image thumbnail (falls back to a placeholder icon).
+            const thumb = document.createElement('div');
+            thumb.className = 'w-10 h-10 flex-shrink-0 rounded border border-gray-200 bg-white flex items-center justify-center overflow-hidden';
+            if (product.image) {
+                const img = document.createElement('img');
+                img.src = product.image;
+                img.alt = product.name;
+                img.loading = 'lazy';
+                img.className = 'w-full h-full object-contain';
+                img.onerror = function () { this.remove(); thumb.appendChild(placeholderIcon()); };
+                thumb.appendChild(img);
+            } else {
+                thumb.appendChild(placeholderIcon());
+            }
+
+            const name = document.createElement('div');
+            name.className = 'flex-1 text-sm text-gray-700 truncate';
+            name.title = product.name;
+            name.textContent = product.name;
+
+            const qty = document.createElement('div');
+            qty.className = 'text-xs font-medium whitespace-nowrap text-right';
+            const outstanding = product.outstanding ?? product.scanned;
+            if (outstanding > 0) {
+                qty.className += ' text-gray-500';
+                qty.textContent = outstanding + (outstanding === 1 ? ' label' : ' labels');
+                if (product.printed > 0) {
+                    const note = document.createElement('div');
+                    note.className = 'text-[11px] font-normal text-gray-400';
+                    note.textContent = product.printed + ' already printed';
+                    qty.appendChild(note);
+                }
+            } else {
+                qty.className += ' text-gray-400';
+                qty.textContent = product.printed + (product.printed === 1 ? ' label printed' : ' labels printed');
+            }
+
+            row.appendChild(checkbox);
+            row.appendChild(thumb);
+            row.appendChild(name);
+            row.appendChild(qty);
+            return row;
+        }
+
+        // Render the review list: outstanding products ticked, already-printed ones
+        // hidden behind a disclosure and unticked (ticking one is an explicit reprint).
+        function renderTranslationList() {
             const list = document.getElementById('translationPrintList');
             list.innerHTML = '';
 
-            TRANSLATABLE_PRODUCTS.forEach(function (product) {
-                const row = document.createElement('label');
-                row.className = 'flex items-center gap-3 py-2 border-b border-gray-100 last:border-0 cursor-pointer';
+            const outstanding = TRANSLATABLE_PRODUCTS.filter(function (p) { return (p.outstanding ?? p.scanned) > 0; });
+            const done = TRANSLATABLE_PRODUCTS.filter(function (p) { return (p.outstanding ?? p.scanned) === 0; });
 
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.className = 'translation-print-select rounded border-gray-300 text-teal-600 focus:ring-teal-500';
-                checkbox.value = product.barcode;
-                checkbox.checked = true;
+            if (outstanding.length === 0) {
+                const empty = document.createElement('p');
+                empty.className = 'py-3 text-sm text-gray-500';
+                empty.textContent = 'Everything scanned has already been printed.';
+                list.appendChild(empty);
+            }
 
-                // Product image thumbnail (falls back to a placeholder icon).
-                const thumb = document.createElement('div');
-                thumb.className = 'w-10 h-10 flex-shrink-0 rounded border border-gray-200 bg-white flex items-center justify-center overflow-hidden';
-                if (product.image) {
-                    const img = document.createElement('img');
-                    img.src = product.image;
-                    img.alt = product.name;
-                    img.loading = 'lazy';
-                    img.className = 'w-full h-full object-contain';
-                    img.onerror = function () { this.remove(); thumb.appendChild(placeholderIcon()); };
-                    thumb.appendChild(img);
-                } else {
-                    thumb.appendChild(placeholderIcon());
-                }
-
-                const name = document.createElement('div');
-                name.className = 'flex-1 text-sm text-gray-700 truncate';
-                name.title = product.name;
-                name.textContent = product.name;
-
-                const qty = document.createElement('div');
-                qty.className = 'text-xs font-medium text-gray-500 whitespace-nowrap';
-                qty.textContent = product.scanned + (product.scanned === 1 ? ' label' : ' labels');
-
-                row.appendChild(checkbox);
-                row.appendChild(thumb);
-                row.appendChild(name);
-                row.appendChild(qty);
-                list.appendChild(row);
+            outstanding.forEach(function (product) {
+                list.appendChild(buildTranslationRow(product, true));
             });
 
+            if (done.length > 0) {
+                const details = document.createElement('details');
+                details.className = 'mt-3 border-t border-gray-100 pt-3';
+
+                const summary = document.createElement('summary');
+                summary.className = 'cursor-pointer text-xs font-medium text-gray-500 hover:text-gray-700';
+                summary.textContent = 'Show already-printed (' + done.length + ')';
+                details.appendChild(summary);
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'mt-2';
+                done.forEach(function (product) {
+                    wrapper.appendChild(buildTranslationRow(product, false));
+                });
+                details.appendChild(wrapper);
+                list.appendChild(details);
+            }
+
             updateTranslationPrintCount();
+        }
+
+        // Update the header button's outstanding count, hiding it once nothing is left.
+        function setTranslatableCount(count) {
+            document.querySelectorAll('.translatable-count-value').forEach(function (el) {
+                el.textContent = count;
+            });
+            const headerBtn = document.getElementById('printTranslationsBtn');
+            if (headerBtn) {
+                headerBtn.classList.toggle('hidden', count === 0);
+            }
+        }
+
+        // Replace the cached product list and header count from a server response.
+        function applyTranslationState(data) {
+            if (Array.isArray(data.products)) {
+                TRANSLATABLE_PRODUCTS = data.products;
+            }
+            if (typeof data.translatable_count === 'number') {
+                setTranslatableCount(data.translatable_count);
+            }
+        }
+
+        // Open a review modal listing the products whose translated labels will print.
+        function printTranslatedLabels() {
+            translationIdempotencyKey = newIdempotencyKey();
+            hideTranslationWarning();
+            renderTranslationList();
             document.getElementById('translationPrintModal').classList.remove('hidden');
+        }
+
+        // Pull the current outstanding state from the server (after a lost response,
+        // or after scanning more units).
+        function refreshTranslationPrintList() {
+            const params = new URLSearchParams({
+                delID: '{{ $deliveryId }}',
+                supplierID: '{{ $supplierId }}',
+            });
+
+            return fetch('{{ route('delivery-legacy.translatable-products') }}?' + params.toString(), {
+                headers: { 'Accept': 'application/json' },
+            })
+                .then(function (response) { return response.json(); })
+                .then(function (data) {
+                    applyTranslationState(data);
+                    hideTranslationWarning();
+                    renderTranslationList();
+                    // A confirmed refresh means any earlier attempt is settled; the next
+                    // press is a genuinely new one.
+                    translationIdempotencyKey = newIdempotencyKey();
+                })
+                .catch(function (error) {
+                    showTranslationWarning('Could not refresh: ' + error);
+                });
+        }
+
+        function showTranslationWarning(message) {
+            document.getElementById('translationPrintWarningText').textContent = message;
+            document.getElementById('translationPrintWarning').classList.remove('hidden');
+            document.getElementById('translationPrintFooter').classList.add('hidden');
+        }
+
+        function hideTranslationWarning() {
+            document.getElementById('translationPrintWarning').classList.add('hidden');
+            document.getElementById('translationPrintFooter').classList.remove('hidden');
         }
 
         // SVG placeholder shown when a product has no image.
@@ -2463,33 +2602,79 @@
 
         function closeTranslationPrintModal() {
             document.getElementById('translationPrintModal').classList.add('hidden');
+            const btn = document.getElementById('submitTranslationsBtn');
+            btn.dataset.printing = '0';
+            hideTranslationWarning();
         }
 
         // Update the footer button label with the running selected label total.
         function updateTranslationPrintCount() {
+            const btn = document.getElementById('submitTranslationsBtn');
+
+            // Never re-arm the button mid-flight. This used to run from .finally(), so a
+            // job that only *looked* failed (printer slow, request timed out after CUPS
+            // had accepted it) left the button live and the obvious next click sent a
+            // second identical job.
+            if (btn.dataset.printing === '1') {
+                return;
+            }
+
             const checked = Array.from(document.querySelectorAll('.translation-print-select:checked'));
             let labels = 0;
+            let reprints = 0;
             checked.forEach(function (cb) {
                 const product = TRANSLATABLE_PRODUCTS.find(function (p) { return p.barcode === cb.value; });
-                if (product) labels += product.scanned;
+                if (!product) return;
+                const outstanding = product.outstanding ?? product.scanned;
+                if (outstanding > 0) {
+                    labels += outstanding;
+                } else {
+                    // An already-printed product was ticked: that's a deliberate reprint
+                    // of the full scanned quantity.
+                    labels += product.scanned;
+                    reprints++;
+                }
             });
-            const btn = document.getElementById('submitTranslationsBtn');
+
             btn.disabled = checked.length === 0;
+            btn.dataset.reprints = String(reprints);
             btn.textContent = checked.length === 0
                 ? 'Print'
-                : 'Print ' + labels + (labels === 1 ? ' Label' : ' Labels');
+                : (reprints > 0 ? 'Reprint ' : 'Print ') + labels + (labels === 1 ? ' Label' : ' Labels');
         }
 
         // Send the selected translated labels to the Zebra in a single job.
         function submitTranslatedLabels() {
+            const btn = document.getElementById('submitTranslationsBtn');
+
+            if (btn.dataset.printing === '1') {
+                return;
+            }
+
             const checked = Array.from(document.querySelectorAll('.translation-print-select:checked'));
             if (checked.length === 0) {
                 return;
             }
             const barcodes = checked.map(function (cb) { return cb.value; });
+            const force = (btn.dataset.reprints || '0') !== '0';
 
-            const btn = document.getElementById('submitTranslationsBtn');
+            if (force && !confirm('This includes labels that have already printed. Reprint them?')) {
+                return;
+            }
+
+            if (!translationIdempotencyKey) {
+                translationIdempotencyKey = newIdempotencyKey();
+            }
+
+            btn.dataset.printing = '1';
             btn.disabled = true;
+            const originalText = btn.textContent;
+            btn.textContent = 'Printing…';
+
+            // Slightly above the server-side `timeout 15` on lp, so the server gets the
+            // chance to answer definitively before we give up on it.
+            const controller = new AbortController();
+            const abortTimer = setTimeout(function () { controller.abort(); }, 25000);
 
             fetch('{{ route('delivery-legacy.print-translations') }}', {
                 method: 'POST',
@@ -2502,18 +2687,52 @@
                     delID: '{{ $deliveryId }}',
                     supplierID: '{{ $supplierId }}',
                     barcodes: barcodes,
+                    idempotency_key: translationIdempotencyKey,
+                    force: force,
                 }),
+                signal: controller.signal,
             })
                 .then(function (response) { return response.json().then(function (data) { return { ok: response.ok, data: data }; }); })
                 .then(function (result) {
-                    alert(result.data.message || (result.ok ? 'Print job sent.' : 'Print failed.'));
-                    if (result.ok) closeTranslationPrintModal();
+                    applyTranslationState(result.data);
+
+                    if (result.ok) {
+                        // Settled: the next press is a genuinely new attempt.
+                        translationIdempotencyKey = newIdempotencyKey();
+                        btn.dataset.printing = '0';
+                        btn.textContent = originalText;
+                        alert(result.data.message || 'Print job sent.');
+                        closeTranslationPrintModal();
+                        return;
+                    }
+
+                    if (result.data.timed_out) {
+                        // The job may have reached the printer. Offer Refresh, never a
+                        // retry that could duplicate it.
+                        renderTranslationList();
+                        showTranslationWarning(result.data.message);
+                        return;
+                    }
+
+                    // Definitive refusal: the server rolled the ledger back, so retrying
+                    // with the same key is safe.
+                    btn.dataset.printing = '0';
+                    btn.textContent = originalText;
+                    renderTranslationList();
+                    alert(result.data.message || 'Print failed.');
                 })
                 .catch(function (error) {
-                    alert('Print request failed: ' + error);
+                    // Aborted or network failure — we cannot tell whether CUPS took the
+                    // job, so the button stays down until the user refreshes.
+                    renderTranslationList();
+                    showTranslationWarning(
+                        error.name === 'AbortError'
+                            ? "We couldn't confirm this print. The job may already have been sent to the printer. Refresh to see what's still outstanding."
+                            : 'Print request failed: ' + error + ". Refresh to see what's still outstanding."
+                    );
                 })
                 .finally(function () {
-                    updateTranslationPrintCount();
+                    clearTimeout(abortTimer);
                 });
         }
 
@@ -2999,6 +3218,12 @@
                             };
                             this.scanner.scanCount++;
                             this.scannerDirty = true;
+
+                            // Keep the outstanding-labels count live: a new scan of a
+                            // translated product adds labels to print.
+                            if (typeof refreshTranslationPrintList === 'function') {
+                                refreshTranslationPrintList();
+                            }
 
                             this.scanner.history.unshift({
                                 barcode: barcode,

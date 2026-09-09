@@ -599,4 +599,4 @@ Each supplier has an `rtd_classification` field that controls how their invoices
 - [Invoice Parser Integration](./invoice-parser-integration.md)
 - [Udea Invoice Parser](./udea-invoice-parser.md)
 - [VAT Returns](./vat-returns.md)
-- [VAT on Purchases](../features/vat-returns.md#vat-on-purchases) (uses RTD classification for purchase VAT analysis)
+- [VAT on Purchases](./vat-returns.md#vat-on-purchases-report) (uses RTD classification for purchase VAT analysis)

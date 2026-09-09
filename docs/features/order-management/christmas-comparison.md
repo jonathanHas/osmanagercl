@@ -403,7 +403,7 @@ If issues arise:
 ## Related Features
 
 - [Order Generation](./order-generation.md) - Core order generation system
-- [Sales Analytics](../analytics/sales-reports.md) - Sales data and reporting
+- [Sales Analytics](../sales-accounting-report.md) - Sales data and reporting
 - Product Order Settings - Per-product configuration
 
 ---

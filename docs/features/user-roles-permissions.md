@@ -112,6 +112,7 @@ Route::get('/products/edit', [Controller::class, 'method'])
   - Delivery creation and management
   - Category management
   - User viewing
+  - Customer accounts (invoicing, payment matching, statements, aged debtors)
 - **Use Case**: Store managers, supervisors
 
 ### Employee (`employee`)
@@ -141,6 +142,11 @@ Route::get('/products/edit', [Controller::class, 'method'])
 - `products.delete` - Delete products
 - `products.manage_pricing` - Update prices and costs
 - `products.manage_barcodes` - Edit product barcodes
+
+### Customer Accounts
+- `customer-invoices.manage` - Create, issue, void and unvoid customer invoices; record payments and match them to invoices; view customer statements and the aged debtors report
+
+  Unlike the other modules here, this is a **single coarse permission** gating the whole module — there is no separate view/create/edit/delete split. Any role granted it can both read and change customer receivables.
 
 ### Sales & Analytics
 - `sales.view_reports` - View sales reports
@@ -483,8 +489,5 @@ if ($this->hasRole('admin')) {
 
 ## Related Documentation
 
-- [Authentication System](../authentication.md)
-- [User Management](./user-management.md)
-- [API Authentication](../api/authentication.md)
-- [Security Best Practices](../security.md)
+- [Security Architecture](../architecture/overview.md#security-architecture) - Authentication, CSRF, and data security
 - **[User Roles Agent](../../.claude/agents/user_roles_agent.md)** - Specialized Claude Code agent for this system

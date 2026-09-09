@@ -46,6 +46,7 @@ Re-routes bulk-upload invoices that the Python parsers couldn't parse (status `f
 - **Image support**: All four providers work identically to Camera Capture
 - **Excluded**: Files flagged as duplicates (which keep their "Delete Duplicate" action)
 - **Data pipeline**: After AI extraction, output flows through the same `InvoiceParsingService::processParserOutput()` as every other parser -- confidence heuristics, duplicate detection, and auto-creation thresholds all apply unchanged
+- **Multi-invoice PDFs are not a candidate**: a file holding several invoices (Coolnagrower) is forced to `review`, which makes it eligible for "Send to AI" -- but the AI path has the same one-file-one-invoice limitation, so it cannot resolve one either. Split the PDF first; see *Files containing several invoices* in [the parser integration guide](./invoice-parser-integration.md)
 
 ### Label Translation
 

@@ -337,6 +337,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/labels/test-print', [LabelAreaController::class, 'testPrint'])->name('labels.test-print');
     Route::post('/labels/save-zpl', [LabelAreaController::class, 'saveZpl'])->name('labels.save-zpl');
     Route::post('/labels/print-zpl', [LabelAreaController::class, 'printZpl'])->name('labels.print-zpl');
+
+    // Zebra printer spool (lives on the printer host, not this machine)
+    Route::get('/labels/printer-queue', [LabelAreaController::class, 'printerQueue'])->name('labels.printer-queue');
+    Route::post('/labels/printer-cancel', [LabelAreaController::class, 'cancelPrinterJob'])
+        ->name('labels.printer-cancel')
+        ->middleware('permission:deliveries.manage');
     Route::get('/labels/translation-history', [LabelAreaController::class, 'labelHistory'])->name('labels.translation-history');
     Route::get('/labels/translation-history/{name}/edit', [LabelAreaController::class, 'editLabel'])->name('labels.edit-label');
 
@@ -568,6 +574,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/deviation-report', [DeliveryLegacyController::class, 'deviationReport'])->name('deviation-report');
         Route::post('/goods-return-sheet', [DeliveryLegacyController::class, 'goodsReturnSheet'])->name('goods-return-sheet');
         Route::post('/print-translations', [DeliveryLegacyController::class, 'printTranslations'])->name('print-translations');
+        Route::get('/translatable-products', [DeliveryLegacyController::class, 'translatableProducts'])->name('translatable-products');
+        Route::post('/undo-last-print', [DeliveryLegacyController::class, 'undoLastPrint'])
+            ->name('undo-last-print')
+            ->middleware('permission:deliveries.manage');
     });
 
     // Order Management mockup routes (for UI testing)

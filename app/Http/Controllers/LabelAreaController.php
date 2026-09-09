@@ -12,6 +12,7 @@ use App\Services\AiSettingsService;
 use App\Services\LabelService;
 use App\Services\SupplierService;
 use App\Services\TillVisibilityService;
+use App\Services\ZebraPrintService;
 use App\Services\ZplGeneratorService;
 use Gemini\Data\Blob;
 use Gemini\Enums\MimeType;
@@ -29,11 +30,14 @@ class LabelAreaController extends Controller
 
     protected TillVisibilityService $tillVisibilityService;
 
-    public function __construct(LabelService $labelService, ZplGeneratorService $zplGenerator, TillVisibilityService $tillVisibilityService)
+    protected ZebraPrintService $zebraPrint;
+
+    public function __construct(LabelService $labelService, ZplGeneratorService $zplGenerator, TillVisibilityService $tillVisibilityService, ZebraPrintService $zebraPrint)
     {
         $this->labelService = $labelService;
         $this->zplGenerator = $zplGenerator;
         $this->tillVisibilityService = $tillVisibilityService;
+        $this->zebraPrint = $zebraPrint;
     }
 
     /**
@@ -870,8 +874,24 @@ class LabelAreaController extends Controller
                 escapeshellarg($printer)
             );
         } elseif ($mode === 'lpstat') {
-            // Just list available printers
+            // Local daemon only — note this does NOT show the printer's own spool.
             $command = 'lpstat -p -d 2>&1';
+        } elseif ($mode === 'queue') {
+            // The real spool: jobs queued on the printer host, not this machine.
+            $queue = $this->zebraPrint->queue();
+            $results['mode'] = $mode;
+            $results['jobs'] = $queue['jobs'];
+            $results['output'] = $queue['output'];
+            $results['success'] = $queue['success'];
+
+            return response()->json($results);
+        } elseif ($mode === 'printer') {
+            $status = $this->zebraPrint->printerStatus();
+            $results['mode'] = $mode;
+            $results['output'] = $status['output'];
+            $results['success'] = $status['success'];
+
+            return response()->json($results);
         } elseif ($mode === 'network') {
             // Test network connectivity to printer
             $host = config('services.zebra.host', '10.42.1.71');
@@ -888,6 +908,49 @@ class LabelAreaController extends Controller
             || ($mode === 'lpstat');
 
         return response()->json($results);
+    }
+
+    /**
+     * List the jobs currently queued on the Zebra's CUPS host.
+     *
+     * The spool lives on services.zebra.host, not on this machine, so clearing the
+     * local queue has never had any effect on stuck label jobs.
+     */
+    public function printerQueue()
+    {
+        $queue = $this->zebraPrint->queue();
+
+        return response()->json([
+            'success' => $queue['success'],
+            'host' => $this->zebraPrint->host(),
+            'printer' => $this->zebraPrint->printerName(),
+            'jobs' => $queue['jobs'],
+            'count' => count($queue['jobs']),
+            'output' => $queue['output'],
+        ]);
+    }
+
+    /**
+     * Cancel one queued job, or every job for this printer when `all` is set.
+     */
+    public function cancelPrinterJob(Request $request)
+    {
+        $request->validate([
+            'job_id' => 'required_without:all|nullable|string|max:64',
+            'all' => 'sometimes|boolean',
+        ]);
+
+        $result = $request->boolean('all')
+            ? $this->zebraPrint->cancelAll()
+            : $this->zebraPrint->cancel($request->input('job_id'));
+
+        return response()->json([
+            'success' => $result['success'],
+            'message' => $result['success']
+                ? ($request->boolean('all') ? 'All queued jobs cancelled.' : 'Job cancelled.')
+                : 'Cancel failed.',
+            'output' => $result['output'],
+        ], $result['success'] ? 200 : 500);
     }
 
     /**
@@ -927,24 +990,15 @@ class LabelAreaController extends Controller
             'zpl' => 'required|string',
         ]);
 
-        $zpl = $request->input('zpl');
-
-        // Write ZPL to a temp file to avoid shell escaping issues
-        $tmpFile = tempnam(sys_get_temp_dir(), 'zpl_');
-        file_put_contents($tmpFile, $zpl);
-
-        $command = "lp -h 10.42.1.71:631/version=1.1 -d ZTC-GX430t -o raw {$tmpFile} 2>&1";
-        $output = shell_exec($command);
-
-        unlink($tmpFile);
-
-        $success = $output && str_contains($output, 'request id');
+        $result = $this->zebraPrint->sendRaw($request->input('zpl'));
 
         return response()->json([
-            'success' => $success,
-            'message' => $success ? 'Print job sent' : 'Print failed',
-            'output' => trim($output ?? 'No output'),
-        ], $success ? 200 : 500);
+            'success' => $result->success,
+            'message' => $result->success
+                ? 'Print job sent'
+                : ($result->timedOut ? "Couldn't confirm the print job — the printer may not have responded." : 'Print failed'),
+            'output' => $result->output,
+        ], $result->success ? 200 : 500);
     }
 
     /**

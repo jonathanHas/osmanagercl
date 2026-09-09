@@ -363,9 +363,9 @@
 
                     // Set ^PQ quantity in ZPL instead of repeating (avoids re-downloading ~DG graphics)
                     if (/\^PQ\d+/i.test(zpl)) {
-                        zpl = zpl.replace(/\^PQ\d+[^^]*/i, '^PQ' + this.copies + ',0,1,Y');
+                        zpl = zpl.replace(/\^PQ\d+[^^]*/i, '^PQ' + this.copies + ',0,0,Y');
                     } else {
-                        zpl = zpl.replace(/\^XZ\s*$/, '^PQ' + this.copies + ',0,1,Y^XZ');
+                        zpl = zpl.replace(/\^XZ\s*$/, '^PQ' + this.copies + ',0,0,Y^XZ');
                     }
 
                     try {

@@ -4,12 +4,17 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Models\ZebraLabel;
+use App\Services\ZebraPrintService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class ZebraLabelController extends Controller
 {
+    public function __construct(
+        protected ZebraPrintService $zebraPrint,
+    ) {}
+
     public function index(Request $request): View
     {
         $search = $request->input('search');
@@ -210,25 +215,14 @@ class ZebraLabelController extends Controller
         // Set ^PQ quantity in ZPL (instead of repeating the whole ZPL which re-downloads ~DG graphics)
         $zpl = ZebraLabel::setZplQuantity($zpl, $copies);
 
-        // Write to temp file and send to printer (same pattern as LabelAreaController::printZpl)
-        $tmpFile = tempnam(sys_get_temp_dir(), 'zpl_');
-        file_put_contents($tmpFile, $zpl);
-
-        $host = config('services.zebra.host', '10.42.1.71');
-        $port = config('services.zebra.port', '631');
-        $printer = config('services.zebra.name', 'ZTC-GX430t');
-
-        $command = "lp -h {$host}:{$port}/version=1.1 -d {$printer} -o raw {$tmpFile} 2>&1";
-        $output = shell_exec($command);
-
-        unlink($tmpFile);
-
-        $success = $output && str_contains($output, 'request id');
+        $result = $this->zebraPrint->sendRaw($zpl);
 
         return response()->json([
-            'success' => $success,
-            'message' => $success ? "Print job sent ({$copies} ".($copies === 1 ? 'copy' : 'copies').')' : 'Print failed',
-            'output' => trim($output ?? 'No output'),
-        ], $success ? 200 : 500);
+            'success' => $result->success,
+            'message' => $result->success
+                ? "Print job sent ({$copies} ".($copies === 1 ? 'copy' : 'copies').')'
+                : ($result->timedOut ? "Couldn't confirm the print job — the printer may not have responded." : 'Print failed'),
+            'output' => $result->output,
+        ], $result->success ? 200 : 500);
     }
 }

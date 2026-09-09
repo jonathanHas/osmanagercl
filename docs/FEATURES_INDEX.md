@@ -9,6 +9,7 @@ This document provides a comprehensive overview of all features in the OSManager
 - [Supplier Management](#supplier-management)
 - [Order Management](#order-management)
 - [Voucher Management](#voucher-management)
+- [Customer Accounts](#customer-accounts)
 - [Financial Systems](#financial-systems)
 - [Analytics & Reporting](#analytics--reporting)
 - [POS Integration](#pos-integration)
@@ -544,16 +545,32 @@ Gift-voucher system with scannable barcodes, server-tracked balances and a full 
 
 ## Customer Accounts
 
-### Customer Statements (NEW! 2026-09-05)
+### Customer Statements (NEW! 2026-09-05, Updated 2026-09-07)
 Statements of account for customers — on screen, on paper, as a PDF, by email, plus an aged-debtors report.
 - **Print**: A4 light-themed print view with repeating table headers and page-break control (the screen ledger is dark-themed and printed as a black page before this)
 - **Aging**: `current / 1–30 / 31–60 / 61–90 / 90+` buckets driven by an *effective* due date — `due_date` falls back to the customer's `payment_terms_days` (default 30), since the invoice due date is optional and was blank on every invoice
 - **Open items**: Outstanding-invoice list with per-invoice balance and days overdue, alongside the running-balance ledger
-- **Unallocated credit**: Reported separately so `aged total − unallocated credit == closing balance` always holds
-- **Email**: Opt-in per customer (`send_statements`), queued Mailable with the PDF attached, `statement_last_sent_at` tracking
+- **Unallocated credit**: Reported separately so `aged total − unallocated credit == closing balance` always holds — and actionable, not just reported (see Customer Payment Matching below)
+- **Payment detail** (NEW! 2026-09-07): Each payment shows its per-invoice split with amounts; money not yet applied is named on the line rather than left implicit
+- **Payments on account** (NEW! 2026-09-07): Section listing unapplied payments with dates and references — credit spans every payment up to the as-at date, while the ledger only covers the selected range
+- **Shows its own proof** (NEW! 2026-09-07): "€X outstanding on invoices, less €Y received on account, leaves a balance of €Z" on screen, print and PDF, so a broken identity reads as a wrong sentence rather than a silently wrong number
+- **Email** (Updated 2026-09-07): Opt-in per customer (`send_statements`), queued Mailable with the PDF attached, `statement_last_sent_at` tracking; a Paid column when any invoice is part-paid, and the same arithmetic spelled out when credit exists
 - **Aged debtors**: Balance column and "owing only" filter on the customer list, a bucketed debtors report with totals, and CSV export
 - **Bulk run**: `customers:send-statements` (with `--dry-run`), scheduled monthly on the 1st; the debtors-page button dispatches the same service method
 - **One source of truth**: `CustomerStatementService::build()` feeds every surface, so screen, paper, PDF and email cannot disagree
+
+📖 [Customer Statements Documentation](./features/customer-statements.md)
+
+### Customer Payment Matching (NEW! 2026-09-05)
+Recording a customer payment against their invoices — and re-matching it afterwards, from either side.
+- **Match from either direction**: Edit a recorded payment's allocations, or apply a customer's existing credit to an outstanding invoice
+- **One-click selection**: Tick an invoice to settle it in full; an invoice whose outstanding equals the payment exactly is badged *exact match*
+- **Auto-match**: Apply oldest-first in one click, leaving any remainder as on-account credit
+- **The payment stays immutable**: Amount, date, method and till are fixed once banked — only the matching changes, stamped with `last_matched_at` / `last_matched_by`
+- **One validator, every path**: Allocations cannot exceed the payment, target another customer's invoice, target a void invoice, or double-count duplicate rows — previously €500 could be applied to a €50 invoice and the excess silently vanished
+- **Nothing denormalized**: Invoice `outstanding_amount`, payment status and the customer balance are all derived from `customer_payment_allocations`; there is no "mark as paid" flag
+- **Credit is visible**: Header stat and *unmatched only* filter on the payments index, a Credit column on the aged debtors report and its CSV, and a line on the customer page
+- **Voiding an invoice frees its payment** (NEW! 2026-09-07): The money returns to on-account credit instead of being swallowed, and unvoiding restores the allocation losslessly
 
 📖 [Customer Statements Documentation](./features/customer-statements.md)
 
@@ -844,7 +861,7 @@ Complete till review and transaction analysis for POS data with modern interface
 - **Export Capabilities**: CSV export functionality with comprehensive transaction data
 - **Audit Trail**: Complete audit logging for compliance and security monitoring
 
-📖 [Receipts Management Documentation](../management/receipts.md)
+📖 [Receipts Management Documentation](./management/receipts.md)
 
 ### Coffee KDS (Kitchen Display System)
 Real-time coffee order tracking system for baristas with optimized performance.

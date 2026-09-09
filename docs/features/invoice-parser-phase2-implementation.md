@@ -152,7 +152,11 @@ The parser extracts and stores:
         'ocr_used' => false,
         'supplier_detected' => 'Dynamis',
         'processing_time' => 1.23
-    ]
+    ],
+
+    // Present only when the parser returned several records for one file —
+    // see "Files containing several invoices" in the parser integration guide.
+    'additional_invoices' => []
 ]
 ```
 
@@ -170,7 +174,8 @@ The system includes specific parsers for:
   - Mossfield Organic Farm
   - Breadelicious
   - Ardu Artisan Bakery (date parsing updated 2026-03-06: supports `dd Mon yyyy` format)
-  - Coolnagrower
+  - Coolnagrower (statement page plus several invoices per PDF — always routed to review, see below)
+  - Menton's Organic Farm (photographed handwriting; zero-rated only)
   - Merry Mill
   - Oldyard Organics
 - **Other**: Oxigen, Kellys, Klee Paper, Vico, Flogas, Imbibe Coffee
@@ -187,6 +192,19 @@ The system detects and warns about:
 - Suspiciously low total amounts
 
 Files with anomalies are marked for review rather than automatic processing.
+
+Two further routes send a file to review without any of the above firing:
+
+- **A parser reported a reconciliation problem.** Any `Parse_Warnings` entry a parser returns —
+  summary rows not tying to the printed total, an unrecognised VAT rate, a total that could not
+  be read — drops confidence to 0.50.
+- **The file contains more than one invoice.** A parser may return a list of records
+  (`coolnagrower.py` is the only one that does). Since a file maps to a single invoice
+  downstream, a multi-record file is always forced to 0.50 and must be split by hand first. This
+  is not an anomaly check and does not depend on any record being faulty.
+
+See *Files containing several invoices* in
+[the parser integration guide](./invoice-parser-integration.md) for the full contract.
 
 ## API Endpoints
 

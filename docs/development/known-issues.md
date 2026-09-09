@@ -11,6 +11,7 @@ This document tracks known issues that have been identified and resolved in the 
 - [Validation Issues](#validation-issues)
 - [VAT & Tax Issues](#vat--tax-issues)
 - [Invoice Parsing Issues](#invoice-parsing-issues)
+- [Environment & Mail Issues](#environment--mail-issues)
 - [Queue Worker Issues](#bulk-upload-batch-stuck-at-processing-forever)
 
 ---
@@ -424,6 +425,134 @@ If the 0.0% row net + paperin adjustment = what the 0.0% row should show, or if 
 
 ## Invoice Parsing Issues
 
+### Multi-Invoice PDFs Imported As Their Last Page Only
+**Status:** Fixed 2026-09-07
+
+#### Problem
+Invoice 8777 (2025-09-30) is a Coolnagrower PDF holding a junk first page and three invoices
+worth **€591.00 in total**. It imported as **€187.00** — the last page alone — silently, at
+confidence 0.85 with no warning that anything was missing, so it auto-created €404 short.
+
+Every Coolnagrower PDF in the archive holds 4–6 records, so all of them collapsed to a single
+invoice. Only this one lost money visibly; on the other eight the OCR produced nothing at all,
+which the all-zero-VAT anomaly caught.
+
+#### Root Cause
+`invoice_parser_laravel.py` allows a parser to return a list of records, and `coolnagrower.py`
+is the only one that does. But the loop that consumed them reassigned `response['data']` and
+`response['confidence']` on **every pass**, so only the final record survived.
+
+The confidence was the more dangerous half. `has_anomalies` was a per-iteration local, so a
+clean last record reset the confidence to 0.85 even though an earlier record had warned — and
+that earlier warning was still sitting in `response['warnings']`, describing a record that had
+already been discarded. The file therefore auto-created *and* carried a warning about data no
+longer present.
+
+Nothing splits these PDFs automatically: `InvoiceBulkUploadController::splitPdf` requires the
+operator to pass explicit `page_ranges`.
+
+#### Solution
+- Extract the per-record formatting into `format_parsed_invoice(data, filename)`, which returns
+  `(formatted_data, has_anomalies, warnings)` so the caller decides what to do with the flag.
+  One clean record can no longer hide the problems found in another.
+- Accumulate the records instead of overwriting. The rest are kept under
+  `data['additional_invoices']`, the combined total is reported as a warning, and confidence is
+  forced to 0.50.
+- A file can only ever become one invoice downstream, so review is the correct destination —
+  the file has to be split by hand first (`scripts/invoice-parser/pdf_splitter.py`, reached
+  from the bulk-upload split route), and the warning says so.
+
+The extraction was verified to change nothing else: 22 synthetic cases covering every branch of
+the moved code produce byte-identical `data`, `confidence` and `warnings` against the previous
+implementation, and a replay of all 945 archived invoices with attachments changed exactly the
+records this fix targets.
+
+#### How to Detect
+A stored `total_amount` that matches one page of a multi-page supplier PDF rather than the sum
+of its pages. More generally, any supplier who sends several invoices in one file.
+
+#### Files Modified
+- `scripts/invoice-parser/invoice_parser_laravel.py`
+- `scripts/invoice-parser/tests/test_invoice_parser_laravel.py` (new)
+
+#### Note
+This is the first instance of the "wrong number at full confidence with nothing flagged" family
+found in the **dispatcher** rather than in a parser — a parser-by-parser audit would not have
+found it, because `coolnagrower.py` was doing exactly the right thing.
+
+Behavioural consequence worth knowing: every Coolnagrower upload now routes to review, and
+folder sync deliberately leaves `review` files in the inbox, so they will stay there until
+split. That is correct, not a regression.
+
+No back-catalogue reparse was run: the affected invoices sit inside finalized VAT returns,
+which `invoice:reparse` refuses by design.
+
+---
+
+
+### Menton's Parser Invented 23% VAT and Read Totals From OCR Noise
+**Status:** Fixed 2026-09-07
+
+#### Problem
+Two silent faults in `scripts/invoice-parser/parsers/mentons.py`:
+
+1. **Fabricated input VAT.** The parser divided the total by 1.23 and booked the result as
+   standard-rated unless the text literally said "tax free", "zero rated" or "vat exempt".
+   Menton's supply certified organic produce and have never charged VAT: across 577 archived
+   invoices, `zero_net` is €92,794.09 and `standard_vat` is €0.00. A legible €200.10 invoice
+   would have claimed **€37.42 of input VAT that was never charged**, at confidence 0.85, with
+   no warning — so it would auto-create and the VAT would be reclaimed.
+2. **Totals read out of OCR noise.** Invoices 9394, 9445 and 9069 parsed as **€7.00, €7.00 and
+   €17.00** against stated totals of €232.00, €232.00 and €58.00.
+
+#### Root Cause
+Menton's photograph handwritten invoices, so the text the parser sees is Tesseract's reading of
+handwriting and is mostly noise. The total was taken from
+`re.search(r'€?\s*([\d,]+\.?\d{0,2})', text)` — the first digit run *anywhere* in the document,
+which on that input is whatever fragment the OCR happened to emit first.
+
+The VAT fault was an `else` branch that assumed 23% whenever the zero-rating keywords were
+absent, which they always are on a handwritten note.
+
+The three wrong totals were held at confidence 0.50 only because the date regex *also* found
+nothing, raising a separate "Invoice date not found" anomaly. The money was already wrong; an
+unrelated second failure was all that kept these out of auto-creation.
+
+#### Solution
+- Everything lands in the 0% bucket, and the parser returns `VAT Amounts` / `Total_VAT` /
+  `Total` so the dispatcher uses those figures rather than recomputing VAT from the aggregate.
+- A total is accepted **only from an anchored position**: the `qty @ price = total` line the
+  farm writes consistently, or a labelled total (`Total`, `Amount due`, `Balance`). Anything
+  else raises a `Parse_Warnings` entry and returns 0.00, so the file goes to review instead of
+  being created from a number found by accident.
+- **A euro sign is not an anchor.** Tesseract reads `€5/2` out of the 2025-04-17 invoice, whose
+  stated total is €58.00, so a bare euro-signed amount is deliberately refused — accepting one
+  would have replaced €17.00 with an equally wrong €5.00.
+- An invoice that mentions VAT at all is flagged for checking by hand, since the handwriting
+  gives no rate breakdown to work from.
+
+#### How to Detect
+Any Menton's invoice with a non-zero `standard_net`, or a stored total that is implausibly
+small against the delivery it covers.
+
+#### Files Modified
+- `scripts/invoice-parser/parsers/mentons.py`
+- `scripts/invoice-parser/tests/test_mentons.py` and `tests/fixtures/mentons/` (new)
+
+#### Note
+The three affected invoices are committed as fixtures exactly as the OCR produced them —
+illegible — because that illegibility is what the tests guard against.
+
+Expect most Menton's invoices to land in review from now on. For photographed handwriting that
+is the honest outcome; the difference is that they no longer arrive with a plausible-looking
+wrong number already attached.
+
+No back-catalogue reparse was run: the affected invoices sit inside finalized VAT returns,
+which `invoice:reparse` refuses by design.
+
+---
+
+
 ### Klee Paper Parser Truncated Amounts Over €1,000
 **Status:** Fixed 2026-09-05
 
@@ -676,6 +805,136 @@ $unmatchedLines = array_map(fn ($line) => array_merge(
 
 #### Files Modified
 - `app/Http/Controllers/DeliveryController.php` (~line 582)
+
+---
+
+## Environment & Mail Issues
+
+### Site Returns 500 (`MissingAppKeyException`) After Editing `.env`
+**Status:** Fixed 2026-09-05
+
+#### Problem
+Every page returned a 500 error immediately after an edit to `.env`. The log showed:
+
+```
+production.ERROR: No application encryption key has been specified.
+```
+
+`APP_KEY` was present and correct in `.env`, and `php artisan` worked fine from the shell.
+
+#### Root Cause
+Editing `.env` with `sed -i` (or any tool that writes a temp file and renames it) **recreates
+the file**, and the replacement can pick up the shell's umask instead of the original mode. The
+file became `-rw-r----- jon:jon` (640), so the web server user `www-data` could no longer read
+it at all.
+
+With `.env` unreadable, the app boots with *no* environment: no `APP_KEY`, and no `APP_ENV`
+either — which is the giveaway. **The log line says `production.ERROR` while `.env` says
+`APP_ENV=local`**, because an unset `APP_ENV` falls back to `production`. CLI still works
+because it runs as the owning user.
+
+#### Solution
+```bash
+chmod 644 .env      # matches the rest of the repo; this is what it was before
+```
+
+Tighter, if the web server has its own group (needs root):
+```bash
+sudo chgrp www-data .env && sudo chmod 640 .env
+```
+
+#### How to Detect
+```bash
+ls -la .env                       # compare against artisan / composer.json
+grep -c "production.ERROR" storage/logs/laravel.log   # 'production' while .env says 'local'
+```
+
+Prefer an editor that writes in place over `sed -i` for `.env`, and always re-check the mode
+afterwards.
+
+**Files Modified**: none (permissions only)
+
+---
+
+### Emailed Statement Fails with "Undefined variable $customer"
+**Status:** Fixed 2026-09-05
+
+#### Problem
+Queuing a customer statement email put the job straight into `failed_jobs`:
+
+```
+ErrorException: Undefined variable $customer in
+storage/framework/views/<hash>.php  (emails/customer-statement.blade.php)
+```
+
+The same context rendered the on-screen, print and PDF views without complaint.
+
+#### Root Cause
+A Mailable passes only its **public properties** to its view. `CustomerStatementMail` has one
+property, `public array $ctx`, so the blade received `$ctx` — but it reads `$customer`,
+`$aging`, `$open_invoices` and friends directly.
+
+#### Solution
+Unpack the context with `Content(with:)`:
+
+```php
+return new Content(
+    view: 'emails.customer-statement',
+    with: $this->ctx,   // without this the view only sees $ctx
+);
+```
+
+#### How to Detect
+**`Mail::fake()` never renders the message**, so `Mail::assertQueued()` passes even when the
+view is broken. A mailable is only really covered by a test that renders it:
+
+```php
+$html = (new CustomerStatementMail($ctx))->render();
+$this->assertStringContainsString('Renderable Ltd', $html);
+```
+
+`CustomerStatementTest::test_the_statement_email_renders_with_its_context()` guards this.
+
+Note also that `->send()` on a `ShouldQueue` mailable **queues** rather than sends; use
+`->sendNow()` when you want it built and delivered synchronously (e.g. against the `array`
+transport while debugging).
+
+**Files Modified**: `app/Mail/CustomerStatementMail.php`, `tests/Feature/CustomerStatementTest.php`
+
+---
+
+### Commenting Out `MAIL_MAILER` Does Not Enable Real Sending
+**Status:** Documented 2026-09-05
+
+#### Problem
+Commenting out `# MAIL_MAILER=log` to "turn off logging and send for real" changes nothing —
+mail still goes to `storage/logs/laravel.log`.
+
+#### Root Cause
+`config/mail.php` reads:
+
+```php
+'default' => env('MAIL_MAILER', 'log'),
+```
+
+The **fallback is `log`**, so removing the variable resolves to exactly what you were trying to
+avoid. The setting needs a value, not absence.
+
+#### Solution
+```dotenv
+MAIL_MAILER=smtp
+```
+then `php artisan config:clear`.
+
+`MAIL_SCHEME=null` with `MAIL_PORT=465` is correct and needs no change — Laravel's
+`MailManager::createSmtpTransport()` selects `smtps` automatically for that port.
+
+#### How to Detect
+```bash
+php artisan tinker --execute="echo config('mail.default');"
+```
+
+**Files Modified**: `.env`
 
 ---
 

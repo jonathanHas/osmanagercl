@@ -380,6 +380,7 @@ sudo chmod 600 .env
 
 ---
 
+<a id="monitoring-and-maintenance"></a>
 ## 📊 **Monitoring and Maintenance**
 
 ### **1. Log Monitoring**

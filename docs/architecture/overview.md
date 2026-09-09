@@ -428,6 +428,6 @@ Label Preview → Batch Printing → Queue Clearance
 - Message queue integration
 
 ## Related Documentation
-- [Database Design](./database-design.md)
-- [API Design](./api-design.md)
+- [Data Model & Hybrid Databases](#data-model-architecture)
+- [API Design](#api-design)
 - [Deployment Architecture](../deployment/production-guide.md)

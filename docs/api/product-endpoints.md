@@ -403,4 +403,4 @@ curl -X POST /products/123e4567-e89b-12d3-a456-426614174000/toggle-stocking \
 
 - [Product Management Feature Guide](../features/product-management.md)
 - [POS Integration](../features/pos-integration.md)
-- [Authentication](../features/authentication.md)
+- [Authentication & Permissions](../features/user-roles-permissions.md)

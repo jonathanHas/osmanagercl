@@ -229,8 +229,8 @@ curl -I https://cdn.ekoplaza.nl/ekoplaza/producten/small/8711521145447.jpg
 
 ## 🔗 Related Documentation
 
-- [POS Integration Guide](./pos-integration.md) - Detailed POS database integration
-- [Supplier Integration](./supplier-integration-plan.md) - External supplier integration details
+- [POS Integration Guide](../features/pos-integration.md) - Detailed POS database integration
+- [Supplier Integration](../features/supplier-integration.md) - External supplier integration details
 - [Main Documentation Index](./README.md) - Complete documentation overview
 
 ---

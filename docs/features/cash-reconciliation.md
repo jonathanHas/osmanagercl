@@ -175,7 +175,7 @@ Variance = Day's Cash Taking - POS Cash Total
 - [Sync from POS](./cash-reconciliation-pos-sync.md) - Force re-import of a day's legacy POS cash figures when the automatic import left them empty
 - [Cash Closed (End-of-Day Overview)](./cash-closed.md) - How reconciliation fits into the full cash-to-bank pipeline, legacy migration details
 - [Cash Lodgements](../features/cash-closed.md#key-integration-reconciliation--lodgements) - Bank deposit tracking with side-by-side reconciliation comparison
-- [Till Review System](./till-review.md) - View receipts and transactions
+- [Receipts / Till Review](../management/receipts.md) - View receipts and transactions
 - [POS Integration](./pos-integration.md) - Connection to uniCenta POS
 - [User Roles & Permissions](./user-roles-permissions.md) - Access control
 

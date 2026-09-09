@@ -66,6 +66,7 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 - **Real-time Updates**: Live addition/removal of products with smooth animations
 - **Instant Visibility Changes**: Products appear/disappear immediately based till visibility changes
 
+<a id="price-sync-management-system"></a>
 ### 7. Price Sync Management System (NEW! 2025-08-28 🔧, Updated 2026-03-19)
 - **Cross-Database Discrepancy Detection**: Identifies products where POS and Laravel price history don't match
 - **Manage Page Mismatch Indicators** (2026-03-19): The `/fruit-veg/manage` page now:
@@ -95,6 +96,7 @@ The Fruit & Vegetables (F&V) system is a specialized module designed for organic
 - **Transaction Safety**: Proper error handling ensures database integrity
 - **Access**: Available at `/fruit-veg/price-sync` from the F&V dashboard, mismatch indicators on `/fruit-veg/manage`
 
+<a id="order-generation-system"></a>
 ### 8. Order Generation System (NEW! 2026-01-09 🥬)
 Supplier-agnostic order generation based on historical sales data for all F&V products.
 
@@ -189,6 +191,7 @@ Supplier-agnostic order generation based on historical sales data for all F&V pr
 - **Currency Consistency**: Euro (€) display throughout all chart labels and statistics
 - **Performance Monitoring**: Comprehensive logging for troubleshooting chart issues
 
+<a id="waste-log"></a>
 ### 11. Waste Log (NEW! 2026-06-06 🗑️)
 Inline quick-log for recording spoiled/discarded produce with live value totals. Records-only — no POS stock changes.
 

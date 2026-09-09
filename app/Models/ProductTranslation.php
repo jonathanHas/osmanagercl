@@ -51,6 +51,30 @@ class ProductTranslation extends Model
     }
 
     /**
+     * Newest translation per product code, keyed by product_code.
+     *
+     * Deliberately applies no auto_print filter: callers must pick the newest row
+     * FIRST and filter afterwards. Filtering first lets an older enabled row win for a
+     * product whose current translation was switched off, which reprints stale ZPL.
+     *
+     * @param  array<int, string>  $productCodes
+     * @return \Illuminate\Support\Collection<string, self>
+     */
+    public static function latestPerProductCode(array $productCodes)
+    {
+        if ($productCodes === []) {
+            return collect();
+        }
+
+        return static::whereIn('product_code', $productCodes)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy('product_code')
+            ->map(fn ($group) => $group->first());
+    }
+
+    /**
      * Find all translations for a product code.
      */
     public static function findByProductCode(string $productCode)

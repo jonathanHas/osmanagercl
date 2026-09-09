@@ -48,6 +48,9 @@ return [
         'host' => env('ZEBRA_PRINTER_HOST', '10.42.1.71'),
         'port' => env('ZEBRA_PRINTER_PORT', '631'),
         'name' => env('ZEBRA_PRINTER_NAME', 'ZTC-GX430t'),
+        // Seconds before a hung lp/lpstat call is killed. Kept well under the PHP/nginx
+        // request timeout so an unreachable printer fails fast and the UI can say so.
+        'timeout' => env('ZEBRA_PRINTER_TIMEOUT', 15),
     ],
 
 ];

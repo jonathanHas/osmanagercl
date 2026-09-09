@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Voucher;
 use App\Models\VoucherTransaction;
+use App\Services\ZebraPrintService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,6 +14,10 @@ use Illuminate\View\View;
 
 class VoucherController extends Controller
 {
+    public function __construct(
+        protected ZebraPrintService $zebraPrint,
+    ) {}
+
     /**
      * The till screen — scan, activate and redeem vouchers.
      */
@@ -333,28 +338,16 @@ class VoucherController extends Controller
         // One distinct ^XA…^XZ block per voucher (unique codes — no ^PQ).
         $zpl = $vouchers->map(fn (Voucher $v) => $v->toZplLabel())->implode('');
 
-        $tmpFile = tempnam(sys_get_temp_dir(), 'zpl_');
-        file_put_contents($tmpFile, $zpl);
-
-        $host = config('services.zebra.host', '10.42.1.71');
-        $port = config('services.zebra.port', '631');
-        $printer = config('services.zebra.name', 'ZTC-GX430t');
-
-        $command = "lp -h {$host}:{$port}/version=1.1 -d {$printer} -o raw {$tmpFile} 2>&1";
-        $output = shell_exec($command);
-
-        unlink($tmpFile);
-
-        $success = $output && str_contains($output, 'request id');
+        $result = $this->zebraPrint->sendRaw($zpl);
         $count = $vouchers->count();
 
         return response()->json([
-            'success' => $success,
-            'message' => $success
+            'success' => $result->success,
+            'message' => $result->success
                 ? "Print job sent ({$count} ".($count === 1 ? 'label' : 'labels').')'
-                : 'Print failed',
-            'output' => trim($output ?? 'No output'),
-        ], $success ? 200 : 500);
+                : ($result->timedOut ? "Couldn't confirm the print job — the printer may not have responded." : 'Print failed'),
+            'output' => $result->output,
+        ], $result->success ? 200 : 500);
     }
 
     /**

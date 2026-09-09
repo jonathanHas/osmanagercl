@@ -1,7 +1,11 @@
-# Customer Statements
+# Customer Statements & Receivables
 
-Statements of account for customers: an on-screen ledger, a printable A4 page, a
-branded PDF, an emailed PDF, and an aged-debtors report.
+Statements of account for customers — an on-screen ledger, a printable A4 page, a branded
+PDF, an emailed PDF and an aged-debtors report — plus the payment↔invoice matching that
+feeds them.
+
+Related: [Known Issues → Environment & Mail](../development/known-issues.md#environment--mail-issues)
+covers the mail-configuration and `.env` traps hit while building this.
 
 ## Surfaces
 
@@ -251,6 +255,22 @@ email — see `Customer::scopeReceivesStatements()`. Sends stamp `statement_last
 `Mail::queue()` (not `sendNow()`) so a failed SMTP call retries rather than aborting a
 bulk run.
 
+**The context must be unpacked with `Content(with:)`.** A Mailable exposes only its
+*public properties* to the view; the single property here is `$ctx`, while the blade
+reads `$customer`, `$aging`, `$open_invoices` directly. Without `with:` every send dies
+on `Undefined variable $customer` — see [Known Issues](../development/known-issues.md#emailed-statement-fails-with-undefined-variable-customer).
+
+```php
+return new Content(view: 'emails.customer-statement', with: $this->ctx);
+```
+
+`Mail::fake()` records a queued mailable **without rendering it**, so `assertQueued`
+passes over a broken view. Any change to the email blade or the context keys needs the
+render test, not just an assertion that something was queued.
+
+Note `->send()` on a `ShouldQueue` mailable *queues* it; use `->sendNow()` to build and
+deliver synchronously (e.g. against the `array` transport when debugging).
+
 ```bash
 php artisan customers:send-statements --dry-run      # list who would be emailed
 php artisan customers:send-statements --customer=12  # single customer
@@ -261,6 +281,12 @@ dispatches `SendCustomerStatementsJob`, which calls the same service method.
 
 > ⚠️ With `MAIL_MAILER=log` nothing is delivered — messages go to
 > `storage/logs/laravel.log`. The UI and the command both warn about this.
+>
+> **Commenting the variable out does not enable real sending.** `config/mail.php` is
+> `env('MAIL_MAILER', 'log')`, so an absent value falls back to `log`. Set
+> `MAIL_MAILER=smtp` explicitly, then `php artisan config:clear`.
+> (`MAIL_SCHEME=null` with port 465 is fine — Laravel's
+> `MailManager::createSmtpTransport()` picks `smtps` automatically for that port.)
 
 ## Branding
 
@@ -279,8 +305,9 @@ The organic cert image is base64-inlined because Dompdf cannot fetch remote asse
 `tests/Feature/CustomerStatementTest.php` — ledger totals, void exclusion, opening
 balance boundary, the terms fallback and its override, bucket sums, overpayment as
 credit, unallocated-credit reconciliation, debtors totals, CSV export, page/PDF
-rendering, the owing filter, the bulk run's skip rules, and the credit identity
-holding across a re-allocation.
+rendering, the owing filter, the bulk run's skip rules, the credit identity holding
+across a re-allocation, and a real render of the Mailable (which `Mail::fake()` would
+not exercise).
 
 `tests/Feature/CustomerPaymentAllocationTest.php` — the allocation invariants
 (per-invoice over-allocation, void invoices, duplicate rows, wrong customer),

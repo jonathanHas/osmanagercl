@@ -56,53 +56,59 @@ python3 /path/to/invoice_parser.py --file /path/to/invoice.xlsx --output json
 
 ### Expected JSON Output Format
 
+This is what `invoice_parser_laravel.py` actually prints on stdout — a real response, for a Klee
+Paper invoice:
+
 ```json
 {
-    "success": true,
-    "confidence": 0.85,
-    "data": {
-        "invoice_number": "INV-2024-001234",
-        "invoice_date": "2024-03-15",
-        "due_date": "2024-04-15",
-        "supplier": {
-            "name": "Supplier Company Ltd",
-            "vat_number": "IE1234567X",
-            "address": "123 Main St, Dublin",
-            "email": "accounts@supplier.com"
-        },
-        "amounts": {
-            "subtotal": 1000.00,
-            "vat_amount": 230.00,
-            "total": 1230.00
-        },
-        "vat_lines": [
-            {
-                "description": "Goods at standard rate",
-                "net_amount": 1000.00,
-                "vat_rate": 0.23,
-                "vat_amount": 230.00,
-                "gross_amount": 1230.00
-            }
-        ],
-        "line_items": [
-            {
-                "description": "Product A",
-                "quantity": 10,
-                "unit_price": 100.00,
-                "total": 1000.00,
-                "vat_rate": 0.23
-            }
-        ],
-        "metadata": {
-            "parsing_method": "template",
-            "template_used": "supplier_standard",
-            "ocr_used": false,
-            "processing_time": 1.23
-        }
+  "success": true,
+  "confidence": 0.85,
+  "data": {
+    "invoice_number": "WS061108",
+    "invoice_date": "2026-06-29",
+    "supplier_name": "Klee Paper",
+    "is_tax_free": false,
+    "is_credit_note": false,
+    "vat_breakdown": {
+      "vat_0":    {"net": 0.0,    "vat": 0.0},
+      "vat_9":    {"net": 0.0,    "vat": 0.0},
+      "vat_13_5": {"net": 0.0,    "vat": 0.0},
+      "vat_23":   {"net": 1278.7, "vat": 294.12}
     },
-    "errors": []
+    "total_amount": 1572.82,
+
+    "Invoice Number": "WS061108",
+    "VAT Amounts": {"0": 0.0, "9": 0.0, "13.5": 0.0, "23": 294.12},
+    "Total": "1572.82",
+    "Total_VAT": 294.12,
+    "Filename": "inv.pdf"
+  },
+  "errors": [],
+  "warnings": [],
+  "metadata": {
+    "filename": "inv.pdf",
+    "parsing_method": "pdfplumber",
+    "ocr_used": false,
+    "supplier_detected": "Klee Paper",
+    "processing_time": 0.0004
+  }
 }
 ```
+
+Three things about this shape are easy to get wrong:
+
+- **`invoice_date` is normalised to `YYYY-MM-DD`** by `format_invoice_date()`, even though every
+  parser returns `DD/MM/YYYY`. A date the function cannot parse is passed through unchanged.
+- **Any key a parser returns that is not one of the consumed names is merged into `data`
+  verbatim.** That is why `Invoice Number`, `VAT Amounts`, `Total`, `Total_VAT` and `Filename`
+  appear alongside the formatted keys above — the dispatcher copies everything except
+  `Invoice Date`, `Supplier`, `Tax Free`, `Credit Note` and the four `VAT n%` keys, which it has
+  already consumed. Custom fields (Amazon's `GBP_Total`, for instance) survive this way.
+- **`additional_invoices`** appears inside `data` only when the parser returned several records.
+  See *Files containing several invoices* below.
+
+`confidence` is `0.85` when nothing was flagged and `0.50` otherwise; the auto-create threshold is
+80, so 0.50 routes the file to review.
 
 ### Error Response Format
 
@@ -602,6 +608,11 @@ scripts/invoice-parser/venv/bin/python -m pytest scripts/invoice-parser/tests/ -
 When a supplier changes layout, add a fixture for the new layout **and keep the old one** — both
 tend to stay in circulation across the archive.
 
+`tests/test_invoice_parser_laravel.py` is the exception to that pattern: it tests the
+**dispatcher** rather than a supplier, so it has no fixture. It stubs `extract_text` and
+`detect_supplier` with `monkeypatch` and drives `process_invoice()` over records built in the
+test, which is what lets it cover multi-record files without committing a multi-invoice PDF.
+
 ### Integration Tests
 - Test Python script execution
 - Test queue job processing
@@ -957,6 +968,83 @@ Points that matter when this layout changes:
   branch sits earlier in `detect_supplier` but additionally requires `ORGANIC FARM` and excludes
   `ORGANIC STORE`, so it does not capture these invoices — verified against the sample.
 
+### Menton's Organic Farm Invoice Parser
+
+`scripts/invoice-parser/parsers/mentons.py` handles Menton's Organic Farm. Unlike every other
+parser here, there is no layout to describe: Menton's write their invoices **by hand and send
+photographs of them**, so the text the parser sees is Tesseract's reading of handwriting. On the
+35 archived invoices with an attachment it is essentially noise — this is a real extraction:
+
+```
+eae a ee ee ea 5 Oe Rath Pee or ke See
+2 O29 (ees
+ane | N VO ! C E Salita oe bs nee
+x fo l® E9%ts A232.
+```
+
+That invoice's stated total is €232.00.
+
+Points that matter:
+
+- **Everything is zero-rated.** Menton's supply certified organic produce and have never charged
+  VAT: across 577 archived invoices, `zero_net` is €92,794.09 and `standard_vat` is €0.00. The
+  parser previously divided the total by 1.23 and booked the result as standard-rated whenever
+  the text did not literally say "tax free"/"zero rated"/"vat exempt" — which handwriting never
+  does — fabricating input VAT that was never charged and is not reclaimable.
+- **A total is only accepted from an anchored position**: the `qty @ price = total` line the farm
+  writes consistently, or a labelled total. The parser used to take the first digit run *anywhere*
+  in the document, which on the text above yields €7.00.
+- **A euro sign is not an anchor.** Tesseract reads `€5/2` out of the 2025-04-17 invoice, whose
+  stated total is €58.00, so a bare euro-signed amount is refused too. Reporting nothing is safer
+  than reporting a plausible wrong number.
+- **Review is the expected outcome**, not a failure. When no total can be read the parser warns
+  and returns 0.00, which drops the file to 0.50. For photographed handwriting that is the honest
+  result; the fixtures under `tests/fixtures/mentons/` are committed illegible on purpose.
+
+### Coolnagrower Invoice Parser
+
+`scripts/invoice-parser/parsers/coolnagrower.py` is the **only parser that returns a list**.
+Coolnagrower send a statement page followed by several invoices in one PDF, and the parser forces
+OCR page by page, skipping the statement page and emitting one record per invoice. Invoice 8777
+is typical: four records, €0.00 + €181.00 + €223.00 + €187.00.
+
+Because of that it is governed by the multi-invoice rule below rather than by anything specific
+to its layout: every Coolnagrower upload carries more than one record, so every one of them is
+forced to review and has to be split by hand before any invoice can be created. Expect these
+files to sit in the inbox — folder sync deliberately leaves `review` files there.
+
+The amount regex is `TOTAL:\s*([0-9]+(?:[.,][0-9]{2}))`, which cannot span a thousands separator:
+against `1,220.00` it would match the fragment `1,20`. No archived invoice has triggered this —
+their largest is €1,220 and it OCR'd to nothing — but see the rule at the end of this section.
+
+### Files containing several invoices
+
+A parser may return either a single record or a **list** of them; `coolnagrower.py` is currently
+the only one that returns a list. The dispatcher used to overwrite `response['data']` and
+`response['confidence']` for each record in turn, so a multi-record file imported as its last
+record alone — invoice 8777 imported as €187.00 against €591.00, at confidence 0.85, and
+auto-created.
+
+The contract now is:
+
+- Every record is formatted. The first becomes `data`; the rest are kept under
+  `data['additional_invoices']`.
+- The combined total is reported as a warning: *"File contains 4 invoices totalling €591.00; it
+  needs splitting before any of them can be created"*.
+- Confidence is forced to **0.50** whenever there is more than one record. This is a **second
+  route to review that is not an anomaly and not a `Parse_Warnings` entry** — elsewhere in this
+  document a drop to 0.50 always means a parser flagged a reconciliation problem, and that is no
+  longer the only cause.
+
+A file maps to exactly one invoice downstream, so review is the correct destination rather than a
+workaround. Splitting is a manual operator action — `scripts/invoice-parser/pdf_splitter.py`,
+reached from the bulk-upload split route, which requires explicit page ranges — and nothing
+splits these files automatically.
+
+If you write a parser that returns a list, be aware that anomaly state is per record:
+`format_parsed_invoice()` returns its own `has_anomalies` for each, and the dispatcher takes the
+worst. A clean record can no longer mask a problem found in another.
+
 ### VAT-inclusive layouts: the `VAT Amounts` and `Total` contract
 
 `invoice_parser_laravel.py` normally derives VAT as `round(net × rate, 2)`. That is wrong for
@@ -977,6 +1065,27 @@ stored invoice tie out to the paper one.
 
 Parsers may also return `'Invoice Number'`, which the dispatcher maps to `invoice_number` →
 `invoice_upload_files.parsed_invoice_number` → `invoices.supplier_invoice_reference`.
+
+### Judging the severity of a money regex
+
+A money regex that matches **nothing** is usually safe. Most parsers here write into a single VAT
+bucket, so a failed match leaves all four buckets at 0.00, `detect_anomalies` raises "All VAT base
+amounts are 0.00", and the file drops to 0.50 and goes to review. Loud, and no money moves.
+
+The dangerous patterns are the ones that match the **wrong fragment**, because they produce a
+non-zero figure that nothing questions:
+
+| Pattern | `1,234.56` reads as | Failure mode |
+|---|---|---|
+| `[0-9]+\.[0-9]{2}` | no match → `0.00` | loud — caught by the all-zero anomaly |
+| `[0-9]+(?:[.,][0-9]{2})` | `1,23` → **123.00** | silent, auto-creates at ~1/10 the value |
+| `[0-9.]+` | **1** | silent, auto-creates at ~1/1000 the value |
+| `[\d,]+\.\d{2}` | `1,234.56` | correct |
+
+Prefer `[\d,]+\.\d{2}` throughout with an `_amount()` that strips commas, and capture the rate
+from the invoice rather than hardcoding it. When triaging an existing parser, the question that
+sorts real exposure from noise is **whether a bad match yields zero or a plausible wrong number**
+— and then whether that supplier's invoices ever reach the value where it bites.
 
 ### Re-parsing stored invoices
 

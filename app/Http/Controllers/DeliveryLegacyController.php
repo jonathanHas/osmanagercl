@@ -3,11 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Models\Delivery;
+use App\Models\DeliveryLabelPrint;
 use App\Models\DeliveryScanItem;
+use App\Models\ProductTranslation;
+use App\Models\ZebraLabel;
 use App\Services\IihfGoodsReturnPdfService;
 use App\Services\SupplierService;
+use App\Services\ZebraPrintService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -16,9 +24,12 @@ class DeliveryLegacyController extends Controller
 {
     private SupplierService $supplierService;
 
-    public function __construct(SupplierService $supplierService)
+    private ZebraPrintService $zebraPrint;
+
+    public function __construct(SupplierService $supplierService, ZebraPrintService $zebraPrint)
     {
         $this->supplierService = $supplierService;
+        $this->zebraPrint = $zebraPrint;
     }
 
     /**
@@ -161,7 +172,9 @@ class DeliveryLegacyController extends Controller
         // physically scanned live in the POS deliveriesScanItems table; translations are
         // matched by product_code = barcode.
         $translatableProducts = $this->getTranslatableScannedProducts($deliveryId, $supplierId);
-        $translatableCount = count($translatableProducts);
+        // Only products with labels still to print — so the button falls to 0 once the
+        // delivery's labels are done, rather than offering the whole set again.
+        $translatableCount = $this->outstandingCount($translatableProducts);
 
         return view('delivery-legacy.match', compact(
             'matchedItems',
@@ -192,23 +205,21 @@ class DeliveryLegacyController extends Controller
      */
     private function getTranslatableScannedProducts(string $deliveryId, string $supplierId): array
     {
-        $scannedQuantities = DB::connection('pos')->table('deliveriesScanItems')
-            ->where('delID', $deliveryId)
-            ->select('barcode', DB::raw('SUM(quantity) as scanned'))
-            ->groupBy('barcode')
-            ->pluck('scanned', 'barcode');
+        $scannedQuantities = $this->scannedQuantities($deliveryId);
 
         if ($scannedQuantities->isEmpty()) {
             return [];
         }
 
-        // Latest translation per scanned barcode (one query, keep newest per code).
-        $translations = \App\Models\ProductTranslation::whereIn('product_code', $scannedQuantities->keys()->all())
-            ->where('auto_print', true)
-            ->orderByDesc('created_at')
-            ->get()
-            ->groupBy('product_code')
-            ->map(fn ($group) => $group->first());
+        $translations = $this->printableTranslations($scannedQuantities->keys()->all());
+
+        if ($translations->isEmpty()) {
+            return [];
+        }
+
+        // What has already gone to the printer for this delivery, so a second press
+        // only offers the difference instead of the whole delivery again.
+        $printedQuantities = DeliveryLabelPrint::printedQuantitiesFor($deliveryId);
 
         // POS database product names, keyed by barcode (PRODUCTS.CODE).
         $posNames = DB::connection('pos')->table('PRODUCTS')
@@ -219,18 +230,21 @@ class DeliveryLegacyController extends Controller
 
         $products = [];
         foreach ($translations as $barcode => $translation) {
-            if (empty($translation->zpl_content)) {
-                continue;
-            }
-
             $barcode = (string) $barcode;
+
+            $scanned = (int) $scannedQuantities->get($barcode);
+            $printed = (int) $printedQuantities->get($barcode, 0);
 
             $products[] = [
                 'barcode' => $barcode,
                 // Prefer the POS database name; fall back to the translation name then the barcode.
                 'name' => $posNames[$barcode]
                     ?? ($translation->label_data['product_name'] ?? $barcode),
-                'scanned' => max(1, min(99, (int) $scannedQuantities->get($barcode))),
+                'scanned' => $scanned,
+                'printed' => $printed,
+                // A single job can carry at most 99 copies of one label; anything beyond
+                // that needs a second press.
+                'outstanding' => max(0, min(99, $scanned - $printed)),
                 'image' => $hasImages
                     ? $this->supplierService->getExternalImageUrlByBarcode((int) $supplierId, $barcode)
                     : null,
@@ -244,14 +258,51 @@ class DeliveryLegacyController extends Controller
     }
 
     /**
-     * Print a translated label for every scanned/received product in the delivery that
-     * has a translation, in a single Zebra job. One label per unit scanned.
+     * Total units scanned per barcode for a delivery, optionally limited to a subset.
      *
-     * Mirrors the single-label print flow in LabelTranslationController::print(): each
-     * translation's stored ZPL has its ^PQ quantity set, and all blocks are concatenated
-     * into one raw ZPL job (multiple ^XA…^XZ blocks print sequentially).
+     * @param  array<int, string>|null  $barcodes
+     * @return \Illuminate\Support\Collection<string, int>
      */
-    public function printTranslations(Request $request)
+    private function scannedQuantities(string $deliveryId, ?array $barcodes = null)
+    {
+        $query = DB::connection('pos')->table('deliveriesScanItems')
+            ->where('delID', $deliveryId);
+
+        if ($barcodes !== null) {
+            $query->whereIn('barcode', $barcodes);
+        }
+
+        return $query
+            ->select('barcode', DB::raw('SUM(quantity) as scanned'))
+            ->groupBy('barcode')
+            ->pluck('scanned', 'barcode')
+            ->map(fn ($scanned) => (int) $scanned);
+    }
+
+    /**
+     * Translations that may be auto-printed for the given barcodes, keyed by barcode.
+     *
+     * Order matters: the newest translation per product is picked FIRST, then filtered
+     * on auto_print. Filtering first (as this used to) let an older enabled row win for
+     * a product whose current translation had been switched off — so the product kept
+     * printing, and printed stale ZPL.
+     *
+     * @param  array<int, string>  $barcodes
+     * @return \Illuminate\Support\Collection<string, ProductTranslation>
+     */
+    private function printableTranslations(array $barcodes)
+    {
+        return ProductTranslation::latestPerProductCode($barcodes)
+            ->filter(fn (ProductTranslation $t) => $t->auto_print && filled($t->zpl_content));
+    }
+
+    /**
+     * Products still awaiting labels for a delivery, as JSON.
+     *
+     * Lets the match page refresh its count and modal after printing or scanning
+     * without a full reload, and is the recovery path when a print response is lost.
+     */
+    public function translatableProducts(Request $request)
     {
         $deliveryId = $request->input('delID');
         $supplierId = $request->input('supplierID');
@@ -263,85 +314,257 @@ class DeliveryLegacyController extends Controller
             ], 422);
         }
 
-        // Optional subset of barcodes selected in the review modal. When absent, print all.
-        $selectedBarcodes = $request->input('barcodes');
-        $selectedBarcodes = is_array($selectedBarcodes)
-            ? array_map('strval', $selectedBarcodes)
-            : null;
-
-        // Scanned barcode => total quantity scanned in this delivery.
-        $query = DB::connection('pos')->table('deliveriesScanItems')
-            ->where('delID', $deliveryId);
-        if ($selectedBarcodes !== null) {
-            $query->whereIn('barcode', $selectedBarcodes);
-        }
-        $scannedQuantities = $query
-            ->select('barcode', DB::raw('SUM(quantity) as scanned'))
-            ->groupBy('barcode')
-            ->pluck('scanned', 'barcode');
-
-        if ($scannedQuantities->isEmpty()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No scanned items found for this delivery.',
-            ], 422);
-        }
-
-        // Latest translation per scanned barcode (avoid N+1: one query, keep newest per code).
-        $translations = \App\Models\ProductTranslation::whereIn('product_code', $scannedQuantities->keys()->all())
-            ->where('auto_print', true)
-            ->orderByDesc('created_at')
-            ->get()
-            ->groupBy('product_code')
-            ->map(fn ($group) => $group->first());
-
-        $zplBlocks = [];
-        $productCount = 0;
-        $labelCount = 0;
-
-        foreach ($translations as $barcode => $translation) {
-            if (empty($translation->zpl_content)) {
-                continue;
-            }
-
-            $copies = max(1, min(99, (int) $scannedQuantities->get($barcode, 1)));
-            $zplBlocks[] = \App\Models\ZebraLabel::setZplQuantity($translation->zpl_content, $copies);
-            $productCount++;
-            $labelCount += $copies;
-        }
-
-        if (empty($zplBlocks)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No translated labels found for scanned products.',
-            ], 422);
-        }
-
-        $zpl = implode("\n", $zplBlocks);
-
-        $tmpFile = tempnam(sys_get_temp_dir(), 'zpl_');
-        file_put_contents($tmpFile, $zpl);
-
-        $host = config('services.zebra.host', '10.42.1.71');
-        $port = config('services.zebra.port', '631');
-        $printer = config('services.zebra.name', 'ZTC-GX430t');
-
-        $command = "lp -h {$host}:{$port}/version=1.1 -d {$printer} -o raw {$tmpFile} 2>&1";
-        $output = shell_exec($command);
-
-        unlink($tmpFile);
-
-        $success = $output && str_contains($output, 'request id');
+        $products = $this->getTranslatableScannedProducts($deliveryId, $supplierId);
 
         return response()->json([
-            'success' => $success,
-            'message' => $success
-                ? "Print job sent: {$labelCount} ".($labelCount === 1 ? 'label' : 'labels')." across {$productCount} ".($productCount === 1 ? 'product' : 'products')
-                : 'Print failed',
-            'printed' => $productCount,
-            'labels' => $labelCount,
-            'output' => trim($output ?? 'No output'),
-        ], $success ? 200 : 500);
+            'success' => true,
+            'products' => $products,
+            'count' => $this->outstandingCount($products),
+        ]);
+    }
+
+    /**
+     * How many products still have labels to print.
+     *
+     * @param  array<int, array<string, mixed>>  $products
+     */
+    private function outstandingCount(array $products): int
+    {
+        return count(array_filter($products, fn ($p) => $p['outstanding'] > 0));
+    }
+
+    /**
+     * Print a translated label for every scanned/received product in the delivery that
+     * has a translation, in a single Zebra job. One label per unit scanned.
+     *
+     * Mirrors the single-label print flow in LabelTranslationController::print(): each
+     * translation's stored ZPL has its ^PQ quantity set, and all blocks are concatenated
+     * into one raw ZPL job (multiple ^XA…^XZ blocks print sequentially).
+     */
+    public function printTranslations(Request $request)
+    {
+        $request->validate([
+            'delID' => 'required|string',
+            'supplierID' => 'required',
+            'barcodes' => 'nullable|array',
+            'idempotency_key' => 'required|string|max:64',
+            'force' => 'sometimes|boolean',
+        ]);
+
+        $deliveryId = (string) $request->input('delID');
+        $supplierId = (string) $request->input('supplierID');
+        $idempotencyKey = (string) $request->input('idempotency_key');
+        $force = $request->boolean('force');
+
+        // Serialise concurrent presses for the same delivery so two clicks can't both
+        // read "nothing printed yet" and each send a full job.
+        $lock = Cache::lock("delivery-print:{$deliveryId}", 30);
+
+        try {
+            $lock->block(5);
+        } catch (\Illuminate\Contracts\Cache\LockTimeoutException) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Another print for this delivery is already in progress.',
+            ], 409);
+        }
+
+        try {
+            // A repeat of the same submit attempt (double-click, or a retry after a lost
+            // response) must never print twice.
+            if (DeliveryLabelPrint::hasIdempotencyKey($idempotencyKey)) {
+                $products = $this->getTranslatableScannedProducts($deliveryId, $supplierId);
+
+                return response()->json([
+                    'success' => true,
+                    'already_printed' => true,
+                    'message' => 'This print has already been sent.',
+                    'printed' => 0,
+                    'labels' => 0,
+                    'products' => $products,
+                    'translatable_count' => $this->outstandingCount($products),
+                ]);
+            }
+
+            // Optional subset of barcodes selected in the review modal. When absent, print all.
+            $selectedBarcodes = $request->input('barcodes');
+            $selectedBarcodes = is_array($selectedBarcodes)
+                ? array_map('strval', $selectedBarcodes)
+                : null;
+
+            $scannedQuantities = $this->scannedQuantities($deliveryId, $selectedBarcodes);
+
+            if ($scannedQuantities->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No scanned items found for this delivery.',
+                ], 422);
+            }
+
+            $translations = $this->printableTranslations($scannedQuantities->keys()->all());
+
+            if ($translations->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No translated labels found for scanned products.',
+                ], 422);
+            }
+
+            $printedQuantities = DeliveryLabelPrint::printedQuantitiesFor($deliveryId);
+
+            $zplBlocks = [];
+            $rows = [];
+            $batchUuid = (string) Str::uuid();
+            $labelCount = 0;
+
+            foreach ($translations as $barcode => $translation) {
+                $barcode = (string) $barcode;
+                $scanned = (int) $scannedQuantities->get($barcode, 0);
+                $printed = (int) $printedQuantities->get($barcode, 0);
+
+                // Print only what is outstanding, unless the user explicitly asked to
+                // reprint. This is what stops every press reprinting the whole delivery.
+                $copies = $force ? $scanned : $scanned - $printed;
+
+                if ($copies <= 0) {
+                    continue;
+                }
+
+                $copies = max(1, min(99, $copies));
+
+                $zplBlocks[] = ZebraLabel::setZplQuantity($translation->zpl_content, $copies);
+                $labelCount += $copies;
+
+                $rows[] = [
+                    'delivery_id' => $deliveryId,
+                    'supplier_id' => is_numeric($supplierId) ? (int) $supplierId : null,
+                    'barcode' => $barcode,
+                    'product_translation_id' => $translation->id,
+                    'quantity' => $copies,
+                    'batch_uuid' => $batchUuid,
+                    'idempotency_key' => $idempotencyKey,
+                    'printed_at' => now(),
+                    'forced' => $force,
+                    'user_id' => Auth::id(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+
+            if ($zplBlocks === []) {
+                $products = $this->getTranslatableScannedProducts($deliveryId, $supplierId);
+
+                return response()->json([
+                    'success' => true,
+                    'nothing_outstanding' => true,
+                    'message' => 'Everything scanned has already been printed.',
+                    'printed' => 0,
+                    'labels' => 0,
+                    'products' => $products,
+                    'translatable_count' => $this->outstandingCount($products),
+                ]);
+            }
+
+            // Record BEFORE printing. If the response is lost or lp hangs after CUPS has
+            // accepted the job, the ledger still reflects it and the next press won't
+            // duplicate. A definitive refusal is rolled back below via failed_at.
+            try {
+                DB::transaction(fn () => DeliveryLabelPrint::insert($rows));
+            } catch (QueryException $e) {
+                // Lost the race on the (idempotency_key, barcode) unique index — another
+                // request for this same attempt already recorded and printed it.
+                $products = $this->getTranslatableScannedProducts($deliveryId, $supplierId);
+
+                return response()->json([
+                    'success' => true,
+                    'already_printed' => true,
+                    'message' => 'This print has already been sent.',
+                    'printed' => 0,
+                    'labels' => 0,
+                    'products' => $products,
+                    'translatable_count' => $this->outstandingCount($products),
+                ]);
+            }
+
+            $result = $this->zebraPrint->sendRaw(implode("\n", $zplBlocks));
+
+            // Only a definitive refusal releases the labels back to outstanding. A
+            // timeout leaves the rows in place, because the job may well have printed.
+            DeliveryLabelPrint::markBatchResult(
+                $batchUuid,
+                $result->jobId,
+                $result->output,
+                $result->definitivelyFailed(),
+            );
+
+            $products = $this->getTranslatableScannedProducts($deliveryId, $supplierId);
+            $productCount = count($rows);
+
+            if (! $result->success) {
+                return response()->json([
+                    'success' => false,
+                    'timed_out' => $result->timedOut,
+                    'message' => $result->timedOut
+                        ? "Couldn't confirm this print. The job may already have been sent to the printer — refresh to see what's still outstanding."
+                        : 'Print failed',
+                    'printed' => 0,
+                    'labels' => 0,
+                    'output' => $result->output,
+                    'products' => $products,
+                    'translatable_count' => $this->outstandingCount($products),
+                ], 500);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Print job sent: {$labelCount} ".($labelCount === 1 ? 'label' : 'labels')." across {$productCount} ".($productCount === 1 ? 'product' : 'products'),
+                'printed' => $productCount,
+                'labels' => $labelCount,
+                'batch_uuid' => $batchUuid,
+                'cups_job_id' => $result->jobId,
+                'output' => $result->output,
+                'products' => $products,
+                'translatable_count' => $this->outstandingCount($products),
+            ]);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * Undo the most recent translated-label print for a delivery, putting those labels
+     * back on the outstanding list. The safety valve for when the ledger gets ahead of
+     * reality (job cancelled at the printer, jammed roll, wrong labels loaded).
+     */
+    public function undoLastPrint(Request $request)
+    {
+        $request->validate([
+            'delID' => 'required|string',
+            'supplierID' => 'required',
+        ]);
+
+        $deliveryId = (string) $request->input('delID');
+        $supplierId = (string) $request->input('supplierID');
+
+        $batchUuid = DeliveryLabelPrint::latestBatchFor($deliveryId);
+
+        if (! $batchUuid) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No print to undo for this delivery.',
+            ], 422);
+        }
+
+        $removed = DeliveryLabelPrint::where('batch_uuid', $batchUuid)->delete();
+
+        $products = $this->getTranslatableScannedProducts($deliveryId, $supplierId);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Last print undone ({$removed} ".($removed === 1 ? 'product' : 'products').' back on the list).',
+            'products' => $products,
+            'translatable_count' => $this->outstandingCount($products),
+        ]);
     }
 
     /**

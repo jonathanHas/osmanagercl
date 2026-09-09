@@ -419,7 +419,7 @@ php artisan optimize:clear
 - [OSAccounts Integration](./osaccounts-integration.md)
 - [Invoice Attachments System](./invoice-attachments-system.md)
 - [User Roles & Permissions](./user-roles-permissions.md)
-- [Supplier Management](../management/suppliers.md)
+- [Supplier Management](./supplier-management.md)
 
 ---
 
