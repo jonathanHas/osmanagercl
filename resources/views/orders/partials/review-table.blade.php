@@ -70,6 +70,19 @@
             ->get()
             ->keyBy('supplier_code');
 
+    // Pallet volume per ORDER UNIT (a case for case products, a single otherwise), keyed by
+    // supplier code. Unlike $udeaCards above this covers every product, not just single-unit
+    // ones, because pallet space is consumed by both. Value is Udea's own sve * volume from
+    // js/orders/order.js:1556 - multiplying it by the quantity in the input gives the line's
+    // pallet volume, exactly as the Udea basket calculates it.
+    $udeaAllCodes = collect($displayItems)->map(function ($item) {
+        $ctx = $item->context_data ?? [];
+
+        return $ctx['supplier_code'] ?? optional(optional($item->product)->supplierLink)->SupplierCode;
+    })->filter()->map(fn ($c) => trim((string) $c))->unique()->values();
+
+    $udeaPalletVolumes = app(\App\Services\UdeaPalletVolumeService::class)->volumesForCodes($udeaAllCodes);
+
     // Split items by category and case/unit type
     // Category IDs: Cheese = "032", Refrigerated = "002"
     $cheeseProducts = $displayItems->filter(function ($item) {
@@ -761,6 +774,7 @@
                                        data-is-case-product="{{ $isCaseProduct ? 1 : 0 }}"
                                        data-product-peak="{{ $peakWeeklySales }}"
                                        data-quantity-precision="{{ $quantityPrecision }}"
+                                       @if($supplierCode && isset($udeaPalletVolumes[(string) $supplierCode])) data-pallet-volume="{{ $udeaPalletVolumes[(string) $supplierCode] }}" @endif
                                        class="qty-input w-20 text-center text-lg font-bold border-2 border-gray-300 rounded py-1">
                                 <button class="qty-increase w-8 h-8 bg-green-100 hover:bg-green-200 text-green-700 rounded font-bold"
                                         type="button"
@@ -1251,6 +1265,7 @@
                                        data-is-case-product="{{ $isCaseProduct ? 1 : 0 }}"
                                        data-product-peak="{{ $peakWeeklySales }}"
                                        data-quantity-precision="{{ $quantityPrecision }}"
+                                       @if($supplierCode && isset($udeaPalletVolumes[(string) $supplierCode])) data-pallet-volume="{{ $udeaPalletVolumes[(string) $supplierCode] }}" @endif
                                        class="qty-input w-20 text-center text-lg font-bold border-2 border-gray-300 rounded py-1">
                                 <button class="qty-increase w-8 h-8 bg-green-100 hover:bg-green-200 text-green-700 rounded font-bold"
                                         type="button"
@@ -1653,6 +1668,7 @@
                                        data-is-case-product="{{ $isCaseProduct ? 1 : 0 }}"
                                        data-product-peak="{{ $peakWeeklySales }}"
                                        data-quantity-precision="{{ $quantityPrecision }}"
+                                       @if($supplierCode && isset($udeaPalletVolumes[(string) $supplierCode])) data-pallet-volume="{{ $udeaPalletVolumes[(string) $supplierCode] }}" @endif
                                        class="qty-input w-20 text-center text-lg font-bold border-2 border-gray-300 rounded py-1">
                                 <button class="qty-increase w-8 h-8 bg-green-100 hover:bg-green-200 text-green-700 rounded font-bold"
                                         type="button"
@@ -2055,6 +2071,7 @@
                                        data-is-case-product="{{ $isCaseProduct ? 1 : 0 }}"
                                        data-product-peak="{{ $peakWeeklySales }}"
                                        data-quantity-precision="{{ $quantityPrecision }}"
+                                       @if($supplierCode && isset($udeaPalletVolumes[(string) $supplierCode])) data-pallet-volume="{{ $udeaPalletVolumes[(string) $supplierCode] }}" @endif
                                        class="qty-input w-20 text-center text-lg font-bold border-2 border-gray-300 rounded py-1">
                                 <button class="qty-increase w-8 h-8 bg-green-100 hover:bg-green-200 text-green-700 rounded font-bold"
                                         type="button"

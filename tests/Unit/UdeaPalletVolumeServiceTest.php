@@ -227,6 +227,81 @@ class UdeaPalletVolumeServiceTest extends TestCase
         $this->assertDatabaseCount('udea_product_cards', 0);
     }
 
+    public function test_volumes_for_codes_returns_volume_per_order_unit(): void
+    {
+        UdeaProductCard::create(['supplier_code' => '5004482', 'pallet_sve' => 10, 'pallet_unit_volume' => 0.65, 'pallet_scraped_at' => now()]);
+        UdeaProductCard::create(['supplier_code' => '45006', 'pallet_sve' => 0.22, 'pallet_unit_volume' => 0.13, 'pallet_scraped_at' => now()]);
+        // No pallet data - must be absent rather than present as zero.
+        UdeaProductCard::create(['supplier_code' => '9999', 'scraped_at' => now()]);
+
+        $volumes = $this->service->volumesForCodes(['5004482', '45006', '9999', null, '  ']);
+
+        $this->assertEqualsWithDelta(6.5, $volumes['5004482'], 0.0001);
+        $this->assertEqualsWithDelta(0.0286, $volumes['45006'], 0.0001);
+        $this->assertArrayNotHasKey('9999', $volumes->all());
+        $this->assertCount(2, $volumes);
+    }
+
+    public function test_volumes_for_codes_handles_an_empty_list(): void
+    {
+        $this->assertTrue($this->service->volumesForCodes([])->isEmpty());
+    }
+
+    public function test_capacity_for_matches_udea_pallet_maths(): void
+    {
+        $this->assertSame(250.0, $this->service->capacityFor(1, 0));
+        $this->assertSame(360.0, $this->service->capacityFor(0, 1));
+        $this->assertSame(860.0, $this->service->capacityFor(2, 1));
+        $this->assertSame(0.0, $this->service->capacityFor(0, 0));
+    }
+
+    /**
+     * The order page's running total must agree with the Udea basket for the same lines.
+     * Same golden master as the parse test, driven through the summarise() API the Blade
+     * component's JS mirrors.
+     */
+    public function test_summarise_reproduces_the_real_basket_fill_percentages(): void
+    {
+        $path = base_path('tests/Fixtures/udea-cart-298-lines.json');
+
+        if (! file_exists($path)) {
+            $this->markTestSkipped('Golden-master fixture not present.');
+        }
+
+        $lines = array_map(fn ($row) => [
+            'volume_per_unit' => $row['sve'] * $row['unit_volume'],
+            'quantity' => $row['quantity'],
+        ], json_decode(file_get_contents($path), true));
+
+        $euro = $this->service->summarise($lines, $this->service->capacityFor(1, 0));
+        $block = $this->service->summarise($lines, $this->service->capacityFor(0, 1));
+
+        $this->assertEqualsWithDelta(470.6612, $euro['volume'], 0.0001);
+        $this->assertEqualsWithDelta(188.24, $euro['percent'], 0.01);
+        $this->assertEqualsWithDelta(130.80, $block['percent'], 0.01);
+        $this->assertSame(298, $euro['counted']);
+    }
+
+    public function test_summarise_ignores_zero_and_negative_quantities(): void
+    {
+        $result = $this->service->summarise([
+            ['volume_per_unit' => 6.5, 'quantity' => 2],
+            ['volume_per_unit' => 6.5, 'quantity' => 0],
+            ['volume_per_unit' => 6.5, 'quantity' => -3],
+        ], 250.0);
+
+        $this->assertSame(1, $result['counted']);
+        $this->assertEqualsWithDelta(13.0, $result['volume'], 0.0001);
+    }
+
+    public function test_summarise_reports_zero_percent_when_no_pallets_selected(): void
+    {
+        $result = $this->service->summarise([['volume_per_unit' => 6.5, 'quantity' => 2]], 0.0);
+
+        $this->assertSame(0.0, $result['percent']);
+        $this->assertEqualsWithDelta(13.0, $result['volume'], 0.0001, 'Volume is still known without a pallet selection.');
+    }
+
     /**
      * Stubs fetchCartHtml() so sync() can be exercised without HTTP.
      */

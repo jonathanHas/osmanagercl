@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\UdeaProductCard;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
@@ -204,6 +205,88 @@ class UdeaPalletVolumeService
         return UdeaProductCard::where('supplier_code', $supplierCode)
             ->first()
             ?->palletVolumeFor($qty);
+    }
+
+    /**
+     * Pallet volume per ORDER UNIT (sve * volume), keyed by supplier code.
+     *
+     * An order unit is what Udea counts in the basket: a case for case-bought products,
+     * a single otherwise. Multiplying by the ordered quantity gives the line's volume,
+     * which is exactly how the Udea basket calculates it.
+     *
+     * @param  iterable<int, string|null>  $supplierCodes
+     * @return \Illuminate\Support\Collection<string, float>
+     */
+    public function volumesForCodes(iterable $supplierCodes): Collection
+    {
+        $codes = collect($supplierCodes)
+            ->filter()
+            ->map(fn ($code) => trim((string) $code))
+            ->unique()
+            ->values();
+
+        if ($codes->isEmpty()) {
+            return collect();
+        }
+
+        return UdeaProductCard::whereIn('supplier_code', $codes->all())
+            ->whereNotNull('pallet_sve')
+            ->whereNotNull('pallet_unit_volume')
+            ->get()
+            ->mapWithKeys(fn (UdeaProductCard $card) => [
+                (string) $card->supplier_code => round((float) $card->pallet_sve * (float) $card->pallet_unit_volume, 6),
+            ]);
+    }
+
+    /**
+     * Total pallet volume and fill percentage for a set of order lines.
+     *
+     * Udea rounds each line's percentage to 2dp before summing (order.js:1556); summing the
+     * raw volumes and rounding once at the end gives a slightly different figure to the one
+     * their page shows. The JS in the pallet-summary component mirrors this exactly.
+     *
+     * @param  iterable<int, array{volume_per_unit: float, quantity: float}>  $lines
+     * @return array{volume:float,percent:float,capacity:float,counted:int}
+     */
+    public function summarise(iterable $lines, float $capacity): array
+    {
+        $volume = 0.0;
+        $percent = 0.0;
+        $counted = 0;
+
+        foreach ($lines as $line) {
+            $qty = (float) ($line['quantity'] ?? 0);
+            $perUnit = (float) ($line['volume_per_unit'] ?? 0);
+
+            if ($qty <= 0) {
+                continue;
+            }
+
+            $lineVolume = $perUnit * $qty;
+            $volume += $lineVolume;
+            $counted++;
+
+            if ($capacity > 0) {
+                $percent += round($lineVolume / $capacity * 100, 2);
+            }
+        }
+
+        return [
+            'volume' => round($volume, 4),
+            'percent' => round($percent, 2),
+            'capacity' => $capacity,
+            'counted' => $counted,
+        ];
+    }
+
+    /**
+     * Total capacity for a pallet selection, per Udea's own calculation.
+     */
+    public function capacityFor(int $euroPallets, int $blockPallets): float
+    {
+        $pallet = config('suppliers.external_links.udea.pallet', ['euro' => 250, 'block' => 360]);
+
+        return $euroPallets * (float) $pallet['euro'] + $blockPallets * (float) $pallet['block'];
     }
 
     /**

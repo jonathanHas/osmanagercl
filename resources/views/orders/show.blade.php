@@ -49,10 +49,35 @@
                 .'</form>';
         }
         $primaryActions[] = '<a href="'.route('orders.export', $order).'" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium">Export CSV</a>';
+
+        // Pallet space only applies to Udea, who are the only supplier publishing the data.
+        $udeaSupplierIds = array_map('strval', config('suppliers.external_links.udea.supplier_ids', [5, 44, 85]));
+        $isUdeaOrder = in_array((string) $order->supplier_id, $udeaSupplierIds, true);
+
+        $palletCoverage = ['withData' => 0, 'total' => 0];
+        if ($isUdeaOrder) {
+            $orderCodes = $order->items->map(function ($item) {
+                $ctx = $item->context_data ?? [];
+
+                return $ctx['supplier_code'] ?? optional(optional($item->product)->supplierLink)->SupplierCode;
+            })->filter()->map(fn ($c) => trim((string) $c))->unique();
+
+            $palletCoverage = [
+                'total' => $orderCodes->count(),
+                'withData' => $orderCodes->isEmpty() ? 0 : \App\Models\UdeaProductCard::whereIn('supplier_code', $orderCodes->all())
+                    ->whereNotNull('pallet_sve')
+                    ->whereNotNull('pallet_unit_volume')
+                    ->count(),
+            ];
+        }
     @endphp
 
     <div class="py-6">
         <div class="max-w-none mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+            @if($isUdeaOrder)
+                <x-udea-pallet-summary :coverage="$palletCoverage" />
+            @endif
+
             <!-- Summary Cards -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div class="bg-white shadow-sm rounded-lg p-4">
