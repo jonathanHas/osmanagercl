@@ -10,6 +10,9 @@
                     • Created by {{ $order->user->name ?? 'System' }}
                     • Status: <span class="font-semibold">{{ ucfirst($order->status) }}</span>
                 </p>
+                @if($order->notes)
+                    <p class="text-sm text-gray-500 mt-1">{{ $order->notes }}</p>
+                @endif
             </div>
             <div class="flex flex-wrap gap-2 justify-end">
                 <a href="{{ route('orders.layout-a2', $order) }}" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg font-medium text-sm transition">
@@ -74,6 +77,18 @@
 
     <div class="py-6">
         <div class="max-w-none mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+            @if(session('success'))
+                <div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                    {{ session('success') }}
+                </div>
+            @endif
+
+            @if(session('error'))
+                <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                    {{ session('error') }}
+                </div>
+            @endif
+
             @if($isUdeaOrder)
                 <x-udea-pallet-summary :coverage="$palletCoverage" />
             @endif

@@ -1,7 +1,8 @@
 {{-- Compares two order sessions, focused on what is absent from each. --}}
 {{-- Rows cover only products actually ordered (final_quantity > 0) in that session. --}}
 {{-- Expects: $orderA, $orderB (OrderSession), $onlyInA, $onlyInB, $changed, $unchanged --}}
-{{-- (Collections of array{a, product, name, supplierCode, stock, ...}), $suppliersDiffer (bool) --}}
+{{-- (Collections of array{a, product, name, supplierCode, stock, ...}), $suppliersDiffer (bool), --}}
+{{-- $diffAB, $diffBA (array{products, units, value} - each order's shortfall against the other) --}}
 @php
     $num = fn ($v) => rtrim(rtrim(number_format((float) $v, 3, '.', ''), '0'), '.');
 
@@ -35,6 +36,12 @@
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+
+            @if(session('error'))
+                <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                    {{ session('error') }}
+                </div>
+            @endif
 
             @if($suppliersDiffer)
                 <div class="rounded-lg border border-amber-200 bg-amber-50 p-4">
@@ -106,6 +113,74 @@
                         </div>
                     @endforeach
                 </div>
+            </div>
+
+            {{-- Turn the gap into a real order, rather than re-keying it by hand --}}
+            <div class="overflow-hidden rounded-lg bg-white shadow-sm">
+                <div class="border-b border-gray-200 bg-gray-50 px-6 py-3">
+                    <h3 class="text-sm font-semibold text-gray-900">Order the difference</h3>
+                    <p class="text-xs text-gray-600">
+                        Creates a draft holding, for each product, the quantity one order has over the other.
+                        Costs, case sizes and sales history are copied from the source order; quantities round up to whole cases.
+                    </p>
+                </div>
+
+                @if($suppliersDiffer)
+                    <p class="px-6 py-8 text-center text-sm text-gray-500">
+                        These orders are for different suppliers. An order belongs to a single supplier,
+                        so their difference cannot be ordered as one.
+                    </p>
+                @else
+                    <div class="grid grid-cols-1 gap-px bg-gray-200 md:grid-cols-2">
+                        @foreach([
+                            ['diff' => $diffAB, 'from' => $orderA, 'to' => $orderB, 'label' => 'Order A &minus; Order B'],
+                            ['diff' => $diffBA, 'from' => $orderB, 'to' => $orderA, 'label' => 'Order B &minus; Order A'],
+                        ] as $dir)
+                            <div class="bg-white p-6">
+                                <div class="flex items-baseline justify-between">
+                                    <h4 class="text-sm font-semibold text-gray-900">{!! $dir['label'] !!}</h4>
+                                    <span class="inline-flex rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-800">
+                                        {{ $dir['diff']['products'] }} {{ \Illuminate\Support\Str::plural('product', $dir['diff']['products']) }}
+                                    </span>
+                                </div>
+
+                                @if($dir['diff']['products'] === 0)
+                                    <p class="mt-4 text-sm text-gray-500">
+                                        Order #{{ $dir['to']->id }} already covers every quantity in order #{{ $dir['from']->id }}.
+                                    </p>
+                                @else
+                                    <p class="mt-1 text-xs text-gray-600">
+                                        What order #{{ $dir['from']->id }} orders over and above order #{{ $dir['to']->id }}
+                                        &mdash; {{ $num($dir['diff']['units']) }} units, &euro;{{ number_format($dir['diff']['value'], 2) }}.
+                                    </p>
+
+                                    <form method="POST" action="{{ route('orders.compare.difference') }}" class="mt-4 space-y-3">
+                                        @csrf
+                                        <input type="hidden" name="from" value="{{ $dir['from']->id }}">
+                                        <input type="hidden" name="to" value="{{ $dir['to']->id }}">
+
+                                        @php $dateId = 'order_date_'.$dir['from']->id.'_'.$dir['to']->id; @endphp
+                                        <div>
+                                            <label for="{{ $dateId }}" class="block text-xs font-medium text-gray-700">Delivery date</label>
+                                            <input type="date"
+                                                   id="{{ $dateId }}"
+                                                   name="order_date"
+                                                   value="{{ optional($dir['from']->order_date)->format('Y-m-d') }}"
+                                                   required
+                                                   class="mt-1 block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                            <p class="mt-1 text-xs text-gray-500">Set it now &mdash; the delivery date cannot be changed once the order exists.</p>
+                                        </div>
+
+                                        <button type="submit"
+                                                class="inline-flex w-full items-center justify-center rounded bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">
+                                            Create draft order
+                                        </button>
+                                    </form>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
             </div>
 
             {{-- The headline: ordered in one, not the other --}}

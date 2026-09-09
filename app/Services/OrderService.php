@@ -1034,6 +1034,176 @@ class OrderService
         return $item->fresh();
     }
 
+    /**
+     * Items actually being ordered in a session, keyed by product.
+     *
+     * A session carries a row for every candidate product, most of them at
+     * quantity zero, so "ordered" has to mean a positive final quantity or the
+     * zero rows bury everything.
+     *
+     * product_id is a string column (PRODUCTS.ID), so keyBy is safe here.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<string, OrderItem>
+     */
+    public function orderedItemsByProduct(OrderSession $session): Collection
+    {
+        return $session->items
+            ->filter(fn (OrderItem $item) => (float) $item->final_quantity > 0)
+            ->keyBy('product_id');
+    }
+
+    /**
+     * The shortfall of one order against another, as order_item attribute sets.
+     *
+     * For each product $from orders, the quantity $to leaves uncovered; products
+     * $to does not order at all come across in full. Both the comparison page's
+     * preview and the order it creates run through here, so the count on the
+     * button is the count that gets created.
+     *
+     * @return Collection<string, array<string, mixed>>
+     */
+    public function differenceItems(OrderSession $from, OrderSession $to): Collection
+    {
+        return $this->differenceItemsFor(
+            $this->orderedItemsByProduct($from),
+            $this->orderedItemsByProduct($to),
+        );
+    }
+
+    /**
+     * differenceItems() over collections the caller has already keyed by product.
+     *
+     * @param  Collection<string, OrderItem>  $fromItems
+     * @param  Collection<string, OrderItem>  $toItems
+     * @return Collection<string, array<string, mixed>>
+     */
+    public function differenceItemsFor(Collection $fromItems, Collection $toItems): Collection
+    {
+        return $fromItems
+            ->map(function (OrderItem $source) use ($toItems) {
+                // The decimal casts hand back strings, so every quantity read
+                // here needs an explicit (float).
+                $covered = (float) ($toItems[$source->product_id]->final_quantity ?? 0);
+                $shortfall = (float) $source->final_quantity - $covered;
+
+                // Same epsilon compare() splits "changed" from "unchanged" on.
+                if ($shortfall < 0.001) {
+                    return null;
+                }
+
+                $caseUnits = max(1, (int) $source->case_units);
+
+                if ($caseUnits > 1) {
+                    // Case products round up to whole cases, as updateOrderItemQuantity()
+                    // does. That can exceed the raw shortfall - a 25-unit gap on a
+                    // 12-pack is 3 cases - which is the honest answer, since part of
+                    // a case cannot be bought.
+                    $finalCases = ceil($shortfall / $caseUnits);
+                    $finalQuantity = $finalCases * $caseUnits;
+                } else {
+                    // Unit products keep the raw shortfall, matching the unit branch
+                    // of updateOrderItemQuantity(), which also stores it unrounded.
+                    $finalQuantity = $shortfall;
+                    $finalCases = $shortfall;
+                }
+
+                $unitCost = (float) $source->unit_cost;
+
+                return [
+                    'product_id' => $source->product_id,
+                    // Suggested matches final so the rows do not read as already
+                    // adjusted - nobody has changed anything on them yet.
+                    'suggested_quantity' => $finalQuantity,
+                    'final_quantity' => $finalQuantity,
+                    'suggested_cases' => $finalCases,
+                    'final_cases' => $finalCases,
+                    'case_units' => $caseUnits,
+                    'unit_cost' => $unitCost,
+                    'total_cost' => $finalQuantity * $unitCost,
+                    'review_priority' => $source->review_priority,
+                    // Neither flag is inherited: nobody has approved this quantity,
+                    // and these rows are the order's own content rather than ad-hoc
+                    // search additions.
+                    'auto_approved' => false,
+                    'added_via_search' => false,
+                    'adjustment_reason' => null,
+                    // The source's sales and stock snapshot carries over as-is - it
+                    // is what the buyer was looking at when the shortfall arose.
+                    'context_data' => array_merge((array) ($source->context_data ?? []), [
+                        'derived_from' => [
+                            'type' => 'order_difference',
+                            'from_quantity' => (float) $source->final_quantity,
+                            'to_quantity' => $covered,
+                            'raw_shortfall' => $shortfall,
+                        ],
+                    ]),
+                ];
+            })
+            ->filter();
+    }
+
+    /**
+     * Create a draft order holding what one compared order has over another.
+     *
+     * Returns null when there is nothing to order, i.e. $to already covers every
+     * quantity in $from.
+     */
+    public function createOrderFromDifference(OrderSession $from, OrderSession $to, Carbon $orderDate): ?OrderSession
+    {
+        if ($from->supplier_id !== $to->supplier_id) {
+            throw new \InvalidArgumentException('Orders from different suppliers cannot be differenced.');
+        }
+
+        $specs = $this->differenceItems($from, $to);
+
+        if ($specs->isEmpty()) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($from, $to, $orderDate, $specs) {
+            $coverageDays = max(1, (int) ($from->coverage_days ?? 7));
+
+            $orderSession = OrderSession::create([
+                'user_id' => Auth::id(),
+                'supplier_id' => $from->supplier_id,
+                'order_date' => $orderDate,
+                'coverage_days' => $coverageDays,
+                // Re-anchored to the new delivery date the way duplicate() does:
+                // the source order's window may already have closed.
+                'coverage_ends_on' => $orderDate->copy()->addDays($coverageDays - 1),
+                // Per-category overrides are dates anchored to the source order's
+                // delivery date, so they are stale against this one.
+                'coverage_overrides' => null,
+                'sales_history_weeks' => $from->sales_history_weeks ?? 8,
+                // show() diverts to the christmas review whenever this is set, and
+                // that page frames items against a christmas window - the wrong
+                // lens for a shortfall order.
+                'christmas_comparison_enabled' => false,
+                'christmas_window_config' => null,
+                'status' => 'draft',
+                'notes' => sprintf(
+                    'Difference between order #%d and order #%d: %d products, %s units. '
+                    .'Regenerating this order would replace the difference with fresh suggestions.',
+                    $from->id,
+                    $to->id,
+                    $specs->count(),
+                    rtrim(rtrim(number_format((float) $specs->sum('final_quantity'), 3, '.', ''), '0'), '.'),
+                ),
+            ]);
+
+            foreach ($specs as $spec) {
+                // One create() per row rather than the chunked insert() generation
+                // uses: a difference runs to tens of rows, and the model casts
+                // encode context_data for us.
+                OrderItem::create($spec + ['order_session_id' => $orderSession->id]);
+            }
+
+            $orderSession->updateTotals();
+
+            return $orderSession;
+        });
+    }
+
     public function updateOrderItemQuantity(OrderItem $orderItem, float $newQuantity, ?string $reason = null): OrderItem
     {
         $originalQuantity = $orderItem->final_quantity;

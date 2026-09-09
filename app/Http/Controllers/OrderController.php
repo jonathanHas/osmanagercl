@@ -15,7 +15,6 @@ use App\Services\SalesDataSyncService;
 use App\Services\SupplierService;
 use App\Support\SpecialOrderCategories;
 use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -349,8 +348,8 @@ class OrderController extends Controller
         // A session carries a row for every candidate product, most at quantity
         // zero: session #1 holds 1,504 rows but only 353 actual orders. Presence
         // must mean "actually ordered", or the zero rows bury the comparison.
-        $itemsA = $this->orderedItemsByProduct($orderA);
-        $itemsB = $this->orderedItemsByProduct($orderB);
+        $itemsA = $this->orderService->orderedItemsByProduct($orderA);
+        $itemsB = $this->orderService->orderedItemsByProduct($orderB);
 
         $rowsFor = fn ($items, $session) => $items
             ->map(fn (OrderItem $item) => $this->compareRow($item, $session))
@@ -379,6 +378,18 @@ class OrderController extends Controller
         // changed / what can be dropped" question, so collapse them out of the way.
         [$changed, $unchanged] = $inBoth->partition(fn ($row) => abs($row['delta']) >= 0.001);
 
+        // What each order holds over the other, as the difference builder would
+        // create it. Routing the preview through the same code as the write keeps
+        // the count on the button honest about case rounding.
+        $diffAB = $this->orderService->differenceItemsFor($itemsA, $itemsB);
+        $diffBA = $this->orderService->differenceItemsFor($itemsB, $itemsA);
+
+        $summarise = fn ($diff) => [
+            'products' => $diff->count(),
+            'units' => (float) $diff->sum('final_quantity'),
+            'value' => (float) $diff->sum('total_cost'),
+        ];
+
         return view('orders.compare', [
             'orderA' => $orderA,
             'orderB' => $orderB,
@@ -387,19 +398,53 @@ class OrderController extends Controller
             'changed' => $changed->values(),
             'unchanged' => $unchanged->values(),
             'suppliersDiffer' => $orderA->supplier_id !== $orderB->supplier_id,
+            'diffAB' => $summarise($diffAB),
+            'diffBA' => $summarise($diffBA),
         ]);
     }
 
     /**
-     * Items actually being ordered in a session, keyed by product.
+     * Create a draft order from the shortfall of one compared order against the other.
      *
-     * product_id is a string column (PRODUCTS.ID), so keyBy is safe here.
+     * The counterpart to compare(): having seen what the trimmed order does
+     * without, order it separately instead of re-keying it by hand.
      */
-    private function orderedItemsByProduct(OrderSession $session): Collection
+    public function storeDifference(Request $request): RedirectResponse
     {
-        return $session->items
-            ->filter(fn (OrderItem $item) => (float) $item->final_quantity > 0)
-            ->keyBy('product_id');
+        $validated = $request->validate([
+            'from' => ['required', 'different:to', 'exists:App\Models\OrderSession,id'],
+            'to' => ['required', 'exists:App\Models\OrderSession,id'],
+            'order_date' => ['required', 'date'],
+        ]);
+
+        // Only ordered rows matter, and nothing here needs the POS product data
+        // compare() loads for display. Both matter: a session runs to 1,500+ rows,
+        // each carrying a multi-KB context_data blob.
+        $load = fn (string $id) => OrderSession::with([
+            'items' => fn ($query) => $query->where('final_quantity', '>', 0),
+        ])->findOrFail($id);
+
+        $from = $load($validated['from']);
+        $to = $load($validated['to']);
+
+        // An order session belongs to exactly one supplier, so a cross-supplier
+        // difference has no valid supplier to be created under.
+        if ($from->supplier_id !== $to->supplier_id) {
+            return back()->with('error', 'These orders are for different suppliers. An order belongs to a single supplier, so their difference cannot be ordered as one.');
+        }
+
+        $orderSession = $this->orderService->createOrderFromDifference(
+            $from,
+            $to,
+            Carbon::parse($validated['order_date'])
+        );
+
+        if ($orderSession === null) {
+            return back()->with('error', "Order #{$to->id} already covers every quantity in order #{$from->id} - there is no difference to order.");
+        }
+
+        return redirect()->route('orders.show', $orderSession)
+            ->with('success', "Draft order #{$orderSession->id} created from the difference between orders #{$from->id} and #{$to->id}.");
     }
 
     /**

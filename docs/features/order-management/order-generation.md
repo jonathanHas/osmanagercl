@@ -102,6 +102,55 @@ Use the **Priority** dropdown on each order row to override a product’s classi
 2. Quick scan "Standard" items (verify suggestions)
 3. Auto-approved items (pre-selected, glance only)
 
+### 2026-09 Enhancements (Order Comparison & Difference Orders)
+
+- **Order comparison** (`/orders/compare?a=X&b=Y`, `OrderController::compare()`): select any two
+  orders on `/orders` via the checkbox column, then use the **Compare** button in the sticky bar
+  at the foot of the page. The comparison splits the two sessions into *Only in A*, *Only in B*,
+  *In both, quantity changed*, and a collapsed *Identical* list. Its purpose is trimming an
+  oversized order: generate a large order, generate a smaller one, then see what the smaller one
+  does without.
+
+  Throughout, "ordered" means `final_quantity > 0` — a session holds a candidate row for every
+  supplier product, most at quantity zero (session #1: 1,504 rows, 353 actual orders), so the
+  zero rows would otherwise bury the comparison. The predicate lives in one place,
+  `OrderService::orderedItemsByProduct()`.
+
+- **Order the difference**: the comparison page can turn the gap between the two orders into a new
+  draft. Both directions are offered — *Order A − Order B* and *Order B − Order A*. For each
+  product the new order takes `from.final_quantity - to.final_quantity` where positive; products
+  the other order does not cover come across in full.
+
+  - Case products round the shortfall **up to whole cases**, as everywhere else in `OrderService`.
+    This can exceed the raw shortfall — a 25-unit gap on a 12-pack is 3 cases — because part of a
+    case cannot be bought. Case size is taken from the *source* order's item, since `case_units` is
+    a per-session snapshot while units are the source of truth.
+  - Item metadata is **copied, not recalculated**: cost, case size, review priority and the whole
+    `context_data` sales/stock snapshot carry over from the source item, with a `derived_from` key
+    added for provenance. `auto_approved` and `added_via_search` are reset — nobody has approved
+    the new quantity, and the rows are the order's own content.
+  - The new session copies the source's supplier and `sales_history_weeks`, **re-anchors**
+    `coverage_ends_on` to the chosen delivery date (as `duplicate()` does), drops
+    `coverage_overrides` (their dates belong to the source order's cycle) and forces
+    `christmas_comparison_enabled` off. Provenance is recorded in `notes`, now rendered in the
+    order header.
+  - Blocked when the two orders have different suppliers — an `OrderSession` belongs to exactly one.
+  - The delivery date is set on the form because `OrderController::update()` accepts only `notes`;
+    an order's date cannot be changed afterwards.
+
+  Because a difference order contains only real lines, its `total_items` is the true product count
+  rather than the candidate-row count generated orders show — it will look strikingly smaller on
+  `/orders` than its neighbours.
+
+  **Caveat**: regenerating a difference order (via the category coverage controls) calls
+  `regenerateOrderSession()`, which deletes all items and rebuilds from live suggestions — that
+  discards the difference. The `notes` string says so.
+
+  Code: `OrderService::differenceItems()` / `differenceItemsFor()` / `createOrderFromDifference()`,
+  `OrderController::storeDifference()`, route `orders.compare.difference`.
+  Tests: `tests/Unit/OrderDifferenceTest.php` (arithmetic, no DB),
+  `tests/Feature/OrderDifferenceCreationTest.php` (HTTP round-trip and guards).
+
 ### 4. Learning System
 The system tracks manual adjustments to improve future suggestions:
 - Records user modifications to suggested quantities
