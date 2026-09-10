@@ -18,6 +18,44 @@ This document tracks known issues that have been identified and resolved in the 
 
 ## Label & Printing Issues
 
+### Translated Labels Reprint the Whole Delivery on Every Press
+**Status:** Fixed (2026-09-09)
+
+#### Problem
+On `/delivery-legacy/match`, pressing **Print Translated Labels** reprinted labels for products that had already printed earlier in the same delivery. The button's count never went down, and clearing the printer queue on the machine made no difference.
+
+#### Root Cause
+Two independent things, and the second is why clearing the queue looked like it should have helped.
+
+1. **The print list was derived but never consumed.** `DeliveryLegacyController::getTranslatableScannedProducts()` and `printTranslations()` both rebuilt the set on every request from `SUM(quantity)` over *all* `pos.deliveriesScanItems` rows for the delivery, and after the `lp` call **nothing was persisted** — no `printed_at` column, no log, no batch row. So each press re-sent the whole delivery at the current running total: scan 3 → print 3, scan 2 more → print **5** (8 labels for 5 units). Completing the delivery didn't clear it either.
+2. **The spool is on the printer host.** `lp -h {host}:{port}` submits to the CUPS server at `ZEBRA_PRINTER_HOST`, not to the local daemon. Clearing the queue on the web/till machine was always a no-op, and nothing in the codebase ever called `cancel`/`lprm`.
+
+Three defects compounded it:
+
+- **`auto_print` was filtered before the newest-per-code grouping** (`->where('auto_print', true)` then `->groupBy('product_code')->first()`). Toggling off the newest translation left an older enabled row matching, so the product kept printing — and printed the **old** ZPL. Four duplicated `product_code`s were live at the time.
+- **`LabelTranslationController::save()` omitted `auto_print`**, so `create()` fell back to the column default (`true`). Re-translating a product you'd switched off silently re-enabled it.
+- **Double-submit.** Success was inferred from `str_contains($output, 'request id')`, and `shell_exec` ran synchronously inside the request. A slow printer timed out PHP *after* CUPS had accepted the job; the user saw "Print failed", `.finally()` re-enabled the button via `updateTranslationPrintCount()`, and the obvious next click sent an identical second job. No idempotency anywhere.
+
+#### Solution
+- **`delivery_label_prints` ledger**, written **before** the job reaches CUPS. Recording first means a lost or timed-out response can never duplicate; only a definitive refusal (lp ran, returned no request id) stamps `failed_at` and releases the labels back. Printing now sends `scanned − already_printed`, so a second press sends nothing and the header count falls to 0.
+- **Filter order reversed** — newest translation per code first, `auto_print` after. A data migration reconciled the existing duplicates.
+- **`save()` inherits `auto_print`** from the product's previous translation instead of defaulting to on.
+- **Idempotency key per submit attempt** (reused across retries), a `Cache::lock` per delivery, and a unique index on `(idempotency_key, barcode)`. The button no longer re-arms mid-flight, and on a timeout the modal offers **Refresh**, not Retry.
+- **`ZebraPrintService`** replaces five copy-pasted `lp` blocks, with `escapeshellarg` and a `timeout` guard. This also fixed `LabelAreaController::printZpl()`, which hardcoded `10.42.1.71` and silently ignored `ZEBRA_PRINTER_HOST`.
+- **Printer Queue card** on `/labels/zebra` shows the real spool via `lpstat -h`, with cancel. The pre-existing `lpstat` diagnostic mode queried the local daemon with no `-h`, which is why the app never showed the actual queue.
+
+#### Gotchas
+- `^PQ{n},0,1,Y` was changed to `,0,0,Y`. The third parameter is *replicates of each serial number*; these labels carry no `^SN`, so a non-zero value is meaningless and doubles output on some GX firmware. **Verify on hardware**: print one translation with `copies = 2` — 4 labels means this was a second, independent duplication source.
+- To clear a stuck spool, target the printer host, not the local machine:
+  ```bash
+  lpstat -h 10.42.1.71:631 -o
+  cancel -h 10.42.1.71:631 -a ZTC-GX430t
+  ```
+
+**Files Modified**: `app/Http/Controllers/DeliveryLegacyController.php`, `app/Http/Controllers/{LabelTranslationController,LabelAreaController,ZebraLabelController,VoucherController}.php`, `app/Services/{ZebraPrintService,ZebraPrintResult}.php` (new), `app/Models/{DeliveryLabelPrint}.php` (new), `app/Models/{ProductTranslation,ZebraLabel}.php`, `database/migrations/2026_09_09_0001*`/`0002*` (new), `resources/views/delivery-legacy/match.blade.php`, `resources/views/labels/zebra.blade.php`, `resources/views/zebra-labels/create.blade.php`, `routes/web.php`, `config/services.php`, `.env.example`, `docs/features/label-translation-system.md`
+
+---
+
 ### ZPL Preview Not Loading on Production (VPN/Slow Connections)
 **Status:** Fixed (2026-03-18)
 
@@ -160,6 +198,41 @@ Using strip_tags with html_entity_decode.
 
 #### Solution
 Use `{!! nl2br(html_entity_decode($variable)) !!}` instead of `{{ strip_tags(html_entity_decode($variable)) }}`.
+
+---
+
+### Flash Messages Silently Swallowed (`x-admin-layout` Renders None)
+**Status:** Fixed for the orders pages (2026-09-09); the underlying gap is app-wide
+
+#### Problem
+`redirect()->with('success', ...)` and `back()->with('error', ...)` appeared to do nothing on the
+order pages. Guard messages from the new "order the difference" action vanished, and so had
+`duplicate()`'s "Order duplicated with updated suggestions." — which no one had ever seen.
+
+#### Root Cause
+**`resources/views/layouts/admin.blade.php` renders no flash block at all.** Unlike layouts that
+handle `session('success')` / `session('error')` centrally, every page using `<x-admin-layout>` must
+render its own. `orders/compare.blade.php` and `orders/show.blade.php` did not, so the messages were
+flashed to the session, never displayed, and cleared on the next request.
+
+This is easy to miss because the controller code looks correct and no error is raised anywhere.
+
+#### Solution
+Added flash blocks to both order views. When adding a redirect-with-flash to any page under
+`x-admin-layout`, **check the view renders the message** — either with the shared component:
+
+```blade
+<x-alert type="success" :message="session('success')" />
+<x-alert type="error" :message="session('error')" />
+```
+
+or, on pages whose own styling has no `dark:` variants (the order views), a plain banner matching
+the surrounding markup.
+
+Related: `OrderSession::notes` was written by `update()` but rendered in no order view either, so
+order provenance was write-only. Now shown in the order header.
+
+**Files Modified**: `resources/views/orders/compare.blade.php`, `resources/views/orders/show.blade.php`
 
 ---
 

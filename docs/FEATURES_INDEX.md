@@ -124,6 +124,9 @@ AI-powered label translation for imported products using phone camera capture an
 - **Dynamic Label Layout**: Word-wrap-aware line estimation with auto-fit scaling prevents text overlap; compact product name maximises content space
 - **EU Nutrition Compliance**: Nutrition values include "Per 100g/100ml" reference quantity as required by EU food labelling regulations
 - **Print Step Adjustments**: Label size and text scale controls available directly on the print step for quick reprints
+- **Delivery Auto-Printing** (UPDATED! 2026-09-09): Bulk-print translated labels for scanned products from the delivery match page. A `delivery_label_prints` ledger records every batch **before** the job reaches CUPS, so a press only prints `scanned − already printed` — pressing Print twice no longer reprints the whole delivery. Already-printed products sit behind a disclosure for explicit reprints, and the last batch can be undone (`deliveries.manage`)
+- **Per-Translation Auto-Print Toggle**: Controls inclusion in delivery printing, on the Translated Labels tab. A new translation **inherits** the toggle from the product's previous one rather than defaulting to on
+- **Printer Queue** (NEW! 2026-09-09): Live view of the jobs queued on the printer host (`lpstat -h`), with per-job Cancel and Cancel all. The spool lives on `ZEBRA_PRINTER_HOST`, **not** the web server — clearing the local CUPS queue has no effect on stuck label jobs
 
 📖 [Label Translation System Documentation](./features/label-translation-system.md)
 
@@ -321,8 +324,20 @@ External supplier connectivity for images, pricing, and product data.
 
 📖 [Supplier Integration Documentation](./features/supplier-integration.md)
 
+### Udea Pallet Volumes (NEW! 2026-09-09)
+Captures Udea's per-product pallet-space figures and shows a running pallet-fill total while building an order.
+- **Why a sync is needed**: Udea publishes this data **only on the logged-in basket page**, and only for products currently in the basket — product pages, search listings and the site JS carry none of it, and there is no API
+- **Admin sync page**: **System Tools → Udea Pallet Volumes** — empty the Udea basket, bulk-upload the range via Udea's own Excel importer, press **Sync from basket**. Read-only against Udea; never adds, changes or removes anything there
+- **Running total on the order page**: Europallet/blockpallet steppers with a live fill percentage on `/orders/{order}` for Udea orders, mirroring Udea's own calculator (including its per-line rounding, which is what reproduces their displayed figure exactly)
+- **Storage**: three columns on `udea_product_cards` keyed by `supplier_code` — deliberately not on `PRODUCTS`, since this is supplier-specific logistics data
+- **CLI equivalent**: `php artisan udea:sync-pallet-volumes [--dry-run]`
+- **Coverage-aware**: lines with a quantity but no pallet data are counted and flagged, so an understated total is always visible as such
+
+📖 [Udea Pallet Volumes Documentation](./features/udea-pallet-volumes.md)
+
 ### Delivery Verification
 Comprehensive delivery processing with barcode scanning and PDF invoice parsing.
+- **Print Translated Labels** (UPDATED! 2026-09-09): Bulk-print translated labels for the products scanned into a delivery, one label per unit still outstanding. Backed by a print ledger, so a second press prints only what has been scanned since the last one instead of the whole delivery again. 📖 [Label Translation System Documentation](./features/label-translation-system.md)
 - **Udea Deviation Report Generator** (NEW! 2026-06-16): On the delivery match page, tick missing/short Udea items in the **Qty Mismatches** and **Missing – Not Scanned** tables and generate a pre-filled Udea deviation report `.xlsx` (order number, article code, product name, amount, deviation reason). Udea-only, desktop-only; values re-queried server-side and written into the official template via PhpSpreadsheet. 📖 [Udea Deviation Report Documentation](./features/udea-deviation-report.md)
 - **IIHF (Independent) Goods Return Sheet Generator** (NEW! 2026-06-16): PDF counterpart to the Udea report for Independent (IIHF, supplier 37). Tick missing/short items and generate a pre-filled official "Goods Return Record" `.pdf` — data overlaid onto the flat PDF form via FPDI/FPDF (Invoice No., Product Code, Description, Quantity, Value, VAT, reason A; plus account name/no, contact name and date). Independent-only, desktop-only. 📖 [IIHF Goods Return Sheet Documentation](./features/iihf-goods-return-sheet.md)
 - **Dynamis Fruit & Veg XLSX Import** (NEW! 2026-04-22): Accepts Dynamis `Historique(NN).xlsx` delivery files on the **XLSX (Dynamis)** tab at `/deliveries/create`. Parsed in PHP via PhpSpreadsheet; matches lines to till-visible F&V products via name-based fuzzy match (SupplierLink unused for F&V). Persistent `dynamis_product_links` table means subsequent imports auto-match. Optional **Suggest with AI** button (uses the `dynamis_matcher` feature on `AiSettingsService`). Freight row (`DIV0010`) routed to `freight_charge`. 📖 [Dynamis Delivery Import Documentation](./features/dynamis-delivery-import.md)
@@ -483,6 +498,7 @@ Intelligent order suggestion system with sales history analysis and coverage pla
 - **Priority Classification**: Products flagged as "Review", "Standard", or "Safe" based on analysis
 - **Min Stock Override**: User-defined minimum stock levels with absolute unit control
 - **Internal Customer Tracking**: Charts display Coffee (☕ purple) and Kitchen (🍳 orange) department transfers alongside regular sales
+- **Udea Pallet Fill** (NEW! 2026-09-09): For Udea orders, a running pallet-space total at the top of the order review page with Europallet/blockpallet selectors. 📖 [Udea Pallet Volumes Documentation](./features/udea-pallet-volumes.md)
 
 📖 [Order Generation Documentation](./features/order-management/order-generation.md)
 
@@ -504,6 +520,21 @@ Seasonal order planning with historical Christmas sales comparison.
 - **Zero-Risk Deployment**: Separate Christmas review pages, original order system untouched
 
 📖 [Christmas Comparison Documentation](./features/order-management/christmas-comparison.md)
+
+### Order Comparison & Difference Orders (NEW! 2026-09-09)
+Compare two orders side by side, then turn the gap between them into a new draft order.
+- **Two-Order Selection**: Tick any two orders on `/orders`; a bar at the foot of the page offers **Compare**
+- **Four-Way Split**: *Only in A*, *Only in B*, *In both, quantity changed* (with delta), and a collapsed *Identical* list
+- **Sales Sparklines**: Each row carries the sales trend, current stock and ordered quantity from its session's snapshot
+- **Mismatch Warnings**: Banners when the two orders are for different suppliers, or snapshot different sales-history windows
+- **Order the Difference** (NEW! 2026-09-09): One click creates a draft holding, per product, what one order has over the other — both directions offered
+  - **Case-Aware Rounding**: Shortfalls round up to whole cases; a 25-unit gap on a 12-pack is 3 cases, because part of a case cannot be bought
+  - **Metadata Copied, Not Recalculated**: Cost, case size, review priority and the whole sales/stock snapshot carry over from the source item, with per-row provenance
+  - **Coverage Re-Anchored**: The new order's coverage window follows the delivery date you pick; stale per-category overrides are dropped
+  - **Guarded**: Blocked for orders from different suppliers (an order belongs to one supplier) and when there is no shortfall in that direction
+- **Trimming Workflow**: Generate a large order, generate a smaller one, compare, then place the remainder as its own order
+
+📖 [Order Comparison Documentation](./features/order-management/order-comparison.md)
 
 ### Order Review & Adjustment
 Interactive review interface with inline editing and approval workflow.

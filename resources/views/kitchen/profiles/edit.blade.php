@@ -1,11 +1,15 @@
+@php
+    // Opened from a recipe's ingredient list? Back/Cancel/save return there instead of the profiles index.
+    $backUrl = $returnRecipe ? route('kitchen.edit', $returnRecipe) : route('kitchen.profiles.index');
+@endphp
 <x-admin-layout>
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
                 {{ __('Edit Ingredient Profile') }}
             </h2>
-            <a href="{{ route('kitchen.profiles.index') }}" class="text-gray-600 hover:text-gray-900">
-                &larr; Back to Profiles
+            <a href="{{ $backUrl }}" class="text-gray-600 hover:text-gray-900">
+                &larr; Back to {{ $returnRecipe ? $returnRecipe->name : 'Profiles' }}
             </a>
         </div>
     </x-slot>
@@ -17,6 +21,9 @@
                     <form method="POST" action="{{ route('kitchen.profiles.update', $profile) }}" id="profileForm">
                         @csrf
                         @method('PUT')
+                        @if($returnRecipe)
+                            <input type="hidden" name="recipe" value="{{ $returnRecipe->id }}">
+                        @endif
 
                         <!-- Cost Source Section -->
                         <div class="mb-6 p-4 rounded-lg" :class="hasProduct ? 'bg-green-50 border border-green-200' : 'bg-amber-50 border border-amber-200'">
@@ -314,7 +321,7 @@
 
                         <!-- Submit -->
                         <div class="flex justify-end space-x-3">
-                            <a href="{{ route('kitchen.profiles.index') }}"
+                            <a href="{{ $backUrl }}"
                                class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">
                                 Cancel
                             </a>

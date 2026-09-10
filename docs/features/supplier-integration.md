@@ -90,12 +90,23 @@ return [
 - **Session Management**: Handles authentication and cookies
 - **Error Handling**: Graceful degradation on scraping failures
 
+#### UdeaPalletVolumeService (`app/Services/UdeaPalletVolumeService.php`)
+Sibling of `UdeaScrapingService`, kept separate because it does one job and only ever issues GETs.
+- **`sync($dryRun)`**: Read pallet volumes from the logged-in Udea basket into `udea_product_cards`
+- **`parseCart($html)`**: Extract `data-sve` / `data-volume` per row plus the pallet capacities
+- **`volumesForCodes($codes)`**: Volume per order unit, keyed by supplier code — used by the order page
+- **`summarise($lines, $capacity)`** / **`capacityFor($euro, $block)`**: Udea's fill-percentage maths
+- Shares `udea_product_cards` with the tier cache above, but writes only the `pallet_*` columns and its own `pallet_scraped_at` — never `scraped_at`, which drives the 30-day tier staleness gate
+
+📖 [Udea Pallet Volumes Documentation](./udea-pallet-volumes.md)
+
 ## Supported Suppliers
 
 ### Udea (Ekoplaza) - Full Integration
 - **Image CDN**: High-quality product images
 - **Website Scraping**: Live pricing and barcode extraction  
 - **Delivery Integration**: Automatic product matching and pricing
+- **Pallet Volumes**: Per-product pallet space, synced from the Udea basket and shown as a running pallet fill on Udea orders 📖 [Documentation](./udea-pallet-volumes.md)
 - **Status**: ✅ Fully Operational
 
 ### Independent Health Foods - Full Integration

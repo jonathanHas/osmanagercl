@@ -289,6 +289,10 @@
                                                     @endif
                                                 </td>
                                                 <td class="px-4 py-3 text-right text-sm">
+                                                    @if($ingredient->hasProfile())
+                                                        <a href="{{ route('kitchen.profiles.edit', [$ingredient->profile, 'recipe' => $recipe->id]) }}"
+                                                           class="text-indigo-600 hover:text-indigo-900 mr-3">Edit</a>
+                                                    @endif
                                                     <form action="{{ route('kitchen.ingredients.remove', $ingredient) }}" method="POST" class="inline" onsubmit="return confirm('Remove this ingredient?');">
                                                         @csrf
                                                         @method('DELETE')
@@ -508,6 +512,16 @@
                                                             </optgroup>
                                                         </select>
                                                     </div>
+                                                </div>
+
+                                                <div>
+                                                    <label class="block text-sm font-medium text-gray-700">Organic Status</label>
+                                                    <p class="text-xs text-gray-500 mb-1">Printed on the Organic Trust registration form.</p>
+                                                    <select x-model="profileForm.organic_status"
+                                                            class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                                        <option value="organic">Organic</option>
+                                                        <option value="non_organic">Non-organic</option>
+                                                    </select>
                                                 </div>
 
                                                 <!-- Cost Preview -->
@@ -1064,6 +1078,7 @@
                     name: '',
                     purchase_quantity: 1,
                     purchase_unit: 'g',
+                    organic_status: 'organic',
                     notes: ''
                 },
                 profileSaving: false,
@@ -1127,6 +1142,7 @@
                     this.profileForm.name = this.selectedName;
                     this.profileForm.purchase_quantity = 1;
                     this.profileForm.purchase_unit = 'g';
+                    this.profileForm.organic_status = 'organic';
                     this.profileForm.notes = '';
                     this.profileError = '';
                     this.showProfileModal = true;
@@ -1173,6 +1189,7 @@
                                 name: this.profileForm.name,
                                 purchase_quantity: this.profileForm.purchase_quantity,
                                 purchase_unit: this.profileForm.purchase_unit,
+                                organic_status: this.profileForm.organic_status,
                                 notes: this.profileForm.notes
                             })
                         });

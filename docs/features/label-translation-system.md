@@ -48,9 +48,32 @@ The label translation system enables staff to quickly create English-language re
 - Changes call `regenerate()` to rebuild ZPL with auto-fit before printing
 
 ### Zebra Printer Integration
-- Direct printing via `lp` command to networked Zebra printer over CUPS/IPP
+- All printing goes through `ZebraPrintService` (`app/Services/ZebraPrintService.php`) — one `lp` invocation to the networked Zebra over CUPS/IPP
 - Label size: 50mm x 76mm (600 x 900 dots at 300dpi)
 - Test print button for verifying printer connectivity
+- **The print spool lives on the printer host** (`ZEBRA_PRINTER_HOST`), not on the web server. Clearing the local CUPS queue has no effect on stuck label jobs — see [Printer Queue](#printer-queue) below
+
+### Delivery Auto-Printing
+Translated labels print in bulk from the delivery match page (`/delivery-legacy/match?delID=…&supplierID=…`).
+
+- **What appears**: a scanned product is listed when it has a translation with `auto_print = true` and non-empty `zpl_content`. The **newest** translation per product code wins, and *then* `auto_print` is checked — never the other way round, or an older enabled row would resurrect a product whose current translation was switched off (and print its stale ZPL)
+- **How many print**: `scanned − already printed for this delivery`, capped at 99 per product per job. Pressing Print a second time prints **nothing** unless more has been scanned since
+- **Print ledger**: every batch is recorded in `delivery_label_prints` before the job reaches CUPS. Recording first means a lost or timed-out response can never cause a duplicate; only a *definitive* refusal (lp ran and returned no request id) stamps `failed_at` and releases the labels back to outstanding
+- **Reprints**: already-printed products sit behind a "Show already-printed" disclosure in the review modal, unticked. Ticking one is an explicit reprint of the full scanned quantity and asks for confirmation
+- **Undo**: `POST /delivery-legacy/undo-last-print` deletes the most recent batch, putting those labels back on the outstanding list. Gated behind `deliveries.manage`
+- **Idempotency**: each submit attempt carries a client-generated `idempotency_key`, reused across retries. A repeat of the same key returns `already_printed` without printing. A `Cache::lock` per delivery serialises concurrent presses, and a unique index on `(idempotency_key, barcode)` catches the race
+- **Auto-print toggle**: per-translation, on the Translated Labels tab at `/labels/zebra?view=translations`. A new translation **inherits** the toggle from the product's previous translation rather than defaulting to on, so re-translating a disabled product keeps it disabled
+
+### Printer Queue
+A **Printer Queue** card on `/labels/zebra` lists the jobs actually queued on the printer host, with per-job Cancel and Cancel all.
+
+Equivalent from a shell:
+```bash
+lpstat -h 10.42.1.71:631 -o          # list queued jobs
+cancel -h 10.42.1.71:631 -a ZTC-GX430t   # clear the queue
+```
+
+Note the `testPrint` `lpstat` diagnostic mode queries the **local** daemon (no `-h`) and will not show this queue; use the `queue` or `printer` modes instead.
 
 ## Routes
 
@@ -60,6 +83,13 @@ The label translation system enables staff to quickly create English-language re
 | POST | `/labels/camera-upload` | `uploadPhoto` | `labels.camera-upload` |
 | POST | `/labels/print-zpl` | `printZpl` | `labels.print-zpl` |
 | POST | `/labels/test-print` | `testPrint` | `labels.test-print` |
+| GET | `/labels/printer-queue` | `printerQueue` | `labels.printer-queue` |
+| POST | `/labels/printer-cancel` | `cancelPrinterJob` | `labels.printer-cancel` |
+| POST | `/labels/translate/{translation}/print` | `LabelTranslationController@print` | `labels.translate.print` |
+| PATCH | `/labels/translate/{translation}/auto-print` | `LabelTranslationController@toggleAutoPrint` | `labels.translate.toggle-auto-print` |
+| POST | `/delivery-legacy/print-translations` | `DeliveryLegacyController@printTranslations` | `delivery-legacy.print-translations` |
+| GET | `/delivery-legacy/translatable-products` | `DeliveryLegacyController@translatableProducts` | `delivery-legacy.translatable-products` |
+| POST | `/delivery-legacy/undo-last-print` | `DeliveryLegacyController@undoLastPrint` | `delivery-legacy.undo-last-print` |
 
 ## Configuration
 
@@ -73,25 +103,33 @@ GEMINI_API_KEY=your-api-key-here
 ZEBRA_PRINTER_HOST=10.42.1.71
 ZEBRA_PRINTER_PORT=631
 ZEBRA_PRINTER_NAME=ZTC-GX430t
+ZEBRA_PRINTER_TIMEOUT=15
 ```
+
+`ZEBRA_PRINTER_TIMEOUT` (seconds) caps every `lp`/`lpstat`/`cancel` call. Keep it well under the PHP/nginx request timeout so an unreachable printer fails fast and the UI can say so, rather than hanging the request.
 
 ### Config Files
 - `config/gemini.php` — API key, base URL, request timeout (default 120s)
-- `config/services.php` — `zebra` block with host, port, printer name
+- `config/services.php` — `zebra` block with host, port, printer name, timeout
 
 ## Technical Details
 
 ### Files
 
 **Controller:**
-- `app/Http/Controllers/LabelAreaController.php` — `cameraTest()`, `uploadPhoto()`, `printZpl()`, `testPrint()`
-- `app/Http/Controllers/LabelTranslationController.php` — `index()`, `save()`, `upload()`, `regenerateZpl()`
+- `app/Http/Controllers/LabelAreaController.php` — `cameraTest()`, `uploadPhoto()`, `printZpl()`, `testPrint()`, `printerQueue()`, `cancelPrinterJob()`
+- `app/Http/Controllers/LabelTranslationController.php` — `index()`, `save()`, `upload()`, `regenerateZpl()`, `print()`, `toggleAutoPrint()`
+- `app/Http/Controllers/DeliveryLegacyController.php` — `printTranslations()`, `translatableProducts()`, `undoLastPrint()`
 
 **Services:**
 - `app/Services/ZplGeneratorService.php` — ZPL generation with auto-fit scaling and dynamic line estimation
+- `app/Services/ZebraPrintService.php` — the single path to the printer: `sendRaw()`, `queue()`, `printerStatus()`, `cancel()`, `cancelAll()`. All shell arguments are escaped and every command is `timeout`-guarded. Used by `DeliveryLegacyController`, `LabelTranslationController`, `ZebraLabelController`, `VoucherController` and `LabelAreaController` — do not shell out to `lp` anywhere else
+- `app/Services/ZebraPrintResult.php` — outcome of one `lp` call. `timedOut` is deliberately distinct from a plain failure: when the printer stops responding CUPS may still have accepted the job, so callers must not treat it as "nothing printed" and offer a retry that duplicates
 
 **Models:**
-- `app/Models/ProductTranslation.php` — Stored translations with label data, ZPL content, and photos
+- `app/Models/ProductTranslation.php` — Stored translations with label data, ZPL content, and photos. `latestPerProductCode()` returns the newest row per code **without** filtering on `auto_print` — callers filter afterwards
+- `app/Models/DeliveryLabelPrint.php` — Per-delivery print ledger. `printedQuantitiesFor()`, `hasIdempotencyKey()`, `markBatchResult()`, `latestBatchFor()`
+- `app/Models/ZebraLabel.php` — `setZplQuantity()` writes `^PQ{n},0,0,Y`. The third parameter is *replicates of each serial number* and must stay `0`; these labels carry no `^SN`, so a non-zero value is meaningless and doubles output on some GX firmware
 
 **Config:**
 - `config/label-sizes.php` — Label dimensions, font sizes, and layout parameters for large/small labels
@@ -104,10 +142,37 @@ ZEBRA_PRINTER_NAME=ZTC-GX430t
 **Routes:**
 - `routes/web.php` — Routes within auth middleware group
 
+### Database
+
+**`product_translations`** — one row per saved translation. `auto_print` (bool, default true) controls inclusion in delivery auto-printing; it is an *inclusion* flag, never a record of having printed.
+
+**`delivery_label_prints`** — the print ledger. One row per (barcode, batch):
+
+| Column | Purpose |
+|--------|---------|
+| `delivery_id` | POS `deliveriesScan.ID` (uuid on the `pos` connection, so no FK) |
+| `barcode`, `product_translation_id`, `quantity` | What was sent |
+| `batch_uuid` | One modal press = one `lp` job = one batch |
+| `idempotency_key` | Client-generated per submit attempt; unique with `barcode` |
+| `cups_job_id`, `lp_output` | Parsed from `request id is …` |
+| `printed_at`, `failed_at` | A stamped `failed_at` releases the quantity back to outstanding |
+| `forced` | Printed via the "reprint anyway" override |
+
+Outstanding per product is `SUM(deliveriesScanItems.quantity) − SUM(successful ledger quantity)`. Nothing mutates the POS scan rows — they are the POS's data.
+
+### Testing
+
+- `tests/Feature/DeliveryTranslatedLabelPrintingTest.php` — the ledger, delta printing, idempotency, force, refusal rollback, timeout retention, the `auto_print` ordering rule, undo
+- `tests/Feature/LabelTranslationSaveTest.php` — `auto_print` inheritance on save
+- `tests/Unit/ZebraPrintServiceTest.php` — command construction, job-id parsing, timeout detection
+- `tests/Unit/ZebraLabelSetZplQuantityTest.php` — `^PQ` handling
+
+Tests bind a fake `ZebraPrintService` via `usingRunner()` so nothing ever shells out. `ProductTranslation` and `DeliveryLabelPrint` pin the `mysql` connection, which under phpunit is an in-memory sqlite database — `tests/Concerns/AliasesMysqlConnection.php` points that connection name at the same PDO `RefreshDatabase` already migrated. Use that trait for any test touching these models.
+
 ### Dependencies
 - `google-gemini-php/laravel` — Gemini API client for Laravel
 - PHP GD extension — Image resizing before API calls
-- CUPS (`lp` command) — Printer communication
+- CUPS (`lp`, `lpstat`, `cancel`) — Printer communication, via `ZebraPrintService`
 
 ### Image Processing Pipeline
 1. Phone captures image (~3-5MB)

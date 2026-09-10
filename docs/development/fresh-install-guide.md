@@ -313,7 +313,7 @@ Supply these by hand only if you need the feature:
 | `GEMINI_API_KEY`, `MISTRAL_API_KEY` | AI invoice parsing, bank reconciliation |
 | `UDEA_USERNAME`, `UDEA_PASSWORD` | Udea supplier price scraping |
 | `MAIL_*` | Supplier sales emails, notifications |
-| `ZEBRA_PRINTER_HOST`, `ZEBRA_PRINTER_PORT`, `ZEBRA_PRINTER_NAME` | Label printing (LAN printer) |
+| `ZEBRA_PRINTER_HOST`, `ZEBRA_PRINTER_PORT`, `ZEBRA_PRINTER_NAME`, `ZEBRA_PRINTER_TIMEOUT` | Label printing (LAN printer). The CUPS spool lives on `ZEBRA_PRINTER_HOST`, not on this machine — check it via the Printer Queue card on `/labels/zebra` or `lpstat -h {host}:631 -o` |
 
 ---
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\KitchenIngredientProfile;
+use App\Models\KitchenRecipe;
 use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -116,12 +117,18 @@ class KitchenIngredientProfileController extends Controller
     /**
      * Show edit profile form.
      */
-    public function edit(KitchenIngredientProfile $profile): View
+    public function edit(Request $request, KitchenIngredientProfile $profile): View
     {
         $profile->load('product.supplierLink');
 
+        // When opened from a recipe's ingredient list, Back/Cancel/save return to that recipe
+        $returnRecipe = $request->filled('recipe')
+            ? KitchenRecipe::find($request->integer('recipe'))
+            : null;
+
         return view('kitchen.profiles.edit', [
             'profile' => $profile,
+            'returnRecipe' => $returnRecipe,
             'unitTypes' => KitchenIngredientProfile::UNIT_CONVERSIONS,
             'unitCategories' => KitchenIngredientProfile::UNIT_CATEGORIES,
         ]);
@@ -145,9 +152,14 @@ class KitchenIngredientProfileController extends Controller
             'apply_delivery_markup' => 'nullable|boolean',
             'delivery_markup_percent' => 'nullable|numeric|min:0|max:100',
             'notes' => 'nullable|string',
+            'recipe' => 'nullable|integer|exists:App\Models\KitchenRecipe,id',
         ];
 
         $validated = $request->validate($rules);
+
+        // Recipe to return to after saving (set when opened from a recipe's ingredient list)
+        $returnRecipeId = $validated['recipe'] ?? null;
+        unset($validated['recipe']);
 
         // Convert checkbox value
         $validated['apply_delivery_markup'] = $request->boolean('apply_delivery_markup');
@@ -168,8 +180,11 @@ class KitchenIngredientProfileController extends Controller
         $profile->load('product');
         $profile->recalculateCost();
 
-        return redirect()
-            ->route('kitchen.profiles.index')
+        $redirect = $returnRecipeId
+            ? redirect()->route('kitchen.edit', $returnRecipeId)
+            : redirect()->route('kitchen.profiles.index');
+
+        return $redirect
             ->with('success', 'Profile updated. Cost per '.$profile->base_unit.': €'.number_format($profile->cost_per_base_unit, 6));
     }
 

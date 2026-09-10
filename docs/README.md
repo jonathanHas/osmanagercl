@@ -32,7 +32,13 @@ Detailed documentation for each major feature. See **[Features Index](./FEATURES
 - [Delivery System](./features/delivery-system.md) - Multi-format delivery verification
 - [Supplier Integration](./features/supplier-integration.md) - Multi-supplier connectivity
 - [Supplier Management](./features/supplier-management.md) - Unified supplier management
+- [Udea Pallet Volumes](./features/udea-pallet-volumes.md) - Pallet-space data from the Udea basket, plus running pallet fill on Udea orders
 - [Order Manager](./features/order-manager.md) - Stock monitoring for managed suppliers
+
+**Order Management**
+- [Order Generation](./features/order-management/order-generation.md) - Sales-driven order suggestions with coverage planning
+- [Order Comparison & Difference Orders](./features/order-management/order-comparison.md) - Compare two orders and order the gap between them
+- [Christmas Comparison](./features/order-management/christmas-comparison.md) - Seasonal ordering against historical Christmas sales
 
 **Customer Accounts**
 - [Customer Statements & Receivables](./features/customer-statements.md) - Customer invoicing, payment matching, statements and aged debtors

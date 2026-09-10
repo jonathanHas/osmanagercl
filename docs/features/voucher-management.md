@@ -54,7 +54,9 @@ Vouchers print on the shop's Zebra label printer (the same one used by `/labels`
 
 - `Voucher::toZplLabel()` builds one `^XA…^XZ` ZPL block: a "GIFT VOUCHER" title, a CODE-128 barcode (`^BC`, with the human-readable code printed under the bars).
 - After generating, the user lands on a **preview + print** page (`resources/views/vouchers/print.blade.php`) that renders each label via the in-browser `ZplPreview` emulator (`resources/js/zpl-preview.js`) and has a **Print to Zebra** button.
-- Printing reuses the established server path: ZPL → temp file → `lp -h {host}:{port}/version=1.1 -d {printer} -o raw` (CUPS raw print over IPP), with the printer from `config('services.zebra.*')` — mirroring `ZebraLabelController::print()`.
+- Printing goes through `ZebraPrintService::sendRaw()` (`app/Services/ZebraPrintService.php`) — ZPL → temp file → a `timeout`-guarded `lp … -o raw` (CUPS raw print over IPP), with the printer from `config('services.zebra.*')`. The same service backs every other Zebra print path in the app; do not shell out to `lp` directly. 📖 [Label Translation System Documentation](./label-translation-system.md)
+- Voucher ZPL carries no `^PQ` (each code is unique, so there is nothing to repeat), which means `ZebraLabel::setZplQuantity()` is not involved — one `^XA…^XZ` block per voucher is concatenated into a single job.
+- If labels do not appear, check the spool **on the printer host**, not the local machine: the **Printer Queue** card on `/labels/zebra`, or `lpstat -h {host}:631 -o`.
 
 ## Admin: deactivate / reactivate
 

@@ -151,6 +151,13 @@ For a complete list of all features with detailed descriptions, see **[Features 
 - Supplier Integration
 - Delivery Verification
 - Unified Supplier Management
+- Udea Pallet Volumes (pallet-space data + running pallet fill on Udea orders)
+
+**Order Management**
+- Order Generation (sales-driven suggestions, coverage windows, category overrides)
+- Order Comparison & Difference Orders (compare two orders, order the gap between them)
+- Christmas Comparison (seasonal ordering against historical Christmas sales)
+- Order Review & Adjustment (inline editing, priority filtering, CSV export)
 
 **Financial Systems**
 - Invoice Bulk Upload
@@ -238,6 +245,8 @@ php artisan optimize:clear     # Clear caches
 - 🔥 **Performance**: [Sales Data Import Plan](./docs/features/sales-data-import-plan.md)
 - **AI Integration**: [AI Integration](./docs/features/ai-integration.md) - Multi-provider AI config, camera capture, diagnostics
 - **Customer Accounts**: [Customer Statements & Receivables](./docs/features/customer-statements.md) - Invoicing, payment matching, statements, aged debtors
+- **Order Comparison**: [Order Comparison & Difference Orders](./docs/features/order-management/order-comparison.md) - Comparing two orders, and creating an order from the difference
+- **Udea Pallet Space**: [Udea Pallet Volumes](./docs/features/udea-pallet-volumes.md) - Basket-only data source, sync page, order-page pallet fill
 - **Features**: [Features Index](./docs/FEATURES_INDEX.md)
 - **Troubleshooting**: [Known Issues](./docs/development/known-issues.md)
 - **Development**: [Quick Start Guide](./docs/development/quick-start-guide.md)
