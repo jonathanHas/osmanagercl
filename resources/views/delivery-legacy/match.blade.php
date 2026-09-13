@@ -365,6 +365,31 @@
                                     <template x-if="scanner.lastResult?.matchStatus === 'over'">
                                         <p class="text-orange-400 text-sm mt-1 font-medium" x-text="(scanner.lastResult?.newQuantity - scanner.lastResult?.expectedQty) + ' over expected'"></p>
                                     </template>
+                                    {{-- Customer request prompt: this product is on an open request, so it needs putting aside --}}
+                                    <template x-if="(scanner.lastResult?.customerRequests || []).length > 0">
+                                        <div class="mt-3 rounded-md bg-pink-600 text-white p-3">
+                                            <p class="text-xs font-bold uppercase tracking-wide mb-1">Put aside &mdash; customer request</p>
+                                            <template x-for="cr in scanner.lastResult.customerRequests" :key="cr.id">
+                                                <div class="flex items-center justify-between gap-2 py-1">
+                                                    <div class="min-w-0">
+                                                        <span class="font-semibold" x-text="cr.customer_name"></span>
+                                                        <span>&times; <span x-text="cr.quantity"></span></span>
+                                                        <span class="text-pink-100 text-xs" x-show="cr.wanted_on" x-text="'(wanted ' + cr.wanted_on + ')'"></span>
+                                                        <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold uppercase bg-pink-800 text-pink-100" x-text="cr.status_label"></span>
+                                                    </div>
+                                                    <button type="button"
+                                                            x-show="cr.status !== 'put_aside'"
+                                                            @click="markCustomerRequestPutAside(cr)"
+                                                            :disabled="cr._saving"
+                                                            class="flex-shrink-0 px-2.5 py-1.5 rounded bg-white text-pink-700 text-xs font-bold hover:bg-pink-50 disabled:opacity-50 touch-manipulation">
+                                                        <span x-text="cr._saving ? 'Saving…' : 'Mark put aside'"></span>
+                                                    </button>
+                                                    <span x-show="cr.status === 'put_aside'" class="text-xs font-bold text-pink-100">&#10003; Put aside</span>
+                                                </div>
+                                            </template>
+                                            <p x-show="scanner.lastResult?.customerRequestError" class="text-xs text-pink-100 mt-1" x-text="scanner.lastResult?.customerRequestError"></p>
+                                        </div>
+                                    </template>
                                 </div>
                             </template>
                         </div>
@@ -387,6 +412,9 @@
                                         <span class="text-white truncate" x-text="scan.name || scan.barcode"></span>
                                         <template x-if="scan.scanType === 'case'">
                                             <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-600/70 text-purple-200 flex-shrink-0">CASE</span>
+                                        </template>
+                                        <template x-if="scan.customerRequestCount > 0">
+                                            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-pink-600 text-white flex-shrink-0">PUT ASIDE</span>
                                         </template>
                                     </div>
                                     <div class="flex items-center gap-2 flex-shrink-0 ml-2">
@@ -656,6 +684,34 @@
                 </div>
             </div>
 
+            <!-- Customer requests in this delivery -->
+            @if($customerRequestLines->isNotEmpty())
+            <div class="bg-pink-50 border border-pink-200 rounded-lg shadow p-3 sm:p-4 mb-4 sm:mb-6">
+                <div class="flex items-center justify-between gap-2 mb-2">
+                    <h3 class="text-sm font-bold text-pink-800 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M3 3a1 1 0 011-1h12a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1V3zm0 8a1 1 0 011-1h12a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6z"/></svg>
+                        Put aside for customer requests ({{ $customerRequestLines->flatten(1)->count() }})
+                    </h3>
+                    <a href="{{ route('customer-requests.index') }}" target="_blank" class="text-xs text-pink-700 hover:text-pink-900 underline">Open requests board</a>
+                </div>
+                <ul class="text-sm text-pink-900 space-y-0.5">
+                    @foreach($customerRequestLines as $barcode => $lines)
+                        @foreach($lines as $line)
+                            <li class="flex flex-wrap items-center gap-x-2">
+                                <span class="font-medium">{{ $line->description }}</span>
+                                <span class="font-mono text-xs text-pink-700">{{ $barcode }}</span>
+                                <span>&rarr; {{ $line->request?->customer_name }} &times; {{ rtrim(rtrim(number_format((float) $line->quantity, 2, '.', ''), '0'), '.') }}</span>
+                                @if($line->request?->wanted_on)
+                                    <span class="text-xs text-pink-700">wanted {{ $line->request->wanted_on->format('D j M') }}</span>
+                                @endif
+                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold uppercase bg-white text-pink-700 border border-pink-200">{{ $line->statusLabel() }}</span>
+                            </li>
+                        @endforeach
+                    @endforeach
+                </ul>
+            </div>
+            @endif
+
             <!-- Quick Filters -->
             <div class="bg-white rounded-lg shadow p-3 sm:p-4 mb-4 sm:mb-6">
                 <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-4">
@@ -806,6 +862,7 @@
                                             @else
                                                 <span class="font-medium text-gray-900 text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
                                             @endif
+                                            @include('delivery-legacy.partials.customer-request-badge', ['lines' => $customerRequestLines[(string) ($item->Barcode ?? '')] ?? null, 'arrived' => true])
                                             <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                             @if($item->Barcode)
                                                 <span class="text-xs text-gray-400 font-mono block">{{ $item->Barcode }}</span>
@@ -920,6 +977,7 @@
                                                 @else
                                                     <span class="font-medium text-gray-900">{{ $item->dbProductName ?? $item->prodName }}</span>
                                                 @endif
+                                                @include('delivery-legacy.partials.customer-request-badge', ['lines' => $customerRequestLines[(string) ($item->Barcode ?? '')] ?? null, 'arrived' => true])
                                                 <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                                 <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                             </td>
@@ -1042,6 +1100,7 @@
                                             @else
                                                 <span class="font-medium text-gray-900 text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
                                             @endif
+                                            @include('delivery-legacy.partials.customer-request-badge', ['lines' => $customerRequestLines[(string) ($item->Barcode ?? '')] ?? null, 'arrived' => true])
                                             <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                             <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                         </div>
@@ -1178,6 +1237,7 @@
                                                 @else
                                                     <span class="font-medium text-gray-900">{{ $item->dbProductName ?? $item->prodName }}</span>
                                                 @endif
+                                                @include('delivery-legacy.partials.customer-request-badge', ['lines' => $customerRequestLines[(string) ($item->Barcode ?? '')] ?? null, 'arrived' => true])
                                                 <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                                 <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                             </td>
@@ -1341,6 +1401,7 @@
                                             @else
                                                 <span class="font-medium text-gray-900 text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
                                             @endif
+                                            @include('delivery-legacy.partials.customer-request-badge', ['lines' => $customerRequestLines[(string) ($item->Barcode ?? '')] ?? null, 'arrived' => true])
                                             <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                             <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                         </div>
@@ -1469,6 +1530,7 @@
                                                 @else
                                                     <span class="font-medium text-gray-900">{{ $item->dbProductName ?? $item->prodName }}</span>
                                                 @endif
+                                                @include('delivery-legacy.partials.customer-request-badge', ['lines' => $customerRequestLines[(string) ($item->Barcode ?? '')] ?? null, 'arrived' => true])
                                                 <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                                 <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                             </td>
@@ -1628,6 +1690,7 @@
                                             @else
                                                 <span class="font-medium text-gray-900 text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
                                             @endif
+                                            @include('delivery-legacy.partials.customer-request-badge', ['lines' => $customerRequestLines[(string) ($item->Barcode ?? '')] ?? null, 'arrived' => true])
                                             <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                             <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                         </div>
@@ -1709,6 +1772,7 @@
                                                 @else
                                                     <span class="font-medium text-gray-900">{{ $item->dbProductName ?? $item->prodName }}</span>
                                                 @endif
+                                                @include('delivery-legacy.partials.customer-request-badge', ['lines' => $customerRequestLines[(string) ($item->Barcode ?? '')] ?? null, 'arrived' => true])
                                                 <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                                 <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                             </td>
@@ -1844,6 +1908,7 @@
                                         @else
                                             <span class="font-medium text-gray-900 text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
                                         @endif
+                                        @include('delivery-legacy.partials.customer-request-badge', ['lines' => $customerRequestLines[(string) ($item->Barcode ?? '')] ?? null, 'arrived' => false])
                                         <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                         <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                     </div>
@@ -1899,6 +1964,7 @@
                                             @else
                                                 <span class="font-medium text-gray-900">{{ $item->dbProductName ?? $item->prodName }}</span>
                                             @endif
+                                            @include('delivery-legacy.partials.customer-request-badge', ['lines' => $customerRequestLines[(string) ($item->Barcode ?? '')] ?? null, 'arrived' => false])
                                             <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                             <span x-show="showCategories" x-cloak class="text-xs text-indigo-500 block">{{ $item->categoryName ?? '' }}</span>
                                         </td>
@@ -1949,6 +2015,7 @@
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             <span class="font-medium text-gray-900 text-sm">{{ $item->NAME ?? 'Unknown Product' }}</span>
+                                            @include('delivery-legacy.partials.customer-request-badge', ['lines' => $customerRequestLines[(string) ($item->Barcode ?? '')] ?? null, 'arrived' => true])
                                             @if($item->productID)
                                                 <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-xs text-indigo-600 hover:text-indigo-900 block">{{ $item->Barcode }}</a>
                                             @else
@@ -2030,6 +2097,7 @@
                                             </td>
                                             <td class="px-3 py-2">
                                                 <span class="font-medium text-gray-900">{{ $item->NAME ?? 'Unknown Product' }}</span>
+                                                @include('delivery-legacy.partials.customer-request-badge', ['lines' => $customerRequestLines[(string) ($item->Barcode ?? '')] ?? null, 'arrived' => true])
                                                 @if($item->SupplierCode)
                                                     <span class="text-xs text-gray-500 block">{{ $item->SupplierCode }}</span>
                                                 @endif
@@ -2148,6 +2216,7 @@
                                             @else
                                                 <span class="font-medium text-gray-900 text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
                                             @endif
+                                            @include('delivery-legacy.partials.customer-request-badge', ['lines' => $customerRequestLines[(string) ($item->Barcode ?? '')] ?? null, 'arrived' => false])
                                             <span class="text-xs text-gray-500 block">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</span>
                                             @if($item->Barcode)
                                                 <span class="text-xs text-gray-400 font-mono block">{{ $item->Barcode }}</span>
@@ -2232,6 +2301,7 @@
                                                 @else
                                                     {{ $item->dbProductName ?? $item->prodName }}
                                                 @endif
+                                                @include('delivery-legacy.partials.customer-request-badge', ['lines' => $customerRequestLines[(string) ($item->Barcode ?? '')] ?? null, 'arrived' => false])
                                             </td>
                                             <td class="px-3 py-2 text-sm text-gray-600 font-mono">{{ $item->Barcode ?? '-' }}</td>
                                             <td class="px-3 py-2 text-gray-500">{{ $item->supCode }}@if(!empty($item->orderNumber)) <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Order #{{ $item->orderNumber }}</span>@endif</td>
@@ -2895,6 +2965,37 @@
                         location.reload();
                     }
                 },
+                // "Mark put aside" on the scanner's customer-request prompt. Moves the
+                // request line to put_aside via the customer requests API; the badge
+                // flips in place and the board picks it up on its next refresh.
+                async markCustomerRequestPutAside(cr) {
+                    if (cr._saving) return;
+                    cr._saving = true;
+                    if (this.scanner.lastResult) this.scanner.lastResult.customerRequestError = null;
+                    try {
+                        const url = '{{ route("customer-requests.items.status", ["item" => "__ID__"]) }}'.replace('__ID__', cr.id);
+                        const response = await fetch(url, {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({ status: 'put_aside' })
+                        });
+                        const data = await response.json().catch(() => ({}));
+                        if (response.ok && data.ok) {
+                            cr.status = data.status;
+                            cr.status_label = data.label;
+                        } else if (this.scanner.lastResult) {
+                            this.scanner.lastResult.customerRequestError = data.message || 'Could not update the customer request.';
+                        }
+                    } catch (e) {
+                        if (this.scanner.lastResult) this.scanner.lastResult.customerRequestError = 'Network error - could not update the customer request.';
+                    } finally {
+                        cr._saving = false;
+                    }
+                },
                 resetScanner() {
                     this.scanner.step = 'scan';
                     this.scanner.barcode = '';
@@ -3214,7 +3315,9 @@
                                 matchStatus: data.matchStatus,
                                 scanType: scanType,
                                 caseUnits: caseUnits,
-                                casesAdded: scanType === 'case' ? qty : null
+                                casesAdded: scanType === 'case' ? qty : null,
+                                customerRequests: (data.customerRequests || []).map(cr => ({ ...cr, _saving: false })),
+                                customerRequestError: null
                             };
                             this.scanner.scanCount++;
                             this.scannerDirty = true;
@@ -3230,6 +3333,7 @@
                                 name: data.product?.name || 'Unknown',
                                 qty: effectiveQty,
                                 matchStatus: data.matchStatus,
+                                customerRequestCount: (data.customerRequests || []).length,
                                 scanType: scanType,
                                 caseUnits: caseUnits,
                                 time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })

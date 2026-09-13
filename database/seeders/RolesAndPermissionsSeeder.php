@@ -230,6 +230,14 @@ class RolesAndPermissionsSeeder extends Seeder
                 'module' => 'Customer Invoicing',
             ],
 
+            // Customer Requests (pre-orders / sourcing)
+            [
+                'name' => 'customer-requests.manage',
+                'display_name' => 'Manage Customer Requests',
+                'description' => 'Take, edit and progress customer pre-orders and sourcing requests',
+                'module' => 'Customer Requests',
+            ],
+
             // Voucher Management
             [
                 'name' => 'vouchers.redeem',
@@ -292,6 +300,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'coffee.manage',
             'kds.access',
             'vouchers.redeem',
+            'customer-requests.manage',
         ];
 
         foreach ($employeePermissions as $permission) {

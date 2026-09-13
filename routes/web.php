@@ -9,6 +9,7 @@ use App\Http\Controllers\CustomerDebtorsController;
 use App\Http\Controllers\CustomerInvoiceController;
 use App\Http\Controllers\CustomerPaymentAllocationController;
 use App\Http\Controllers\CustomerPaymentController;
+use App\Http\Controllers\CustomerRequestController;
 use App\Http\Controllers\CustomerStatementController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\DeliveryDocumentController;
@@ -50,6 +51,10 @@ Route::get('/auth/check', function () {
     return response()->json(['authenticated' => auth()->check()]);
 })->name('auth.check');
 
+// Customer requests board — public so the shop-floor tablet can show it without a
+// login. Every write (create / edit / status change) lives in the auth group below.
+Route::get('/customer-requests', [CustomerRequestController::class, 'index'])->name('customer-requests.index');
+
 Route::get('/dashboard', function () {
     $productRepository = new \App\Repositories\ProductRepository;
     $statistics = $productRepository->getStatistics();
@@ -57,7 +62,10 @@ Route::get('/dashboard', function () {
     // Add Amazon pending count for dashboard widget
     $amazonPendingCount = \App\Models\AmazonInvoicePending::pending()->count();
 
-    return view('dashboard', compact('statistics', 'amazonPendingCount'));
+    // Customer requests due today / overdue and items put aside awaiting collection
+    $customerRequestCounts = app(\App\Services\CustomerRequestService::class)->dashboardCounts();
+
+    return view('dashboard', compact('statistics', 'amazonPendingCount', 'customerRequestCounts'));
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
@@ -1072,6 +1080,23 @@ Route::middleware('auth')->group(function () {
             Route::post('vouchers/{voucher}/reactivate', [VoucherController::class, 'reactivate'])->name('vouchers.reactivate');
         });
     });
+    // Customer Requests — staff-only writes (the board itself is public, see top of file)
+    Route::prefix('customer-requests')->name('customer-requests.')
+        ->middleware('permission:customer-requests.manage')->group(function () {
+            Route::get('/create', [CustomerRequestController::class, 'create'])->name('create');
+            Route::post('/', [CustomerRequestController::class, 'store'])->name('store');
+            Route::get('/api/products/search', [CustomerRequestController::class, 'searchProducts'])->name('api.products.search');
+            Route::patch('/items/{item}/status', [CustomerRequestController::class, 'updateItemStatus'])
+                ->whereNumber('item')->name('items.status');
+            Route::get('/{customerRequest}', [CustomerRequestController::class, 'show'])
+                ->whereNumber('customerRequest')->name('show');
+            Route::get('/{customerRequest}/edit', [CustomerRequestController::class, 'edit'])
+                ->whereNumber('customerRequest')->name('edit');
+            Route::put('/{customerRequest}', [CustomerRequestController::class, 'update'])
+                ->whereNumber('customerRequest')->name('update');
+            Route::post('/{customerRequest}/cancel', [CustomerRequestController::class, 'cancel'])
+                ->whereNumber('customerRequest')->name('cancel');
+        });
 });
 
 require __DIR__.'/auth.php';

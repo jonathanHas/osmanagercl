@@ -190,7 +190,7 @@
                         @endunless
 
                         <!-- CUSTOMER SECTION -->
-                        @if(auth()->user()->can('customer-invoices.manage'))
+                        @if(auth()->user()->can('customer-invoices.manage') || auth()->user()->can('customer-requests.manage'))
                         <div class="px-2 pt-4">
                             <button @click="customerOpen = !customerOpen"
                                     class="w-full flex items-center justify-between text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-300 py-2">
@@ -202,6 +202,17 @@
                         </div>
 
                         <div x-show="customerOpen" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-1">
+                            @if(auth()->user()->can('customer-requests.manage'))
+                            <a href="{{ route('customer-requests.index') }}"
+                               class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('customer-requests.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                                <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                                </svg>
+                                Customer Requests
+                            </a>
+                            @endif
+
+                            @if(auth()->user()->can('customer-invoices.manage'))
                             <a href="{{ route('customers.index') }}"
                                class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('customers.*') && ! request()->routeIs('customers.debtors*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                                 <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -241,6 +252,7 @@
                                 </svg>
                                 Customer Payments
                             </a>
+                            @endif
                         </div>
                         @endif
 

@@ -576,6 +576,17 @@ Gift-voucher system with scannable barcodes, server-tracked balances and a full 
 
 ## Customer Accounts
 
+### Customer Requests (NEW! 2026-09-10)
+Pre-orders and "please source this" asks, moved out of the spreadsheet into a board that reminds staff to put items aside.
+- **Public board**: `/customer-requests` renders without a login for the shop-floor tablet, due today / overdue first, auto-refreshing every 5 minutes
+- **Login to write**: Adding, editing and every status change need `customer-requests.manage`, so the request records who took it and who moved each line
+- **One or more lines per request**: Each line is a stocked POS product (scan or typeahead, name snapshotted) or free text to source, with its own status
+- **Lifecycle**: `pending → ordered → put_aside → collected`, plus `not_available` and `cancelled`, with undo moves and an append-only status log; a request closes itself when every line is terminal
+- **Reminders**: Dashboard banner counting requests due and items put aside awaiting collection; a pink **Put aside for …** badge and summary card on the legacy delivery match screen; a scanner prompt with a one-tap **Mark put aside**
+- **Own layout**: `<x-board-layout>` — full width, no sidebar, renders for guests (the admin layout cannot)
+
+📖 [Customer Requests Documentation](./features/customer-requests.md)
+
 ### Customer Statements (NEW! 2026-09-05, Updated 2026-09-07)
 Statements of account for customers — on screen, on paper, as a PDF, by email, plus an aged-debtors report.
 - **Print**: A4 light-themed print view with repeating table headers and page-break control (the screen ledger is dark-themed and printed as a black page before this)

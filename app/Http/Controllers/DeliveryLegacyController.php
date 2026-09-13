@@ -7,6 +7,7 @@ use App\Models\DeliveryLabelPrint;
 use App\Models\DeliveryScanItem;
 use App\Models\ProductTranslation;
 use App\Models\ZebraLabel;
+use App\Services\CustomerRequestService;
 use App\Services\IihfGoodsReturnPdfService;
 use App\Services\SupplierService;
 use App\Services\ZebraPrintService;
@@ -26,10 +27,13 @@ class DeliveryLegacyController extends Controller
 
     private ZebraPrintService $zebraPrint;
 
-    public function __construct(SupplierService $supplierService, ZebraPrintService $zebraPrint)
+    private CustomerRequestService $customerRequests;
+
+    public function __construct(SupplierService $supplierService, ZebraPrintService $zebraPrint, CustomerRequestService $customerRequests)
     {
         $this->supplierService = $supplierService;
         $this->zebraPrint = $zebraPrint;
+        $this->customerRequests = $customerRequests;
     }
 
     /**
@@ -176,6 +180,17 @@ class DeliveryLegacyController extends Controller
         // delivery's labels are done, rather than offering the whole set again.
         $translatableCount = $this->outstandingCount($translatableProducts);
 
+        // Open customer request lines (pending / ordered) keyed by barcode, so the
+        // screen can flag "put this aside for X" on anything in this delivery. The
+        // requests live on the app database, so this is a separate lookup rather
+        // than a join into the raw POS queries above.
+        $customerRequestLines = $this->customerRequests->awaitingArrivalByBarcode(
+            collect($matchedItems)->pluck('Barcode')
+                ->merge(collect($scannedNotOnInvoice)->pluck('Barcode'))
+                ->merge(collect($onInvoiceNotScanned)->pluck('Barcode'))
+                ->all()
+        );
+
         return view('delivery-legacy.match', compact(
             'matchedItems',
             'scannedNotOnInvoice',
@@ -192,7 +207,8 @@ class DeliveryLegacyController extends Controller
             'syncedDelivery',
             'unresolvedCodes',
             'translatableCount',
-            'translatableProducts'
+            'translatableProducts',
+            'customerRequestLines'
         ))->with('supplierService', $this->supplierService);
     }
 
@@ -1319,6 +1335,9 @@ class DeliveryLegacyController extends Controller
             'matchStatus' => $matchStatus,
             'scanType' => $scanType,
             'caseUnits' => $caseUnitsPerScan,
+            // Open customer request lines for this product — the scanner shows a
+            // "put aside for X" prompt with a one-tap "Mark put aside" button.
+            'customerRequests' => $this->customerRequests->awaitingArrivalPayload((string) $resolvedBarcode),
         ]);
     }
 

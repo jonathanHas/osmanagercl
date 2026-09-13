@@ -174,6 +174,7 @@ For a complete list of all features with detailed descriptions, see **[Features 
 - Customer Invoicing (draft → issue → void, PDF)
 - Payment Matching & On-Account Credit
 - Statements, Aged Debtors & Emailed Statements
+- Customer Requests (pre-orders / sourcing asks, public shop-floor board, put-aside flag on deliveries)
 
 **Analytics & Reporting**
 - Sales Accounting Reports
@@ -245,6 +246,7 @@ php artisan optimize:clear     # Clear caches
 - 🔥 **Performance**: [Sales Data Import Plan](./docs/features/sales-data-import-plan.md)
 - **AI Integration**: [AI Integration](./docs/features/ai-integration.md) - Multi-provider AI config, camera capture, diagnostics
 - **Customer Accounts**: [Customer Statements & Receivables](./docs/features/customer-statements.md) - Invoicing, payment matching, statements, aged debtors
+- **Customer Requests**: [Customer Requests](./docs/features/customer-requests.md) - Public board, login-gated writes, line status lifecycle, delivery put-aside flag
 - **Order Comparison**: [Order Comparison & Difference Orders](./docs/features/order-management/order-comparison.md) - Comparing two orders, and creating an order from the difference
 - **Udea Pallet Space**: [Udea Pallet Volumes](./docs/features/udea-pallet-volumes.md) - Basket-only data source, sync page, order-page pallet fill
 - **Features**: [Features Index](./docs/FEATURES_INDEX.md)

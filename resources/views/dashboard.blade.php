@@ -155,6 +155,48 @@
             </div>
             @endif
 
+            <!-- Customer Requests Alert (due today / overdue, or put aside awaiting collection) -->
+            @php($crDue = $customerRequestCounts['due'] ?? 0)
+            @php($crPutAside = $customerRequestCounts['put_aside'] ?? 0)
+            @if($crDue + $crPutAside > 0)
+            <div class="mb-8">
+                <div class="bg-gradient-to-r from-indigo-500 to-purple-600 overflow-hidden shadow rounded-lg">
+                    <div class="p-6">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <svg class="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                                </svg>
+                            </div>
+                            <div class="ml-5 w-0 flex-1">
+                                <dl>
+                                    <dt class="text-sm font-medium text-indigo-100 truncate">Customer Requests Need Attention</dt>
+                                    <dd class="text-3xl font-bold text-white">{{ $crDue }}</dd>
+                                </dl>
+                            </div>
+                            <div class="ml-5 flex-shrink-0">
+                                <a href="{{ route('customer-requests.index') }}"
+                                   class="bg-white bg-opacity-20 backdrop-blur-sm hover:bg-opacity-30 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 inline-flex items-center">
+                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                    Open Requests Board
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-indigo-700 bg-opacity-50 px-6 py-3">
+                        <div class="text-sm">
+                            <p class="text-indigo-100">
+                                {{ $crDue }} {{ $crDue == 1 ? 'request is' : 'requests are' }} due today or overdue &middot;
+                                {{ $crPutAside }} {{ $crPutAside == 1 ? 'item is' : 'items are' }} put aside awaiting collection.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
+
             <!-- Quick Links -->
             <div class="bg-white overflow-hidden shadow rounded-lg">
                 <div class="p-6">
