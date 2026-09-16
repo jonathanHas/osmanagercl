@@ -5,6 +5,13 @@
                 {{ __('Kitchen Products') }}
             </h2>
             <div class="flex items-center space-x-4">
+                <a href="{{ route('kitchen.orders.create') }}"
+                   class="inline-flex items-center px-4 py-2 bg-orange-600 text-white font-semibold rounded-md hover:bg-orange-700">
+                    Create Order
+                </a>
+                <a href="{{ route('kitchen.orders.index') }}" class="text-indigo-600 hover:text-indigo-900">
+                    Order History
+                </a>
                 <a href="{{ route('kitchen.profiles.index') }}" class="text-indigo-600 hover:text-indigo-900">
                     View Ingredient Profiles
                 </a>

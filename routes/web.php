@@ -22,6 +22,7 @@ use App\Http\Controllers\KdsController;
 use App\Http\Controllers\KdsProductController;
 use App\Http\Controllers\KitchenController;
 use App\Http\Controllers\KitchenIngredientProfileController;
+use App\Http\Controllers\KitchenOrderController;
 use App\Http\Controllers\KitchenProductController;
 use App\Http\Controllers\KitchenWholesaleController;
 use App\Http\Controllers\LabelAreaController;
@@ -484,6 +485,17 @@ Route::middleware('auth')->group(function () {
             Route::get('/', [KitchenWholesaleController::class, 'index'])->name('index');
             Route::post('/{recipe}', [KitchenWholesaleController::class, 'store'])->name('store');
         });
+
+        // Kitchen supplier orders + standing order (must be before {recipe} wildcard)
+        Route::prefix('orders')->name('orders.')->group(function () {
+            Route::get('/', [KitchenOrderController::class, 'index'])->name('index');
+            Route::get('/create', [KitchenOrderController::class, 'create'])->name('create');
+            Route::post('/', [KitchenOrderController::class, 'store'])->name('store');
+            Route::get('/{kitchenOrder}', [KitchenOrderController::class, 'show'])->name('show');
+            Route::get('/{kitchenOrder}/csv', [KitchenOrderController::class, 'csv'])->name('csv');
+        });
+        Route::get('/standing-order', [KitchenOrderController::class, 'standing'])->name('standing-order.edit');
+        Route::put('/standing-order', [KitchenOrderController::class, 'updateStanding'])->name('standing-order.update');
 
         // AJAX API endpoints (must be before {recipe} wildcard)
         Route::get('/api/products/search', [KitchenController::class, 'searchProducts'])->name('api.products.search');

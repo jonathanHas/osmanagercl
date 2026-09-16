@@ -254,6 +254,18 @@ Audit trail for destock/restock actions with intelligent restock suggestions bas
 
 ## Kitchen Management
 
+### Kitchen Supplier Orders (NEW! 2026-09-16)
+Build, confirm and export a kitchen ingredient order to one supplier at a time, with a standing weekly order that pre-fills each new one.
+- **Create Order page**: `/kitchen/orders/create`, reached from the Create Order button on `/kitchen/products` or the sidebar; one supplier at a time, defaulting to the one with the most kitchen products
+- **Quantities are cases**: case size comes from `supplier_link.CaseUnits` (empty = 1); rows show product image, supplier code, case size and the last three orders for that supplier
+- **Confirm then download**: confirming logs the order and lands on a page with **Download CSV** (`Quantity,Supplier Code,Product Name,Case Size`); no CSV of an unlogged draft
+- **Snapshots keep CSVs stable**: supplier code, product name and case size are copied server-side at confirm time, so re-downloads never change when POS data does
+- **Order History**: `/kitchen/orders` with a supplier filter and CSV re-download
+- **Standing Weekly Order**: `/kitchen/standing-order` stores a case quantity per product that is pre-filled on every new order — nothing is sent or logged automatically
+- **Laravel-side tables only**: nothing is written to the POS database; the shop's sales-driven order system is not involved
+
+📖 [Kitchen Orders Documentation](./features/kitchen-orders.md)
+
 ### Kitchen Wholesale Pricing (NEW! 2026-07-31)
 Price full batches of each recipe for wholesale buyers, with a POS product created and kept in step automatically.
 - **Batch pricing page**: `/kitchen/wholesale`, reached from the Wholesale button on `/kitchen` or the sidebar

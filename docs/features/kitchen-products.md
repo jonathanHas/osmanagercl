@@ -93,6 +93,10 @@ Each product row links directly to ingredient profiles:
 - **"Has Profile"** (green): Links to edit existing profile
 - **"Create Profile"** (amber): Links to create new profile with product pre-filled
 
+### Create Order (2026-09-16)
+
+The **Create Order** button in the page header opens `/kitchen/orders/create`, where the kitchen products for one supplier can be ordered in cases, confirmed and exported as a CSV. **Order History** lists past orders. See [Kitchen Orders](./kitchen-orders.md).
+
 ## Database Schema
 
 ### kitchen_products
@@ -211,6 +215,7 @@ Route::prefix('products')->name('products.')->group(function () {
 
 ## Related Documentation
 
+- [Kitchen Orders](./kitchen-orders.md) - Per-supplier orders, CSV export and standing weekly order built from this list
 - [Kitchen Recipe Costing](./kitchen-recipe-costing.md) - Recipe management and costing
 - [Order Generation](./order-management/order-generation.md) - Order system with Kitchen toggle
 - [Product Management](./product-management.md) - POS product details

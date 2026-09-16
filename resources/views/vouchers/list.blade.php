@@ -48,14 +48,11 @@
                         <tr class="hover:bg-gray-700/40">
                             <td class="px-4 py-2 font-mono font-medium">{{ $voucher->code }}</td>
                             <td class="px-4 py-2">
-                                @php
-                                    $badge = match ($voucher->status) {
-                                        'active' => 'bg-green-800/50 text-green-300',
-                                        'deactivated' => 'bg-red-800/50 text-red-300',
-                                        'exhausted' => 'bg-gray-700 text-gray-400',
-                                        default => 'bg-yellow-800/50 text-yellow-300',
-                                    };
-                                @endphp
+                                @php($badge = [
+                                    'active' => 'bg-green-800/50 text-green-300',
+                                    'deactivated' => 'bg-red-800/50 text-red-300',
+                                    'exhausted' => 'bg-gray-700 text-gray-400',
+                                ][$voucher->status] ?? 'bg-yellow-800/50 text-yellow-300')
                                 <span class="text-xs px-2 py-0.5 rounded {{ $badge }}">{{ ucfirst($voucher->status) }}</span>
                             </td>
                             <td class="px-4 py-2 text-right">{{ $voucher->initial_value !== null ? '€'.number_format($voucher->initial_value, 2) : '—' }}</td>
