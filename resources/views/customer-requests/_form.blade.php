@@ -2,9 +2,11 @@
     Shared create / edit form. Expects:
       $customerRequest  CustomerRequest|null
       $seedItems        array  lines to seed the Alpine state with (old() input wins, see controller)
+      $inModal          bool   optional; when true the cancel link closes the board modal instead of navigating
 --}}
 @php
     $isEdit = $customerRequest !== null;
+    $inModal = $inModal ?? false;
     $action = $isEdit ? route('customer-requests.update', $customerRequest) : route('customer-requests.store');
 
     // Old input wins wholesale on a validation bounce so nothing the user typed is lost.
@@ -17,9 +19,9 @@
 
 <div x-data="customerRequestForm({{ \Illuminate\Support\Js::from([
         'items' => $seedItems,
-        'urls' => ['productSearch' => route('customer-requests.api.products.search')],
         'statusLabels' => \App\Models\CustomerRequestItem::LABELS,
-    ]) }})">
+    ]) }})"
+     x-on:product-search:selected="addProduct($event.detail)">
 
     @if($errors->any())
         <div class="mb-4 rounded bg-red-100 border border-red-300 text-red-800 px-4 py-3 text-sm">
@@ -44,7 +46,7 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label for="customer_name" class="block text-sm font-medium text-gray-700">Name <span class="text-red-500">*</span></label>
-                    <input type="text" id="customer_name" name="customer_name" value="{{ $value('customer_name') }}" required maxlength="120" autofocus
+                    <input type="text" id="customer_name" name="customer_name" value="{{ $value('customer_name') }}" required maxlength="120" @if(! $inModal) autofocus @endif
                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
                 </div>
                 <div>
@@ -76,40 +78,12 @@
                 </button>
             </div>
 
-            {{-- Product typeahead --}}
-            <div class="relative mb-4" @click.outside="searchOpen = false">
-                <label for="product-search" class="block text-sm font-medium text-gray-700">Add a stocked product</label>
-                <div class="mt-1 relative">
-                    <input type="text" id="product-search" x-model="searchTerm" x-ref="search"
-                           @input.debounce.250ms="runSearch()"
-                           @focus="searchOpen = searchResults.length > 0"
-                           @keydown.enter.prevent="commitTopMatch()"
-                           @keydown.escape="searchOpen = false"
-                           @keydown.down.prevent="moveActive(1)"
-                           @keydown.up.prevent="moveActive(-1)"
-                           placeholder="Scan a barcode or type a product name…" autocomplete="off"
-                           class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm pr-10">
-                    <div x-show="searching" x-cloak class="absolute inset-y-0 right-3 flex items-center">
-                        <svg class="animate-spin h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
-                    </div>
-                </div>
-                <div x-show="searchOpen && searchResults.length > 0" x-cloak
-                     class="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-72 overflow-auto">
-                    <template x-for="(p, i) in searchResults" :key="p.code">
-                        <button type="button" @click="addProduct(p)" @mouseenter="activeIndex = i"
-                                :class="activeIndex === i ? 'bg-indigo-50' : ''"
-                                class="w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-3 hover:bg-indigo-50">
-                            <span class="min-w-0">
-                                <span class="block truncate text-gray-900" x-text="p.name"></span>
-                                <span class="block text-xs font-mono text-gray-500" x-text="p.code"></span>
-                            </span>
-                            <span class="text-xs text-gray-500 flex-shrink-0" x-show="p.price !== null" x-text="'€' + Number(p.price).toFixed(2)"></span>
-                        </button>
-                    </template>
-                </div>
-                <p x-show="searchOpen && searchTerm.trim().length >= 2 && searchResults.length === 0 && !searching" x-cloak class="mt-1 text-xs text-gray-500">
-                    No stocked product matches — use "Source a new product" to add it as free text.
-                </p>
+            {{-- Product picker: x-product-search dispatches product-search:selected, handled on the form root --}}
+            <div class="mb-4">
+                <p class="block text-sm font-medium text-gray-700 mb-1">Add a stocked product</p>
+                <x-product-search mode="picker" :show-stocked-toggle="false" :min-length="2"
+                                  placeholder="Scan a barcode or type a product name…" />
+                <p class="mt-1 text-xs text-gray-500">No match? Use "Source a new product" to add it as free text.</p>
             </div>
 
             <p x-show="items.length === 0" x-cloak class="text-sm text-gray-500 border border-dashed border-gray-300 rounded-md px-4 py-6 text-center">
@@ -168,7 +142,11 @@
         </div>
 
         <div class="flex items-center justify-between">
-            <a href="{{ route('customer-requests.index') }}" class="text-sm text-gray-600 hover:text-gray-900">Back to board</a>
+            @if($inModal)
+                <button type="button" @click="$dispatch('close-new-request')" class="text-sm text-gray-600 hover:text-gray-900">Cancel</button>
+            @else
+                <a href="{{ route('customer-requests.index') }}" class="text-sm text-gray-600 hover:text-gray-900">Back to board</a>
+            @endif
             <button type="submit" class="inline-flex items-center px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold">
                 {{ $isEdit ? 'Save changes' : 'Save request' }}
             </button>
@@ -194,46 +172,7 @@
 
         return {
             items: (config.items ?? []).map(withKey),
-            urls: config.urls,
             statusLabels: config.statusLabels ?? {},
-            searchTerm: '',
-            searchResults: [],
-            searchOpen: false,
-            searching: false,
-            activeIndex: 0,
-
-            async runSearch() {
-                const term = this.searchTerm.trim();
-                if (term.length < 2) { this.searchResults = []; this.searchOpen = false; return; }
-                this.searching = true;
-                try {
-                    const r = await fetch(`${this.urls.productSearch}?q=${encodeURIComponent(term)}`, { headers: { Accept: 'application/json' } });
-                    const j = await r.json();
-                    this.searchResults = j.data ?? [];
-                    this.activeIndex = 0;
-                    this.searchOpen = true;
-                } catch (e) {
-                    this.searchResults = [];
-                } finally {
-                    this.searching = false;
-                }
-            },
-
-            // Enter commits the highlighted match — a barcode scanner sends the code
-            // followed by Enter, so a scan adds the product in one go.
-            async commitTopMatch() {
-                if (this.searchResults.length === 0 && this.searchTerm.trim() !== '') {
-                    await this.runSearch();
-                }
-                if (this.searchResults.length > 0) {
-                    this.addProduct(this.searchResults[this.activeIndex] ?? this.searchResults[0]);
-                }
-            },
-
-            moveActive(delta) {
-                if (this.searchResults.length === 0) return;
-                this.activeIndex = (this.activeIndex + delta + this.searchResults.length) % this.searchResults.length;
-            },
 
             addProduct(p) {
                 const existing = this.items.find(it => it.product_code === p.code && (!it.id || it.status === 'pending'));
@@ -242,10 +181,6 @@
                 } else {
                     this.items.push(withKey({ product_code: p.code, product_name: p.name, description: p.name, quantity: 1 }));
                 }
-                this.searchResults = [];
-                this.searchTerm = '';
-                this.searchOpen = false;
-                this.$nextTick(() => this.$refs.search?.focus());
             },
 
             addBlankItem() {

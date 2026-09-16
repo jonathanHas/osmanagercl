@@ -22,11 +22,41 @@ class AuthenticationTest extends TestCase
         $user = User::factory()->create();
 
         $response = $this->post('/login', [
-            'email' => $user->email,
+            'login' => $user->email,
             'password' => 'password',
         ]);
 
         $this->assertAuthenticated();
+        $response->assertRedirect(route('dashboard', absolute: false));
+    }
+
+    public function test_login_returns_user_to_public_page_they_came_from(): void
+    {
+        $user = User::factory()->create();
+
+        $this->get('/login?redirect=/customer-requests');
+
+        $response = $this->post('/login', [
+            'login' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $this->assertAuthenticated();
+        $response->assertRedirect('/customer-requests');
+    }
+
+    public function test_login_ignores_external_redirect_targets(): void
+    {
+        $user = User::factory()->create();
+
+        $this->get('/login?redirect=https://evil.example.com/phish');
+        $this->get('/login?redirect=//evil.example.com/phish');
+
+        $response = $this->post('/login', [
+            'login' => $user->email,
+            'password' => 'password',
+        ]);
+
         $response->assertRedirect(route('dashboard', absolute: false));
     }
 
@@ -35,7 +65,7 @@ class AuthenticationTest extends TestCase
         $user = User::factory()->create();
 
         $this->post('/login', [
-            'email' => $user->email,
+            'login' => $user->email,
             'password' => 'wrong-password',
         ]);
 

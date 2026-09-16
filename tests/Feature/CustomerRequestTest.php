@@ -112,6 +112,7 @@ class CustomerRequestTest extends TestCase
         $response->assertSee('Walk-in Wendy');
         $response->assertSee('Oat milk');
         $response->assertSee('Staff sign in');
+        $response->assertSee(route('login', ['redirect' => '/customer-requests']), false);
         $response->assertDontSee('New request');
         $response->assertDontSee(route('customer-requests.items.status', $request->items->first()));
     }
@@ -178,7 +179,6 @@ class CustomerRequestTest extends TestCase
         $this->get(route('customer-requests.create'))->assertRedirect(route('login'));
         $this->post(route('customer-requests.store'), $this->payload([]))->assertRedirect(route('login'));
         $this->patch(route('customer-requests.items.status', $item), ['status' => 'ordered'])->assertRedirect(route('login'));
-        $this->get(route('customer-requests.api.products.search', ['q' => 'oat']))->assertRedirect(route('login'));
 
         $this->assertDatabaseCount('customer_requests', 1);
         $this->assertSame('pending', $item->fresh()->status);
@@ -240,13 +240,13 @@ class CustomerRequestTest extends TestCase
         $user = $this->employee();
 
         $this->actingAs($user)
-            ->from(route('customer-requests.create'))
+            ->from(route('customer-requests.index'))
             ->post(route('customer-requests.store'), $this->payload([], ['customer_name' => '']))
-            ->assertRedirect(route('customer-requests.create'))
+            ->assertRedirect(route('customer-requests.index'))
             ->assertSessionHasErrors(['customer_name', 'items']);
 
         $this->actingAs($user)
-            ->from(route('customer-requests.create'))
+            ->from(route('customer-requests.index'))
             ->post(route('customer-requests.store'), $this->payload([
                 ['description' => '', 'quantity' => 0],
             ]))
@@ -255,13 +255,30 @@ class CustomerRequestTest extends TestCase
         $this->assertDatabaseCount('customer_requests', 0);
         $this->assertDatabaseCount('customer_request_items', 0);
 
-        // The bounced form re-seeds from old() so nothing typed is lost.
+        // The bounced form re-seeds from old() so nothing typed is lost, and the modal re-opens.
         $response = $this->actingAs($user)
             ->withSession(['_old_input' => $this->payload([['description' => 'Kept line', 'quantity' => 3]], ['customer_name' => 'Kept Name'])])
-            ->get(route('customer-requests.create'));
+            ->get(route('customer-requests.index'));
         $response->assertOk();
         $response->assertSee('Kept Name');
         $response->assertSee('Kept line');
+        $response->assertSee('x-data="{ open: true }"', false);
+    }
+
+    public function test_create_route_opens_the_new_request_modal_on_the_board(): void
+    {
+        $user = $this->employee();
+
+        $this->actingAs($user)->get(route('customer-requests.create'))
+            ->assertRedirect(route('customer-requests.index', ['new' => 1]));
+
+        $this->actingAs($user)->get(route('customer-requests.index', ['new' => 1]))
+            ->assertOk()
+            ->assertSee('x-data="{ open: true }"', false);
+
+        $this->actingAs($user)->get(route('customer-requests.index'))
+            ->assertOk()
+            ->assertSee('x-data="{ open: false }"', false);
     }
 
     // ---------------------------------------------------------------- update
@@ -437,22 +454,6 @@ class CustomerRequestTest extends TestCase
     }
 
     // ------------------------------------------------------------- lookups
-
-    public function test_product_search_returns_pos_matches(): void
-    {
-        $response = $this->actingAs($this->employee())
-            ->getJson(route('customer-requests.api.products.search', ['q' => 'oat']));
-
-        $response->assertOk();
-        $response->assertJsonCount(1, 'data');
-        $response->assertJsonPath('data.0.code', '5000000000017');
-        $response->assertJsonPath('data.0.name', 'Organic Oat Milk 1L');
-
-        $this->actingAs($this->employee())
-            ->getJson(route('customer-requests.api.products.search', ['q' => 'o']))
-            ->assertOk()
-            ->assertJsonCount(0, 'data');
-    }
 
     public function test_awaiting_arrival_lookup_only_returns_pending_and_ordered_lines(): void
     {

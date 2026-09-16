@@ -255,33 +255,6 @@ class CustomerRequestService
     }
 
     /**
-     * POS product lookup for the request form typeahead.
-     *
-     * @return array<int, array{code: string, name: string, price: float|null}>
-     */
-    public function searchProducts(string $q, int $limit = 20): array
-    {
-        $q = trim($q);
-        if (mb_strlen($q) < 2) {
-            return [];
-        }
-
-        return Product::query()
-            ->search($q)
-            ->orderByRaw('CASE WHEN CODE = ? THEN 0 ELSE 1 END', [$q])
-            ->orderBy('NAME')
-            ->limit($limit)
-            ->get(['ID', 'CODE', 'NAME', 'PRICESELL'])
-            ->map(fn (Product $p) => [
-                'code' => (string) $p->CODE,
-                'name' => (string) $p->NAME,
-                'price' => $p->PRICESELL !== null ? (float) $p->PRICESELL : null,
-            ])
-            ->values()
-            ->all();
-    }
-
-    /**
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */

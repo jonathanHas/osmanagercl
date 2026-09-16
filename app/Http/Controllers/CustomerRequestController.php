@@ -28,21 +28,27 @@ class CustomerRequestController extends Controller
 
         $board = $this->service->board($showClosed);
 
+        // The "new request" form lives in a modal on the board. It opens on ?new=1
+        // and re-opens by itself when a submission bounced back with errors.
+        $openNew = $canManage && ($request->boolean('new') || session()->hasOldInput('customer_name'));
+
         return view('customer-requests.index', [
             'due' => $board['due'],
             'open' => $board['open'],
             'closed' => $board['closed'],
             'showClosed' => $showClosed,
             'canManage' => $canManage,
+            'openNew' => $openNew,
+            'seedItems' => $canManage ? $this->seedItems(null) : [],
         ]);
     }
 
-    public function create(): View
+    /**
+     * Kept for links/bookmarks: the form itself is a modal on the board.
+     */
+    public function create(): RedirectResponse
     {
-        return view('customer-requests.create', [
-            'customerRequest' => null,
-            'seedItems' => $this->seedItems(null),
-        ]);
+        return redirect()->route('customer-requests.index', ['new' => 1]);
     }
 
     public function store(CustomerRequestRequest $request): RedirectResponse
@@ -136,16 +142,6 @@ class CustomerRequestController extends Controller
         }
 
         return back()->with('status', $message);
-    }
-
-    /**
-     * POS product typeahead for the request form.
-     */
-    public function searchProducts(Request $request): JsonResponse
-    {
-        return response()->json([
-            'data' => $this->service->searchProducts((string) $request->query('q', '')),
-        ]);
     }
 
     /**

@@ -126,7 +126,6 @@ No environment variables. One permission, seeded by `RolesAndPermissionsSeeder`:
 | PUT | `/customer-requests/{customerRequest}` | `customer-requests.update` | permission |
 | POST | `/customer-requests/{customerRequest}/cancel` | `customer-requests.cancel` | permission |
 | PATCH | `/customer-requests/items/{item}/status` | `customer-requests.items.status` | permission; JSON when `Accept: application/json` |
-| GET | `/customer-requests/api/products/search?q=` | `customer-requests.api.products.search` | permission |
 
 The public route is registered **outside** the `Route::middleware('auth')` group in `routes/web.php`; everything else is inside it under `permission:customer-requests.manage`, so guests hitting a write URL are redirected to login rather than getting a bare 403.
 

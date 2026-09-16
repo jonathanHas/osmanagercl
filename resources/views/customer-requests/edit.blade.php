@@ -1,5 +1,5 @@
-<x-admin-layout>
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<x-board-layout title="Edit request">
+    <div>
         <div class="flex items-center justify-between mb-6">
             <div>
                 <h2 class="text-2xl font-bold text-gray-900">Edit request for {{ $customerRequest->customer_name }}</h2>
@@ -13,4 +13,4 @@
 
         @include('customer-requests._form', ['customerRequest' => $customerRequest, 'seedItems' => $seedItems])
     </div>
-</x-admin-layout>
+</x-board-layout>

@@ -14,8 +14,16 @@ class AuthenticatedSessionController extends Controller
     /**
      * Display the login view.
      */
-    public function create(): View
+    public function create(Request $request): View
     {
+        // Public pages (e.g. the customer requests board) link here with ?redirect=
+        // so the user lands back where they started rather than on the dashboard.
+        // Only same-site paths are honoured to prevent open redirects.
+        $redirect = $request->query('redirect');
+        if (is_string($redirect) && str_starts_with($redirect, '/') && ! str_starts_with($redirect, '//')) {
+            redirect()->setIntendedUrl($redirect);
+        }
+
         return view('auth.login');
     }
 

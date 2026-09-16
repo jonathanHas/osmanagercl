@@ -256,6 +256,35 @@ Use separate transaction management for each database connection:
 
 Use the Price Sync Management tool at `/fruit-veg/price-sync` to identify and fix discrepancies.
 
+### POS Collation Mismatch: Never `WHERE EXISTS` Against `stocking` / `supplier_link`
+**Status:** Documented 2026-09-16 (trap still present in the schema; the POS DB is read-only for us)
+
+#### Problem
+`PRODUCTS.CODE` is `utf8_general_ci` but `stocking.Barcode` and `supplier_link.Barcode`
+are `latin1_swedish_ci`. Any *correlated* comparison between them (`WHERE EXISTS (... WHERE
+stocking.Barcode = PRODUCTS.CODE)`) cannot use an index, so MySQL scans `stocking` once per
+product row. `Product::scopeStocked()` is written exactly this way.
+
+Measured on the live POS DB (10,649 products, 5,264 `stocking` rows), stocked-filtered product search:
+
+| Stocked-filter strategy | Time |
+|---|---|
+| `JOIN stocking ON stocking.Barcode = PRODUCTS.CODE` | 30–40 ms |
+| `whereIn('CODE', all 5,264 stocking barcodes)` | 60 ms |
+| `Product::stocked()` scope, i.e. `WHERE EXISTS (...)` | **20,381 ms** |
+| `LEFT JOIN supplier_link` inside the search query | Block Nested Loop over 10k rows, seconds cold |
+
+`ProductRepository::getAllSuppliersWithProducts(stockedOnly: true)` (133 ms) and
+`getAllCategoriesWithProducts(stockedOnly: true)` (397 ms) suffer the same way; their
+unfiltered forms take 51 ms and 2 ms.
+
+#### Rules
+- Use a plain `join('stocking', 'stocking.Barcode', '=', 'PRODUCTS.CODE')` for a stocked filter (`stocking.Barcode` is the PK, so no duplicate rows).
+- Never `whereExists` / correlated subqueries against `stocking` or `supplier_link`.
+- Never join `supplier_link` into a search query. Pre-pluck barcodes (`DB::connection('pos')->table('supplier_link')->where(...)->pluck('Barcode')`) and `whereIn('PRODUCTS.CODE', ...)`, or load supplier links *after* the page of results is known (`whereIn` on ≤50 codes).
+- Do not "fix" this with `COLLATE`: it breaks the SQLite test connection and errors on the utf8 column.
+- Reference implementation: `app/Services/ProductSearch/ProductSearchService.php` (see [Product Search](../features/product-search.md)).
+
 ---
 
 ## File Upload & Permissions Issues

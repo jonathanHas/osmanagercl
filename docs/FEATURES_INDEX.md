@@ -31,6 +31,18 @@ Comprehensive, configuration-driven barcode suggestion system for streamlined pr
 
 📖 [Auto-Barcode Suggestion System Documentation](./features/barcode-suggestion-system.md)
 
+### Product Search Bar (`x-product-search`)
+One reusable Blade component and one JSON endpoint (`GET /api/products/search`) for finding products anywhere in the app.
+- **Two Modes**: `picker` (dropdown, select one product, page reacts via `product-search:selected`) and `list` (full results table, used by `/products`)
+- **Fast**: ~40–95 ms server time on the live POS DB; stocked filter via `JOIN stocking`, two-phase hydration
+- **Word-Order Independent**: "chocolatemakers fruit" finds "Chocolatemakers forest fruit milk chocolate 100 gram"; ranked exact code → name prefix → phrase → word starts
+- **Typo Tolerant**: "chocolatmakers friut" is corrected against a cached vocabulary of product-name words and the UI says "Showing results for …"
+- **Thumbnails**: POS blob first, then Udea / Independent CDN, with a placeholder fallback
+- **Barcode Scanner Ready**: Enter commits the top match; optional camera button
+- **Test Page**: `/products/search-test` shows both modes and per-request `took_ms`
+
+📖 [Product Search Documentation](./features/product-search.md)
+
 ### Barcode Editing
 Safe barcode modification for correcting scanner errors.
 - **Safety Warnings**: Clear indication of affected records before changes

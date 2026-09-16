@@ -138,6 +138,7 @@ For a complete list of all features with detailed descriptions, see **[Features 
 ### Feature Categories
 
 **Product Management**
+- Product Search Bar (`x-product-search`, `/api/products/search`)
 - Auto-Barcode Suggestion System
 - Barcode Editing
 - Categories Management
@@ -231,6 +232,7 @@ For comprehensive guidelines, see **[AI Assistant Guide](./docs/development/ai-a
 
 **Common Pitfalls:**
 - Don't access database tables directly
+- Don't build a new product search input or endpoint - use `<x-product-search>` and `GET /api/products/search` (see [Product Search](./docs/features/product-search.md))
 - Don't put business logic in controllers
 - Don't ignore existing patterns
 - Don't forget to run tests
@@ -245,6 +247,7 @@ php artisan optimize:clear     # Clear caches
 **Where to Find Information:**
 - 🔥 **Performance**: [Sales Data Import Plan](./docs/features/sales-data-import-plan.md)
 - **AI Integration**: [AI Integration](./docs/features/ai-integration.md) - Multi-provider AI config, camera capture, diagnostics
+- **Product Search**: [Product Search](./docs/features/product-search.md) - `x-product-search` component, `/api/products/search` JSON shape, POS collation performance rules
 - **Customer Accounts**: [Customer Statements & Receivables](./docs/features/customer-statements.md) - Invoicing, payment matching, statements, aged debtors
 - **Customer Requests**: [Customer Requests](./docs/features/customer-requests.md) - Public board, login-gated writes, line status lifecycle, delivery put-aside flag
 - **Order Comparison**: [Order Comparison & Difference Orders](./docs/features/order-management/order-comparison.md) - Comparing two orders, and creating an order from the difference

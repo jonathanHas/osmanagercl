@@ -1,278 +1,445 @@
-# Kitchen supplier orders + standing order — implementation
+# Reusable product search bar (`x-product-search`) — implementation
 
 Status: DONE
-Plan revision: 1
+Plan revision: 2
 Implementer: Opus
 Date: 2026-09-16
 
 ## Baseline
-HEAD: 341d74fa (branch `feature/modularization-phase1`)
+HEAD: 76dc597c
 Pre-existing dirty files:
 ```
-?? docs/planImp/
+ M app/Http/Controllers/Auth/AuthenticatedSessionController.php
+ M app/Http/Controllers/CustomerRequestController.php
+ D docs/planImp/implemented.md
+ M docs/planImp/plan.md
+ M resources/views/customer-requests/_form.blade.php
+D  resources/views/customer-requests/create.blade.php
+ M resources/views/customer-requests/edit.blade.php
+ M resources/views/customer-requests/index.blade.php
+ M resources/views/customer-requests/show.blade.php
+ M resources/views/layouts/board.blade.php
+ M tests/Feature/Auth/AuthenticationTest.php
+ M tests/Feature/CustomerRequestTest.php
+?? docs/planImp/archive/
 ```
 
 ## Steps
-### 1. Migrations — done
-Changed: `database/migrations/2026_09_16_100000_create_kitchen_orders_table.php` (new),
-`database/migrations/2026_09_16_100001_create_kitchen_order_items_table.php` (new),
-`database/migrations/2026_09_16_100002_create_kitchen_standing_order_items_table.php` (new)
+### 1. `ProductSearchVocabulary` — done
+Changed: `app/Services/ProductSearch/ProductSearchVocabulary.php` (new),
+`tests/Unit/ProductSearchVocabularyTest.php` (new),
+`app/Http/Controllers/ProductController.php` (`use` line + `forget()` after
+the success log in `store()` and `update()`, lines 1413 / 1648).
 Check output:
 ```
-$ php artisan migrate
-  2026_09_16_100000_create_kitchen_orders_table ................ 302.52ms DONE
-  2026_09_16_100001_create_kitchen_order_items_table ........... 284.13ms DONE
-  2026_09_16_100002_create_kitchen_standing_order_items_table .. 115.44ms DONE
-$ tinker: Schema::hasTable(...) && ... && ...
-bool(true)
-$ php artisan migrate:rollback --step=3
-  2026_09_16_100002_... DONE / 100001 DONE / 100000 DONE
-$ php artisan migrate
-  all three DONE again
+PASS  Tests\Unit\ProductSearchVocabularyTest
+  ✓ builds vocabulary of words three chars or longer
+  ✓ corrects typos against vocabulary
+  ✓ forget clears the cache
+Tests: 3 passed (13 assertions)
+
+live POS (tinker): build: 51.1 ms, 6212 words
+chocolatmakers => 'chocolatemakers' (4.32 ms)
+friut => 'fruit' (4.36 ms)
+choc => NULL  |  8721325594341 => NULL  |  xyzzyqq => NULL
 ```
+See Deviations #1 (transposition distance).
 
 
-### 2. Models — done
-Changed: `app/Models/KitchenOrder.php` (new), `app/Models/KitchenOrderItem.php` (new),
-`app/Models/KitchenStandingOrderItem.php` (new). None declares `$connection` (grep count 0 in each).
+### 2. `ProductSearchService` — done
+Changed: `app/Services/ProductSearch/ProductSearchService.php` (new),
+`app/Services/ProductSearch/ProductSearchCriteria.php` (new).
+Check output (live POS, tinker, second call = warm):
+```
+"chocolatemakers fruit"  total=1    took= 93.3 ms (warm  46.6) corrected=null                    first=Chocolatemakers forest fruit milk chocolate 100 gram rank=3
+"chocolatmakers friut"   total=1    took= 94.1 ms (warm  89.5) corrected="chocolatemakers fruit" first=Chocolatemakers forest fruit milk chocolate 100 gram rank=3
+"8721325594341"          total=1    took= 33.6 ms (warm  33.0) corrected=null                    first=Chocolatemakers forest fruit milk chocolate 100 gram rank=0
+"6001397"                total=1    took= 32.1 ms (warm  42.5) corrected=null                    first=Chocolatemakers ... rank=4   (supplier code)
+"milk"                   total=73   took= 87.7 ms (warm 107.4) corrected=null                    first=Milk Alternative rank=1
+"a"                      total=4885 took=103.9 ms (warm 107.9)                                   first=A A Cake Free rank=1
+""                       total=5219 took= 77.4 ms (warm  77.2)                                   first= cake rank=null
+milk page 2: total=73 page=2 rows=20 took=77.0
+```
+Query profile for "milk" (77.7 ms wall): supplier_link pluck 3.6 ms, main
+select 30.4 ms, COUNT 28.9 ms, five eager loads + image cache ≈ 5 ms. EXPLAIN
+confirms the shape the plan wants (stocking index → eq_ref PRODUCTS_INX_1).
+The two ~30 ms queries are the floor; "milk"/"a" hover around 80–105 ms
+depending on run. See Deviations #2 (COUNT skipped when the page is short).
+
+### 3. JSON endpoint — done
+Changed: `app/Http/Controllers/Api/ProductSearchController.php` (new),
+`routes/web.php` (one line after `api.products.suggest-barcode`, inside the auth group).
+Check output (logged in as admin via curl):
+```
+$ curl -b cookies '.../api/products/search?q=chocolatemakers%20fruit' | jq '.data[0], .meta'
+{"name":"Chocolatemakers forest fruit milk chocolate 100 gram","code":"8721325594341",
+ "image_url":"https://cdn.ekoplaza.nl/ekoplaza/producten/small/8721325594341.jpg",
+ "supplier":{"id":"5","name":"Udea","code":"6001397","website_url":"https://www.udea.nl/search/?qry=6001397"},
+ "category_name":"Chocolate","price_with_vat":6.25,"vat_label":"23.0%",
+ "vat_badge_class":"bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100",
+ "stock_units":7,"has_stock_record":true,"is_stocked":true,"is_service":false,"has_image":false,
+ "match_rank":3,"edit_url":"/products/98f8a46e-.../edit"}
+{"query":"chocolatemakers fruit","corrected_query":null,"total":1,"page":1,"per_page":20,"last_page":1,"stocked":true,"took_ms":51}
+
+$ php artisan route:list --path=api/products
+GET|HEAD   api/products/search  api.products.search › Api\ProductSearchController
+
+unauthenticated: HTML → 302 /login ; Accept: application/json → 401
+
+took_ms over HTTP, 5–8 samples each (box load average ≈ 8.9 while measuring):
+  chocolatemakers fruit : 38 43 50 40 44 49
+  chocolatmakers friut  : 95 79 97 85 92 87 93 94   (typo path, two passes)
+  8721325594341         : 47 35 35 36 33
+  6001397               : 39 35 35 35 39
+  milk                  : 83 77 91 77 91
+  milk&stocked=0        : 48
+  a                     : 86 101 84 85 132
+  (empty)               : 80 183 143 142 73   (browse: ORDER BY NAME over the 5.2k join = 38 ms + COUNT 14 ms; outliers coincide with load spikes)
+```
+`vat_label` is `"23.0%"` (existing `formatted_vat_rate` accessor), not `"23%"`
+as in the plan's sample JSON.
+
+### 4. Feature tests for the endpoint — done
+Changed: `tests/Feature/ProductSearchApiTest.php` (new),
+`tests/Concerns/CreatesProductSearchPosTables.php` (new).
+All nine planned tests plus two extra (`response_carries_supplier_price_and_stock_details`,
+`pagination_meta_is_accurate` — the latter guards Deviation #2).
 Check output:
 ```
-$ tinker: KitchenOrder::create([...]) ->items()->create([...])
-order id: 1 item id: 1
-csv: kitchen-order-udea-2026-09-16-1.csv
-$ KitchenOrder::find($id)->delete()
-after delete items: 0
-orders left: 0
+PASS  Tests\Feature\ProductSearchApiTest
+  ✓ words match in any order
+  ✓ ranking prefers exact code then prefix
+  ✓ stocked is default and toggle includes unstocked
+  ✓ supplier code matches
+  ✓ typo correction reports corrected query
+  ✓ no correction when results exist
+  ✓ image url prefers blob then udea cdn
+  ✓ response carries supplier price and stock details
+  ✓ exclude and supplier filter
+  ✓ pagination meta is accurate
+  ✓ per page is capped at 50 and requires auth
+Tests: 11 passed (70 assertions)      (73 after Step 10)
 ```
 
-### 3. Service — done
-Changed: `app/Services/KitchenOrderService.php` (new)
+### 5. The Blade component — done
+Changed: `resources/views/components/product-search.blade.php` (new).
+All props from the plan; slots `row-actions` (used as `<x-slot:row-actions>`,
+Blade camel-cases it to `$rowActions`) and `empty`. Events
+`product-search:selected`, `product-search:cleared`, plus
+`product-search:results` (`{data, meta, url}`) which the test page's debug
+panel uses. Alpine factory is `window.productSearch(config)` inside
+`@once @push('scripts')`; camera pushes `@vite(['resources/js/barcode-scanner.js'])`
+under its own `@once` key. Debounce is a manual `setTimeout` (Alpine's
+`.debounce.Nms` modifier can't take a prop value).
 Check output:
 ```
-$ tinker
-options: [{"id":"5","name":"Udea","count":74},{"id":"37","name":"Independent","count":19},{"id":"44","name":"Udea Veg","count":4}]
-default: 5
-rows: 74
-pos queries: 4          (suppliers, PRODUCTS, supplier_link, STOCKCURRENT)
-min case_units: 1
-cdn rows: 55            (image_url starts https://cdn.ekoplaza.nl/)
-blob rows: 19           (image_url is route products.image)
-no image rows: 0
-first: AGF tas TGTG paper bag big
-$ allProductsGroupedBySupplier()
-Independent 19 / Misc 1 / Mossfield 1 / Udea 74 / Udea Veg 4 / No supplier link 2 / Missing POS product 1 = 102
+$ php artisan view:cache   →   INFO  Blade templates cached successfully.
+$ php artisan view:clear   →   INFO  Compiled views cleared successfully.
 ```
+See Deviations #4 (camera runs the search in-page) and #5 ("search instead").
 
-### 4. Form requests + controller — done
-Changed: `app/Http/Requests/StoreKitchenOrderRequest.php` (new),
-`app/Http/Requests/UpdateKitchenStandingOrderRequest.php` (new),
-`app/Http/Controllers/KitchenOrderController.php` (new)
-Check output (after step 5):
+### 6. Test page — done
+Changed: `app/Http/Controllers/ProductSearchTestController.php` (new, `__invoke`),
+`resources/views/products/search-test.blade.php` (new), `routes/web.php`
+(`products.search-test` right after `products.independent-test`, before `/products/{id}`).
+Check output (Chrome, logged in, `/products/search-test`; `took_ms` from the
+debug panel / component meta):
 ```
-$ php artisan route:list --path=kitchen/orders
-  GET|HEAD   kitchen/orders                     kitchen.orders.index
-  POST       kitchen/orders                     kitchen.orders.store
-  GET|HEAD   kitchen/orders/create              kitchen.orders.create
-  GET|HEAD   kitchen/orders/{kitchenOrder}      kitchen.orders.show
-  GET|HEAD   kitchen/orders/{kitchenOrder}/csv  kitchen.orders.csv
-$ php artisan route:list --path=kitchen/standing-order
-  GET|HEAD  kitchen/standing-order  kitchen.standing-order.edit
-  PUT       kitchen/standing-order  kitchen.standing-order.update
+query                   stocked?   total  took_ms  corrected               first result
+chocolatemakers fruit   yes        1      44.7                             Chocolatemakers forest fruit milk chocolate 100 gram (Udea CDN thumbnail shown)
+chocolatmakers friut    yes        1      84.4     chocolatemakers fruit   same
+chocolatmakers          yes        3      95.7     chocolatemakers         same; banner "Showing results for chocolatemakers (search instead for chocolatmakers)"
+8721325594341           yes        1      40.4                             same
+6001397 (supplier code) yes        1      39.4                             same
+milk                    yes        73     73.2                             Milk Alternative
+milk                    no         215    62.9                             Milk Alternative
+a                       yes        4885   127.9                            A A Cake Free   (< 300 allowed)
+(empty)                 yes        5219   68.8                             " cake"
 ```
+Picker: typed "milk choc" → dropdown with thumbnails, ↓↓ Enter selected the
+third row; hidden `demo_product` input = product id, input cleared, dropdown
+closed, `product-search:selected` payload printed. Barcode-scanner flow: typed
+`5412860001205` + Enter with no dropdown open → searched (43 ms) and selected
+"Chocolates From Heaven Belgian Milk Chocolate 100g", match_rank 0.
+List: Next/Prev → "Showing 41–60 of 73" / "Showing 21–40 of 73". Camera
+button opens the teleported modal ("Starting camera…" — no HTTPS on dev, as
+on the old page). Console: no errors.
 
-### 5. Routes — done
-Changed: `routes/web.php` (import added after KitchenIngredientProfileController; block added
-immediately after the `wholesale` prefix group, before the AJAX endpoints)
+### 7. Migrate `/products` — done
+Changed: `app/Http/Controllers/ProductController.php` (`index()` rewritten;
+two `use` lines), `resources/views/products/index.blade.php` (statistics
+block kept verbatim; `x-filter-form`, hand-written table, supplier-toggle JS
+and the page's own scanner modal/JS removed; "More filters" `<details>` with
+supplier + category selects that reload via `productsFilterChanged()`;
+`<x-product-search mode="list" :initial :camera :supplier-id :category-id>`
+with a `row-actions` slot holding the inline stock editor, sales-chart button
+and edit link; `updateStock()` / `showToast()` kept; `<x-sales-chart-modal />` kept).
+Check output (curl, server-rendered `initial` decoded from the page):
+```
+/products                                 200 0.157s  total=5219 page=1 stocked=True took=70.4 rows=20 first=" cake"
+/products?q=chocolatemakers%20fruit       200 0.126s  total=1    page=1 stocked=True took=44.6 rows=1  first=Chocolatemakers forest fruit…
+/products?search=8721325594341  (legacy)  200 0.113s  total=1    page=1 stocked=True took=35.4 rows=1  first=Chocolatemakers forest fruit…
+/products?stocked_only=1&search=milk      200 0.175s  total=73   page=1 stocked=True took=92.3 rows=20 first=Milk Alternative
+/products?q=milk&stocked=0&page=2         200 0.126s  total=215  page=2 stocked=False took=48.9 rows=20 first=Biona Coconut Milk 200ml
+/products?supplier_id=37                  200 0.179s  total=1377 page=1 stocked=True took=98.1 rows=20 supplierId=37
+```
+Chrome: default page shows 20 stocked products with thumbnails and the
+"87 ms" badge; inline stock edit on " cake" (re-saved its current value 0 so
+live POS data is unchanged) → toast "Stock updated successfully", editor
+closes; sales-chart button opens the modal titled "Het Dichtste Bij Spelt
+tagliatelle 500g - Sales History"; camera button opens the modal; simulated
+scan of 8721325594341 → in-page search, address bar `?q=8721325594341`;
+Next page with "Include unstocked" → `?q=milk&stocked=0&page=2`,
+"Showing 21–40 of 215"; typo banner + "search instead" → empty state;
+`?show_stats=1&supplier_id=37` shows statistics, "More filters" open with
+Independent selected and 1377 results (404 CDN images fall back to the
+placeholder, cached ones load). Console: no errors.
+See Deviations #6 (dropdown loaders).
+
+### 8. Docs and known-issues — done
+Changed: `docs/features/product-search.md` (new), `docs/FEATURES_INDEX.md`
+(entry under Product Management), `docs/development/known-issues.md` (new
+section "POS Collation Mismatch: Never `WHERE EXISTS` Against `stocking` /
+`supplier_link`" with the timings table, under Database & Transaction Issues),
+`CLAUDE.md` (bullet under Product Management + a "Where to Find Information" line).
 Check output:
 ```
-$ tinker: Route::getRoutes()->match(Request::create($url,'GET'))->getName()
-/kitchen/orders => kitchen.orders.index
-/kitchen/orders/create => kitchen.orders.create
-/kitchen/standing-order => kitchen.standing-order.edit
-/kitchen/orders/1/csv => kitchen.orders.csv
+CLAUDE.md:            ](./docs/features/product-search.md)  → exists
+docs/FEATURES_INDEX.md:](./features/product-search.md)      → exists
+product-search.md → ../development/known-issues.md         → exists
 ```
-(`route:list` sorts alphabetically so it cannot show registration order; the router match above
-proves the new routes win over `kitchen/{recipe}`. Also covered by KitchenOrderRoutesTest in step 8.)
 
-### 6. Views — done
-Changed (new): `resources/views/kitchen/orders/{create,show,index,standing}.blade.php`,
-`resources/views/kitchen/orders/partials/{product-row,qty-scripts}.blade.php`.
-Changed (existing): `resources/views/kitchen/products/index.blade.php` (header: Create Order button +
-Order History link), `resources/views/layouts/admin.blade.php` (sidebar: Kitchen Orders + Standing Order
-after Kitchen Products).
-
-The Chrome extension was not connected in this session, so the browser check was run instead by
-driving the pages through the HTTP kernel as user #1 (admin@osmanager.local) against the live dev
-databases (scratch script, not committed). Smoke data was deleted afterwards. JS behaviour (totals
-updating, Confirm enabling on input, Clear all) is **not** verified in a browser — only `node --check`
-on the script. See Deviations.
-
+### 9. Update `ProductTest` — done (2 pre-existing failures remain)
+Changed: `tests/Feature/ProductTest.php` — `setUp()`/`tearDown()` use
+`CreatesProductSearchPosTables` (all eight POS tables), `stocking` rows for
+CODE001 and CODE003; `test_can_search_products_by_name` → `?q=Kitchen`;
+`test_can_filter_active_products_only` replaced by
+`test_unstocked_products_hidden_by_default_and_shown_with_toggle`;
+`test_legacy_search_param_still_works` added.
+Baseline for this file (before any of my changes): **5 failed, 2 passed** —
+every page-rendering test died with `no such table: suppliers`, plus the two below.
 Check output:
 ```
-GET /kitchen/products => 200 create-order link: yes
-GET /kitchen/orders/create => 200 udea selected: yes qty inputs: 74 images(img src): 222 confirm disabled: yes history dashes: 74
-GET create?supplier=37 => 200 qty inputs: 19
-GET create?supplier=999 => 302 location: http://localhost/kitchen/orders/create?supplier=5
-PUT standing qty[A]=3 => 302 location: http://localhost/kitchen/standing-order rows: 1
-GET /kitchen/standing-order => 200 value=3 for A: yes groups: 7
-GET create (after standing) => prefilled 3: yes standing badge: yes row highlighted: yes
-POST /kitchen/orders => 302 location: http://localhost/kitchen/orders/4
-  order #4 Udea lines=2 cases=5 user=1
-GET show => 200 has Download CSV: yes
-GET csv => 200 text/csv; charset=UTF-8 | attachment; filename="kitchen-order-udea-2026-09-16-4.csv"
-  CSV line1: Quantity,Supplier Code,Product Name,Case Size
-  CSV line2: 3,6000562,AGF tas TGTG paper bag big,1
-POST all-zero => 302 location: http://localhost/kitchen/orders/create?supplier=5 error flash: Enter a quantity for at least one product.
-GET /kitchen/orders => 200 lists #2: yes
-GET create (after 2 orders) => history chips: 3 (expect 3: A has 2, B has 1)
-cleanup: orders=0 standing=0
-$ node --check qty-scripts.js
-JS syntax OK
+  ✓ products page requires authentication
+  ✓ authenticated user can view products list
+  ✓ can search products by name
+  ✓ legacy search param still works
+  ✓ unstocked products hidden by default and shown with toggle
+  ✓ can view product details
+  ⨯ shows 404 for non existent product          (pre-existing: show() redirects to edit without checking the product exists → 302)
+  ⨯ product statistics are displayed            (pre-existing: statistics only render with ?show_stats=1, and the label is "Active (Non-Service)" not "Active Products")
+  Tests: 2 failed, 6 passed (24 assertions)
 ```
-(222 img tags = 74 rows × 3: thumbnail + hover preview + tap overlay from the product-image component.)
+Both remaining failures are untouched per "Leave the other tests untouched".
+See Deviations #7 for the one assertion I did change.
 
-### 7. Documentation — done
-Changed: `docs/features/kitchen-orders.md` (new), `docs/features/kitchen-products.md` (Create Order
-feature bullet + Related Documentation link), `docs/FEATURES_INDEX.md` (`### Kitchen Supplier Orders
-(NEW! 2026-09-16)` above Wholesale), `CHANGELOG.md` (first entry under `## [Unreleased]` → `### Added`).
+### 10. Guard the missing website template — done (revision 2)
+Changed: `app/Services/SupplierService.php` (`getSupplierWebsiteLink`: early
+`return null` when `$config['website_search']` is empty),
+`tests/Concerns/CreatesProductSearchPosTables.php` (supplier 65 "Natural
+Medicine", link `NM-1` on P5), `tests/Feature/ProductSearchApiTest.php`
+(three assertions on P5 in `test_response_carries_supplier_price_and_stock_details`:
+supplier name, code, `website_url === null`).
 Check output:
 ```
-$ for f in <every path in the changelog Modified list>; do [ -f "$f" ] || echo MISSING; done
-all changelog paths checked
-$ ls database/migrations/2026_09_16_* | wc -l
-3
+$ php artisan tinker --execute='app(...ProductSearchService::class)->search(new ...Criteria(q: ""));'
+(no output — no DEPRECATED line)
+
+$ php artisan test --filter=ProductSearchApiTest
+Tests: 11 passed (73 assertions)
 ```
 
-### 8. Tests — done
-Changed (new): `tests/Concerns/CreatesKitchenOrderPosTables.php`,
-`tests/Feature/{KitchenOrderRoutesTest,KitchenOrderCreatePageTest,KitchenOrderStoreTest,KitchenOrderCsvTest,KitchenStandingOrderTest,KitchenOrderHistoryTest}.php`
+### 11. Forget the vocabulary on inline rename — done (revision 2)
+Changed: `app/Http/Controllers/ProductController.php` (`updateName`, after the `update()`).
 Check output:
 ```
-$ php artisan test --filter='KitchenOrder|KitchenStandingOrder'
-  PASS  KitchenOrderCreatePageTest (4)  PASS  KitchenOrderCsvTest (3)  PASS  KitchenOrderHistoryTest (4)
-  PASS  KitchenOrderRoutesTest (3)      PASS  KitchenOrderStoreTest (5)  PASS  KitchenStandingOrderTest (3)
-  Tests:    22 passed (117 assertions)
-$ php artisan test --filter=Kitchen
-  Tests:    94 passed (298 assertions)
+$ grep -n "ProductSearchVocabulary::class)->forget()" app/Http/Controllers/ProductController.php
+206:        app(ProductSearchVocabulary::class)->forget();     (updateName)
+1403:            app(ProductSearchVocabulary::class)->forget();  (store)
+1638:            app(ProductSearchVocabulary::class)->forget();  (update)
 ```
-First run had 2 failures in KitchenOrderHistoryTest: "Access denied for user 'osmanager'@'localhost'
-to database ':memory:' (Connection: mysql ... kitchen_products)". The index page's supplier filter
-calls `supplierOptions()` → `KitchenProduct` (mysql-pinned), so the history test also needs
-`AliasesMysqlConnection` even though it creates no POS tables. Added; the plan's table said
-"Service-level, no POS tables" which is still true — it is the mysql alias that was missing.
 
-### 9. Format — done
+### 12. Complete `implemented.md` — done (revision 2)
+Changed: this file. Root cause of the gap: my Step 2 edit replaced the
+`## Deviations` heading with the step text and did not re-add it, so every
+later "insert before `## Deviations`" was a silent no-op (the deviation
+entries themselves survived because they were appended after existing text).
+Steps 3–9 above are reconstructed from the checks I ran and recorded during
+revision 1 (same numbers as reported in the session).
 Check output:
 ```
-$ ./vendor/bin/pint <18 new/changed PHP files>
-  PASS .... 18 files
-$ ./vendor/bin/pint --test <all changed .php from git status>
-  PASS .... 20 files          (second run, no changes)
+$ grep -c "^### " docs/planImp/implemented.md   → 12
+$ grep -n "^## Deviations" docs/planImp/implemented.md → found
 ```
 
 ## Deviations
+1. **Step 1, distance for transpositions.** The plan's rules say "accept
+   distance ≤1 for tokens of 4–6 chars", but its check requires
+   `correct('friut') === 'fruit'`, and plain `levenshtein('friut','fruit')` is 2
+   (the plan's own Context notes d=2). Rather than loosen the threshold for
+   short tokens (which would over-correct 4-letter words), an adjacent
+   transposition is counted as one edit (`ProductSearchVocabulary::distance()`,
+   Damerau-style, using native `levenshtein()` plus a cheap swap check so the
+   ~1 ms/token scan is kept). All other rules unchanged.
+2. **Step 2f, pagination.** Plan says `->paginate()` "is fine". Measured: the
+   COUNT is ~29 ms, so a typo search (empty pass + corrected pass) cost
+   ~128 ms warm, over the 100 ms check. `runQuery()` now fetches the page
+   first and only runs `getCountForPagination()` when page 1 came back full
+   (otherwise total = row count). Same `meta` (total/last_page verified on
+   "milk" page 2), same two-phase eager loads. Typo search dropped to ~90 ms.
+3. **Step 2h, Independent image URLs.** `getExternalImageUrlBySupplierCode()`
+   runs its own `supplier_image_cache` query per call, which would be one
+   query per row. The service instead reads the batched cache rows directly
+   (`not_found` → null, else `image_url`) and builds the template URL from
+   `config('suppliers.external_links')` for codes with no cache row. Same
+   output as the SupplierService method, one query per page.
+4. **Step 5/7, camera scan result.** Step 7 says "on detection navigate to
+   `/products?q=<barcode>`". The component owns the camera now, so a scan sets
+   the input to the barcode and runs the search in place; with `syncUrl` the
+   address bar becomes `/products?q=<barcode>` without a reload (picker mode
+   additionally selects the top match, like the Enter-from-scanner flow). No
+   page navigation, same end state.
+5. **Step 5, "search instead for *original*".** The endpoint has no
+   "don't correct" flag (the plan's param list is canonical), so re-running
+   the original would just be corrected again. The link therefore shows the
+   original query's real result client-side: the empty "No products found"
+   state with the corrected banner cleared. Noted under Notes for Planner as a
+   possible `exact=1` follow-up.
+6. **Step 7, dropdown loaders.** Plan: "pass `stockedOnly: $stocked` and
+   nothing else to the existing repository methods". Measured on live POS:
+   `getAllSuppliersWithProducts(stockedOnly: true)` = 133 ms and
+   `getAllCategoriesWithProducts(stockedOnly: true)` = 397 ms (both are nested
+   `WHERE EXISTS` against `stocking`, the collation trap) versus 51 ms + 2 ms
+   unfiltered. That would add ~0.5 s to every `/products` load. The controller
+   calls both unfiltered, which is exactly what the old default `/products`
+   did (no filters → unfiltered dropdowns). Only effect: the dropdowns list
+   60 suppliers / 81 categories instead of 53 / 80.
+7. **Step 9, `test_authenticated_user_can_view_products_list`.** It asserted
+   `assertSee('Test Service Product')` on the default `/products`, but that
+   product is deliberately left unstocked by the plan's seeding instruction
+   and the plan's decision is "stocked products by default". The test could
+   not pass as written without contradicting the plan, so that one line became
+   `assertDontSee('Test Service Product')` with a comment. Please confirm; if
+   you would rather the service product be stocked in the fixture, the toggle
+   test needs a different unstocked product.
 
-1. **CSV writer (step 3 / constraint "header row must be exactly …")**. The plan said to use
-   `fputcsv` and that it "only quotes when needed". PHP's `fputcsv` quotes any field containing a
-   space, so the header came out as `Quantity,"Supplier Code","Product Name","Case Size"` in the
-   smoke run, violating the exact-header constraint. Replaced with a private `csvLine()` that quotes
-   only fields containing `,` `"` CR or LF (RFC 4180) and escapes `"` as `""`. Header now byte-exact;
-   comma-containing names are still quoted (KitchenOrderCsvTest covers both).
-2. **Browser check (step 6 / verification 6)**. The Claude-in-Chrome extension was not connected, so
-   the manual browser check was replaced by a scratch script driving the real HTTP kernel as the
-   admin user against the live dev DBs (all pages, standing save → pre-fill, confirm, CSV, all-zero
-   rejection, history, last-3 chips). Output is under step 6. **Not verified**: the JS (totals
-   updating on input, Confirm enabling, Clear all). Only `node --check` was run on it.
-3. **`create()` when no supplier exists at all**. The plan says an unknown `?supplier=` redirects to
-   the default. If there is no default (no kitchen products with a link) that would loop, so in that
-   case the page renders an empty state instead of redirecting. Only reachable on an empty database.
-4. **`KitchenOrderHistoryTest` uses `AliasesMysqlConnection`** (see step 8). Not a behaviour change.
 
 ## Verification
 
-1. `php artisan migrate:status`:
-```
-  2026_09_16_100000_create_kitchen_orders_table ..................... [90] Ran
-  2026_09_16_100001_create_kitchen_order_items_table ................ [90] Ran
-  2026_09_16_100002_create_kitchen_standing_order_items_table ....... [90] Ran
-```
-2. `php artisan route:list --path=kitchen | grep -c 'kitchen.orders.|kitchen.standing-order.'` → `7`.
-   `route:list` sorts alphabetically so it cannot show registration order; router matching (step 5)
-   and KitchenOrderRoutesTest prove precedence over `kitchen/{recipe}`.
-3. `php artisan test --filter=Kitchen` → `Tests: 94 passed (298 assertions)`.
-4. `php artisan test` → `Tests: 21 failed, 363 passed (1423 assertions)`. **No new failures.** The 21
-   are in AuthenticationTest (1), CashReconciliationTest (3), FruitVegLabelPrintingTest (2),
-   ProductTest (5), TestScraperControllerTest (1), WasteLogTest (2), UdeaScrapingServiceTest (7).
-   Proven pre-existing: the same seven classes run in a clean `git worktree` of HEAD 341d74fa give
-   `21 failed, 33 passed` (worktree removed afterwards). This matches the "21 pre-existing failures"
-   noted in the two most recent CHANGELOG entries.
-5. `./vendor/bin/pint --test` on all changed PHP files → PASS (20 files). The repo-wide
-   `pint --test` reports 1 pre-existing issue in `JFolder_temp/old_system/organic_trust_supplier_handler.php`,
-   untouched by this work.
-6. Browser check → replaced by the kernel-driven run (Deviation 2). First two lines of the downloaded CSV:
-```
-Quantity,Supplier Code,Product Name,Case Size
-3,6000562,AGF tas TGTG paper bag big,1
-```
-7. Query count: `productsForSupplier('5')` → `pos queries: 4`.
+### Revision 1
+1. `./vendor/bin/pint --test <all changed PHP files>` →
+   ```
+   PASS .......................................................... 11 files
+   ```
+2. `php artisan test --filter='ProductSearchVocabularyTest|ProductSearchApiTest|ProductTest'` →
+   ```
+   PASS  Tests\Unit\ProductSearchVocabularyTest   (3)
+   PASS  Tests\Feature\ProductSearchApiTest       (11)
+   FAIL  Tests\Feature\ProductTest                (6 pass, 2 fail — both pre-existing, see Step 9)
+   Tests: 2 failed, 20 passed (107 assertions)
+   ```
+3. `php artisan test` → `Tests: 17 failed, 385 passed (1536 assertions), 29.11s`.
+   No new failures. The 17 are:
+   - `ProductTest` × 2 — pre-existing (Step 9).
+   - `Unit\UdeaScrapingServiceTest` × 7 — `BadMethodCallException` / `InvalidCountException` (mocking).
+   - `CashReconciliationTest` × 3 — `BadMethodCallException`.
+   - `FruitVegLabelPrintingTest` × 2 — its fixture has no `CATEGORIES` table (`no such table: CATEGORIES`), and a count assertion that depends on it.
+   - `TestScraperControllerTest` × 1.
+   - `WasteLogTest` × 2 — SQLite unique-constraint violation in its own fixture.
+   None of these touch the product search code, `/products`, or the POS tables I create.
+4. `php artisan route:list --path=products` → lists `api.products.search`
+   (`Api\ProductSearchController`) and `products.search-test`
+   (`ProductSearchTestController`). `route:list` sorts alphabetically; in
+   `routes/web.php` `products.search-test` is registered on line 95, before
+   `/products/{id}` on line 97, and `GET /products/search-test` returns 200
+   from the test controller (not `products.show`).
+5. Test page timings — see Step 6 (all < 100 ms except `a` = 127.9 ms, within the 300 ms allowance).
+6. `/products` live checks — see Step 7 (default page, `?q=`, legacy `?search=`,
+   Next/Prev, inline stock edit + toast, sales chart modal, camera modal all verified in Chrome).
+7. After a typo search over HTTP: `php artisan tinker --execute='dump(Cache::get("product-search:vocab") !== null)'` → `true`.
 
-
-## Verification
-(pending)
+### Revision 2
+1. `./vendor/bin/pint --test app/Services/SupplierService.php app/Http/Controllers/ProductController.php tests/Feature/ProductSearchApiTest.php tests/Concerns/CreatesProductSearchPosTables.php` →
+   ```
+   PASS ........................................................... 4 files
+   ```
+2. `php artisan test --filter='ProductSearchVocabularyTest|ProductSearchApiTest|ProductTest'` →
+   ```
+   ⨯ shows 404 for non existent product        (pre-existing)
+   ⨯ product statistics are displayed          (pre-existing)
+   Tests: 2 failed, 20 passed (110 assertions)
+   ```
+3. Tinker command from Step 10 → prints nothing.
 
 ## Files changed
-`git status --short` at the end (`?? docs/planImp/` was the only pre-existing dirty entry):
+
+`git status --short` at the end. Lines marked `[pre-existing]` were dirty before I started (customer-requests / auth work from another session) and are untouched by me; `docs/planImp/plan.md` is the Planner's.
+
 ```
- M CHANGELOG.md
+ M CLAUDE.md
+ M app/Http/Controllers/Auth/AuthenticatedSessionController.php   [pre-existing]
+ M app/Http/Controllers/CustomerRequestController.php             [pre-existing]
+ M app/Http/Controllers/ProductController.php
+ M app/Services/SupplierService.php                                (rev 2)
  M docs/FEATURES_INDEX.md
- M docs/features/kitchen-products.md
- M resources/views/kitchen/products/index.blade.php
- M resources/views/layouts/admin.blade.php
+ M docs/development/known-issues.md
+ M docs/planImp/implemented.md
+ M docs/planImp/plan.md                                           [Planner's]
+ M resources/views/customer-requests/_form.blade.php              [pre-existing]
+D  resources/views/customer-requests/create.blade.php             [pre-existing]
+ M resources/views/customer-requests/edit.blade.php               [pre-existing]
+ M resources/views/customer-requests/index.blade.php              [pre-existing]
+ M resources/views/customer-requests/show.blade.php               [pre-existing]
+ M resources/views/layouts/board.blade.php                        [pre-existing]
+ M resources/views/products/index.blade.php
  M routes/web.php
-?? app/Http/Controllers/KitchenOrderController.php
-?? app/Http/Requests/StoreKitchenOrderRequest.php
-?? app/Http/Requests/UpdateKitchenStandingOrderRequest.php
-?? app/Models/KitchenOrder.php
-?? app/Models/KitchenOrderItem.php
-?? app/Models/KitchenStandingOrderItem.php
-?? app/Services/KitchenOrderService.php
-?? database/migrations/2026_09_16_100000_create_kitchen_orders_table.php
-?? database/migrations/2026_09_16_100001_create_kitchen_order_items_table.php
-?? database/migrations/2026_09_16_100002_create_kitchen_standing_order_items_table.php
-?? docs/features/kitchen-orders.md
-?? docs/planImp/                      (pre-existing; now also holds this file)
-?? resources/views/kitchen/orders/    (create, show, index, standing, partials/product-row, partials/qty-scripts)
-?? tests/Concerns/CreatesKitchenOrderPosTables.php
-?? tests/Feature/KitchenOrderCreatePageTest.php
-?? tests/Feature/KitchenOrderCsvTest.php
-?? tests/Feature/KitchenOrderHistoryTest.php
-?? tests/Feature/KitchenOrderRoutesTest.php
-?? tests/Feature/KitchenOrderStoreTest.php
-?? tests/Feature/KitchenStandingOrderTest.php
+ M tests/Feature/Auth/AuthenticationTest.php                      [pre-existing]
+ M tests/Feature/CustomerRequestTest.php                          [pre-existing]
+ M tests/Feature/ProductTest.php
+?? app/Http/Controllers/Api/ProductSearchController.php
+?? app/Http/Controllers/ProductSearchTestController.php
+?? app/Services/ProductSearch/ProductSearchCriteria.php
+?? app/Services/ProductSearch/ProductSearchService.php
+?? app/Services/ProductSearch/ProductSearchVocabulary.php
+?? docs/features/product-search.md
+?? docs/planImp/archive/                                          [pre-existing]
+?? resources/views/components/product-search.blade.php
+?? resources/views/products/search-test.blade.php
+?? tests/Concerns/CreatesProductSearchPosTables.php
+?? tests/Feature/ProductSearchApiTest.php
+?? tests/Unit/ProductSearchVocabularyTest.php
 ```
-Nothing committed. The three migrations have been run on the dev MySQL database (tables exist,
-empty — all smoke rows were deleted).
+
+Nothing committed, pushed or deployed. The one live-data side effect: the
+inline-stock-edit check re-saved " cake" (CODE 4112) with its existing value
+0 via `/products/{id}/update-stock`, which is a no-op for STOCKCURRENT.
 
 ## Notes for Planner
 
-- **JS is the one unverified piece.** Please open `/kitchen/orders/create` in a browser and check:
-  totals update as you type / press +/−, Confirm enables above 0 cases, Clear all resets, and
-  pre-filled standing rows show non-zero totals on load. Also that the sticky footer behaves
-  with the hover image preview.
-- **`PRODUCTS.*` still loads the IMAGE blob.** The plan's "cheap has_image flag without loading
-  blobs" idiom from `ProductRepository` selects `PRODUCTS.*` *and* the flag, so the blob column is
-  transferred for all 74 rows (the flag just avoids the accessor). It is fast enough on dev (page
-  renders in well under a second) but a follow-up could select explicit columns. Not changed
-  because the plan named that idiom.
-- **Live data counts differ slightly from the plan's Context**: I see 2 kitchen products with no
-  supplier link + 1 with a missing POS row (plan said 3 + 1); 74+19+4+1+1+2+1 = 102 matches
-  `KitchenProduct::count()`. The plan's "3" likely counted the missing-POS product as also unlinked.
-- **Independent images cost one Laravel-DB query per product** via `SupplierImageCache` inside
-  `SupplierService::getExternalImageUrl()` (19 rows on live data). This is on the default
-  connection, so the ≤4 POS-query check still holds, and `SupplierService` is out of scope to change.
-- The order-again link on the show page and the `?supplier=` redirect both use the stored
-  `supplier_id`; if a supplier later loses all kitchen products the create page redirects to the
-  default with an error flash, as specified.
-- `KitchenStandingOrderItem` got an extra `updatedBy()` relation (not in the plan, harmless, unused).
-- Scratch files (kernel smoke script, worktree) live only in the session scratchpad; nothing was
-  added to the repo outside the file list above.
+- (Resolved in revision 2: `updateName` now calls `forget()`; the
+  `website_search` null deprecation is guarded.)
+- **"Search instead for *original*"** would be a proper feature with an
+  `exact=1` (skip correction) param on the endpoint; currently it just shows
+  the honest empty result (Deviation #5).
+- **The `stocked=0` search is faster than the stocked one** (48 ms vs 77 ms
+  for "milk") because the unfiltered PRODUCTS scan is 11 ms vs the 30 ms
+  `JOIN stocking`. STRAIGHT_JOIN and `IN (subquery)` variants were measured and
+  are not better (185 ms / 33 ms). A Laravel-side cache of the ~5k stocking
+  barcodes would not help either (`whereIn` of 5,264 values was 60 ms).
+- **Box load was ~9** during all measurements (the other session and the
+  test-suite runs), so the `took_ms` figures have maybe ±20 ms noise; the
+  quiet-box numbers are at the low end of each range.
+- **`vat_label` is `"23.0%"`** (existing accessor), not `"23%"` as in the
+  plan's example JSON.
+- **Pre-existing `ProductTest` failures** (404 for a missing product, and the
+  statistics test) are real gaps: `ProductController@show` never checks the
+  product exists, and the statistics test predates the `show_stats` toggle.
+  Both are one-line fixes for a future plan.
+- **Old page's `Product::scopeSearch` / `ProductRepository::searchProducts`
+  callers**: `/products` no longer calls `searchProducts()` or
+  `getAllProducts()`; they remain for the other pages listed in
+  `docs/features/product-search.md`.
+- **Independent thumbnails**: as on the old page, uncached supplier codes get
+  a template URL that often 404s and falls back to the placeholder. A
+  follow-up could queue `resolveAndCacheImageUrl()` for codes seen in search
+  results (never inline).

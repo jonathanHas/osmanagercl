@@ -39,7 +39,7 @@
                             <span class="hidden sm:inline text-sm text-gray-300">{{ auth()->user()->name }}</span>
                             <a href="{{ route('dashboard') }}" class="text-sm text-gray-300 hover:text-white px-2 py-1">Dashboard</a>
                         @else
-                            <a href="{{ route('login') }}" class="inline-flex items-center px-3 py-1.5 rounded-md bg-gray-700 hover:bg-gray-600 text-sm font-medium text-white">
+                            <a href="{{ route('login', ['redirect' => request()->getRequestUri()]) }}" class="inline-flex items-center px-3 py-1.5 rounded-md bg-gray-700 hover:bg-gray-600 text-sm font-medium text-white">
                                 Staff sign in
                             </a>
                         @endauth
@@ -66,7 +66,7 @@
                     .then(r => r.json())
                     .then(data => {
                         if (!data.authenticated) {
-                            window.location.href = '{{ route("login") }}';
+                            window.location.href = '{{ route("login", ["redirect" => request()->getRequestUri()]) }}';
                         }
                     })
                     .catch(() => {});

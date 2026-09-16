@@ -5,54 +5,25 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use Tests\Concerns\CreatesProductSearchPosTables;
 use Tests\TestCase;
 
 class ProductTest extends TestCase
 {
+    use CreatesProductSearchPosTables;
     use RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        // Create POS database table for testing
-        $this->createProductsTable();
+        // /products now renders through ProductSearchService, which reads
+        // PRODUCTS, stocking, supplier_link, suppliers, STOCKCURRENT,
+        // CATEGORIES, TAXCATEGORIES and TAXES from the POS connection.
+        $this->createProductSearchPosTables();
 
         // Seed test products
         $this->seedTestProducts();
-    }
-
-    protected function createProductsTable(): void
-    {
-        Schema::connection('pos')->create('PRODUCTS', function ($table) {
-            $table->string('ID', 255)->primary();
-            $table->string('REFERENCE', 255)->unique();
-            $table->string('CODE', 255)->unique();
-            $table->string('CODETYPE', 255)->nullable();
-            $table->string('NAME', 255);
-            $table->double('PRICEBUY')->default(0);
-            $table->double('PRICESELL')->default(0);
-            $table->string('CATEGORY', 255);
-            $table->string('TAXCAT', 255);
-            $table->string('ATTRIBUTESET_ID', 255)->nullable();
-            $table->double('STOCKCOST')->default(0);
-            $table->double('STOCKVOLUME')->default(0);
-            $table->binary('IMAGE')->nullable();
-            $table->boolean('ISCOM')->default(false);
-            $table->boolean('ISSCALE')->default(false);
-            $table->boolean('ISKITCHEN')->default(false);
-            $table->boolean('PRINTKB')->default(false);
-            $table->boolean('SENDSTATUS')->default(false);
-            $table->boolean('ISSERVICE')->default(false);
-            $table->binary('ATTRIBUTES')->nullable();
-            $table->string('DISPLAY', 255)->nullable();
-            $table->smallInteger('ISVPRICE')->default(0);
-            $table->smallInteger('ISVERPATRIB')->default(0);
-            $table->string('TEXTTIP', 255)->nullable();
-            $table->smallInteger('WARRANTY')->default(0);
-            $table->double('STOCKUNITS')->default(0);
-        });
     }
 
     protected function seedTestProducts(): void
@@ -101,6 +72,12 @@ class ProductTest extends TestCase
                 'ISKITCHEN' => true,
             ],
         ]);
+
+        // Test Product 1 and Kitchen Item are stocked; Test Service Product is not.
+        DB::connection('pos')->table('stocking')->insert([
+            ['Barcode' => 'CODE001'],
+            ['Barcode' => 'CODE003'],
+        ]);
     }
 
     public function test_products_page_requires_authentication()
@@ -118,11 +95,23 @@ class ProductTest extends TestCase
         $response->assertStatus(200);
         $response->assertViewIs('products.index');
         $response->assertSee('Test Product 1');
-        $response->assertSee('Test Service Product');
         $response->assertSee('Kitchen Item');
+        // Stocked products by default: the unstocked service product is behind the "Include unstocked" toggle.
+        $response->assertDontSee('Test Service Product');
     }
 
     public function test_can_search_products_by_name()
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/products?q=Kitchen');
+
+        $response->assertStatus(200);
+        $response->assertSee('Kitchen Item');
+        $response->assertDontSee('Test Product 1');
+    }
+
+    public function test_legacy_search_param_still_works()
     {
         $user = User::factory()->create();
 
@@ -133,16 +122,20 @@ class ProductTest extends TestCase
         $response->assertDontSee('Test Product 1');
     }
 
-    public function test_can_filter_active_products_only()
+    public function test_unstocked_products_hidden_by_default_and_shown_with_toggle()
     {
         $user = User::factory()->create();
 
-        $response = $this->actingAs($user)->get('/products?active_only=1');
-
+        // "Test Service Product" has no stocking row, so the default (stocked) view hides it.
+        $response = $this->actingAs($user)->get('/products?q=Test');
         $response->assertStatus(200);
         $response->assertSee('Test Product 1');
-        $response->assertSee('Kitchen Item');
         $response->assertDontSee('Test Service Product');
+
+        $response = $this->actingAs($user)->get('/products?q=Test&stocked=0');
+        $response->assertStatus(200);
+        $response->assertSee('Test Product 1');
+        $response->assertSee('Test Service Product');
     }
 
     public function test_can_view_product_details()
@@ -179,8 +172,7 @@ class ProductTest extends TestCase
 
     protected function tearDown(): void
     {
-        // Drop the test products table
-        Schema::connection('pos')->dropIfExists('PRODUCTS');
+        $this->dropProductSearchPosTables();
 
         parent::tearDown();
     }

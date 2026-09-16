@@ -29,6 +29,9 @@ use App\Repositories\SalesRepository;
 use App\Services\BarcodeGeneratorService;
 use App\Services\LabelService;
 use App\Services\OrderService;
+use App\Services\ProductSearch\ProductSearchCriteria;
+use App\Services\ProductSearch\ProductSearchService;
+use App\Services\ProductSearch\ProductSearchVocabulary;
 use App\Services\SupplierService;
 use App\Services\TillVisibilityService;
 use App\Services\UdeaScrapingService;
@@ -119,66 +122,52 @@ class ProductController extends Controller
 
     /**
      * Display a listing of products.
+     *
+     * The list itself is <x-product-search mode="list">; the first page is
+     * rendered server-side from the same ProductSearchService the JSON
+     * endpoint uses, so links like /products?q=... are shareable and fast.
+     * Legacy parameters are still honoured: `search` (camera scanner and
+     * external links) maps to `q`, `stocked_only=1` means stocked.
      */
-    public function index(Request $request): View
+    public function index(Request $request, ProductSearchService $productSearch): View
     {
-        $search = $request->get('search');
-        $activeOnly = $request->boolean('active_only');
-        $stockedOnly = $request->boolean('stocked_only');
-        $inStockOnly = $request->boolean('in_stock_only');
-        $showStats = $request->boolean('show_stats');
-        $supplierId = $request->get('supplier_id');
-        $categoryId = $request->get('category_id');
-        $showSuppliers = $request->boolean('show_suppliers');
-        $perPage = $request->get('per_page', 20);
-
-        // Get suppliers for dropdown (always load for immediate availability when checkbox is toggled)
-        $suppliers = $this->productRepository->getAllSuppliersWithProducts(
-            stockedOnly: $stockedOnly,
-            inStockOnly: $inStockOnly,
-            activeOnly: $activeOnly
-        );
-
-        // Get categories for dropdown - shows ALL categories regardless of till visibility
-        // CATSHOWNAME controls POS till display, not product management
-        $categories = $this->productRepository->getAllCategoriesWithProducts(
-            activeOnly: $activeOnly,
-            stockedOnly: $stockedOnly,
-            inStockOnly: $inStockOnly
-        );
-
-        if ($search || $activeOnly || $stockedOnly || $inStockOnly || $supplierId || $categoryId) {
-            $products = $this->productRepository->searchProducts(
-                search: $search,
-                activeOnly: $activeOnly,
-                stockedOnly: $stockedOnly,
-                inStockOnly: $inStockOnly,
-                categoryId: $categoryId,
-                supplierId: $supplierId,
-                perPage: $perPage,
-                withSuppliers: $showSuppliers
-            );
-        } else {
-            $products = $this->productRepository->getAllProducts($perPage, $showSuppliers);
+        $q = trim((string) ($request->get('q') ?? $request->get('search') ?? ''));
+        $stocked = $request->has('stocked') ? $request->boolean('stocked') : true;
+        if ($request->boolean('stocked_only')) {
+            $stocked = true;
         }
+        $showStats = $request->boolean('show_stats');
+        $supplierId = $request->get('supplier_id') ?: null;
+        $categoryId = $request->get('category_id') ?: null;
+
+        $initial = $productSearch->search(new ProductSearchCriteria(
+            q: $q,
+            stocked: $stocked,
+            supplierId: $supplierId,
+            categoryId: $categoryId,
+            page: max(1, (int) $request->get('page', 1)),
+            perPage: (int) $request->get('per_page', 20),
+        ));
+
+        // Dropdown options for the "More filters" disclosure. Loaded unfiltered:
+        // the stocked variants use nested EXISTS against stocking (~500 ms, see
+        // docs/development/known-issues.md) and the extra options are harmless.
+        $suppliers = $this->productRepository->getAllSuppliersWithProducts();
+        $categories = $this->productRepository->getAllCategoriesWithProducts();
 
         // Only calculate statistics when requested
         $statistics = $showStats ? $this->productRepository->getStatistics() : null;
 
         return view('products.index', [
-            'products' => $products,
+            'initial' => $initial,
             'statistics' => $statistics,
-            'search' => $search,
-            'activeOnly' => $activeOnly,
-            'stockedOnly' => $stockedOnly,
-            'inStockOnly' => $inStockOnly,
+            'q' => $q,
+            'stocked' => $stocked,
             'showStats' => $showStats,
             'supplierId' => $supplierId,
             'categoryId' => $categoryId,
-            'showSuppliers' => $showSuppliers,
             'suppliers' => $suppliers,
             'categories' => $categories,
-            'supplierService' => $this->supplierService,
         ]);
     }
 
@@ -213,6 +202,8 @@ class ProductController extends Controller
         $product->update([
             'NAME' => trim($request->product_name),
         ]);
+
+        app(ProductSearchVocabulary::class)->forget();
 
         return redirect()
             ->route('products.edit', $id)
@@ -1409,6 +1400,8 @@ class ProductController extends Controller
                 }
             });
 
+            app(ProductSearchVocabulary::class)->forget();
+
             // Determine redirect route with context
             if ($request->delivery_item_id) {
                 $deliveryItem = \App\Models\DeliveryItem::findOrFail($request->delivery_item_id);
@@ -1641,6 +1634,8 @@ class ProductController extends Controller
                 'updated_by' => auth()->id(),
                 'updated_fields' => array_keys($productData),
             ]);
+
+            app(ProductSearchVocabulary::class)->forget();
 
             // Determine redirect route with context
             $fromDelivery = $request->query('from_delivery');

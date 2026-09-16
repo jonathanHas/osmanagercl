@@ -283,6 +283,11 @@ class SupplierService
                 return null;
             }
 
+            // Some integrations (e.g. Natural Medicine) have no website search URL
+            if (empty($config['website_search'])) {
+                return null;
+            }
+
             // URL encode the supplier code to handle special characters
             $supplierCode = urlencode($product->supplierLink->SupplierCode);
 

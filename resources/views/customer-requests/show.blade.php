@@ -1,5 +1,5 @@
-<x-admin-layout>
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<x-board-layout title="Customer request">
+    <div>
         <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
             <div>
                 <h2 class="text-2xl font-bold text-gray-900">{{ $customerRequest->customer_name }}</h2>
@@ -72,4 +72,4 @@
             </div>
         </div>
     </div>
-</x-admin-layout>
+</x-board-layout>

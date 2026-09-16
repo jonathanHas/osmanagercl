@@ -92,6 +92,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/products', [ProductController::class, 'index'])->name('products.index');
     Route::get('/products/create', [ProductController::class, 'create'])->name('products.create');
     Route::get('/products/independent-test', [\App\Http\Controllers\IndependentTestController::class, 'index'])->name('products.independent-test');
+    Route::get('/products/search-test', \App\Http\Controllers\ProductSearchTestController::class)->name('products.search-test');
     Route::post('/products', [ProductController::class, 'store'])->name('products.store');
     Route::get('/products/suppliers', [ProductController::class, 'suppliersIndex'])->name('products.suppliers');
     Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show');
@@ -132,6 +133,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/api/products/check-barcode-duplicate', [ProductController::class, 'checkBarcodeDuplicate'])->name('api.products.check-barcode-duplicate');
     Route::post('/api/products/check-supplier-link-duplicate', [ProductController::class, 'checkSupplierLinkDuplicate'])->name('api.products.check-supplier-link-duplicate');
     Route::post('/api/products/suggest-barcode', [ProductController::class, 'suggestBarcode'])->name('api.products.suggest-barcode');
+    Route::get('/api/products/search', \App\Http\Controllers\Api\ProductSearchController::class)->name('api.products.search');
 
     // Stocking scanner routes
     Route::get('/stocking', [StockingController::class, 'index'])->name('stocking.index');
@@ -1097,7 +1099,6 @@ Route::middleware('auth')->group(function () {
         ->middleware('permission:customer-requests.manage')->group(function () {
             Route::get('/create', [CustomerRequestController::class, 'create'])->name('create');
             Route::post('/', [CustomerRequestController::class, 'store'])->name('store');
-            Route::get('/api/products/search', [CustomerRequestController::class, 'searchProducts'])->name('api.products.search');
             Route::patch('/items/{item}/status', [CustomerRequestController::class, 'updateItemStatus'])
                 ->whereNumber('item')->name('items.status');
             Route::get('/{customerRequest}', [CustomerRequestController::class, 'show'])
