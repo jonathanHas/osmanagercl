@@ -121,17 +121,47 @@ code via `supplier_image_cache`, template URL when uncached), else `null`. `matc
 
 ## Matching and ranking
 
-1. **Barcode mode** — whole query is ≥6 digits: `CODE = q OR REFERENCE = q OR CODE LIKE 'q%' OR CODE IN (barcodes whose supplier code = q)`.
-2. **Token mode** — otherwise the query is lower-cased, split on whitespace, stripped to
-   `[a-z0-9%.-]`, de-duplicated, max 6 tokens. Every token must match (`AND`), each against
-   `NAME`, `CODE`, `REFERENCE` (`LIKE '%t%'`) or the barcodes whose `supplier_link.SupplierCode`
-   contains it (`OR CODE IN (...)`, only for tokens ≥3 chars that match fewer than 500 links).
-   `%`, `_` and `!` are escaped (`ESCAPE '!'`, which works on MySQL and SQLite).
-3. **Ranking** (`match_rank`, then `NAME`): 0 exact code/reference · 1 name starts with the
-   phrase · 2 name contains the phrase · 3 every token starts a word in the name · 4 anything else.
+1. **Tokenising** — the query is lower-cased, split on whitespace, stripped to
+   `[a-z0-9%.-]`, de-duplicated, max 6 tokens. Every token must match (`AND`).
+   `%`, `_` and `!` are escaped (`ESCAPE '!'`, which works on MySQL and SQLite). There is no
+   separate "barcode mode": a full barcode is simply a long digit token.
+2. **Token classification** — an all-digit token of **4+ characters** is a code fragment and
+   matches `CODE`, `REFERENCE` (`LIKE '%t%'`) and the barcodes whose
+   `supplier_link.SupplierCode` contains it — **never `NAME`**. Only 80 of 10,649 product
+   names contain a 4-digit run, so matching those against names ("Vitamin D3 1000iu") buried
+   the real barcode hits. Shorter tokens, including 3-digit ones like `100` or `500` that are
+   usually sizes, also match `NAME`. The supplier-code lookup runs for tokens of 3+ chars and
+   is skipped when a token matches 500 or more links (too generic).
+3. **Ranking** (`match_rank`, then `NAME`), lower is better:
+
+   | Tier | Matches |
+   |---|---|
+   | 0 | `CODE` or `REFERENCE` equals the whole query |
+   | 1 | code, reference **or supplier code ends with** a **4+ digit** token |
+   | 2 | `NAME` starts with the phrase |
+   | 3 | `NAME` contains the phrase |
+   | 4 | every token starts a word in `NAME` |
+   | 5 | code, reference or supplier code ends with a **3-digit** token |
+   | 6 | anything else |
+
+   Tiers 1 and 5 are what make "type the last few digits of the barcode" work: `4341` puts the
+   codes *ending* in those digits above the ones that merely contain them, and an exact supplier
+   code such as `6001397` ranks straight after an exact barcode. Each tier is OR-ed across the
+   qualifying tokens.
+
+   **The suffix rule is split at 4 digits on purpose.** A 4+ digit run is only ever a barcode
+   fragment, so it outranks the name tiers. A 3-digit run is usually a size — and on 10,649
+   products, 7–17 unrelated 13-digit barcodes happen to end in `100`, `250` or `500` — so those
+   coincidences sit *below* the name matches. This needs no "is it a size?" guess: when nothing
+   is named after the digits (`341`, where no product name contains those characters) the name
+   tiers are empty and the suffix matches surface at the top anyway.
+
+   **`match_rank` values above 0 changed on 2026-09-19** when the suffix tiers were added
+   (old 1–4 are now 2–5, and 5/6 are new). Nothing outside the tests reads specific values.
 4. **Typo fallback** — if the tokenised search returns nothing, each token is corrected by
    `ProductSearchVocabulary::correct()` and the search reruns once; `meta.corrected_query`
-   carries the corrected string and the UI shows "Showing results for …".
+   carries the corrected string and the UI shows "Showing results for …". All-digit tokens are
+   never corrected, so a mistyped digit simply returns nothing.
 
 ### Typo-correction rules (`ProductSearchVocabulary`)
 

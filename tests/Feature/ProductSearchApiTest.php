@@ -15,7 +15,7 @@ class ProductSearchApiTest extends TestCase
     use CreatesProductSearchPosTables;
     use RefreshDatabase;
 
-    /** @var array{P1: string, P2: string, P3: string, P4: string, P5: string} */
+    /** @var array{P1: string, P2: string, P3: string, P4: string, P5: string, P6: string, P7: string} */
     protected array $ids;
 
     protected function setUp(): void
@@ -60,10 +60,11 @@ class ProductSearchApiTest extends TestCase
         $this->assertSame($this->ids['P1'], $response->json('data.0.id'));
         $this->assertSame(0, $response->json('data.0.match_rank'));
 
+        // Tiers shifted by one on 2026-09-19 when the code-suffix tier was inserted at 1.
         $response = $this->search(['q' => 'milk', 'stocked' => 0])->assertOk();
         $this->assertSame([$this->ids['P3'], $this->ids['P1']], $this->idsOf($response));
-        $this->assertSame(1, $response->json('data.0.match_rank'));
-        $this->assertSame(2, $response->json('data.1.match_rank'));
+        $this->assertSame(2, $response->json('data.0.match_rank'), 'name prefix');
+        $this->assertSame(3, $response->json('data.1.match_rank'), 'phrase anywhere in name');
     }
 
     public function test_stocked_is_default_and_toggle_includes_unstocked(): void
@@ -88,6 +89,66 @@ class ProductSearchApiTest extends TestCase
 
         $response = $this->search(['q' => 'ind-a'])->assertOk();
         $this->assertSame([$this->ids['P4']], $this->idsOf($response));
+    }
+
+    public function test_partial_barcode_matches_code_suffix_first(): void
+    {
+        // P1 code ends with 4341; P7 merely contains it. P6 has 4341 in its NAME only.
+        $response = $this->search(['q' => '4341', 'stocked' => 0])->assertOk();
+        $this->assertSame([$this->ids['P1'], $this->ids['P7']], $this->idsOf($response));
+        $this->assertSame(1, $response->json('data.0.match_rank'));
+        $this->assertNotContains($this->ids['P6'], $this->idsOf($response), '4-digit tokens never match names');
+
+        $response = $this->search(['q' => '594341', 'stocked' => 0])->assertOk();
+        $this->assertSame([$this->ids['P1']], $this->idsOf($response));
+
+        // Three-digit tokens are usually sizes, so they still match names.
+        $response = $this->search(['q' => '100', 'stocked' => 0])->assertOk();
+        $this->assertContains($this->ids['P1'], $this->idsOf($response), '"100 gram" in the name');
+    }
+
+    public function test_three_digit_sizes_rank_names_above_coincidental_code_suffixes(): void
+    {
+        // "100" is a size, and plenty of barcodes end in those digits by
+        // coincidence (P6 is "Kettle Model 4341", code 1000100). The product
+        // actually named "…100 gram" (P1) must come first; P4/P5 merely
+        // contain the digits mid-code.
+        $response = $this->search(['q' => '100', 'stocked' => 0])->assertOk();
+
+        $this->assertSame(
+            [$this->ids['P1'], $this->ids['P6'], $this->ids['P4'], $this->ids['P5']],
+            $this->idsOf($response)
+        );
+        $this->assertSame(3, $response->json('data.0.match_rank'), 'name contains the phrase');
+        $this->assertSame(5, $response->json('data.1.match_rank'), 'code ends with a 3-digit token');
+
+        // Full ordering for a 3-digit token: name match, then code suffix,
+        // then codes that merely contain the digits.
+        $response = $this->search(['q' => '341', 'stocked' => 0])->assertOk();
+        $this->assertSame(
+            [$this->ids['P6'], $this->ids['P1'], $this->ids['P7']],
+            $this->idsOf($response)
+        );
+        $this->assertSame([3, 5, 6], array_column($response->json('data'), 'match_rank'));
+
+        // When nothing is named after the digits the name tiers are empty, so
+        // the suffix match surfaces on its own — that is what makes a short
+        // barcode fragment work.
+        $response = $this->search(['q' => '009', 'stocked' => 0])->assertOk();
+        $this->assertSame([$this->ids['P5']], $this->idsOf($response));
+        $this->assertSame(5, $response->json('data.0.match_rank'));
+    }
+
+    public function test_supplier_code_ranks_like_a_barcode(): void
+    {
+        $response = $this->search(['q' => '6001397'])->assertOk();
+        $this->assertSame([$this->ids['P1']], $this->idsOf($response));
+        $this->assertSame(1, $response->json('data.0.match_rank'));
+
+        // Supplier code 6001397 ends with 1397.
+        $response = $this->search(['q' => '1397', 'stocked' => 0])->assertOk();
+        $this->assertSame($this->ids['P1'], $response->json('data.0.id'));
+        $this->assertSame(1, $response->json('data.0.match_rank'));
     }
 
     public function test_typo_correction_reports_corrected_query(): void
@@ -158,19 +219,22 @@ class ProductSearchApiTest extends TestCase
         $this->assertSame([$this->ids['P4']], $this->idsOf($response));
 
         $response = $this->search(['category_id' => 'cat-drinks', 'q' => '', 'stocked' => 0])->assertOk();
-        $this->assertEqualsCanonicalizing([$this->ids['P4'], $this->ids['P5']], $this->idsOf($response));
+        $this->assertEqualsCanonicalizing(
+            [$this->ids['P4'], $this->ids['P5'], $this->ids['P6'], $this->ids['P7']],
+            $this->idsOf($response)
+        );
     }
 
     public function test_pagination_meta_is_accurate(): void
     {
         $response = $this->search(['q' => '', 'stocked' => 0, 'per_page' => 2])->assertOk();
         $this->assertCount(2, $response->json('data'));
-        $this->assertSame(5, $response->json('meta.total'));
-        $this->assertSame(3, $response->json('meta.last_page'));
+        $this->assertSame(7, $response->json('meta.total'));
+        $this->assertSame(4, $response->json('meta.last_page'));
 
-        $response = $this->search(['q' => '', 'stocked' => 0, 'per_page' => 2, 'page' => 3])->assertOk();
+        $response = $this->search(['q' => '', 'stocked' => 0, 'per_page' => 2, 'page' => 4])->assertOk();
         $this->assertCount(1, $response->json('data'));
-        $this->assertSame(3, $response->json('meta.page'));
+        $this->assertSame(4, $response->json('meta.page'));
     }
 
     public function test_per_page_is_capped_at_50_and_requires_auth(): void

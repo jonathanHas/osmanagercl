@@ -102,8 +102,10 @@ trait CreatesProductSearchPosTables
      *   P3 Milk Chocolate Bar                                  — 5000000000001, no supplier, NOT stocked
      *   P4 Apple Juice 1L                                      — 1000001, Independent IND-A, stocked, blob image
      *   P5 Old Delisted Thing                                  — 1000009, Natural Medicine NM-1, not stocked
+     *   P6 Kettle Model 4341                                   — 1000100, no supplier, not stocked (4341 in the NAME only; code ends in 100)
+     *   P7 Bulk Oats                                           — 1143419999999, no supplier, not stocked (4341 mid-code)
      *
-     * @return array{P1: string, P2: string, P3: string, P4: string, P5: string}
+     * @return array{P1: string, P2: string, P3: string, P4: string, P5: string, P6: string, P7: string}
      */
     protected function seedProductSearchFixture(): array
     {
@@ -129,6 +131,8 @@ trait CreatesProductSearchPosTables
             ['ID' => 'p3', 'NAME' => 'Milk Chocolate Bar', 'CODE' => '5000000000001', 'CATEGORY' => 'cat-choc', 'PRICESELL' => 2.00, 'IMAGE' => null],
             ['ID' => 'p4', 'NAME' => 'Apple Juice 1L', 'CODE' => '1000001', 'CATEGORY' => 'cat-drinks', 'PRICESELL' => 3.00, 'IMAGE' => 'not-really-a-jpeg'],
             ['ID' => 'p5', 'NAME' => 'Old Delisted Thing', 'CODE' => '1000009', 'CATEGORY' => 'cat-drinks', 'PRICESELL' => 1.00, 'IMAGE' => null],
+            ['ID' => 'p6', 'NAME' => 'Kettle Model 4341', 'CODE' => '1000100', 'CATEGORY' => 'cat-drinks', 'PRICESELL' => 20.00, 'IMAGE' => null],
+            ['ID' => 'p7', 'NAME' => 'Bulk Oats', 'CODE' => '1143419999999', 'CATEGORY' => 'cat-drinks', 'PRICESELL' => 2.50, 'IMAGE' => null],
         ];
 
         foreach ($products as $product) {
@@ -157,6 +161,6 @@ trait CreatesProductSearchPosTables
             ['LOCATION' => '0', 'PRODUCT' => 'p4', 'UNITS' => 3.5],
         ]);
 
-        return ['P1' => 'p1', 'P2' => 'p2', 'P3' => 'p3', 'P4' => 'p4', 'P5' => 'p5'];
+        return ['P1' => 'p1', 'P2' => 'p2', 'P3' => 'p3', 'P4' => 'p4', 'P5' => 'p5', 'P6' => 'p6', 'P7' => 'p7'];
     }
 }
