@@ -105,7 +105,7 @@ class KitchenOrganicRegistrationTest extends TestCase
     {
         $recipe = $this->makeRecipe(3);
 
-        $response = $this->actingAs(User::factory()->create())
+        $response = $this->actingAs(User::factory()->withRole('admin')->create())
             ->get(route('kitchen.organic-form', $recipe));
 
         $response->assertOk();
@@ -118,7 +118,7 @@ class KitchenOrganicRegistrationTest extends TestCase
     {
         $recipe = $this->makeRecipe(12);
 
-        $content = $this->actingAs(User::factory()->create())
+        $content = $this->actingAs(User::factory()->withRole('admin')->create())
             ->get(route('kitchen.organic-form', $recipe))
             ->getContent();
 
@@ -130,7 +130,7 @@ class KitchenOrganicRegistrationTest extends TestCase
     {
         $recipe = $this->makeRecipe(13);
 
-        $content = $this->actingAs(User::factory()->create())
+        $content = $this->actingAs(User::factory()->withRole('admin')->create())
             ->get(route('kitchen.organic-form', $recipe))
             ->getContent();
 
@@ -141,7 +141,7 @@ class KitchenOrganicRegistrationTest extends TestCase
     {
         $recipe = $this->makeRecipe(1);
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withRole('admin')->create())
             ->get(route('kitchen.index'))
             ->assertOk()
             ->assertSee('Organic registration forms')
@@ -175,7 +175,7 @@ class KitchenOrganicRegistrationTest extends TestCase
             'unit_type' => 'unit',
         ]);
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withRole('admin')->create())
             ->get(route('kitchen.index'))
             ->assertOk()
             ->assertSee('1 of 2 ingredients have no % weight worked out', false);
@@ -185,7 +185,7 @@ class KitchenOrganicRegistrationTest extends TestCase
     {
         $this->makeRecipe(2);
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withRole('admin')->create())
             ->get(route('kitchen.index'))
             ->assertOk()
             ->assertDontSee('have no % weight worked out', false);
@@ -195,7 +195,7 @@ class KitchenOrganicRegistrationTest extends TestCase
     {
         $recipe = $this->makeRecipe(1);
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withRole('admin')->create())
             ->get(route('kitchen.show', $recipe))
             ->assertOk()
             ->assertSee('Organic registration form is incomplete')

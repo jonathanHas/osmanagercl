@@ -40,7 +40,7 @@ class KitchenIngredientProfileStoreTest extends TestCase
 
     public function test_quick_create_stores_profile_and_returns_json(): void
     {
-        $response = $this->actingAs(User::factory()->create())
+        $response = $this->actingAs(User::factory()->withRole('admin')->create())
             ->postJson(route('kitchen.profiles.store'), $this->payload());
 
         $response->assertOk()
@@ -57,7 +57,7 @@ class KitchenIngredientProfileStoreTest extends TestCase
 
     public function test_quick_create_stores_non_organic_status(): void
     {
-        $response = $this->actingAs(User::factory()->create())
+        $response = $this->actingAs(User::factory()->withRole('admin')->create())
             ->postJson(route('kitchen.profiles.store'), $this->payload([
                 'name' => 'Salt',
                 'organic_status' => 'non_organic',
@@ -73,7 +73,7 @@ class KitchenIngredientProfileStoreTest extends TestCase
         $payload = $this->payload();
         unset($payload['organic_status']);
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withRole('admin')->create())
             ->postJson(route('kitchen.profiles.store'), $payload)
             ->assertStatus(422)
             ->assertJsonValidationErrors(['organic_status']);

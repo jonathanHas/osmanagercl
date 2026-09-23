@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>14 F&V harvest · Shop mode</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="shop.css">
+<style>body{margin:0;background:#f5ead8}</style>
+</head>
+<body>
+<div class="shop is-touch" data-screen-label="14 FV harvest">
+  <header class="shop-topbar">
+    <a class="shop-iconbtn" href="screen-01-home.html" aria-label="Back"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></a>
+    <h1 class="shop-topbar__title">Fruit &amp; veg</h1>
+    <details class="shop-usermenu">
+      <summary class="shop-chip"><span class="shop-avatar">MJ</span><span class="shop-chip__name">Maya</span><svg class="shop-ico shop-ico--sm shop-chip__caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+      <div class="shop-menu" role="menu">
+        <div class="shop-menu__head"><span class="shop-avatar">MJ</span><div><div class="shop-menu__name">Maya Jensen</div><div class="shop-meta">Shop floor</div></div></div>
+        <a class="shop-menu__item" role="menuitem" href="screen-16-switch-user.html"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>Switch user</a>
+        <a class="shop-menu__item" role="menuitem" href="screen-18-locked.html"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>Lock</a>
+        <a class="shop-menu__item" role="menuitem" href="#"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path><rect width="20" height="14" x="2" y="6" rx="2"></rect></svg>Office</a>
+        <div class="shop-menu__sep"></div>
+        <a class="shop-menu__item shop-menu__item--danger" role="menuitem" href="#"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="m16 17 5-5-5-5"></path><path d="M21 12H9"></path></svg>Log out</a>
+      </div>
+    </details>
+  </header>
+  <main class="shop-page">
+    <nav class="shop-seg" aria-label="Fruit and veg"><a class="shop-seg__opt" href="screen-12-fv-availability.html">Availability</a><a class="shop-seg__opt" href="screen-13-fv-waste.html">Waste log</a><a class="shop-seg__opt" href="screen-14-fv-harvest.html" aria-current="page">Harvest</a><a class="shop-seg__opt" href="screen-15-fv-labels.html">Labels</a></nav>
+    <div class="shop-split">
+      <div class="shop-stack">
+        <section class="shop-stack">
+          <h2 class="shop-subtitle">What did you pick?</h2>
+          <div class="shop-choices">
+            <label class="shop-choice"><input type="radio" name="h" checked>Salad mix<small>own garden</small></label><label class="shop-choice"><input type="radio" name="h">Chard, rainbow<small>own garden</small></label><label class="shop-choice"><input type="radio" name="h">Radishes<small>bunches</small></label><label class="shop-choice"><input type="radio" name="h">Basil<small>bunches</small></label><label class="shop-choice"><input type="radio" name="h">Cherry tomatoes<small>per kg</small></label><label class="shop-choice"><input type="radio" name="h">Courgette<small>per kg</small></label>
+          </div>
+        </section>
+        <section class="shop-stack shop-stack--tight">
+          <h2 class="shop-label">Today</h2>
+          <div class="shop-list">
+            <div class="shop-row"><div class="shop-row__main"><span class="shop-row__title">Radishes</span><span class="shop-row__meta">08:10 · Ben</span></div><div class="shop-row__aside"><span class="shop-row__qty">12 bunches</span></div></div>
+            <div class="shop-row"><div class="shop-row__main"><span class="shop-row__title">Cherry tomatoes</span><span class="shop-row__meta">07:45 · Ben</span></div><div class="shop-row__aside"><span class="shop-row__qty">3.2 kg</span></div></div>
+          </div>
+        </section>
+      </div>
+      <section class="shop-card"><div class="shop-numpad">
+        <div class="shop-numpad__display"><span class="shop-label">Quantity (kg)</span><span>4.2</span></div>
+        <button class="shop-key" type="button">1</button><button class="shop-key" type="button">2</button><button class="shop-key" type="button">3</button><button class="shop-key" type="button">4</button><button class="shop-key" type="button">5</button><button class="shop-key" type="button">6</button><button class="shop-key" type="button">7</button><button class="shop-key" type="button">8</button><button class="shop-key" type="button">9</button>
+        <button class="shop-key shop-key--fn" type="button">.</button><button class="shop-key" type="button">0</button><button class="shop-key shop-key--fn" type="button" aria-label="Delete"><svg class="shop-ico shop-ico--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5a2 2 0 0 0-1.344.519l-6.328 5.74a1 1 0 0 0 0 1.481l6.328 5.741A2 2 0 0 0 10 19h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z"></path><path d="m12 9 6 6"></path><path d="m18 9-6 6"></path></svg></button>
+      </div></section>
+    </div>
+    <div class="shop-actions"><button class="shop-btn shop-btn--primary shop-btn--lg" type="button"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 20h10"></path><path d="M10 20c5.5-2.5.8-6.4 3-10"></path><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"></path><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"></path></svg>Log 4.2 kg salad mix</button></div>
+  </main>
+</div>
+</body>
+</html>

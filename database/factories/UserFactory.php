@@ -33,6 +33,23 @@ class UserFactory extends Factory
     }
 
     /**
+     * Give the user a role, creating it if the test has not seeded one.
+     *
+     * Most feature tests only need a user who can reach the page under test;
+     * 'admin' short-circuits every permission check in HasPermissions, so no
+     * role_permissions rows are needed.
+     */
+    public function withRole(string $name): static
+    {
+        return $this->state(fn () => [
+            'role_id' => \App\Models\Role::firstOrCreate(
+                ['name' => $name],
+                ['display_name' => ucfirst($name)]
+            )->id,
+        ]);
+    }
+
+    /**
      * Indicate that the model's email address should be unverified.
      */
     public function unverified(): static

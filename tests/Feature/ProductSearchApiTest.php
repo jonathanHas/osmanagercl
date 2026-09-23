@@ -36,7 +36,7 @@ class ProductSearchApiTest extends TestCase
 
     protected function search(array $params): TestResponse
     {
-        return $this->actingAs(User::factory()->create())
+        return $this->actingAs(User::factory()->withRole('admin')->create())
             ->getJson(route('api.products.search', $params));
     }
 

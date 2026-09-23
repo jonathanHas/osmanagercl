@@ -62,7 +62,7 @@ class KitchenRecipeScalingTest extends TestCase
 
     private function scale(KitchenRecipe $recipe, array $overrides = []): array
     {
-        $response = $this->actingAs(User::factory()->create())
+        $response = $this->actingAs(User::factory()->withRole('admin')->create())
             ->postJson(route('kitchen.scale', $recipe), array_merge([
                 'name' => 'Mincemeat (3x batch)',
                 'recipe_multiplier' => 3,

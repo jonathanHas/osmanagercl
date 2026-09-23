@@ -17,7 +17,7 @@
         
         <!-- Livewire Styles are auto-injected when inject_assets is true in config/livewire.php -->
     </head>
-    <body class="font-sans antialiased">
+    <body class="font-sans antialiased" data-shell="admin">
         <div x-data="{
             sidebarOpen: false,
             sidebarCollapsed: localStorage.getItem('sidebarCollapsed') === 'true',
@@ -134,6 +134,28 @@
 
                     <!-- Navigation -->
                     <nav class="flex-1 overflow-y-auto space-y-1 px-2 py-4">
+                        <div class="px-2 pb-2">
+                            @if(auth()->user()->can('kds.access'))
+                            <a href="{{ route('kds.index') }}"
+                               class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('kds.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                                <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                                </svg>
+                                Coffee KDS
+                            </a>
+                            @endif
+
+                            <form method="POST" action="{{ route('ui-mode.set', 'shop') }}">
+                                @csrf
+                                <button type="submit" class="group flex w-full items-center px-2 py-2 text-sm font-medium rounded-md text-gray-300 hover:bg-gray-700 hover:text-white">
+                                    <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9l1-4h16l1 4M3 9h18M3 9v10a1 1 0 001 1h16a1 1 0 001-1V9M9 20v-6h6v6" />
+                                    </svg>
+                                    Shop mode
+                                </button>
+                            </form>
+                        </div>
+
                         <!-- OPERATIONS SECTION -->
                         @unless(auth()->user()->hasRole('barista'))
                         <div class="px-2">
@@ -361,7 +383,7 @@
                         @endif
 
                         <!-- ORDER MANAGEMENT SECTION -->
-                        @unless(auth()->user()->hasRole('barista'))
+                        @if(auth()->user()->can('orders.manage') || auth()->user()->can('deliveries.manage') || auth()->user()->can('deliveries.process'))
                         <div class="px-2 pt-4">
                             <button @click="ordersOpen = !ordersOpen" 
                                     class="w-full flex items-center justify-between text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-300 py-2">
@@ -373,6 +395,7 @@
                         </div>
                         
                         <div x-show="ordersOpen" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-1">
+                            @if(auth()->user()->can('orders.manage'))
                             <a href="{{ route('orders.index') }}" 
                                class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('orders.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                                 <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -380,7 +403,9 @@
                                 </svg>
                                 Orders
                             </a>
+                            @endif
                             
+                            @if(auth()->user()->can('deliveries.manage'))
                             <a href="{{ route('deliveries.index') }}"
                                class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('deliveries.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                                 <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -388,7 +413,9 @@
                                 </svg>
                                 Deliveries
                             </a>
+                            @endif
 
+                            @if(auth()->user()->can('deliveries.process'))
                             <a href="{{ route('delivery-legacy.index') }}"
                                class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('delivery-legacy.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                                 <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -396,8 +423,9 @@
                                 </svg>
                                 Delivery Legacy
                             </a>
+                            @endif
                         </div>
-                        @endunless
+                        @endif
 
                         <!-- STOCK MONITORING SECTION -->
                         @if(auth()->user()->hasRole('admin'))
@@ -599,7 +627,7 @@
                         @endif
 
                         <!-- STOCK SECTION -->
-                        @unless(auth()->user()->hasRole('barista'))
+                        @if(auth()->user()->can('stocking.scan'))
                         <div class="px-2 pt-4">
                             <button @click="stockOpen = !stockOpen"
                                     class="w-full flex items-center justify-between text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-300 py-2">
@@ -653,10 +681,10 @@
                                 Labels & Printing
                             </a>
                         </div>
-                        @endunless
+                        @endif
 
                         <!-- SYSTEM TOOLS SECTION -->
-                        @unless(auth()->user()->hasRole('barista'))
+                        @if(auth()->user()->can('sales.import_data') || auth()->user()->isAdmin())
                         <div class="px-2 pt-4">
                             <button @click="systemToolsOpen = !systemToolsOpen" 
                                     class="w-full flex items-center justify-between text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-300 py-2">
@@ -668,21 +696,13 @@
                         </div>
                         
                         <div x-show="systemToolsOpen" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-1">
+                            @if(auth()->user()->can('sales.import_data'))
                             <a href="{{ route('sales-import.index') }}"
                                class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('sales-import.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                                 <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                                 </svg>
                                 Sales Import
-                            </a>
-
-                            @if(auth()->user()->can('kds.access'))
-                            <a href="{{ route('kds.index') }}"
-                               class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('kds.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
-                                <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-                                </svg>
-                                Coffee KDS
                             </a>
                             @endif
 
@@ -703,10 +723,10 @@
                             </a>
                             @endif
                         </div>
-                        @endunless
+                        @endif
 
                         <!-- ADMINISTRATION SECTION -->
-                        @if(auth()->user()->can('users.view') || !auth()->user()->hasRole('barista'))
+                        @if(auth()->user()->can('users.view') || auth()->user()->can('settings.view') || auth()->user()->isAdmin())
                         <div class="px-2 pt-4">
                             <button @click="adminOpen = !adminOpen" 
                                     class="w-full flex items-center justify-between text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-300 py-2">
@@ -728,7 +748,7 @@
                             </a>
                             @endif
 
-                            @unless(auth()->user()->hasRole('barista'))
+                            @if(auth()->user()->can('settings.view'))
                             <a href="{{ route('settings.index') }}"
                                class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('settings.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
                                 <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -737,7 +757,7 @@
                                 </svg>
                                 Settings
                             </a>
-                            @endunless
+                            @endif
 
                             @if(auth()->user()->hasRole('admin'))
                             <a href="{{ route('stocking.logs') }}"

@@ -108,7 +108,7 @@ class WasteLogTest extends TestCase
     {
         $this->createProduct();
 
-        $response = $this->actingAs(User::factory()->create())
+        $response = $this->actingAs(User::factory()->withRole('admin')->create())
             ->postJson(route('fruit-veg.waste.entry'), [
                 'date' => '2026-06-06',
                 'product_code' => '2243',
@@ -130,7 +130,7 @@ class WasteLogTest extends TestCase
     public function test_entry_updates_the_same_day_row_instead_of_duplicating(): void
     {
         $this->createProduct();
-        $user = User::factory()->create();
+        $user = User::factory()->withRole('admin')->create();
 
         $this->actingAs($user)->postJson(route('fruit-veg.waste.entry'), [
             'date' => '2026-06-06', 'product_code' => '2243', 'quantity' => 1.5, 'unit' => 'kg',
@@ -147,7 +147,7 @@ class WasteLogTest extends TestCase
     public function test_zero_quantity_deletes_the_entry(): void
     {
         $this->createProduct();
-        $user = User::factory()->create();
+        $user = User::factory()->withRole('admin')->create();
 
         $this->actingAs($user)->postJson(route('fruit-veg.waste.entry'), [
             'date' => '2026-06-06', 'product_code' => '2243', 'quantity' => 2, 'unit' => 'kg',
@@ -164,7 +164,7 @@ class WasteLogTest extends TestCase
     {
         $this->createProduct(); // priced unit defaults to kg
 
-        $this->actingAs(User::factory()->create())->postJson(route('fruit-veg.waste.entry'), [
+        $this->actingAs(User::factory()->withRole('admin')->create())->postJson(route('fruit-veg.waste.entry'), [
             'date' => '2026-06-06', 'product_code' => '2243', 'quantity' => 4, 'unit' => 'unit',
         ])->assertOk()->assertJson(['saved' => true, 'value' => null]);
 
@@ -173,7 +173,7 @@ class WasteLogTest extends TestCase
 
     public function test_unknown_product_is_rejected(): void
     {
-        $this->actingAs(User::factory()->create())->postJson(route('fruit-veg.waste.entry'), [
+        $this->actingAs(User::factory()->withRole('admin')->create())->postJson(route('fruit-veg.waste.entry'), [
             'date' => '2026-06-06', 'product_code' => 'NOPE', 'quantity' => 1, 'unit' => 'kg',
         ])->assertStatus(422);
     }
@@ -182,7 +182,7 @@ class WasteLogTest extends TestCase
     {
         $this->createProduct('9999', 'COFFEE');
 
-        $this->actingAs(User::factory()->create())->postJson(route('fruit-veg.waste.entry'), [
+        $this->actingAs(User::factory()->withRole('admin')->create())->postJson(route('fruit-veg.waste.entry'), [
             'date' => '2026-06-06', 'product_code' => '9999', 'quantity' => 1, 'unit' => 'kg',
         ])->assertStatus(422);
 

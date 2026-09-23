@@ -58,7 +58,7 @@ class FruitVegLabelPrintingTest extends TestCase
 
     public function test_print_labels_clears_queue_and_records_batch(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->withRole('admin')->create();
         $this->actingAs($user);
 
         $productOne = $this->createProduct('P-100', '100', 'Conference Pears');
@@ -83,7 +83,7 @@ class FruitVegLabelPrintingTest extends TestCase
 
     public function test_restore_last_printed_batch_requeues_products(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->withRole('admin')->create();
         $this->actingAs($user);
 
         $productOne = $this->createProduct('P-100', '100', 'Conference Pears');

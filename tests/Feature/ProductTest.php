@@ -88,7 +88,7 @@ class ProductTest extends TestCase
 
     public function test_authenticated_user_can_view_products_list()
     {
-        $user = User::factory()->create();
+        $user = User::factory()->withRole('admin')->create();
 
         $response = $this->actingAs($user)->get('/products');
 
@@ -102,7 +102,7 @@ class ProductTest extends TestCase
 
     public function test_can_search_products_by_name()
     {
-        $user = User::factory()->create();
+        $user = User::factory()->withRole('admin')->create();
 
         $response = $this->actingAs($user)->get('/products?q=Kitchen');
 
@@ -113,7 +113,7 @@ class ProductTest extends TestCase
 
     public function test_legacy_search_param_still_works()
     {
-        $user = User::factory()->create();
+        $user = User::factory()->withRole('admin')->create();
 
         $response = $this->actingAs($user)->get('/products?search=Kitchen');
 
@@ -124,7 +124,7 @@ class ProductTest extends TestCase
 
     public function test_unstocked_products_hidden_by_default_and_shown_with_toggle()
     {
-        $user = User::factory()->create();
+        $user = User::factory()->withRole('admin')->create();
 
         // "Test Service Product" has no stocking row, so the default (stocked) view hides it.
         $response = $this->actingAs($user)->get('/products?q=Test');
@@ -140,7 +140,7 @@ class ProductTest extends TestCase
 
     public function test_can_view_product_details()
     {
-        $user = User::factory()->create();
+        $user = User::factory()->withRole('admin')->create();
 
         $response = $this->actingAs($user)->get('/products/prod001');
 
@@ -150,7 +150,7 @@ class ProductTest extends TestCase
 
     public function test_shows_404_for_non_existent_product()
     {
-        $user = User::factory()->create();
+        $user = User::factory()->withRole('admin')->create();
 
         $response = $this->actingAs($user)->get('/products/non-existent');
 
@@ -159,7 +159,7 @@ class ProductTest extends TestCase
 
     public function test_product_statistics_are_displayed()
     {
-        $user = User::factory()->create();
+        $user = User::factory()->withRole('admin')->create();
 
         $response = $this->actingAs($user)->get('/products');
 

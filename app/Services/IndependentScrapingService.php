@@ -386,17 +386,4 @@ class IndependentScrapingService
 
         return $this->getProductData($item->supplier_code);
     }
-
-    public function queueProductScraping(
-        string $productCode,
-        ?string $callbackUrl = null,
-        ?array $callbackData = null
-    ): void {
-        \App\Jobs\ScrapeIndependentProductDataJob::dispatch($productCode, $callbackUrl, $callbackData);
-
-        Log::info('Independent product scraping job queued', [
-            'product_code' => $productCode,
-            'has_callback' => ! is_null($callbackUrl),
-        ]);
-    }
 }

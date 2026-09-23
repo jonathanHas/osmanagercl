@@ -31,7 +31,7 @@ class KitchenOrderHistoryTest extends TestCase
 
         $this->aliasMysqlConnectionToTestDatabase();
 
-        $this->actingAs(User::factory()->create(['name' => 'Kitchen Kate']));
+        $this->actingAs(User::factory()->withRole('admin')->create(['name' => 'Kitchen Kate']));
     }
 
     private function makeOrder(string $supplierId, string $supplierName, int $qty, string $createdAt, ?string $notes = null): KitchenOrder

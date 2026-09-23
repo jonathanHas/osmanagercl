@@ -20,7 +20,7 @@ class TestScraperControllerTest extends TestCase
     {
         parent::setUp();
 
-        $this->user = User::factory()->create();
+        $this->user = User::factory()->withRole('admin')->create();
 
         // Mock the UdeaScrapingService
         $this->mockService = Mockery::mock(UdeaScrapingService::class);

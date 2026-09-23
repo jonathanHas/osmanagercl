@@ -87,26 +87,6 @@ class TestScraperController extends Controller
         ]);
     }
 
-    public function queueScraping(Request $request): JsonResponse
-    {
-        $request->validate([
-            'product_code' => 'required|string|max:50',
-            'callback_url' => 'nullable|url',
-            'callback_data' => 'nullable|array',
-        ]);
-
-        $this->scrapingService->queueProductScraping(
-            $request->input('product_code'),
-            $request->input('callback_url'),
-            $request->input('callback_data')
-        );
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Product scraping job queued successfully',
-        ]);
-    }
-
     public function testApiRoute(): JsonResponse
     {
         return response()->json([
@@ -355,28 +335,6 @@ class TestScraperController extends Controller
         $section = substr($html, $start, $maxLength);
 
         return $section;
-    }
-
-    public function debugSearch(): JsonResponse
-    {
-        try {
-            $productCode = '5014415';
-            $data = $this->scrapingService->getProductData($productCode);
-
-            return response()->json([
-                'success' => true,
-                'product_code' => $productCode,
-                'scraped_data' => $data,
-                'data_found' => ! is_null($data),
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'error' => $e->getMessage(),
-                'error_class' => get_class($e),
-            ]);
-        }
     }
 
     public function debugLoginPage(): JsonResponse

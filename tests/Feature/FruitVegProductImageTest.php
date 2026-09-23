@@ -40,7 +40,7 @@ class FruitVegProductImageTest extends TestCase
 
     public function test_upload_resizes_image_to_maximum_128_pixels(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->withRole('admin')->create();
 
         $product = Product::query()->create([
             'ID' => 'PRODUCT-2308',

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>03 Price check · Shop mode</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="shop.css">
+<style>body{margin:0;background:#f5ead8}</style>
+</head>
+<body>
+<div class="shop is-touch" data-screen-label="03 Price check">
+  <header class="shop-topbar">
+    <a class="shop-iconbtn" href="screen-01-home.html" aria-label="Back"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></a>
+    <h1 class="shop-topbar__title">Price check</h1>
+    <details class="shop-usermenu">
+      <summary class="shop-chip"><span class="shop-avatar">MJ</span><span class="shop-chip__name">Maya</span><svg class="shop-ico shop-ico--sm shop-chip__caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+      <div class="shop-menu" role="menu">
+        <div class="shop-menu__head"><span class="shop-avatar">MJ</span><div><div class="shop-menu__name">Maya Jensen</div><div class="shop-meta">Shop floor</div></div></div>
+        <a class="shop-menu__item" role="menuitem" href="screen-16-switch-user.html"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>Switch user</a>
+        <a class="shop-menu__item" role="menuitem" href="screen-18-locked.html"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>Lock</a>
+        <a class="shop-menu__item" role="menuitem" href="#"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path><rect width="20" height="14" x="2" y="6" rx="2"></rect></svg>Office</a>
+        <div class="shop-menu__sep"></div>
+        <a class="shop-menu__item shop-menu__item--danger" role="menuitem" href="#"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="m16 17 5-5-5-5"></path><path d="M21 12H9"></path></svg>Log out</a>
+      </div>
+    </details>
+  </header>
+  <main class="shop-page">
+    <div class="shop-split">
+      <div class="shop-stack">
+        <div class="shop-scan is-focused">
+      <label class="shop-scan__field"><svg class="shop-ico shop-ico--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path><path d="M8 7v10"></path><path d="M12 7v10"></path><path d="M17 7v10"></path></svg><span class="shop-sr-only">Barcode</span><input class="shop-scan__input" inputmode="none" autocomplete="off" enterkeyhint="go" placeholder="Scan or type a barcode" value=""></label>
+      <div class="shop-scan__tools">
+        <button class="shop-iconbtn shop-touch-only" type="button" aria-pressed="false" aria-label="Camera"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg></button>
+        <button class="shop-iconbtn shop-touch-only" type="button" aria-pressed="false" aria-label="Show keyboard"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"></path></svg></button>
+      </div>
+      <p class="shop-scan__hint">Ready — scanner listening</p>
+      <p class="shop-scan__msg"><svg class="shop-ico shop-ico--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg></p>
+      <div class="shop-scan__camera"><div class="shop-scan__reticle"></div><span class="shop-scan__camlabel">Point at the barcode</span></div>
+    </div>
+        <section class="shop-card">
+          <div class="shop-stack shop-stack--tight"><span class="shop-label">Shelf price</span><h2 class="shop-subtitle">Apples, Elstar — organic</h2></div>
+          <span class="shop-bignum"><span class="shop-bignum__cur">€</span>3.49<small>/ kg</small></span>
+          <div class="shop-inline"><span class="shop-pill shop-pill--ok">In stock</span><span class="shop-pill shop-pill--sage">Organic</span></div>
+        </section>
+      </div>
+      <section class="shop-card">
+        <h2 class="shop-label">Details</h2>
+        <div class="shop-facts shop-facts--2">
+          <div class="shop-fact"><span class="shop-label">Stock</span><span class="shop-fact__value">18 kg</span></div>
+          <div class="shop-fact"><span class="shop-label">Category</span><span class="shop-fact__value">Fruit</span></div>
+          <div class="shop-fact"><span class="shop-label">Supplier</span><span class="shop-fact__value">Hof Linde</span></div>
+          <div class="shop-fact"><span class="shop-label">Origin</span><span class="shop-fact__value">Local</span></div>
+          <div class="shop-fact"><span class="shop-label">Barcode</span><span class="shop-fact__value shop-code">2100450</span></div>
+          <div class="shop-fact"><span class="shop-label">Price since</span><span class="shop-fact__value">1 Sep</span></div>
+        </div>
+      </section>
+    </div>
+    <div class="shop-actions"><button class="shop-btn shop-btn--secondary shop-btn--lg" type="button">Add to queue</button><button class="shop-btn shop-btn--primary shop-btn--lg" type="button"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 9V3h12v6"></path><rect x="6" y="14" width="12" height="8" rx="1"></rect></svg>Print shelf label</button></div>
+  </main>
+</div>
+</body>
+</html>

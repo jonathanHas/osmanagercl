@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Support\UiMode;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -36,11 +37,8 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        if ($request->user()->isBarista()) {
-            return redirect()->route('kds.index');
-        }
-
-        return redirect()->intended(route('dashboard', absolute: false));
+        // intended() still wins: create() honours a same-site ?redirect=.
+        return redirect()->intended(app(UiMode::class)->landingUrl($request->user()));
     }
 
     /**

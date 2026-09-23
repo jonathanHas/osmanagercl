@@ -29,7 +29,7 @@ class KitchenOrderCreatePageTest extends TestCase
         $this->createPosTables();
         $this->ids = $this->seedKitchenProducts();
 
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->withRole('admin')->create());
     }
 
     protected function tearDown(): void

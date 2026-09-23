@@ -31,7 +31,7 @@ class KitchenOrderStoreTest extends TestCase
         $this->createPosTables();
         $this->ids = $this->seedKitchenProducts();
 
-        $this->user = User::factory()->create();
+        $this->user = User::factory()->withRole('admin')->create();
         $this->actingAs($this->user);
     }
 

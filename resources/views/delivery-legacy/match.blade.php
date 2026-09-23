@@ -858,7 +858,11 @@
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             @if($item->productID)
+                                                @if(auth()->user()->can('products.edit'))
                                                 <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->dbProductName ?? $item->prodName }}</a>
+                                                @else
+                                                <span class="font-medium text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
+                                                @endif
                                             @else
                                                 <span class="font-medium text-gray-900 text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
                                             @endif
@@ -971,9 +975,13 @@
                                             </td>
                                             <td class="px-3 py-2">
                                                 @if($item->productID)
+                                                    @if(auth()->user()->can('products.edit'))
                                                     <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium">
                                                         {{ $item->dbProductName ?? $item->prodName }}
                                                     </a>
+                                                    @else
+                                                    <span class="font-medium">{{ $item->dbProductName ?? $item->prodName }}</span>
+                                                    @endif
                                                 @else
                                                     <span class="font-medium text-gray-900">{{ $item->dbProductName ?? $item->prodName }}</span>
                                                 @endif
@@ -1096,7 +1104,11 @@
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             @if($item->productID)
+                                                @if(auth()->user()->can('products.edit'))
                                                 <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->dbProductName ?? $item->prodName }}</a>
+                                                @else
+                                                <span class="font-medium text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
+                                                @endif
                                             @else
                                                 <span class="font-medium text-gray-900 text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
                                             @endif
@@ -1231,9 +1243,13 @@
                                             </td>
                                             <td class="px-3 py-2">
                                                 @if($item->productID)
+                                                    @if(auth()->user()->can('products.edit'))
                                                     <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium">
                                                         {{ $item->dbProductName ?? $item->prodName }}
                                                     </a>
+                                                    @else
+                                                    <span class="font-medium">{{ $item->dbProductName ?? $item->prodName }}</span>
+                                                    @endif
                                                 @else
                                                     <span class="font-medium text-gray-900">{{ $item->dbProductName ?? $item->prodName }}</span>
                                                 @endif
@@ -1397,7 +1413,11 @@
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             @if($item->productID)
+                                                @if(auth()->user()->can('products.edit'))
                                                 <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->dbProductName ?? $item->prodName }}</a>
+                                                @else
+                                                <span class="font-medium text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
+                                                @endif
                                             @else
                                                 <span class="font-medium text-gray-900 text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
                                             @endif
@@ -1524,9 +1544,13 @@
                                             </td>
                                             <td class="px-3 py-2">
                                                 @if($item->productID)
+                                                    @if(auth()->user()->can('products.edit'))
                                                     <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium">
                                                         {{ $item->dbProductName ?? $item->prodName }}
                                                     </a>
+                                                    @else
+                                                    <span class="font-medium">{{ $item->dbProductName ?? $item->prodName }}</span>
+                                                    @endif
                                                 @else
                                                     <span class="font-medium text-gray-900">{{ $item->dbProductName ?? $item->prodName }}</span>
                                                 @endif
@@ -1686,7 +1710,11 @@
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             @if($item->productID)
+                                                @if(auth()->user()->can('products.edit'))
                                                 <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->dbProductName ?? $item->prodName }}</a>
+                                                @else
+                                                <span class="font-medium text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
+                                                @endif
                                             @else
                                                 <span class="font-medium text-gray-900 text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
                                             @endif
@@ -1766,9 +1794,13 @@
                                             </td>
                                             <td class="px-3 py-2">
                                                 @if($item->productID)
+                                                    @if(auth()->user()->can('products.edit'))
                                                     <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium">
                                                         {{ $item->dbProductName ?? $item->prodName }}
                                                     </a>
+                                                    @else
+                                                    <span class="font-medium">{{ $item->dbProductName ?? $item->prodName }}</span>
+                                                    @endif
                                                 @else
                                                     <span class="font-medium text-gray-900">{{ $item->dbProductName ?? $item->prodName }}</span>
                                                 @endif
@@ -1904,7 +1936,11 @@
                                     </div>
                                     <div class="min-w-0 flex-1">
                                         @if($item->productID)
+                                            @if(auth()->user()->can('products.edit'))
                                             <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->dbProductName ?? $item->prodName }}</a>
+                                            @else
+                                            <span class="font-medium text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
+                                            @endif
                                         @else
                                             <span class="font-medium text-gray-900 text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
                                         @endif
@@ -1958,9 +1994,13 @@
                                         </td>
                                         <td class="px-3 py-2">
                                             @if($item->productID)
+                                                @if(auth()->user()->can('products.edit'))
                                                 <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium">
                                                     {{ $item->dbProductName ?? $item->prodName }}
                                                 </a>
+                                                @else
+                                                <span class="font-medium">{{ $item->dbProductName ?? $item->prodName }}</span>
+                                                @endif
                                             @else
                                                 <span class="font-medium text-gray-900">{{ $item->dbProductName ?? $item->prodName }}</span>
                                             @endif
@@ -2017,7 +2057,11 @@
                                             <span class="font-medium text-gray-900 text-sm">{{ $item->NAME ?? 'Unknown Product' }}</span>
                                             @include('delivery-legacy.partials.customer-request-badge', ['lines' => $customerRequestLines[(string) ($item->Barcode ?? '')] ?? null, 'arrived' => true])
                                             @if($item->productID)
+                                                @if(auth()->user()->can('products.edit'))
                                                 <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-xs text-indigo-600 hover:text-indigo-900 block">{{ $item->Barcode }}</a>
+                                                @else
+                                                <span class="text-xs block">{{ $item->Barcode }}</span>
+                                                @endif
                                             @else
                                                 <span class="text-xs text-gray-500 block">{{ $item->Barcode }}</span>
                                             @endif
@@ -2105,9 +2149,13 @@
                                             </td>
                                             <td class="px-3 py-2">
                                                 @if($item->productID)
+                                                    @if(auth()->user()->can('products.edit'))
                                                     <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 text-sm">
                                                         {{ $item->Barcode }}
                                                     </a>
+                                                    @else
+                                                    <span class="text-sm">{{ $item->Barcode }}</span>
+                                                    @endif
                                                 @else
                                                     <span class="text-gray-500">-</span>
                                                 @endif
@@ -2212,7 +2260,11 @@
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             @if($item->productID)
+                                                @if(auth()->user()->can('products.edit'))
                                                 <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900 font-medium text-sm">{{ $item->dbProductName ?? $item->prodName }}</a>
+                                                @else
+                                                <span class="font-medium text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
+                                                @endif
                                             @else
                                                 <span class="font-medium text-gray-900 text-sm">{{ $item->dbProductName ?? $item->prodName }}</span>
                                             @endif
@@ -2297,7 +2349,11 @@
                                             </td>
                                             <td class="px-3 py-2 font-medium text-gray-900">
                                                 @if($item->productID)
+                                                    @if(auth()->user()->can('products.edit'))
                                                     <a href="{{ route('products.edit', $item->productID) }}" target="_blank" class="text-indigo-600 hover:text-indigo-900">{{ $item->dbProductName ?? $item->prodName }}</a>
+                                                    @else
+                                                    <span>{{ $item->dbProductName ?? $item->prodName }}</span>
+                                                    @endif
                                                 @else
                                                     {{ $item->dbProductName ?? $item->prodName }}
                                                 @endif

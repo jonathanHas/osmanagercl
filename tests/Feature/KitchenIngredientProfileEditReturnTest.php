@@ -100,7 +100,7 @@ class KitchenIngredientProfileEditReturnTest extends TestCase
         $profile = $this->makeProfile();
         $recipe = $this->makeRecipe($profile);
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withRole('admin')->create())
             ->get(route('kitchen.edit', $recipe))
             ->assertOk()
             ->assertSee(route('kitchen.profiles.edit', [$profile, 'recipe' => $recipe->id]), false);
@@ -111,7 +111,7 @@ class KitchenIngredientProfileEditReturnTest extends TestCase
         $profile = $this->makeProfile();
         $recipe = $this->makeRecipe($profile);
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withRole('admin')->create())
             ->get(route('kitchen.profiles.edit', [$profile, 'recipe' => $recipe->id]))
             ->assertOk()
             ->assertSee(route('kitchen.edit', $recipe), false)
@@ -123,7 +123,7 @@ class KitchenIngredientProfileEditReturnTest extends TestCase
     {
         $profile = $this->makeProfile();
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withRole('admin')->create())
             ->get(route('kitchen.profiles.edit', $profile))
             ->assertOk()
             ->assertSee(route('kitchen.profiles.index'), false)
@@ -136,7 +136,7 @@ class KitchenIngredientProfileEditReturnTest extends TestCase
         $profile = $this->makeProfile();
         $recipe = $this->makeRecipe($profile);
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withRole('admin')->create())
             ->put(route('kitchen.profiles.update', $profile), $this->updatePayload() + ['recipe' => $recipe->id])
             ->assertRedirect(route('kitchen.edit', $recipe))
             ->assertSessionHas('success');
@@ -148,7 +148,7 @@ class KitchenIngredientProfileEditReturnTest extends TestCase
     {
         $profile = $this->makeProfile();
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withRole('admin')->create())
             ->put(route('kitchen.profiles.update', $profile), $this->updatePayload())
             ->assertRedirect(route('kitchen.profiles.index'));
     }
@@ -157,7 +157,7 @@ class KitchenIngredientProfileEditReturnTest extends TestCase
     {
         $profile = $this->makeProfile();
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->withRole('admin')->create())
             ->from(route('kitchen.profiles.edit', $profile))
             ->put(route('kitchen.profiles.update', $profile), $this->updatePayload() + ['recipe' => 999])
             ->assertRedirect(route('kitchen.profiles.edit', $profile))

@@ -23,7 +23,7 @@ class KitchenOrderCsvTest extends TestCase
 
         parent::setUp();
 
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->withRole('admin')->create());
     }
 
     private function makeOrder(): KitchenOrder

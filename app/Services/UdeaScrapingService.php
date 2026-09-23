@@ -1158,17 +1158,4 @@ class UdeaScrapingService
 
         return null;
     }
-
-    public function queueProductScraping(
-        string $productCode,
-        ?string $callbackUrl = null,
-        ?array $callbackData = null
-    ): void {
-        \App\Jobs\ScrapeProductDataJob::dispatch($productCode, $callbackUrl, $callbackData);
-
-        Log::info('Product scraping job queued', [
-            'product_code' => $productCode,
-            'has_callback' => ! is_null($callbackUrl),
-        ]);
-    }
 }

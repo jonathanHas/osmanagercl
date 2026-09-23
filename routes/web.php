@@ -11,6 +11,7 @@ use App\Http\Controllers\CustomerPaymentAllocationController;
 use App\Http\Controllers\CustomerPaymentController;
 use App\Http\Controllers\CustomerRequestController;
 use App\Http\Controllers\CustomerStatementController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\DeliveryDocumentController;
 use App\Http\Controllers\DeliveryLegacyController;
@@ -37,6 +38,7 @@ use App\Http\Controllers\StockingController;
 use App\Http\Controllers\TestScraperController;
 use App\Http\Controllers\TillProductBrowserController;
 use App\Http\Controllers\UdeaDiagnosticsController;
+use App\Http\Controllers\UiModeController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\WasteController;
@@ -56,23 +58,22 @@ Route::get('/auth/check', function () {
 // login. Every write (create / edit / status change) lives in the auth group below.
 Route::get('/customer-requests', [CustomerRequestController::class, 'index'])->name('customer-requests.index');
 
-Route::get('/dashboard', function () {
-    $productRepository = new \App\Repositories\ProductRepository;
-    $statistics = $productRepository->getStatistics();
-
-    // Add Amazon pending count for dashboard widget
-    $amazonPendingCount = \App\Models\AmazonInvoicePending::pending()->count();
-
-    // Customer requests due today / overdue and items put aside awaiting collection
-    $customerRequestCounts = app(\App\Services\CustomerRequestService::class)->dashboardCounts();
-
-    return view('dashboard', compact('statistics', 'amazonPendingCount', 'customerRequestCounts'));
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // Shop mode — the simplified shop-floor interface.
+    Route::prefix('shop')->name('shop.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Shop\ShopHomeController::class, 'index'])->name('home');
+    });
+
+    // Switch this device between the shop-floor and office interfaces.
+    Route::post('/ui-mode/{mode}', [UiModeController::class, 'set'])
+        ->whereIn('mode', ['shop', 'office'])
+        ->name('ui-mode.set');
 
     // Role & Permission Test Routes
     Route::prefix('roles-test')->name('roles.')->group(function () {
@@ -89,40 +90,59 @@ Route::middleware('auth')->group(function () {
     });
 
     // Product routes
-    Route::get('/products', [ProductController::class, 'index'])->name('products.index');
-    Route::get('/products/create', [ProductController::class, 'create'])->name('products.create');
-    Route::get('/products/independent-test', [\App\Http\Controllers\IndependentTestController::class, 'index'])->name('products.independent-test');
-    Route::get('/products/search-test', \App\Http\Controllers\ProductSearchTestController::class)->name('products.search-test');
-    Route::post('/products', [ProductController::class, 'store'])->name('products.store');
-    Route::get('/products/suppliers', [ProductController::class, 'suppliersIndex'])->name('products.suppliers');
-    Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show');
-    Route::get('/products/{id}/edit', [ProductController::class, 'edit'])->name('products.edit');
-    Route::put('/products/{id}', [ProductController::class, 'update'])->name('products.update');
-    Route::get('/products/{id}/sales-data', [ProductController::class, 'salesData'])->name('products.sales-data');
-    Route::get('/products/{id}/weekly-sales', [ProductController::class, 'weeklySalesData'])->name('products.weekly-sales');
-    Route::get('/products/{id}/daily-sales', [ProductController::class, 'dailySalesData'])->name('products.daily-sales');
-    Route::get('/products/{id}/transaction-details', [ProductController::class, 'transactionDetailsData'])->name('products.transaction-details');
-    Route::get('/products/{id}/image', [ProductController::class, 'image'])->name('products.image');
-    Route::post('/products/{id}/update-image', [ProductController::class, 'updateProductImage'])->name('products.update-image');
-    Route::get('/products/{id}/refresh-udea-pricing', [ProductController::class, 'refreshUdeaPricing'])->name('products.refresh-udea-pricing');
-    Route::get('/products/udea-pricing', [ProductController::class, 'getUdeaPricing'])->name('products.udea-pricing');
-    Route::patch('/products/{id}/name', [ProductController::class, 'updateName'])->name('products.update-name');
-    Route::patch('/products/{id}/tax', [ProductController::class, 'updateTax'])->name('products.update-tax');
-    Route::patch('/products/{id}/category', [ProductController::class, 'updateCategory'])->name('products.update-category');
-    Route::patch('/products/{id}/price', [ProductController::class, 'updatePrice'])->name('products.update-price');
-    Route::patch('/products/{id}/cost', [ProductController::class, 'updateCost'])->name('products.update-cost');
-    Route::patch('/products/{id}/min-stock-override', [ProductController::class, 'updateMinStockOverride'])->name('products.update-min-stock-override');
-    Route::patch('/products/{id}/short-dated-settings', [ProductController::class, 'updateShortDatedSettings'])->name('products.update-short-dated-settings');
-    Route::patch('/products/{id}/barcode', [ProductController::class, 'updateBarcode'])->name('products.update-barcode');
-    Route::post('/products/{id}/create-alternate', [ProductController::class, 'createAlternateBarcode'])->name('products.create-alternate');
-    Route::patch('/products/{id}/display', [ProductController::class, 'updateDisplay'])->name('products.update-display');
-    Route::post('/products/{id}/update-stock', [ProductController::class, 'updateStock'])->name('products.update-stock');
-    Route::post('/products/{id}/toggle-stocking', [ProductController::class, 'toggleStocking'])->name('products.toggle-stocking');
-    Route::post('/products/{id}/toggle-till-visibility', [ProductController::class, 'toggleTillVisibility'])->name('products.toggle-till-visibility');
-    Route::get('/products/{id}/print-label', [ProductController::class, 'printLabel'])->name('products.print-label');
-    Route::get('/tools/udea-debug', UdeaDiagnosticsController::class)->name('tools.udea-debug');
-    Route::get('/tools/udea-case-test/{order}', \App\Http\Controllers\UdeaCaseTestController::class)->name('tools.udea-case-test');
-    Route::post('/tools/udea-case-test-scrape', [\App\Http\Controllers\UdeaCaseTestController::class, 'scrape'])->name('tools.udea-case-test.scrape');
+    // Literal /products/* paths must stay registered above /products/{id};
+    // the permission groups below are ordered to preserve that.
+    Route::middleware('permission:products.view')->group(function () {
+        Route::get('/products', [ProductController::class, 'index'])->name('products.index');
+        Route::get('/products/suppliers', [ProductController::class, 'suppliersIndex'])->name('products.suppliers');
+        Route::get('/products/udea-pricing', [ProductController::class, 'getUdeaPricing'])->name('products.udea-pricing');
+    });
+
+    Route::middleware('permission:products.create')->group(function () {
+        Route::get('/products/create', [ProductController::class, 'create'])->name('products.create');
+        Route::post('/products', [ProductController::class, 'store'])->name('products.store');
+    });
+
+    Route::middleware('role:admin')->group(function () {
+        Route::get('/products/independent-test', [\App\Http\Controllers\IndependentTestController::class, 'index'])->name('products.independent-test');
+        Route::get('/products/search-test', \App\Http\Controllers\ProductSearchTestController::class)->name('products.search-test');
+    });
+
+    Route::middleware('permission:products.view')->group(function () {
+        Route::get('/products/{id}', [ProductController::class, 'show'])->name('products.show');
+        Route::get('/products/{id}/sales-data', [ProductController::class, 'salesData'])->name('products.sales-data');
+        Route::get('/products/{id}/weekly-sales', [ProductController::class, 'weeklySalesData'])->name('products.weekly-sales');
+        Route::get('/products/{id}/daily-sales', [ProductController::class, 'dailySalesData'])->name('products.daily-sales');
+        Route::get('/products/{id}/transaction-details', [ProductController::class, 'transactionDetailsData'])->name('products.transaction-details');
+        Route::get('/products/{id}/image', [ProductController::class, 'image'])->name('products.image');
+        Route::get('/products/{id}/print-label', [ProductController::class, 'printLabel'])->name('products.print-label');
+    });
+
+    Route::middleware('permission:products.edit')->group(function () {
+        Route::get('/products/{id}/edit', [ProductController::class, 'edit'])->name('products.edit');
+        Route::put('/products/{id}', [ProductController::class, 'update'])->name('products.update');
+        Route::post('/products/{id}/update-image', [ProductController::class, 'updateProductImage'])->name('products.update-image');
+        Route::get('/products/{id}/refresh-udea-pricing', [ProductController::class, 'refreshUdeaPricing'])->name('products.refresh-udea-pricing');
+        Route::patch('/products/{id}/name', [ProductController::class, 'updateName'])->name('products.update-name');
+        Route::patch('/products/{id}/tax', [ProductController::class, 'updateTax'])->name('products.update-tax');
+        Route::patch('/products/{id}/category', [ProductController::class, 'updateCategory'])->name('products.update-category');
+        Route::patch('/products/{id}/price', [ProductController::class, 'updatePrice'])->name('products.update-price');
+        Route::patch('/products/{id}/cost', [ProductController::class, 'updateCost'])->name('products.update-cost');
+        Route::patch('/products/{id}/min-stock-override', [ProductController::class, 'updateMinStockOverride'])->name('products.update-min-stock-override');
+        Route::patch('/products/{id}/short-dated-settings', [ProductController::class, 'updateShortDatedSettings'])->name('products.update-short-dated-settings');
+        Route::patch('/products/{id}/barcode', [ProductController::class, 'updateBarcode'])->name('products.update-barcode');
+        Route::post('/products/{id}/create-alternate', [ProductController::class, 'createAlternateBarcode'])->name('products.create-alternate');
+        Route::patch('/products/{id}/display', [ProductController::class, 'updateDisplay'])->name('products.update-display');
+        Route::post('/products/{id}/update-stock', [ProductController::class, 'updateStock'])->name('products.update-stock');
+        Route::post('/products/{id}/toggle-stocking', [ProductController::class, 'toggleStocking'])->name('products.toggle-stocking');
+        Route::post('/products/{id}/toggle-till-visibility', [ProductController::class, 'toggleTillVisibility'])->name('products.toggle-till-visibility');
+    });
+
+    Route::middleware('role:admin')->group(function () {
+        Route::get('/tools/udea-debug', UdeaDiagnosticsController::class)->name('tools.udea-debug');
+        Route::get('/tools/udea-case-test/{order}', \App\Http\Controllers\UdeaCaseTestController::class)->name('tools.udea-case-test');
+        Route::post('/tools/udea-case-test-scrape', [\App\Http\Controllers\UdeaCaseTestController::class, 'scrape'])->name('tools.udea-case-test.scrape');
+    });
     Route::get('/tools/ai-diagnostics', [\App\Http\Controllers\AiDiagnosticsController::class, 'index'])->middleware('role:admin')->name('tools.ai-diagnostics');
     Route::post('/tools/ai-diagnostics/test', [\App\Http\Controllers\AiDiagnosticsController::class, 'testConnection'])->middleware('role:admin')->name('tools.ai-diagnostics.test');
     Route::post('/tools/ai-diagnostics/settings', [\App\Http\Controllers\AiDiagnosticsController::class, 'saveSettings'])->middleware('role:admin')->name('tools.ai-diagnostics.settings');
@@ -130,178 +150,186 @@ Route::middleware('auth')->group(function () {
     Route::post('/tools/udea-pallet-volumes/sync', [\App\Http\Controllers\UdeaPalletVolumeController::class, 'sync'])->middleware('role:admin')->name('tools.udea-pallet-volumes.sync');
 
     // Product AJAX API routes (for real-time validation)
-    Route::post('/api/products/check-barcode-duplicate', [ProductController::class, 'checkBarcodeDuplicate'])->name('api.products.check-barcode-duplicate');
-    Route::post('/api/products/check-supplier-link-duplicate', [ProductController::class, 'checkSupplierLinkDuplicate'])->name('api.products.check-supplier-link-duplicate');
-    Route::post('/api/products/suggest-barcode', [ProductController::class, 'suggestBarcode'])->name('api.products.suggest-barcode');
-    Route::get('/api/products/search', \App\Http\Controllers\Api\ProductSearchController::class)->name('api.products.search');
+    Route::middleware('permission:products.view')->group(function () {
+        Route::post('/api/products/check-barcode-duplicate', [ProductController::class, 'checkBarcodeDuplicate'])->name('api.products.check-barcode-duplicate');
+        Route::post('/api/products/check-supplier-link-duplicate', [ProductController::class, 'checkSupplierLinkDuplicate'])->name('api.products.check-supplier-link-duplicate');
+        Route::post('/api/products/suggest-barcode', [ProductController::class, 'suggestBarcode'])->name('api.products.suggest-barcode');
+        Route::get('/api/products/search', \App\Http\Controllers\Api\ProductSearchController::class)->name('api.products.search');
+    });
 
-    // Stocking scanner routes
-    Route::get('/stocking', [StockingController::class, 'index'])->name('stocking.index');
-    Route::post('/stocking/lookup', [StockingController::class, 'lookup'])->name('stocking.lookup');
-    Route::post('/stocking/update-stock', [StockingController::class, 'updateStock'])->name('stocking.update-stock');
-    Route::get('/stocking/logs', [StockingController::class, 'logs'])->name('stocking.logs')->middleware('role:admin');
+    Route::middleware('permission:stocking.scan')->group(function () {
+        // Stocking scanner routes
+        Route::get('/stocking', [StockingController::class, 'index'])->name('stocking.index');
+        Route::post('/stocking/lookup', [StockingController::class, 'lookup'])->name('stocking.lookup');
+        Route::post('/stocking/update-stock', [StockingController::class, 'updateStock'])->name('stocking.update-stock');
+        Route::get('/stocking/logs', [StockingController::class, 'logs'])->name('stocking.logs')->middleware('role:admin');
 
-    // Stock Check Review routes
-    Route::get('/stock-review', [StockCheckReviewController::class, 'index'])->name('stock-review.index');
-    Route::post('/stock-review/stock-check', [StockCheckReviewController::class, 'stockCheck'])->name('stock-review.stock-check');
-    Route::post('/stock-review/set-to-zero', [StockCheckReviewController::class, 'setToZero'])->name('stock-review.set-to-zero');
-    Route::post('/stock-review/mark-checked', [StockCheckReviewController::class, 'markChecked'])->name('stock-review.mark-checked');
-    Route::post('/stock-review/toggle-category', [StockCheckReviewController::class, 'toggleCategory'])->name('stock-review.toggle-category')->middleware('role:admin,manager');
-    Route::get('/stock-review/sales-data', [StockCheckReviewController::class, 'salesData'])->name('stock-review.sales-data');
-    Route::get('/stock-review/history', [StockCheckReviewController::class, 'history'])->name('stock-review.history');
-    Route::get('/stock-review/audit-log', [StockCheckReviewController::class, 'auditLog'])->name('stock-review.audit-log');
+        // Stock Check Review routes
+        Route::get('/stock-review', [StockCheckReviewController::class, 'index'])->name('stock-review.index');
+        Route::post('/stock-review/stock-check', [StockCheckReviewController::class, 'stockCheck'])->name('stock-review.stock-check');
+        Route::post('/stock-review/set-to-zero', [StockCheckReviewController::class, 'setToZero'])->name('stock-review.set-to-zero');
+        Route::post('/stock-review/mark-checked', [StockCheckReviewController::class, 'markChecked'])->name('stock-review.mark-checked');
+        Route::post('/stock-review/toggle-category', [StockCheckReviewController::class, 'toggleCategory'])->name('stock-review.toggle-category')->middleware('role:admin,manager');
+        Route::get('/stock-review/sales-data', [StockCheckReviewController::class, 'salesData'])->name('stock-review.sales-data');
+        Route::get('/stock-review/history', [StockCheckReviewController::class, 'history'])->name('stock-review.history');
+        Route::get('/stock-review/audit-log', [StockCheckReviewController::class, 'auditLog'])->name('stock-review.audit-log');
 
-    // Destock Review routes
-    Route::get('/destock-review', [\App\Http\Controllers\DestockReviewController::class, 'index'])->name('destock-review.index');
-    Route::get('/destock-review/suggestions', [\App\Http\Controllers\DestockReviewController::class, 'suggestions'])->name('destock-review.suggestions');
+        // Destock Review routes
+        Route::get('/destock-review', [\App\Http\Controllers\DestockReviewController::class, 'index'])->name('destock-review.index');
+        Route::get('/destock-review/suggestions', [\App\Http\Controllers\DestockReviewController::class, 'suggestions'])->name('destock-review.suggestions');
+    });
 
-    // Supplier Code Lookup routes
-    Route::get('/supplier-code-lookup', [\App\Http\Controllers\SupplierCodeLookupController::class, 'index'])->name('supplier-code-lookup.index');
-    Route::post('/supplier-code-lookup', [\App\Http\Controllers\SupplierCodeLookupController::class, 'lookup'])->name('supplier-code-lookup.lookup');
+    Route::middleware('permission:products.view')->group(function () {
+        // Supplier Code Lookup routes
+        Route::get('/supplier-code-lookup', [\App\Http\Controllers\SupplierCodeLookupController::class, 'index'])->name('supplier-code-lookup.index');
+        Route::post('/supplier-code-lookup', [\App\Http\Controllers\SupplierCodeLookupController::class, 'lookup'])->name('supplier-code-lookup.lookup');
+    });
 
     // Invoice Management routes - specific routes BEFORE resource routes
-    Route::get('/invoices/create-simple', [\App\Http\Controllers\InvoiceController::class, 'createSimple'])->name('invoices.create-simple');
-    Route::post('/invoices/store-simple', [\App\Http\Controllers\InvoiceController::class, 'storeSimple'])->name('invoices.store-simple');
-    Route::post('/invoices/vat-rate', [\App\Http\Controllers\InvoiceController::class, 'getVatRate'])->name('invoices.vat-rate');
-    Route::post('/invoices/{invoice}/mark-paid', [\App\Http\Controllers\InvoiceController::class, 'markPaid'])->name('invoices.mark-paid');
+    Route::middleware('permission:invoices.manage')->group(function () {
+        Route::get('/invoices/create-simple', [\App\Http\Controllers\InvoiceController::class, 'createSimple'])->name('invoices.create-simple');
+        Route::post('/invoices/store-simple', [\App\Http\Controllers\InvoiceController::class, 'storeSimple'])->name('invoices.store-simple');
+        Route::post('/invoices/vat-rate', [\App\Http\Controllers\InvoiceController::class, 'getVatRate'])->name('invoices.vat-rate');
+        Route::post('/invoices/{invoice}/mark-paid', [\App\Http\Controllers\InvoiceController::class, 'markPaid'])->name('invoices.mark-paid');
 
-    // Invoice Attachments routes
-    Route::prefix('invoices/{invoice}/attachments')->name('invoices.attachments.')->group(function () {
-        Route::get('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'index'])->name('index');
-        Route::post('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'store'])->name('store');
-        Route::get('/config', [\App\Http\Controllers\InvoiceAttachmentController::class, 'getUploadConfig'])->name('config');
-        Route::get('/missing', [\App\Http\Controllers\InvoiceAttachmentController::class, 'getMissing'])->name('missing');
+        // Invoice Attachments routes
+        Route::prefix('invoices/{invoice}/attachments')->name('invoices.attachments.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'index'])->name('index');
+            Route::post('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'store'])->name('store');
+            Route::get('/config', [\App\Http\Controllers\InvoiceAttachmentController::class, 'getUploadConfig'])->name('config');
+            Route::get('/missing', [\App\Http\Controllers\InvoiceAttachmentController::class, 'getMissing'])->name('missing');
+        });
+        Route::prefix('invoice-attachments/{attachment}')->name('invoices.attachments.')->group(function () {
+            Route::get('/view', [\App\Http\Controllers\InvoiceAttachmentController::class, 'view'])->name('view');
+            Route::get('/viewer', [\App\Http\Controllers\InvoiceAttachmentController::class, 'viewEmbedded'])->name('viewer');
+            Route::get('/viewer-minimal', [\App\Http\Controllers\InvoiceAttachmentController::class, 'viewEmbeddedMinimal'])->name('viewer-minimal');
+            Route::get('/download', [\App\Http\Controllers\InvoiceAttachmentController::class, 'download'])->name('download');
+            Route::patch('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'update'])->name('update');
+            Route::delete('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'destroy'])->name('destroy');
+            Route::post('/replace', [\App\Http\Controllers\InvoiceAttachmentController::class, 'replace'])->name('replace');
+        });
+
+        // Bulk Upload Routes (must be before resource route)
+        Route::prefix('invoices/bulk-upload')->name('invoices.bulk-upload.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'index'])->name('index');
+            Route::post('/upload', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'upload'])->name('upload');
+            Route::post('/camera-upload', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'cameraUpload'])->name('camera-upload');
+            Route::get('/status/{batchId}', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'status'])->name('status');
+            Route::get('/preview/{batchId}', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'preview'])->name('preview');
+            Route::get('/amazon-pending', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'amazonPending'])->name('amazon-pending');
+            Route::delete('/amazon-pending/files', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'deleteAmazonPendingFiles'])->name('delete-amazon-pending-files');
+            Route::post('/{batchId}/cancel', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'cancel'])->name('cancel');
+            Route::post('/{batchId}/process', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'startProcessing'])->name('process');
+            Route::post('/{batchId}/create-from-review', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'createFromReview'])->name('create-from-review');
+            Route::get('/check-parser', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'checkParserConfiguration'])->name('check-parser');
+            Route::get('/{batchId}/file/{fileId}/viewer', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'fileViewer'])->name('file-viewer');
+            Route::get('/{batchId}/file/{fileId}/view', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'viewFile'])->name('view-file');
+            Route::delete('/{batchId}/file/{fileId}', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'deleteFile'])->name('delete-file');
+            Route::post('/{batchId}/file/{fileId}/retry', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'retryFile'])->name('retry-file');
+            Route::post('/{batchId}/file/{fileId}/cancel', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'cancelFile'])->name('cancel-file');
+            Route::post('/{batchId}/file/{fileId}/send-to-ai', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'sendToAi'])->name('send-to-ai');
+            Route::get('/{batchId}/file/{fileId}/thumbnails', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'getThumbnails'])->name('get-thumbnails');
+            Route::post('/{batchId}/file/{fileId}/split', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'splitPdf'])->name('split-pdf');
+            Route::put('/{batchId}/file/{fileId}/parsed-data', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'updateParsedData'])->name('update-parsed-data');
+            Route::post('/{batchId}/file/{fileId}/parse-udea', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'parseUdeaInvoice'])->name('parse-udea');
+        });
+
+        Route::patch('/invoices/{invoice}/notes', [\App\Http\Controllers\InvoiceController::class, 'updateNotes'])->name('invoices.update-notes');
+        Route::post('/invoices/bulk-mark-paid', [\App\Http\Controllers\InvoiceController::class, 'bulkMarkPaid'])->name('invoices.bulk-mark-paid');
+        Route::patch('/invoices/{invoice}/mark-unpaid', [\App\Http\Controllers\InvoiceController::class, 'markUnpaid'])->name('invoices.mark-unpaid');
+
+        // Amazon Pending Invoices (must be before resource route)
+        Route::prefix('invoices/amazon-pending')->name('amazon-pending.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'index'])->name('index');
+            Route::get('/{pending}', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'show'])->name('show');
+            Route::get('/{pending}/viewer', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'viewer'])->name('viewer');
+            Route::get('/{pending}/view-invoice', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'viewInvoice'])->name('view-invoice');
+            Route::put('/{pending}/payment', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'updatePayment'])->name('update-payment');
+            Route::post('/{pending}/process', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'process'])->name('process');
+            Route::delete('/{pending}', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'cancel'])->name('cancel');
+            Route::post('/bulk-process', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'bulkProcess'])->name('bulk-process');
+            Route::get('/ajax/summary', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'summary'])->name('ajax.summary');
+            Route::post('/{pending}/preview-calculation', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'previewCalculation'])->name('preview-calculation');
+        });
+
+        Route::get('/invoices/export', [\App\Http\Controllers\InvoiceController::class, 'exportCsv'])->name('invoices.export');
+
+        // RTD (Return of Trading Details) Management
+        Route::prefix('rtd')->name('rtd.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\RtdController::class, 'index'])->name('index');
+            Route::get('/year-report', [\App\Http\Controllers\RtdController::class, 'yearReport'])->name('year-report');
+            Route::get('/issues', [\App\Http\Controllers\RtdController::class, 'issues'])->name('issues');
+            Route::get('/suppliers', [\App\Http\Controllers\RtdController::class, 'suppliers'])->name('suppliers');
+            Route::post('/suppliers/{supplier}/classify', [\App\Http\Controllers\RtdController::class, 'classifySupplier'])->name('suppliers.classify');
+
+            // RTD Submissions
+            Route::get('/submissions', [\App\Http\Controllers\RtdSubmissionController::class, 'index'])->name('submissions.index');
+            Route::get('/submissions/create', [\App\Http\Controllers\RtdSubmissionController::class, 'create'])->name('submissions.create');
+            Route::post('/submissions', [\App\Http\Controllers\RtdSubmissionController::class, 'store'])->name('submissions.store');
+            Route::get('/submissions/{submission}', [\App\Http\Controllers\RtdSubmissionController::class, 'show'])->name('submissions.show');
+            Route::get('/submissions/{submission}/report', [\App\Http\Controllers\RtdSubmissionController::class, 'report'])->name('submissions.report');
+            Route::get('/submissions/{submission}/export-csv', [\App\Http\Controllers\RtdSubmissionController::class, 'exportCsv'])->name('submissions.export-csv');
+            Route::get('/submissions/{submission}/debug-sales', [\App\Http\Controllers\RtdSubmissionController::class, 'debugSales'])->name('submissions.debug-sales');
+            Route::post('/submissions/{submission}/submit', [\App\Http\Controllers\RtdSubmissionController::class, 'markSubmitted'])->name('submissions.submit');
+            Route::post('/submissions/{submission}/recalculate', [\App\Http\Controllers\RtdSubmissionController::class, 'recalculate'])->name('submissions.recalculate');
+            Route::post('/submissions/{submission}/add-invoices', [\App\Http\Controllers\RtdSubmissionController::class, 'addInvoices'])->name('submissions.add-invoices');
+            Route::delete('/submissions/{submission}/invoices/{invoice}', [\App\Http\Controllers\RtdSubmissionController::class, 'removeInvoice'])->name('submissions.remove-invoice');
+            Route::delete('/submissions/{submission}', [\App\Http\Controllers\RtdSubmissionController::class, 'destroy'])->name('submissions.destroy');
+
+            Route::post('/{invoice}/parse', [\App\Http\Controllers\RtdController::class, 'parse'])->name('parse');
+            Route::post('/{invoice}/force-parse', [\App\Http\Controllers\RtdController::class, 'forceParse'])->name('force-parse');
+            Route::post('/{invoice}/compute', [\App\Http\Controllers\RtdController::class, 'compute'])->name('compute');
+            Route::post('/{invoice}/accept', [\App\Http\Controllers\RtdController::class, 'accept'])->name('accept');
+            Route::post('/{invoice}/unfreeze', [\App\Http\Controllers\RtdController::class, 'unfreeze'])->name('unfreeze');
+            Route::post('/unfreeze-visible', [\App\Http\Controllers\RtdController::class, 'unfreezeVisible'])->name('unfreeze-visible');
+            Route::post('/{invoice}/manual-assign', [\App\Http\Controllers\RtdController::class, 'manualAssign'])->name('manual-assign');
+            Route::post('/recompute-all', [\App\Http\Controllers\RtdController::class, 'recomputeAll'])->name('recompute-all');
+        });
+
+        // RTD Fallback Management
+        Route::prefix('rtd-fallbacks')->group(function () {
+            Route::get('/', [\App\Http\Controllers\RtdFallbackController::class, 'index'])->name('rtd-fallbacks.index');
+            Route::get('/unresolved', [\App\Http\Controllers\RtdFallbackController::class, 'unresolved'])->name('rtd-fallbacks.unresolved');
+            Route::post('/bulk-assign', [\App\Http\Controllers\RtdFallbackController::class, 'bulkAssign'])->name('rtd-fallbacks.bulk-assign');
+            Route::post('/recompute-affected', [\App\Http\Controllers\RtdFallbackController::class, 'recomputeAffected'])->name('rtd-fallbacks.recompute-affected');
+            Route::put('/{fallback}', [\App\Http\Controllers\RtdFallbackController::class, 'update'])->name('rtd-fallbacks.update');
+            Route::delete('/{fallback}', [\App\Http\Controllers\RtdFallbackController::class, 'destroy'])->name('rtd-fallbacks.destroy');
+        });
+
+        Route::resource('invoices', \App\Http\Controllers\InvoiceController::class);
+
+        // VAT Rates Management
+        Route::get('/vat-rates', [\App\Http\Controllers\VatRateController::class, 'index'])->name('vat-rates.index');
+        Route::post('/vat-rates', [\App\Http\Controllers\VatRateController::class, 'store'])->name('vat-rates.store');
+        Route::put('/vat-rates/{vatRate}', [\App\Http\Controllers\VatRateController::class, 'update'])->name('vat-rates.update');
+        Route::delete('/vat-rates/{vatRate}', [\App\Http\Controllers\VatRateController::class, 'destroy'])->name('vat-rates.destroy');
+
+        // Supplier Management routes
+        Route::post('/suppliers/{supplier}/refresh-analytics', [\App\Http\Controllers\AccountingSuppliersController::class, 'refreshAnalytics'])->name('suppliers.refresh-analytics');
+        Route::post('/suppliers/{supplier}/toggle-status', [\App\Http\Controllers\AccountingSuppliersController::class, 'toggleStatus'])->name('suppliers.toggle-status');
+        Route::post('/suppliers/{supplier}/update-vat-classification', [\App\Http\Controllers\AccountingSuppliersController::class, 'updateVatClassification'])->name('suppliers.update-vat-classification');
+        Route::post('/suppliers/{supplier}/update-rtd-classification', [\App\Http\Controllers\AccountingSuppliersController::class, 'updateRtdClassification'])->name('suppliers.update-rtd-classification');
+        Route::get('/suppliers/outstanding-report', [\App\Http\Controllers\SupplierOutstandingController::class, 'index'])->name('suppliers.outstanding-report');
+        Route::get('/suppliers/outstanding-report/export', [\App\Http\Controllers\SupplierOutstandingController::class, 'exportCsv'])->name('suppliers.outstanding-report.export');
+        Route::get('/suppliers/payments', [\App\Http\Controllers\SupplierPaymentsController::class, 'index'])->name('suppliers.payments');
+        Route::get('/suppliers/payments/export', [\App\Http\Controllers\SupplierPaymentsController::class, 'exportCsv'])->name('suppliers.payments.export');
+        Route::get('/suppliers/organic-trust-report', [\App\Http\Controllers\OrganicTrustReportController::class, 'index'])->name('suppliers.organic-trust-report');
+        Route::get('/suppliers/organic-trust-report/export-bought-in', [\App\Http\Controllers\OrganicTrustReportController::class, 'exportBoughtIn'])->name('suppliers.organic-trust-report.export-bought-in');
+        Route::get('/suppliers/organic-trust-report/export-sales', [\App\Http\Controllers\OrganicTrustReportController::class, 'exportSales'])->name('suppliers.organic-trust-report.export-sales');
+        Route::post('/suppliers/{supplier}/toggle-organic', [\App\Http\Controllers\OrganicTrustReportController::class, 'toggleOrganic'])->name('suppliers.toggle-organic');
+        Route::post('/suppliers/{supplier}/update-organic-fields', [\App\Http\Controllers\OrganicTrustReportController::class, 'updateOrganicFields'])->name('suppliers.update-organic-fields');
+        Route::post('/suppliers/organic-trust-report/options', [\App\Http\Controllers\OrganicTrustReportController::class, 'updateOptions'])->name('suppliers.organic-trust-report.options');
+        // Daily sales email preview (see exactly what opted-in suppliers would receive, without sending)
+        Route::get('/suppliers/daily-sales-preview', [\App\Http\Controllers\AccountingSuppliersController::class, 'dailySalesPreviewIndex'])->name('suppliers.daily-sales-preview');
+        Route::post('/suppliers/daily-sales-preview/refresh', [\App\Http\Controllers\AccountingSuppliersController::class, 'dailySalesPreviewRefresh'])->name('suppliers.daily-sales-preview.refresh');
+        Route::get('/suppliers/{supplier}/daily-sales-preview', [\App\Http\Controllers\AccountingSuppliersController::class, 'dailySalesPreview'])->name('suppliers.daily-sales-preview.show');
+        Route::get('/suppliers/{supplier}/daily-sales-preview/csv', [\App\Http\Controllers\AccountingSuppliersController::class, 'dailySalesPreviewCsv'])->name('suppliers.daily-sales-preview.csv');
+        Route::post('/suppliers/{supplier}/daily-sales-preview/send', [\App\Http\Controllers\AccountingSuppliersController::class, 'dailySalesPreviewSend'])->name('suppliers.daily-sales-preview.send');
+        Route::resource('suppliers', \App\Http\Controllers\AccountingSuppliersController::class);
     });
-    Route::prefix('invoice-attachments/{attachment}')->name('invoices.attachments.')->group(function () {
-        Route::get('/view', [\App\Http\Controllers\InvoiceAttachmentController::class, 'view'])->name('view');
-        Route::get('/viewer', [\App\Http\Controllers\InvoiceAttachmentController::class, 'viewEmbedded'])->name('viewer');
-        Route::get('/viewer-minimal', [\App\Http\Controllers\InvoiceAttachmentController::class, 'viewEmbeddedMinimal'])->name('viewer-minimal');
-        Route::get('/download', [\App\Http\Controllers\InvoiceAttachmentController::class, 'download'])->name('download');
-        Route::patch('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'update'])->name('update');
-        Route::delete('/', [\App\Http\Controllers\InvoiceAttachmentController::class, 'destroy'])->name('destroy');
-        Route::post('/replace', [\App\Http\Controllers\InvoiceAttachmentController::class, 'replace'])->name('replace');
-    });
-
-    // Bulk Upload Routes (must be before resource route)
-    Route::prefix('invoices/bulk-upload')->name('invoices.bulk-upload.')->group(function () {
-        Route::get('/', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'index'])->name('index');
-        Route::post('/upload', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'upload'])->name('upload');
-        Route::post('/camera-upload', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'cameraUpload'])->name('camera-upload');
-        Route::get('/status/{batchId}', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'status'])->name('status');
-        Route::get('/preview/{batchId}', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'preview'])->name('preview');
-        Route::get('/amazon-pending', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'amazonPending'])->name('amazon-pending');
-        Route::delete('/amazon-pending/files', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'deleteAmazonPendingFiles'])->name('delete-amazon-pending-files');
-        Route::post('/{batchId}/cancel', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'cancel'])->name('cancel');
-        Route::post('/{batchId}/process', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'startProcessing'])->name('process');
-        Route::post('/{batchId}/create-from-review', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'createFromReview'])->name('create-from-review');
-        Route::get('/check-parser', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'checkParserConfiguration'])->name('check-parser');
-        Route::get('/{batchId}/file/{fileId}/viewer', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'fileViewer'])->name('file-viewer');
-        Route::get('/{batchId}/file/{fileId}/view', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'viewFile'])->name('view-file');
-        Route::delete('/{batchId}/file/{fileId}', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'deleteFile'])->name('delete-file');
-        Route::post('/{batchId}/file/{fileId}/retry', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'retryFile'])->name('retry-file');
-        Route::post('/{batchId}/file/{fileId}/cancel', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'cancelFile'])->name('cancel-file');
-        Route::post('/{batchId}/file/{fileId}/send-to-ai', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'sendToAi'])->name('send-to-ai');
-        Route::get('/{batchId}/file/{fileId}/thumbnails', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'getThumbnails'])->name('get-thumbnails');
-        Route::post('/{batchId}/file/{fileId}/split', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'splitPdf'])->name('split-pdf');
-        Route::put('/{batchId}/file/{fileId}/parsed-data', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'updateParsedData'])->name('update-parsed-data');
-        Route::post('/{batchId}/file/{fileId}/parse-udea', [\App\Http\Controllers\InvoiceBulkUploadController::class, 'parseUdeaInvoice'])->name('parse-udea');
-    });
-
-    Route::patch('/invoices/{invoice}/notes', [\App\Http\Controllers\InvoiceController::class, 'updateNotes'])->name('invoices.update-notes');
-    Route::post('/invoices/bulk-mark-paid', [\App\Http\Controllers\InvoiceController::class, 'bulkMarkPaid'])->name('invoices.bulk-mark-paid');
-    Route::patch('/invoices/{invoice}/mark-unpaid', [\App\Http\Controllers\InvoiceController::class, 'markUnpaid'])->name('invoices.mark-unpaid');
-
-    // Amazon Pending Invoices (must be before resource route)
-    Route::prefix('invoices/amazon-pending')->name('amazon-pending.')->group(function () {
-        Route::get('/', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'index'])->name('index');
-        Route::get('/{pending}', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'show'])->name('show');
-        Route::get('/{pending}/viewer', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'viewer'])->name('viewer');
-        Route::get('/{pending}/view-invoice', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'viewInvoice'])->name('view-invoice');
-        Route::put('/{pending}/payment', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'updatePayment'])->name('update-payment');
-        Route::post('/{pending}/process', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'process'])->name('process');
-        Route::delete('/{pending}', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'cancel'])->name('cancel');
-        Route::post('/bulk-process', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'bulkProcess'])->name('bulk-process');
-        Route::get('/ajax/summary', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'summary'])->name('ajax.summary');
-        Route::post('/{pending}/preview-calculation', [\App\Http\Controllers\AmazonPendingInvoiceController::class, 'previewCalculation'])->name('preview-calculation');
-    });
-
-    Route::get('/invoices/export', [\App\Http\Controllers\InvoiceController::class, 'exportCsv'])->name('invoices.export');
-
-    // RTD (Return of Trading Details) Management
-    Route::prefix('rtd')->name('rtd.')->group(function () {
-        Route::get('/', [\App\Http\Controllers\RtdController::class, 'index'])->name('index');
-        Route::get('/year-report', [\App\Http\Controllers\RtdController::class, 'yearReport'])->name('year-report');
-        Route::get('/issues', [\App\Http\Controllers\RtdController::class, 'issues'])->name('issues');
-        Route::get('/suppliers', [\App\Http\Controllers\RtdController::class, 'suppliers'])->name('suppliers');
-        Route::post('/suppliers/{supplier}/classify', [\App\Http\Controllers\RtdController::class, 'classifySupplier'])->name('suppliers.classify');
-
-        // RTD Submissions
-        Route::get('/submissions', [\App\Http\Controllers\RtdSubmissionController::class, 'index'])->name('submissions.index');
-        Route::get('/submissions/create', [\App\Http\Controllers\RtdSubmissionController::class, 'create'])->name('submissions.create');
-        Route::post('/submissions', [\App\Http\Controllers\RtdSubmissionController::class, 'store'])->name('submissions.store');
-        Route::get('/submissions/{submission}', [\App\Http\Controllers\RtdSubmissionController::class, 'show'])->name('submissions.show');
-        Route::get('/submissions/{submission}/report', [\App\Http\Controllers\RtdSubmissionController::class, 'report'])->name('submissions.report');
-        Route::get('/submissions/{submission}/export-csv', [\App\Http\Controllers\RtdSubmissionController::class, 'exportCsv'])->name('submissions.export-csv');
-        Route::get('/submissions/{submission}/debug-sales', [\App\Http\Controllers\RtdSubmissionController::class, 'debugSales'])->name('submissions.debug-sales');
-        Route::post('/submissions/{submission}/submit', [\App\Http\Controllers\RtdSubmissionController::class, 'markSubmitted'])->name('submissions.submit');
-        Route::post('/submissions/{submission}/recalculate', [\App\Http\Controllers\RtdSubmissionController::class, 'recalculate'])->name('submissions.recalculate');
-        Route::post('/submissions/{submission}/add-invoices', [\App\Http\Controllers\RtdSubmissionController::class, 'addInvoices'])->name('submissions.add-invoices');
-        Route::delete('/submissions/{submission}/invoices/{invoice}', [\App\Http\Controllers\RtdSubmissionController::class, 'removeInvoice'])->name('submissions.remove-invoice');
-        Route::delete('/submissions/{submission}', [\App\Http\Controllers\RtdSubmissionController::class, 'destroy'])->name('submissions.destroy');
-
-        Route::post('/{invoice}/parse', [\App\Http\Controllers\RtdController::class, 'parse'])->name('parse');
-        Route::post('/{invoice}/force-parse', [\App\Http\Controllers\RtdController::class, 'forceParse'])->name('force-parse');
-        Route::post('/{invoice}/compute', [\App\Http\Controllers\RtdController::class, 'compute'])->name('compute');
-        Route::post('/{invoice}/accept', [\App\Http\Controllers\RtdController::class, 'accept'])->name('accept');
-        Route::post('/{invoice}/unfreeze', [\App\Http\Controllers\RtdController::class, 'unfreeze'])->name('unfreeze');
-        Route::post('/unfreeze-visible', [\App\Http\Controllers\RtdController::class, 'unfreezeVisible'])->name('unfreeze-visible');
-        Route::post('/{invoice}/manual-assign', [\App\Http\Controllers\RtdController::class, 'manualAssign'])->name('manual-assign');
-        Route::post('/recompute-all', [\App\Http\Controllers\RtdController::class, 'recomputeAll'])->name('recompute-all');
-    });
-
-    // RTD Fallback Management
-    Route::prefix('rtd-fallbacks')->group(function () {
-        Route::get('/', [\App\Http\Controllers\RtdFallbackController::class, 'index'])->name('rtd-fallbacks.index');
-        Route::get('/unresolved', [\App\Http\Controllers\RtdFallbackController::class, 'unresolved'])->name('rtd-fallbacks.unresolved');
-        Route::post('/bulk-assign', [\App\Http\Controllers\RtdFallbackController::class, 'bulkAssign'])->name('rtd-fallbacks.bulk-assign');
-        Route::post('/recompute-affected', [\App\Http\Controllers\RtdFallbackController::class, 'recomputeAffected'])->name('rtd-fallbacks.recompute-affected');
-        Route::put('/{fallback}', [\App\Http\Controllers\RtdFallbackController::class, 'update'])->name('rtd-fallbacks.update');
-        Route::delete('/{fallback}', [\App\Http\Controllers\RtdFallbackController::class, 'destroy'])->name('rtd-fallbacks.destroy');
-    });
-
-    Route::resource('invoices', \App\Http\Controllers\InvoiceController::class);
-
-    // VAT Rates Management
-    Route::get('/vat-rates', [\App\Http\Controllers\VatRateController::class, 'index'])->name('vat-rates.index');
-    Route::post('/vat-rates', [\App\Http\Controllers\VatRateController::class, 'store'])->name('vat-rates.store');
-    Route::put('/vat-rates/{vatRate}', [\App\Http\Controllers\VatRateController::class, 'update'])->name('vat-rates.update');
-    Route::delete('/vat-rates/{vatRate}', [\App\Http\Controllers\VatRateController::class, 'destroy'])->name('vat-rates.destroy');
-
-    // Supplier Management routes
-    Route::post('/suppliers/{supplier}/refresh-analytics', [\App\Http\Controllers\AccountingSuppliersController::class, 'refreshAnalytics'])->name('suppliers.refresh-analytics');
-    Route::post('/suppliers/{supplier}/toggle-status', [\App\Http\Controllers\AccountingSuppliersController::class, 'toggleStatus'])->name('suppliers.toggle-status');
-    Route::post('/suppliers/{supplier}/update-vat-classification', [\App\Http\Controllers\AccountingSuppliersController::class, 'updateVatClassification'])->name('suppliers.update-vat-classification');
-    Route::post('/suppliers/{supplier}/update-rtd-classification', [\App\Http\Controllers\AccountingSuppliersController::class, 'updateRtdClassification'])->name('suppliers.update-rtd-classification');
-    Route::get('/suppliers/outstanding-report', [\App\Http\Controllers\SupplierOutstandingController::class, 'index'])->name('suppliers.outstanding-report');
-    Route::get('/suppliers/outstanding-report/export', [\App\Http\Controllers\SupplierOutstandingController::class, 'exportCsv'])->name('suppliers.outstanding-report.export');
-    Route::get('/suppliers/payments', [\App\Http\Controllers\SupplierPaymentsController::class, 'index'])->name('suppliers.payments');
-    Route::get('/suppliers/payments/export', [\App\Http\Controllers\SupplierPaymentsController::class, 'exportCsv'])->name('suppliers.payments.export');
-    Route::get('/suppliers/organic-trust-report', [\App\Http\Controllers\OrganicTrustReportController::class, 'index'])->name('suppliers.organic-trust-report');
-    Route::get('/suppliers/organic-trust-report/export-bought-in', [\App\Http\Controllers\OrganicTrustReportController::class, 'exportBoughtIn'])->name('suppliers.organic-trust-report.export-bought-in');
-    Route::get('/suppliers/organic-trust-report/export-sales', [\App\Http\Controllers\OrganicTrustReportController::class, 'exportSales'])->name('suppliers.organic-trust-report.export-sales');
-    Route::post('/suppliers/{supplier}/toggle-organic', [\App\Http\Controllers\OrganicTrustReportController::class, 'toggleOrganic'])->name('suppliers.toggle-organic');
-    Route::post('/suppliers/{supplier}/update-organic-fields', [\App\Http\Controllers\OrganicTrustReportController::class, 'updateOrganicFields'])->name('suppliers.update-organic-fields');
-    Route::post('/suppliers/organic-trust-report/options', [\App\Http\Controllers\OrganicTrustReportController::class, 'updateOptions'])->name('suppliers.organic-trust-report.options');
-    // Daily sales email preview (see exactly what opted-in suppliers would receive, without sending)
-    Route::get('/suppliers/daily-sales-preview', [\App\Http\Controllers\AccountingSuppliersController::class, 'dailySalesPreviewIndex'])->name('suppliers.daily-sales-preview');
-    Route::post('/suppliers/daily-sales-preview/refresh', [\App\Http\Controllers\AccountingSuppliersController::class, 'dailySalesPreviewRefresh'])->name('suppliers.daily-sales-preview.refresh');
-    Route::get('/suppliers/{supplier}/daily-sales-preview', [\App\Http\Controllers\AccountingSuppliersController::class, 'dailySalesPreview'])->name('suppliers.daily-sales-preview.show');
-    Route::get('/suppliers/{supplier}/daily-sales-preview/csv', [\App\Http\Controllers\AccountingSuppliersController::class, 'dailySalesPreviewCsv'])->name('suppliers.daily-sales-preview.csv');
-    Route::post('/suppliers/{supplier}/daily-sales-preview/send', [\App\Http\Controllers\AccountingSuppliersController::class, 'dailySalesPreviewSend'])->name('suppliers.daily-sales-preview.send');
-    Route::resource('suppliers', \App\Http\Controllers\AccountingSuppliersController::class);
 
     // Order Manager routes
-    Route::prefix('order-manager')->name('order-manager.')->group(function () {
+    Route::prefix('order-manager')->name('order-manager.')->middleware('permission:orders.manage')->group(function () {
         Route::get('/', [\App\Http\Controllers\OrderManagerController::class, 'index'])->name('index');
         Route::get('/check', [\App\Http\Controllers\OrderManagerController::class, 'check'])->name('check');
         Route::post('/{supplier}/toggle', [\App\Http\Controllers\OrderManagerController::class, 'toggleManaged'])->name('toggle');
@@ -310,135 +338,137 @@ Route::middleware('auth')->group(function () {
     });
 
     // Label area routes
-    Route::get('/labels', [LabelAreaController::class, 'hub'])->name('labels.index');
-    Route::get('/labels/zebra', [LabelAreaController::class, 'zebra'])->name('labels.zebra');
-    Route::get('/labels/shelf-labels', [LabelAreaController::class, 'shelfLabels'])->name('labels.shelf-labels');
-    Route::post('/labels/print-a4', [LabelAreaController::class, 'printA4'])->name('labels.print-a4');
-    Route::get('/labels/preview-a4', [LabelAreaController::class, 'previewA4'])->name('labels.preview-a4');
-    Route::get('/labels/preview/{productId}', [LabelAreaController::class, 'previewLabel'])->name('labels.preview');
+    Route::get('/labels', [LabelAreaController::class, 'hub'])->name('labels.index')->middleware('permission:labels.print');
+    Route::get('/labels/zebra', [LabelAreaController::class, 'zebra'])->name('labels.zebra')->middleware('permission:labels.print');
+    Route::get('/labels/shelf-labels', [LabelAreaController::class, 'shelfLabels'])->name('labels.shelf-labels')->middleware('permission:labels.print');
+    Route::post('/labels/print-a4', [LabelAreaController::class, 'printA4'])->name('labels.print-a4')->middleware('permission:labels.print');
+    Route::get('/labels/preview-a4', [LabelAreaController::class, 'previewA4'])->name('labels.preview-a4')->middleware('permission:labels.print');
+    Route::get('/labels/preview/{productId}', [LabelAreaController::class, 'previewLabel'])->name('labels.preview')->middleware('permission:labels.print');
 
     // Requeue product route
-    Route::post('/labels/requeue', [LabelAreaController::class, 'requeueProduct'])->name('labels.requeue');
+    Route::post('/labels/requeue', [LabelAreaController::class, 'requeueProduct'])->name('labels.requeue')->middleware('permission:labels.print');
 
     // Clear all labels route
-    Route::post('/labels/clear-all', [LabelAreaController::class, 'clearAllLabels'])->name('labels.clear-all');
+    Route::post('/labels/clear-all', [LabelAreaController::class, 'clearAllLabels'])->name('labels.clear-all')->middleware('permission:labels.manage');
 
     // Restore batch of labels route
-    Route::post('/labels/restore-batch', [LabelAreaController::class, 'restoreBatch'])->name('labels.restore-batch');
+    Route::post('/labels/restore-batch', [LabelAreaController::class, 'restoreBatch'])->name('labels.restore-batch')->middleware('permission:labels.manage');
 
     // Scanner routes
-    Route::post('/labels/lookup-barcode', [LabelAreaController::class, 'lookupBarcode'])->name('labels.lookup-barcode');
-    Route::post('/labels/scan', [LabelAreaController::class, 'processBarcodeScan'])->name('labels.scan');
+    Route::post('/labels/lookup-barcode', [LabelAreaController::class, 'lookupBarcode'])->name('labels.lookup-barcode')->middleware('permission:labels.print');
+    Route::post('/labels/scan', [LabelAreaController::class, 'processBarcodeScan'])->name('labels.scan')->middleware('permission:labels.print');
 
     // Label translation - debug
-    Route::get('/labels/zpl-debug', fn () => view('labels.zpl-debug'))->name('labels.zpl-debug');
+    Route::get('/labels/zpl-debug', fn () => view('labels.zpl-debug'))->name('labels.zpl-debug')->middleware('permission:labels.manage');
 
     // Barcode scanner test page
-    Route::get('/labels/barcode-scan-test', fn () => view('labels.barcode-scan-test'))->name('labels.barcode-scan-test');
+    Route::get('/labels/barcode-scan-test', fn () => view('labels.barcode-scan-test'))->name('labels.barcode-scan-test')->middleware('permission:labels.manage');
 
     // Label translation - v1 (Gemini generates raw ZPL)
-    Route::get('/labels/camera-test', [LabelAreaController::class, 'cameraTest'])->name('labels.camera-test');
-    Route::post('/labels/camera-upload', [LabelAreaController::class, 'uploadPhoto'])->name('labels.camera-upload');
+    Route::get('/labels/camera-test', [LabelAreaController::class, 'cameraTest'])->name('labels.camera-test')->middleware('permission:labels.manage');
+    Route::post('/labels/camera-upload', [LabelAreaController::class, 'uploadPhoto'])->name('labels.camera-upload')->middleware('permission:labels.manage');
 
     // Label translation - v2 (Gemini returns JSON, Laravel generates ZPL)
-    Route::get('/labels/camera-test2', [LabelAreaController::class, 'cameraTest2'])->name('labels.camera-test2');
-    Route::post('/labels/camera-upload2', [LabelAreaController::class, 'uploadPhoto2'])->name('labels.camera-upload2');
-    Route::get('/labels/camera-upload2', fn () => redirect()->route('labels.camera-test2'))->name('labels.camera-upload2-redirect');
-    Route::post('/labels/regenerate-zpl', [LabelAreaController::class, 'regenerateZpl'])->name('labels.regenerate-zpl');
+    Route::get('/labels/camera-test2', [LabelAreaController::class, 'cameraTest2'])->name('labels.camera-test2')->middleware('permission:labels.manage');
+    Route::post('/labels/camera-upload2', [LabelAreaController::class, 'uploadPhoto2'])->name('labels.camera-upload2')->middleware('permission:labels.manage');
+    Route::get('/labels/camera-upload2', fn () => redirect()->route('labels.camera-test2'))->name('labels.camera-upload2-redirect')->middleware('permission:labels.manage');
+    Route::post('/labels/regenerate-zpl', [LabelAreaController::class, 'regenerateZpl'])->name('labels.regenerate-zpl')->middleware('permission:labels.manage');
 
     // Label translation - shared
-    Route::post('/labels/test-print', [LabelAreaController::class, 'testPrint'])->name('labels.test-print');
-    Route::post('/labels/save-zpl', [LabelAreaController::class, 'saveZpl'])->name('labels.save-zpl');
-    Route::post('/labels/print-zpl', [LabelAreaController::class, 'printZpl'])->name('labels.print-zpl');
+    Route::post('/labels/test-print', [LabelAreaController::class, 'testPrint'])->name('labels.test-print')->middleware('permission:labels.print');
+    Route::post('/labels/save-zpl', [LabelAreaController::class, 'saveZpl'])->name('labels.save-zpl')->middleware('permission:labels.print');
+    Route::post('/labels/print-zpl', [LabelAreaController::class, 'printZpl'])->name('labels.print-zpl')->middleware('permission:labels.print');
 
     // Zebra printer spool (lives on the printer host, not this machine)
-    Route::get('/labels/printer-queue', [LabelAreaController::class, 'printerQueue'])->name('labels.printer-queue');
+    Route::get('/labels/printer-queue', [LabelAreaController::class, 'printerQueue'])->name('labels.printer-queue')->middleware('permission:labels.print');
     Route::post('/labels/printer-cancel', [LabelAreaController::class, 'cancelPrinterJob'])
         ->name('labels.printer-cancel')
-        ->middleware('permission:deliveries.manage');
-    Route::get('/labels/translation-history', [LabelAreaController::class, 'labelHistory'])->name('labels.translation-history');
-    Route::get('/labels/translation-history/{name}/edit', [LabelAreaController::class, 'editLabel'])->name('labels.edit-label');
+        ->middleware('permission:labels.manage');
+    Route::get('/labels/translation-history', [LabelAreaController::class, 'labelHistory'])->name('labels.translation-history')->middleware('permission:labels.print');
+    Route::get('/labels/translation-history/{name}/edit', [LabelAreaController::class, 'editLabel'])->name('labels.edit-label')->middleware('permission:labels.print');
 
     // Label Translation - unified workflow
-    Route::get('/labels/translate', [LabelTranslationController::class, 'index'])->name('labels.translate');
-    Route::post('/labels/translate/check', [LabelTranslationController::class, 'checkExisting'])->name('labels.translate.check');
-    Route::post('/labels/translate/upload', [LabelTranslationController::class, 'upload'])->name('labels.translate.upload');
-    Route::post('/labels/translate/save', [LabelTranslationController::class, 'save'])->name('labels.translate.save');
-    Route::get('/labels/translate/history', [LabelTranslationController::class, 'history'])->name('labels.translate.history');
-    Route::get('/labels/translate/{translation}', [LabelTranslationController::class, 'show'])->name('labels.translate.show');
-    Route::post('/labels/translate/{translation}/print', [LabelTranslationController::class, 'print'])->name('labels.translate.print');
-    Route::patch('/labels/translate/{translation}/auto-print', [LabelTranslationController::class, 'toggleAutoPrint'])->name('labels.translate.toggle-auto-print');
+    Route::get('/labels/translate', [LabelTranslationController::class, 'index'])->name('labels.translate')->middleware('permission:labels.print');
+    Route::post('/labels/translate/check', [LabelTranslationController::class, 'checkExisting'])->name('labels.translate.check')->middleware('permission:labels.print');
+    Route::post('/labels/translate/upload', [LabelTranslationController::class, 'upload'])->name('labels.translate.upload')->middleware('permission:labels.print');
+    Route::post('/labels/translate/save', [LabelTranslationController::class, 'save'])->name('labels.translate.save')->middleware('permission:labels.print');
+    Route::get('/labels/translate/history', [LabelTranslationController::class, 'history'])->name('labels.translate.history')->middleware('permission:labels.print');
+    Route::get('/labels/translate/{translation}', [LabelTranslationController::class, 'show'])->name('labels.translate.show')->middleware('permission:labels.print');
+    Route::post('/labels/translate/{translation}/print', [LabelTranslationController::class, 'print'])->name('labels.translate.print')->middleware('permission:labels.print');
+    Route::patch('/labels/translate/{translation}/auto-print', [LabelTranslationController::class, 'toggleAutoPrint'])->name('labels.translate.toggle-auto-print')->middleware('permission:labels.print');
 
     // Zebra Label Storage (ZebraDesigner .prn exports)
     Route::prefix('labels/zebra/manage')->name('zebra-labels.')->group(function () {
-        Route::get('/', [ZebraLabelController::class, 'index'])->name('index');
-        Route::get('/create', [ZebraLabelController::class, 'create'])->name('create');
-        Route::post('/lookup-product', [ZebraLabelController::class, 'lookupProduct'])->name('lookup-product');
-        Route::post('/', [ZebraLabelController::class, 'store'])->name('store');
-        Route::get('/{zebraLabel}', [ZebraLabelController::class, 'show'])->name('show');
-        Route::delete('/{zebraLabel}', [ZebraLabelController::class, 'destroy'])->name('destroy');
-        Route::post('/{zebraLabel}/print', [ZebraLabelController::class, 'print'])->name('print');
-        Route::patch('/{zebraLabel}/copies', [ZebraLabelController::class, 'updateCopies'])->name('update-copies');
-        Route::patch('/{zebraLabel}/fields', [ZebraLabelController::class, 'updateFields'])->name('update-fields');
+        Route::get('/', [ZebraLabelController::class, 'index'])->name('index')->middleware('permission:labels.print');
+        Route::get('/create', [ZebraLabelController::class, 'create'])->name('create')->middleware('permission:labels.manage');
+        Route::post('/lookup-product', [ZebraLabelController::class, 'lookupProduct'])->name('lookup-product')->middleware('permission:labels.print');
+        Route::post('/', [ZebraLabelController::class, 'store'])->name('store')->middleware('permission:labels.manage');
+        Route::get('/{zebraLabel}', [ZebraLabelController::class, 'show'])->name('show')->middleware('permission:labels.print');
+        Route::delete('/{zebraLabel}', [ZebraLabelController::class, 'destroy'])->name('destroy')->middleware('permission:labels.manage');
+        Route::post('/{zebraLabel}/print', [ZebraLabelController::class, 'print'])->name('print')->middleware('permission:labels.print');
+        Route::patch('/{zebraLabel}/copies', [ZebraLabelController::class, 'updateCopies'])->name('update-copies')->middleware('permission:labels.manage');
+        Route::patch('/{zebraLabel}/fields', [ZebraLabelController::class, 'updateFields'])->name('update-fields')->middleware('permission:labels.manage');
     });
 
     // Fruit & Veg routes
     Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
-        Route::get('/', [FruitVegController::class, 'index'])->name('index');
-        Route::get('/availability', [FruitVegController::class, 'availability'])->name('availability');
-        Route::post('/availability/toggle', [FruitVegController::class, 'toggleAvailability'])->name('availability.toggle');
-        Route::post('/availability/bulk', [FruitVegController::class, 'bulkAvailability'])->name('availability.bulk');
-        Route::get('/prices', [FruitVegController::class, 'prices'])->name('prices');
-        Route::post('/prices/update', [FruitVegController::class, 'updatePrice'])->name('prices.update');
-        Route::get('/manage', [FruitVegController::class, 'manage'])->name('manage');
-        Route::get('/labels', [FruitVegController::class, 'labels'])->name('labels');
-        Route::get('/labels/preview', [FruitVegController::class, 'previewLabels'])->name('labels.preview');
-        Route::post('/labels/print', [FruitVegController::class, 'printLabels'])->name('labels.print');
-        Route::post('/labels/printed', [FruitVegController::class, 'markLabelsPrinted'])->name('labels.printed');
-        Route::post('/labels/clear-all', [FruitVegController::class, 'clearAllLabels'])->name('labels.clear-all');
-        Route::post('/labels/restore-last', [FruitVegController::class, 'restoreLastPrintedBatch'])->name('labels.restore-last');
-        Route::post('/labels/remove', [FruitVegController::class, 'removeFromLabels'])->name('labels.remove');
-        Route::post('/labels/add', [FruitVegController::class, 'addToLabels'])->name('labels.add');
-        Route::post('/display/update', [FruitVegController::class, 'updateDisplay'])->name('display.update');
-        Route::post('/country/update', [FruitVegController::class, 'updateCountry'])->name('country.update');
-        Route::post('/unit/update', [FruitVegController::class, 'updateUnit'])->name('unit.update');
-        Route::post('/class/update', [FruitVegController::class, 'updateClass'])->name('class.update');
-        Route::get('/countries', [FruitVegController::class, 'getCountries'])->name('countries');
-        Route::get('/units', [FruitVegController::class, 'getUnits'])->name('units');
-        Route::get('/classes', [FruitVegController::class, 'getClasses'])->name('classes');
-        Route::get('/search', [FruitVegController::class, 'searchProducts'])->name('search');
-        Route::get('/quick-search', [FruitVegController::class, 'quickSearch'])->name('quick-search');
-        Route::get('/product/{code}', [FruitVegController::class, 'editProduct'])->name('product.edit');
-        Route::post('/product/{code}/update-image', [FruitVegController::class, 'updateProductImage'])->name('product.update-image');
-        Route::get('/product-image/{code}', [FruitVegController::class, 'productImage'])->name('product-image');
-        Route::get('/sales', [FruitVegController::class, 'sales'])->name('sales');
-        Route::get('/sales/data', [FruitVegController::class, 'getSalesData'])->name('sales.data');
-        Route::get('/sales/product/{code}/daily', [FruitVegController::class, 'getProductDailySales'])->name('sales.product.daily');
-        Route::get('/price-sync', [FruitVegController::class, 'priceSync'])->name('price-sync');
-        Route::post('/price-sync/sync', [FruitVegController::class, 'syncPrice'])->name('price-sync.sync');
-        Route::post('/price-sync/bulk-sync', [FruitVegController::class, 'bulkSyncPrices'])->name('price-sync.bulk-sync');
+        Route::get('/', [FruitVegController::class, 'index'])->name('index')->middleware('permission:fruit_veg.operate');
+        Route::get('/availability', [FruitVegController::class, 'availability'])->name('availability')->middleware('permission:fruit_veg.operate');
+        Route::post('/availability/toggle', [FruitVegController::class, 'toggleAvailability'])->name('availability.toggle')->middleware('permission:fruit_veg.operate');
+        Route::post('/availability/bulk', [FruitVegController::class, 'bulkAvailability'])->name('availability.bulk')->middleware('permission:fruit_veg.operate');
+        Route::get('/prices', [FruitVegController::class, 'prices'])->name('prices')->middleware('permission:fruit_veg.manage');
+        Route::post('/prices/update', [FruitVegController::class, 'updatePrice'])->name('prices.update')->middleware('permission:fruit_veg.manage');
+        Route::get('/manage', [FruitVegController::class, 'manage'])->name('manage')->middleware('permission:fruit_veg.manage');
+        Route::get('/labels', [FruitVegController::class, 'labels'])->name('labels')->middleware('permission:fruit_veg.operate');
+        Route::get('/labels/preview', [FruitVegController::class, 'previewLabels'])->name('labels.preview')->middleware('permission:fruit_veg.operate');
+        Route::post('/labels/print', [FruitVegController::class, 'printLabels'])->name('labels.print')->middleware('permission:fruit_veg.operate');
+        Route::post('/labels/printed', [FruitVegController::class, 'markLabelsPrinted'])->name('labels.printed')->middleware('permission:fruit_veg.operate');
+        Route::post('/labels/clear-all', [FruitVegController::class, 'clearAllLabels'])->name('labels.clear-all')->middleware('permission:fruit_veg.operate');
+        Route::post('/labels/restore-last', [FruitVegController::class, 'restoreLastPrintedBatch'])->name('labels.restore-last')->middleware('permission:fruit_veg.operate');
+        Route::post('/labels/remove', [FruitVegController::class, 'removeFromLabels'])->name('labels.remove')->middleware('permission:fruit_veg.operate');
+        Route::post('/labels/add', [FruitVegController::class, 'addToLabels'])->name('labels.add')->middleware('permission:fruit_veg.operate');
+        Route::post('/display/update', [FruitVegController::class, 'updateDisplay'])->name('display.update')->middleware('permission:fruit_veg.manage');
+        Route::post('/country/update', [FruitVegController::class, 'updateCountry'])->name('country.update')->middleware('permission:fruit_veg.manage');
+        Route::post('/unit/update', [FruitVegController::class, 'updateUnit'])->name('unit.update')->middleware('permission:fruit_veg.manage');
+        Route::post('/class/update', [FruitVegController::class, 'updateClass'])->name('class.update')->middleware('permission:fruit_veg.manage');
+        Route::get('/countries', [FruitVegController::class, 'getCountries'])->name('countries')->middleware('permission:fruit_veg.operate');
+        Route::get('/units', [FruitVegController::class, 'getUnits'])->name('units')->middleware('permission:fruit_veg.operate');
+        Route::get('/classes', [FruitVegController::class, 'getClasses'])->name('classes')->middleware('permission:fruit_veg.operate');
+        Route::get('/search', [FruitVegController::class, 'searchProducts'])->name('search')->middleware('permission:fruit_veg.operate');
+        Route::get('/quick-search', [FruitVegController::class, 'quickSearch'])->name('quick-search')->middleware('permission:fruit_veg.operate');
+        Route::get('/product/{code}', [FruitVegController::class, 'editProduct'])->name('product.edit')->middleware('permission:fruit_veg.manage');
+        Route::post('/product/{code}/update-image', [FruitVegController::class, 'updateProductImage'])->name('product.update-image')->middleware('permission:fruit_veg.manage');
+        Route::get('/product-image/{code}', [FruitVegController::class, 'productImage'])->name('product-image')->middleware('permission:fruit_veg.operate');
+        Route::get('/sales', [FruitVegController::class, 'sales'])->name('sales')->middleware('permission:fruit_veg.manage');
+        Route::get('/sales/data', [FruitVegController::class, 'getSalesData'])->name('sales.data')->middleware('permission:fruit_veg.manage');
+        Route::get('/sales/product/{code}/daily', [FruitVegController::class, 'getProductDailySales'])->name('sales.product.daily')->middleware('permission:fruit_veg.manage');
+        Route::get('/price-sync', [FruitVegController::class, 'priceSync'])->name('price-sync')->middleware('permission:fruit_veg.manage');
+        Route::post('/price-sync/sync', [FruitVegController::class, 'syncPrice'])->name('price-sync.sync')->middleware('permission:fruit_veg.manage');
+        Route::post('/price-sync/bulk-sync', [FruitVegController::class, 'bulkSyncPrices'])->name('price-sync.bulk-sync')->middleware('permission:fruit_veg.manage');
 
         // F&V Order Generation
-        Route::get('/orders', [FruitVegController::class, 'orders'])->name('orders');
-        Route::post('/orders', [FruitVegController::class, 'generateOrder'])->name('orders.generate');
-        Route::post('/orders/generate-stream', [FruitVegController::class, 'generateOrderWithProgress'])->name('orders.generate-stream');
+        Route::middleware('permission:orders.manage')->group(function () {
+            Route::get('/orders', [FruitVegController::class, 'orders'])->name('orders');
+            Route::post('/orders', [FruitVegController::class, 'generateOrder'])->name('orders.generate');
+            Route::post('/orders/generate-stream', [FruitVegController::class, 'generateOrderWithProgress'])->name('orders.generate-stream');
+        });
 
         // Harvest log (own-farm produce, records only)
-        Route::get('/harvest', [HarvestController::class, 'index'])->name('harvest');
-        Route::post('/harvest/row', [HarvestController::class, 'saveRow'])->name('harvest.save-row');
-        Route::get('/harvest/history', [HarvestController::class, 'history'])->name('harvest.history');
-        Route::delete('/harvest/{harvest}', [HarvestController::class, 'destroy'])->name('harvest.destroy');
+        Route::get('/harvest', [HarvestController::class, 'index'])->name('harvest')->middleware('permission:fruit_veg.operate');
+        Route::post('/harvest/row', [HarvestController::class, 'saveRow'])->name('harvest.save-row')->middleware('permission:fruit_veg.operate');
+        Route::get('/harvest/history', [HarvestController::class, 'history'])->name('harvest.history')->middleware('permission:fruit_veg.operate');
+        Route::delete('/harvest/{harvest}', [HarvestController::class, 'destroy'])->name('harvest.destroy')->middleware('permission:fruit_veg.operate');
 
         // Waste log (till-visible F&V range + full-range search, instant save)
-        Route::get('/waste', [WasteController::class, 'index'])->name('waste');
-        Route::post('/waste/entry', [WasteController::class, 'entry'])->name('waste.entry');
-        Route::get('/waste/search', [WasteController::class, 'search'])->name('waste.search');
-        Route::get('/waste/history', [WasteController::class, 'history'])->name('waste.history');
-        Route::delete('/waste/{wasteLog}', [WasteController::class, 'destroy'])->name('waste.destroy');
+        Route::get('/waste', [WasteController::class, 'index'])->name('waste')->middleware('permission:fruit_veg.operate');
+        Route::post('/waste/entry', [WasteController::class, 'entry'])->name('waste.entry')->middleware('permission:fruit_veg.operate');
+        Route::get('/waste/search', [WasteController::class, 'search'])->name('waste.search')->middleware('permission:fruit_veg.operate');
+        Route::get('/waste/history', [WasteController::class, 'history'])->name('waste.history')->middleware('permission:fruit_veg.operate');
+        Route::delete('/waste/{wasteLog}', [WasteController::class, 'destroy'])->name('waste.destroy')->middleware('permission:fruit_veg.operate');
     });
 
     // Coffee routes
-    Route::prefix('coffee')->name('coffee.')->group(function () {
+    Route::prefix('coffee')->name('coffee.')->middleware('permission:coffee.manage')->group(function () {
         Route::get('/', [CoffeeController::class, 'index'])->name('index');
         Route::get('/products', [CoffeeController::class, 'products'])->name('products');
         Route::post('/visibility/toggle', [CoffeeController::class, 'toggleVisibility'])->name('visibility.toggle');
@@ -458,7 +488,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // Kitchen/Recipe Management routes
-    Route::prefix('kitchen')->name('kitchen.')->group(function () {
+    Route::prefix('kitchen')->name('kitchen.')->middleware('permission:kitchen.manage')->group(function () {
         // Static routes first
         Route::get('/', [KitchenController::class, 'index'])->name('index');
         Route::get('/create', [KitchenController::class, 'create'])->name('create');
@@ -524,65 +554,73 @@ Route::middleware('auth')->group(function () {
 
     // Categories management routes
     Route::prefix('categories')->name('categories.')->group(function () {
-        Route::get('/', [CategoriesController::class, 'index'])->name('index');
-        Route::get('/{category}', [CategoriesController::class, 'show'])->name('show');
-        Route::get('/{category}/products', [CategoriesController::class, 'products'])->name('products');
-        Route::get('/{category}/sales', [CategoriesController::class, 'sales'])->name('sales');
-        Route::get('/{category}/sales/data', [CategoriesController::class, 'getSalesData'])->name('sales.data');
-        Route::get('/{category}/sales/product/{code}/daily', [CategoriesController::class, 'getProductDailySales'])->name('sales.product.daily');
-        Route::get('/{category}/dashboard-data', [CategoriesController::class, 'getDashboardData'])->name('dashboard.data');
-        Route::post('/visibility/toggle', [CategoriesController::class, 'toggleVisibility'])->name('visibility.toggle');
-        Route::post('/category-visibility/toggle', [CategoriesController::class, 'toggleCategoryVisibility'])->name('category-visibility.toggle');
-        Route::get('/product-image/{code}', [CategoriesController::class, 'productImage'])->name('product-image');
+        Route::middleware('permission:categories.view')->group(function () {
+            Route::get('/', [CategoriesController::class, 'index'])->name('index');
+            Route::get('/{category}', [CategoriesController::class, 'show'])->name('show');
+            Route::get('/{category}/products', [CategoriesController::class, 'products'])->name('products');
+            Route::get('/{category}/sales', [CategoriesController::class, 'sales'])->name('sales');
+            Route::get('/{category}/sales/data', [CategoriesController::class, 'getSalesData'])->name('sales.data');
+            Route::get('/{category}/sales/product/{code}/daily', [CategoriesController::class, 'getProductDailySales'])->name('sales.product.daily');
+            Route::get('/{category}/dashboard-data', [CategoriesController::class, 'getDashboardData'])->name('dashboard.data');
+        });
+        Route::middleware('permission:categories.manage')->group(function () {
+            Route::post('/visibility/toggle', [CategoriesController::class, 'toggleVisibility'])->name('visibility.toggle');
+            Route::post('/category-visibility/toggle', [CategoriesController::class, 'toggleCategoryVisibility'])->name('category-visibility.toggle');
+        });
+        Route::middleware('permission:categories.view')->group(function () {
+            Route::get('/product-image/{code}', [CategoriesController::class, 'productImage'])->name('product-image');
+        });
     });
 
     // Delivery management routes
-    Route::resource('deliveries', DeliveryController::class);
-    Route::post('/deliveries/detect-supplier', [DeliveryController::class, 'detectSupplier'])->name('deliveries.detect-supplier');
-    Route::post('/deliveries/parse-pdf', [DeliveryController::class, 'parsePdf'])->name('deliveries.parse-pdf');
-    Route::post('/deliveries/store-pdf', [DeliveryController::class, 'storePdf'])->name('deliveries.store-pdf');
-    Route::post('/deliveries/parse-xlsx', [DeliveryController::class, 'parseXlsx'])->name('deliveries.parse-xlsx');
-    Route::post('/deliveries/ai-suggest-xlsx', [DeliveryController::class, 'aiSuggestXlsx'])->name('deliveries.ai-suggest-xlsx');
-    Route::post('/deliveries/store-xlsx', [DeliveryController::class, 'storeXlsx'])->name('deliveries.store-xlsx');
-    Route::get('/deliveries/{delivery}/scan', [DeliveryController::class, 'scan'])->name('deliveries.scan');
-    Route::post('/deliveries/{delivery}/scan', [DeliveryController::class, 'processScan'])->name('deliveries.process-scan');
-    Route::patch('/deliveries/{delivery}/items/{item}/quantity', [DeliveryController::class, 'adjustQuantity'])->name('deliveries.adjust-quantity');
-    Route::patch('/deliveries/{delivery}/items/{item}/price', [DeliveryController::class, 'updateItemPrice'])->name('deliveries.update-item-price');
-    Route::patch('/deliveries/{delivery}/items/{item}/barcode', [DeliveryController::class, 'updateItemBarcode'])->name('deliveries.update-item-barcode');
-    Route::get('/deliveries/{delivery}/stats', [DeliveryController::class, 'getStats'])->name('deliveries.stats');
-    Route::get('/deliveries/{delivery}/summary', [DeliveryController::class, 'summary'])->name('deliveries.summary');
-    Route::post('/deliveries/{delivery}/complete', [DeliveryController::class, 'complete'])->name('deliveries.complete');
-    Route::post('/deliveries/{delivery}/cancel', [DeliveryController::class, 'cancel'])->name('deliveries.cancel');
-    Route::post('/deliveries/{delivery}/toggle-order-stock', [DeliveryController::class, 'toggleOrderStock'])->name('deliveries.toggle-order-stock');
-    Route::get('/deliveries/{delivery}/export-discrepancies', [DeliveryController::class, 'exportDiscrepancies'])->name('deliveries.export-discrepancies');
-    Route::post('/deliveries/{delivery}/update-costs', [DeliveryController::class, 'updateCosts'])->name('deliveries.update-costs');
-    Route::post('/deliveries/{delivery}/sync-legacy', [DeliveryController::class, 'syncToLegacy'])->name('deliveries.sync-legacy');
-    Route::get('/deliveries/{delivery}/lookup-supplier-code/{code}', [DeliveryController::class, 'lookupSupplierCode'])->name('deliveries.lookup-supplier-code');
-    Route::delete('/deliveries/{delivery}/unparsed-lines/{index}', [DeliveryController::class, 'resolveUnparsedLine'])->name('deliveries.resolve-unparsed-line');
-    Route::post('/deliveries/{delivery}/items', [DeliveryController::class, 'createDeliveryItem'])->name('deliveries.create-item');
-    Route::post('/delivery-items/{item}/refresh-barcode', [DeliveryController::class, 'refreshBarcode'])->name('delivery-items.refresh-barcode');
-    Route::get('/deliveries/{delivery}/debug-images', [DeliveryController::class, 'debugImages'])->name('deliveries.debug-images');
-    Route::post('/deliveries/{delivery}/resolve-images', [DeliveryController::class, 'resolveImages'])->name('deliveries.resolve-images');
-    Route::post('/deliveries/{delivery}/resolve-images-batch', [DeliveryController::class, 'resolveImagesBatch'])->name('deliveries.resolve-images-batch');
+    Route::middleware('permission:deliveries.manage')->group(function () {
+        Route::resource('deliveries', DeliveryController::class);
+        Route::post('/deliveries/detect-supplier', [DeliveryController::class, 'detectSupplier'])->name('deliveries.detect-supplier');
+        Route::post('/deliveries/parse-pdf', [DeliveryController::class, 'parsePdf'])->name('deliveries.parse-pdf');
+        Route::post('/deliveries/store-pdf', [DeliveryController::class, 'storePdf'])->name('deliveries.store-pdf');
+        Route::post('/deliveries/parse-xlsx', [DeliveryController::class, 'parseXlsx'])->name('deliveries.parse-xlsx');
+        Route::post('/deliveries/ai-suggest-xlsx', [DeliveryController::class, 'aiSuggestXlsx'])->name('deliveries.ai-suggest-xlsx');
+        Route::post('/deliveries/store-xlsx', [DeliveryController::class, 'storeXlsx'])->name('deliveries.store-xlsx');
+        Route::get('/deliveries/{delivery}/scan', [DeliveryController::class, 'scan'])->name('deliveries.scan');
+        Route::post('/deliveries/{delivery}/scan', [DeliveryController::class, 'processScan'])->name('deliveries.process-scan');
+        Route::patch('/deliveries/{delivery}/items/{item}/quantity', [DeliveryController::class, 'adjustQuantity'])->name('deliveries.adjust-quantity');
+        Route::patch('/deliveries/{delivery}/items/{item}/price', [DeliveryController::class, 'updateItemPrice'])->name('deliveries.update-item-price');
+        Route::patch('/deliveries/{delivery}/items/{item}/barcode', [DeliveryController::class, 'updateItemBarcode'])->name('deliveries.update-item-barcode');
+        Route::get('/deliveries/{delivery}/stats', [DeliveryController::class, 'getStats'])->name('deliveries.stats');
+        Route::get('/deliveries/{delivery}/summary', [DeliveryController::class, 'summary'])->name('deliveries.summary');
+        Route::post('/deliveries/{delivery}/complete', [DeliveryController::class, 'complete'])->name('deliveries.complete');
+        Route::post('/deliveries/{delivery}/cancel', [DeliveryController::class, 'cancel'])->name('deliveries.cancel');
+        Route::post('/deliveries/{delivery}/toggle-order-stock', [DeliveryController::class, 'toggleOrderStock'])->name('deliveries.toggle-order-stock');
+        Route::get('/deliveries/{delivery}/export-discrepancies', [DeliveryController::class, 'exportDiscrepancies'])->name('deliveries.export-discrepancies');
+        Route::post('/deliveries/{delivery}/update-costs', [DeliveryController::class, 'updateCosts'])->name('deliveries.update-costs');
+        Route::post('/deliveries/{delivery}/sync-legacy', [DeliveryController::class, 'syncToLegacy'])->name('deliveries.sync-legacy');
+        Route::get('/deliveries/{delivery}/lookup-supplier-code/{code}', [DeliveryController::class, 'lookupSupplierCode'])->name('deliveries.lookup-supplier-code');
+        Route::delete('/deliveries/{delivery}/unparsed-lines/{index}', [DeliveryController::class, 'resolveUnparsedLine'])->name('deliveries.resolve-unparsed-line');
+        Route::post('/deliveries/{delivery}/items', [DeliveryController::class, 'createDeliveryItem'])->name('deliveries.create-item');
+        Route::post('/delivery-items/{item}/refresh-barcode', [DeliveryController::class, 'refreshBarcode'])->name('delivery-items.refresh-barcode');
+        Route::get('/deliveries/{delivery}/debug-images', [DeliveryController::class, 'debugImages'])->name('deliveries.debug-images');
+        Route::post('/deliveries/{delivery}/resolve-images', [DeliveryController::class, 'resolveImages'])->name('deliveries.resolve-images');
+        Route::post('/deliveries/{delivery}/resolve-images-batch', [DeliveryController::class, 'resolveImagesBatch'])->name('deliveries.resolve-images-batch');
 
-    // Delivery Documents
-    Route::get('/deliveries/{delivery}/documents', [DeliveryDocumentController::class, 'index'])->name('deliveries.documents.index');
-    Route::get('/delivery-documents/{document}/view', [DeliveryDocumentController::class, 'view'])->name('delivery-documents.view');
-    Route::get('/delivery-documents/{document}/viewer', [DeliveryDocumentController::class, 'viewEmbedded'])->name('delivery-documents.viewer');
-    Route::get('/delivery-documents/{document}/viewer-minimal', [DeliveryDocumentController::class, 'viewEmbeddedMinimal'])->name('delivery-documents.viewer-minimal');
-    Route::get('/delivery-documents/{document}/download', [DeliveryDocumentController::class, 'download'])->name('delivery-documents.download');
-    Route::delete('/delivery-documents/{document}', [DeliveryDocumentController::class, 'destroy'])->name('delivery-documents.destroy');
+        // Delivery Documents
+        Route::get('/deliveries/{delivery}/documents', [DeliveryDocumentController::class, 'index'])->name('deliveries.documents.index');
+        Route::get('/delivery-documents/{document}/view', [DeliveryDocumentController::class, 'view'])->name('delivery-documents.view');
+        Route::get('/delivery-documents/{document}/viewer', [DeliveryDocumentController::class, 'viewEmbedded'])->name('delivery-documents.viewer');
+        Route::get('/delivery-documents/{document}/viewer-minimal', [DeliveryDocumentController::class, 'viewEmbeddedMinimal'])->name('delivery-documents.viewer-minimal');
+        Route::get('/delivery-documents/{document}/download', [DeliveryDocumentController::class, 'download'])->name('delivery-documents.download');
+        Route::delete('/delivery-documents/{document}', [DeliveryDocumentController::class, 'destroy'])->name('delivery-documents.destroy');
 
-    // Barrel Codes management (deposit items from deliveries)
-    Route::get('/barrel-codes', [BarrelCodeController::class, 'index'])->name('barrel-codes.index');
-    Route::get('/barrel-codes/{barrelCode}/edit', [BarrelCodeController::class, 'edit'])->name('barrel-codes.edit');
-    Route::put('/barrel-codes/{barrelCode}', [BarrelCodeController::class, 'update'])->name('barrel-codes.update');
-    Route::get('/barrel-codes/{barrelCode}/image', [BarrelCodeController::class, 'image'])->name('barrel-codes.image');
-    Route::post('/barrel-codes/{barrelCode}/image', [BarrelCodeController::class, 'updateImage'])->name('barrel-codes.update-image');
-    Route::delete('/barrel-codes/{barrelCode}/image', [BarrelCodeController::class, 'removeImage'])->name('barrel-codes.remove-image');
+        // Barrel Codes management (deposit items from deliveries)
+        Route::get('/barrel-codes', [BarrelCodeController::class, 'index'])->name('barrel-codes.index');
+        Route::get('/barrel-codes/{barrelCode}/edit', [BarrelCodeController::class, 'edit'])->name('barrel-codes.edit');
+        Route::put('/barrel-codes/{barrelCode}', [BarrelCodeController::class, 'update'])->name('barrel-codes.update');
+        Route::get('/barrel-codes/{barrelCode}/image', [BarrelCodeController::class, 'image'])->name('barrel-codes.image');
+        Route::post('/barrel-codes/{barrelCode}/image', [BarrelCodeController::class, 'updateImage'])->name('barrel-codes.update-image');
+        Route::delete('/barrel-codes/{barrelCode}/image', [BarrelCodeController::class, 'removeImage'])->name('barrel-codes.remove-image');
+    });
 
     // Delivery Legacy (Invoice Match) - replicates legacy PHP workflow
-    Route::prefix('delivery-legacy')->name('delivery-legacy.')->group(function () {
+    Route::prefix('delivery-legacy')->name('delivery-legacy.')->middleware('permission:deliveries.process')->group(function () {
         Route::get('/', [DeliveryLegacyController::class, 'index'])->name('index');
         Route::get('/match', [DeliveryLegacyController::class, 'match'])->name('match');
         Route::post('/create-session', [DeliveryLegacyController::class, 'createSession'])->name('create-session');
@@ -607,42 +645,46 @@ Route::middleware('auth')->group(function () {
     });
 
     // Order Management mockup routes (for UI testing)
-    Route::get('/orders/mockups', fn () => view('orders.mockup-index'))->name('orders.mockups');
-    Route::get('/orders/mockup/1-charts', fn () => view('orders.mockup-1-charts'))->name('orders.mockup.1');
-    Route::get('/orders/mockup/2-compact', fn () => view('orders.mockup-2-compact'))->name('orders.mockup.2');
-    Route::get('/orders/mockup/3-dashboard', fn () => view('orders.mockup-3-dashboard'))->name('orders.mockup.3');
-    Route::get('/orders/mockup/layout-experiments', fn () => view('orders.mockup-layout-experiments'))->name('orders.mockup.layout-experiments');
-    Route::get('/orders/mockup/layout-experiments2', fn () => view('orders.mockup-layout-experiments2'))->name('orders.mockup.layout-experiments2');
-    Route::get('/orders/mockup/layout-experiments4', fn () => view('orders.mockup-layout-experiments4'))->name('orders.mockup.layout-experiments4');
-    Route::get('/orders/mockup/layout-experiments3', fn () => view('orders.mockup-layout-experiments3'))->name('orders.mockup.layout-experiments3');
+    Route::middleware('role:admin')->group(function () {
+        Route::get('/orders/mockups', fn () => view('orders.mockup-index'))->name('orders.mockups');
+        Route::get('/orders/mockup/1-charts', fn () => view('orders.mockup-1-charts'))->name('orders.mockup.1');
+        Route::get('/orders/mockup/2-compact', fn () => view('orders.mockup-2-compact'))->name('orders.mockup.2');
+        Route::get('/orders/mockup/3-dashboard', fn () => view('orders.mockup-3-dashboard'))->name('orders.mockup.3');
+        Route::get('/orders/mockup/layout-experiments', fn () => view('orders.mockup-layout-experiments'))->name('orders.mockup.layout-experiments');
+        Route::get('/orders/mockup/layout-experiments2', fn () => view('orders.mockup-layout-experiments2'))->name('orders.mockup.layout-experiments2');
+        Route::get('/orders/mockup/layout-experiments4', fn () => view('orders.mockup-layout-experiments4'))->name('orders.mockup.layout-experiments4');
+        Route::get('/orders/mockup/layout-experiments3', fn () => view('orders.mockup-layout-experiments3'))->name('orders.mockup.layout-experiments3');
 
-    // Real data mockup (Vico supplier)
-    Route::get('/orders/mockup/vico-live', [OrderController::class, 'mockupVicoLive'])->name('orders.mockup.vico-live');
+        // Real data mockup (Vico supplier)
+        Route::get('/orders/mockup/vico-live', [OrderController::class, 'mockupVicoLive'])->name('orders.mockup.vico-live');
+    });
 
     // Order Management routes
-    Route::post('/orders/generate-stream', [OrderController::class, 'storeWithProgress'])->name('orders.generate-stream');
-    // Must stay above Route::resource: orders/{order} would otherwise match "compare".
-    Route::get('/orders/compare', [OrderController::class, 'compare'])->name('orders.compare');
-    Route::post('/orders/compare/difference', [OrderController::class, 'storeDifference'])->name('orders.compare.difference');
-    Route::resource('orders', OrderController::class);
-    Route::post('/orders/{order}/complete', [OrderController::class, 'complete'])->name('orders.complete');
-    Route::post('/orders/{order}/duplicate', [OrderController::class, 'duplicate'])->name('orders.duplicate');
-    Route::get('/orders/{order}/export', [OrderController::class, 'export'])->name('orders.export');
-    Route::get('/orders/{order}/grid-view', [OrderController::class, 'gridView'])->name('orders.grid-view');
-    Route::get('/orders/{order}/layout-a2', [OrderController::class, 'showLayoutA2'])->name('orders.layout-a2');
-    Route::get('/orders/{order}/layout-a2-dense', [OrderController::class, 'showLayoutA2Dense'])->name('orders.layout-a2-dense');
-    Route::get('/orders/{order}/christmas-review', [OrderController::class, 'showChristmasReview'])->name('orders.christmas-review');
-    Route::get('/orders/{order}/statistics', [OrderController::class, 'statistics'])->name('orders.statistics');
-    Route::patch('/orders/{order}/coverage-overrides', [OrderController::class, 'updateCategoryCoverage'])->name('orders.coverage-overrides');
-    Route::get('/orders/{order}/product-search', [OrderController::class, 'searchProducts'])->name('orders.product-search');
-    Route::post('/orders/{order}/add-product', [OrderController::class, 'addProduct'])->name('orders.add-product');
-    Route::patch('/order-items/{orderItem}/quantity', [OrderController::class, 'updateQuantity'])->name('order-items.update-quantity');
-    Route::patch('/order-items/{orderItem}/cases', [OrderController::class, 'updateCaseQuantity'])->name('order-items.update-cases');
-    Route::patch('/order-items/{orderItem}/cost', [OrderController::class, 'updateItemCost'])->name('order-items.update-cost');
-    Route::patch('/order-items/{orderItem}/priority', [OrderController::class, 'updateItemPriority'])->name('order-items.update-priority');
-    Route::post('/orders/{order}/bulk-update', [OrderController::class, 'bulkUpdate'])->name('orders.bulk-update');
-    Route::post('/orders/{order}/auto-approve-safe', [OrderController::class, 'autoApproveSafeItems'])->name('orders.auto-approve-safe');
-    Route::post('/products/update-priority', [OrderController::class, 'updateProductPriority'])->name('products.update-priority');
+    Route::middleware('permission:orders.manage')->group(function () {
+        Route::post('/orders/generate-stream', [OrderController::class, 'storeWithProgress'])->name('orders.generate-stream');
+        // Must stay above Route::resource: orders/{order} would otherwise match "compare".
+        Route::get('/orders/compare', [OrderController::class, 'compare'])->name('orders.compare');
+        Route::post('/orders/compare/difference', [OrderController::class, 'storeDifference'])->name('orders.compare.difference');
+        Route::resource('orders', OrderController::class);
+        Route::post('/orders/{order}/complete', [OrderController::class, 'complete'])->name('orders.complete');
+        Route::post('/orders/{order}/duplicate', [OrderController::class, 'duplicate'])->name('orders.duplicate');
+        Route::get('/orders/{order}/export', [OrderController::class, 'export'])->name('orders.export');
+        Route::get('/orders/{order}/grid-view', [OrderController::class, 'gridView'])->name('orders.grid-view');
+        Route::get('/orders/{order}/layout-a2', [OrderController::class, 'showLayoutA2'])->name('orders.layout-a2');
+        Route::get('/orders/{order}/layout-a2-dense', [OrderController::class, 'showLayoutA2Dense'])->name('orders.layout-a2-dense');
+        Route::get('/orders/{order}/christmas-review', [OrderController::class, 'showChristmasReview'])->name('orders.christmas-review');
+        Route::get('/orders/{order}/statistics', [OrderController::class, 'statistics'])->name('orders.statistics');
+        Route::patch('/orders/{order}/coverage-overrides', [OrderController::class, 'updateCategoryCoverage'])->name('orders.coverage-overrides');
+        Route::get('/orders/{order}/product-search', [OrderController::class, 'searchProducts'])->name('orders.product-search');
+        Route::post('/orders/{order}/add-product', [OrderController::class, 'addProduct'])->name('orders.add-product');
+        Route::patch('/order-items/{orderItem}/quantity', [OrderController::class, 'updateQuantity'])->name('order-items.update-quantity');
+        Route::patch('/order-items/{orderItem}/cases', [OrderController::class, 'updateCaseQuantity'])->name('order-items.update-cases');
+        Route::patch('/order-items/{orderItem}/cost', [OrderController::class, 'updateItemCost'])->name('order-items.update-cost');
+        Route::patch('/order-items/{orderItem}/priority', [OrderController::class, 'updateItemPriority'])->name('order-items.update-priority');
+        Route::post('/orders/{order}/bulk-update', [OrderController::class, 'bulkUpdate'])->name('orders.bulk-update');
+        Route::post('/orders/{order}/auto-approve-safe', [OrderController::class, 'autoApproveSafeItems'])->name('orders.auto-approve-safe');
+        Route::post('/products/update-priority', [OrderController::class, 'updateProductPriority'])->name('products.update-priority');
+    });
 
     // User Management routes (protected by permissions)
     Route::prefix('users')->name('users.')->group(function () {
@@ -670,9 +712,11 @@ Route::middleware('auth')->group(function () {
     });
 
     // Settings routes
-    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
-    Route::post('/settings/clear-cache', [SettingsController::class, 'clearCache'])->name('settings.clear-cache');
-    Route::get('/settings/system-info', [SettingsController::class, 'systemInfo'])->name('settings.system-info');
+    Route::middleware('permission:settings.view')->group(function () {
+        Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+        Route::post('/settings/clear-cache', [SettingsController::class, 'clearCache'])->name('settings.clear-cache');
+        Route::get('/settings/system-info', [SettingsController::class, 'systemInfo'])->name('settings.system-info');
+    });
 
     // KDS (Kitchen Display System) routes
     Route::prefix('kds')->name('kds.')->middleware('permission:kds.access')->group(function () {
@@ -696,7 +740,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // Sales Import routes
-    Route::prefix('sales-import')->name('sales-import.')->group(function () {
+    Route::prefix('sales-import')->name('sales-import.')->middleware('permission:sales.import_data')->group(function () {
         Route::get('/', [SalesImportController::class, 'index'])->name('index');
         Route::post('/daily', [SalesImportController::class, 'runDailyImport'])->name('run-daily');
         Route::post('/monthly', [SalesImportController::class, 'runMonthlySummaries'])->name('run-monthly');
@@ -720,7 +764,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // Udea scraping test routes
-    Route::prefix('tests')->name('tests.')->group(function () {
+    Route::prefix('tests')->name('tests.')->middleware('role:admin')->group(function () {
         Route::get('/guzzle', [TestScraperController::class, 'guzzleLogin'])->name('guzzle');
         Route::get('/client', [TestScraperController::class, 'clientFetch'])->name('client');
         Route::get('/dashboard', [TestScraperController::class, 'dashboard'])->name('dashboard');
@@ -746,95 +790,97 @@ Route::middleware('auth')->group(function () {
     });
 
     // Debug routes for testing supplier tables
-    Route::get('/debug/suppliers', function () {
-        try {
-            // Test 1: Check if we can query suppliers table
-            $suppliers = \DB::connection('pos')->table('suppliers')->limit(5)->get();
+    Route::middleware('role:admin')->group(function () {
+        Route::get('/debug/suppliers', function () {
+            try {
+                // Test 1: Check if we can query suppliers table
+                $suppliers = \DB::connection('pos')->table('suppliers')->limit(5)->get();
 
-            // Test 2: Check if we can query supplier_link table
-            $supplierLinks = \DB::connection('pos')->table('supplier_link')->limit(5)->get();
+                // Test 2: Check if we can query supplier_link table
+                $supplierLinks = \DB::connection('pos')->table('supplier_link')->limit(5)->get();
 
-            // Test 3: Get table structure
-            $supplierColumns = \DB::connection('pos')->getSchemaBuilder()->getColumnListing('suppliers');
-            $linkColumns = \DB::connection('pos')->getSchemaBuilder()->getColumnListing('supplier_link');
+                // Test 3: Get table structure
+                $supplierColumns = \DB::connection('pos')->getSchemaBuilder()->getColumnListing('suppliers');
+                $linkColumns = \DB::connection('pos')->getSchemaBuilder()->getColumnListing('supplier_link');
 
-            // Test 4: Try using the models
-            $supplierModel = \App\Models\Supplier::first();
-            $linkModel = \App\Models\SupplierLink::first();
+                // Test 4: Try using the models
+                $supplierModel = \App\Models\Supplier::first();
+                $linkModel = \App\Models\SupplierLink::first();
 
-            return view('debug.suppliers', compact(
-                'suppliers',
-                'supplierLinks',
-                'supplierColumns',
-                'linkColumns',
-                'supplierModel',
-                'linkModel'
-            ));
-        } catch (\Exception $e) {
-            return 'Error: '.$e->getMessage();
-        }
-    });
+                return view('debug.suppliers', compact(
+                    'suppliers',
+                    'supplierLinks',
+                    'supplierColumns',
+                    'linkColumns',
+                    'supplierModel',
+                    'linkModel'
+                ));
+            } catch (\Exception $e) {
+                return 'Error: '.$e->getMessage();
+            }
+        });
 
-    Route::get('/debug/product-suppliers', function () {
-        // Get some products and check if they have supplier links
-        $products = \App\Models\Product::limit(10)->get();
-        $results = [];
-
-        foreach ($products as $product) {
-            $supplierLink = \App\Models\SupplierLink::where('Barcode', $product->CODE)->first();
-            $stocking = \App\Models\Stocking::where('Barcode', $product->CODE)->first();
-            $results[] = [
-                'product_id' => $product->ID,
-                'product_code' => $product->CODE,
-                'product_name' => $product->NAME,
-                'has_supplier_link' => $supplierLink ? 'YES' : 'NO',
-                'supplier_id' => $supplierLink ? $supplierLink->SupplierID : null,
-                'supplier_name' => $supplierLink && $supplierLink->supplier ? $supplierLink->supplier->Supplier : null,
-                'is_stocked' => $stocking ? 'YES' : 'NO',
-            ];
-        }
-
-        return view('debug.product-suppliers', compact('results'));
-    });
-
-    Route::get('/debug/stock', function () {
-        try {
-            // Test 1: Check raw STOCKCURRENT data
-            $stockData = \DB::connection('pos')->table('STOCKCURRENT')->limit(10)->get();
-
-            // Test 2: Check specific product IDs and their stock
-            $products = \App\Models\Product::limit(5)->get();
-            $stockTests = [];
+        Route::get('/debug/product-suppliers', function () {
+            // Get some products and check if they have supplier links
+            $products = \App\Models\Product::limit(10)->get();
+            $results = [];
 
             foreach ($products as $product) {
-                $rawStock = \DB::connection('pos')
-                    ->table('STOCKCURRENT')
-                    ->where('PRODUCT', $product->ID)
-                    ->first();
-
-                $modelStock = \App\Models\StockCurrent::where('PRODUCT', $product->ID)->first();
-
-                $stockTests[] = [
+                $supplierLink = \App\Models\SupplierLink::where('Barcode', $product->CODE)->first();
+                $stocking = \App\Models\Stocking::where('Barcode', $product->CODE)->first();
+                $results[] = [
                     'product_id' => $product->ID,
+                    'product_code' => $product->CODE,
                     'product_name' => $product->NAME,
-                    'raw_stock_query' => $rawStock ? $rawStock->UNITS : 'NOT FOUND',
-                    'model_stock_query' => $modelStock ? $modelStock->UNITS : 'NOT FOUND',
-                    'getCurrentStock_method' => $product->getCurrentStock(),
+                    'has_supplier_link' => $supplierLink ? 'YES' : 'NO',
+                    'supplier_id' => $supplierLink ? $supplierLink->SupplierID : null,
+                    'supplier_name' => $supplierLink && $supplierLink->supplier ? $supplierLink->supplier->Supplier : null,
+                    'is_stocked' => $stocking ? 'YES' : 'NO',
                 ];
             }
 
-            // Test 3: Check if any products have stock relationships
-            $productsWithStock = \App\Models\Product::with('stockCurrent')->limit(10)->get();
+            return view('debug.product-suppliers', compact('results'));
+        });
 
-            return view('debug.stock', compact('stockData', 'stockTests', 'productsWithStock'));
+        Route::get('/debug/stock', function () {
+            try {
+                // Test 1: Check raw STOCKCURRENT data
+                $stockData = \DB::connection('pos')->table('STOCKCURRENT')->limit(10)->get();
 
-        } catch (\Exception $e) {
-            return 'Error: '.$e->getMessage();
-        }
+                // Test 2: Check specific product IDs and their stock
+                $products = \App\Models\Product::limit(5)->get();
+                $stockTests = [];
+
+                foreach ($products as $product) {
+                    $rawStock = \DB::connection('pos')
+                        ->table('STOCKCURRENT')
+                        ->where('PRODUCT', $product->ID)
+                        ->first();
+
+                    $modelStock = \App\Models\StockCurrent::where('PRODUCT', $product->ID)->first();
+
+                    $stockTests[] = [
+                        'product_id' => $product->ID,
+                        'product_name' => $product->NAME,
+                        'raw_stock_query' => $rawStock ? $rawStock->UNITS : 'NOT FOUND',
+                        'model_stock_query' => $modelStock ? $modelStock->UNITS : 'NOT FOUND',
+                        'getCurrentStock_method' => $product->getCurrentStock(),
+                    ];
+                }
+
+                // Test 3: Check if any products have stock relationships
+                $productsWithStock = \App\Models\Product::with('stockCurrent')->limit(10)->get();
+
+                return view('debug.stock', compact('stockData', 'stockTests', 'productsWithStock'));
+
+            } catch (\Exception $e) {
+                return 'Error: '.$e->getMessage();
+            }
+        });
     });
 
     // Till Review routes
-    Route::prefix('till-review')->name('till-review.')->group(function () {
+    Route::prefix('till-review')->name('till-review.')->middleware('permission:till_review.view')->group(function () {
         Route::get('/', [\App\Http\Controllers\TillReviewController::class, 'index'])->name('index');
         Route::get('/summary', [\App\Http\Controllers\TillReviewController::class, 'getSummary'])->name('summary');
         Route::get('/transactions', [\App\Http\Controllers\TillReviewController::class, 'getTransactions'])->name('transactions');

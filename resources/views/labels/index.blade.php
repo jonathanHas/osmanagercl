@@ -155,6 +155,7 @@
                                 @endif
                             </h3>
                             <div class="flex items-center gap-3">
+                                @if(auth()->user()->can('labels.manage'))
                                 <!-- Clear Labels Button -->
                                 <button onclick="clearAllLabels()" 
                                         class="inline-flex items-center px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold text-xs uppercase tracking-widest rounded-md transition">
@@ -171,6 +172,7 @@
                                     </span>
                                     (<span id="clear-products-count">{{ count($productsNeedingLabels) }}</span>)
                                 </button>
+                                @endif
                                 
                                 <!-- Preview Button -->
                                 <button onclick="previewAllLabels()" 
@@ -324,6 +326,7 @@
                                         
                                         <!-- Batch Actions -->
                                         <div class="flex items-center space-x-2">
+                                            @if(auth()->user()->can('labels.manage'))
                                             <button onclick="event.stopPropagation(); restoreBatch('{{ $group['display_time'] }}', '{{ $groupKey }}', {{ $loop->index }})"
                                                     class="inline-flex items-center px-3 py-1 text-xs bg-green-100 hover:bg-green-200 dark:bg-green-900 dark:hover:bg-green-800 text-green-700 dark:text-green-300 rounded transition">
                                                 <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -331,6 +334,7 @@
                                                 </svg>
                                                 Restore All ({{ $group['count'] }})
                                             </button>
+                                            @endif
                                         </div>
                                     </div>
                                     

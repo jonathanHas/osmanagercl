@@ -26,7 +26,7 @@ class OrderDifferenceCreationTest extends TestCase
     {
         parent::setUp();
 
-        $this->user = User::factory()->create();
+        $this->user = User::factory()->withRole('admin')->create();
     }
 
     /**

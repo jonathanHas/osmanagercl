@@ -277,6 +277,47 @@ class RolesAndPermissionsSeeder extends Seeder
                 'description' => 'Can enable/disable maintenance mode',
                 'module' => 'System Settings',
             ],
+
+            // Till review (also created by 2025_08_11_232011_add_cash_reconciliation_permissions;
+            // defined here too so a fresh install can grant it - see below)
+            [
+                'name' => 'till_review.view',
+                'display_name' => 'View Till Receipts',
+                'description' => 'Can view till receipts and transactions',
+                'module' => 'Financial Management',
+            ],
+
+            // Shop mode route gating (see 2026_09_23_150000_add_shop_mode_permissions)
+            [
+                'name' => 'stocking.scan',
+                'display_name' => 'Scan and adjust stock',
+                'description' => 'Can scan products and adjust stock levels on the shop floor',
+                'module' => 'Stock',
+            ],
+            [
+                'name' => 'fruit_veg.operate',
+                'display_name' => 'Fruit & veg daily tasks',
+                'description' => 'Can run the daily fruit & veg tasks: availability, labels, waste and harvest',
+                'module' => 'Category Management',
+            ],
+            [
+                'name' => 'orders.manage',
+                'display_name' => 'Manage supplier orders',
+                'description' => 'Can generate, compare and approve supplier orders',
+                'module' => 'Ordering',
+            ],
+            [
+                'name' => 'invoices.manage',
+                'display_name' => 'Manage supplier invoices and RTD',
+                'description' => 'Can manage supplier invoices, attachments, RTD and supplier records',
+                'module' => 'Accounting',
+            ],
+            [
+                'name' => 'kitchen.manage',
+                'display_name' => 'Manage kitchen recipes and orders',
+                'description' => 'Can manage kitchen recipes, ingredient profiles and kitchen orders',
+                'module' => 'Kitchen',
+            ],
         ];
 
         // Create all permissions
@@ -301,6 +342,11 @@ class RolesAndPermissionsSeeder extends Seeder
             'kds.access',
             'vouchers.redeem',
             'customer-requests.manage',
+            'stocking.scan',
+            'fruit_veg.operate',
+            // Employees hold this on the live database (granted by the cash
+            // reconciliation migration); a fresh install needs it here too.
+            'till_review.view',
         ];
 
         foreach ($employeePermissions as $permission) {
@@ -321,6 +367,10 @@ class RolesAndPermissionsSeeder extends Seeder
             'users.view',
             'customer-invoices.manage',
             'vouchers.manage',
+            'products.create',
+            'orders.manage',
+            'invoices.manage',
+            'kitchen.manage',
         ]);
 
         foreach ($managerPermissions as $permission) {

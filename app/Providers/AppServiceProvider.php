@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\InvoiceAttachment;
 use App\Models\Product;
 use App\Observers\ProductObserver;
+use App\Support\UiMode;
 use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -16,7 +17,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->scoped(UiMode::class);
     }
 
     /**
@@ -24,11 +25,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Redirect authenticated baristas to KDS instead of dashboard
+        // Send an already-authenticated user to the home screen of their mode
+        // (shop floor or office) rather than always to the dashboard.
         RedirectIfAuthenticated::redirectUsing(function ($request) {
-            return $request->user()?->isBarista()
-                ? route('kds.index')
-                : route('dashboard');
+            return app(UiMode::class)->landingUrl($request->user());
         });
 
         // Route model binding for invoice attachments

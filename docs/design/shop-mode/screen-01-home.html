@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>01 Home · Shop mode</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="shop.css">
+<style>body{margin:0;background:#f5ead8}</style>
+</head>
+<body>
+<div class="shop" data-screen-label="01 Home">
+  <header class="shop-topbar">
+    <div class="shop-topbar__brand"><span class="shop-topbar__mark"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"></path><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"></path></svg></span><span>Shop</span></div>
+    <details class="shop-usermenu">
+      <summary class="shop-chip"><span class="shop-avatar">MJ</span><span class="shop-chip__name">Maya</span><svg class="shop-ico shop-ico--sm shop-chip__caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+      <div class="shop-menu" role="menu">
+        <div class="shop-menu__head"><span class="shop-avatar">MJ</span><div><div class="shop-menu__name">Maya Jensen</div><div class="shop-meta">Shop floor</div></div></div>
+        <a class="shop-menu__item" role="menuitem" href="screen-16-switch-user.html"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>Switch user</a>
+        <a class="shop-menu__item" role="menuitem" href="screen-18-locked.html"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>Lock</a>
+        <a class="shop-menu__item" role="menuitem" href="#"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path><rect width="20" height="14" x="2" y="6" rx="2"></rect></svg>Office</a>
+        <div class="shop-menu__sep"></div>
+        <a class="shop-menu__item shop-menu__item--danger" role="menuitem" href="#"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="m16 17 5-5-5-5"></path><path d="M21 12H9"></path></svg>Log out</a>
+      </div>
+    </details>
+  </header>
+  <main class="shop-page">
+    <div class="shop-stack shop-stack--tight">
+      <h2 class="shop-title">Good morning, Maya</h2>
+      <p class="shop-meta">Tuesday 23 September</p>
+    </div>
+    <nav class="shop-tiles" aria-label="Tasks">
+      <a class="shop-tile" href="screen-02-stock-scan.html"><span class="shop-tile__icon"><svg class="shop-ico shop-ico--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"></path><path d="M12 22V12"></path><path d="m3.3 7 8.7 5 8.7-5"></path></svg></span><span class="shop-tile__text"><span class="shop-tile__label">Stock scan</span><span class="shop-tile__hint">Count and adjust</span></span></a>
+      <a class="shop-tile" href="screen-03-price-check.html"><span class="shop-tile__icon"><svg class="shop-ico shop-ico--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"></path><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"></circle></svg></span><span class="shop-tile__text"><span class="shop-tile__label">Price check</span><span class="shop-tile__hint">Scan for shelf price</span></span></a>
+      <a class="shop-tile" href="screen-04-deliveries.html"><span class="shop-tile__icon"><svg class="shop-ico shop-ico--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"></path><path d="M15 18H9"></path><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"></path><circle cx="17" cy="18" r="2"></circle><circle cx="7" cy="18" r="2"></circle></svg></span><span class="shop-tile__badge" aria-label="2 waiting">2</span><span class="shop-tile__text"><span class="shop-tile__label">Receive delivery</span><span class="shop-tile__hint">2 waiting</span></span></a>
+      <a class="shop-tile" href="screen-07-print-labels.html"><span class="shop-tile__icon"><svg class="shop-ico shop-ico--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 9V3h12v6"></path><rect x="6" y="14" width="12" height="8" rx="1"></rect></svg></span><span class="shop-tile__badge" aria-label="7 in queue">7</span><span class="shop-tile__text"><span class="shop-tile__label">Print labels</span><span class="shop-tile__hint">7 in queue</span></span></a>
+      <a class="shop-tile" href="#"><span class="shop-tile__icon"><svg class="shop-ico shop-ico--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2v2"></path><path d="M14 2v2"></path><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"></path><path d="M6 2v2"></path></svg></span><span class="shop-tile__text"><span class="shop-tile__label">Coffee orders</span><span class="shop-tile__hint">Kitchen display</span></span></a>
+      <a class="shop-tile" href="screen-10-requests-staff.html"><span class="shop-tile__icon"><svg class="shop-ico shop-ico--lg" viewBox="0 0 24 24" aria-hidden="true"><rect width="8" height="4" x="8" y="2" rx="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="M12 11h4M12 16h4M8 11h.01M8 16h.01"></path></svg></span><span class="shop-tile__badge" aria-label="3 due this week">3</span><span class="shop-tile__text"><span class="shop-tile__label">Customer requests</span><span class="shop-tile__hint">3 due this week</span></span></a>
+      <a class="shop-tile" href="screen-11-vouchers.html"><span class="shop-tile__icon"><svg class="shop-ico shop-ico--lg" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"></rect><path d="M12 8v13"></path><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"></path><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"></path></svg></span><span class="shop-tile__text"><span class="shop-tile__label">Vouchers</span><span class="shop-tile__hint">Balance and redeem</span></span></a>
+      <a class="shop-tile" href="screen-12-fv-availability.html"><span class="shop-tile__icon shop-tile__icon--sage"><svg class="shop-ico shop-ico--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.27 21.7s9.87-3.5 12.73-6.36a4.5 4.5 0 0 0-6.36-6.37C5.77 11.84 2.27 21.7 2.27 21.7zM8.64 14l-2.05-2.04M15.34 15l-2.46-2.46"></path><path d="M22 9s-1.33-2-3.5-2C16.86 7 15 9 15 9s1.33 2 3.5 2S22 9 22 9z"></path><path d="M15 2s-2 1.33-2 3.5S15 9 15 9s2-1.84 2-3.5C17 3.33 15 2 15 2z"></path></svg></span><span class="shop-tile__text"><span class="shop-tile__label">Fruit &amp; veg</span><span class="shop-tile__hint">Availability, waste, harvest</span></span></a>
+    </nav>
+  </main>
+</div>
+</body>
+</html>

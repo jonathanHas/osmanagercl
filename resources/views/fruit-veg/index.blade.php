@@ -132,6 +132,7 @@
                             Price Sync
                         </a>
 
+                        @if(auth()->user()->can('orders.manage'))
                         <a href="{{ route('fruit-veg.orders') }}"
                            class="flex items-center justify-center px-4 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition">
                             <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -139,6 +140,7 @@
                             </svg>
                             Generate Order
                         </a>
+                        @endif
 
                         <a href="{{ route('fruit-veg.harvest') }}"
                            class="flex items-center justify-center px-4 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition">

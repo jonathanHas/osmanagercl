@@ -117,7 +117,7 @@
             </div>
 
             <!-- Amazon Pending Invoices Alert (if any) -->
-            @if(($amazonPendingCount ?? 0) > 0)
+            @if(auth()->user()->can('invoices.manage') && ($amazonPendingCount ?? 0) > 0)
             <div class="mb-8">
                 <div class="bg-gradient-to-r from-orange-500 to-red-600 overflow-hidden shadow rounded-lg">
                     <div class="p-6">
@@ -222,6 +222,7 @@
                             </svg>
                         </a>
 
+                        @if(auth()->user()->can('invoices.manage'))
                         <a href="{{ route('invoices.bulk-upload.index') }}" class="group relative flex items-center justify-between rounded-xl border border-indigo-100 bg-white p-5 shadow-sm transition hover:shadow-md focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
                             <div class="flex items-center">
                                 <div class="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
@@ -238,7 +239,9 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                             </svg>
                         </a>
+                        @endif
 
+                        @if(auth()->user()->can('invoices.manage'))
                         <a href="{{ route('suppliers.outstanding-report') }}" class="group relative flex items-center justify-between rounded-xl border border-amber-100 bg-white p-5 shadow-sm transition hover:shadow-md focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-amber-500">
                             <div class="flex items-center">
                                 <div class="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-amber-600">
@@ -256,6 +259,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                             </svg>
                         </a>
+                        @endif
                     </div>
                 </div>
             </div>

@@ -27,7 +27,7 @@ class LabelTranslationSaveTest extends TestCase
 
         $this->aliasMysqlConnectionToTestDatabase();
 
-        $this->actingAs(User::factory()->create());
+        $this->actingAs(User::factory()->withRole('admin')->create());
     }
 
     private function save(array $overrides = []): \Illuminate\Testing\TestResponse
