@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\CoffeeProductMetadata;
 use App\Models\KdsOrderItem;
+use App\Models\KdsProduct;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -17,6 +18,11 @@ class CoffeeMetadataController extends Controller
         $coffeeTypes = $allMetadata->where('type', 'coffee');
         $optionsGrouped = $allMetadata->where('type', 'option')->groupBy('group_name');
         $groupNames = $optionsGrouped->keys()->filter()->sort()->values();
+
+        // Flag rows whose product is not on the active KDS allow-list: the
+        // importers drop those ticket lines, so the product never reaches /kds.
+        $this->flagKdsListing($allMetadata);
+        $unlisted = $allMetadata->where('kds_listed', '===', false)->values();
 
         // Get any products that don't have metadata yet
         $allCoffeeProducts = DB::connection('pos')
@@ -40,7 +46,66 @@ class CoffeeMetadataController extends Controller
         // Badge picker options for option rows, grouped by family.
         $badgeKinds = CoffeeProductMetadata::BADGE_KINDS;
 
-        return view('coffee.metadata', compact('coffeeTypes', 'optionsGrouped', 'missingMetadata', 'groupNames', 'sampleDrinkName', 'badgeKinds'));
+        return view('coffee.metadata', compact('coffeeTypes', 'optionsGrouped', 'missingMetadata', 'groupNames', 'sampleDrinkName', 'badgeKinds', 'unlisted'));
+    }
+
+    /**
+     * Set kds_listed on each row: true when on the active allow-list, false
+     * when a real POS product is missing from it, null when the product does
+     * not exist in the POS at all (synthetic ids), which cannot be listed.
+     */
+    private function flagKdsListing($metadata): void
+    {
+        $productIds = $metadata->pluck('product_id')->unique()->values();
+
+        $listed = KdsProduct::active()->whereIn('product_id', $productIds)->pluck('product_id')->flip();
+        $inPos = DB::connection('pos')->table('PRODUCTS')->whereIn('ID', $productIds)->pluck('ID')->flip();
+
+        foreach ($metadata as $row) {
+            $row->kds_listed = isset($listed[$row->product_id])
+                ? true
+                : (isset($inPos[$row->product_id]) ? false : null);
+        }
+    }
+
+    /**
+     * Put one metadata row's product on the KDS allow-list.
+     */
+    public function listOnKds(CoffeeProductMetadata $metadata)
+    {
+        $result = KdsProduct::ensureListed($metadata->product_id);
+
+        if ($result['action'] === 'not_in_pos') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This product does not exist in the POS, so it cannot be sent to the KDS.',
+            ], 422);
+        }
+
+        return response()->json(['success' => true, 'action' => $result['action']]);
+    }
+
+    /**
+     * Put every metadata row's product on the KDS allow-list (same rule as
+     * `php artisan kds:sync-products`).
+     */
+    public function syncKds()
+    {
+        $counts = ['created' => 0, 'reactivated' => 0, 'unchanged' => 0, 'not_in_pos' => 0];
+
+        foreach (CoffeeProductMetadata::pluck('product_id') as $productId) {
+            $counts[KdsProduct::ensureListed($productId)['action']]++;
+        }
+
+        $added = $counts['created'] + $counts['reactivated'];
+
+        return response()->json([
+            'success' => true,
+            'counts' => $counts,
+            'message' => $added > 0
+                ? "Added {$added} product(s) to the KDS."
+                : 'Every product with metadata is already on the KDS.',
+        ]);
     }
 
     public function update(Request $request, CoffeeProductMetadata $metadata)

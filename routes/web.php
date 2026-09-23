@@ -449,6 +449,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/metadata', [CoffeeMetadataController::class, 'store'])->name('metadata.store');
         Route::delete('/metadata/{metadata}', [CoffeeMetadataController::class, 'destroy'])->name('metadata.destroy');
         Route::post('/metadata/add-syrups', [CoffeeMetadataController::class, 'addSpecificSyrups'])->name('metadata.add-syrups');
+        Route::post('/metadata/sync-kds', [CoffeeMetadataController::class, 'syncKds'])->name('metadata.sync-kds');
+        Route::post('/metadata/{metadata}/list-on-kds', [CoffeeMetadataController::class, 'listOnKds'])->name('metadata.list-on-kds');
         Route::get('/sales', [CoffeeController::class, 'sales'])->name('sales');
         Route::get('/sales/data', [CoffeeController::class, 'getSalesData'])->name('sales.data');
         Route::get('/sales/product/{code}/daily', [CoffeeController::class, 'getProductDailySales'])->name('sales.product.daily');

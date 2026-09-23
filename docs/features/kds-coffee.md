@@ -82,6 +82,41 @@ The Coffee KDS is a real-time order display system for baristas to track and man
 
 #### Command
 - `kds:monitor-coffee`: Manual trigger for order monitoring
+- `kds:sync-products [--dry-run]`: Put every product with coffee metadata on the KDS allow-list (see below)
+
+### Which products reach the KDS
+
+A ticket line only becomes a KDS order item if its POS product is on the
+**KDS allow-list** (`kds_products`, managed at `/kds/products`). The importers
+(`MonitorCoffeeOrdersJob` and `KdsRealtimeController`) filter on that list
+before anything else. The **coffee metadata** (`coffee_product_metadata`,
+managed at `/coffee/metadata`) then decides how a listed item is drawn: as a
+drink line or folded into the drink above it as a modifier chip.
+
+Both lists must agree. A product with metadata but no allow-list row is
+silently dropped, which is how almond milk went missing in September 2026:
+the milk products created after the allow-list was seeded were given metadata
+but never listed.
+
+To keep the lists in step:
+
+- **Creating metadata auto-lists the product.** `CoffeeProductMetadata` has a
+  `created` hook that calls `KdsProduct::ensureListed()`. It creates the
+  allow-list row from POS data (trigger mode `primary`), or reactivates an
+  existing row that had been switched off. Products that do not exist in the
+  POS, such as the synthetic `SYRUP_*` ids, are skipped. Failures are logged
+  and never block saving the metadata.
+- **`/coffee/metadata` shows the gap.** Each row carries a green dot when its
+  product is on the allow-list, a red "Not on KDS" tag with an "Add to KDS"
+  button when it is not, or a grey "Not in POS" tag for synthetic ids. When
+  anything is unlisted a banner at the top of the page names each product and
+  offers "Add all to KDS", which runs the same rule as the command below.
+- **`php artisan kds:sync-products`** backfills the same rule across every
+  existing metadata row. Run it once after deploying the hook, and any time the
+  two lists are suspected of drifting. `--dry-run` prints what would change.
+
+`/kds/products` is still the place to manage products that have no coffee
+metadata (bakery companions, excluders) and to switch a product off.
 
 #### Event
 - `CoffeeOrderReceived`: Broadcast event for new orders

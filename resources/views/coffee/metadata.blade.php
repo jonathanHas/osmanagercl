@@ -12,6 +12,37 @@
 
     <div class="py-6">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            @if($unlisted->count() > 0)
+            <!-- Products with metadata that the KDS importer will drop -->
+            <div id="kds-unlisted-banner" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 shadow-sm sm:rounded-lg mb-6">
+                <div class="p-6 text-gray-900 dark:text-gray-100">
+                    <div class="flex flex-wrap items-start justify-between gap-4">
+                        <div>
+                            <h3 class="text-lg font-semibold text-red-800 dark:text-red-200">
+                                {{ $unlisted->count() }} {{ Str::plural('product', $unlisted->count()) }} will not appear on the KDS
+                            </h3>
+                            <p class="text-sm text-red-700 dark:text-red-300 mt-1">
+                                These have metadata but are not on the KDS product list, so their ticket lines are dropped before an order is created.
+                            </p>
+                            <ul class="mt-3 text-sm space-y-1">
+                                @foreach($unlisted as $row)
+                                <li class="flex items-center gap-2">
+                                    <span class="inline-block w-2 h-2 rounded-full bg-red-500"></span>
+                                    <span>{{ $row->product_name }}</span>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">({{ $row->type === 'coffee' ? 'coffee type' : 'option' }})</span>
+                                </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                        <button type="button" onclick="syncKds()"
+                            class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700">
+                            Add all to KDS
+                        </button>
+                    </div>
+                </div>
+            </div>
+            @endif
+
             <!-- Coffee Types Section -->
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg mb-6">
                 <div class="p-6 text-gray-900 dark:text-gray-100">
@@ -45,6 +76,7 @@
                                 <tr class="bg-green-50 dark:bg-green-900/20">
                                     <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                                         {{ $coffee->product_name }}
+                                        @include('coffee.partials.kds-listing-status', ['row' => $coffee])
                                     </td>
                                     <td class="px-4 py-2 whitespace-nowrap">
                                         <select id="type_{{ $coffee->id }}" 
@@ -136,6 +168,7 @@
                                     <tr class="bg-blue-50 dark:bg-blue-900/20">
                                         <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                                             {{ $option->product_name }}
+                                            @include('coffee.partials.kds-listing-status', ['row' => $option])
                                         </td>
                                         <td class="px-4 py-2 whitespace-nowrap">
                                             <select id="type_{{ $option->id }}" 
@@ -626,6 +659,51 @@
                     }
                 }
             };
+        }
+
+        async function listOnKds(id) {
+            try {
+                const response = await fetch(`/coffee/metadata/${id}/list-on-kds`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    }
+                });
+                const result = await response.json();
+                if (response.ok && result.success) {
+                    location.reload();
+                } else {
+                    alert(result.message || 'Failed to add product to the KDS');
+                }
+            } catch (error) {
+                console.error('Error adding product to KDS:', error);
+                alert('Error adding product to the KDS');
+            }
+        }
+
+        async function syncKds() {
+            try {
+                const response = await fetch('/coffee/metadata/sync-kds', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    }
+                });
+                const result = await response.json();
+                if (response.ok && result.success) {
+                    alert(result.message);
+                    location.reload();
+                } else {
+                    alert(result.message || 'Failed to sync products to the KDS');
+                }
+            } catch (error) {
+                console.error('Error syncing products to KDS:', error);
+                alert('Error syncing products to the KDS');
+            }
         }
 
         async function addSpecificSyrups() {

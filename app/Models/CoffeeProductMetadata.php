@@ -3,10 +3,39 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
 
 class CoffeeProductMetadata extends Model
 {
     protected $table = 'coffee_product_metadata';
+
+    /**
+     * New metadata implies the product should feed the KDS, so put it on the
+     * kds_products allow-list too. Without this the two lists drift apart and
+     * the product silently never appears on /kds. Failures (POS unreachable)
+     * are logged, never surfaced: the metadata row is still worth saving.
+     */
+    protected static function booted(): void
+    {
+        static::created(function (self $metadata) {
+            try {
+                $result = KdsProduct::ensureListed($metadata->product_id);
+
+                if (in_array($result['action'], ['created', 'reactivated'], true)) {
+                    Log::info('KDS allow-list updated from coffee metadata', [
+                        'product_id' => $metadata->product_id,
+                        'product_name' => $metadata->product_name,
+                        'action' => $result['action'],
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Could not auto-add product to KDS allow-list', [
+                    'product_id' => $metadata->product_id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        });
+    }
 
     protected $fillable = [
         'product_id',
