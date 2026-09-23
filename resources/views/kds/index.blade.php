@@ -5,10 +5,10 @@
         </h2>
     </x-slot>
 
-    {{-- Geist + Geist Mono fonts (loaded once for this view) --}}
+    {{-- Geist + Geist Mono for the card, Public Sans 800 for modifier badge labels (loaded once for this view) --}}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&family=Public+Sans:wght@800&display=swap" rel="stylesheet">
 
     {{-- /kds design styles (mobile-first, ported from Claude Design bundle Z5SX0Nv6IX4Uh6uEQjriLA) --}}
     <style>
@@ -402,14 +402,16 @@
             padding: 0;
             display: flex;
             flex-direction: column;
-            gap: 2px;
+            /* Roomier than the old chips needed: badge decorations overhang the
+               badge box (syrup drip ~1.8em below, ice cube ~0.5em above). */
+            gap: 8px;
         }
 
         .item {
             display: flex;
             align-items: flex-start;
             gap: 10px;
-            padding: 8px 4px 8px 0;
+            padding: 10px 4px 16px 0;
             cursor: pointer;
             border-radius: 8px;
             user-select: none;
@@ -442,7 +444,7 @@
             display: flex;
             align-items: center;
             flex-wrap: wrap;
-            gap: 6px 8px;
+            gap: 12px 10px;
             font-size: 16px;
             line-height: 1.2;
         }
@@ -469,7 +471,7 @@
             display: inline-flex;
             align-items: center;
             flex-wrap: wrap;
-            gap: 5px 6px;
+            gap: 10px 12px;
         }
         .item__mod {
             font-size: 14px;
@@ -486,6 +488,8 @@
             opacity: 0.45;
             text-decoration: line-through;
         }
+        .item--done .mb { opacity: 0.45; }
+        .item--done .mb__label { text-decoration: line-through; }
         .item__notes {
             margin-top: 4px;
             font-size: 12px;
@@ -616,6 +620,8 @@
             padding: 16px;
         }
     </style>
+
+    @include('kds._modifier-badge-assets')
 
     <div class="kds" id="kds-root">
         <header class="kds__bar">
@@ -801,13 +807,24 @@
         };
         const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c =>
             ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        /* card_items carries modifiers as {label, kind}; kind selects the badge
+           shape (null = plain chip). Bare strings and the old POS key/value
+           object are still accepted so a stale payload cannot blank a card. */
+        const normaliseMods = (mods) => {
+            if (!mods) return [];
+            if (!Array.isArray(mods)) {
+                return Object.values(mods)
+                    .filter(v => v !== null && v !== '')
+                    .map(v => ({ label: String(v), kind: null }));
+            }
+            return mods.map(m => (m && typeof m === 'object')
+                ? { label: m.label ?? '', kind: m.kind ?? null }
+                : { label: String(m), kind: null });
+        };
         const modifiersHtml = (mods) => {
-            if (!mods) return '';
-            const list = Array.isArray(mods)
-                ? mods
-                : Object.entries(mods).map(([k, v]) => `${k}: ${v}`);
+            const list = normaliseMods(mods);
             return list.length
-                ? `<div class="item__mods">${list.map(m => `<span class="item__mod">${escapeHtml(m)}</span>`).join('')}</div>`
+                ? `<div class="item__mods">${list.map(m => kdsModifierBadgeHtml(m.kind, m.label)).join('')}</div>`
                 : '';
         };
 

@@ -7,7 +7,8 @@
             @if(! empty($item['modifiers']))
                 <span class="item__mods">
                     @foreach($item['modifiers'] as $m)
-                        <span class="item__mod">{{ $m }}</span>
+                        {{-- Legacy string entries are tolerated in case a cached payload predates card_items' {label, kind} shape. --}}
+                        <x-kds.modifier-badge :kind="is_array($m) ? ($m['kind'] ?? null) : null" :label="is_array($m) ? ($m['label'] ?? '') : (string) $m" />
                     @endforeach
                 </span>
             @endif

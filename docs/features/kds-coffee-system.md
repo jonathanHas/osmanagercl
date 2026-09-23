@@ -160,7 +160,58 @@ Access `/coffee/metadata` to:
 - Change product types (coffee vs option)
 - Edit short names for mobile display
 - Manage grouping categories
+- Choose each option's **modifier badge** (see below)
 - Add new products to the system
+
+### Modifier badges
+
+Each option row can carry a `badge_kind`, which gives that modifier its own
+shape and colour on the KDS card instead of the generic orange chip. The label
+on the badge is always the option's **short name** — the design's own default
+labels are not used.
+
+Pick one of twelve kinds, or "Plain chip" for options that have no visual
+counterpart (Takeaway, Sit In, Cup Discount, …):
+
+| Family | Shape | Kinds |
+|---|---|---|
+| Temperature | pale-blue ice cube with two floating cubes | `ice` |
+| Milk | tinted milk puddle with droplets | `oat`, `almond`, `soy`, `coconut`, `whole` |
+| Syrups | rounded pill with a drip falling from it | `caramel`, `vanilla`, `hazelnut`, `mocha` |
+| Espresso | cup with crema; dashed outline = decaf | `shot`, `decaf` |
+
+The picker on `/coffee/metadata` previews the badge live, in both the options
+table and the "Add Metadata" modal. Options with no kind, native POS
+`ATTRIBUTES` modifiers, and options with no metadata at all all render the
+existing `.item__mod` chip, so nothing regresses.
+
+The migration that added the column backfilled the existing options by matching
+their `product_name` (Decaf, Espresso Extra Shot, Milk Alternative OAT/Almond/
+Coconut, Syrup Caramel/Vanilla/Hazelnut, ON ICE). Anything else starts as a
+plain chip.
+
+**Where the design lives:** Claude Design project "KDS Modifier Icons"
+(`47420d2a-5362-4f13-bc11-44b10205f5bc`), component `ModifierBadge.dc.html`.
+The SVG paths, colours and offsets in the app are copied from it verbatim; the
+design's `size` and `deco` props are not exposed.
+
+**Two render paths — change them together:**
+
+- `resources/views/components/kds/modifier-badge.blade.php` — server-side first
+  paint, used by `kds/_item.blade.php`.
+- `window.kdsModifierBadgeHtml()` in
+  `resources/views/kds/_modifier-badge-assets.blade.php` — every SSE/poll
+  re-render, used by `modifiersHtml()` in `kds/index.blade.php`.
+
+The assets partial also holds the CSS and the SVG symbol sprite, and must be
+`@include`d once by any page that shows badges. The geometry both paths read
+lives in `CoffeeProductMetadata::BADGE_KINDS` and `::BADGE_DECOS`, so only the
+wrapper markup is duplicated — a mismatch shows up as a badge changing shape a
+second after first paint.
+
+`KdsOrder::card_items` carries modifiers as `['label' => …, 'kind' => …]`
+(`kind` null = plain chip), and `/kds/orders` and the SSE stream pass that
+straight through.
 
 ### Troubleshooting Grouping
 

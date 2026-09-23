@@ -55,6 +55,33 @@ and JSON shape.
 - `row-actions` (list mode) — rendered inside the `x-for` template, so Alpine expressions on `product` work (`:href="product.edit_url"`, `x-on:click="doThing(product.id)"`). Nested `x-data` inside the slot can read `product` too.
 - `empty` — text for the "No products found" state.
 
+### Thumbnails and the hover preview
+
+Each result row renders `resources/views/components/product-search/thumb.blade.php`
+(`@include`d, because it reads `product` from the Alpine `x-for` scope rather than
+taking a prop). It shows the 40 px thumbnail from `image_url`, falls back to a grey
+placeholder icon when there is no image or the CDN URL 404s, and on hover shows a
+256 px preview with the product name — the same idea as the `x-product-image`
+component's hover mode used on `/delivery-legacy/match`, which the Alpine-rendered
+search rows cannot use.
+
+- The preview is `x-teleport`ed to `<body>` at `z-[99999]`, so table overflow, the
+  picker dropdown and the customer-requests modal cannot clip it.
+- It opens below the thumbnail and flips above when there is not enough room, and is
+  clamped to the viewport horizontally.
+- **List mode** also supports click/tap, which pins a centred overlay with a backdrop
+  and a close button (Escape closes it) — touch screens have no hover.
+- **Picker mode is hover-only**: the row itself is the select button, so a tap must
+  still select the product rather than open a preview.
+- A thumbnail whose image fails to load shows the placeholder and no preview.
+
+The preview uses the same `image_url` as the thumbnail, scaled up. For Udea that is the
+Ekoplaza `/small/` CDN image, which is larger than 40 px but not full resolution.
+
+> Blade compiles component tags **before** it strips comments, so never write a literal
+> `x-…` component tag inside a comment in these files — it renders for real. (This cost
+> a broken `/products` page once.)
+
 ### Events (bubble from the component root)
 
 | Event | `detail` | When |

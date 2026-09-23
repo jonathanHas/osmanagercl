@@ -938,6 +938,7 @@ Real-time coffee order tracking system for baristas with optimized performance.
 - **Complete All Orders**: Mark all active orders as completed (prevents re-import issues)
 - **System Monitoring**: Live connection status and response time display
 - **Completed Orders**: Track recently completed orders with quick restore
+- **Modifier Badges**: Per-modifier shapes and colours on the card (ice cube, milk puddle, syrup drip, espresso crema), chosen per option on `/coffee/metadata`
 - **Mobile Optimized**: Responsive design for tablets and phones
 - **No Queue Dependencies**: Direct polling eliminates queue worker requirements
 

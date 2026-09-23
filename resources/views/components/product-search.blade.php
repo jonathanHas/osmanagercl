@@ -136,16 +136,7 @@
                         x-on:mouseenter="activeIndex = i"
                         :class="activeIndex === i ? 'bg-indigo-50 dark:bg-gray-700' : ''"
                         class="w-full text-left px-3 py-2 text-sm flex items-center gap-3 hover:bg-indigo-50 dark:hover:bg-gray-700">
-                    <span class="relative w-10 h-10 flex-shrink-0">
-                        <template x-if="product.image_url">
-                            <img :src="product.image_url" :alt="product.name" loading="lazy"
-                                 class="w-10 h-10 object-cover rounded border border-gray-200 dark:border-gray-700"
-                                 onerror="this.style.display='none'; this.parentElement.querySelector('.ps-fallback').classList.remove('hidden')">
-                        </template>
-                        <span class="ps-fallback absolute inset-0 bg-gray-100 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-700 items-center justify-center flex" :class="product.image_url ? 'hidden' : ''">
-                            <svg class="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                        </span>
-                    </span>
+                    @include('components.product-search.thumb')
                     <span class="min-w-0 flex-1">
                         <span class="block truncate text-gray-900 dark:text-gray-100" x-text="product.name"></span>
                         <span class="block text-xs text-gray-500 dark:text-gray-400 truncate">
@@ -196,16 +187,7 @@
                         <template x-for="product in results" :key="product.id">
                             <tr>
                                 <td class="px-2 py-2 whitespace-nowrap">
-                                    <span class="relative block w-10 h-10">
-                                        <template x-if="product.image_url">
-                                            <img :src="product.image_url" :alt="product.name" loading="lazy"
-                                                 class="w-10 h-10 object-cover rounded border border-gray-200 dark:border-gray-700"
-                                                 onerror="this.style.display='none'; this.parentElement.querySelector('.ps-fallback').classList.remove('hidden')">
-                                        </template>
-                                        <span class="ps-fallback absolute inset-0 bg-gray-100 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-700 items-center justify-center flex" :class="product.image_url ? 'hidden' : ''">
-                                            <svg class="w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                        </span>
-                                    </span>
+                                    @include('components.product-search.thumb', ['tap' => true])
                                 </td>
                                 <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
                                     <div x-text="product.name"></div>
@@ -307,6 +289,46 @@
 @once('product-search-script')
 @push('scripts')
 <script>
+    // Hover/tap preview for a result-row thumbnail. Mirrors the x-product-image
+    // component's hover mode (see components/product-search/thumb.blade.php).
+    window.productSearchThumb = function () {
+        const PREVIEW = 256;   // w-64
+        const CAPTION = 64;    // rough height of the name strip below the image
+
+        return {
+            open: false,
+            pinned: false,
+            failed: false,
+            pos: { x: 0, y: 0 },
+
+            place(el) {
+                const rect = el.getBoundingClientRect();
+                const below = window.innerHeight - rect.bottom;
+                const height = Math.min(320, window.innerHeight - 16) + CAPTION;
+
+                // Prefer below the thumbnail, flip above when there is more room there.
+                this.pos.y = (below >= height || below > rect.top) ? rect.bottom + 8 : Math.max(8, rect.top - height - 8);
+                this.pos.x = Math.max(8, Math.min(rect.left, window.innerWidth - PREVIEW - 8));
+            },
+
+            preview(el) {
+                if (this.failed || this.pinned) return;
+                this.place(el);
+                this.open = true;
+            },
+
+            hide() {
+                this.open = false;
+            },
+
+            pin(el) {
+                if (this.failed) return;
+                this.open = false;
+                this.pinned = true;
+            },
+        };
+    };
+
     // Plain window function (not Alpine.data): app.js starts Alpine before this stack runs.
     window.productSearch = function (config) {
         return {

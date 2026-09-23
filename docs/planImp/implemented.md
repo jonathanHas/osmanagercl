@@ -1,281 +1,436 @@
-# Product search: partial barcode and supplier-code matching — implementation
+# KDS modifier badges: per-kind shapes on /kds, chosen on /coffee/metadata — implementation
 
 Status: DONE
 Plan revision: 1
 Implementer: Opus
-Date: 2026-09-19
+Date: 2026-09-23
 
 ## Baseline
-HEAD: 2005a3cb
-Pre-existing dirty files:
+HEAD: 828903a2
+Pre-existing dirty files (none of these are mine):
 ```
- D docs/planImp/implemented.md      (archived by the user after the previous task)
- M docs/planImp/plan.md             (Planner's new plan)
-?? docs/planImp/archive/2026-09-16-product-search/
+ M app/Http/Controllers/CoffeeMetadataController.php   [metadata-page work described in plan Context]
+ M docs/features/product-search.md                     [previous task + hover preview]
+ M docs/planImp/implemented.md                         [previous task's report — see note below]
+ M docs/planImp/plan.md                                [Planner's new plan]
+ M resources/views/coffee/metadata.blade.php           [metadata-page work described in plan Context]
+ M resources/views/components/product-search.blade.php [hover preview, out of scope here]
+?? resources/views/components/product-search/          [hover preview, out of scope here]
 ```
+
+`CoffeeMetadataController.php` and `coffee/metadata.blade.php` were already
+dirty when I started — that is the uncommitted Alpine-modal / KDS-preview work
+the plan's Context says to treat as the baseline. I build on it and revert
+nothing. `product-search*` files are the unrelated hover-preview change and I
+do not touch them.
+
+Note on this file: it previously held the finished *product-search* report
+(`Status: DONE`, plus a note appended 2026-09-22). I copied it to the session
+scratchpad as `implemented-product-search-PREVIOUS.md` before overwriting, and
+the version as committed at HEAD is still available via
+`git show 828903a2:docs/planImp/implemented.md`. The Planner has already
+replaced `plan.md` with this task, so the previous pair was never archived
+under `docs/planImp/archive/`.
 
 ## Steps
 
-### 1. Classify tokens and drop the separate barcode mode — done
-Changed: `app/Services/ProductSearch/ProductSearchService.php` — `asBarcode()`
-and `applyBarcodeMatch()` deleted; `search()` always tokenises and
-`runQuery()` lost its `?string $barcode` parameter; new `isCodeToken()`
-(all-digit, 4+ chars → constant `CODE_TOKEN_LENGTH`) and `isDigitToken()`
-(all-digit, 3+ chars, used for ranking only); `applyTokenMatch()` omits the
-`NAME` clause for code tokens. Typo fallback condition untouched.
+### 0. Preserve previous report, record baseline — done
+See Baseline above.
+
+### 1. Column, model constant, backfill — done
+Changed: `database/migrations/2026_09_23_000001_add_badge_kind_to_coffee_product_metadata.php` (new),
+`app/Models/CoffeeProductMetadata.php` (`badge_kind` in `$fillable`, `BADGE_KINDS`
+const with the twelve kinds in picker order, `badgeFamily()`).
+The backfill patterns live in a private `BACKFILL` const on the migration, in
+the plan's order, and run through Eloquent so the same code works on MySQL and
+SQLite.
 Check output:
 ```
-$ php artisan tinker --execute='...foreach(["594341","4341","8721325594341","100"]...'
-594341 total=1 first=8721325594341
-4341 total=1 first=8721325594341
-8721325594341 total=1 first=8721325594341
-100 total=1113 first=7610313131495
-```
-Matches the plan (`100` ≥ 1000, so 3-digit tokens still match names).
-Behaviour worth flagging: `100`'s *first* row changed from "100 Eco Toilet
-Paper" to a code ending in 100, because Step 2 ranks digit suffixes above a
-NAME prefix. That follows the plan's recommendation; see Notes for Planner.
+$ php artisan migrate
+   INFO  Running migrations.
+  2026_09_23_000001_add_badge_kind_to_coffee_product_metadata .. 156.43ms DONE
 
-### 2. Rank code fragments — done (see Deviations #3: suffix tier split in two)
-Changed: `app/Services/ProductSearch/ProductSearchService.php`
-(`applyRanking()` rebuilt, SQL and bindings appended together; new
-`suffixGroup()` helper). Seven tiers:
+$ php artisan tinker --execute='...option rows with badge_kind...'
+Extra Hot     Extra Hot                          => null
+Hot Milk      Hot Milk                           => null
+Cocoa         Cocoa                              => null
+Decaf         Decaf                              => decaf
+Extra Shot    Espresso Extra Shot                => shot
+ON ICE        ON ICE                             => ice
+Singl         single shot                        => null
+Small Cup     Small Cup                          => null
+Almond        Milk Alternative Almond            => almond
+Alt Milk      Milk Alternative                   => null
+Coconut       Milk Alternative Coconut           => coconut
+Oat           Milk Alternative OAT               => oat
+2Go Cup       2GoCup Cup                         => null
+2Go Return    2GoCup Cup Return                  => null
+Cup Disc      Cup Discount                       => null
+Sit In        Sit In                             => null
+Takeaway      Take Away                          => null
+Caramel       Syrup Caramel                      => caramel
+Hazel         Syrup Hazelnut                     => hazelnut
+Syrup         Syrup                              => null
+Van           Syrup Vanilla                      => vanilla
 ```
-0  CODE = phrase OR REFERENCE = phrase
-1  code, reference or supplier code ends with a 4+ digit token
-2  NAME LIKE 'phrase%'
-3  NAME LIKE '%phrase%'
-4  every token at a word start
-5  code, reference or supplier code ends with a 3-digit token
-6  everything else
-```
-The plan put every 3+ digit token in tier 1. Built that way first; it worked
-for barcode fragments but wrecked size queries (`100`, `250`, `500`), so on the
-user's decision the 3-digit case was demoted to tier 5. Full reasoning and
-evidence in Deviations #3.
-Check output (the plan's Step 2 check, live POS, `stocked: false`):
-```
-341      total=164  rank=5  med 58.3 ms  first=5032722315341  Biona Borlotti Beans 400g   (code ends 341)
-6001397  total=1    rank=1  med 23.7 ms  first=8721325594341  Chocolatemakers forest fruit…
-1397     total=4    rank=1  med 27.1 ms  first=8721325594341  Chocolatemakers forest fruit…
-```
-The plan expects `341` at `match_rank` 1; it is 5 by the split above, with the
-same rows in the same order (no product name contains "341", so tiers 2–4 are
-empty and the suffix rows still lead). `6001397` and `1397` are 4+ digit
-tokens and rank 1 as the plan specifies.
+Exactly the nine mappings the plan's Context lists, `null` for the other twelve.
+`Sit In` and `Take Away` confirm the `\bice\b` word boundary was the right call
+(neither "Service"-style substring matched).
 
-Timings (live POS, warm, 5 runs, median / max; box load average 3.3–4.3).
-"before" = same query on the committed code at HEAD 2005a3cb:
+### 2. Carry the kind through `card_items` — done
+Changed: `app/Models/KdsOrder.php` — the two `pluck()` calls collapsed into one
+`->get(['product_id','type','short_name','badge_kind'])->keyBy('product_id')`,
+each modifier now `['label' => …, 'kind' => …]`, native POS ATTRIBUTES values
+mapped to `['label' => …, 'kind' => null]`, docblock rewritten to describe the
+new shape and the one-query rule.
+Check output (a real order that already carries ON ICE + Oat on a Latte):
 ```
-query                  before    med     max
-594341                    0.0*   26.0    32.5   (*returned nothing before)
-4341                     45.0    23.8    26.5
-341                      76.2    58.3    59.0
-1397                     31.2    27.1    30.9
-6001397                   8.4    23.7    25.3
-8721325594341             7.7    23.8    29.2
-100                      62.9    62.7    64.4
-250                         -    57.3    61.9
-500                         -    51.3    54.2
-chocolatemakers fruit    39.4    30.6    31.5
-choc 100                 56.5    59.0    66.3
+$ php artisan tinker --execute='...latest order with option lines...'
+order id: 39147
+Array
+(
+    [0] => Array
+        (
+            [id] => 79676
+            [product_name] => Latte
+            [quantity] => 1
+            [kind] => drink
+            [modifiers] => Array
+                (
+                    [0] => Array ( [label] => ON ICE  [kind] => ice )
+                    [1] => Array ( [label] => Oat     [kind] => oat )
+                )
+            [notes] =>
+        )
+)
 ```
-All < 100 ms. See Deviations #1 (one supplier-code query instead of two).
 
-### 3. Tests — done
-Changed: `tests/Concerns/CreatesProductSearchPosTables.php` (P6 "Kettle Model
-4341" code `1000100`, P7 "Bulk Oats" code `1143419999999`, both unstocked with
-no supplier link; docblock table and the returned id map updated. P6's code
-ends in `100` so it doubles as the coincidental-barcode case for the tier-5
-test — the plan suggested `1000011`),
-`tests/Feature/ProductSearchApiTest.php` (three new tests; `milk` ranks 1/2 → 2/3
-in `test_ranking_prefers_exact_code_then_prefix`; pagination totals 5 → 7,
-`last_page` 3 → 4, page 3 → page 4; category-filter assertion widened, see
-Deviations #2). `test_supplier_code_matches` needed no change — it only
-asserts ids.
+### 3. Shared badge assets: CSS, SVG sprite, JS renderer, Blade component — done
+Changed: `resources/views/kds/_modifier-badge-assets.blade.php` (new),
+`resources/views/components/kds/modifier-badge.blade.php` (new),
+`app/Models/CoffeeProductMetadata.php` (`BADGE_DECOS`, see Deviations #3).
+
+The partial carries `.mb` / `.mb__bg` / `.mb__deco`, four `.mb--f-*` placement
+classes, twelve `.mb--{kind}` colour classes (`--mb-crema` / `--mb-dash` on
+shot and decaf), a `#mb-sprite` of four shape symbols plus five deco symbols
+with `style="fill:var(--mb-fill);…"`, and the `window.kdsModifierBadgeHtml()`
+renderer with its own local `esc()`. Both files open with a LOCKSTEP comment
+naming the other. Kind lookup in the JS goes through
+`Object.prototype.hasOwnProperty` so a stray `kind` of `"constructor"` from the
+JSON cannot reach the class-name interpolation.
 Check output:
 ```
-PASS  Tests\Feature\ProductSearchApiTest
-  ✓ words match in any order
-  ✓ ranking prefers exact code then prefix
-  ✓ stocked is default and toggle includes unstocked
-  ✓ supplier code matches
-  ✓ partial barcode matches code suffix first
-  ✓ three digit sizes rank names above coincidental code suffixes
-  ✓ supplier code ranks like a barcode
-  ✓ typo correction reports corrected query
-  ✓ no correction when results exist
-  ✓ image url prefers blob then udea cdn
-  ✓ response carries supplier price and stock details
-  ✓ exclude and supplier filter
-  ✓ pagination meta is accurate
-  ✓ per page is capped at 50 and requires auth
-Tests: 14 passed (97 assertions)
-```
+$ php artisan tinker --execute='...Blade::render of the component...'
+--- decaf ---
+<span class="mb mb--f-shot mb--decaf"><svg class="mb__bg" aria-hidden="true"><use href="#mb-shape-shot"/></svg><span class="mb__label">Decaf</span></span>
 
-### 4. Docs — done
-Changed: `docs/features/product-search.md`, "Matching and ranking" section
-rewritten: the "Barcode mode" item is replaced by "Tokenising" (no separate
-barcode mode) and "Token classification" (all-digit 4+ tokens match CODE /
-REFERENCE / supplier codes only, 3-digit tokens also match names), the ranking
-list is now a 0–6 table with tier 1 = "ends with a 4+ digit token" and tier 5 =
-"ends with a 3-digit token", a paragraph explains why the suffix rule is split
-at 4 digits, and a line records that `match_rank` values above 0 changed on
-2026-09-19. Item 4 also notes that digit
-tokens are never typo-corrected.
+--- unknown ---
+<span class="item__mod">Decaf</span>
+
+--- null ---
+<span class="item__mod">Takeaway</span>
+
+--- oat (decos) ---
+<span class="mb mb--f-milk mb--oat"><svg class="mb__bg" …><use href="#mb-shape-milk"/></svg><svg class="mb__deco" style="width:0.42em;height:0.42em;right:-0.62em;bottom:0.05em" …><use href="#mb-deco-dot-a"/></svg><svg class="mb__deco" style="width:0.24em;…" …><use href="#mb-deco-dot-b"/></svg><svg class="mb__deco" style="width:0.28em;…" …><use href="#mb-deco-dot-b"/></svg><span class="mb__label">Oat</span></span>
+
+--- xss ---
+… <span class="mb__label">&lt;b&gt;x&lt;/b&gt;</span></span>
+```
+`kind="decaf"` gives `mb--f-shot`, `mb--decaf`, `#mb-shape-shot` and `>Decaf<`;
+`kind="nope"` and a null kind both give the plain chip; the label is escaped.
+
+### 4. Render badges on /kds — done
+Changed: `resources/views/kds/_item.blade.php` (the `@foreach` chip becomes
+`<x-kds.modifier-badge>`, with an `is_array()` guard so a legacy string entry
+still renders), `resources/views/kds/index.blade.php`
+(`family=Public+Sans:wght@800` added to the existing fonts `<link>`;
+`@include('kds._modifier-badge-assets')` between `</style>` and `#kds-root`;
+`.group__list` gap 2px → 8px, `.item` padding `8px 4px 8px 0` → `10px 4px 16px 0`,
+`.item__main` gap `6px 8px` → `12px 10px`, `.item__mods` gap `5px 6px` → `10px 12px`,
+plus `.item--done .mb` / `.item--done .mb__label`; `modifiersHtml()` now
+normalises through a new `normaliseMods()` — `{label,kind}`, bare string, and the
+legacy POS key/value object — and maps through `kdsModifierBadgeHtml()`).
+Check output (server render of `_item.blade.php` for live order 39147, a Latte
+with ON ICE + Oat):
+```
+<span class="item__mods">
+  <span class="mb mb--f-ice mb--ice"><svg class="mb__bg" …><use href="#mb-shape-ice"/></svg><svg class="mb__deco" style="width:0.95em;…;transform:rotate(18deg)" …><use href="#mb-deco-cube"/></svg><svg class="mb__deco" style="…rotate(-16deg)" …><use href="#mb-deco-cube-plain"/></svg><span class="mb__label">ON ICE</span></span>
+  <span class="mb mb--f-milk mb--oat"><svg class="mb__bg" …><use href="#mb-shape-milk"/></svg>…3 dots…<span class="mb__label">Oat</span></span>
+</span>
+```
+```
+Public Sans link: yes
+include present:  yes
+old chip JS gone: yes
+```
+Visual/SSE confirmation is Verification 4.
+
+### 5. Badge picker and live previews on /coffee/metadata — done
+Changed: `app/Http/Controllers/CoffeeMetadataController.php` (`index()` passes
+`badgeKinds`; `badge_kind` validated with
+`Rule::in(array_keys(CoffeeProductMetadata::BADGE_KINDS))` in `update()` and
+`store()`; added to `update()`'s `only([...])`; `store()`'s
+`create($request->all())` replaced with an explicit `only([...])`),
+`resources/views/coffee/metadata.blade.php` (Badge column between Group and
+Order with `<select id="badge_kind_{id}">` — "Plain chip" plus one `<optgroup>`
+per family — beside a server-rendered `<span id="badge_preview_{id}">`;
+`previewBadge(id)` on the select's `onchange` and the short-name `oninput`;
+`updateMetadata()` sends `badge_kind: value || null`; modal gains
+`<select x-model="badgeKind">`, `badgeKind` in state / `open()` / `submit()`,
+and its preview span is now
+`x-html="kdsModifierBadgeHtml(badgeKind, shortName.trim() || '…')"`;
+`.kds-preview .item__mod` styled like the KDS chip; option help text extended;
+Geist + Public Sans `<link>` and `@include('kds._modifier-badge-assets')` after
+the existing `<style>`). The optgroups come from a `$badgeKindsByGroup` built once
+at the top of the view with `groupBy('group', preserveKeys: true)`, which keeps
+the `BADGE_KINDS` order (Temperature, Milk, Syrups, Espresso).
+No badge column on the coffee-types table.
+Check output (server render of the real page as a logged-in user; 21 option rows
+of which 9 are badged):
+```
+bytes: 346326
+mb-sprite                  2
+kdsModifierBadgeHtml       4
+Public+Sans                1
+previewBadge(              43   (21 rows x 2 handlers + the definition)
+optgroup label="Milk"      22   (21 row selects + the modal select)
+badge_kind_                23
+Plain chip                 23
+create_badge_kind          2
+mb--oat                    2    (1 badge + 1 CSS rule)
+mb--f-milk                 4    (oat/almond/coconut + 1 CSS rule)
+mb--caramel / mb--ice / mb--decaf / mb--shot   2 each
+item__mod                  16
+```
+Interactive confirmation is Verification 4.
+
+### 6. Tests — done
+Changed: `tests/Feature/KdsModifierBadgeTest.php` (new). `RefreshDatabase`, POS
+`:memory:` with `PRODUCTS(ID, NAME, DISPLAY, CATEGORY)` seeded with one
+category-081 product so the "missing metadata" panel has something to list,
+`admin()` and `barista()` helpers (the latter granted `kds.access` explicitly —
+`Role::hasPermission()` has no admin bypass), and a `seedOrder()` fixture of
+Latte (native `['milk' => 'Whole']`) + Oat (`badge_kind` `oat`) + Takeaway (no
+badge). The fixture does not set `kind` on the items because the column defaults
+to `drink`, which is what makes the options fold.
 Check output:
 ```
-$ sed -n '135,158p' docs/features/product-search.md  → tiers 0–6 listed
-$ grep -n "CODE LIKE 'q%'" docs/features/product-search.md
-none
+$ php artisan test --filter=KdsModifierBadgeTest
+   PASS  Tests\Feature\KdsModifierBadgeTest
+  ✓ badge kind is validated on store and update                          2.40s
+  ✓ card items carry badge kind for folded options                       0.12s
+  ✓ kds page renders badge and plain chip                                0.21s
+  ✓ metadata page shows badge picker                                     0.12s
+  ✓ component falls back to plain chip for unknown kind                  0.03s
+
+  Tests:    5 passed (29 assertions)
 ```
-Risk check from the plan: `grep -rn "match_rank" resources/ app/` outside
-`ProductSearchService.php` → no hits, so nothing else reads specific values.
+
+### 7. Docs — done
+Changed: `docs/features/kds-coffee-system.md` (new "### Modifier badges"
+subsection after "Managing Metadata": the twelve kinds in a family table, that
+the label is the short name, that "Plain chip" is the fallback for service
+options, what the migration backfilled, the design project and component, the
+two render paths with the lockstep warning, and the `card_items` modifier shape.
+"Managing Metadata" gained a bullet pointing at it),
+`docs/FEATURES_INDEX.md` (one "Modifier Badges" bullet in the Coffee KDS block).
+Check output:
+```
+$ grep -n "Modifier badges" docs/features/kds-coffee-system.md
+166:### Modifier badges
+
+$ grep -n -i "badge" docs/FEATURES_INDEX.md   # KDS section hit
+941:- **Modifier Badges**: Per-modifier shapes and colours on the card (ice cube,
+     milk puddle, syrup drip, espresso crema), chosen per option on `/coffee/metadata`
+```
+(The other `badge` hits in FEATURES_INDEX.md are pre-existing and in unrelated
+sections.)
 
 ## Deviations
-1. **Steps 1–2, one supplier-code lookup instead of two.** The plan describes
-   `:suffixLinked_t` as "a second, tiny pluck per digit token". Implemented as
-   written first and measured: the extra query cost ~4.5 ms and pushed `341`
-   from 76 ms to ~67–159 ms depending on box load. Since the suffix set is a
-   subset of the contains set, `supplierCodeMatches($token)` now runs one query
-   selecting `Barcode, SupplierCode` and derives both lists (`str_ends_with`
-   in PHP). `runQuery()` computes it once per token and passes it to both
-   `applyTokenMatch()` and `applyRanking()`, so no per-instance state. Result
-   sets are identical (verified: `341`, `1397`, `6001397`, `100` return the
-   same rows and ranks); one query fewer per token (9 instead of 10 for `341`).
-   One semantic difference: the `SUPPLIER_CODE_LIMIT` cap now drops the
-   contains *and* suffix lists together, where the plan capped them
-   separately. Worst realistic token is `100` at 128 supplier codes, so the
-   500 cap is not reached in practice.
-2. **Step 3, one more test assertion than the plan listed.** P6 and P7 are in
-   `cat-drinks`, so `test_exclude_and_supplier_filter`'s category assertion
-   (`[P4, P5]`) also had to gain the two new ids. The plan anticipated the
-   pagination knock-on but not this one. The alternative — putting the new
-   products in `cat-choc` — would have made the chocolate fixture nonsense
-   ("Kettle Model 4341"), so the assertion was widened instead.
-3. **Step 2, the suffix tier is split at 4 digits instead of 3.** The plan
-   made tier 1 "any all-digit token of 3+ chars" (its recommended option) and
-   its Step 2 check expects `341` at `match_rank` 1. Built exactly that, then
-   measured what it did to size queries on live data:
 
-   | query | product names containing the digits (page 1 of 50) | unrelated barcodes *ending* in them |
-   |---|---|---|
-   | `341` | 0 | 6 |
-   | `100` | 34 | 17 |
-   | `500` | 43 | 7 |
-   | `250` | 41 | 10 |
-   | `150` | 40 | 10 |
+1. **Step 3, `<symbol>` needed `overflow="visible"`.** The design's shapes sit
+   in plain `<svg>` elements with `overflow:visible`; the milk path
+   (`…C120 32 106 40 88 37 C72 42…`) overshoots its own `viewBox="0 0 120 40"`
+   and relies on that. A `<symbol>` establishes its own viewport and clips at
+   the viewBox, so the puddle came out shaved. Every symbol now carries
+   `overflow="visible"` as a presentation attribute (attributes are cloned into
+   the `<use>` shadow tree; a document CSS rule is not reliably applied there),
+   with a `#mb-sprite symbol` CSS rule as belt and braces. No visual difference
+   from the design — this is what makes it match.
 
-   So `/products?q=100` led with "Absolute Aromas Lavender **10ml**"
-   (barcode `800783023100`), "Johnny Cashew **125g**" (`8720865728100`) and 15
-   more coincidences; the first genuine "100 gram" product was row 18. The
-   plan's own Verification #3 expected `choc 100` to be unchanged, which this
-   broke. Raised it with the user, who chose to demote the 3-digit case to a
-   tier *below* the name matches (tier 5).
+2. **Step 3, `--mb-dash` for `shot` is `none`, not `0`.** The plan suggested
+   `0`; `renderVals()` in the design uses the string `none`. Used `none` so the
+   two are identical.
 
-   This needs no "is it a size?" heuristic and no extra query: when the digits
-   appear in product names (`100`) the name tiers fill up first; when they do
-   not (`341`, no product is named "341") those tiers are empty and the suffix
-   rows surface at the top regardless. Verified both ways live and in tests.
-   4+ digit tokens are untouched at tier 1, which is the actual feature.
+3. **Step 3, milk decorations need two symbols and a shared geometry const.**
+   The design's three milk circles are `r=8.5 stroke-width=2` once and
+   `r=8 stroke-width=2.5` twice, which one `mb-deco-dot` symbol cannot express —
+   so `mb-deco-dot-a` and `mb-deco-dot-b`. Separately, the plan asks for the
+   deco offsets to be "inline `style` on each deco `<svg>` so the JS and the
+   Blade component can share the exact same strings". Rather than copy those
+   strings into two files, they live in a new
+   `CoffeeProductMetadata::BADGE_DECOS` const that both paths read. Same
+   rendered markup, but the sharing is enforced rather than hoped for. This is
+   the only addition to the model beyond `BADGE_KINDS`.
 
-   Consequence for the plan's text: the Step 2 check for `341` now yields
-   `match_rank` 5 rather than 1 (same rows, same order), and the tier list in
-   Step 2 has seven entries instead of six.
+4. **Step 5, `.item__mod` had to be styled page-wide, not just inside
+   `.kds-preview`.** The plan says "add `.kds-preview .item__mod { … }` or switch
+   the class". I did the former and the browser check caught it: the *table*
+   previews (`#badge_preview_{id}`) sit outside `.kds-preview`, so every
+   plain-chip row rendered as unstyled black text. The rule is now a page-level
+   `.item__mod` with literal colours (`--kp-accent` is scoped to `.kds-preview`),
+   which covers the table and the modal. `.kds-preview__mod` is untouched.
 
+5. **Verification 4 could not use a 390px viewport.** Chrome would not size its
+   inner width below 500px on this box. Constrained `#kds-root` to 390px instead
+   and measured there — see Verification 4 for what that showed.
+
+Nothing else differs. Step 1's backfill list, Step 2's one-query rule, Step 4's
+spacing numbers, Step 6's five tests and Step 7's doc sections are as written.
 
 ## Verification
 
-1. `./vendor/bin/pint --test app/Services/ProductSearch/ProductSearchService.php tests/Feature/ProductSearchApiTest.php tests/Concerns/CreatesProductSearchPosTables.php` →
+1. `./vendor/bin/pint --test` on the five PHP files → **pass**
    ```
-   PASS ........................................................... 3 files
+   PASS ........................................................... 5 files
    ```
-2. `php artisan test --filter='ProductSearchApiTest|ProductTest|CustomerRequestTest'` →
+
+2. `php artisan test --filter='KdsModifierBadgeTest|CustomerRequestTest|ProductSearchApiTest'` → **all pass**
    ```
-   PASS  Tests\Feature\CustomerRequestTest
-   PASS  Tests\Feature\ProductSearchApiTest      (14 tests)
-   FAIL  Tests\Feature\ProductTest
-     ⨯ shows 404 for non existent product        (pre-existing)
-     ⨯ product statistics are displayed          (pre-existing)
-   Tests: 2 failed, 38 passed (256 assertions)
+   Tests:    37 passed (261 assertions)
    ```
-   Whole suite as a regression check: `Tests: 17 failed, 387 passed (1555
-   assertions), 28.44s` — the same 17 the Planner verified fail on a clean
-   checkout during the previous task. No new failures.
-3. Live tinker loop, `stocked: false`, 5 warm runs each (box load average 3.3):
+
+3. `php artisan test` → **no new failures**
    ```
-   query                  total  rank  med ms  max ms  first row
-   594341                     1     1    26.0    32.5  Chocolatemakers forest fruit milk chocolate 100 gram
-   4341                       1     1    23.8    26.5  Chocolatemakers forest fruit…
-   341                      164     5    58.3    59.0  Biona Borlotti Beans 400g          (code ends 341)
-   1397                       4     1    27.1    30.9  Chocolatemakers forest fruit…
-   6001397                    1     1    23.7    25.3  Chocolatemakers forest fruit…
-   8721325594341              1     0    23.8    29.2  Chocolatemakers forest fruit…
-   100                     1113     2    62.7    64.4  100 Eco Toilet Paper 4pc
-   250                      841     3    57.3    61.9  A. Vogel Herbamare 250g b
-   500                     1099     3    51.3    54.2  Het Dichtste Bij Spelt tagliatelle 500g
-   chocolatemakers fruit      2     4    30.6    31.5  Chocolatemakers forest fruit…
-   choc 100                  85     4    59.0    66.3  Belvas Chocolate Sensations 100g
+   Tests:    17 failed, 392 passed (1584 assertions)
    ```
-   Every `took_ms` < 100. `chocolatemakers fruit`, `choc 100` and `100` all
-   return the same first row as before this task, as the plan's Verification #3
-   requires (that was *not* true before Deviation #3 — `choc 100` and `100` led
-   with coincidental barcode rows). `341` is `match_rank` 5 rather than the
-   plan's 1, with identical rows in identical order.
-   Spot-checked that tier-1/5 rows are genuine suffix matches and not a
-   binding-order bug: `8711521971008` has supplier code `97100`,
-   `7610313131495` has `03100`, `5032722315341`'s barcode ends in `341`.
-4. Browser, logged in:
-   - `/customer-requests/create` picker (stocked only), `341` → top rows
-     `8721325594341`, `8719189416060` (Udea **5007341**), `5412971160341`,
-     `4025089071341`, `5701058012797` (Natural Medicine **33341**) — all code
-     or supplier-code suffix matches, unchanged by the tier split because no
-     stocked product is named "341".
-   - Same picker, `4341` → one row, "Chocolatemakers forest fruit milk
-     chocolate 100 gram" (`8721325594341 · Udea 6001397`).
-   - Same picker, `594341` → same single row.
-   - `/products?q=100` → first rows are "100 gram Chorizo, St. Hendrick",
-     "100 gram Dessert mini moment raspberry", "A Vogel Bambu Coffee Instant
-     Jar 100g", "A Vogel Echinaforce Oral Drops 100ml", "Absolute Aromas
-     Orange Blossom 100ml". The size products lead, as before this task.
+   The same 17 the previous task recorded (`UdeaScrapingServiceTest` ×7,
+   `CashReconciliationTest` ×3, `FruitVegLabelPrintingTest` ×2, `ProductTest` ×2,
+   `TestScraperControllerTest` ×1, `WasteLogTest` ×2). Passing count went
+   387 → 392, which is exactly the five new tests. None of the failures touch
+   KDS or coffee metadata.
+
+4. **Browser, logged in, against the live data.** Test order created with the
+   plan's tinker snippet (`BADGE_TEST`, Latte + ON ICE + Oat + Caramel +
+   Extra Shot + Takeaway); `card_items` folded all five onto the Latte with
+   kinds `ice, oat, caramel, shot, null`.
+
+   - **/kds desktop** — all five render as the design intends: pale-blue ice
+     cube with its two floating cubes and white highlights, cream Oat puddle
+     with three droplets, orange Caramel pill with the drop falling below it,
+     dark Extra Shot with crema, and Takeaway as the plain orange chip. So
+     `var()` does inherit into the `<use>` shadow tree (the first risk in the
+     plan), and the milk puddle is not clipped (Deviations #1).
+   - **Two render paths agree.** Rather than complete a real order to force an
+     SSE refresh, I compared them directly in the page: for each of the five
+     modifiers, the server-rendered node and
+     `kdsModifierBadgeHtml(kind, label)` normalised through the DOM are
+     **identical** (5/5). Then I repainted the card's `.item__mods` from the
+     live `/kds/orders` payload through `modifiersHtml()` and re-zoomed — the
+     result is pixel-identical to first paint.
+     (A first comparison reported a mismatch; that was my method, not the
+     markup — `outerHTML` re-serialises `<use …/>` as `<use …></use>`, a
+     20-character difference across an Oat badge's four `<use>` elements.
+     Comparing both sides through the DOM resolves it.)
+   - **Done state** — tapping the line dims all four badges to 0.45 and strikes
+     through their labels, matching the plain chip.
+   - **Narrow width** — Chrome would not go below a 500px inner width, so
+     `#kds-root` was constrained to 390px. Badges wrap to two rows, **no
+     horizontal scroll** on the page or inside the card, and the Caramel drip
+     clears the green "Complete order" bar with room to spare.
+   - **/coffee/metadata** — 21 badge pickers, 9 rendered badges, 12 plain chips.
+     Milk group shows Oat/Almond/Coconut as puddles and Alt Milk as a plain
+     chip; Syrups show Caramel/Hazel/Van as dripping pills. Switching Alt Milk
+     to Whole updated the preview instantly (`mb mb--f-milk mb--whole`,
+     label "Alt Milk"), Update persisted it (`badge_kind = 'whole'` in the DB)
+     and it came back selected after a reload with the server-rendered preview
+     matching. **Restored to Plain chip afterwards**, since the plan's Context
+     lists Alt Milk as `null`; confirmed `NULL` in the DB.
+   - **Add Metadata modal** — opened on the one product missing metadata
+     ("Happy Hour Coffee & Sausage Roll"), switched to Option, picked Vanilla,
+     typed a short name: the KDS preview shows the dripping syrup pill labelled
+     "Vanilla" on the sample drink, and the help text carries the new sentence.
+     Cancelled without creating anything.
+   - **Cleanup** — `BADGE_TEST` order and its 6 items deleted, 0 orphan items
+     left, browser tab closed.
+
+5. `git status --short` — only this plan's files plus the pre-existing dirty ones.
 
 ## Files changed
 
-`git status --short` at the end. `[pre-existing]` = dirty before I started.
+`[pre-existing]` = dirty before I started, not mine.
 
 ```
- M app/Services/ProductSearch/ProductSearchService.php
- M docs/features/product-search.md
+ M app/Http/Controllers/CoffeeMetadataController.php          [pre-existing, + my badge_kind changes]
+ M app/Models/CoffeeProductMetadata.php
+ M app/Models/KdsOrder.php
+ M docs/FEATURES_INDEX.md
+ M docs/features/kds-coffee-system.md
+ M docs/features/product-search.md                            [pre-existing]
  M docs/planImp/implemented.md
- M docs/planImp/plan.md                                      [pre-existing / Planner's]
- M tests/Concerns/CreatesProductSearchPosTables.php
- M tests/Feature/ProductSearchApiTest.php
-?? docs/planImp/archive/2026-09-16-product-search/           [pre-existing]
+ M docs/planImp/plan.md                                       [pre-existing / Planner's]
+ M resources/views/coffee/metadata.blade.php                  [pre-existing, + my badge picker]
+ M resources/views/components/product-search.blade.php        [pre-existing]
+ M resources/views/kds/_item.blade.php
+ M resources/views/kds/index.blade.php
+?? database/migrations/2026_09_23_000001_add_badge_kind_to_coffee_product_metadata.php
+?? resources/views/components/kds/                            [modifier-badge.blade.php]
+?? resources/views/components/product-search/                 [pre-existing]
+?? resources/views/kds/_modifier-badge-assets.blade.php
+?? tests/Feature/KdsModifierBadgeTest.php
 ```
 
-Nothing committed, pushed or deployed. No writes to the POS database.
+Nothing committed, pushed or deployed. No writes to the POS database. The
+primary (MySQL) DB got the new nullable column, the nine backfilled rows, and
+the Alt Milk round-trip described above, which was restored.
 
 ## Notes for Planner
 
-- **Deviation #3 changes a rule the plan chose deliberately**, so it needs your
-  sign-off rather than just a note: 3-digit digit tokens now rank their
-  code-suffix matches *below* the name matches (tier 5), not above (tier 1).
-  The plan's Step 2 check for `341` therefore reads `match_rank` 5, not 1 —
-  same rows, same order. The user picked this after seeing what tier 1 did to
-  `q=100` on `/products` (17 coincidental barcodes ahead of the first "100
-  gram" product). Evidence table is in Deviations #3.
-- **`REFERENCE` is still matched and ranked alongside `CODE`.** In this data
-  the two columns are nearly always equal, so the extra LIKE buys little. Left
-  alone because the plan's tier definitions name both.
-- **`341` remains the slowest query** at ~58 ms, dominated by the main select
-  (20 ms) and the pagination COUNT (17 ms) over its 164 matches. Unchanged in
-  character by this task.
-- **Timing noise:** this box ran at load average 3.3–8.8 during the session.
-  An early measurement round showed `341` at a 159 ms median while an
-  unaffected word query sat at 34 ms; re-profiling showed identical SQL, so
-  single high readings are load, not regression. Figures reported above are
-  medians of 5–7 runs taken at load ≈ 3–4.
-- **Possible follow-up:** `docs/features/product-search.md` now documents the
-  4-digit split as the rule for the whole search. If a later page wants "find
-  me anything with these digits anywhere", it would need a flag on the
-  criteria rather than a change to this ranking.
+- **Deviation #4 is the one worth your eye.** It is a real bug the plan's
+  wording would have shipped: scoping the plain-chip rule to `.kds-preview`
+  leaves the twelve unbadged rows in the *options table* rendering as bare
+  black text. Only the browser step caught it — every automated check passed
+  with it broken, because the markup was right and only the CSS was missing.
+  Worth remembering that `assertSee('<span class="item__mod">…')` proves the
+  chip is emitted, not that it looks like a chip.
+
+- **The 3-digit-ish question again, in a new place.** At 390px the modifiers
+  wrap to two rows and the Caramel drip, which hangs ~1.35em below its badge,
+  lands in the row gap beside the badge below it rather than under empty space.
+  It reads fine (I looked), but if a future order has a syrup badge directly
+  above another badge the drip will overlap that badge's top edge. The fix
+  would be a larger row gap on `.item__mods` for syrup-bearing rows, which
+  needs a rule I did not want to invent. Flagging rather than acting.
+
+- **`.item__mods` is a `<span>` server-side and a `<div>` in the JS path.**
+  Pre-existing (`_item.blade.php` vs `modifiersHtml()`), untouched by this task,
+  and harmless since both are `display:inline-flex`. Mentioning it because it
+  briefly looked like a lockstep failure while I was verifying.
+
+- **Badge size is fixed at 15px** (`--mb-fs`), between the old chip's 14px and
+  the design's `md` 17px. The variable is there if you want to tune it per
+  context; the plan put `size` out of scope so I did not expose it.
+
+- **`whole`, `soy` and `mocha` have no live rows.** They exist because the plan
+  fixes the enum to the design's twelve. The backfill patterns for them are in
+  the migration and will do nothing on this data.
+
+- **Possible follow-up:** the two render paths now share their geometry through
+  `BADGE_KINDS`/`BADGE_DECOS`, but the wrapper markup is still written twice.
+  A single PHP function returning the badge HTML, called by the component and
+  serialised into the JS bundle, would close that gap entirely. Not worth it
+  today; the comparison in Verification 4 is cheap to re-run if it drifts.
+
+- **Still uncommitted in this tree from before this task:** the
+  `x-product-search` hover-preview work (`components/product-search/`,
+  `product-search.blade.php`, part of `docs/features/product-search.md`) and the
+  metadata-page modal/preview work that this task built on. Untouched by me
+  except where this plan required it.
+
+- **The previous task was never archived.** `plan.md` was overwritten with this
+  task while the product-search pair was still `READY`/`DONE` with an empty
+  Review section. Its report is at
+  `git show 828903a2:docs/planImp/implemented.md` and a copy of the
+  working-tree version (with the hover-preview note) is in this session's
+  scratchpad as `implemented-product-search-PREVIOUS.md`. If you want it
+  archived properly, it will have to come from one of those.

@@ -157,32 +157,44 @@ class KdsOrder extends Model
     /**
      * Build the option-folded item list used by the /kds card layout.
      * Option-typed lines (per coffee_product_metadata) collapse into the
-     * previous drink's modifiers as short-name chips; everything else
-     * stays as its own card item.
+     * previous drink's modifiers; everything else stays as its own card item.
+     *
+     * Each entry of `modifiers` is `['label' => string, 'kind' => ?string]`,
+     * where `kind` is the coffee_product_metadata.badge_kind that selects the
+     * modifier badge shape on the card (null = the plain chip). Native POS
+     * ATTRIBUTES modifiers on the line itself are always plain.
+     *
+     * Metadata is fetched in one query for the whole order: the SSE loop calls
+     * this every second for every active order.
      */
     public function getCardItemsAttribute(): array
     {
         $productIds = $this->items->pluck('product_id')->unique()->all();
-        $optionTypeFor = empty($productIds)
+        $metaFor = empty($productIds)
             ? collect()
-            : \App\Models\CoffeeProductMetadata::whereIn('product_id', $productIds)->pluck('type', 'product_id');
-        $shortNameFor = empty($productIds)
-            ? collect()
-            : \App\Models\CoffeeProductMetadata::whereIn('product_id', $productIds)->pluck('short_name', 'product_id');
+            : \App\Models\CoffeeProductMetadata::whereIn('product_id', $productIds)
+                ->get(['product_id', 'type', 'short_name', 'badge_kind'])
+                ->keyBy('product_id');
 
         $out = [];
         foreach ($this->items as $item) {
-            $isOption = ($optionTypeFor[$item->product_id] ?? null) === 'option';
+            $meta = $metaFor[$item->product_id] ?? null;
+            $isOption = $meta?->type === 'option';
 
             // Flatten POS ATTRIBUTES modifiers (key/value array) into bare values.
-            $native = is_array($item->modifiers)
-                ? array_values(array_filter(array_values($item->modifiers), fn ($v) => $v !== null && $v !== ''))
-                : [];
+            $native = array_map(
+                fn ($v) => ['label' => (string) $v, 'kind' => null],
+                is_array($item->modifiers)
+                    ? array_values(array_filter(array_values($item->modifiers), fn ($v) => $v !== null && $v !== ''))
+                    : []
+            );
 
             $lastIdx = count($out) - 1;
             if ($isOption && $lastIdx >= 0 && $out[$lastIdx]['kind'] === 'drink') {
-                $label = $shortNameFor[$item->product_id] ?? $item->display_name;
-                $out[$lastIdx]['modifiers'][] = (string) $label;
+                $out[$lastIdx]['modifiers'][] = [
+                    'label' => (string) ($meta->short_name ?? $item->display_name),
+                    'kind' => $meta->badge_kind,
+                ];
 
                 continue;
             }
