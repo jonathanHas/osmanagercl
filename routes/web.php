@@ -74,6 +74,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/find', [\App\Http\Controllers\Shop\FindProductController::class, 'index'])
             ->middleware('permission:products.view')
             ->name('find-product');
+        Route::middleware('permission:deliveries.process')->group(function () {
+            Route::get('/deliveries', [\App\Http\Controllers\Shop\DeliveryController::class, 'index'])->name('deliveries');
+            Route::get('/deliveries/scan', [\App\Http\Controllers\Shop\DeliveryController::class, 'scan'])->name('deliveries.scan');
+            Route::get('/deliveries/summary', [\App\Http\Controllers\Shop\DeliveryController::class, 'summary'])->name('deliveries.summary');
+        });
     });
 
     // Switch this device between the shop-floor and office interfaces.
@@ -629,6 +634,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('delivery-legacy')->name('delivery-legacy.')->middleware('permission:deliveries.process')->group(function () {
         Route::get('/', [DeliveryLegacyController::class, 'index'])->name('index');
         Route::get('/match', [DeliveryLegacyController::class, 'match'])->name('match');
+        Route::get('/items', [DeliveryLegacyController::class, 'items'])->name('items');
         Route::post('/create-session', [DeliveryLegacyController::class, 'createSession'])->name('create-session');
         Route::patch('/scan-item', [DeliveryLegacyController::class, 'updateScannedQuantity'])->name('update-quantity');
         Route::post('/scan-increment', [DeliveryLegacyController::class, 'incrementScanQuantity'])->name('scan-increment');

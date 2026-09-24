@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Shop;
 use App\Http\Controllers\Controller;
 use App\Services\CustomerRequestService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
@@ -47,7 +48,21 @@ class ShopHomeController extends Controller
     {
         return match ($badge) {
             'requests' => app(CustomerRequestService::class)->dashboardCounts()['due'],
+            'deliveries' => $this->openDeliveryCount(),
             default => null,
         };
+    }
+
+    /**
+     * Open legacy scan sessions. Guarded: Home must render even when the POS
+     * connection is down or the table is absent, so a badge can never 500 it.
+     */
+    private function openDeliveryCount(): ?int
+    {
+        try {
+            return DB::connection('pos')->table('deliveriesScan')->where('status', 0)->count() ?: null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 }

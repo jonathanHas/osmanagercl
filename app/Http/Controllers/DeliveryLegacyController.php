@@ -861,6 +861,107 @@ class DeliveryLegacyController extends Controller
     }
 
     /**
+     * Invoice lines and scans for one session, classified, as JSON.
+     *
+     * This is what the Shop mode scan screen renders from; the office match page
+     * builds the same picture in Blade from the same three queries. The expected
+     * quantity follows match.blade.php: a whole `myOrder` means cases, so
+     * multiply by the invoice's case units; a fractional one is already a unit
+     * count (weighed goods).
+     */
+    public function items(Request $request)
+    {
+        $validated = $request->validate([
+            'delID' => 'required|string',
+            'supplierID' => 'required|string',
+        ]);
+
+        $delID = $validated['delID'];
+        $supplierID = $validated['supplierID'];
+
+        $session = DB::connection('pos')
+            ->table('deliveriesScan')
+            ->select('deliveriesScan.ID', 'deliveriesScan.supID', 'deliveriesScan.dateUpload', 'deliveriesScan.status', 'suppliers.Supplier')
+            ->leftJoin('suppliers', 'deliveriesScan.supID', '=', 'suppliers.SupplierID')
+            ->where('deliveriesScan.ID', $delID)
+            ->first();
+
+        if (! $session) {
+            abort(404);
+        }
+
+        $rows = [];
+
+        foreach ($this->getMatchedItems($delID, $supplierID) as $item) {
+            $myOrder = (float) ($item->myOrder ?? 0);
+
+            // myOrder 0 means the supplier did not send it; the office page lists
+            // those separately and the shop floor has nothing to scan.
+            if ($myOrder <= 0) {
+                continue;
+            }
+
+            $expected = fmod($myOrder, 1) != 0.0
+                ? round($myOrder, 3)
+                : ($item->invoiceCaseUnits ?? 1) * $myOrder;
+
+            $scanned = $item->scanned === null ? null : (float) $item->scanned;
+
+            $rows[] = [
+                'barcode' => $item->Barcode,
+                'code' => $item->supCode,
+                'name' => $item->dbProductName ?? $item->prodName,
+                'expected' => (float) $expected,
+                'scanned' => $scanned,
+                // Completion only increments STOCKCURRENT for rows that resolved
+                // to a product, so the summary must not promise more than that.
+                'stockable' => ! empty($item->productID),
+                'status' => match (true) {
+                    $scanned === null => 'not_scanned',
+                    $scanned == $expected => 'ok',
+                    $scanned < $expected => 'short',
+                    default => 'over',
+                },
+            ];
+        }
+
+        $invoiceRowCount = count($rows);
+        $checked = count(array_filter($rows, fn (array $r) => $r['scanned'] !== null));
+
+        foreach ($this->getScannedNotOnInvoice($delID, $supplierID) as $item) {
+            $rows[] = [
+                'barcode' => $item->Barcode,
+                'code' => $item->SupplierCode,
+                'name' => $item->NAME ?? $item->Barcode,
+                'expected' => null,
+                'scanned' => (float) $item->scanned,
+                'stockable' => ! empty($item->productID),
+                'status' => 'unexpected',
+            ];
+        }
+
+        $issues = count(array_filter(
+            $rows,
+            fn (array $r) => in_array($r['status'], ['short', 'over', 'unexpected'], true)
+        ));
+
+        return response()->json([
+            'session' => [
+                'id' => $session->ID,
+                'supplier' => $session->Supplier,
+                'date' => $session->dateUpload,
+                'completed' => (int) $session->status === 1,
+            ],
+            'rows' => $rows,
+            'progress' => [
+                'total' => $invoiceRowCount,
+                'checked' => $checked,
+                'issues' => $issues,
+            ],
+        ]);
+    }
+
+    /**
      * Get items that were scanned but NOT on the invoice.
      * These are barcodes scanned that don't match any supplier_link record for this supplier.
      * Also includes the supplier code from supplier_link if one exists for this supplier.
@@ -1462,6 +1563,22 @@ class DeliveryLegacyController extends Controller
         $delID = $validated['delID'];
         $supplierID = $validated['supplierID'];
 
+        // Completing twice adds the stock twice: the item queries read the scan
+        // rows, which completion does not clear, so a re-run increments by the
+        // same amounts again. A back-button resubmit, a double tap, or two devices
+        // on one session would all do it, and undo is manager-only. Refuse instead.
+        $session = DB::connection('pos')->table('deliveriesScan')->where('ID', $delID)->first();
+
+        if (! $session || (int) $session->status === 1) {
+            // back() uses the referer when there is one. Without it, land on the
+            // page the person came from rather than the dashboard.
+            $fallback = $request->input('return') === 'shop'
+                ? route('shop.deliveries.summary', ['delID' => $delID, 'supplierID' => $supplierID])
+                : route('delivery-legacy.match', ['delID' => $delID, 'supplierID' => $supplierID]);
+
+            return redirect()->back(302, [], $fallback)->with('error', 'This delivery is already completed.');
+        }
+
         // Get matched items with scanned quantities
         $matchedItems = $this->getMatchedItems($delID, $supplierID);
         // Get extra items (scanned but NOT on invoice)
@@ -1512,6 +1629,15 @@ class DeliveryLegacyController extends Controller
                 ->where('ID', $delID)
                 ->update(['status' => 1]);
         });
+
+        // Shop mode posts return=shop so staff land back on the shop-floor list with
+        // the figures they just committed. The office form sends nothing, so its
+        // behaviour is unchanged.
+        if ($request->input('return') === 'shop') {
+            return redirect()
+                ->route('shop.deliveries')
+                ->with('success', "Delivery completed. {$updateResults['unitsAdded']} units added to stock for {$updateResults['productsUpdated']} products.");
+        }
 
         return redirect()
             ->route('delivery-legacy.match', ['delID' => $delID, 'supplierID' => $supplierID])
@@ -1737,9 +1863,20 @@ class DeliveryLegacyController extends Controller
             ->where('SupplierID', $supplierId)
             ->first();
 
+        $message = 'New scan session created for '.($supplier->Supplier ?? 'supplier').'.';
+
+        // Shop mode posts return=shop so staff land on the shop-floor scan screen
+        // rather than the office match page. The office form sends nothing, so its
+        // behaviour is unchanged.
+        if ($request->input('return') === 'shop') {
+            return redirect()
+                ->route('shop.deliveries.scan', ['delID' => $sessionId, 'supplierID' => $supplierId])
+                ->with('success', $message);
+        }
+
         return redirect()
             ->route('delivery-legacy.match', ['delID' => $sessionId, 'supplierID' => $supplierId])
-            ->with('success', 'New scan session created for '.($supplier->Supplier ?? 'supplier').'.');
+            ->with('success', $message);
     }
 
     /**

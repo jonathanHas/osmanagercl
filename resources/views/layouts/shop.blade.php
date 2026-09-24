@@ -25,6 +25,19 @@
                 <x-shop.topbar :title="$title" :back="$back" :guest-safe="$guestSafe" />
             @endunless
 
+            {{-- Server flash as a toast, so a redirect after an action says what happened.
+                 Pages with their own client toast region can only overlap with this for the
+                 few seconds after a redirect, before the person has done anything. --}}
+            @if (session('success') || session('error'))
+                <div class="shop-toasts" role="status" x-data="{ open: true }" x-show="open" x-init="setTimeout(() => open = false, 8000)">
+                    <div class="shop-toast {{ session('error') ? 'shop-toast--bad' : 'shop-toast--ok' }}">
+                        <span class="shop-toast__icon"><x-shop.icon :name="session('error') ? 'alert' : 'check'" size="sm" /></span>
+                        <span class="shop-toast__text">{{ session('error') ?? session('success') }}</span>
+                        <button class="shop-iconbtn shop-iconbtn--ghost" type="button" aria-label="Dismiss" @click="open = false"><x-shop.icon name="x" /></button>
+                    </div>
+                </div>
+            @endif
+
             {{ $slot }}
         </div>
 

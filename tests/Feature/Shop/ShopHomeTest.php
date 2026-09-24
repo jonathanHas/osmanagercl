@@ -33,6 +33,44 @@ class ShopHomeTest extends TestCase
         return User::factory()->create(['role_id' => $role->id, 'name' => 'Maya Jensen']);
     }
 
+    /**
+     * A redirect after an action has to say what happened. Before cycle 9 the Shop
+     * layer rendered no flash at all, so "Delivery completed" and "already
+     * completed" went nowhere.
+     */
+    public function test_flash_success_is_shown_as_a_toast(): void
+    {
+        $this->actingAs($this->userWith('employee', ['stocking.scan']))
+            ->withSession(['success' => 'Delivery completed. 18 units added.'])
+            ->get('/shop')
+            ->assertOk()
+            ->assertSee('Delivery completed. 18 units added.')
+            ->assertSee('shop-toast--ok', false);
+    }
+
+    public function test_flash_error_is_shown_as_a_bad_toast(): void
+    {
+        $this->actingAs($this->userWith('employee', ['stocking.scan']))
+            ->withSession(['error' => 'This delivery is already completed.'])
+            ->get('/shop')
+            ->assertOk()
+            ->assertSee('This delivery is already completed.')
+            ->assertSee('shop-toast--bad', false)
+            ->assertDontSee('shop-toast--ok', false);
+    }
+
+    /**
+     * Home has no client-side toast region of its own, so the absence of the
+     * markup is assertable here in a way it would not be on the scan screens.
+     */
+    public function test_no_toast_region_without_a_flash(): void
+    {
+        $this->actingAs($this->userWith('employee', ['stocking.scan']))
+            ->get('/shop')
+            ->assertOk()
+            ->assertDontSee('shop-toasts', false);
+    }
+
     public function test_employee_sees_only_the_tiles_they_may_use(): void
     {
         $user = $this->userWith('employee', ['stocking.scan', 'deliveries.process', 'customer-requests.manage']);
@@ -87,20 +125,24 @@ class ShopHomeTest extends TestCase
     }
 
     /**
-     * Employees receive deliveries through the legacy flow; the newer
+     * Employees receive deliveries through the legacy scan sessions; the newer
      * /deliveries system is manager-only from cycle 2 on, so the tile must not
-     * send them somewhere they would get a 403.
+     * send them somewhere they would get a 403. From cycle 8 the tile points at
+     * the Shop mode list, which is built on those same legacy sessions.
+     *
+     * The badge is not asserted here: it counts open sessions on the POS
+     * connection, which this test does not create, so its absence would prove
+     * nothing. ShopDeliveryTest covers the badge with the table seeded.
      */
-    public function test_deliveries_tile_links_to_the_legacy_delivery_screen(): void
+    public function test_deliveries_tile_links_to_the_shop_delivery_list(): void
     {
         $user = $this->userWith('employee', ['deliveries.process']);
 
         $response = $this->actingAs($user)->get('/shop');
 
         $response->assertOk()
-            ->assertSee('href="'.route('delivery-legacy.index').'"', false)
-            ->assertDontSee(route('deliveries.index'), false)
-            ->assertDontSee('shop-tile__badge', false);
+            ->assertSee('href="'.route('shop.deliveries').'"', false)
+            ->assertDontSee(route('deliveries.index'), false);
     }
 
     public function test_guest_is_sent_to_login(): void

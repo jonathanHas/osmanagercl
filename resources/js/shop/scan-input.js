@@ -57,6 +57,10 @@ export default () => ({
     submit() {
         const code = this.parseBarcode(this.value);
         if (! code) {
+            // Enter on an empty input. A page can treat this as "confirm what is
+            // already on screen"; pages that do not listen simply ignore it.
+            this.$dispatch('scan-empty');
+
             return;
         }
 
