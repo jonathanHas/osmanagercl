@@ -75,6 +75,14 @@ Do:
 - When reviewing, read the actual diff (`git diff`, `git status`), not just
   `implemented.md`. Check every acceptance criterion yourself. Rerun the
   verification commands.
+- Read `implemented.md` to the end before accepting. `## Deviations` and
+  `## Notes for Planner` come last and are where the Implementer records what
+  the plan got wrong and what it noticed but did not touch. Every note gets an
+  explicit decision in the `## Review` section: fixed now (as new steps in a
+  bumped Revision, or a follow-up plan), deferred with a reason, or rejected
+  with a reason. A review that does not mention the notes is not finished.
+  (Cycle 7, 2026-09-24: two correct notes were missed because the report was
+  read only part-way; a follow-up cycle was needed.)
 
 Don't:
 
@@ -131,6 +139,8 @@ Where this could go wrong and what to watch for.
 ## Review
 (Planner fills this in after reading implemented.md and the diff.)
 - Criterion-by-criterion pass/fail.
+- Deviations: each accepted or rejected, with a reason.
+- Notes for Planner: each one fixed now, deferred (why), or rejected (why).
 - Anything to redo, as new numbered steps in a bumped Revision.
 ```
 

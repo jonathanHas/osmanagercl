@@ -481,3 +481,17 @@ textarea.shop-input { min-height: 112px; padding: 14px 20px; border-radius: var(
 @media (prefers-reduced-motion: reduce) {
   .shop *, .shop *::before, .shop *::after { transition: none !important; }
 }
+
+/* === APP ADDITIONS START ===
+   Styles the app needs that the design bundle does not define. Keep the design
+   block above byte-identical to docs/design/shop-mode/shop.css; add here only. */
+.shop-thumb { display: block; flex: none; width: 48px; height: 48px; border-radius: var(--shop-radius-sm); background: var(--shop-surface-2); border: 1px solid var(--shop-line); object-fit: cover; }
+.shop-thumb--lg { width: 128px; height: 128px; border-radius: var(--shop-radius-md); object-fit: contain; background: var(--shop-surface); }
+.shop-thumb-btn { display: block; flex: none; padding: 0; border: 0; background: none; border-radius: var(--shop-radius-md); cursor: zoom-in; }
+.shop-thumb-btn.is-open { cursor: zoom-out; width: 100%; }
+.shop-thumb-btn.is-open .shop-thumb--lg { width: 100%; height: auto; max-height: 60vh; }
+.shop-peek { display: none; position: fixed; z-index: 45; width: 272px; padding: var(--shop-space-2); border-radius: var(--shop-radius-lg); background: var(--shop-surface); border: 1px solid var(--shop-line); box-shadow: var(--shop-shadow-lg); pointer-events: none; }
+.shop-peek img { display: block; width: 256px; height: 256px; object-fit: contain; border-radius: var(--shop-radius-md); background: var(--shop-surface); }
+.shop-peek__name { margin-top: var(--shop-space-2); font-size: var(--shop-fs-sm); font-weight: var(--shop-fw-bold); color: var(--shop-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (hover: hover) and (pointer: fine) { .shop-peek.is-open { display: block; } }
+/* === APP ADDITIONS END === */

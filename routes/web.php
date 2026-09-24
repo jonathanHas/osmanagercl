@@ -68,6 +68,12 @@ Route::middleware('auth')->group(function () {
     // Shop mode — the simplified shop-floor interface.
     Route::prefix('shop')->name('shop.')->group(function () {
         Route::get('/', [\App\Http\Controllers\Shop\ShopHomeController::class, 'index'])->name('home');
+        Route::get('/stock-scan', [\App\Http\Controllers\Shop\StockScanController::class, 'index'])
+            ->middleware('permission:stocking.scan')
+            ->name('stock-scan');
+        Route::get('/find', [\App\Http\Controllers\Shop\FindProductController::class, 'index'])
+            ->middleware('permission:products.view')
+            ->name('find-product');
     });
 
     // Switch this device between the shop-floor and office interfaces.

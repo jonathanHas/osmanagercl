@@ -8,7 +8,7 @@ session so the Implementer can build from files. This folder is documentation, n
 
 | File | What it is |
 |---|---|
-| `shop.css` | The design, verbatim. Token block first (`/* === SHOP TOKENS START === */` … `END`), then the component layer. Everything is scoped under the root class `.shop`. Copy to `resources/css/shop.css` unchanged. |
+| `shop.css` | The design, verbatim. Token block first (`/* === SHOP TOKENS START === */` … `END`), then the component layer. Everything is scoped under the root class `.shop`. Copy to `resources/css/shop.css` unchanged; the app appends its own styles below an `APP ADDITIONS` marker at the end of that file, so the design block stays byte-identical and `head -c $(stat -c %s docs/design/shop-mode/shop.css) resources/css/shop.css \| cmp - docs/design/shop-mode/shop.css` compares it. |
 | `shop-icons.svg` | Lucide sprite (stroke 2.75). The screens inline the same paths; a Blade `<x-shop.icon name="scan"/>` rendering `<svg class="shop-ico"><use href="…/shop-icons.svg#scan"/></svg>` is the natural port. Provenance metadata stripped; symbols unchanged. Ids: back, scan, camera, keyboard, plus, minus, printer, tag, truck, coffee, requests, gift, carrot, package, search, lock, users, logout, login, office, check, x, alert, chevron-right, chevron-down, backspace, trash, sprout, list-checks, history, pencil, bookmark, inbox, sort, barcode, leaf. |
 | `screen-NN-*.html` | The 17 screens in scope, as plain static pages that open in a browser from this folder. Markup inside `<div class="shop">` is identical to the design; only the Claude Design viewer wrapper was replaced by a normal `<head>` and the cross-links renamed to these filenames. Screen 08 (Coffee KDS) is deliberately omitted: the KDS keeps its existing page. |
 
@@ -56,3 +56,13 @@ To retheme, change only these
 
 Next to the existing KDS
 - The Shop palette shares the KDS's warm beige ground, orange accent and green/amber/red order states, so the two sit side by side. The KDS is not being moved onto these tokens.
+
+Component API in the app
+- `<x-shop.scan-input />` — props `placeholder` (default "Scan or type a barcode"), `hint` (default "Ready — scanner listening"), `camera` (default `true`; `false` drops the camera and keyboard buttons).
+- It emits a `scan` event on its own root with `detail = { code }`; the screen listens with `@scan="..."` on the element wrapping it.
+- It listens on `window` for `shop-scan-done` (clears and re-focuses), `shop-scan-error` (`detail` = the message to show) and `shop-scan-saved` (reopens the camera, which stops itself on a detection).
+- Page behaviour lives in `resources/js/shop/<screen>.js`, registered as `Alpine.data('shop<Screen>', ...)` inside the `alpine:init` listener in `resources/js/shop.js`. Screens under `resources/views/shop/` carry no `<script>`.
+- Those modules take every URL from a `data-*` attribute on the page root (`this.$root.dataset.*`), never from Blade, so no route helper appears in JavaScript.
+- `.shop-thumb` / `.shop-thumb--lg` are app additions for product photos (48 px in rows, 128 px on a detail card); both hide on a load error and the row falls back to the `shop-row__lead` circle.
+- The card image sits in a `.shop-thumb-btn`; `.is-open` grows it to the card width (max 60 vh), toggled by tap — same gesture with a finger or a mouse. No overlay, scrim or teleport by design: the design system has no lightbox pattern and markup outside `.shop` gets no shop styles.
+- `.shop-peek` is the hover preview for row photos: one shared panel per screen, `position: fixed` beside the thumbnail, non-interactive (`pointer-events: none`), and shown only under `@media (hover: hover) and (pointer: fine)` so touch devices never get it. Because it is fixed rather than teleported, it depends on no ancestor of `.shop-page` having a `transform` — adding one would trap it in a new containing block.

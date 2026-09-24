@@ -10,7 +10,8 @@
  */
 return [
     'tiles' => [
-        ['key' => 'stock-scan', 'label' => 'Stock scan', 'hint' => 'Count and adjust', 'icon' => 'package', 'route' => 'stocking.index', 'permissions' => ['products.view'], 'badge' => null],
+        ['key' => 'stock-scan', 'label' => 'Stock scan', 'hint' => 'Count and adjust', 'icon' => 'package', 'route' => 'shop.stock-scan', 'permissions' => ['stocking.scan'], 'badge' => null],
+        ['key' => 'find-product', 'label' => 'Find product', 'hint' => 'Search and check stock', 'icon' => 'search', 'route' => 'shop.find-product', 'permissions' => ['products.view'], 'badge' => null],
         ['key' => 'deliveries', 'label' => 'Receive delivery', 'hint' => 'Scan a delivery in', 'icon' => 'truck', 'route' => 'delivery-legacy.index', 'permissions' => ['deliveries.process'], 'badge' => null],
         ['key' => 'labels', 'label' => 'Print labels', 'hint' => 'Shelf and Zebra labels', 'icon' => 'printer', 'route' => 'labels.index', 'permissions' => ['labels.print'], 'badge' => null],
         ['key' => 'kds', 'label' => 'Coffee orders', 'hint' => 'Kitchen display', 'icon' => 'coffee', 'route' => 'kds.index', 'permissions' => ['kds.access'], 'badge' => null],

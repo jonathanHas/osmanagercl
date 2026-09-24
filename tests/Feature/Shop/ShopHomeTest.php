@@ -35,7 +35,7 @@ class ShopHomeTest extends TestCase
 
     public function test_employee_sees_only_the_tiles_they_may_use(): void
     {
-        $user = $this->userWith('employee', ['products.view', 'deliveries.process', 'customer-requests.manage']);
+        $user = $this->userWith('employee', ['stocking.scan', 'deliveries.process', 'customer-requests.manage']);
 
         $response = $this->actingAs($user)->get('/shop');
 
