@@ -16,6 +16,9 @@ class LabelLog extends Model
         'barcode',
         'event_type',
         'user_id',
+        // ProductController json_encodes this itself, so there is deliberately
+        // no array cast here — casting would double-encode it.
+        'metadata',
     ];
 
     /**
@@ -38,6 +41,31 @@ class LabelLog extends Model
     const EVENT_LABEL_PRINT = 'label_print';
 
     const EVENT_REQUEUE_LABEL = 'requeue_label';
+
+    const EVENT_BARCODE_CHANGE = 'barcode_change';
+
+    const EVENT_LABEL_DISMISS = 'label_dismiss';
+
+    /**
+     * Events that put a product into the shelf-label queue. A barcode change
+     * belongs here because the label carries the barcode: after a change the one
+     * on the shelf is wrong.
+     */
+    public const QUEUE_EVENTS = [
+        self::EVENT_NEW_PRODUCT,
+        self::EVENT_PRICE_UPDATE,
+        self::EVENT_REQUEUE_LABEL,
+        self::EVENT_BARCODE_CHANGE,
+    ];
+
+    /**
+     * Events that take it back out again: the label was printed, or somebody
+     * decided it did not need printing.
+     */
+    public const RESOLVE_EVENTS = [
+        self::EVENT_LABEL_PRINT,
+        self::EVENT_LABEL_DISMISS,
+    ];
 
     /**
      * Get the user that created this log entry.
@@ -101,6 +129,21 @@ class LabelLog extends Model
         return self::create([
             'barcode' => $barcode,
             'event_type' => self::EVENT_LABEL_PRINT,
+            'user_id' => $userId ?? auth()->id(),
+        ]);
+    }
+
+    /**
+     * Log a label dismissal: taken off the queue without being printed.
+     *
+     * Deliberately not a print, so the office "Recent Label Prints" history shows
+     * only labels that were actually produced.
+     */
+    public static function logLabelDismiss(string $barcode, ?int $userId = null): self
+    {
+        return self::create([
+            'barcode' => $barcode,
+            'event_type' => self::EVENT_LABEL_DISMISS,
             'user_id' => $userId ?? auth()->id(),
         ]);
     }

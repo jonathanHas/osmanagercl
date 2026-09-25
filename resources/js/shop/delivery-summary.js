@@ -54,6 +54,14 @@ export default () => ({
     },
 
     /**
+     * No invoice lines loaded for this supplier: scans are recorded but there is
+     * nothing to check them against. See delivery-scan.js for why.
+     */
+    get hasInvoice() {
+        return !! this.progress && this.progress.total > 0;
+    },
+
+    /**
      * Row counts, not unit counts — "OK 2" means two invoice lines agree.
      */
     get totals() {

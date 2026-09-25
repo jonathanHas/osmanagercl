@@ -86,6 +86,45 @@ class ShopDeliveryTest extends TestCase
         $response->assertSee('In progress');
     }
 
+    /**
+     * Regression, from the live walkthrough on 2026-09-24: index() used to take
+     * the 50 most recent sessions and only then filter to open ones, so on the
+     * real database (1,201 sessions) an open session older than that window was
+     * invisible while the Home badge still counted it — badge 6, list 5.
+     */
+    public function test_old_open_sessions_are_listed(): void
+    {
+        $rows = [];
+
+        for ($i = 0; $i < 60; $i++) {
+            $rows[] = [
+                'ID' => "done-{$i}",
+                'supID' => '999',
+                'dateUpload' => now()->subDays($i % 7)->subMinutes($i),
+                'status' => 1,
+            ];
+        }
+
+        $rows[] = ['ID' => 'd-old', 'supID' => '999', 'dateUpload' => now()->subDays(120), 'status' => 0];
+
+        DB::connection('pos')->table('deliveriesScan')->insert($rows);
+
+        $response = $this->actingAs($this->employee())
+            ->get(route('shop.deliveries'))
+            ->assertOk();
+
+        // The old open session is well outside any recent-N window.
+        $response->assertSee('href="'.e(route('shop.deliveries.scan', ['delID' => 'd-old', 'supplierID' => '999'])).'"', false);
+        $response->assertSee('2 open');
+
+        // The completed list is still capped.
+        $this->assertLessThanOrEqual(
+            10,
+            substr_count($response->getContent(), 'shop-pill--ok">Completed'),
+            'Recently completed should stay capped at 10 rows.'
+        );
+    }
+
     public function test_barista_is_forbidden(): void
     {
         $barista = $this->userWith('barista', ['kds.access']);

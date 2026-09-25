@@ -25,7 +25,32 @@ class DeliveryController extends Controller
             ->orderBy('Supplier')
             ->get();
 
-        $sessions = DB::connection('pos')
+        // Open sessions are never windowed. Taking the most recent N and then
+        // filtering hid an open session older than the window while the Home badge
+        // (which counts them all) still showed it — found in the live walkthrough
+        // on 2026-09-24 with 1,201 sessions. There are only ever a handful open.
+        $open = $this->sessions()->where('deliveriesScan.status', 0)->get();
+
+        $completed = $this->sessions()->where('deliveriesScan.status', 1)->limit(10)->get();
+
+        $counts = DB::connection('pos')
+            ->table('deliveriesScanItems')
+            ->select('delID', DB::raw('COUNT(*) as item_count'), DB::raw('SUM(quantity) as total_qty'))
+            ->whereIn('delID', $open->pluck('ID')->merge($completed->pluck('ID'))->all())
+            ->groupBy('delID')
+            ->pluck('item_count', 'delID')
+            ->toArray();
+
+        return view('shop.deliveries', compact('suppliers', 'open', 'completed', 'counts'));
+    }
+
+    /**
+     * Sessions with their supplier, newest first. The caller decides which status
+     * it wants and whether to limit.
+     */
+    private function sessions(): \Illuminate\Database\Query\Builder
+    {
+        return DB::connection('pos')
             ->table('deliveriesScan')
             ->select(
                 'deliveriesScan.ID',
@@ -35,21 +60,7 @@ class DeliveryController extends Controller
                 'suppliers.Supplier'
             )
             ->leftJoin('suppliers', 'deliveriesScan.supID', '=', 'suppliers.SupplierID')
-            ->orderByDesc('dateUpload')
-            ->limit(50)
-            ->get();
-
-        $counts = DB::connection('pos')
-            ->table('deliveriesScanItems')
-            ->select('delID', DB::raw('COUNT(*) as item_count'), DB::raw('SUM(quantity) as total_qty'))
-            ->groupBy('delID')
-            ->pluck('item_count', 'delID')
-            ->toArray();
-
-        $open = $sessions->where('status', 0)->values();
-        $completed = $sessions->where('status', 1)->take(10)->values();
-
-        return view('shop.deliveries', compact('suppliers', 'open', 'completed', 'counts'));
+            ->orderByDesc('dateUpload');
     }
 
     public function scan(Request $request): View

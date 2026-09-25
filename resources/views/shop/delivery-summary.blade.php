@@ -8,7 +8,7 @@
             <h2 class="shop-subtitle">{{ $session['supplier'] ?? 'Unknown supplier' }} · {{ substr($session['id'], 0, 8) }}</h2>
             <p class="shop-meta">
                 {{ $session['date'] ? \Illuminate\Support\Carbon::parse($session['date'])->format('D j M, H:i') : 'No date' }}
-                · <span x-text="progress ? progress.total + ' items expected' : ''"></span>
+                · <span x-text="hasInvoice ? progress.total + ' items expected' : 'no invoice lines loaded'"></span>
             </p>
         </div>
 

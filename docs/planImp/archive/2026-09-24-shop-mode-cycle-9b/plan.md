@@ -1,6 +1,6 @@
 # Shop mode cycle 9b — delivery list completeness and two cosmetic fixes
 
-Status: READY
+Status: ACCEPTED
 Revision: 1
 Planner: Fable 5.1
 Date: 2026-09-24
@@ -72,4 +72,16 @@ Check: `./vendor/bin/pint --test --dirty` clean; `npm run build` succeeds.
 
 ## Review
 
-(Planner fills this in after reading implemented.md and the diff.)
+Reviewed 2026-09-24 by the Planner against the full `implemented.md`, the diff (a clean tree at baseline, HEAD `f1ae53ad`), and a rerun of the checks.
+
+Steps 1–4: all PASS. Open sessions unwindowed and completed limited to 10 through a shared query builder; `$counts` scoped to the listed ids; the regression test fails against the old controller and passes against the new one; on the dev database the badge and the list both read 5 and the May Imbibe session is listed. `hasInvoice` getters on both delivery pages with the honest wording and the progress bar hidden; unexpected rows still listed. Toast icons follow the tone, with the directive on the icon span because `x-shop.icon` drops attributes. `--filter=Shop` 128 passed; full suite 17 failed / 528 passed, the identical 17; formatter clean; no legacy or office change; design block byte-identical.
+
+Deviations 1–2: accepted; both are the better shape.
+
+Notes for Planner, each decided:
+- Open list unbounded, and abandoned sessions now show: **accepted**; the owner is told so they can complete or clear them on the office page.
+- `$counts` scoped: **accepted**, a small performance gain.
+- "No invoice lines" is common because the scratch table holds one synced delivery: **deferred**, recorded as a candidate cycle ("load the invoice from Shop mode") for the owner to weigh.
+- `x-shop.icon` swallows attributes: **fixed in the next cycle** as its first step (one line, a rendering check).
+
+Result: ACCEPTED. Archived by the Planner to `docs/planImp/archive/2026-09-24-shop-mode-cycle-9b/`. Next: print labels (screen 07).

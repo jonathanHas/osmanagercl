@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\ProductTranslation;
 use App\Models\ZebraLabel;
 use App\Services\AiSettingsService;
+use App\Services\LabelQueueService;
 use App\Services\LabelService;
 use App\Services\SupplierService;
 use App\Services\TillVisibilityService;
@@ -32,12 +33,15 @@ class LabelAreaController extends Controller
 
     protected ZebraPrintService $zebraPrint;
 
-    public function __construct(LabelService $labelService, ZplGeneratorService $zplGenerator, TillVisibilityService $tillVisibilityService, ZebraPrintService $zebraPrint)
+    protected LabelQueueService $labelQueue;
+
+    public function __construct(LabelService $labelService, ZplGeneratorService $zplGenerator, TillVisibilityService $tillVisibilityService, ZebraPrintService $zebraPrint, LabelQueueService $labelQueue)
     {
         $this->labelService = $labelService;
         $this->zplGenerator = $zplGenerator;
         $this->tillVisibilityService = $tillVisibilityService;
         $this->zebraPrint = $zebraPrint;
+        $this->labelQueue = $labelQueue;
     }
 
     /**
@@ -48,7 +52,8 @@ class LabelAreaController extends Controller
         $zebraLabelCount = ZebraLabel::active()->whereNotNull('product_code')->count();
         $translationCount = ProductTranslation::count();
         $labelCounts = $this->getLabelCountsByEventType();
-        $needsLabelsCount = array_sum($labelCounts);
+        // $labelCounts already carries its own 'total'; array_sum() counted it twice.
+        $needsLabelsCount = $labelCounts['total'];
 
         return view('labels.hub', compact('zebraLabelCount', 'translationCount', 'needsLabelsCount'));
     }
@@ -388,63 +393,89 @@ class LabelAreaController extends Controller
     }
 
     /**
+     * The shelf-label queue as JSON, for the Shop mode screen.
+     *
+     * Same derivation the office page renders in Blade; only the shape differs.
+     */
+    public function queue(): \Illuminate\Http\JsonResponse
+    {
+        $rows = $this->labelQueue->needingLabels()->map(fn ($product) => [
+            'id' => $product->ID,
+            'code' => $product->CODE,
+            'name' => $product->NAME,
+            'price' => $product->formatted_price_with_vat,
+            'event' => $product->label_event_type,
+            'since' => optional($product->label_event_date)->toIso8601String(),
+            'reason' => match ($product->label_event_type) {
+                LabelLog::EVENT_NEW_PRODUCT => 'New product',
+                LabelLog::EVENT_PRICE_UPDATE => 'Price changed',
+                LabelLog::EVENT_BARCODE_CHANGE => 'Barcode changed',
+                default => 'Re-queued',
+            },
+        ])->values();
+
+        return response()->json([
+            'rows' => $rows,
+            'counts' => $this->labelQueue->countsByEventType(),
+            'labels_per_sheet' => LabelTemplate::getDefault()?->labels_per_a4 ?? 24,
+        ]);
+    }
+
+    /**
+     * Take one product off the queue.
+     *
+     * Recorded as a dismissal, not a print, so the office "Recent Label Prints"
+     * history shows only labels that were actually produced.
+     */
+    public function dismiss(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate([
+            'barcode' => 'required|string|max:255',
+        ]);
+
+        $product = Product::where('CODE', $validated['barcode'])->first();
+
+        if (! $product) {
+            return response()->json(['success' => false, 'message' => 'Product not found'], 404);
+        }
+
+        LabelLog::logLabelDismiss($product->CODE, auth()->id());
+
+        return response()->json(['success' => true, 'code' => $product->CODE]);
+    }
+
+    /**
+     * Empty the queue without printing anything.
+     *
+     * The Shop screen's "Clear queue". Unlike the office "Clear All", which logs
+     * prints so that "Restore" can undo it, this writes dismissals: nothing was
+     * printed, so the print history should not say otherwise.
+     */
+    public function dismissAll(): \Illuminate\Http\JsonResponse
+    {
+        $products = $this->labelQueue->needingLabels();
+
+        foreach ($products as $product) {
+            LabelLog::logLabelDismiss($product->CODE, auth()->id());
+        }
+
+        $count = $products->count();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Cleared {$count} products from labels queue",
+            'cleared_count' => $count,
+        ]);
+    }
+
+    /**
      * Get products that likely need labels printed.
+     *
+     * Derivation lives in LabelQueueService so Shop mode reads the same queue.
      */
     private function getProductsNeedingLabels(array $filters = [])
     {
-        // Get all products with any label-related events in the last 30 days
-        $candidateEvents = LabelLog::whereIn('event_type', [
-            LabelLog::EVENT_NEW_PRODUCT,
-            LabelLog::EVENT_PRICE_UPDATE,
-            LabelLog::EVENT_REQUEUE_LABEL,
-        ])
-            ->where('created_at', '>=', now()->subDays(30))
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        $needsLabelsData = collect();
-
-        // Group events by barcode and find the most recent for each
-        $eventsByBarcode = $candidateEvents->groupBy('barcode');
-
-        foreach ($eventsByBarcode as $barcode => $events) {
-            // Get the most recent print event for this barcode (last 30 days - matching the event window)
-            $mostRecentPrint = LabelLog::where('barcode', $barcode)
-                ->where('event_type', LabelLog::EVENT_LABEL_PRINT)
-                ->where('created_at', '>=', now()->subDays(30))
-                ->orderBy('created_at', 'desc')
-                ->first();
-
-            // Get the most recent non-print event for this barcode
-            $mostRecentEvent = $events->first(); // Already ordered by created_at desc
-
-            // Product needs a label if:
-            // 1. There's a recent event (new_product, price_update, or requeue_label)
-            // 2. AND either no recent print OR the event is more recent than the print
-            if ($mostRecentEvent && (! $mostRecentPrint || $mostRecentEvent->created_at > $mostRecentPrint->created_at)) {
-                // Apply filter if specified
-                if (empty($filters) || in_array($mostRecentEvent->event_type, $filters)) {
-                    $needsLabelsData->push([
-                        'barcode' => $barcode,
-                        'event_type' => $mostRecentEvent->event_type,
-                        'created_at' => $mostRecentEvent->created_at,
-                    ]);
-                }
-            }
-        }
-
-        $needsLabelsBarcodes = $needsLabelsData->pluck('barcode');
-
-        return Product::whereIn('CODE', $needsLabelsBarcodes)
-            ->orderBy('NAME')
-            ->get()
-            ->map(function ($product) use ($needsLabelsData) {
-                $eventData = $needsLabelsData->firstWhere('barcode', $product->CODE);
-                $product->label_event_type = $eventData['event_type'];
-                $product->label_event_date = $eventData['created_at'];
-
-                return $product;
-            });
+        return $this->labelQueue->needingLabels($filters);
     }
 
     /**
@@ -452,47 +483,7 @@ class LabelAreaController extends Controller
      */
     private function getLabelCountsByEventType(): array
     {
-        $counts = [
-            LabelLog::EVENT_NEW_PRODUCT => 0,
-            LabelLog::EVENT_PRICE_UPDATE => 0,
-            LabelLog::EVENT_REQUEUE_LABEL => 0,
-        ];
-
-        // Get all products with any label-related events in the last 30 days
-        $candidateEvents = LabelLog::whereIn('event_type', [
-            LabelLog::EVENT_NEW_PRODUCT,
-            LabelLog::EVENT_PRICE_UPDATE,
-            LabelLog::EVENT_REQUEUE_LABEL,
-        ])
-            ->where('created_at', '>=', now()->subDays(30))
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        // Group events by barcode and find the most recent for each
-        $eventsByBarcode = $candidateEvents->groupBy('barcode');
-
-        foreach ($eventsByBarcode as $barcode => $events) {
-            // Get the most recent print event for this barcode (last 30 days - matching the event window)
-            $mostRecentPrint = LabelLog::where('barcode', $barcode)
-                ->where('event_type', LabelLog::EVENT_LABEL_PRINT)
-                ->where('created_at', '>=', now()->subDays(30))
-                ->orderBy('created_at', 'desc')
-                ->first();
-
-            // Get the most recent non-print event for this barcode
-            $mostRecentEvent = $events->first(); // Already ordered by created_at desc
-
-            // Product needs a label if:
-            // 1. There's a recent event (new_product, price_update, or requeue_label)
-            // 2. AND either no recent print OR the event is more recent than the print
-            if ($mostRecentEvent && (! $mostRecentPrint || $mostRecentEvent->created_at > $mostRecentPrint->created_at)) {
-                $counts[$mostRecentEvent->event_type]++;
-            }
-        }
-
-        $counts['total'] = array_sum(array_filter($counts, 'is_numeric'));
-
-        return $counts;
+        return $this->labelQueue->countsByEventType();
     }
 
     /**

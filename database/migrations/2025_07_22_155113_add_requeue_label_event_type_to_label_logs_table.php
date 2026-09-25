@@ -10,8 +10,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Widening an ENUM is MySQL-only DDL. SQLite (used by the test
-        // suite) stores these columns as text, so there is nothing to do.
+        // Widening an ENUM is MySQL-only DDL. SQLite: Laravel's enum() adds a
+        // CHECK constraint, so this widening is needed there too; it is done by
+        // 2026_09_24_220000_widen_label_logs_event_type_on_non_mysql.
         if (DB::getDriverName() !== 'mysql') {
             return;
         }
@@ -25,8 +26,9 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // Widening an ENUM is MySQL-only DDL. SQLite (used by the test
-        // suite) stores these columns as text, so there is nothing to do.
+        // Widening an ENUM is MySQL-only DDL. SQLite: Laravel's enum() adds a
+        // CHECK constraint, so this widening is needed there too; it is done by
+        // 2026_09_24_220000_widen_label_logs_event_type_on_non_mysql.
         if (DB::getDriverName() !== 'mysql') {
             return;
         }

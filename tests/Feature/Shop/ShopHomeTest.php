@@ -38,6 +38,21 @@ class ShopHomeTest extends TestCase
      * layer rendered no flash at all, so "Delivery completed" and "already
      * completed" went nowhere.
      */
+    /**
+     * The component declares name/size/class as props, so everything else must
+     * reach the <svg>. Before cycle 10 it rendered no $attributes at all, and an
+     * x-show written on the tag was dropped silently — found in cycle 9b.
+     */
+    public function test_icon_component_passes_attributes_through(): void
+    {
+        $html = \Illuminate\Support\Facades\Blade::render('<x-shop.icon name="check" x-show="open" data-test="1" />');
+
+        $this->assertStringContainsString('x-show="open"', $html);
+        $this->assertStringContainsString('data-test="1"', $html);
+        $this->assertStringContainsString('class="shop-ico', $html);
+        $this->assertStringContainsString('#check', $html);
+    }
+
     public function test_flash_success_is_shown_as_a_toast(): void
     {
         $this->actingAs($this->userWith('employee', ['stocking.scan']))

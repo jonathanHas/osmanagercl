@@ -65,6 +65,15 @@ export default () => ({
         return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
     },
 
+    /**
+     * The POS `delivery` scratch table is per sync, not per session, so a supplier
+     * whose invoice has not been synced (or has been replaced) has no lines at all.
+     * Scans are still recorded; they simply cannot be checked against anything.
+     */
+    get hasInvoice() {
+        return !! this.progress && this.progress.total > 0;
+    },
+
     get percent() {
         return this.progress.total
             ? Math.round((this.progress.checked / this.progress.total) * 100)

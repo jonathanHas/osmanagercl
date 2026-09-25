@@ -86,7 +86,9 @@
 
         <div class="shop-toasts" role="status" x-show="toast" x-cloak>
             <div class="shop-toast" :class="toast && 'shop-toast--' + toast.tone">
-                <span class="shop-toast__icon"><x-shop.icon name="check" size="sm" /></span>
+                {{-- x-shop.icon does not merge $attributes, so the directive goes on the styled span. --}}
+                <span class="shop-toast__icon" x-show="! toast || toast.tone === 'ok'"><x-shop.icon name="check" size="sm" /></span>
+                <span class="shop-toast__icon" x-show="toast && toast.tone !== 'ok'" x-cloak><x-shop.icon name="alert" size="sm" /></span>
                 <span class="shop-toast__text" x-text="toast?.text"></span>
             </div>
         </div>

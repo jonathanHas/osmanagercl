@@ -66,10 +66,11 @@
                 <section class="shop-card">
                     <h2 class="shop-label">Progress</h2>
                     <div class="shop-progress-meta">
-                        <span><strong x-text="progress.checked"></strong> of <span x-text="progress.total"></span> items</span>
+                        <span x-show="hasInvoice"><strong x-text="progress.checked"></strong> of <span x-text="progress.total"></span> items</span>
+                        <span x-show="! hasInvoice" x-cloak>No invoice lines loaded</span>
                         <span x-text="progress.issues + ' issues'"></span>
                     </div>
-                    <div class="shop-progress shop-progress--lg"
+                    <div class="shop-progress shop-progress--lg" x-show="hasInvoice"
                          :class="{ 'is-done': progress.total && progress.checked === progress.total, 'is-issue': progress.issues > 0 }"
                          role="progressbar" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="percent">
                         <span class="shop-progress__bar" :style="'width:' + percent + '%'"></span>
@@ -98,6 +99,10 @@
                         </label>
                     </div>
                 </div>
+
+                <p class="shop-meta" x-show="! hasInvoice && rows.length" x-cloak>
+                    No invoice lines are loaded for this supplier; everything below was scanned but cannot be checked.
+                </p>
 
                 <div class="shop-list" x-show="rows.length" x-cloak>
                     <template x-for="row in sorted" :key="row.barcode">
@@ -143,7 +148,9 @@
 
         <div class="shop-toasts" role="status" x-show="toast" x-cloak>
             <div class="shop-toast" :class="toast && 'shop-toast--' + toast.tone">
-                <span class="shop-toast__icon"><x-shop.icon name="check" size="sm" /></span>
+                {{-- x-shop.icon does not merge $attributes, so the directive goes on the styled span. --}}
+                <span class="shop-toast__icon" x-show="! toast || toast.tone === 'ok'"><x-shop.icon name="check" size="sm" /></span>
+                <span class="shop-toast__icon" x-show="toast && toast.tone !== 'ok'" x-cloak><x-shop.icon name="alert" size="sm" /></span>
                 <span class="shop-toast__text" x-text="toast?.text"></span>
             </div>
         </div>

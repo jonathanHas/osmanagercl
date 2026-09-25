@@ -11,6 +11,7 @@
 import deliveryScan from './shop/delivery-scan';
 import deliverySummary from './shop/delivery-summary';
 import findProduct from './shop/find-product';
+import labels from './shop/labels';
 import scanInput from './shop/scan-input';
 import stockScan from './shop/stock-scan';
 
@@ -20,4 +21,5 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('shopFindProduct', findProduct);
     Alpine.data('shopDeliveryScan', deliveryScan);
     Alpine.data('shopDeliverySummary', deliverySummary);
+    Alpine.data('shopLabels', labels);
 });

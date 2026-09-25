@@ -137,6 +137,20 @@
                                 <div class="text-xs text-gray-500 dark:text-gray-400">{{ $labelCounts['requeue_label'] }} products</div>
                             </div>
                         </label>
+
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" 
+                                   name="filter_barcode_change" 
+                                   id="filter-barcode-change"
+                                   class="sr-only filter-checkbox" 
+                                   data-filter="barcode_change"
+                                   @if(in_array('barcode_change', $filters)) checked @endif>
+                            <div class="filter-card border-2 rounded-lg px-4 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700" 
+                                 data-filter="barcode_change">
+                                <div class="text-sm font-medium text-gray-900 dark:text-gray-100">Barcode Changes</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">{{ $labelCounts['barcode_change'] }} products</div>
+                            </div>
+                        </label>
                     </div>
                 </div>
             </div>
@@ -229,11 +243,13 @@
                                                         'new_product' => 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
                                                         'price_update' => 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
                                                         'requeue_label' => 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+                                                        'barcode_change' => 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
                                                     ];
                                                     $badgeText = [
                                                         'new_product' => 'New Product',
                                                         'price_update' => 'Price Update',
                                                         'requeue_label' => 'Scanned',
+                                                        'barcode_change' => 'Barcode Changed',
                                                     ];
                                                 @endphp
                                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $badgeColors[$eventType] ?? 'bg-gray-100 text-gray-800' }}">
@@ -883,6 +899,7 @@
                     case 'new_product': return 'New Products';
                     case 'price_update': return 'Price Updates';
                     case 'requeue_label': return 'Scanned/Re-queued';
+                    case 'barcode_change': return 'Barcode Changes';
                     default: return filter.replace(/_/g, ' ');
                 }
             });

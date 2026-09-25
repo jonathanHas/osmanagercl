@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Shop;
 
 use App\Http\Controllers\Controller;
 use App\Services\CustomerRequestService;
+use App\Services\LabelQueueService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -49,8 +50,23 @@ class ShopHomeController extends Controller
         return match ($badge) {
             'requests' => app(CustomerRequestService::class)->dashboardCounts()['due'],
             'deliveries' => $this->openDeliveryCount(),
+            'labels' => $this->labelQueueCount(),
             default => null,
         };
+    }
+
+    /**
+     * Products whose shelf label is out of date. Guarded like the delivery badge:
+     * the derivation reads the POS product table, so a POS outage must not stop
+     * Home rendering.
+     */
+    private function labelQueueCount(): ?int
+    {
+        try {
+            return app(LabelQueueService::class)->countsByEventType()['total'] ?: null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /**

@@ -74,6 +74,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/find', [\App\Http\Controllers\Shop\FindProductController::class, 'index'])
             ->middleware('permission:products.view')
             ->name('find-product');
+        Route::get('/labels', [\App\Http\Controllers\Shop\LabelsController::class, 'index'])
+            ->middleware('permission:labels.print')
+            ->name('labels');
+
         Route::middleware('permission:deliveries.process')->group(function () {
             Route::get('/deliveries', [\App\Http\Controllers\Shop\DeliveryController::class, 'index'])->name('deliveries');
             Route::get('/deliveries/scan', [\App\Http\Controllers\Shop\DeliveryController::class, 'scan'])->name('deliveries.scan');
@@ -361,6 +365,7 @@ Route::middleware('auth')->group(function () {
 
     // Clear all labels route
     Route::post('/labels/clear-all', [LabelAreaController::class, 'clearAllLabels'])->name('labels.clear-all')->middleware('permission:labels.manage');
+    Route::post('/labels/dismiss-all', [LabelAreaController::class, 'dismissAll'])->name('labels.dismiss-all')->middleware('permission:labels.manage');
 
     // Restore batch of labels route
     Route::post('/labels/restore-batch', [LabelAreaController::class, 'restoreBatch'])->name('labels.restore-batch')->middleware('permission:labels.manage');
@@ -368,6 +373,8 @@ Route::middleware('auth')->group(function () {
     // Scanner routes
     Route::post('/labels/lookup-barcode', [LabelAreaController::class, 'lookupBarcode'])->name('labels.lookup-barcode')->middleware('permission:labels.print');
     Route::post('/labels/scan', [LabelAreaController::class, 'processBarcodeScan'])->name('labels.scan')->middleware('permission:labels.print');
+    Route::get('/labels/queue', [LabelAreaController::class, 'queue'])->name('labels.queue')->middleware('permission:labels.print');
+    Route::post('/labels/dismiss', [LabelAreaController::class, 'dismiss'])->name('labels.dismiss')->middleware('permission:labels.print');
 
     // Label translation - debug
     Route::get('/labels/zpl-debug', fn () => view('labels.zpl-debug'))->name('labels.zpl-debug')->middleware('permission:labels.manage');

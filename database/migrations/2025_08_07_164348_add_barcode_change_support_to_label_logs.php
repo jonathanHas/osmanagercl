@@ -13,7 +13,9 @@ return new class extends Migration
     public function up(): void
     {
         // First, modify the enum to include 'barcode_change' and keep 'requeue_label'.
-        // MySQL-only DDL - SQLite stores the column as text, so it is skipped there.
+        // MySQL-only DDL. SQLite: Laravel's enum() adds a CHECK constraint, so this
+        // widening is needed there too; it is done by
+        // 2026_09_24_220000_widen_label_logs_event_type_on_non_mysql.
         if (DB::getDriverName() === 'mysql') {
             DB::statement("ALTER TABLE label_logs MODIFY COLUMN event_type ENUM('new_product', 'price_update', 'label_print', 'requeue_label', 'barcode_change')");
         }
