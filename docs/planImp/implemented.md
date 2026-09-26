@@ -1,4 +1,4 @@
-# Cycle 20 — Grant the customer-requests, voucher and customer-invoice permissions — implementation
+# Shop mode cycle 21 — Product pictures on the customer requests screens — implementation
 
 Status: DONE
 Plan revision: 1
@@ -7,188 +7,236 @@ Date: 2026-09-26
 
 ## Baseline
 
-HEAD: 35c861c6 — the earlier cycles are now committed, so the tree is clean apart
-from this cycle's own files.
+HEAD: 58a48360 — cycle 20 is committed; the tree is clean apart from this cycle.
 
-Test baseline: 15 failed / 636 passed (2721 assertions).
+Test baseline: 15 failed / 640 passed (2762 assertions).
 
 ## Pre-flight
 
-The four permission definitions and the role grants were read from the seeder
-rather than taken from the plan, and they match:
-
+**The plan's third risk, checked first because it decides whether the feature works
+for staff at all:**
 ```
-database/seeders/RolesAndPermissionsSeeder.php:227  customer-invoices.manage
-                                              :235  customer-requests.manage
-                                              :243  vouchers.redeem
-                                              :249  vouchers.manage
-employee list (line 343-344): vouchers.redeem, customer-requests.manage
-manager list: array_merge($employeePermissions, [... customer-invoices.manage,
-                                                 vouchers.manage ...])
-admin: every permission
+$ php artisan route:list --name=products.image -v
+GET|HEAD products/{id}/image › ProductController@image
+    ⇂ Illuminate\Auth\Middleware\Authenticate
+    ⇂ App\Http\Middleware\PermissionMiddleware:products.view
+
+$ employee has products.view → true
 ```
-So managers inherit the employee two and add the other two — which is the
-`EMPLOYEE_GRANTS` + extras shape the plan describes.
+So signed-in staff see POS photos on every screen. Guests do not — the route
+redirects to login and the `<img>` errors onto the placeholder, which is the
+behaviour the plan puts in Out of scope and which the component has to handle
+cleanly.
 
-The pattern migration `2026_09_23_150000_add_shop_mode_permissions.php` does **not**
-pass `guard_name`, confirming the plan's instruction to follow it rather than the
-cash-reconciliation one.
-
-**I have not verified the production database myself** — I have no access to it.
-The claim that the four names are absent there is the Planner's, made read-only via
-the deploy host, and everything here is additive and idempotent, so it is correct
-whether or not they are already present.
+The resolver is as described: `SELECT_COLUMNS` never includes `IMAGE`, `has_image`
+is a raw CASE expression at line 155, and `imageUrl()` goes POS photo → supplier
+CDN by barcode → cached/template supplier code → null.
 
 ## Steps
 
-### 1. The migration — done
+### 1. `imageUrlsByCode()` on the search service — done
 
-Changed: `database/migrations/2026_09_26_120000_add_customer_requests_and_voucher_permissions.php (new)`.
+Changed: `app/Services/ProductSearch/ProductSearchService.php` — a
+`HAS_IMAGE_EXPRESSION` constant now shared by `runQuery()` and the new public
+`imageUrlsByCode()`, which delegates to the existing private `loadSupplierImageCache()`
+and `imageUrl()`. `imageUrl()`'s rules are untouched, so the search API is unaffected.
 
-Modelled on the shop-mode migration: `firstOrCreate` for each permission,
-`syncWithoutDetaching` per role, roles looked up by name and skipped if absent, no
-`guard_name`. The four definitions are copied verbatim from the seeder.
-
-Check output — dev already had all four from the seeder, so `up()` alone proves
-little. The rollback/re-migrate cycle is what proves it works on a database that
-does **not** have them, which is the production case:
+Changed: `tests/Feature/ProductSearchImageUrlsTest.php (new)` — 11 tests.
 ```
-$ php artisan migrate                       → DONE
-employee  ["customer-requests.manage","vouchers.redeem"]
-manager   ["customer-invoices.manage","customer-requests.manage","vouchers.manage","vouchers.redeem"]
-admin     ["customer-invoices.manage","customer-requests.manage","vouchers.manage","vouchers.redeem"]
-barista   []
+✓ a product with a pos photo gets the image route
+✓ a product with no photo and no supplier gets null
+✓ an empty blob is not a photo
+✓ a supplier with a barcode template gets the cdn url
+✓ a supplier that keys images by supplier code uses the template
+✓ a disabled integration gets null
+✓ a pos photo wins over a supplier picture
+✓ an unknown code is absent rather than null
+✓ an empty list runs no query
+✓ duplicate codes are queried once
+✓ the blob never leaves the database
+Tests:    11 passed (19 assertions)
+```
+Four go beyond the plan's list and are the ones that pin the *rules* rather than the
+plumbing: an empty blob is not a photo (the expression checks `LENGTH > 0`, not just
+`NOT NULL`), a disabled integration yields null, a POS photo wins over a supplier
+picture, and — the constraint the whole design rests on — **the query never selects
+`PRODUCTS.*` or `IMAGE`**, asserted against the query log, because `IMAGE` is a
+mediumblob and selecting it would pull every photo into PHP.
 
-$ php artisan migrate:rollback --step=1     → DONE
-permissions table has: 0 of the four
-employee still has: 12 permissions          ← unrelated grants intact
+### 2. Board rows and the detail page carry the URL — done
 
-$ php artisan migrate                       → DONE
-restored: 4 of the four
-employee: ["customer-requests.manage","vouchers.redeem"]
+Changed: `app/Services/CustomerRequestService.php` (a constructor taking
+`ProductSearchService`; `rowsFrom()` enriches every row),
+`app/Http/Controllers/CustomerRequestController.php` (`show()` passes `images`,
+`seedItems()` attaches a `product` object through a new `seedProduct()` helper).
+
+The enrichment went into `rowsFrom()` rather than `boardRows()` because it is the
+single funnel both branches pass through, and only one branch runs — so it is
+exactly one extra query per board however the board is filtered.
+
+`seedProduct()` keys the object by `code`, not `id`: a request line stores a product
+code, and `productImages()` falls back from `id` to `code` (cycle 17c), so the
+Alpine thumbnail resolves it unchanged.
+
+### 3. A server-side photo component and the three views — done
+
+Changed: `resources/views/components/shop/photo.blade.php (new)`, the staff row,
+the guest card, the detail page, and the two includes that pass `image` down.
+
+**The plan's third risk, resolved first:** `products.image` is behind `auth` +
+`permission:products.view`, and employees hold `products.view`. So staff see POS
+photos everywhere; guests do not, and the component's error handler is what puts
+the placeholder there. Recorded in the component's own docblock and in the docs.
+
+Sourcing lines render neither photo nor placeholder, so their layout is byte-for-byte
+what it was.
+
+### 4. Tests — done
+
+Changed: `tests/Feature/Shop/ShopRequestsTest.php`.
+
+The fixture needed more than the plan's `IMAGE` column: it was also missing
+`PRICEBUY`, `ISSERVICE` and `DISPLAY`, all of which are in `SELECT_COLUMNS`. Four
+tests failed with `no such column: PRODUCTS.DISPLAY` until all four were added.
+
+```
+$ php artisan test --filter=ShopRequestsTest
+✓ a sourcing line has no picture and no placeholder
+✓ detail page shows the picture for a pre order line
+✓ guest board is shop styled and read only        (+ photo assertions)
+✓ staff board shows actions and form              (+ photo assertions)
+✓ edit page seeds lines and posts to update       (+ seeded product assertion)
+  ... 14 in all
+Tests:    14 passed (135 assertions)
 ```
 
-### 2. Tests — done
+Two assertions I had to get right rather than merely green:
 
-Changed: `tests/Feature/Shop/RolePermissionGrantsTest.php` — four tests.
+- **`assertDontSee('class="shop-thumb"')` for a sourcing line was wrong.** The New
+  request sheet on the same page renders the Alpine thumbnail regardless, so that
+  assertion could never have passed and, had I weakened it instead, would have
+  proved nothing. The test now asserts on `shop-photo` — the server component's own
+  wrapper — and then seeds a pre-order line and asserts the board *does* show one,
+  so it cannot pass just because nothing ever emits it.
+- **The edit-page seed goes through `@js()`**, i.e. `Illuminate\Support\Js::from()`,
+  which hex-escapes quotes as `"` rather than `&quot;`. The expected fragment
+  is built with the same helper instead of hand-written JSON.
 
-```
-$ php artisan test --filter=RolePermissionGrantsTest
-✓ requests migration creates the four permissions and grants them by role
-✓ requests migration is additive and idempotent
-✓ requests migration down removes only the four
-✓ the migration grants what the seeder grants
-  ... plus the 6 that were there
-Tests:    10 passed (75 assertions)
-```
+### 5. Docs, format, build — done
 
-The fourth is beyond the plan and is the one I would keep if only one survived:
-**it asserts the migration grants exactly what the seeder grants** for these four,
-per role. The whole incident is two sources of truth disagreeing about who holds
-what, and nothing was checking they agreed. It ends with
-`assertNotSame([], $fromSeeder['employee'])` so it cannot pass vacuously.
-
-Two things the harness made me fix, both worth recording because they would
-silently have made the tests meaningless:
-
-- **`RefreshDatabase` runs this migration**, since it lives in
-  `database/migrations/`. So the four permissions already exist in every test
-  database and `assertDatabaseMissing` failed. The helper now deletes them first,
-  which is what makes the tests exercise `up()` rather than assert the state the
-  harness built.
-- **`till_review.export` is created by the cash-reconciliation migration**, so
-  `Permission::create` for it hit a unique constraint. `firstOrCreate` instead —
-  and it is a better fixture for it, being genuinely pre-existing, exactly like the
-  live database's extras.
-
-I also broke three passing tests briefly by calling `$this->refreshDatabase()`
-inside a test; it rolls back the transaction `RefreshDatabase` is holding. The
-comparison test now reaches the "production" state by deleting the four in place.
-
-### 3. Docs — done
-
-Changed: `docs/features/customer-requests.md` and
-`docs/features/voucher-management.md` (the "run the seeder on deploy" instructions
-replaced — both now say the migration does it and that the seeder is fresh-install
-only), `docs/development/known-issues.md` (a full entry with the verification
-snippet), `DEPLOYMENT_SCRIPTS_README.md` (a "Permissions (post-deploy check)"
-section next to the `schedule:list` one from cycle 18).
-
-Both new documents carry the rule in the same words: **a new permission ships as a
-migration, never only in the seeder.**
-
-### 4. Format — done. `./vendor/bin/pint --test --dirty` → PASS.
+`docs/features/customer-requests.md` (a "Product pictures" section including the
+guest limitation), `docs/design/shop-mode/README.md` (`x-shop.photo` beside
+`x-shop.product-thumb` and when to use which), `docs/features/product-search.md`
+(the new public method). `pint --test --dirty` → PASS; `npm run build` → built.
 
 ## Verification
 
 **1. Tests**
 ```
-$ php artisan test --filter="RolePermissionGrantsTest|ShopVouchersTest|ShopRequestsTest|ShopHomeTest"
-Tests:    44 passed (270 assertions)
+$ php artisan test --filter="Shop|CustomerRequest|ProductSearch"
+Tests:    258 passed (1290 assertions)
 $ php artisan test
-Tests:    15 failed, 640 passed (2762 assertions)
+Tests:    15 failed, 653 passed (2797 assertions)
 ```
-The identical set. 640 = 636 + 4 (the plan budgeted 3; the seeder-comparison test
-is the extra).
+The identical set. 653 = 640 + 13 (11 resolver tests + 2 new request tests).
 
-**2. `php artisan migrate:status`**
+**2. Diff scope**
 ```
-2026_09_26_120000_add_customer_requests_and_voucher_permissions ... [94] Ran
+ app/Http/Controllers/CustomerRequestController.php | 41 ++    show(), seedItems(), seedProduct()
+ app/Services/CustomerRequestService.php            | 26 ++    constructor, rowsFrom()
+ app/Services/ProductSearch/ProductSearchService.php| 48 ++    the constant and the new method
 ```
+Nothing else in `app/`.
 
-**3. After the owner deploys** — not something I can do. What I could close is the
-link between the permission and the tile, which is the whole point of the fix: on
-dev, Home as the signed-in employee renders
-```
-["Stock scan","Find product","Receive delivery","Print labels",
- "Customer requests","Vouchers","Fruit & veg"]
-```
-Both tiles present, with their badges. That is the state production should reach
-once `migrate --force` runs.
+**3. Contract** — no `<script>`/`<style>` in shop views; design block `cmp`
+IDENTICAL; no stylesheet change was needed.
 
-**This ships with the next deploy's `php artisan migrate --force`. No seeder run is
-needed, and the seeder must not be run against the live database.**
+**4. Manual, dev app, on a throwaway request with one pre-order line and one
+sourcing line, deleted afterwards.**
+
+*Staff board* — zoomed in to read it:
+```
+"ZZ sourcing line, no product"  no photo wrapper at all, title flush left as before
+"Watered Down"                  the product's picture beside the title, 128×128 natural
+```
+*Detail page*: the pre-order line shows the picture, the sourcing line has no
+wrapper.
+
+*Edit page* — this is the cycle 14 gap, now closed:
+```
+items[0].product = { code: "4156", image_url: "http://…/products/001f8843…/image" }
+items[1].product = null
+1 thumbnail with a src, loaded
+```
+The seeded line shows its picture without the user re-picking the product.
+
+*Guest board*, requested with no cookies at all rather than by signing anyone out:
+```
+6 shop-photo wrappers, 6 with x-on:error="ok = false"
+srcs: 4 × https://cdn.ekoplaza.nl…   2 × http://osmanager.local/products/…/image
+GET /products/{id}/image as a guest → 302 to /login
+```
+Exactly the documented behaviour: four of the six guest pictures are supplier CDN
+URLs and load for anyone; the two POS photos redirect to login, error, and fall back
+to the placeholder.
+
+Twice the browser reported an image as not loaded when it had simply not been
+fetched yet — the hidden-tab lazy-load artifact from cycle 17d. Both figures above
+were taken after forcing a render.
+
+*Dev data*: the throwaway request and its two lines deleted; `CustomerRequest::count()`
+back to 8.
 
 ## Deviations
 
-None.
+None. Two things the plan under-specified, both recorded in their steps: the POS
+fixture needed `PRICEBUY`, `ISSERVICE` and `DISPLAY` as well as `IMAGE`, and the
+enrichment sits in `rowsFrom()` rather than `boardRows()`.
 
 ## Files changed
 
 ```
-?? database/migrations/2026_09_26_120000_add_customer_requests_and_voucher_permissions.php
- M tests/Feature/Shop/RolePermissionGrantsTest.php
+ M app/Http/Controllers/CustomerRequestController.php
+ M app/Services/CustomerRequestService.php
+ M app/Services/ProductSearch/ProductSearchService.php
+ M resources/views/shop/partials/request-row.blade.php
+ M resources/views/shop/partials/request-card.blade.php
+ M resources/views/shop/partials/requests-staff.blade.php
+ M resources/views/shop/requests.blade.php
+ M resources/views/shop/request-show.blade.php
+ M tests/Feature/Shop/ShopRequestsTest.php
  M docs/features/customer-requests.md
- M docs/features/voucher-management.md
- M docs/development/known-issues.md
- M DEPLOYMENT_SCRIPTS_README.md
+ M docs/features/product-search.md
+ M docs/design/shop-mode/README.md
+?? resources/views/components/shop/photo.blade.php
+?? tests/Feature/ProductSearchImageUrlsTest.php
 ```
-The tree was clean at the start of this cycle, so this is the whole of it.
+The tree was clean at the start of this cycle apart from an editor swap file in
+`docs/jons_docs/`, which is not mine.
 
 **Not committed, not pushed, not deployed.**
 
 ## Notes for Planner
 
-1. **I could not verify production myself.** The claim that the four names are
-   absent there is the Planner's, from a read-only check. Everything in this cycle
-   is additive and idempotent, so it is correct either way — but the post-deploy
-   check in the deploy README is what will actually confirm it, and it is worth
-   someone running the tinker snippet once after the deploy rather than assuming.
+1. **Guests get placeholders for POS-photo products**, which is stated as out of
+   scope but is now visible on the public board: two of six pictures on dev. The
+   cheapest fix, if it is wanted, is not to open `products.image` to guests but to
+   let the *board* serve the picture — the same `?w=`/`?v=` thumbnail route the F&V
+   screens use (cycles 17d/17e) could take a guest-readable variant, since a
+   112 px thumbnail of a product on a public board is not sensitive. That is a
+   decision, not an implementation detail.
 
-2. **The seeder still grants employees more than any migration does** — notably
-   `fruit_veg.manage`, `coffee.manage`, `kds.access`, `deliveries.view`,
-   `labels.view`, `categories.view`. If production is missing those too, the same
-   class of problem exists for whatever they gate, and this cycle did not look.
-   Comparing the seeder's full employee list against the live database would be a
-   short, purely read-only cycle and would find any remaining gaps in one pass.
+2. **`imageUrlsByCode()` now has three plausible callers that do not use it yet**:
+   deliveries, order review and the label queue all hold product codes and show
+   names without pictures. Nothing needs it, but it is the reason the method was
+   made public rather than left private to the requests flow.
 
-3. **`RolesAndPermissionsSeeder` is now documented as fresh-install-only in three
-   places** but nothing enforces it. A guard in the seeder — refuse to run when the
-   database already holds permissions it does not list, unless `--force` — would
-   make the rule mechanical. Worth considering; I did not add it, as it is beyond
-   this cycle and changes a tool people may be using deliberately.
+3. **The staff row wraps its title in a `shop-inline` only for pre-order lines**,
+   so the two line types now have slightly different DOM. They look identical when
+   there is no picture, but anything that later styles `.shop-req__title` by
+   position in its parent will need to know.
 
-4. **Admins bypass permission checks**, so the admin grants here change nothing
-   functional. They are for completeness, as the seeder does it, and so that any
-   future code that reads permissions directly rather than through `hasPermission`
-   sees a consistent picture.
+4. **`ShopRequestsTest`'s POS fixture is now a full `SELECT_COLUMNS` table.** Any
+   future test that exercises a page reaching `ProductSearchService` will need the
+   same; the four columns I added are easy to miss because the failure is a raw
+   `no such column` from deep inside a view render.

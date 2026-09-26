@@ -252,3 +252,16 @@ Call sites (view → current endpoint):
 
 Out of scope until those migrations: `Product::scopeSearch()`, `Product::scopeStocked()` and
 `ProductRepository::searchProducts()` stay as they are because those pages still call them.
+
+## Reusing the picture resolver
+
+`ProductSearchService::imageUrlsByCode(array $codes): array` returns `CODE => url`
+for a batch of product codes, resolved by exactly the rules the search API uses —
+POS photo (`products.image`) first, supplier CDN second, `null` if neither. A code
+that matches no product is absent from the result; an empty list runs no query.
+
+It exists so a page that already holds product codes — a customer request's lines,
+an order, a delivery — shows the same picture the staff member saw when they picked
+the product, without a second implementation of the rules. It never selects
+`PRODUCTS.IMAGE` (a mediumblob); presence is a computed `has_image` column shared
+with the search query.

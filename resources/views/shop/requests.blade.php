@@ -48,6 +48,7 @@
                                         'item' => $row['item'],
                                         'request' => $row['request'],
                                         'qty' => $qtyOf,
+                                        'image' => $row['image_url'] ?? null,
                                     ])
                                 @endforeach
                             </div>

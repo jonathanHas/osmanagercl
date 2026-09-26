@@ -53,7 +53,7 @@
                     <h2 class="shop-group-title">{{ $heading }} <small>{{ count($rows[$key]) }}</small></h2>
                     <div class="shop-reqs">
                         @foreach ($rows[$key] as $row)
-                            @include('shop.partials.request-row', ['item' => $row['item'], 'request' => $row['request']])
+                            @include('shop.partials.request-row', ['item' => $row['item'], 'request' => $row['request'], 'image' => $row['image_url'] ?? null])
                         @endforeach
                     </div>
                 </section>

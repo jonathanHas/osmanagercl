@@ -45,7 +45,14 @@ class ShopRequestsTest extends TestCase
             $table->string('REFERENCE')->nullable();
             $table->string('CATEGORY')->nullable();
             $table->decimal('PRICESELL', 10, 4)->default(0);
+            // The rest of ProductSearchService::SELECT_COLUMNS, which the picture
+            // resolver selects (cycle 21) — it never selects IMAGE itself, only
+            // LENGTH(IMAGE) through the has_image expression.
+            $table->decimal('PRICEBUY', 10, 4)->default(0);
+            $table->boolean('ISSERVICE')->default(false);
+            $table->string('DISPLAY')->nullable();
             $table->string('TAXCAT')->nullable();
+            $table->binary('IMAGE')->nullable();
         });
         $pos->create('supplier_link', function (Blueprint $table) {
             $table->string('Barcode');
@@ -54,7 +61,7 @@ class ShopRequestsTest extends TestCase
         });
 
         DB::connection('pos')->table('PRODUCTS')->insert([
-            ['ID' => 'p1', 'NAME' => 'Oat drink 1 L', 'CODE' => '5000000000017', 'REFERENCE' => 'OAT1', 'CATEGORY' => 'c1', 'PRICESELL' => 2.10, 'TAXCAT' => '001'],
+            ['ID' => 'p1', 'NAME' => 'Oat drink 1 L', 'CODE' => '5000000000017', 'REFERENCE' => 'OAT1', 'CATEGORY' => 'c1', 'PRICESELL' => 2.10, 'TAXCAT' => '001', 'IMAGE' => 'fake-jpeg-bytes'],
         ]);
     }
 
@@ -73,6 +80,30 @@ class ShopRequestsTest extends TestCase
     /**
      * A due request for "Walk-in Wendy" with one stocked line.
      */
+    /** The picture the shared resolver produces for the fixture's product. */
+    private function photoUrl(): string
+    {
+        return route('products.image', 'p1');
+    }
+
+    /** A free-text sourcing line: no product, so no picture and no placeholder. */
+    private function seedSourcingLine(): CustomerRequestItem
+    {
+        $request = CustomerRequest::factory()->create([
+            'customer_name' => 'Sourcing Sam',
+            'wanted_on' => today(),
+        ]);
+
+        return CustomerRequestItem::factory()->for($request, 'request')->create([
+            'product_code' => null,
+            'product_name' => null,
+            'description' => 'Something we do not stock',
+            'quantity' => 1,
+            'status' => CustomerRequestItem::STATUS_PENDING,
+            'position' => 1,
+        ]);
+    }
+
     private function seedDueRequest(): CustomerRequestItem
     {
         $request = CustomerRequest::factory()->create([
@@ -102,6 +133,13 @@ class ShopRequestsTest extends TestCase
         $response->assertSee('Walk-in Wendy');
         $response->assertSee('Oat milk');
         $response->assertSee('Due today');
+
+        // Cycle 21: the guest card shows the product's picture. A guest cannot
+        // load `products.image` (auth + products.view), so the img's error handler
+        // is what puts the placeholder there — assert it is wired.
+        $response->assertSee('class="shop-thumb"', false);
+        $response->assertSee('src="'.$this->photoUrl().'"', false);
+        $response->assertSee('x-on:error="ok = false"', false);
         $response->assertSee('Staff sign in');
 
         // Nothing a customer should not see, and nothing they could act on.
@@ -119,6 +157,30 @@ class ShopRequestsTest extends TestCase
         $response->assertDontSee('Search customer or item');
     }
 
+    public function test_a_sourcing_line_has_no_picture_and_no_placeholder(): void
+    {
+        $employee = $this->employee();
+        $this->seedSourcingLine();
+
+        // Sourcing lines are free text with no product behind them, so the row
+        // keeps the layout it had before cycle 21 — not even a placeholder circle.
+        // `shop-photo` is the server component's wrapper; `shop-thumb` alone would
+        // be the wrong assertion, because the New request sheet on the same page
+        // renders the Alpine thumbnail regardless.
+        $this->actingAs($employee)->get('/customer-requests')
+            ->assertOk()
+            ->assertSee('Something we do not stock')
+            ->assertDontSee('shop-photo', false);
+
+        // And the same board with a pre-order line does show one, so the assertion
+        // above is not passing merely because nothing ever emits it.
+        $this->seedDueRequest();
+
+        $this->actingAs($employee)->get('/customer-requests')
+            ->assertOk()
+            ->assertSee('shop-photo', false);
+    }
+
     public function test_staff_board_shows_actions_and_form(): void
     {
         $item = $this->seedDueRequest();
@@ -131,6 +193,10 @@ class ShopRequestsTest extends TestCase
         $response->assertSee('shop-req__date', false);
         $response->assertSee('shop-steps', false);
         $response->assertSee('#more', false);
+
+        // Cycle 21: a pre-order row shows the product's picture.
+        $response->assertSee('class="shop-thumb"', false);
+        $response->assertSee('src="'.$this->photoUrl().'"', false);
 
         // A pending line offers "Mark ordered" and can be put aside or marked
         // unavailable from the menu; there is nothing yet to undo.
@@ -218,6 +284,17 @@ class ShopRequestsTest extends TestCase
         $response->assertSee(route('customer-requests.edit', $request), false);
     }
 
+    public function test_detail_page_shows_the_picture_for_a_pre_order_line(): void
+    {
+        $item = $this->seedDueRequest();
+
+        $this->actingAs($this->employee())
+            ->get(route('customer-requests.show', $item->request))
+            ->assertOk()
+            ->assertSee('class="shop-thumb"', false)
+            ->assertSee('src="'.$this->photoUrl().'"', false);
+    }
+
     public function test_edit_page_seeds_lines_and_posts_to_update(): void
     {
         $employee = $this->employee();
@@ -230,6 +307,27 @@ class ShopRequestsTest extends TestCase
 
         $response->assertSee('x-data="shopRequestEdit(', false);
         $response->assertSee('data-search-url="'.e(route('api.products.search')).'"', false);
+
+        // Cycle 21 closes the cycle 14 gap: a seeded line carries the product
+        // object the Alpine thumbnail needs, so an edited request shows its
+        // pictures without the user re-picking every product.
+        $seeded = CustomerRequestItem::factory()->for($request, 'request')
+            ->create(['product_code' => '5000000000017', 'product_name' => 'Oat milk', 'position' => 2]);
+
+        // The seed goes through @js(), i.e. Illuminate\Support\Js::from(), which
+        // hex-escapes quotes — so the assertion has to be written the same way
+        // rather than in plain JSON.
+        $expected = trim((string) \Illuminate\Support\Js::from([
+            'product' => ['code' => '5000000000017', 'image_url' => $this->photoUrl()],
+        ]));
+        $expected = str_replace(["JSON.parse('", "')"], '', $expected);
+        $expected = trim($expected, '{}');
+
+        $this->actingAs($employee)->get(route('customer-requests.edit', $request))
+            ->assertOk()
+            ->assertSee($expected, false);
+
+        $this->assertNotNull($seeded->id);
         $response->assertSee('name="_method" value="PUT"', false);
         $response->assertSee('Save changes');
         $response->assertSee('Line statuses are changed from the board');

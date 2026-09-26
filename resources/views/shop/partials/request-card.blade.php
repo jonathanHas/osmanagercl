@@ -16,6 +16,9 @@
 @endphp
 <article class="shop-request">
     <div class="shop-request__head">
+        @if ($item->isLinkedToProduct())
+            <x-shop.photo :url="$image ?? null" :alt="$item->label()" />
+        @endif
         <div class="shop-stack shop-stack--tight">
             <span class="shop-request__item">{{ $item->label() }}</span>
             <span class="shop-request__who">{{ $request->customer_name }} &middot; {{ $qty($item->quantity) }}</span>

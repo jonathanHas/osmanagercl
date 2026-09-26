@@ -76,6 +76,9 @@
             <div class="shop-list">
                 @foreach ($customerRequest->items as $item)
                     <div class="shop-row">
+                        @if ($item->isLinkedToProduct())
+                            <x-shop.photo :url="$images[$item->product_code] ?? null" :alt="$item->label()" />
+                        @endif
                         <div class="shop-row__main">
                             <span class="shop-row__title">{{ $item->label() }}</span>
                             <span class="shop-row__meta">

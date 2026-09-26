@@ -6,6 +6,7 @@ use App\Models\CustomerRequest;
 use App\Models\CustomerRequestItem;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\ProductSearch\ProductSearchService;
 use DomainException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,10 @@ use Illuminate\Support\Facades\DB;
  */
 class CustomerRequestService
 {
+    public function __construct(
+        private ProductSearchService $productSearch,
+    ) {}
+
     /**
      * Create a request with its lines. Lines that reference a POS product get
      * the current product name snapshotted so the request stays readable if
@@ -261,14 +266,29 @@ class CustomerRequestService
     }
 
     /**
-     * @return list<array{item: CustomerRequestItem, request: CustomerRequest}>
+     * Rows for the board, each with the product's picture URL.
+     *
+     * The picture is resolved by the same service the product search uses, so the
+     * board shows what the staff member saw when they picked the product. One
+     * batched lookup for the whole board; a sourcing line has no code and gets null.
+     *
+     * @return list<array{item: CustomerRequestItem, request: CustomerRequest, image_url: string|null}>
      */
     private function rowsFrom($items): array
     {
-        return $items
+        $rows = $items
             ->map(fn (CustomerRequestItem $item) => ['item' => $item, 'request' => $item->request])
             ->filter(fn (array $row) => $row['request'] !== null)
-            ->values()
+            ->values();
+
+        $urls = $this->productSearch->imageUrlsByCode(
+            $rows->pluck('item.product_code')->all()
+        );
+
+        return $rows
+            ->map(fn (array $row) => $row + [
+                'image_url' => $row['item']->product_code ? ($urls[$row['item']->product_code] ?? null) : null,
+            ])
             ->all();
     }
 

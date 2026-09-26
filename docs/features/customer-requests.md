@@ -100,6 +100,22 @@ No environment variables. One permission:
 
 **Deploy step**: none beyond `php artisan migrate --force`. The permission is created and granted by migration `2026_09_26_120000_add_customer_requests_and_voucher_permissions.php`. It is also in `RolesAndPermissionsSeeder`, but the seeder is for **fresh installs only** — it must never be run against the live database, which holds permissions the seeder does not list. Until that migration existed this section said to run the seeder on deploy, nobody did, and the permission was simply absent on production, so the Home tile was invisible to everyone (2026-09-26).
 
+## Product pictures
+
+Every pre-order line shows the product's picture — on the staff board, the public
+guest board, the detail page's item list, and the edit page's seeded lines. Sourcing
+lines are free text with no product behind them and show nothing, not even a
+placeholder, so their layout is unchanged.
+
+The picture is resolved by `ProductSearchService::imageUrlsByCode()`, the same rules
+the product search uses (POS photo first, supplier CDN second), so a line shows what
+the staff member saw when they picked the product. One batched lookup per board.
+
+**Guests see supplier pictures only.** `products.image` requires `auth` and
+`products.view`, so on the public board a POS-photo product's `<img>` gets a login
+redirect, errors, and falls back to the placeholder. Supplier CDN URLs work for
+everyone. Making POS photos guest-readable is a separate decision.
+
 ## Usage
 
 ### User Perspective

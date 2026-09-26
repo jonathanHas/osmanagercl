@@ -40,6 +40,12 @@ class ProductSearchService
     /** All-digit tokens at least this long are treated as code fragments, never words. */
     private const CODE_TOKEN_LENGTH = 4;
 
+    /**
+     * Whether the POS row carries a photo, without reading the mediumblob.
+     * Shared by the search query and imageUrlsByCode() so the two cannot diverge.
+     */
+    private const HAS_IMAGE_EXPRESSION = '(CASE WHEN PRODUCTS.IMAGE IS NOT NULL AND LENGTH(PRODUCTS.IMAGE) > 0 THEN 1 ELSE 0 END) as has_image';
+
     private const SELECT_COLUMNS = [
         'PRODUCTS.ID', 'PRODUCTS.CODE', 'PRODUCTS.REFERENCE', 'PRODUCTS.NAME', 'PRODUCTS.DISPLAY',
         'PRODUCTS.CATEGORY', 'PRODUCTS.TAXCAT', 'PRODUCTS.PRICESELL', 'PRODUCTS.PRICEBUY', 'PRODUCTS.ISSERVICE',
@@ -152,7 +158,7 @@ class ProductSearchService
     {
         $query = Product::query()
             ->select(self::SELECT_COLUMNS)
-            ->addSelect(DB::raw('(CASE WHEN PRODUCTS.IMAGE IS NOT NULL AND LENGTH(PRODUCTS.IMAGE) > 0 THEN 1 ELSE 0 END) as has_image'));
+            ->addSelect(DB::raw(self::HAS_IMAGE_EXPRESSION));
 
         if ($criteria->stocked) {
             // Plain JOIN: the only stocked filter that can use an index (see class docblock).
@@ -458,6 +464,46 @@ class ProductSearchService
         }
 
         return $cache;
+    }
+
+    /**
+     * Picture URLs for a set of product codes, resolved exactly as the search API
+     * resolves them — POS photo first, supplier CDN second, null if neither.
+     *
+     * For pages that already hold product codes (a customer request's lines, an
+     * order, a delivery) and want the same picture the staff member saw when they
+     * picked the product. One query for the products plus one batched supplier-cache
+     * lookup, whatever the number of codes.
+     *
+     * A code that matches no product is simply absent from the result.
+     *
+     * @param  array<int, string|null>  $codes
+     * @return array<string, string|null> CODE => url or null
+     */
+    public function imageUrlsByCode(array $codes): array
+    {
+        $codes = array_values(array_unique(array_filter($codes, fn ($c) => $c !== null && $c !== '')));
+
+        if ($codes === []) {
+            return [];
+        }
+
+        $products = Product::query()
+            ->select(self::SELECT_COLUMNS)
+            ->addSelect(DB::raw(self::HAS_IMAGE_EXPRESSION))
+            ->whereIn('CODE', $codes)
+            ->with('supplierLink')
+            ->get();
+
+        $cache = $this->loadSupplierImageCache($products->all());
+
+        $urls = [];
+
+        foreach ($products as $product) {
+            $urls[$product->CODE] = $this->imageUrl($product, $cache);
+        }
+
+        return $urls;
     }
 
     /**

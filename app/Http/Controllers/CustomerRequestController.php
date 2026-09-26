@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateCustomerRequestItemStatusRequest;
 use App\Models\CustomerRequest;
 use App\Models\CustomerRequestItem;
 use App\Services\CustomerRequestService;
+use App\Services\ProductSearch\ProductSearchService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -15,7 +16,10 @@ use Illuminate\View\View;
 
 class CustomerRequestController extends Controller
 {
-    public function __construct(private CustomerRequestService $service) {}
+    public function __construct(
+        private CustomerRequestService $service,
+        private ProductSearchService $productSearch,
+    ) {}
 
     /**
      * The board. Public (no auth) so the shop-floor tablet can show it;
@@ -78,7 +82,12 @@ class CustomerRequestController extends Controller
     {
         $customerRequest->load(['items.statusLogs.user', 'items.statusChanger', 'creator', 'updater', 'closer']);
 
-        return view('shop.request-show', ['customerRequest' => $customerRequest]);
+        return view('shop.request-show', [
+            'customerRequest' => $customerRequest,
+            'images' => $this->productSearch->imageUrlsByCode(
+                $customerRequest->items->pluck('product_code')->all()
+            ),
+        ]);
     }
 
     public function edit(CustomerRequest $customerRequest): View
@@ -164,6 +173,8 @@ class CustomerRequestController extends Controller
     {
         $old = old('items');
         if (is_array($old)) {
+            $urls = $this->productSearch->imageUrlsByCode(array_column($old, 'product_code'));
+
             return array_values(array_map(fn ($i) => [
                 'id' => $i['id'] ?? null,
                 'product_code' => $i['product_code'] ?? null,
@@ -172,12 +183,17 @@ class CustomerRequestController extends Controller
                 'quantity' => $i['quantity'] ?? 1,
                 'notes' => $i['notes'] ?? '',
                 'status' => $i['status'] ?? null,
+                'product' => $this->seedProduct($i['product_code'] ?? null, $urls),
             ], $old));
         }
 
         if ($customerRequest === null) {
             return [];
         }
+
+        $urls = $this->productSearch->imageUrlsByCode(
+            $customerRequest->items->pluck('product_code')->all()
+        );
 
         return $customerRequest->items->map(fn (CustomerRequestItem $i) => [
             'id' => $i->id,
@@ -187,6 +203,27 @@ class CustomerRequestController extends Controller
             'quantity' => (float) $i->quantity,
             'notes' => $i->notes ?? '',
             'status' => $i->status,
+            'product' => $this->seedProduct($i->product_code, $urls),
         ])->values()->all();
+    }
+
+    /**
+     * The shape `productImages()` expects for a seeded line, so an edited request
+     * shows its pictures without the user re-picking each product. `withKey()` in
+     * request-edit.js already passes `product` through; until now nothing set it.
+     *
+     * Keyed by code because that is what a request line stores — `productImages()`
+     * falls back from `id` to `code` (cycle 17c).
+     *
+     * @param  array<string, string|null>  $urls
+     * @return array<string, mixed>|null
+     */
+    private function seedProduct(?string $code, array $urls): ?array
+    {
+        if (! $code) {
+            return null;
+        }
+
+        return ['code' => $code, 'image_url' => $urls[$code] ?? null];
     }
 }

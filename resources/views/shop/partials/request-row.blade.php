@@ -79,7 +79,17 @@
     @endif
 
     <div class="shop-req__main">
-        <h3 class="shop-req__title">{{ $item->label() }}</h3>
+        {{-- Pre-order lines are a stocked product, so show the picture staff saw
+             when they picked it. Sourcing lines are free text: no photo, and no
+             placeholder either, so their layout is unchanged. --}}
+        @if ($item->isLinkedToProduct())
+            <span class="shop-inline">
+                <x-shop.photo :url="$image ?? null" :alt="$item->label()" />
+                <h3 class="shop-req__title">{{ $item->label() }}</h3>
+            </span>
+        @else
+            <h3 class="shop-req__title">{{ $item->label() }}</h3>
+        @endif
         <div class="shop-req__meta">
             <span>{{ $request->customer_name }} &middot; {{ $qty }}</span>
             @if ($request->customer_phone)
