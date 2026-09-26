@@ -154,6 +154,13 @@ class ShopRequestsTest extends TestCase
 
         $response->assertSee('class="shop-thumb"', false);
         $response->assertSee('x-on:error="imageFailed(p)"', false);
+
+        // The handler names must match what the module actually exposes. Cycle 14
+        // renamed pick() to pickResult() in the shared typeahead and left this
+        // call site behind, so clicking a search result did nothing.
+        $response->assertSee('@click="pickResult(p)"', false);
+        $response->assertSee('@keydown.enter.prevent="pickFirst()"', false);
+        $response->assertSee('@click="unpick()"', false);
         $response->assertDontSee('http-equiv="refresh"', false);
 
         // Search hides whole groups, not just rows, and says when nothing is left.

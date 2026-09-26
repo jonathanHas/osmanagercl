@@ -117,6 +117,49 @@ Added automatic hex decode/encode in the Zebra Label Storage UI. Common currency
 
 ## Frontend Issues
 
+### Shop Scan Camera Showed No Video
+**Status:** Fixed (2026-09-26)
+
+#### Problem
+On the Shop screens (`/shop/stock-scan`, the delivery scan, print labels), tapping the
+camera button opened the dark camera box with its reticle and then nothing happened: no
+video, no detection, and no error message. The office `/stocking` camera worked on the
+same phone, over the same HTTPS, at the same moment.
+
+#### Root Cause
+Geometry, not permissions or HTTPS. `html5-qrcode` (2.3.8) creates its `<video>` with
+`createVideoElement(parentElement.clientWidth)` and writes the result as an **inline**
+`style.width`, so a stylesheet `width: 100%` cannot override it. The Shop mounted the
+library in an empty `<div>` inside `.shop-scan__camera`, which is `display: grid` with
+`place-items: center`; `justify-items: center` makes a grid item shrink-to-fit, so the
+empty mount was 0 px wide. The video was therefore created at `width: 0px`, and the
+width the library then reports to `setupUi()` is the video's own `clientWidth`, so the
+scan region was truncated to zero and no frame was ever decoded.
+
+The office page escaped this by mounting on a full-width block with a `min-height`.
+
+The fault was invisible on dev because dev is HTTP, where the camera cannot start at
+all, and the component's catch block reported a fixed "Live scanning needs HTTPS" for
+every failure — so the one message that could have pointed at the real cause was
+never shown.
+
+#### Solution
+1. The mount is its own class, `.shop-scan__mount`, pinned over the whole camera box
+   (`position: absolute !important; inset: 0; width: 100%; height: 100%`), so what the
+   library measures is the box. The `!important` is needed because the library also
+   writes `position: relative` inline on the mount.
+2. `.shop-scan__mount video { width: 100% !important; height: 100% !important }` keeps
+   it right through orientation changes.
+3. The library's `#qr-shaded-region` overlay is hidden; the design draws its own reticle.
+4. `cameraFailureText()` now reports the actual failure — refused permission, no
+   camera, camera in use by another app, insecure origin, or the library's message.
+
+#### Lesson
+A design box that centres its children (`place-items: center`) cannot host any library
+that sizes itself from its container: the container must be pinned or otherwise given
+an explicit size first. And a catch block with one hardcoded cause hides every other
+cause — log the exception and report what it actually says.
+
 ### Bank Reconciliation Checkbox Synchronization
 **Status:** Fixed 2025-09-08
 

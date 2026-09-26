@@ -107,6 +107,11 @@ options, a recommendation, and what it does not affect. The Planner folds it
 into the next plan (or a short follow-up cycle) and moves the finding file into
 that cycle's archive folder on acceptance. A finding never edits code.
 
+A manual check in the browser exercises the action, not just the render:
+click the result, submit the form, tap the button, and watch the console.
+(Cycle 14 shipped a search result that threw on click because the check
+stopped at "results appear".)
+
 A plan the user wants to put aside before it is implemented goes to
 `docs/planImp/parked/YYYY-MM-DD-<slug>/plan.md` with `Status: PARKED` and a
 line saying how to resume. Resuming means copying it back to `plan.md`,

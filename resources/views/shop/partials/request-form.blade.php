@@ -45,7 +45,7 @@
 
         <div class="shop-list" x-show="! picked && results.length" x-cloak>
             <template x-for="p in results" :key="p.id">
-                <button class="shop-row" type="button" @click="pick(p)">
+                <button class="shop-row" type="button" @click="pickResult(p)">
                     <x-shop.product-thumb />
                     <div class="shop-row__main">
                         <span class="shop-row__title" x-text="p.name"></span>

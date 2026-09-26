@@ -113,10 +113,31 @@ export default () => ({
             const scanner = await import('../barcode-scanner');
             await scanner.startScanner(this.cameraId, (text) => this.detected(text), () => {});
         } catch (e) {
+            console.error('Shop scan: camera failed', e);
             this.cameraOpen = false;
             this.cameraWanted = false;
-            this.fail('Camera could not start. Live scanning needs HTTPS.');
+            this.fail(this.cameraFailureText(e));
         }
+    },
+
+    /**
+     * Say what actually went wrong. The old fixed "needs HTTPS" text was wrong
+     * everywhere except one case and hid a geometry fault for a whole cycle.
+     * getUserMedia rejects with a DOMException carrying one of these names; the
+     * library itself throws plain strings, which fall through to the last branch.
+     */
+    cameraFailureText(e) {
+        if (! window.isSecureContext) {
+            return 'Live scanning needs HTTPS';
+        }
+
+        switch (e?.name) {
+            case 'NotAllowedError': return 'Camera permission was refused';
+            case 'NotFoundError': return 'No camera found';
+            case 'NotReadableError': return 'Camera is in use by another app';
+        }
+
+        return 'Camera could not start: ' + (e?.message ?? String(e));
     },
 
     detected(text) {

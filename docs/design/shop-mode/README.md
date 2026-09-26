@@ -59,6 +59,8 @@ Next to the existing KDS
 
 Component API in the app
 - `<x-shop.scan-input />` — props `placeholder` (default "Scan or type a barcode"), `hint` (default "Ready — scanner listening"), `camera` (default `true`; `false` drops the camera and keyboard buttons).
+- The camera mounts in `<div class="shop-scan__mount">`, an app addition pinned absolutely over the whole `.shop-scan__camera` box, because html5-qrcode sizes its `<video>` from the element it mounts on and writes that width inline: a centred, empty grid child measures 0 px, so the video came out 0 px wide and nothing decoded. Any library that measures its own container needs the same treatment inside a `place-items: center` box. The library's own shaded overlay (`#qr-shaded-region`) is hidden so the design's reticle is the only frame.
+- A camera that cannot start shows what went wrong (`cameraFailureText()` in `resources/js/shop/scan-input.js`): refused permission, no camera, camera in use, a non-secure origin, or the library's own message.
 - It emits a `scan` event on its own root with `detail = { code }`; the screen listens with `@scan="..."` on the element wrapping it.
 - It also emits `scan-empty` (no detail) when Enter is pressed on an empty input. Pages that ignore it lose nothing; the delivery scan screen uses it so Enter confirms an open quantity prompt. This is why that screen needs no `keydown` listener on `window`: a typed barcode produces exactly one `scan`, an empty Enter exactly one `scan-empty`, so a confirm can never fire twice from one keystroke.
 - It listens on `window` for `shop-scan-done` (clears and re-focuses), `shop-scan-error` (`detail` = the message to show) and `shop-scan-saved` (reopens the camera, which stops itself on a detection).

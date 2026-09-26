@@ -22,5 +22,5 @@
     <p class="shop-scan__msg"><x-shop.icon name="alert" size="sm" /><span x-text="error"></span></p>
     {{-- html5-qrcode replaces the children of the element it mounts on, so it gets
          its own empty div; the reticle and label must survive. --}}
-    <div class="shop-scan__camera"><div :id="cameraId"></div><div class="shop-scan__reticle"></div><span class="shop-scan__camlabel">Point at the barcode</span></div>
+    <div class="shop-scan__camera"><div class="shop-scan__mount" :id="cameraId"></div><div class="shop-scan__reticle"></div><span class="shop-scan__camlabel">Point at the barcode</span></div>
 </div>

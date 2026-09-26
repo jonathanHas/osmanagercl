@@ -547,4 +547,12 @@ textarea.shop-input { min-height: 112px; padding: 14px 20px; border-radius: var(
 .shop-req__more { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; gap: var(--shop-space-2); padding: var(--shop-space-2); background: var(--shop-surface-2); box-shadow: none; }
 .shop-req__more .shop-menu__item { width: auto; padding: 0 18px; background: var(--shop-surface); }
 .shop-req__more .shop-menu__sep { width: 100%; height: 0; margin: 0; }
+/* html5-qrcode sizes its <video> from the mount's clientWidth as an inline px width
+   and sets the mount to position: relative inline, so the stylesheet cannot win on
+   either; an empty, centred grid child of .shop-scan__camera is 0 px wide, which made
+   the video 0 px wide and truncated the library's scan region to nothing. Pin the
+   mount over the whole camera box so what it measures is the box. */
+.shop-scan__mount { position: absolute !important; inset: 0; width: 100%; height: 100%; }
+.shop-scan__mount video { width: 100% !important; height: 100% !important; object-fit: cover; }
+.shop-scan__mount #qr-shaded-region { display: none; }   /* the design draws its own reticle */
 /* === APP ADDITIONS END === */

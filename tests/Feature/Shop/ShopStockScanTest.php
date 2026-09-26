@@ -101,6 +101,29 @@ class ShopStockScanTest extends TestCase
             ->assertSee('href="'.route('shop.home').'"', false);
     }
 
+    /**
+     * The camera fault of 2026-09-26: html5-qrcode sizes its <video> from the
+     * element it mounts on, as an inline px width, and the mount was an empty
+     * centred grid child, so it measured 0 px and no video ever appeared. The
+     * markup half of the fix is the mount class; the half that actually gives the
+     * mount a size is a stylesheet rule, so this test asserts on the stylesheet
+     * too. That is unusual in a feature test, and it is here because no markup
+     * assertion could have caught a fault that was entirely geometry.
+     */
+    public function test_scan_input_mounts_the_camera_in_a_sized_element(): void
+    {
+        $user = $this->userWith('employee', ['stocking.scan']);
+
+        $this->actingAs($user)->get('/shop/stock-scan')
+            ->assertOk()
+            ->assertSee('<div class="shop-scan__mount" :id="cameraId"></div>', false);
+
+        $css = file_get_contents(resource_path('css/shop.css'));
+        $additions = substr($css, strpos($css, 'APP ADDITIONS START'));
+
+        $this->assertStringContainsString('.shop-scan__mount { position: absolute !important;', $additions);
+    }
+
     public function test_barista_is_forbidden(): void
     {
         $user = $this->userWith('barista', ['kds.access']);
