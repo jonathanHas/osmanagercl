@@ -106,26 +106,28 @@
 
                 <div class="shop-list" x-show="rows.length" x-cloak>
                     <template x-for="row in sorted" :key="row.barcode">
-                        <div class="shop-row" :class="{ 'is-latest': row.barcode === latest, 'is-off': row.status === 'not_scanned' }">
+                        <div class="shop-row shop-row--wrap" :class="{ 'is-latest': row.barcode === latest, 'is-off': row.status === 'not_scanned' }">
                             <div class="shop-row__main">
                                 <span class="shop-row__meta shop-code" x-text="row.code || row.barcode"></span>
                                 <span class="shop-row__title" x-text="row.name"></span>
                             </div>
-                            <div class="shop-row__aside">
-                                <span class="shop-row__qty">
-                                    <span x-text="row.scanned ?? 0"></span><small x-text="expectedLabel(row)"></small>
-                                </span>
-                                <span class="shop-pill" :class="pill(row).tone" x-text="pill(row).text"></span>
+                            <div class="shop-row__controls">
+                                <div class="shop-row__aside">
+                                    <span class="shop-row__qty">
+                                        <span x-text="row.scanned ?? 0"></span><small x-text="expectedLabel(row)"></small>
+                                    </span>
+                                    <span class="shop-pill" :class="pill(row).tone" x-text="pill(row).text"></span>
+                                </div>
+                                <div class="shop-qty" x-show="editing === row.barcode" x-cloak>
+                                    <button class="shop-iconbtn" type="button" aria-label="One fewer" :disabled="busy" @click="adjust(row, -1)"><x-shop.icon name="minus" /></button>
+                                    <span class="shop-qty__value" x-text="row.scanned ?? 0"></span>
+                                    <button class="shop-iconbtn" type="button" aria-label="One more" :disabled="busy" @click="adjust(row, 1)"><x-shop.icon name="plus" /></button>
+                                </div>
+                                <button class="shop-iconbtn shop-iconbtn--ghost" type="button" aria-label="Correct quantity"
+                                        :aria-pressed="editing === row.barcode" @click="edit(row)">
+                                    <x-shop.icon name="pencil" />
+                                </button>
                             </div>
-                            <div class="shop-qty" x-show="editing === row.barcode" x-cloak>
-                                <button class="shop-iconbtn" type="button" aria-label="One fewer" :disabled="busy" @click="adjust(row, -1)"><x-shop.icon name="minus" /></button>
-                                <span class="shop-qty__value" x-text="row.scanned ?? 0"></span>
-                                <button class="shop-iconbtn" type="button" aria-label="One more" :disabled="busy" @click="adjust(row, 1)"><x-shop.icon name="plus" /></button>
-                            </div>
-                            <button class="shop-iconbtn shop-iconbtn--ghost" type="button" aria-label="Correct quantity"
-                                    :aria-pressed="editing === row.barcode" @click="edit(row)">
-                                <x-shop.icon name="pencil" />
-                            </button>
                         </div>
                     </template>
                 </div>

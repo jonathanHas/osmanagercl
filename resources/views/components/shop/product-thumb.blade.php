@@ -1,4 +1,4 @@
-@props(['expr' => 'p'])
+@props(['expr' => 'p', 'placeholder' => 'package'])
 {{--
     A product thumbnail with its placeholder, for any Alpine scope composed with
     `productImages()` (see `mix()`). `expr` names the product in that scope; extra
@@ -10,4 +10,4 @@
 {{-- Optional chaining matters: x-show hides the element but :src and :alt are
      still evaluated, and the expression can be null before anything is picked. --}}
 <img class="shop-thumb" x-show="hasImage({{ $expr }})" :src="{{ $expr }}?.image_url" :alt="{{ $expr }}?.name" loading="lazy" decoding="async" x-on:error="imageFailed({{ $expr }})" {{ $attributes }}>
-<span class="shop-row__lead" x-show="! hasImage({{ $expr }})"><x-shop.icon name="package" /></span>
+<span class="shop-row__lead" x-show="! hasImage({{ $expr }})"><x-shop.icon :name="$placeholder" /></span>

@@ -1,9 +1,9 @@
 # Shop mode cycle 15 — Vouchers (screen 11)
 
-Status: PARKED (2026-09-26) — not yet implemented; parked while the owner tests the deployed Shop mode (camera scan issue). To resume: copy back to docs/planImp/plan.md, set Status: READY, re-check Context against VoucherController and config/shop.php.
+Status: ACCEPTED
 Revision: 1
 Planner: Fable 5.1
-Date: 2026-09-26
+Date: 2026-09-26 (unparked 2026-09-26 after the camera fix, cycle 16)
 
 ## Goal
 
@@ -95,11 +95,11 @@ Check: `./vendor/bin/pint --test --dirty` clean; build succeeds.
 
 1. `php artisan route:list --name=shop.vouchers` → present, `vouchers.redeem`; `--name=vouchers` unchanged otherwise.
 2. `php artisan test --filter="Shop|Voucher"` → green; the contract test lists the new screen.
-3. `php artisan test` → 17 failed, the identical set; passed = 567 + 6.
+3. `php artisan test` → 17 failed, the identical set; passed = 568 + 6.
 4. `git diff app/Http/Controllers/VoucherController.php` → only `lookup()`, additive; `git diff --stat resources/views/vouchers/` → empty.
 5. Contract greps; `grep -c "route(" resources/js/shop/vouchers.js` → 0; design block `cmp` identical.
 6. `./vendor/bin/pint --test --dirty` clean; `npm run build` succeeds.
-7. Manual, dev app, on one of the two active dev vouchers or a fresh one a manager activates for the purpose: scan (or type the code and Enter) → balance, Active pill, issued line, history; tap 1 2 . 8 0 → display "12.80", "Remaining after" correct, button reads "Deduct €12.80"; Deduct → toast, balance and history update, pad clears; tap an amount above the balance → button disabled; "Use full balance" → Deduct → pill "Exhausted", note shown, pad hidden; as an employee scan an unknown code → "Voucher not active. Please ask a manager." and no pad; as a manager the same scan → pad with "Starting balance €", Activate works; on the till PC the USB scanner's `]C1` prefix is stripped and the code resolves.
+7. Manual, dev app (the camera works on dev once the browser is allowed to use it, per cycle 16; exercise every action, not just the render: tap the keys, tap Deduct, tap Use full balance), on one of the two active dev vouchers or a fresh one a manager activates for the purpose: scan (or type the code and Enter) → balance, Active pill, issued line, history; tap 1 2 . 8 0 → display "12.80", "Remaining after" correct, button reads "Deduct €12.80"; Deduct → toast, balance and history update, pad clears; tap an amount above the balance → button disabled; "Use full balance" → Deduct → pill "Exhausted", note shown, pad hidden; as an employee scan an unknown code → "Voucher not active. Please ask a manager." and no pad; as a manager the same scan → pad with "Starting balance €", Activate works; on the till PC the USB scanner's `]C1` prefix is stripped and the code resolves.
 
 ## Risks
 
@@ -107,3 +107,23 @@ Check: `./vendor/bin/pint --test --dirty` clean; build succeeds.
 - **Scanner prefixes**: CODE-128 scanners may emit `]C1`; the parser strips it. Some emit nothing; either way the bare code reaches lookup. If a scanner emits lowercase, lookup fails (codes are uppercase); the office screen has the same behaviour, so nothing new.
 - **Employees and unknown codes**: the office shows "ask a manager"; the Shop screen does the same and never renders the activate markup, and the server enforces `vouchers.manage` regardless.
 - **History size**: capped at 20; a voucher rarely has more than a handful.
+
+## Review
+
+### Revision 1 (2026-09-26, Planner)
+
+Read `implemented.md` to the end and the diffs of `VoucherController`, `config/shop.php`, `routes/web.php`, `shop.js`, the new Shop controller, `vouchers.js`, the view and the ten tests. Reran `php artisan test`: 17 failed / 579 passed, the identical pre-existing set (568 + 10 tests + 1 contract data set). Design block byte-identical; no app rules added; the office till view untouched; `lookup()` gained only additions.
+
+**Steps 1–6: pass.** The screen follows the design; the pad, remaining-after preview, full-balance shortcut, refusal handling and manager activation all behave as specified, and the implementer walked the whole employee flow on a throwaway voucher it then deleted.
+
+**Deviations.** `issued_at`/`history` built with their own queries because the relation is already ordered newest-first: **accepted, correct**. Ghost button at stack level rather than inside the card: **accepted**. Ten tests instead of six: **accepted**.
+
+**Notes for Planner.**
+1. The plan's 422 test would have tested nothing because the client guard runs first; the implementer simulated the real double-spend window instead: **accepted, and the lesson kept**: a server-refusal test must get past the client's own guard.
+2. "Sept" for September from the Irish locale: **accepted**; consistent with the platform, one character off the mock.
+3. `AuthenticationTest` flaked once in a full run: **noted**; a shared rate limiter is the likely cause; watch for an 18th failure.
+4. The office deduct/activate endpoints had no tests before this cycle: **deferred**, a small housekeeping cycle.
+5. Only one manager account on dev: **owner to check the activate path by hand** as a manager (scan an unknown or printed-but-inactive code, enter a starting balance, activate).
+6. Second session in the tree: read correctly as the side fix; no conflict.
+
+**Verdict: ACCEPTED.** Archive to `docs/planImp/archive/2026-09-26-shop-mode-cycle-15/`.

@@ -29,11 +29,39 @@ class WasteController extends Controller
     {
         $selectedDate = Carbon::parse($request->input('date', now()->toDateString()))->toDateString();
 
+        return view('fruit-veg.waste', [
+            'selectedDate' => $selectedDate,
+            'rows' => $this->rowsFor($selectedDate),
+        ]);
+    }
+
+    /**
+     * The same rows as the page, as JSON, for the Shop mode waste screen.
+     */
+    public function rows(Request $request)
+    {
+        $validated = $request->validate([
+            'date' => 'nullable|date',
+        ]);
+
+        $date = Carbon::parse($validated['date'] ?? now()->toDateString())->toDateString();
+
+        return response()->json([
+            'date' => $date,
+            'products' => $this->rowsFor($date)->values(),
+        ]);
+    }
+
+    /**
+     * The till-visible F&V range for a date, plus anything off-till already logged
+     * that day so it stays editable.
+     */
+    private function rowsFor(string $date): Collection
+    {
         $onTill = $this->tillVisibilityService->getProductsWithVisibility('fruit_veg', ['visibility' => 'visible']);
 
-        $existing = WasteLog::where('waste_date', $selectedDate)->get()->keyBy('product_code');
+        $existing = WasteLog::whereDate('waste_date', $date)->get()->keyBy('product_code');
 
-        // Off-till products already logged for this date stay visible/editable.
         $onTillCodes = $onTill->pluck('CODE')->all();
         $missingCodes = $existing->keys()->reject(fn ($code) => in_array($code, $onTillCodes))->values();
         $offTill = $missingCodes->isNotEmpty()
@@ -42,12 +70,7 @@ class WasteController extends Controller
                 ->each(fn ($p) => $p->is_visible_on_till = false)
             : collect();
 
-        $rows = $this->buildRows($onTill->concat($offTill), $existing);
-
-        return view('fruit-veg.waste', [
-            'selectedDate' => $selectedDate,
-            'rows' => $rows,
-        ]);
+        return $this->buildRows($onTill->concat($offTill), $existing);
     }
 
     /**
@@ -79,7 +102,7 @@ class WasteController extends Controller
         $unit = $validated['unit'] ?? 'kg';
 
         if ($qty <= 0) {
-            WasteLog::where('waste_date', $date)
+            WasteLog::whereDate('waste_date', $date)
                 ->where('product_code', $code)
                 ->delete();
 
@@ -91,17 +114,21 @@ class WasteController extends Controller
         $pricedUnit = ($product->vegDetails?->unit_name ?: 'kg') === 'kg' ? 'kg' : 'unit';
         $value = $unit === $pricedUnit ? round($qty * $price, 2) : null;
 
-        $entry = WasteLog::updateOrCreate(
-            ['waste_date' => $date, 'product_code' => $code],
-            [
-                'product_name' => $product->NAME,
-                'quantity' => $qty,
-                'unit' => $unit,
-                'unit_price' => round($price, 2),
-                'value' => $value,
-                'created_by' => Auth::id(),
-            ]
-        );
+        // Not updateOrCreate: its attribute array becomes `where waste_date = '<Y-m-d>'`,
+        // which a date column only matches on MySQL. SQLite compares the stored
+        // 'Y-m-d 00:00:00' as a string, misses, and then trips the unique index.
+        $entry = WasteLog::whereDate('waste_date', $date)
+            ->where('product_code', $code)
+            ->first() ?? new WasteLog(['waste_date' => $date, 'product_code' => $code]);
+
+        $entry->fill([
+            'product_name' => $product->NAME,
+            'quantity' => $qty,
+            'unit' => $unit,
+            'unit_price' => round($price, 2),
+            'value' => $value,
+            'created_by' => Auth::id(),
+        ])->save();
 
         return response()->json([
             'saved' => true,
@@ -126,7 +153,7 @@ class WasteController extends Controller
             ->take(50);
 
         $date = Carbon::parse($validated['date'] ?? now()->toDateString())->toDateString();
-        $existing = WasteLog::where('waste_date', $date)
+        $existing = WasteLog::whereDate('waste_date', $date)
             ->whereIn('product_code', $products->pluck('CODE'))
             ->get()
             ->keyBy('product_code');
@@ -201,11 +228,33 @@ class WasteController extends Controller
                 'on_till' => (bool) ($product->is_visible_on_till ?? false),
                 'current_price' => round((float) ($historyPrices->get($product->CODE) ?? $product->getGrossPrice()), 2),
                 'priced_unit' => $pricedUnit,
+                // The blob is already in memory from the product query, so this
+                // costs nothing; the URL is the office image route, and null keeps
+                // the client's placeholder.
+                'image_url' => $product->IMAGE !== null ? $this->imageUrl($product) : null,
                 'quantity' => $entry ? (float) $entry->quantity : null,
                 'unit' => $entry->unit ?? $lastUnits->get($product->CODE, $pricedUnit),
                 'value' => $entry && $entry->value !== null ? (float) $entry->value : null,
             ];
         })->values();
+    }
+
+    /**
+     * A thumbnail URL for a product that has a photo.
+     *
+     * `v` is the first 8 hex of the blob's md5 — derived from the photo itself, so
+     * it is the same on every server and survives a deploy, and it changes the
+     * moment the photo does. The route sends a week-long cache lifetime only when
+     * `v` matches what it holds, so a warm screen costs nothing and a replaced
+     * photo is fetched at once.
+     */
+    private function imageUrl(Product $product): string
+    {
+        return route('fruit-veg.product-image', [
+            'code' => $product->CODE,
+            'w' => 112,
+            'v' => substr(md5($product->IMAGE), 0, 8),
+        ]);
     }
 
     /**

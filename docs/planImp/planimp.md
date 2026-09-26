@@ -101,6 +101,12 @@ When the work is accepted, set `Status: ACCEPTED` and tell the user to
 archive: `mkdir -p docs/planImp/archive/YYYY-MM-DD-<slug>` and move both
 `plan.md` and `implemented.md` there. The next task starts with empty files.
 
+A small fix that must not wait for the current cycle can run beside it as a
+side plan: `docs/planImp/plan-<slug>.md`, reported in
+`docs/planImp/implemented-<slug>.md`, reviewed and archived like any cycle.
+The side plan names the files it touches so the two implementer sessions
+cannot collide; the kickoff prompt names the file.
+
 Something found after a cycle is accepted (a browser check, a later thought)
 goes in `docs/planImp/findings/YYYY-MM-DD-<slug>.md`: what happened, why, the
 options, a recommendation, and what it does not affect. The Planner folds it
@@ -184,6 +190,10 @@ Do:
   verified.
 - Run the full `## Verification` section at the end and record the output,
   including failures.
+- A file the plan marks `(new)` is still checked before you write it. Look
+  first; if it exists, extend it and say so in Deviations. (Cycle 17d
+  overwrote an existing test file on the strength of the label and had to
+  recover it from git.)
 - Deviate from the plan only when a step is impossible or clearly wrong as
   written. Make the smallest deviation that unblocks you, and record it
   under `## Deviations` with the reason. If the deviation would change

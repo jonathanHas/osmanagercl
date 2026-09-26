@@ -77,6 +77,14 @@ Route::middleware('auth')->group(function () {
         Route::get('/labels', [\App\Http\Controllers\Shop\LabelsController::class, 'index'])
             ->middleware('permission:labels.print')
             ->name('labels');
+        Route::get('/vouchers', [\App\Http\Controllers\Shop\VouchersController::class, 'index'])
+            ->middleware('permission:vouchers.redeem')
+            ->name('vouchers');
+
+        Route::middleware('permission:fruit_veg.operate')->group(function () {
+            Route::get('/fv/waste', [\App\Http\Controllers\Shop\FruitVegController::class, 'waste'])->name('fv.waste');
+            Route::get('/fv/harvest', [\App\Http\Controllers\Shop\FruitVegController::class, 'harvest'])->name('fv.harvest');
+        });
 
         Route::middleware('permission:deliveries.process')->group(function () {
             Route::get('/deliveries', [\App\Http\Controllers\Shop\DeliveryController::class, 'index'])->name('deliveries');
@@ -474,12 +482,14 @@ Route::middleware('auth')->group(function () {
         // Harvest log (own-farm produce, records only)
         Route::get('/harvest', [HarvestController::class, 'index'])->name('harvest')->middleware('permission:fruit_veg.operate');
         Route::post('/harvest/row', [HarvestController::class, 'saveRow'])->name('harvest.save-row')->middleware('permission:fruit_veg.operate');
+        Route::get('/harvest/rows', [HarvestController::class, 'rows'])->name('harvest.rows')->middleware('permission:fruit_veg.operate');
         Route::get('/harvest/history', [HarvestController::class, 'history'])->name('harvest.history')->middleware('permission:fruit_veg.operate');
         Route::delete('/harvest/{harvest}', [HarvestController::class, 'destroy'])->name('harvest.destroy')->middleware('permission:fruit_veg.operate');
 
         // Waste log (till-visible F&V range + full-range search, instant save)
         Route::get('/waste', [WasteController::class, 'index'])->name('waste')->middleware('permission:fruit_veg.operate');
         Route::post('/waste/entry', [WasteController::class, 'entry'])->name('waste.entry')->middleware('permission:fruit_veg.operate');
+        Route::get('/waste/rows', [WasteController::class, 'rows'])->name('waste.rows')->middleware('permission:fruit_veg.operate');
         Route::get('/waste/search', [WasteController::class, 'search'])->name('waste.search')->middleware('permission:fruit_veg.operate');
         Route::get('/waste/history', [WasteController::class, 'history'])->name('waste.history')->middleware('permission:fruit_veg.operate');
         Route::delete('/waste/{wasteLog}', [WasteController::class, 'destroy'])->name('waste.destroy')->middleware('permission:fruit_veg.operate');

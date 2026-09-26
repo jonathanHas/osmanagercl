@@ -182,6 +182,16 @@ class ShopDeliveryTest extends TestCase
         $response->assertSee('shop-scan__input', false);
         $response->assertSee('New first');
         $response->assertSee('href="'.e(route('shop.deliveries')).'"', false);
+
+        // The row's controls wrap under the name on a phone; the fault was geometry.
+        $response->assertSee('class="shop-row shop-row--wrap"', false);
+        $response->assertSee('class="shop-row__controls"', false);
+
+        $css = file_get_contents(resource_path('css/shop.css'));
+        $additions = substr($css, strpos($css, 'APP ADDITIONS START'));
+
+        $this->assertStringContainsString('.shop-row--wrap { flex-wrap: wrap; }', $additions);
+        $this->assertMatchesRegularExpression('/\.shop-row__controls \{[^}]*flex-wrap: wrap;/', $additions);
     }
 
     public function test_completed_session_hides_the_scan_input(): void

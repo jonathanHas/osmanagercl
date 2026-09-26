@@ -117,6 +117,55 @@ Added automatic hex decode/encode in the Zebra Label Storage UI. Common currency
 
 ## Frontend Issues
 
+### Waste and Harvest Day Lookups Only Worked on MySQL
+**Status:** Fixed (2026-09-26)
+
+#### Problem
+`WasteLogTest::entry_updates_the_same_day_row_instead_of_duplicating` and
+`zero_quantity_deletes_the_entry` had been failing for months, and were carried in the
+suite's list of known failures. Nothing was wrong in production.
+
+#### Root Cause
+`WasteController` and `HarvestController` looked a day's row up with
+`where('waste_date', '2026-09-26')` against a column the model casts to `date`, so the
+stored value is `2026-09-26 00:00:00`. MySQL's DATE column coerces the string and
+matches. SQLite stores and compares it as text, so the lookup misses — and because the
+miss happened inside `updateOrCreate()` / `firstOrNew()`, the code then tried to
+*insert* a second row for the same day and hit the `UNIQUE (date, product_code)` index.
+
+So the tests were right and the code was wrong; it simply could not fail on the
+production engine.
+
+#### Solution
+Every equality predicate on those columns is now `whereDate()`, which compiles to
+`date(col)` on MySQL and `strftime('%Y-%m-%d', col)` on SQLite. `updateOrCreate` and
+`firstOrNew` could not just take a `whereDate`, because the broken comparison lives
+inside their attribute array, so both became an explicit
+`whereDate(...)->where(...)->first() ?? new Model([...])` followed by `fill()->save()`.
+
+Range predicates (`where('harvest_date', '>=', $ymd)`) are left alone: they are correct
+on both, because `'2026-08-27 00:00:00' >= '2026-08-27'` holds as a string comparison.
+
+#### Lesson
+Comparing a `date`-cast column with a `Y-m-d` string is an engine-specific behaviour,
+not a portable one. Use `whereDate()`. And a test that has "always failed" is worth
+reading before it is written off as environmental — these two were describing a real
+defect the whole time.
+
+### Relations From a `mysql`-Pinned Model Inherit That Connection
+**Status:** Noted (2026-09-26)
+
+A model with `protected $connection = 'mysql'` (`Harvest`, `WasteLog`) passes that
+connection to any related model that does not declare its own — so `$harvest->creator`
+looks for `users` on the `mysql` connection. In production that is the same database,
+because `config/database.php` has `'default' => env('DB_CONNECTION', 'mysql')`. Under
+test the default is sqlite while `mysql` is repointed to a separate in-memory database,
+so the relation fails with `no such table: users`.
+
+Query the related model directly (`User::whereIn('id', ...)->pluck('name', 'id')`)
+rather than through the relation when a pinned model needs to reach an unpinned one.
+Identical in production, correct in both.
+
 ### Shop Scan Camera Showed No Video
 **Status:** Fixed (2026-09-26)
 

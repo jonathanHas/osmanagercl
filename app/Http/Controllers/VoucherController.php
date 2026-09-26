@@ -78,7 +78,61 @@ class VoucherController extends Controller
             'status' => $voucher->status,
             'initial_value' => (float) $voucher->initial_value,
             'current_balance' => (float) $voucher->current_balance,
+            'issued_at' => $this->issuedAt($voucher),
+            'history' => $this->history($voucher),
         ]);
+    }
+
+    /**
+     * When the voucher was first loaded with a balance. A reactivated voucher has
+     * more than one `issue` row, so take the earliest: `transactions()` is ordered
+     * newest-first, and a second orderBy would append rather than replace it, so
+     * this asks its own question.
+     */
+    private function issuedAt(Voucher $voucher): ?string
+    {
+        $first = VoucherTransaction::where('voucher_id', $voucher->id)
+            ->where('type', VoucherTransaction::TYPE_ISSUE)
+            ->orderBy('created_at')
+            ->first();
+
+        return $first?->created_at?->toIso8601String();
+    }
+
+    /**
+     * The voucher's recent movements, newest first, for the Shop screen.
+     *
+     * `amount` is signed for display — money on is positive, money off negative,
+     * and a status change carries no money at all. The decimal:2 casts hand back
+     * strings, so everything is cast to float here rather than in the client.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function history(Voucher $voucher): array
+    {
+        return $voucher->transactions()
+            ->with('user')
+            ->limit(20)
+            ->get()
+            ->map(fn (VoucherTransaction $t) => [
+                'type' => $t->type,
+                'label' => match ($t->type) {
+                    VoucherTransaction::TYPE_ISSUE => 'Issued',
+                    VoucherTransaction::TYPE_DEDUCT => 'Redeemed',
+                    VoucherTransaction::TYPE_DEACTIVATE => 'Deactivated',
+                    VoucherTransaction::TYPE_ACTIVATE => 'Reactivated',
+                    default => ucfirst($t->type),
+                },
+                'amount' => match ($t->type) {
+                    VoucherTransaction::TYPE_ISSUE => (float) $t->amount,
+                    VoucherTransaction::TYPE_DEDUCT => -(float) $t->amount,
+                    default => 0.0,
+                },
+                'balance_after' => (float) $t->balance_after,
+                'user' => $t->user?->name ?? 'Office',
+                'at' => $t->created_at?->toIso8601String(),
+            ])
+            ->all();
     }
 
     /**

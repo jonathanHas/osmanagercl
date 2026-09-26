@@ -8,19 +8,30 @@
  * Composed into an Alpine data object with mix(): `mix(productImages(), {…})`.
  */
 export default () => ({
-    // Product ids whose image would not load; keyed so a miss is per-row.
+    // Products whose image would not load; keyed so a miss is per-row.
     failed: {},
 
+    /**
+     * The search API's products carry `id`; the fruit & veg rows are built from POS
+     * products and carry `code` instead. `id` wins where both exist, so nothing
+     * that worked before changes key.
+     */
+    key(p) {
+        return p?.id ?? p?.code ?? null;
+    },
+
     hasImage(p) {
-        return !! p?.image_url && ! this.failed[p.id];
+        return !! p?.image_url && ! this.failed[this.key(p)];
     },
 
     imageFailed(p) {
-        if (! p?.id) {
+        const k = this.key(p);
+
+        if (k === null) {
             return;
         }
 
         // Reassigned rather than mutated so Alpine sees the change.
-        this.failed = { ...this.failed, [p.id]: true };
+        this.failed = { ...this.failed, [k]: true };
     },
 });

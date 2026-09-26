@@ -44,6 +44,34 @@ On scan, the screen looks up the code and shows one of:
 - **Balance + Deduct** (`active`) — shows the balance with a deduct field (and "use full balance").
 - **Deactivated** / **Exhausted** — an informational message.
 
+## Shop mode screen (`/shop/vouchers`)
+
+The shop-floor version of the same job, for staff on the counter tablet
+(`resources/views/shop/vouchers.blade.php`, `resources/js/shop/vouchers.js`,
+`App\Http\Controllers\Shop\VouchersController`). It calls the **same three
+endpoints** — nothing about redemption is duplicated — and adds no rules of its own.
+
+What it shows: the balance as a big number with a status pill, an "Issued … · code"
+line, the voucher's recent history, and a number pad for the amount with a running
+"Remaining after". "Use full balance" fills the pad. A manager who scans an unknown
+or inactive code gets the pad labelled "Starting balance €" and an Activate button;
+an employee gets "Voucher not active. Please ask a manager." and no pad, because the
+view is rendered without an activate URL and without the activate markup. The route
+requires `vouchers.redeem`; `vouchers.activate` still enforces `vouchers.manage`
+server side regardless of what the page offers.
+
+After a successful deduct or activate the screen re-runs the lookup, so the balance,
+status and history on screen are what the server recorded rather than what the client
+predicted — and a 422 (another till spent the voucher first) replaces the balance with
+the true one and disables the button without a rescan.
+
+`vouchers.lookup` gained two keys for this screen, **additively**, so the office till
+screen is unaffected:
+- `issued_at` — ISO timestamp of the earliest `issue` transaction, or null.
+- `history` — up to 20 transactions, newest first, each `{ type, label, amount,
+  balance_after, user, at }`. `amount` is signed for display (issue positive, deduct
+  negative, status changes zero) and `user` is the staff name or "Office".
+
 ### Double-spend protection
 
 `VoucherController::deduct()` (and `activate()`) wrap the read-modify-write in a database transaction with `lockForUpdate()` row locking. The balance is re-read under the lock and the deduct is rejected if it exceeds the remaining balance — so two concurrent tills cannot each spend the last of a voucher. At €0 the status flips to `exhausted`. Deactivated/inactive/exhausted vouchers are rejected.
@@ -79,6 +107,7 @@ Employees get a cut-down till screen: they can ring up a voucher payment but can
 | Route | Verb / path | Access |
 |---|---|---|
 | `vouchers.index` | GET `/vouchers` | redeem |
+| `shop.vouchers` | GET `/shop/vouchers` | redeem |
 | `vouchers.lookup` | POST `/vouchers/lookup` | redeem |
 | `vouchers.deduct` | POST `/vouchers/deduct` | redeem |
 | `vouchers.activate` | POST `/vouchers/activate` | manage |
@@ -90,7 +119,7 @@ Employees get a cut-down till screen: they can ring up a voucher payment but can
 
 ## Key files
 
-- **Controller**: `app/Http/Controllers/VoucherController.php`
+- **Controller**: `app/Http/Controllers/VoucherController.php`, `app/Http/Controllers/Shop/VouchersController.php`
 - **Models**: `app/Models/Voucher.php`, `app/Models/VoucherTransaction.php`
 - **Migrations**: `database/migrations/2026_06_24_120000_create_vouchers_table.php`, `..._120001_create_voucher_transactions_table.php`, `2026_06_25_120000_add_note_to_voucher_transactions_table.php`
 - **Views**: `resources/views/vouchers/{index,list,generate,print,transactions}.blade.php`

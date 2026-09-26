@@ -219,6 +219,41 @@ Inline quick-log for recording spoiled/discarded produce with live value totals.
 - Routes: `fruit-veg.waste`, `fruit-veg.waste.entry` (POST), `fruit-veg.waste.search`, `fruit-veg.waste.history`, `fruit-veg.waste.destroy`
 - Product scope/search via `TillVisibilityService::getProductsWithVisibility()` / `searchAllProductsWithVisibility()`; prices batch-loaded from `veg_price_history` (latest per code) with `Product::getGrossPrice()` fallback
 
+### 12. Harvest Log (own-farm produce)
+Records what Jon picks. Jon's range is every POS product whose `CODE` appears in `supplier_link` for `config('suppliers.jon')`.
+
+- **Saves accumulate**: `harvest.save-row` *adds* the submitted amount to whatever is already logged for that (date, product), unlike the waste log which replaces. Over-logging is corrected by deleting the day's line in history.
+- **Unit remembered per product**: `harvest_product_units` stores `kg` or `unit` per code and is updated on every save; it is the default the next time that product is picked.
+- **One row per day**: `UNIQUE (harvest_date, product_code)`.
+- Controller `HarvestController` (`index`, `rows`, `saveRow`, `history`, `destroy`); models `Harvest`, `HarvestProductUnit`.
+
+### Shop mode (2026-09-26)
+
+Both logs have shop-floor screens for staff on the counter tablet, on the existing endpoints:
+
+| Screen | URL | Module | Reads | Writes |
+|---|---|---|---|---|
+| Waste log | `/shop/fv/waste` | `resources/js/shop/fv-waste.js` | `fruit-veg.waste.rows`, `fruit-veg.waste.search` | `fruit-veg.waste.entry` |
+| Harvest | `/shop/fv/harvest` | `resources/js/shop/fv-harvest.js` | `fruit-veg.harvest.rows` | `fruit-veg.harvest.save-row` |
+
+Both require `fruit_veg.operate` only — the Home tile previously asked for `fruit_veg.manage` and opened the office availability page, which is why shop-floor staff could not reach either log. The two screens share a segmented nav; Availability and F&V labels join it when those screens exist.
+
+**The two write semantics are opposite, and the screens differ because of it.** Waste *replaces* the day's row, so the Shop screen adds client-side and sends today's total plus the new amount; a unit change therefore replaces rather than adds, and the screen says so before you tap Log. Harvest *accumulates*, so the Shop screen sends only the new amount and then re-reads, because the server also stamps the time and the user. Removing a waste entry is a save of zero; harvest corrections stay on the office history page.
+
+The Shop harvest screen lists **recent picks** by default — the same set the office page shows as rows, i.e. anything harvested in the last 30 days plus anything logged today — and searching reaches Jon's whole range, matching the office page's "Add a product" search. Logging a product found by search promotes it to a recent pick immediately, because the save is followed by a re-read. With no harvest in the last 30 days the screen shows "Nothing harvested recently" and points at the search, as the office page does.
+
+`fruit-veg.product-image` takes an optional `?w=`, honoured for **112** and **224** only (`ProductThumbnailService::SIZES`); anything else is ignored rather than refused, so the office pages, which pass no `w`, get the stored blob byte-for-byte as before. A size returns a square JPEG at quality 80, cached on the `local` disk at `fv-thumbs/<md5(code)>-<size>-<md5(blob)>.jpg`. The blob's hash is in the key, so replacing a product photo can never serve the old thumbnail: the new blob hashes to a new key and the stale file is simply never asked for again, so there is normally nothing to clear. Nothing in the folder is authoritative and it rebuilds on demand if emptied — but note the web server creates it, so on a normal deployment it is owned by `www-data` and removing it needs `sudo rm -rf storage/app/private/fv-thumbs`, not a plain `rm`. A blob the encoder cannot read, or a host without GD, falls back to the full image rather than failing. The office pages can adopt `?w=224` whenever someone wants to.
+
+A thumbnail request may also carry `?v=` — the first 8 hex of the photo's md5, which the rows endpoints put in `image_url`. When `v` matches the stored photo the response is `Cache-Control: public, max-age=604800, immutable`, so a warm screen re-opens with no image requests at all; the same header goes on the 304, so a client that revalidates once is not dropped back to asking every time. Replacing a photo changes `v`, so the browser asks for a different URL rather than being told a stale one is still good. A `v` that does not match is treated as absent and the current thumbnail is served with the short-lived headers, so a guessed or stale link can never pin a picture for a week. Versioning applies to thumbnails only: the full-size URL the office pages use carries no hash, so a long lifetime there could pin a replaced photo.
+
+Both Shop screens show the product picture on every choice tile and Today row that has one, and a carrot placeholder where there is none. The pictures are the ones the office pages already show: `PRODUCTS.IMAGE`, served by `fruit-veg.product-image`. The rows endpoints carry `image_url` — the route URL when the product has a blob, `null` when it does not — so a product with no picture is never requested at all. That matters because the route answers `200 image/png` either way, returning a 1x1 transparent PNG for a missing image, so the client cannot tell the two apart from the response. The blob is already loaded by the product query, so the check costs no extra query.
+
+Waste reasons are not recorded — there is no column for them. The design mock shows a Reason step; adding it is a migration and a later cycle.
+
+`fruit-veg.waste.rows` and `fruit-veg.harvest.rows` are read-only JSON views of exactly what the office pages render (harvest without the Zebra label payloads). The office pages and these endpoints share the extracted `WasteController::rowsFor()` and `HarvestController::dataFor()`.
+
+**Both controllers use `whereDate()` for day lookups.** Comparing a `date`-cast column against a `Y-m-d` string works on MySQL, which coerces, but not on SQLite, which compares `'2026-09-26 00:00:00'` as a string and misses — so `updateOrCreate`/`firstOrNew` would create a duplicate and trip the unique index. Range predicates (`>=`) are unaffected and are left alone.
+
 ## Technical Implementation
 
 ### Database Structure

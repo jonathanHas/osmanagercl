@@ -11,12 +11,15 @@
 import deliveryScan from './shop/delivery-scan';
 import deliverySummary from './shop/delivery-summary';
 import findProduct from './shop/find-product';
+import fvHarvest from './shop/fv-harvest';
+import fvWaste from './shop/fv-waste';
 import labels from './shop/labels';
 import requestEdit from './shop/request-edit';
 import requestForm from './shop/requests';
 import requestsBoard from './shop/requests-board';
 import scanInput from './shop/scan-input';
 import stockScan from './shop/stock-scan';
+import vouchers from './shop/vouchers';
 
 document.addEventListener('alpine:init', () => {
     Alpine.data('shopScanInput', scanInput);
@@ -28,4 +31,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('shopRequestForm', requestForm);
     Alpine.data('shopRequestEdit', requestEdit);
     Alpine.data('shopRequestsBoard', requestsBoard);
+    Alpine.data('shopVouchers', vouchers);
+    Alpine.data('shopFvWaste', fvWaste);
+    Alpine.data('shopFvHarvest', fvHarvest);
 });

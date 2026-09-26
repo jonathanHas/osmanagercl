@@ -6,6 +6,7 @@ use App\Models\Harvest;
 use App\Models\HarvestProductUnit;
 use App\Models\Product;
 use App\Models\SupplierLink;
+use App\Models\User;
 use App\Models\ZebraLabel;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -24,6 +25,71 @@ class HarvestController extends Controller
     {
         $selectedDate = Carbon::parse($request->input('date', now()->toDateString()))->toDateString();
 
+        $data = $this->dataFor($selectedDate);
+
+        return view('fruit-veg.harvest', [
+            'selectedDate' => $selectedDate,
+            'rows' => $data['rows'],
+            'availableProducts' => $data['available'],
+        ]);
+    }
+
+    /**
+     * The same rows as the page, as JSON, for the Shop mode harvest screen.
+     *
+     * Zebra label payloads are dropped: the Shop screen does not print.
+     */
+    public function rows(Request $request)
+    {
+        $validated = $request->validate([
+            'date' => 'nullable|date',
+        ]);
+
+        $date = Carbon::parse($validated['date'] ?? now()->toDateString())->toDateString();
+        $data = $this->dataFor($date);
+
+        $logged = Harvest::whereDate('harvest_date', $date)->get()->keyBy('product_code');
+
+        // Not ->with('creator'): Harvest is pinned to 'mysql' and User is not, so
+        // the relation would inherit 'mysql' from its parent. That is the same
+        // database in production, where 'mysql' is the default connection, but not
+        // under test, where the default is sqlite and 'mysql' is repointed.
+        // Querying User on its own connection is right on both.
+        $names = User::whereIn('id', $logged->pluck('created_by')->filter()->unique()->all())
+            ->pluck('name', 'id');
+
+        return response()->json([
+            'date' => $date,
+            'rows' => collect($data['rows'])->map(function ($row) use ($logged, $names) {
+                $entry = $logged->get($row['code']);
+
+                return [
+                    'code' => $row['code'],
+                    'name' => $row['name'],
+                    'unit' => $row['unit'],
+                    'image_url' => $row['image_url'],
+                    'logged' => $row['logged'],
+                    'updated_at' => $entry?->updated_at?->toIso8601String(),
+                    'by' => $entry?->created_by ? $names->get($entry->created_by) : null,
+                ];
+            })->values(),
+            'available' => collect($data['available'])->map(fn ($p) => [
+                'code' => $p['code'],
+                'name' => $p['name'],
+                'unit' => $p['unit'],
+                'image_url' => $p['image_url'],
+            ])->values(),
+        ]);
+    }
+
+    /**
+     * Rows to show for a date (recently harvested ∪ already logged that day) and
+     * the rest of Jon's range, shared by the office page and the Shop screen.
+     *
+     * @return array{rows: \Illuminate\Support\Collection, available: \Illuminate\Support\Collection}
+     */
+    private function dataFor(string $selectedDate): array
+    {
         // Saved per-product unit preference (kg|unit); defaults to kg when unset.
         $unitPrefs = HarvestProductUnit::pluck('unit', 'product_code');
 
@@ -44,12 +110,13 @@ class HarvestController extends Controller
                 'name' => $p->NAME,
                 'category' => $p->CATEGORY,
                 'unit' => $unitPrefs->get($p->CODE, 'kg'),
+                'image_url' => $p->IMAGE !== null ? $this->imageUrl($p) : null,
                 'label' => $this->labelPayload($labels->get($p->CODE)),
             ],
         ]);
 
         // Quantities already logged for the selected date (prefill).
-        $existingForDate = Harvest::where('harvest_date', $selectedDate)
+        $existingForDate = Harvest::whereDate('harvest_date', $selectedDate)
             ->get()
             ->keyBy('product_code');
 
@@ -70,6 +137,7 @@ class HarvestController extends Controller
             'code' => $code,
             'name' => $productLookup[$code]['name'],
             'unit' => $productLookup[$code]['unit'],
+            'image_url' => $productLookup[$code]['image_url'],
             'logged' => (float) (optional($existingForDate->get($code))->quantity ?? 0),
             'label' => $productLookup[$code]['label'],
         ])->values();
@@ -79,11 +147,7 @@ class HarvestController extends Controller
             ->reject(fn ($p, $code) => $rowCodes->contains($code))
             ->values();
 
-        return view('fruit-veg.harvest', [
-            'selectedDate' => $selectedDate,
-            'rows' => $rows,
-            'availableProducts' => $availableProducts,
-        ]);
+        return ['rows' => $rows, 'available' => $availableProducts];
     }
 
     /**
@@ -127,10 +191,11 @@ class HarvestController extends Controller
 
         // Accumulate onto any existing line for the date (single-user store, so
         // a plain read-add-save is safe).
-        $harvest = Harvest::firstOrNew([
-            'harvest_date' => $date,
-            'product_code' => $code,
-        ]);
+        // Not firstOrNew: its attribute array becomes `where harvest_date = '<Y-m-d>'`,
+        // which a date column only matches on MySQL (see WasteController::entry).
+        $harvest = Harvest::whereDate('harvest_date', $date)
+            ->where('product_code', $code)
+            ->first() ?? new Harvest(['harvest_date' => $date, 'product_code' => $code]);
 
         $harvest->fill([
             'product_name' => $product->NAME,
@@ -186,6 +251,20 @@ class HarvestController extends Controller
      * than a whereHas() correlated subquery against the large PRODUCTS table —
      * the latter takes ~27s, this takes ~30ms.
      */
+    /**
+     * A thumbnail URL for a product that has a photo. See the matching helper on
+     * WasteController: `v` is derived from the blob, so the URL changes when the
+     * photo does and the route can cache it for a week.
+     */
+    private function imageUrl(Product $product): string
+    {
+        return route('fruit-veg.product-image', [
+            'code' => $product->CODE,
+            'w' => 112,
+            'v' => substr(md5($product->IMAGE), 0, 8),
+        ]);
+    }
+
     private function jonProducts()
     {
         $codes = SupplierLink::where('SupplierID', (string) config('suppliers.jon'))

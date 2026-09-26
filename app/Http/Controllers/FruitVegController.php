@@ -12,6 +12,7 @@ use App\Models\VegLabelPrintBatch;
 use App\Models\VegPrintQueue;
 use App\Models\ZebraLabel;
 use App\Repositories\OptimizedSalesRepository;
+use App\Services\ProductThumbnailService;
 use App\Services\SalesDataSyncService;
 use App\Services\TillVisibilityService;
 use Carbon\Carbon;
@@ -994,12 +995,40 @@ class FruitVegController extends Controller
             ]);
         }
 
-        // Detect content type from image binary data
         $imageData = $product->IMAGE;
         $contentType = 'image/jpeg'; // default fallback
 
-        // Detect image format from first few bytes (magic numbers)
-        if (strlen($imageData) >= 4) {
+        // Optional thumbnail. The Shop screens draw these at 48-56 px and asked for
+        // 3.15 MB of full-size packshots to do it (cycle 17c), so they request
+        // ?w=112. An unknown width is ignored rather than refused, and a blob the
+        // encoder cannot read falls through to the full image below.
+        $width = (int) $request->query('w');
+        $thumbnail = in_array($width, ProductThumbnailService::SIZES, true)
+            ? app(ProductThumbnailService::class)->jpeg($code, $imageData, $width)
+            : null;
+
+        if ($thumbnail !== null) {
+            $imageData = $thumbnail;
+            $contentType = 'image/jpeg';
+        }
+
+        // A thumbnail whose URL names the photo it was made from can be cached hard:
+        // replacing the photo changes `v`, so the browser asks for a different URL
+        // rather than being told a stale one is still good. A `v` that does not
+        // match is treated as absent — a guessed or stale link must never pin a
+        // picture for a week — and the full-size URL carries no version, so the
+        // office pages keep revalidating exactly as they do now.
+        $versioned = $thumbnail !== null
+            && ($version = (string) $request->query('v')) !== ''
+            && hash_equals(substr(md5($product->IMAGE), 0, 8), $version);
+
+        $cacheControl = $versioned
+            ? 'public, max-age=604800, immutable'
+            : 'public, max-age='.($request->has('t') ? 300 : 0).', must-revalidate';
+
+        // Detect image format from first few bytes (magic numbers). Skipped for a
+        // thumbnail, which is a JPEG we just encoded ourselves.
+        if ($thumbnail === null && strlen($imageData) >= 4) {
             $header = substr($imageData, 0, 4);
             if (substr($header, 0, 3) === "\xFF\xD8\xFF") {
                 $contentType = 'image/jpeg';
@@ -1014,20 +1043,20 @@ class FruitVegController extends Controller
 
         $etag = '"'.md5($imageData).'"';
 
+        // The same lifetime on the 304: a client that revalidates once must not be
+        // dropped back to asking every time, which is the cost this versioning
+        // exists to remove.
         if ($request->headers->get('If-None-Match') === $etag) {
             return response('', 304, [
                 'ETag' => $etag,
-                'Cache-Control' => 'public, max-age=0, must-revalidate',
+                'Cache-Control' => $cacheControl,
             ]);
         }
-
-        // Cache busting parameter hints if the UI explicitly asked for a fresh image
-        $cacheTime = $request->has('t') ? 300 : 0; // 5 minutes when requested, otherwise force revalidation
 
         // Return the image from the database
         return response($imageData, 200, [
             'Content-Type' => $contentType,
-            'Cache-Control' => "public, max-age={$cacheTime}, must-revalidate",
+            'Cache-Control' => $cacheControl,
             'ETag' => $etag,
             'Last-Modified' => gmdate('D, d M Y H:i:s T'),
         ]);
