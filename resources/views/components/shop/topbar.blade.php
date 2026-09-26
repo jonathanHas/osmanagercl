@@ -1,5 +1,6 @@
 @props([
     'title' => 'Shop',
+    'subtitle' => null,
     'back' => null,
     'guestSafe' => false,
 ])
@@ -14,7 +15,13 @@
         <div class="shop-topbar__brand"><span class="shop-topbar__mark"><x-shop.icon name="leaf" /></span><span>Shop</span></div>
     @else
         <a class="shop-iconbtn" href="{{ $back }}" aria-label="Back"><x-shop.icon name="back" /></a>
-        <h1 class="shop-topbar__title">{{ $title }}</h1>
+        {{-- Without a subtitle the markup is exactly what it was, so every other
+             page's tests and layout are untouched. --}}
+        @if ($subtitle)
+            <div class="shop-topbar__titles"><h1 class="shop-topbar__title">{{ $title }}</h1><span class="shop-topbar__sub shop-code">{{ $subtitle }}</span></div>
+        @else
+            <h1 class="shop-topbar__title">{{ $title }}</h1>
+        @endif
     @endif
 
     @auth

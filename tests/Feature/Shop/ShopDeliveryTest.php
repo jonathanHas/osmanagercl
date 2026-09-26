@@ -163,6 +163,13 @@ class ShopDeliveryTest extends TestCase
         $this->assertTrue($rows['5000000000024']['stockable']);
         $this->assertFalse($rows['4260009912200']['stockable']);
 
+        // Cycle 23: the row carries the shop's current stock so the scan screen
+        // can show it. Zero is a figure; a row whose product never resolved has
+        // no stock to report and gets null, not 0.
+        $this->assertEquals(3, $rows['5000000000017']['stock']);
+        $this->assertEquals(0, $rows['5000000000024']['stock']);
+        $this->assertNull($rows['4260009912200']['stock']);
+
         $this->assertSame(['total' => 2, 'checked' => 2, 'issues' => 2], $json['progress']);
         $this->assertSame('Hof Linde', $json['session']['supplier']);
         $this->assertFalse($json['session']['completed']);
@@ -183,15 +190,41 @@ class ShopDeliveryTest extends TestCase
         $response->assertSee('New first');
         $response->assertSee('href="'.e(route('shop.deliveries')).'"', false);
 
-        // The row's controls wrap under the name on a phone; the fault was geometry.
-        $response->assertSee('class="shop-row shop-row--wrap"', false);
-        $response->assertSee('class="shop-row__controls"', false);
+        // Screen 05 v2 (cycle 23): a row is a button that opens a correction card,
+        // the top bar carries a second line, and the scan field is the compact one.
+        $response->assertSee('class="shop-row shop-item"', false);
+        $response->assertSee('shop-row__stock', false);
+        $response->assertSee('shop-scan--inline', false);
+        $response->assertSee('shop-topbar__sub', false);
+        $response->assertSee('shop-notice', false);
+        $response->assertSee('shop-status', false);
+        $response->assertSee('toggleSort()', false);
+        $response->assertSee('Correct quantity', false);
+        $response->assertSee('adjust(editingRow, 1)', false);
 
-        $css = file_get_contents(resource_path('css/shop.css'));
-        $additions = substr($css, strpos($css, 'APP ADDITIONS START'));
+        // The per-row stepper and its app CSS are gone with it.
+        $response->assertDontSee('shop-row--wrap', false);
+        $response->assertDontSee('shop-row__controls', false);
 
-        $this->assertStringContainsString('.shop-row--wrap { flex-wrap: wrap; }', $additions);
-        $this->assertMatchesRegularExpression('/\.shop-row__controls \{[^}]*flex-wrap: wrap;/', $additions);
+        $additions = substr(
+            $css = file_get_contents(resource_path('css/shop.css')),
+            strpos($css, 'APP ADDITIONS START')
+        );
+
+        $this->assertStringNotContainsString('.shop-row--wrap', $additions);
+        $this->assertStringNotContainsString('.shop-row__controls', $additions);
+    }
+
+    public function test_the_scan_page_top_bar_carries_the_session_and_date(): void
+    {
+        $response = $this->actingAs($this->employee())
+            ->get(route('shop.deliveries.scan', ['delID' => 'd-1', 'supplierID' => 999]))
+            ->assertOk();
+
+        // Supplier on line one, session and when on line two. The fixture's
+        // session is dated today, which reads better than the date itself.
+        $response->assertSee('<span class="shop-topbar__sub shop-code">d-1 · today</span>', false);
+        $response->assertSee('<h1 class="shop-topbar__title">', false);
     }
 
     public function test_completed_session_hides_the_scan_input(): void

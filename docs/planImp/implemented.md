@@ -1,4 +1,4 @@
-# Shop mode cycle 21 — Product pictures on the customer requests screens — implementation
+# Shop mode cycle 23 — Delivery scan v2 (Screen 05 v2) — implementation
 
 Status: DONE
 Plan revision: 1
@@ -7,236 +7,233 @@ Date: 2026-09-26
 
 ## Baseline
 
-HEAD: 58a48360 — cycle 20 is committed; the tree is clean apart from this cycle.
+HEAD: d5aae2b9. Cycle 22's work is accepted and archived but still uncommitted, so
+the tree carries it alongside this cycle. Files changed at the end separates them.
 
-Test baseline: 15 failed / 640 passed (2762 assertions).
+Test baseline: 15 failed / 662 passed.
 
 ## Pre-flight
 
-**The plan's third risk, checked first because it decides whether the feature works
-for staff at all:**
-```
-$ php artisan route:list --name=products.image -v
-GET|HEAD products/{id}/image › ProductController@image
-    ⇂ Illuminate\Auth\Middleware\Authenticate
-    ⇂ App\Http\Middleware\PermissionMiddleware:products.view
+The plan's two factual claims about the design, both checked:
 
-$ employee has products.view → true
 ```
-So signed-in staff see POS photos on every screen. Guests do not — the route
-redirects to login and the `<img>` errors onto the placeholder, which is the
-behaviour the plan puts in Out of scope and which the component has to handle
-cleanly.
+$ wc -l docs/design/shop-mode/shop.css resources/css/shop.css
+553 docs/design/shop-mode/shop.css
+575 resources/css/shop.css
 
-The resolver is as described: `SELECT_COLUMNS` never includes `IMAGE`, `has_image`
-is a raw CASE expression at line 155, and `imageUrl()` goes POS photo → supplier
-CDN by barcode → cached/template supplier code → null.
+$ head -c $(stat -c %s docs/design/shop-mode/shop.css) resources/css/shop.css | cmp - …
+differ: byte 8908, line 152
+```
+and the diff against the committed design file is exactly what the plan describes:
+`.shop-topbar__title` line-height 1.15 → 1.35, plus 24 new lines
+(`.shop-topbar__titles`, `.shop-topbar__sub`, four `.shop-scan--inline` rules, the
+`.shop .shop-scan__input` reset, `.shop-status`, `.shop-notice`, `.shop-item`,
+`.shop-row__stock`).
+
+`docs/design/shop-mode/screen-05-delivery-scan-v2.html` exists and is Planner-owned;
+I read it but did not touch it.
 
 ## Steps
 
-### 1. `imageUrlsByCode()` on the search service — done
+### 1. Refresh the design block — done
 
-Changed: `app/Services/ProductSearch/ProductSearchService.php` — a
-`HAS_IMAGE_EXPRESSION` constant now shared by `runQuery()` and the new public
-`imageUrlsByCode()`, which delegates to the existing private `loadSupplierImageCache()`
-and `imageUrl()`. `imageUrl()`'s rules are untouched, so the search API is unaffected.
-
-Changed: `tests/Feature/ProductSearchImageUrlsTest.php (new)` — 11 tests.
+Replaced everything before `APP ADDITIONS START` with the current design file.
 ```
-✓ a product with a pos photo gets the image route
-✓ a product with no photo and no supplier gets null
-✓ an empty blob is not a photo
-✓ a supplier with a barcode template gets the cdn url
-✓ a supplier that keys images by supplier code uses the template
-✓ a disabled integration gets null
-✓ a pos photo wins over a supplier picture
-✓ an unknown code is absent rather than null
-✓ an empty list runs no query
-✓ duplicate codes are queried once
-✓ the blob never leaves the database
-Tests:    11 passed (19 assertions)
-```
-Four go beyond the plan's list and are the ones that pin the *rules* rather than the
-plumbing: an empty blob is not a photo (the expression checks `LENGTH > 0`, not just
-`NOT NULL`), a disabled integration yields null, a POS photo wins over a supplier
-picture, and — the constraint the whole design rests on — **the query never selects
-`PRODUCTS.*` or `IMAGE`**, asserted against the query log, because `IMAGE` is a
-mediumblob and selecting it would pull every photo into PHP.
-
-### 2. Board rows and the detail page carry the URL — done
-
-Changed: `app/Services/CustomerRequestService.php` (a constructor taking
-`ProductSearchService`; `rowsFrom()` enriches every row),
-`app/Http/Controllers/CustomerRequestController.php` (`show()` passes `images`,
-`seedItems()` attaches a `product` object through a new `seedProduct()` helper).
-
-The enrichment went into `rowsFrom()` rather than `boardRows()` because it is the
-single funnel both branches pass through, and only one branch runs — so it is
-exactly one extra query per board however the board is filtered.
-
-`seedProduct()` keys the object by `code`, not `id`: a request line stores a product
-code, and `productImages()` falls back from `id` to `code` (cycle 17c), so the
-Alpine thumbnail resolves it unchanged.
-
-### 3. A server-side photo component and the three views — done
-
-Changed: `resources/views/components/shop/photo.blade.php (new)`, the staff row,
-the guest card, the detail page, and the two includes that pass `image` down.
-
-**The plan's third risk, resolved first:** `products.image` is behind `auth` +
-`permission:products.view`, and employees hold `products.view`. So staff see POS
-photos everywhere; guests do not, and the component's error handler is what puts
-the placeholder there. Recorded in the component's own docblock and in the docs.
-
-Sourcing lines render neither photo nor placeholder, so their layout is byte-for-byte
-what it was.
-
-### 4. Tests — done
-
-Changed: `tests/Feature/Shop/ShopRequestsTest.php`.
-
-The fixture needed more than the plan's `IMAGE` column: it was also missing
-`PRICEBUY`, `ISSERVICE` and `DISPLAY`, all of which are in `SELECT_COLUMNS`. Four
-tests failed with `no such column: PRODUCTS.DISPLAY` until all four were added.
-
-```
-$ php artisan test --filter=ShopRequestsTest
-✓ a sourcing line has no picture and no placeholder
-✓ detail page shows the picture for a pre order line
-✓ guest board is shop styled and read only        (+ photo assertions)
-✓ staff board shows actions and form              (+ photo assertions)
-✓ edit page seeds lines and posts to update       (+ seeded product assertion)
-  ... 14 in all
-Tests:    14 passed (135 assertions)
+$ head -c $(stat -c %s docs/design/shop-mode/shop.css) resources/css/shop.css | cmp - docs/design/shop-mode/shop.css
+(nothing)
+$ grep -c "APP ADDITIONS START" resources/css/shop.css
+1
 ```
 
-Two assertions I had to get right rather than merely green:
+### 2. `info` icon — done
 
-- **`assertDontSee('class="shop-thumb"')` for a sourcing line was wrong.** The New
-  request sheet on the same page renders the Alpine thumbnail regardless, so that
-  assertion could never have passed and, had I weakened it instead, would have
-  proved nothing. The test now asserts on `shop-photo` — the server component's own
-  wrapper — and then seeds a pre-order line and asserts the board *does* show one,
-  so it cannot pass just because nothing ever emits it.
-- **The edit-page seed goes through `@js()`**, i.e. `Illuminate\Support\Js::from()`,
-  which hex-escapes quotes as `"` rather than `&quot;`. The expected fragment
-  is built with the same helper instead of hand-written JSON.
+```
+$ grep -c 'id="info"' public/images/shop-icons.svg          → 1
+$ Blade::render('<x-shop.icon name="info" size="sm" />')    → …#info
+```
 
-### 5. Docs, format, build — done
+### 3. Topbar subtitle — done
 
-`docs/features/customer-requests.md` (a "Product pictures" section including the
-guest limitation), `docs/design/shop-mode/README.md` (`x-shop.photo` beside
-`x-shop.product-thumb` and when to use which), `docs/features/product-search.md`
-(the new public method). `pint --test --dirty` → PASS; `npm run build` → built.
+`ShopLayout` gained `?string $subtitle`, the layout passes it, the topbar renders
+`shop-topbar__titles` **only when it is set**; otherwise the markup is the bare
+`<h1>` it always was.
+```
+no subtitle:  <h1 class="shop-topbar__title">Sup</h1>
+with:         <div class="shop-topbar__titles"><h1 …>Sup</h1><span class="shop-topbar__sub shop-code">d1 · today</span></div>
+```
+
+### 4. Inline scan-input variant — done
+
+`inline` prop. **I proved the non-inline output is unchanged rather than assuming
+it**: rendered the component, stashed my changes, rendered again on the original,
+and diffed. The only differences are leading whitespace from the new Blade
+directives; normalised for whitespace the two are identical, and
+`ShopStockScanTest|ShopFindProductTest|ShopVouchersTest` (31 tests) pass untouched.
+
+### 5. Stock in the items JSON — done
+
+`'stock'` on both row builders; no query change, both already selected
+`STOCKCURRENT.UNITS`.
+
+### 6. The view rebuilt to Screen 05 v2 — done
+
+Subtitle, inline field, notice/status block, correction card, ghost sort toggle,
+button rows with stock, the new empty state, Summary-only action bar.
+
+**I checked before deleting the old app CSS**, as the plan requires:
+```
+$ grep -rn "shop-row--wrap\|shop-row__controls" resources/ tests/ app/
+resources/css/shop.css:585-587   (the rules)
+tests/…/ShopDeliveryTest.php:187,188,193,194   (the assertions)
+```
+Nothing else, so both rules are gone. The plan's risk about the phone squeeze does
+not materialise — measured below.
+
+### 7. `delivery-scan.js` — done
+
+`toggleSort()`, `editingRow`, `edit()` scrolls `$refs.correct` into view, `onScan()`
+clears `editing`, `pill()` returns null for `ok` and for `unexpected` without an
+invoice, `stockText()` replaces `qtyLabel()` (grepped: nothing else used it — the
+`$qtyLabel` hits in `orders/compare.blade.php` are an unrelated PHP closure).
+
+### 8 & 9. Tests, format, build — done
+
+Replaced the two `shop-row--wrap` assertions with nine for v2 plus two
+`assertDontSee`, added a subtitle test, the `stock` assertions, and a topbar
+regression test in `ShopHomeTest` proving a page without a subtitle still renders a
+bare `<h1>`.
 
 ## Verification
 
-**1. Tests**
+**1. `php artisan test`**
 ```
-$ php artisan test --filter="Shop|CustomerRequest|ProductSearch"
-Tests:    258 passed (1290 assertions)
-$ php artisan test
-Tests:    15 failed, 653 passed (2797 assertions)
+Tests:    15 failed, 664 passed (2851 assertions)
 ```
-The identical set. 653 = 640 + 13 (11 resolver tests + 2 new request tests).
+The identical 15 (Udea ×7, CashReconciliation ×3, FruitVegLabelPrinting ×2,
+Product ×2, TestScraper ×1). 664 = 662 + 2 new tests.
 
-**2. Diff scope**
-```
- app/Http/Controllers/CustomerRequestController.php | 41 ++    show(), seedItems(), seedProduct()
- app/Services/CustomerRequestService.php            | 26 ++    constructor, rowsFrom()
- app/Services/ProductSearch/ProductSearchService.php| 48 ++    the constant and the new method
-```
-Nothing else in `app/`.
+**2. Contract** — the `cmp` prints nothing (above); no `<script>`/`<style>` in shop
+views.
 
-**3. Contract** — no `<script>`/`<style>` in shop views; design block `cmp`
-IDENTICAL; no stylesheet change was needed.
+**3. Browser, the Shop, at desktop width and at the narrowest this browser allows.**
 
-**4. Manual, dev app, on a throwaway request with one pre-order line and one
-sourcing line, deleted afterwards.**
+*State B — a session with 164 invoice lines* (`supplierID=37`; none of the sessions
+the list offers has invoice lines, so I had to find the supplier that does):
+```
+hasInvoice true, rows 164, progress {total 164, checked 0, issues 0}
+status block visible, notice hidden, bar width "0%"
+rows: "All About Kombucha Ginger & Lemon Can 330ml b" · 49037A · Stock 16 · 0 / 10 · "Not scanned"
+      expectedLabel "/ 1", "/ 6", "/ 5"
+```
+**`stockText()` earns its place here.** One real row has
+`stock: 1.5200000000000011`; it renders `1.52`. A whole `8` renders `8`, not `8.0`.
 
-*Staff board* — zoomed in to read it:
-```
-"ZZ sourcing line, no product"  no photo wrapper at all, title flush left as before
-"Watered Down"                  the product's picture beside the title, 128×128 natural
-```
-*Detail page*: the pre-order line shows the picture, the sourcing line has no
-wrapper.
+*State A — a session with no invoice lines:* the notice paragraph, no progress bar,
+one row showing a plain count with **no pill** (correct — nothing is "unexpected"
+without an invoice), `Items 1`, the ghost `New first` toggle. A second such session
+with nothing scanned shows the new **"Nothing scanned yet / Scan the first item."**
+empty state.
 
-*Edit page* — this is the cycle 14 gap, now closed:
-```
-items[0].product = { code: "4156", image_url: "http://…/products/001f8843…/image" }
-items[1].product = null
-1 thumbnail with a src, loaded
-```
-The seeded line shows its picture without the user re-picking the product.
+*Interactions, all by real clicks:*
+- Sort toggle: `New first` → `Scanned first` → `New first`, `sort` following.
+- Tapping a row (`<button>`, `aria-pressed`) opens **Correct quantity** with the
+  name, code, `Stock 53` and the stepper at 27.
+- `−` then `+` each hit the server and the row updated 27 → 26 → 27, so the figure
+  is exactly where it started.
+- `Done` closes the card (`editing` null, card hidden).
 
-*Guest board*, requested with no cookies at all rather than by signing anyone out:
-```
-6 shop-photo wrappers, 6 with x-on:error="ok = false"
-srcs: 4 × https://cdn.ekoplaza.nl…   2 × http://osmanager.local/products/…/image
-GET /products/{id}/image as a guest → 302 to /login
-```
-Exactly the documented behaviour: four of the six guest pictures are supplier CDN
-URLs and load for anyone; the two POS photos redirect to login, error, and fall back
-to the placeholder.
+*Top bar:* supplier on line 1, `9e5c52db · Sat 20 Jun` on line 2, not truncated.
 
-Twice the browser reported an image as not loaded when it had simply not been
-fetched yet — the hidden-tab lazy-load artifact from cycle 17d. Both figures above
-were taken after forcing a render.
+*Phone width:* the browser would not go below a **500 px** CSS viewport however I
+resized it, so I could not test at 390. At 500: nothing truncated, rows are
+80 px two-column grids (main 384 px, aside 36 px), the title fits. **The old
+`shop-row--wrap` rules are not needed** — `.shop-item`'s grid handles it.
 
-*Dev data*: the throwaway request and its two lines deleted; `CustomerRequest::count()`
-back to 8.
+*`is-touch`:* `shop-scan shop-scan--inline`, both toggles inside the field at
+**52×52**, no `shop-scan__tools` wrapper, no hint line, the camera box present and
+`.shop-scan__mount` still `position: absolute` (cycle 16's fix survives). The
+keyboard toggle flips `aria-pressed` and `inputmode` between `none` and `text`.
+
+**4 & 5.** State A covered above. A completed session still hides the scan input and
+shows "This delivery is completed" — pinned by `test_completed_session_hides_the_scan_input`,
+which passes.
+
+**6. Other screens unchanged**, checked in the browser:
+```
+stock-scan: classes "shop-scan", inline false, tools outside, 0 toggles in field,
+            hint "Ready — scanner listening"
+labels:     same, and no shop-topbar__titles
+```
+
+*Console:* two messages, both Alpine's startup log.
+
+*Dev data:* the one quantity I moved is back at 27; nothing else was written.
 
 ## Deviations
 
-None. Two things the plan under-specified, both recorded in their steps: the POS
-fixture needed `PRICEBUY`, `ISSERVICE` and `DISPLAY` as well as `IMAGE`, and the
-enrichment sits in `rowsFrom()` rather than `boardRows()`.
+**One, from a measurement.** The plan's subtitle is `{id} · {date}`. A real session
+id is a 36-character UUID, and at the narrowest width I could reach the subtitle was
+truncated to **97 px of 396 px** — the date, the useful half, was cut off entirely.
+I truncate the id to 8 characters, which is what the previous single-line title did
+(`substr($session['id'], 0, 8)`) and what the design's own example shows
+(`d1-20931`). After the change: `9e5c52db · Sat 20 Jun`, 156 px, not truncated.
+The plan's test assertion still holds — the fixture's id is `d-1`.
+
+## Risks the plan named, and what actually happened
+
+- **Buttons inside a `<label>`:** no misbehaviour observed; the toggles work and the
+  fallback the plan offers was not needed.
+- **`button.shop-row`:** no UA border or background. The design's button reset plus
+  `.shop-item` is enough; **no APP ADDITIONS rule was needed**.
+- **The phone squeeze:** did not recur; the old rules are deleted.
+- **Sort label semantics:** in use the label reads as the order in force, which is
+  what the design intends. I am not confident it is unambiguous — see Notes.
 
 ## Files changed
 
 ```
- M app/Http/Controllers/CustomerRequestController.php
- M app/Services/CustomerRequestService.php
- M app/Services/ProductSearch/ProductSearchService.php
- M resources/views/shop/partials/request-row.blade.php
- M resources/views/shop/partials/request-card.blade.php
- M resources/views/shop/partials/requests-staff.blade.php
- M resources/views/shop/requests.blade.php
- M resources/views/shop/request-show.blade.php
- M tests/Feature/Shop/ShopRequestsTest.php
- M docs/features/customer-requests.md
- M docs/features/product-search.md
- M docs/design/shop-mode/README.md
-?? resources/views/components/shop/photo.blade.php
-?? tests/Feature/ProductSearchImageUrlsTest.php
+ M app/Http/Controllers/DeliveryLegacyController.php   'stock' on both row builders
+ M app/View/Components/ShopLayout.php                  $subtitle
+ M public/images/shop-icons.svg                        the info symbol
+ M resources/css/shop.css                              design block refreshed; 3 app rules removed
+ M resources/js/shop/delivery-scan.js
+ M resources/views/components/shop/scan-input.blade.php   the inline variant
+ M resources/views/components/shop/topbar.blade.php
+ M resources/views/layouts/shop.blade.php
+ M resources/views/shop/delivery-scan.blade.php        rebuilt to v2
+ M tests/Feature/Shop/ShopDeliveryTest.php
+ M tests/Feature/Shop/ShopHomeTest.php
 ```
-The tree was clean at the start of this cycle apart from an editor swap file in
-`docs/jons_docs/`, which is not mine.
+Cycle 22's files are also still dirty in this tree, uncommitted. I did not touch
+`docs/design/shop-mode/**`.
 
 **Not committed, not pushed, not deployed.**
 
 ## Notes for Planner
 
-1. **Guests get placeholders for POS-photo products**, which is stated as out of
-   scope but is now visible on the public board: two of six pictures on dev. The
-   cheapest fix, if it is wanted, is not to open `products.image` to guests but to
-   let the *board* serve the picture — the same `?w=`/`?v=` thumbnail route the F&V
-   screens use (cycles 17d/17e) could take a guest-readable variant, since a
-   112 px thumbnail of a product on a public board is not sensitive. That is a
-   decision, not an implementation detail.
+1. **No delivery session on dev has invoice lines through the list.** Every session
+   the Deliveries page offers came back `hasInvoice: false`; I reached state B only
+   by pointing the URL at supplier 37, which is where the 206 `delivery` rows
+   belong. So the owner testing this by tapping through the list will only ever see
+   state A and may conclude the progress bar is missing. Worth knowing before they
+   look, and worth asking whether the list should show which sessions have an
+   invoice loaded.
 
-2. **`imageUrlsByCode()` now has three plausible callers that do not use it yet**:
-   deliveries, order review and the label queue all hold product codes and show
-   names without pictures. Nothing needs it, but it is the reason the method was
-   made public rather than left private to the requests flow.
+2. **The sort label is genuinely ambiguous and I am reporting rather than changing
+   it, as the plan asks.** "New first" beside a sort icon reads equally as "this is
+   the order" and "tap for this order". The radio group it replaced could not be
+   misread. If the owner hesitates over it, the cheap fix is a label that cannot be
+   an instruction — e.g. `Sorted: new first` — rather than reverting to the segmented
+   control.
 
-3. **The staff row wraps its title in a `shop-inline` only for pre-order lines**,
-   so the two line types now have slightly different DOM. They look identical when
-   there is no picture, but anything that later styles `.shop-req__title` by
-   position in its parent will need to know.
+3. **`inputmode` does not refresh when `is-touch` is added after load.** `isTouch`
+   reads the DOM rather than reactive state, so Alpine's binding only re-evaluates
+   when something reactive changes. On a real device the class is present at page
+   load so the first render is correct; it only shows up when forcing touch in
+   DevTools, as I did. Pre-existing, not introduced here, and harmless — but it will
+   confuse the next person who tests touch this way.
 
-4. **`ShopRequestsTest`'s POS fixture is now a full `SELECT_COLUMNS` table.** Any
-   future test that exercises a page reaching `ProductSearchService` will need the
-   same; the four columns I added are easy to miss because the failure is a raw
-   `no such column` from deep inside a view render.
+4. **I could not get a CSS viewport below 500 px** in this browser however I resized
+   the window, so the 390 px check in the plan's verification is unmet. Everything
+   holds at 500 px with room to spare (aside 36 px of 500), so I do not expect a
+   problem, but it is untested at true phone width.

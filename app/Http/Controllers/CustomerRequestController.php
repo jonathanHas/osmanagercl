@@ -6,19 +6,26 @@ use App\Http\Requests\CustomerRequestRequest;
 use App\Http\Requests\UpdateCustomerRequestItemStatusRequest;
 use App\Models\CustomerRequest;
 use App\Models\CustomerRequestItem;
+use App\Models\Product;
 use App\Services\CustomerRequestService;
-use App\Services\ProductSearch\ProductSearchService;
+use App\Services\ProductThumbnailService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 
 class CustomerRequestController extends Controller
 {
+    /** The board draws these at 48 px; 112 covers a 2x screen. */
+    private const PHOTO_SIZE = 112;
+
+    /** Matches the staff board's "Done" window. */
+    private const PHOTO_WINDOW_DAYS = 30;
+
     public function __construct(
         private CustomerRequestService $service,
-        private ProductSearchService $productSearch,
     ) {}
 
     /**
@@ -78,13 +85,81 @@ class CustomerRequestController extends Controller
             ->with('status', "Request for {$customerRequest->customer_name} saved.");
     }
 
+    /**
+     * A small public thumbnail of a product's till photo, for the public board.
+     *
+     * The board is public, but `products.image` needs a login, so a signed-out
+     * tablet showed a placeholder wherever the only picture was the till's own
+     * photo. Rather than opening that route, this one is deliberately narrow:
+     *
+     *  - it serves a 112 px JPEG and never the stored photo;
+     *  - only for a product code that appears on a request line whose request is
+     *    open, or was closed within the last 30 days — the same lines the board
+     *    itself shows. Anything else is 404, so it cannot be used as a general
+     *    product-image endpoint;
+     *  - it is throttled.
+     *
+     * Versioned like the fruit & veg thumbnails (cycles 17d/17e): `?v=` is the
+     * first 8 hex of the photo's md5, and a match earns a week-long immutable
+     * cache, so a board that is already open costs nothing to re-render.
+     */
+    public function photo(string $code, Request $request, ProductThumbnailService $thumbnails): Response
+    {
+        abort_unless($this->codeIsOnACurrentRequest($code), 404);
+
+        $product = Product::where('CODE', $code)->first(['ID', 'CODE', 'IMAGE']);
+
+        abort_if($product === null || $product->IMAGE === null || $product->IMAGE === '', 404);
+
+        $jpeg = $thumbnails->jpeg($code, $product->IMAGE, self::PHOTO_SIZE);
+
+        // Null means the encoder could not read the blob. The full photo is not an
+        // acceptable fallback here — this route is public and must never serve it.
+        abort_if($jpeg === null, 404);
+
+        $versioned = ($version = (string) $request->query('v')) !== ''
+            && hash_equals(substr(md5($product->IMAGE), 0, 8), $version);
+
+        $cacheControl = $versioned
+            ? 'public, max-age=604800, immutable'
+            : 'public, max-age=0, must-revalidate';
+
+        $etag = '"'.md5($jpeg).'"';
+
+        if ($request->headers->get('If-None-Match') === $etag) {
+            return response('', 304, ['ETag' => $etag, 'Cache-Control' => $cacheControl]);
+        }
+
+        return response($jpeg, 200, [
+            'Content-Type' => 'image/jpeg',
+            'Cache-Control' => $cacheControl,
+            'ETag' => $etag,
+        ]);
+    }
+
+    /**
+     * Is this product on a line the board could be showing?
+     *
+     * Open requests, plus ones closed in the last 30 days, which is the window the
+     * staff "Done" view uses. This is the whole of the route's authorisation.
+     */
+    private function codeIsOnACurrentRequest(string $code): bool
+    {
+        return CustomerRequestItem::where('product_code', $code)
+            ->whereHas('request', fn ($q) => $q
+                ->whereNull('closed_at')
+                ->orWhere('closed_at', '>=', now()->subDays(self::PHOTO_WINDOW_DAYS))
+            )
+            ->exists();
+    }
+
     public function show(CustomerRequest $customerRequest): View
     {
         $customerRequest->load(['items.statusLogs.user', 'items.statusChanger', 'creator', 'updater', 'closer']);
 
         return view('shop.request-show', [
             'customerRequest' => $customerRequest,
-            'images' => $this->productSearch->imageUrlsByCode(
+            'images' => $this->service->imageUrlsForRequestLines(
                 $customerRequest->items->pluck('product_code')->all()
             ),
         ]);
@@ -173,7 +248,7 @@ class CustomerRequestController extends Controller
     {
         $old = old('items');
         if (is_array($old)) {
-            $urls = $this->productSearch->imageUrlsByCode(array_column($old, 'product_code'));
+            $urls = $this->service->imageUrlsForRequestLines(array_column($old, 'product_code'));
 
             return array_values(array_map(fn ($i) => [
                 'id' => $i['id'] ?? null,
@@ -191,7 +266,7 @@ class CustomerRequestController extends Controller
             return [];
         }
 
-        $urls = $this->productSearch->imageUrlsByCode(
+        $urls = $this->service->imageUrlsForRequestLines(
             $customerRequest->items->pluck('product_code')->all()
         );
 

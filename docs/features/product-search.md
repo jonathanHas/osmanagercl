@@ -260,6 +260,8 @@ for a batch of product codes, resolved by exactly the rules the search API uses 
 POS photo (`products.image`) first, supplier CDN second, `null` if neither. A code
 that matches no product is absent from the result; an empty list runs no query.
 
+A second argument, `?callable $posPhotoUrl`, replaces the URL used for a product whose picture is the till's own photo; supplier resolution is unchanged and callers that pass nothing get exactly what they got before. The public customer-requests board uses it to point at its own guest-readable thumbnail route.
+
 It exists so a page that already holds product codes — a customer request's lines,
 an order, a delivery — shows the same picture the staff member saw when they picked
 the product, without a second implementation of the rules. It never selects

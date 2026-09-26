@@ -27,7 +27,7 @@
         <script>if (window.matchMedia('(pointer: coarse)').matches) document.getElementById('shop-root').classList.add('is-touch');</script>
 
             @unless($bare)
-                <x-shop.topbar :title="$title" :back="$back" :guest-safe="$guestSafe" />
+                <x-shop.topbar :title="$title" :subtitle="$subtitle" :back="$back" :guest-safe="$guestSafe" />
             @endunless
 
             {{-- Server flash as a toast, so a redirect after an action says what happened.

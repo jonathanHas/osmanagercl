@@ -182,6 +182,59 @@ class ProductSearchImageUrlsTest extends TestCase
         );
     }
 
+    public function test_a_pos_photo_uses_the_callback_when_one_is_given(): void
+    {
+        $this->product('p1', '5000000000017', 'fake-jpeg-bytes');
+
+        $urls = $this->service()->imageUrlsByCode(
+            ['5000000000017'],
+            fn ($product) => 'https://board.example/photo/'.$product->CODE
+        );
+
+        $this->assertSame('https://board.example/photo/5000000000017', $urls['5000000000017']);
+    }
+
+    public function test_the_callback_does_not_touch_supplier_pictures(): void
+    {
+        Config::set('suppliers.external_links', [
+            'udea' => [
+                'supplier_ids' => [self::UDEA],
+                'enabled' => true,
+                'image_url' => 'https://cdn.example/{CODE}.jpg',
+            ],
+        ]);
+
+        $this->product('p4', '8712345678901');           // no POS photo
+        $this->linkTo('8712345678901', self::UDEA, 'S1');
+        $this->product('p1', '5000000000017', 'bytes');  // POS photo
+
+        $called = [];
+        $urls = $this->service()->imageUrlsByCode(
+            ['8712345678901', '5000000000017'],
+            function ($product) use (&$called) {
+                $called[] = $product->CODE;
+
+                return 'https://board.example/photo/'.$product->CODE;
+            }
+        );
+
+        // Supplier pictures already load for guests, so the callback must not see them.
+        $this->assertSame(['5000000000017'], $called);
+        $this->assertSame('https://cdn.example/8712345678901.jpg', $urls['8712345678901']);
+        $this->assertSame('https://board.example/photo/5000000000017', $urls['5000000000017']);
+    }
+
+    public function test_without_a_callback_the_behaviour_is_unchanged(): void
+    {
+        // The search API passes nothing and must keep getting products.image.
+        $this->product('p1', '5000000000017', 'bytes');
+
+        $this->assertSame(
+            route('products.image', 'p1'),
+            $this->service()->imageUrlsByCode(['5000000000017'])['5000000000017']
+        );
+    }
+
     public function test_an_unknown_code_is_absent_rather_than_null(): void
     {
         $this->product('p1', '5000000000017', 'bytes');

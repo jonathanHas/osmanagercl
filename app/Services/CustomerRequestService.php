@@ -281,14 +281,68 @@ class CustomerRequestService
             ->filter(fn (array $row) => $row['request'] !== null)
             ->values();
 
-        $urls = $this->productSearch->imageUrlsByCode(
-            $rows->pluck('item.product_code')->all()
-        );
+        $urls = $this->imageUrlsForRequestLines($rows->pluck('item.product_code')->all());
 
         return $rows
             ->map(fn (array $row) => $row + [
                 'image_url' => $row['item']->product_code ? ($urls[$row['item']->product_code] ?? null) : null,
             ])
+            ->all();
+    }
+
+    /**
+     * Picture URLs for request lines, with till photos pointing at the board's own
+     * public thumbnail route rather than `products.image`.
+     *
+     * The board is public; `products.image` needs a login. Supplier pictures are
+     * untouched — they already load for anyone.
+     *
+     * @param  array<int, string|null>  $codes
+     * @return array<string, string|null>
+     */
+    public function imageUrlsForRequestLines(array $codes): array
+    {
+        $versions = $this->photoVersions($codes);
+
+        return $this->productSearch->imageUrlsByCode(
+            $codes,
+            fn (Product $product) => route('customer-requests.photo', array_filter([
+                'code' => $product->CODE,
+                'v' => $versions[$product->CODE] ?? null,
+            ]))
+        );
+    }
+
+    /**
+     * First 8 hex of each product photo's md5, keyed by code — the `?v=` that earns
+     * the thumbnail route's week-long cache.
+     *
+     * Hashed in SQL where the driver can, because a product photo runs to a
+     * megabyte and this would otherwise pull every board product's photo into PHP
+     * on every render, including the guest board's auto-refresh. SQLite has no
+     * `md5()`, so tests take the other branch.
+     *
+     * @param  array<int, string|null>  $codes
+     * @return array<string, string>
+     */
+    private function photoVersions(array $codes): array
+    {
+        $codes = array_values(array_filter($codes, fn ($c) => $c !== null && $c !== ''));
+
+        if ($codes === []) {
+            return [];
+        }
+
+        $query = Product::whereIn('CODE', $codes)->whereRaw('IMAGE IS NOT NULL');
+
+        if (DB::connection($query->getModel()->getConnectionName())->getDriverName() === 'mysql') {
+            return $query->get(['CODE', DB::raw('MD5(IMAGE) as image_md5')])
+                ->mapWithKeys(fn ($p) => [$p->CODE => substr((string) $p->image_md5, 0, 8)])
+                ->all();
+        }
+
+        return $query->get(['CODE', 'IMAGE'])
+            ->mapWithKeys(fn ($p) => [$p->CODE => substr(md5((string) $p->IMAGE), 0, 8)])
             ->all();
     }
 

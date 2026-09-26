@@ -185,6 +185,20 @@ class ShopHomeTest extends TestCase
             ->assertDontSee(route('deliveries.index'), false);
     }
 
+    public function test_a_page_without_a_subtitle_keeps_the_plain_title(): void
+    {
+        // Cycle 23 gave the top bar an optional second line. Every other screen
+        // must render exactly what it rendered before — a bare h1, not one wrapped
+        // in shop-topbar__titles.
+        $user = $this->userWith('employee', ['stocking.scan']);
+
+        $this->actingAs($user)->get('/shop/stock-scan')
+            ->assertOk()
+            ->assertSee('<h1 class="shop-topbar__title">Stock scan</h1>', false)
+            ->assertDontSee('shop-topbar__titles', false)
+            ->assertDontSee('shop-topbar__sub', false);
+    }
+
     public function test_guest_is_sent_to_login(): void
     {
         $this->get('/shop')->assertRedirect('/login');

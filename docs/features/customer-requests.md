@@ -111,10 +111,26 @@ The picture is resolved by `ProductSearchService::imageUrlsByCode()`, the same r
 the product search uses (POS photo first, supplier CDN second), so a line shows what
 the staff member saw when they picked the product. One batched lookup per board.
 
-**Guests see supplier pictures only.** `products.image` requires `auth` and
-`products.view`, so on the public board a POS-photo product's `<img>` gets a login
-redirect, errors, and falls back to the placeholder. Supplier CDN URLs work for
-everyone. Making POS photos guest-readable is a separate decision.
+**Guests see every picture** (cycle 22). Supplier CDN URLs always worked for
+anyone; a till photo is served by the board's own public route,
+`customer-requests.photo` — `GET /customer-requests/photo/{code}` — rather than by
+`products.image`, which stays behind `auth` + `products.view`.
+
+That route is public but deliberately narrow:
+
+- it returns a **112 px JPEG** and never the stored photo;
+- only for a product code that appears on a request line whose request is open or
+  was closed in the last 30 days — the same lines the board shows. Anything else,
+  including a product with no photo or a blob that cannot be decoded, is **404**, so
+  it cannot be used as a general product-image endpoint;
+- it is throttled to 120 requests a minute.
+
+The thumbnails are cached by `ProductThumbnailService` on the `local` disk, sharing
+the `fv-thumbs/` folder with the fruit-and-veg ones (keys hash the code and the
+blob, so they cannot collide). `?v=` is the first 8 hex of the photo's md5; when it
+matches, the response is `Cache-Control: public, max-age=604800, immutable`, so a
+board that is already open re-renders with no image requests. A wrong version is
+served short-lived, so a stale link can never pin an old picture.
 
 ## Usage
 

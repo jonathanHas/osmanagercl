@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="shop.css">
+<style>body{margin:0;background:#f5ead8}</style>
+<!-- Claude Design "Screen 05 Delivery scan v2.dc.html", saved 2026-09-26. The prototype toggles between a "no invoice lines" state and an "invoice loaded" state (both lists shown below), and its sort button flips between "New first" and "Scanned first". -->
+</head>
+<body>
+<div class="shop is-touch" data-screen-label="05 Delivery scan v2">
+  <header class="shop-topbar">
+    <a class="shop-iconbtn" href="screen-04-deliveries.html" aria-label="Back to deliveries"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></a>
+    <div class="shop-topbar__titles"><h1 class="shop-topbar__title">Dynamis</h1><span class="shop-topbar__sub shop-code">d1-20931 · today 07:40</span></div>
+    <details class="shop-usermenu">
+      <summary class="shop-chip"><span class="shop-avatar">J</span><span class="shop-chip__name">Jonathan</span><svg class="shop-ico shop-ico--sm shop-chip__caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+      <div class="shop-menu" role="menu">
+        <a class="shop-menu__item" role="menuitem" href="screen-16-switch-user.html">Switch user</a>
+        <a class="shop-menu__item" role="menuitem" href="screen-18-locked.html">Lock</a>
+        <a class="shop-menu__item" role="menuitem" href="#">Office</a>
+        <div class="shop-menu__sep"></div>
+        <a class="shop-menu__item shop-menu__item--danger" role="menuitem" href="#">Log out</a>
+      </div>
+    </details>
+  </header>
+  <main class="shop-page">
+    <div class="shop-split">
+      <div class="shop-stack">
+        <div class="shop-scan shop-scan--inline is-focused">
+          <label class="shop-scan__field"><svg class="shop-ico shop-ico--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path><path d="M8 7v10"></path><path d="M12 7v10"></path><path d="M17 7v10"></path></svg><span class="shop-sr-only">Barcode</span><input class="shop-scan__input" inputmode="none" autocomplete="off" enterkeyhint="go" placeholder="Scan item"><button class="shop-iconbtn shop-touch-only" type="button" aria-pressed="false" aria-label="Camera"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg></button><button class="shop-iconbtn shop-touch-only" type="button" aria-pressed="false" aria-label="Show keyboard"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"></path></svg></button></label>
+        </div>
+        <!-- State A: no invoice lines -->
+        <p class="shop-notice"><svg class="shop-ico shop-ico--sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>No invoice lines, so quantities can't be checked.</p>
+        <!-- State B: invoice loaded -->
+        <div class="shop-status">
+          <div class="shop-progress-meta"><span><strong>3</strong> of 5 lines checked</span><span>2 issues</span></div>
+          <div class="shop-progress" role="progressbar" aria-valuenow="3" aria-valuemax="5"><span class="shop-progress__bar" style="width:60%"></span></div>
+        </div>
+      </div>
+      <section class="shop-stack shop-stack--tight">
+        <div class="shop-between">
+          <h2 class="shop-group-title">Items <small>5</small></h2>
+          <button class="shop-btn shop-btn--ghost" type="button"><svg class="shop-ico shop-ico--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg>New first</button>
+        </div>
+        <!-- State A rows: no invoice, scanned count only -->
+        <div class="shop-list">
+          <button class="shop-row shop-item is-latest" type="button">
+            <span class="shop-row__main"><span class="shop-row__title">Coteaux Nantais Strawberry Jam 690 g</span><span class="shop-row__meta"><span class="shop-code">30301011</span><span class="shop-row__stock">Stock 4</span></span></span>
+            <span class="shop-row__aside"><span class="shop-row__qty">6</span></span>
+          </button>
+          <button class="shop-row shop-item" type="button">
+            <span class="shop-row__main"><span class="shop-row__title">Philia Extra Virgin Olive Oil 75 cl</span><span class="shop-row__meta"><span class="shop-code">11106039</span><span class="shop-row__stock">Stock 9</span></span></span>
+            <span class="shop-row__aside"><span class="shop-row__qty">12</span></span>
+          </button>
+        </div>
+        <!-- State B rows: invoice loaded, scanned / expected and a status pill where needed -->
+        <div class="shop-list">
+          <button class="shop-row shop-item is-latest" type="button">
+            <span class="shop-row__main"><span class="shop-row__title">Coteaux Nantais Strawberry Jam 690 g</span><span class="shop-row__meta"><span class="shop-code">30301011</span><span class="shop-row__stock">Stock 4</span></span></span>
+            <span class="shop-row__aside"><span class="shop-row__qty">6<small> / 6</small></span></span>
+          </button>
+          <button class="shop-row shop-item" type="button">
+            <span class="shop-row__main"><span class="shop-row__title">Philia Extra Virgin Olive Oil 75 cl</span><span class="shop-row__meta"><span class="shop-code">11106039</span><span class="shop-row__stock">Stock 9</span></span></span>
+            <span class="shop-row__aside"><span class="shop-row__qty">10<small> / 12</small></span><span class="shop-pill shop-pill--warn">Short</span></span>
+          </button>
+          <button class="shop-row shop-item" type="button">
+            <span class="shop-row__main"><span class="shop-row__title">Dynamis Halloumi 250 g</span><span class="shop-row__meta"><span class="shop-code">20459990</span><span class="shop-row__stock">Stock 3</span></span></span>
+            <span class="shop-row__aside"><span class="shop-row__qty">4<small> / —</small></span><span class="shop-pill shop-pill--bad">Unexpected</span></span>
+          </button>
+          <button class="shop-row shop-item" type="button">
+            <span class="shop-row__main"><span class="shop-row__title">Dynamis Feta PDO 200 g</span><span class="shop-row__meta"><span class="shop-code">20450129</span><span class="shop-row__stock">Stock 15</span></span></span>
+            <span class="shop-row__aside"><span class="shop-row__qty">0<small> / 10</small></span><span class="shop-pill shop-pill--muted">Not scanned</span></span>
+          </button>
+        </div>
+      </section>
+    </div>
+    <div class="shop-actions"><a class="shop-btn shop-btn--primary shop-btn--lg" href="screen-06-delivery-summary.html">Summary<span class="shop-btn__count">2</span></a></div>
+  </main>
+</div>
+</body>
+</html>

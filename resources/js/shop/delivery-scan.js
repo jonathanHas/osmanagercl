@@ -11,7 +11,11 @@
  * zero quantity, which records nothing, a prompt shows the product with what has
  * been scanned so far, the invoice figure and the stock, and only "Add N" records
  * it. Scanning an outer/case barcode adds whole cases, which the endpoint works
- * out. Corrections after the fact use the row stepper.
+ * out.
+ *
+ * Screen 05 v2: a row is a button. Tapping it opens a correction card beside the
+ * list, because a button cannot hold the stepper's own buttons. Sort is a single
+ * toggle whose label names the order in force.
  *
  * After every write the whole list is refetched: the server owns the expected
  * quantities and the statuses, and re-deriving them here would be a second
@@ -107,6 +111,11 @@ export default () => ({
      * unscanned, then the rest by name. "Scanned first" is the reverse emphasis:
      * what has been counted, then what has not.
      */
+    /** The row the correction card is editing, or null. */
+    get editingRow() {
+        return this.rows.find((r) => r.barcode === this.editing) ?? null;
+    },
+
     get sorted() {
         const byName = (a, b) => (a.name ?? '').localeCompare(b.name ?? '');
 
@@ -161,6 +170,9 @@ export default () => ({
             await this.commit();
         }
 
+        // A scan is a new subject; an open correction card for another row would
+        // sit there looking current.
+        this.editing = null;
         this.busy = true;
 
         try {
@@ -289,8 +301,21 @@ export default () => ({
         this.recent = [barcode, ...this.recent.filter((b) => b !== barcode)];
     },
 
+    /** The label names the order in force, so tapping it flips to the other. */
+    toggleSort() {
+        this.sort = this.sort === 'new' ? 'scanned' : 'new';
+    },
+
     edit(row) {
-        this.editing = this.editing === row.barcode ? null : row.barcode;
+        const opening = this.editing !== row.barcode;
+
+        this.editing = opening ? row.barcode : null;
+
+        // On a phone the card is below the fold; bring it into view as the
+        // scan prompt does.
+        if (opening) {
+            this.$nextTick(() => this.$refs.correct?.scrollIntoView({ block: 'nearest' }));
+        }
     },
 
     async adjust(row, delta) {
@@ -335,24 +360,35 @@ export default () => ({
         return await response.json();
     },
 
-    qtyLabel(row) {
-        return `${row.scanned ?? 0} / ${row.expected ?? '—'}`;
+    /**
+     * STOCKCURRENT.UNITS is a decimal, so a whole number arrives as 4 and must not
+     * read "4.0"; a weighed item can be 1.25. Up to 3 dp, trailing zeros trimmed.
+     */
+    stockText(row) {
+        const n = Number(row?.stock ?? 0);
+
+        return Number.isInteger(n) ? String(n) : String(parseFloat(n.toFixed(3)));
     },
 
     expectedLabel(row) {
         return `/ ${row.expected ?? '—'}`;
     },
 
+    /**
+     * A pill only where there is something to say. A matching line needs no
+     * badge, and without an invoice nothing is "unexpected" — every row is just
+     * a count.
+     */
     pill(row) {
         switch (row.status) {
             case 'ok':
-                return { text: 'OK', tone: 'shop-pill--ok' };
+                return null;
             case 'short':
                 return { text: 'Short', tone: 'shop-pill--warn' };
             case 'over':
                 return { text: 'Over', tone: 'shop-pill--warn' };
             case 'unexpected':
-                return { text: 'Unexpected', tone: 'shop-pill--bad' };
+                return this.hasInvoice ? { text: 'Unexpected', tone: 'shop-pill--bad' } : null;
             default:
                 return { text: 'Not scanned', tone: 'shop-pill--muted' };
         }

@@ -916,6 +916,9 @@ class DeliveryLegacyController extends Controller
                 // Completion only increments STOCKCURRENT for rows that resolved
                 // to a product, so the summary must not promise more than that.
                 'stockable' => ! empty($item->productID),
+                // Current shop stock, shown on the scan row so staff can see what
+                // is already on the shelf. Null when the product did not resolve.
+                'stock' => $item->UNITS === null ? null : (float) $item->UNITS,
                 'status' => match (true) {
                     $scanned === null => 'not_scanned',
                     $scanned == $expected => 'ok',
@@ -936,6 +939,7 @@ class DeliveryLegacyController extends Controller
                 'expected' => null,
                 'scanned' => (float) $item->scanned,
                 'stockable' => ! empty($item->productID),
+                'stock' => $item->UNITS === null ? null : (float) $item->UNITS,
                 'status' => 'unexpected',
             ];
         }

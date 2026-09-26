@@ -2,8 +2,15 @@
     'placeholder' => 'Scan or type a barcode',
     'hint' => 'Ready — scanner listening',
     'camera' => true,
+    /**
+     * Compact variant (delivery scan v2): the camera and keyboard toggles sit
+     * inside the field and there is no hint line. Every other screen leaves this
+     * false and gets byte-for-byte the markup it had before.
+     */
+    'inline' => false,
 ])
-<div class="shop-scan" x-data="shopScanInput()" :class="{ 'is-camera': cameraOpen, 'is-error': error !== null }"
+
+<div class="shop-scan{{ $inline ? ' shop-scan--inline' : '' }}" x-data="shopScanInput()" :class="{ 'is-camera': cameraOpen, 'is-error': error !== null }"
      @shop-scan-done.window="done()" @shop-scan-error.window="fail($event.detail)"
      @shop-scan-saved.window="restartCameraIfWanted()">
     <label class="shop-scan__field">
@@ -11,14 +18,22 @@
         <span class="shop-sr-only">Barcode</span>
         <input class="shop-scan__input" x-ref="input" x-model="value" :inputmode="inputMode" autocomplete="off" enterkeyhint="go"
                placeholder="{{ $placeholder }}" @keydown.enter.prevent="submit()" @focusout="refocus($event)">
+        @if ($camera && $inline)
+            {{-- Inside the field in the compact variant. A button is interactive
+                 content, so clicking one does not activate the enclosing label. --}}
+            <button class="shop-iconbtn shop-touch-only" type="button" :aria-pressed="cameraOpen" aria-label="Camera" @click="toggleCamera()"><x-shop.icon name="camera" /></button>
+            <button class="shop-iconbtn shop-touch-only" type="button" :aria-pressed="keyboard" aria-label="Show keyboard" @click="toggleKeyboard()"><x-shop.icon name="keyboard" /></button>
+        @endif
     </label>
-    @if ($camera)
+    @if ($camera && ! $inline)
         <div class="shop-scan__tools">
             <button class="shop-iconbtn shop-touch-only" type="button" :aria-pressed="cameraOpen" aria-label="Camera" @click="toggleCamera()"><x-shop.icon name="camera" /></button>
             <button class="shop-iconbtn shop-touch-only" type="button" :aria-pressed="keyboard" aria-label="Show keyboard" @click="toggleKeyboard()"><x-shop.icon name="keyboard" /></button>
         </div>
     @endif
-    <p class="shop-scan__hint">{{ $hint }}</p>
+    @unless ($inline)
+        <p class="shop-scan__hint">{{ $hint }}</p>
+    @endunless
     <p class="shop-scan__msg"><x-shop.icon name="alert" size="sm" /><span x-text="error"></span></p>
     {{-- html5-qrcode replaces the children of the element it mounts on, so it gets
          its own empty div; the reticle and label must survive. --}}

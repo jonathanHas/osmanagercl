@@ -149,7 +149,7 @@
 
 /* ── Top bar ──────────────────────────────────────── */
 .shop-topbar { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: var(--shop-space-3); min-height: var(--shop-topbar-h); padding: var(--shop-space-2) var(--shop-space-3); background: var(--shop-bg); border-bottom: 1px solid var(--shop-line); }
-.shop-topbar__title { flex: 1; min-width: 0; font-size: var(--shop-fs-lg); font-weight: var(--shop-fw-heavy); line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shop-topbar__title { flex: 1; min-width: 0; font-size: var(--shop-fs-lg); font-weight: var(--shop-fw-heavy); line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .shop-topbar__brand { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--shop-space-3); font-size: var(--shop-fs-lg); font-weight: var(--shop-fw-heavy); white-space: nowrap; }
 .shop-topbar__mark { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 50%; background: var(--shop-sage); color: var(--shop-on-accent); }
 
@@ -414,6 +414,30 @@ textarea.shop-input { min-height: 112px; padding: 14px 20px; border-radius: var(
 .shop-request__foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--shop-space-2); }
 .shop-group-title { display: flex; align-items: baseline; gap: 10px; font-size: var(--shop-fs-lg); font-weight: var(--shop-fw-heavy); }
 .shop-group-title small { font-size: var(--shop-fs-sm); font-weight: var(--shop-fw-bold); color: var(--shop-ink-2); }
+
+/* ── Two-line top bar title ─────────────────────── */
+.shop-topbar__titles { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.shop-topbar__titles .shop-topbar__title { flex: none; }
+.shop-topbar__sub { font-size: var(--shop-fs-xs); font-weight: var(--shop-fw-bold); color: var(--shop-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Compact scan: tools sit inside the field ─────── */
+.shop-scan--inline { grid-template-columns: minmax(0, 1fr); }
+.shop-scan--inline .shop-scan__field { padding-right: 6px; }
+.shop-scan--inline .shop-scan__field > .shop-iconbtn { width: 52px; height: 52px; border-color: transparent; background: transparent; }
+.shop-scan--inline .shop-scan__field > .shop-iconbtn[aria-pressed="true"] { background: var(--shop-accent-soft); }
+.shop .shop-scan__input, .shop .shop-scan__input:focus { border: 0; outline: none; box-shadow: none; background: transparent; appearance: none; }
+
+/* ── Status strip + notice ────────────────────────── */
+.shop-status { display: flex; flex-direction: column; gap: 8px; padding: 0 4px; }
+.shop-notice { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: var(--shop-radius-pill); background: var(--shop-muted-soft); color: var(--shop-muted-ink); font-size: var(--shop-fs-sm); font-weight: var(--shop-fw-bold); line-height: 1.3; }
+.shop-notice > .shop-ico { flex: none; }
+
+/* ── Delivery item row ────────────────────────────── */
+.shop-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px var(--shop-space-4); width: 100%; min-height: 80px; text-align: left; }
+.shop-item .shop-row__aside { gap: 6px; }
+.shop-item .shop-row__qty { font-size: var(--shop-fs-xl); }
+.shop-row__stock { color: var(--shop-ink-2); white-space: nowrap; }
+.shop-row__stock::before { content: "·"; margin: 0 6px; }
 
 /* ── Request rows (staff) ─────────────────────────── */
 .shop-reqs { display: flex; flex-direction: column; gap: var(--shop-space-2); }

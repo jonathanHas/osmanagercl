@@ -58,6 +58,14 @@ Route::get('/auth/check', function () {
 // login. Every write (create / edit / status change) lives in the auth group below.
 Route::get('/customer-requests', [CustomerRequestController::class, 'index'])->name('customer-requests.index');
 
+// A 112 px thumbnail of a product's till photo, for the public board. Public, but
+// only for products on a current request line (the controller 404s otherwise) and
+// never the full-size photo — `products.image` stays behind auth.
+Route::get('/customer-requests/photo/{code}', [CustomerRequestController::class, 'photo'])
+    ->where('code', '[A-Za-z0-9_-]+')
+    ->middleware('throttle:120,1')
+    ->name('customer-requests.photo');
+
 Route::get('/dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {

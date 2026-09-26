@@ -18,6 +18,11 @@ class ShopLayout extends Component
         public string $title = 'Shop',
         /** URL for the back button. Null shows the brand mark instead (Home). */
         public ?string $back = null,
+        /**
+         * A second line under the title, e.g. a delivery session id and date.
+         * Only rendered when there is a back button.
+         */
+        public ?string $subtitle = null,
         /** Show a "Staff sign in" button rather than assuming a user. */
         public bool $guestSafe = false,
         /** Drop the top bar entirely (the Locked screen). */

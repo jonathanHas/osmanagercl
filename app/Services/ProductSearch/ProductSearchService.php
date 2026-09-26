@@ -477,10 +477,16 @@ class ProductSearchService
      *
      * A code that matches no product is simply absent from the result.
      *
+     * `$posPhotoUrl`, when given, replaces the URL used for a product whose picture
+     * is the till's own photo — the public requests board needs its own route,
+     * because `products.image` requires a login. Supplier resolution is unchanged,
+     * and callers that pass nothing get exactly what they got before.
+     *
      * @param  array<int, string|null>  $codes
+     * @param  null|callable(Product): string  $posPhotoUrl
      * @return array<string, string|null> CODE => url or null
      */
-    public function imageUrlsByCode(array $codes): array
+    public function imageUrlsByCode(array $codes, ?callable $posPhotoUrl = null): array
     {
         $codes = array_values(array_unique(array_filter($codes, fn ($c) => $c !== null && $c !== '')));
 
@@ -500,7 +506,9 @@ class ProductSearchService
         $urls = [];
 
         foreach ($products as $product) {
-            $urls[$product->CODE] = $this->imageUrl($product, $cache);
+            $urls[$product->CODE] = $posPhotoUrl !== null && $product->has_image
+                ? $posPhotoUrl($product)
+                : $this->imageUrl($product, $cache);
         }
 
         return $urls;

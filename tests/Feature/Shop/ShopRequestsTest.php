@@ -29,6 +29,8 @@ class ShopRequestsTest extends TestCase
     {
         parent::setUp();
 
+        \Illuminate\Support\Facades\Storage::fake('local');
+
         Config::set('database.connections.pos', [
             'driver' => 'sqlite',
             'database' => ':memory:',
@@ -61,7 +63,9 @@ class ShopRequestsTest extends TestCase
         });
 
         DB::connection('pos')->table('PRODUCTS')->insert([
-            ['ID' => 'p1', 'NAME' => 'Oat drink 1 L', 'CODE' => '5000000000017', 'REFERENCE' => 'OAT1', 'CATEGORY' => 'c1', 'PRICESELL' => 2.10, 'TAXCAT' => '001', 'IMAGE' => 'fake-jpeg-bytes'],
+            ['ID' => 'p1', 'NAME' => 'Oat drink 1 L', 'CODE' => '5000000000017', 'REFERENCE' => 'OAT1', 'CATEGORY' => 'c1', 'PRICESELL' => 2.10, 'TAXCAT' => '001', 'IMAGE' => self::photoBlob()],
+            // A second product with no photo, for the 404 case.
+            ['ID' => 'p2', 'NAME' => 'Rye bread', 'CODE' => '5000000000024', 'REFERENCE' => 'RYE1', 'CATEGORY' => 'c1', 'PRICESELL' => 3.00, 'TAXCAT' => '001', 'IMAGE' => null],
         ]);
     }
 
@@ -80,10 +84,32 @@ class ShopRequestsTest extends TestCase
     /**
      * A due request for "Walk-in Wendy" with one stocked line.
      */
-    /** The picture the shared resolver produces for the fixture's product. */
+    /**
+     * A real (tiny) PNG, so ProductThumbnailService can actually decode it — the
+     * public photo route 404s on a blob it cannot encode.
+     */
+    private static function photoBlob(): string
+    {
+        $im = imagecreatetruecolor(60, 40);
+        imagefill($im, 0, 0, imagecolorallocate($im, 20, 120, 200));
+        ob_start();
+        imagepng($im);
+        imagedestroy($im);
+
+        return ob_get_clean();
+    }
+
+    /**
+     * The picture the board resolver produces for the fixture's product: the
+     * public thumbnail route, versioned by the photo's md5 (cycle 22), not
+     * `products.image`, which a guest cannot load.
+     */
     private function photoUrl(): string
     {
-        return route('products.image', 'p1');
+        return route('customer-requests.photo', [
+            'code' => '5000000000017',
+            'v' => substr(md5(self::photoBlob()), 0, 8),
+        ]);
     }
 
     /** A free-text sourcing line: no product, so no picture and no placeholder. */
@@ -155,6 +181,103 @@ class ShopRequestsTest extends TestCase
         $response->assertDontSee('shop-req__date', false);
         $response->assertDontSee('shop-steps', false);
         $response->assertDontSee('Search customer or item');
+    }
+
+    // --- cycle 22: the public thumbnail route ------------------------------
+
+    private function photoRoute(string $code = '5000000000017', array $query = []): string
+    {
+        return route('customer-requests.photo', array_merge(['code' => $code], $query));
+    }
+
+    public function test_a_guest_can_load_a_request_line_photo(): void
+    {
+        $this->seedDueRequest();
+
+        // No session at all: this is the case that used to show a placeholder.
+        $response = $this->get($this->photoRoute())->assertOk();
+
+        $response->assertHeader('Content-Type', 'image/jpeg');
+
+        $info = getimagesizefromstring($response->getContent());
+        $this->assertSame([112, 112], [$info[0], $info[1]]);
+        $this->assertSame('image/jpeg', $info['mime']);
+    }
+
+    public function test_the_photo_route_caches_hard_only_with_a_matching_version(): void
+    {
+        $this->seedDueRequest();
+        $version = substr(md5(self::photoBlob()), 0, 8);
+
+        $good = $this->get($this->photoRoute('5000000000017', ['v' => $version]))->assertOk();
+        $this->assertStringContainsString('max-age=604800', $good->headers->get('Cache-Control'));
+        $this->assertStringContainsString('immutable', $good->headers->get('Cache-Control'));
+
+        foreach (['deadbeef', strtoupper($version), ''] as $bad) {
+            $response = $this->get($this->photoRoute('5000000000017', ['v' => $bad]))->assertOk();
+            $this->assertStringContainsString('must-revalidate', $response->headers->get('Cache-Control'), "v={$bad}");
+            $this->assertStringNotContainsString('604800', $response->headers->get('Cache-Control'), "v={$bad}");
+        }
+
+        // A revalidation keeps the long lifetime, as the F&V route does.
+        $etag = $good->headers->get('ETag');
+        $revalidated = $this->get($this->photoRoute('5000000000017', ['v' => $version]), ['If-None-Match' => $etag]);
+        $revalidated->assertStatus(304);
+        $this->assertStringContainsString('max-age=604800', $revalidated->headers->get('Cache-Control'));
+    }
+
+    public function test_the_photo_route_refuses_a_product_that_is_not_on_a_current_request(): void
+    {
+        // The product exists and has a photo, but nobody has asked for it.
+        $this->get($this->photoRoute())->assertNotFound();
+
+        // A line on a request closed long ago is not current either.
+        $item = $this->seedDueRequest();
+        $item->request->update(['closed_at' => now()->subDays(40)]);
+        $this->get($this->photoRoute())->assertNotFound();
+
+        // Recently closed is still on the staff board's Done view, so it is served.
+        $item->request->update(['closed_at' => now()->subDays(5)]);
+        $this->get($this->photoRoute())->assertOk();
+
+        // And reopening it works too.
+        $item->request->update(['closed_at' => null]);
+        $this->get($this->photoRoute())->assertOk();
+    }
+
+    public function test_the_photo_route_refuses_a_product_with_no_photo(): void
+    {
+        $request = CustomerRequest::factory()->create(['customer_name' => 'No Photo Nora']);
+        CustomerRequestItem::factory()->for($request, 'request')->create([
+            'product_code' => '5000000000024',
+            'product_name' => 'Rye bread',
+            'position' => 1,
+        ]);
+
+        $this->get($this->photoRoute('5000000000024'))->assertNotFound();
+    }
+
+    public function test_the_photo_route_refuses_an_unknown_code(): void
+    {
+        $this->seedDueRequest();
+
+        $this->get($this->photoRoute('9999999999999'))->assertNotFound();
+    }
+
+    public function test_the_photo_route_is_public_and_throttled_but_never_serves_the_full_photo(): void
+    {
+        $this->seedDueRequest();
+
+        $route = app('router')->getRoutes()->getByName('customer-requests.photo');
+
+        // Public by design; the 404 rule above is the whole authorisation.
+        $this->assertNotContains('auth', $route->gatherMiddleware());
+        $this->assertContains('throttle:120,1', $route->gatherMiddleware());
+
+        // What comes back is a 112 px JPEG, never the stored blob.
+        $body = $this->get($this->photoRoute())->assertOk()->getContent();
+        $this->assertNotSame(self::photoBlob(), $body);
+        $this->assertSame([112, 112], array_slice(getimagesizefromstring($body), 0, 2));
     }
 
     public function test_a_sourcing_line_has_no_picture_and_no_placeholder(): void
