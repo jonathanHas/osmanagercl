@@ -83,8 +83,7 @@
             <div class="shop-list">
                 <template x-for="p in results" :key="p.id">
                     <button class="shop-row" type="button" :class="{ 'is-off': units(p) === 0 }" @click="select(p)">
-                        <img class="shop-thumb" x-show="hasImage(p)" :src="p.image_url" :alt="p.name" loading="lazy" decoding="async" x-on:error="imageFailed(p)" @mouseenter="peekAt(p, $el)" @mouseleave="unpeek()">
-                        <span class="shop-row__lead" x-show="! hasImage(p)"><x-shop.icon name="package" /></span>
+                        <x-shop.product-thumb x-on:mouseenter="peekAt(p, $el)" x-on:mouseleave="unpeek()" />
                         <div class="shop-row__main">
                             <span class="shop-row__title" x-text="p.name"></span>
                             <span class="shop-row__meta shop-code" x-text="rowMeta(p)"></span>

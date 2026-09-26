@@ -607,7 +607,7 @@ Pre-orders and "please source this" asks, moved out of the spreadsheet into a bo
 - **One or more lines per request**: Each line is a stocked POS product (scan or typeahead, name snapshotted) or free text to source, with its own status
 - **Lifecycle**: `pending → ordered → put_aside → collected`, plus `not_available` and `cancelled`, with undo moves and an append-only status log; a request closes itself when every line is terminal
 - **Reminders**: Dashboard banner counting requests due and items put aside awaiting collection; a pink **Put aside for …** badge and summary card on the legacy delivery match screen; a scanner prompt with a one-tap **Mark put aside**
-- **Own layout**: `<x-board-layout>` — full width, no sidebar, renders for guests (the admin layout cannot)
+- **Shop mode shell**: `<x-shop-layout>` — the board, detail and edit pages all render in Shop mode; it renders for guests (the admin layout cannot)
 
 📖 [Customer Requests Documentation](./features/customer-requests.md)
 

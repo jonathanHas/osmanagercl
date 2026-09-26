@@ -111,6 +111,9 @@ class ShopRequestsTest extends TestCase
 
         // Guests keep the cycle 12 cards: none of the staff v2 furniture.
         $response->assertSee('shop-request', false);
+        // The guest card no longer takes staff-only arguments, so none of what
+        // they gated can appear.
+        $response->assertDontSee(route('customer-requests.edit', 1), false);
         $response->assertDontSee('shop-req__date', false);
         $response->assertDontSee('shop-steps', false);
         $response->assertDontSee('Search customer or item');
@@ -163,6 +166,96 @@ class ShopRequestsTest extends TestCase
         $response->assertSee(':aria-expanded="more"', false);
         $response->assertSee('shop-menu--static shop-req__more', false);
         $response->assertSee('x-show="more"', false);
+    }
+
+    public function test_board_panel_links_to_details(): void
+    {
+        $item = $this->seedDueRequest();
+
+        $this->actingAs($this->employee())
+            ->get('/customer-requests')
+            ->assertOk()
+            ->assertSee(route('customer-requests.show', $item->request), false)
+            ->assertSee('Details');
+    }
+
+    public function test_detail_page_is_shop_styled_and_lists_lines_and_history(): void
+    {
+        $employee = $this->employee();
+        $request = CustomerRequest::factory()->create(['customer_name' => 'History Hetty', 'wanted_on' => today()]);
+        $first = CustomerRequestItem::factory()->for($request, 'request')->create(['description' => 'First line', 'position' => 1]);
+        CustomerRequestItem::factory()->for($request, 'request')->create(['description' => 'Second line', 'position' => 2]);
+
+        // Move one line so there is a history entry with a note and a user.
+        $this->actingAs($employee)
+            ->patch(route('customer-requests.items.status', $first), [
+                'status' => CustomerRequestItem::STATUS_ORDERED,
+                'note' => 'Udea order #123',
+            ])
+            ->assertRedirect();
+
+        $response = $this->actingAs($employee)
+            ->get(route('customer-requests.show', $request))
+            ->assertOk();
+
+        $response->assertSee('data-shell="shop"', false);
+        $response->assertSee('shop-page--narrow', false);
+        $response->assertSee('History Hetty');
+        $response->assertSee('First line');
+        $response->assertSee('Second line');
+        $response->assertSee('Ordered');
+        $response->assertSee('Status history');
+        $response->assertSee('Pending');
+        $response->assertSee('Udea order #123');
+        $response->assertSee($employee->name);
+        $response->assertSee(route('customer-requests.edit', $request), false);
+    }
+
+    public function test_edit_page_seeds_lines_and_posts_to_update(): void
+    {
+        $employee = $this->employee();
+        $request = CustomerRequest::factory()->create(['customer_name' => 'Edit Edna']);
+        $keep = CustomerRequestItem::factory()->for($request, 'request')->create(['description' => 'Keep me', 'position' => 1]);
+
+        $response = $this->actingAs($employee)
+            ->get(route('customer-requests.edit', $request))
+            ->assertOk();
+
+        $response->assertSee('x-data="shopRequestEdit(', false);
+        $response->assertSee('data-search-url="'.e(route('api.products.search')).'"', false);
+        $response->assertSee('name="_method" value="PUT"', false);
+        $response->assertSee('Save changes');
+        $response->assertSee('Line statuses are changed from the board');
+        $response->assertSee('Keep me');
+        // A stocked line seeded without an image still reads as a product; only
+        // a free-text line gets the "to source" sprout.
+        $response->assertSee('#package', false);
+        $response->assertSee('#sprout', false);
+
+        $this->actingAs($employee)
+            ->put(route('customer-requests.update', $request), [
+                'customer_name' => 'Edit Edna',
+                'items' => [
+                    ['id' => $keep->id, 'description' => 'Renamed line', 'quantity' => 3],
+                    ['description' => 'Brand new line', 'quantity' => 1],
+                ],
+            ])
+            ->assertRedirect(route('customer-requests.index'))
+            ->assertSessionHas('status');
+
+        $this->assertSame('Renamed line', $keep->fresh()->description);
+        $this->assertSame(2, $request->fresh()->items()->count());
+        // Editing details never moves a line's status.
+        $this->assertSame(CustomerRequestItem::STATUS_PENDING, $keep->fresh()->status);
+    }
+
+    public function test_board_layout_is_gone(): void
+    {
+        $this->assertFileDoesNotExist(resource_path('views/layouts/board.blade.php'));
+        // Second argument false: do not invoke the autoloader, so this asserts the
+        // class is gone rather than that the classmap happens to be fresh.
+        $this->assertFalse(class_exists(\App\View\Components\BoardLayout::class, false));
+        $this->assertDirectoryDoesNotExist(resource_path('views/customer-requests'));
     }
 
     public function test_rows_are_grouped_and_counted(): void

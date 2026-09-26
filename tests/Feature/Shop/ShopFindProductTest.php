@@ -78,6 +78,21 @@ class ShopFindProductTest extends TestCase
         $response->assertDontSee('Edit');
     }
 
+    /**
+     * The thumbnail component is shared, so a caller must be able to hang its own
+     * handlers on the <img> — Find product's hover preview depends on it.
+     */
+    public function test_product_thumb_component_passes_attributes_through(): void
+    {
+        $html = \Illuminate\Support\Facades\Blade::render(
+            '<x-shop.product-thumb x-on:mouseenter="peekAt(p, $el)" />'
+        );
+
+        $this->assertStringContainsString('x-on:mouseenter="peekAt(p, $el)"', $html);
+        $this->assertStringContainsString('x-on:error="imageFailed(p)"', $html);
+        $this->assertStringContainsString('class="shop-thumb"', $html);
+    }
+
     public function test_barista_is_forbidden(): void
     {
         $this->actingAs($this->userWith('barista', ['kds.access']))
@@ -172,7 +187,10 @@ class ShopFindProductTest extends TestCase
 
         $response->assertSee('class="shop-peek"', false);
         $response->assertSee('peekAt(p, $el)', false);
-        $response->assertSee('@mouseleave="unpeek()"', false);
+        // x-on:, not the @ shorthand: these handlers ride on the shared
+        // x-shop.product-thumb component tag, and Blade does not pass @-prefixed
+        // attributes through $attributes reliably.
+        $response->assertSee('x-on:mouseleave="unpeek()"', false);
 
         // One shared panel for the whole list, not one per row.
         $this->assertSame(1, substr_count($response->getContent(), 'class="shop-peek"'));

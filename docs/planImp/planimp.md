@@ -83,6 +83,11 @@ Do:
   with a reason. A review that does not mention the notes is not finished.
   (Cycle 7, 2026-09-24: two correct notes were missed because the report was
   read only part-way; a follow-up cycle was needed.)
+- Two Alpine facts every Shop plan should respect: never use an Alpine `@`
+  shorthand that is also a Blade directive (`@error`, `@class`, …; write
+  `x-on:error`); and `x-show` hides an element but still evaluates its other
+  bindings, so anything nullable behind an `x-show` guard needs `?.` in `:src`,
+  `:alt` and handlers, or an `x-if` template instead (cycle 14b).
 
 Don't:
 

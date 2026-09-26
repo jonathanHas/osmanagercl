@@ -78,14 +78,14 @@ class CustomerRequestController extends Controller
     {
         $customerRequest->load(['items.statusLogs.user', 'items.statusChanger', 'creator', 'updater', 'closer']);
 
-        return view('customer-requests.show', ['customerRequest' => $customerRequest]);
+        return view('shop.request-show', ['customerRequest' => $customerRequest]);
     }
 
     public function edit(CustomerRequest $customerRequest): View
     {
         $customerRequest->load('items');
 
-        return view('customer-requests.edit', [
+        return view('shop.request-edit', [
             'customerRequest' => $customerRequest,
             'seedItems' => $this->seedItems($customerRequest),
         ]);

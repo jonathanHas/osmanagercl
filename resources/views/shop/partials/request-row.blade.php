@@ -123,6 +123,10 @@
          underneath another row's. --}}
     <div class="shop-menu shop-menu--static shop-req__more" role="group" aria-label="More actions" x-show="more" x-cloak>
 
+            <a class="shop-menu__item" href="{{ route('customer-requests.show', $request) }}">
+                <x-shop.icon name="list-checks" />Details
+            </a>
+
             <a class="shop-menu__item" href="{{ route('customer-requests.edit', $request) }}">
                 <x-shop.icon name="pencil" />Edit
             </a>

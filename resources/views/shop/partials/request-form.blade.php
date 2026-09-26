@@ -26,8 +26,7 @@
         <label class="shop-field__label" for="product_query">Item</label>
 
         <div class="shop-row is-latest" x-show="picked" x-cloak>
-            <img class="shop-thumb" x-show="picked && hasImage(picked)" :src="picked?.image_url" :alt="picked?.name" decoding="async" x-on:error="imageFailed(picked)">
-            <span class="shop-row__lead" x-show="! picked || ! hasImage(picked)"><x-shop.icon name="package" /></span>
+            <x-shop.product-thumb expr="picked" />
             <div class="shop-row__main">
                 <span class="shop-row__title" x-text="picked?.name"></span>
                 <span class="shop-row__meta shop-code" x-text="picked?.code"></span>
@@ -47,8 +46,7 @@
         <div class="shop-list" x-show="! picked && results.length" x-cloak>
             <template x-for="p in results" :key="p.id">
                 <button class="shop-row" type="button" @click="pick(p)">
-                    <img class="shop-thumb" x-show="hasImage(p)" :src="p.image_url" :alt="p.name" loading="lazy" decoding="async" x-on:error="imageFailed(p)">
-                    <span class="shop-row__lead" x-show="! hasImage(p)"><x-shop.icon name="package" /></span>
+                    <x-shop.product-thumb />
                     <div class="shop-row__main">
                         <span class="shop-row__title" x-text="p.name"></span>
                         <span class="shop-row__meta shop-code" x-text="p.code"></span>

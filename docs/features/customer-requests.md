@@ -18,7 +18,7 @@ Customer Requests moves that spreadsheet into the app:
 - **`CustomerRequestService`** (`app/Services/`): all business logic — creating and syncing lines, the status lifecycle (`changeItemStatus`), the board grouping, dashboard counts, the barcode lookup used by delivery screens, and the POS product search.
 - **`CustomerRequestRequest`** / **`UpdateCustomerRequestItemStatusRequest`** (`app/Http/Requests/`): validation. The first also checks that every `items.*.id` on an update belongs to the request being edited.
 - **Models**: `CustomerRequest`, `CustomerRequestItem`, `CustomerRequestItemStatusLog`.
-- **`<x-board-layout>`** (`app/View/Components/BoardLayout.php`, `resources/views/layouts/board.blade.php`): a full-width layout with no sidebar that renders for guests. `<x-admin-layout>` calls `auth()->user()->can()` unguarded in its sidebar and cannot render logged out, which is why the board has its own layout. Guests get a 5-minute `<meta http-equiv="refresh">`; signed-in users get the same stale-session check as the admin layout instead, so nobody is reloaded mid-edit.
+- **`<x-shop-layout>`** (`app/View/Components/ShopLayout.php`, `resources/views/layouts/shop.blade.php`): every customer-request page renders in the Shop shell since cycle 14; `BoardLayout` is gone. It renders for guests, and its `guestRefresh` prop gives a signed-out viewer a 5-minute `<meta http-equiv="refresh">` while signed-in users keep the stale-session check instead, so nobody is reloaded mid-edit.
 - **Views** (`resources/views/customer-requests/`): `index` (the board), `_form` (shared by `create` / `edit`, Alpine.js with dynamic lines and a product typeahead), `show` (detail + status history), and partials for the request card, status pill and status buttons.
 - **Delivery hook**: `resources/views/delivery-legacy/partials/customer-request-badge.blade.php`, included after every product name on the match page, plus a summary card and a scanner prompt with a one-tap **Mark put aside** button.
 
@@ -227,5 +227,16 @@ endpoint are unchanged.
   plain HTML POST to `customer-requests.store`, so the redirect-and-flash contract
   is untouched; the only JavaScript is the typeahead in
   `resources/js/shop/requests.js`.
-- `show` and `edit` still use `BoardLayout` and are unchanged — they are the next
-  cycle's work.
+- `show` and `edit` are Shop screens too since cycle 14:
+  `resources/views/shop/request-show.blade.php` (header facts, the lines with
+  status pills, and the full status history) and
+  `resources/views/shop/request-edit.blade.php` (customer, phone, due date and
+  notes; rename lines, change quantities and line notes; add a stocked product by
+  typing or scanning, or a free-text line to source; remove a line that has not
+  moved past pending). Statuses are never changed from the edit screen — the
+  board does that. Behaviour is `resources/js/shop/request-edit.js`.
+- The product thumbnail and the typeahead are shared:
+  `<x-shop.product-thumb>`, `resources/js/shop/product-images.js` and
+  `resources/js/shop/product-typeahead.js`, used by both the New request sheet
+  and the edit screen. (Find product still has its own copy, which carries the
+  hover peek; a later tidy.)

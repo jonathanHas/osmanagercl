@@ -1,22 +1,4 @@
-@php
-    $qtyOf = fn ($value) => rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.');
-
-    $statusTone = [
-        \App\Models\CustomerRequestItem::STATUS_ORDERED => 'shop-pill--sage',
-        \App\Models\CustomerRequestItem::STATUS_PUT_ASIDE => 'shop-pill--ok',
-        \App\Models\CustomerRequestItem::STATUS_COLLECTED => 'shop-pill--ok',
-        \App\Models\CustomerRequestItem::STATUS_NOT_AVAILABLE => 'shop-pill--bad',
-        \App\Models\CustomerRequestItem::STATUS_CANCELLED => 'shop-pill--muted',
-    ];
-    $actionLabels = [
-        \App\Models\CustomerRequestItem::STATUS_ORDERED => 'Ordered',
-        \App\Models\CustomerRequestItem::STATUS_PUT_ASIDE => 'Put aside',
-        \App\Models\CustomerRequestItem::STATUS_COLLECTED => 'Collected',
-        \App\Models\CustomerRequestItem::STATUS_NOT_AVAILABLE => 'Not available',
-        \App\Models\CustomerRequestItem::STATUS_CANCELLED => 'Cancel',
-        \App\Models\CustomerRequestItem::STATUS_PENDING => 'Back to pending',
-    ];
-@endphp
+@php($qtyOf = fn ($value) => rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.'))
 
 <x-shop-layout
     title="Customer requests"
@@ -65,9 +47,6 @@
                                     @include('shop.partials.request-card', [
                                         'item' => $row['item'],
                                         'request' => $row['request'],
-                                        'canManage' => false,
-                                        'statusTone' => $statusTone,
-                                        'actionLabels' => $actionLabels,
                                         'qty' => $qtyOf,
                                     ])
                                 @endforeach
