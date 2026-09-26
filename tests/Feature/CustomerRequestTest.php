@@ -127,7 +127,10 @@ class CustomerRequestTest extends TestCase
         $response->assertOk();
         $response->assertSee('New request');
         $response->assertSee(route('customer-requests.items.status', $item));
-        $response->assertSee('Show closed');
+        // Cycle 13 replaced the "Show closed" link with a segmented view filter;
+        // the Done view is the same set of requests.
+        $response->assertSee('Done');
+        $response->assertSee(route('customer-requests.index', ['show' => 'aside']), false);
     }
 
     public function test_board_groups_due_open_and_hides_closed(): void

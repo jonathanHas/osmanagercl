@@ -38,9 +38,13 @@ class LandingRedirectTest extends TestCase
         $this->login($this->userWithRole('employee'))->assertRedirect('/shop');
     }
 
-    public function test_barista_lands_on_shop(): void
+    /**
+     * The KDS is the whole of a barista's job and Shop Home has no tile for them
+     * since cycle 12, so login goes straight there.
+     */
+    public function test_barista_lands_on_the_kds(): void
     {
-        $this->login($this->userWithRole('barista'))->assertRedirect('/shop');
+        $this->login($this->userWithRole('barista'))->assertRedirect(route('kds.index', absolute: false));
     }
 
     public function test_manager_lands_on_dashboard(): void

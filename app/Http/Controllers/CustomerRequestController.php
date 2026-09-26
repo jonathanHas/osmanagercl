@@ -24,22 +24,32 @@ class CustomerRequestController extends Controller
     public function index(Request $request): View
     {
         $canManage = $request->user()?->can('customer-requests.manage') ?? false;
-        $showClosed = $canManage && $request->boolean('closed');
 
-        $board = $this->service->board($showClosed);
+        // Staff pick a view with ?show=; ?closed=1 is kept as an alias for the
+        // Done view so old links and bookmarks still work. Guests get the board
+        // view: everything still outstanding, put-aside lines included.
+        $view = $request->boolean('closed') ? 'done' : (string) $request->query('show', 'open');
 
-        // The "new request" form lives in a modal on the board. It opens on ?new=1
+        if (! in_array($view, ['open', 'aside', 'done'], true)) {
+            $view = 'open';
+        }
+
+        if (! $canManage) {
+            $view = 'board';
+        }
+
+        // The "new request" form lives in a sheet on the board. It opens on ?new=1
         // and re-opens by itself when a submission bounced back with errors.
         $openNew = $canManage && ($request->boolean('new') || session()->hasOldInput('customer_name'));
 
-        return view('customer-requests.index', [
-            'due' => $board['due'],
-            'open' => $board['open'],
-            'closed' => $board['closed'],
-            'showClosed' => $showClosed,
+        return view('shop.requests', [
+            'rows' => $this->service->boardRows($view),
+            'view' => $view,
             'canManage' => $canManage,
             'openNew' => $openNew,
             'seedItems' => $canManage ? $this->seedItems(null) : [],
+            // The typeahead endpoint is behind auth; guests never render the form.
+            'searchUrl' => $canManage ? route('api.products.search') : null,
         ]);
     }
 

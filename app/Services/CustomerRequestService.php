@@ -193,6 +193,106 @@ class CustomerRequestService
     }
 
     /**
+     * The staff board's rows, one per line, for one of its views.
+     *
+     * - `open`   lines still to act on (pending or ordered) on open requests
+     * - `aside`  lines put aside, waiting to be collected
+     * - `board`  both of the above together: what the public guest board shows
+     * - `done`   lines finished in the last 30 days, newest first
+     *
+     * `due` holds rows whose request is due today or overdue, `open` the rest;
+     * the `done` view puts everything in `done`. `counts` drives the segmented
+     * filter and is computed whichever view is asked for.
+     *
+     * @return array{due: list<array{item: CustomerRequestItem, request: CustomerRequest}>, open: list<...>, done: list<...>, counts: array{open: int, aside: int}}
+     */
+    public function boardRows(string $view = 'open'): array
+    {
+        $statuses = match ($view) {
+            'aside' => [CustomerRequestItem::STATUS_PUT_ASIDE],
+            'board' => [CustomerRequestItem::STATUS_PENDING, CustomerRequestItem::STATUS_ORDERED, CustomerRequestItem::STATUS_PUT_ASIDE],
+            default => [CustomerRequestItem::STATUS_PENDING, CustomerRequestItem::STATUS_ORDERED],
+        };
+
+        $due = [];
+        $open = [];
+        $done = [];
+
+        if ($view === 'done') {
+            $done = $this->rowsFrom(
+                CustomerRequestItem::query()
+                    ->whereIn('status', CustomerRequestItem::DONE_STATUSES)
+                    ->where('status_changed_at', '>=', now()->subDays(30))
+                    ->with(['request.creator', 'statusChanger'])
+                    ->orderByDesc('status_changed_at')
+                    ->get()
+            );
+        } else {
+            $rows = $this->rowsFrom(
+                CustomerRequestItem::query()
+                    ->whereIn('status', $statuses)
+                    ->whereHas('request', fn ($q) => $q->open())
+                    ->with(['request.creator', 'statusChanger'])
+                    ->get()
+                    ->sortBy([
+                        fn ($item) => $item->request->wanted_on === null ? 1 : 0,
+                        fn ($item) => $item->request->wanted_on?->toDateString() ?? '',
+                        fn ($item) => $item->request->created_at?->toDateTimeString() ?? '',
+                        fn ($item) => $item->position,
+                    ])
+                    ->values()
+            );
+
+            foreach ($rows as $row) {
+                if ($row['request']->isDue()) {
+                    $due[] = $row;
+                } else {
+                    $open[] = $row;
+                }
+            }
+        }
+
+        return [
+            'due' => $due,
+            'open' => $open,
+            'done' => $done,
+            'counts' => $this->boardCounts(),
+        ];
+    }
+
+    /**
+     * @return list<array{item: CustomerRequestItem, request: CustomerRequest}>
+     */
+    private function rowsFrom($items): array
+    {
+        return $items
+            ->map(fn (CustomerRequestItem $item) => ['item' => $item, 'request' => $item->request])
+            ->filter(fn (array $row) => $row['request'] !== null)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Labels for the segmented filter. Done carries no count by design.
+     *
+     * @return array{open: int, aside: int}
+     */
+    private function boardCounts(): array
+    {
+        $onOpenRequests = fn () => CustomerRequestItem::query()
+            ->whereHas('request', fn ($q) => $q->open());
+
+        return [
+            'open' => $onOpenRequests()
+                ->whereIn('status', [CustomerRequestItem::STATUS_PENDING, CustomerRequestItem::STATUS_ORDERED])
+                ->count(),
+            'aside' => $onOpenRequests()
+                ->where('status', CustomerRequestItem::STATUS_PUT_ASIDE)
+                ->count(),
+        ];
+    }
+
+    /**
      * Counts for the dashboard banner.
      *
      * @return array{due: int, put_aside: int}

@@ -60,6 +60,16 @@ class CustomerRequestItem extends Model
     ];
 
     /**
+     * Statuses that take a line off the working board: it is finished, one way
+     * or another.
+     */
+    public const DONE_STATUSES = [
+        self::STATUS_COLLECTED,
+        self::STATUS_NOT_AVAILABLE,
+        self::STATUS_CANCELLED,
+    ];
+
+    /**
      * Which statuses a line may move to from each status. The "backwards"
      * moves exist to undo a mis-tap on the shop-floor tablet.
      */

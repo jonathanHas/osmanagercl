@@ -22,6 +22,12 @@ class ShopLayout extends Component
         public bool $guestSafe = false,
         /** Drop the top bar entirely (the Locked screen). */
         public bool $bare = false,
+        /**
+         * Seconds between meta-refreshes for a signed-out viewer. The counter
+         * tablet sits on a public board all day with nobody to reload it; a
+         * signed-in user keeps the stale-session check instead.
+         */
+        public ?int $guestRefresh = null,
     ) {}
 
     /**

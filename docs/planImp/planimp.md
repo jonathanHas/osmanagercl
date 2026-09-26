@@ -96,6 +96,17 @@ When the work is accepted, set `Status: ACCEPTED` and tell the user to
 archive: `mkdir -p docs/planImp/archive/YYYY-MM-DD-<slug>` and move both
 `plan.md` and `implemented.md` there. The next task starts with empty files.
 
+Something found after a cycle is accepted (a browser check, a later thought)
+goes in `docs/planImp/findings/YYYY-MM-DD-<slug>.md`: what happened, why, the
+options, a recommendation, and what it does not affect. The Planner folds it
+into the next plan (or a short follow-up cycle) and moves the finding file into
+that cycle's archive folder on acceptance. A finding never edits code.
+
+A plan the user wants to put aside before it is implemented goes to
+`docs/planImp/parked/YYYY-MM-DD-<slug>/plan.md` with `Status: PARKED` and a
+line saying how to resume. Resuming means copying it back to `plan.md`,
+re-checking its Context against the code, and setting `Status: READY`.
+
 ### `plan.md` template
 
 ```markdown

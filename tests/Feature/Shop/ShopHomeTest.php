@@ -39,6 +39,26 @@ class ShopHomeTest extends TestCase
      * completed" went nowhere.
      */
     /**
+     * The counter tablet shows a public board with nobody to reload it, so a
+     * signed-out viewer gets a meta refresh. A signed-in user must not: they have
+     * the stale-session check, and a refresh would interrupt them mid-task.
+     */
+    public function test_guest_refresh_renders_only_for_guests(): void
+    {
+        $html = \Illuminate\Support\Facades\Blade::render(
+            '<x-shop-layout title="T" :guest-safe="true" :guest-refresh="300">x</x-shop-layout>'
+        );
+        $this->assertStringContainsString('http-equiv="refresh" content="300"', $html);
+
+        $this->actingAs($this->userWith('employee', ['stocking.scan']));
+
+        $signedIn = \Illuminate\Support\Facades\Blade::render(
+            '<x-shop-layout title="T" :guest-safe="true" :guest-refresh="300">x</x-shop-layout>'
+        );
+        $this->assertStringNotContainsString('http-equiv="refresh"', $signedIn);
+    }
+
+    /**
      * The component declares name/size/class as props, so everything else must
      * reach the <svg>. Before cycle 10 it rendered no $attributes at all, and an
      * x-show written on the tag was dropped silently — found in cycle 9b.
@@ -100,14 +120,19 @@ class ShopHomeTest extends TestCase
             ->assertDontSee('Print labels');
     }
 
-    public function test_barista_sees_only_coffee_orders_and_no_office_switch(): void
+    /**
+     * Since cycle 12 a barista lands on the KDS, so Coffee orders is no longer a
+     * Home tile. A barista who reaches /shop anyway sees nothing to do.
+     */
+    public function test_barista_sees_no_tiles_and_no_office_switch(): void
     {
         $user = $this->userWith('barista', ['kds.access']);
 
         $response = $this->actingAs($user)->get('/shop');
 
         $response->assertOk()
-            ->assertSee('Coffee orders')
+            ->assertSee('Nothing to do here yet')
+            ->assertDontSee('Coffee orders')
             ->assertDontSee('Stock scan')
             ->assertDontSee('Office');
     }

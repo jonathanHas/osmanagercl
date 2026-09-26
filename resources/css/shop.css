@@ -415,6 +415,46 @@ textarea.shop-input { min-height: 112px; padding: 14px 20px; border-radius: var(
 .shop-group-title { display: flex; align-items: baseline; gap: 10px; font-size: var(--shop-fs-lg); font-weight: var(--shop-fw-heavy); }
 .shop-group-title small { font-size: var(--shop-fs-sm); font-weight: var(--shop-fw-bold); color: var(--shop-ink-2); }
 
+/* ── Request rows (staff) ─────────────────────────── */
+.shop-reqs { display: flex; flex-direction: column; gap: var(--shop-space-2); }
+.shop-req { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "date main" "steps steps" "act act"; align-items: center; gap: var(--shop-space-3) var(--shop-space-4); padding: var(--shop-space-4); border-radius: var(--shop-radius-lg); background: var(--shop-surface); box-shadow: var(--shop-shadow-sm); }
+.shop-req__date { grid-area: date; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 72px; height: 72px; border-radius: var(--shop-radius-md); background: var(--shop-surface-2); color: var(--shop-ink-2); font-size: var(--shop-fs-xs); font-weight: var(--shop-fw-heavy); line-height: 1.05; text-transform: uppercase; letter-spacing: 0.04em; }
+.shop-req__date strong { font-size: var(--shop-fs-xl); color: var(--shop-ink); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.shop-req__date.is-today { background: var(--shop-warn-soft); color: var(--shop-warn-ink); }
+.shop-req__date.is-today strong { color: var(--shop-warn-ink); }
+.shop-req__date.is-late { background: var(--shop-bad-soft); color: var(--shop-bad-ink); }
+.shop-req__date.is-late strong { color: var(--shop-bad-ink); }
+.shop-req__main { grid-area: main; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.shop-req__title { font-size: var(--shop-fs-lg); font-weight: var(--shop-fw-heavy); line-height: 1.2; text-wrap: pretty; }
+.shop-req__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: var(--shop-fs-sm); font-weight: var(--shop-fw-medium); color: var(--shop-ink-2); }
+.shop-req__actions { grid-area: act; display: flex; gap: var(--shop-space-2); }
+.shop-req__actions > .shop-btn { flex: 1; }
+.shop-req.is-done { background: transparent; box-shadow: inset 0 0 0 2px var(--shop-line); }
+.shop-req.is-done .shop-req__title { color: var(--shop-ink-2); }
+.shop-more { position: relative; flex: none; }
+.shop-more > summary { list-style: none; }
+.shop-more > summary::-webkit-details-marker { display: none; }
+.shop-more[open] > summary { background: var(--shop-accent-soft); border-color: var(--shop-accent); }
+.shop-more > .shop-menu { min-width: 220px; }
+
+/* Lifecycle steps — each step labelled, current step bold + ringed */
+.shop-steps { grid-area: steps; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: var(--shop-radius-pill); background: var(--shop-surface-2); }
+.shop-step { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 0 10px; border-radius: var(--shop-radius-pill); font-size: var(--shop-fs-xs); font-weight: var(--shop-fw-bold); color: var(--shop-ink-3); white-space: nowrap; }
+.shop-step::before { content: ""; flex: none; width: 9px; height: 9px; border-radius: 50%; border: 2px solid currentColor; }
+.shop-step.is-done { color: var(--shop-sage-ink); }
+.shop-step.is-done::before { background: var(--shop-sage); border-color: var(--shop-sage); }
+.shop-step.is-current { background: var(--shop-surface); color: var(--shop-ink); font-weight: var(--shop-fw-heavy); box-shadow: var(--shop-shadow-sm); }
+.shop-step.is-current::before { background: var(--shop-accent); border-color: var(--shop-accent); }
+.shop-steps.is-stopped .shop-step { text-decoration: line-through; }
+
+/* ── Sheet (side panel ≥768, bottom sheet on phone). Port as <dialog>. ── */
+.shop-sheet-backdrop { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; background: var(--shop-scrim); }
+.shop-sheet { display: flex; flex-direction: column; width: 100%; max-height: 92dvh; overflow: hidden; background: var(--shop-bg); border-radius: var(--shop-radius-xl) var(--shop-radius-xl) 0 0; box-shadow: var(--shop-shadow-lg); }
+.shop-sheet__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: var(--shop-space-4) var(--shop-space-4) var(--shop-space-2) var(--shop-space-5); }
+.shop-sheet__body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: var(--shop-space-4); padding: var(--shop-space-2) var(--shop-space-5) var(--shop-space-5); }
+.shop-sheet__foot { display: flex; gap: var(--shop-space-3); padding: var(--shop-space-3) var(--shop-space-5) calc(var(--shop-space-4) + env(safe-area-inset-bottom)); border-top: 1px solid var(--shop-line); }
+.shop-sheet__foot > .shop-btn { flex: 1; }
+
 /* ── Kitchen display tickets ──────────────────────── */
 .shop-kds { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--shop-space-3); align-items: start; }
 .shop-ticket { --ticket: var(--shop-muted); --ticket-soft: var(--shop-muted-soft); --ticket-ink: var(--shop-muted-ink); display: flex; flex-direction: column; overflow: hidden; border-radius: var(--shop-radius-lg); background: var(--shop-surface); border: 3px solid var(--ticket-soft); box-shadow: var(--shop-shadow-md); }
@@ -466,6 +506,11 @@ textarea.shop-input { min-height: 112px; padding: 14px 20px; border-radius: var(
   .shop-actions > .shop-actions__spacer { margin-right: auto; }
   .shop-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .shop-board, .shop-kds { gap: var(--shop-space-4); }
+  .shop-req { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "date main act" "date steps steps"; padding: var(--shop-space-4) var(--shop-space-5); }
+  .shop-req__actions > .shop-btn { flex: 0 0 auto; min-width: 180px; }
+  .shop-sheet-backdrop { align-items: stretch; justify-content: flex-end; }
+  .shop-sheet { width: min(480px, 100%); max-height: none; border-radius: var(--shop-radius-xl) 0 0 var(--shop-radius-xl); }
+  .shop-sheet__foot { justify-content: flex-end; }
 }
 @media (min-width: 1024px) {
   .shop-tiles:not(.shop-tiles--hub) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -473,6 +518,7 @@ textarea.shop-input { min-height: 112px; padding: 14px 20px; border-radius: var(
   .shop-split { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: var(--shop-space-5); align-items: start; }
   .shop-split--even { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .shop-facts--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .shop-req { grid-template-columns: auto minmax(0, 1fr) minmax(0, 360px) auto; grid-template-areas: "date main steps act"; }
 }
 @media (min-width: 1280px) {
   .shop-page { padding: var(--shop-space-6); }
@@ -494,4 +540,11 @@ textarea.shop-input { min-height: 112px; padding: 14px 20px; border-radius: var(
 .shop-peek img { display: block; width: 256px; height: 256px; object-fit: contain; border-radius: var(--shop-radius-md); background: var(--shop-surface); }
 .shop-peek__name { margin-top: var(--shop-space-2); font-size: var(--shop-fs-sm); font-weight: var(--shop-fw-bold); color: var(--shop-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (hover: hover) and (pointer: fine) { .shop-peek.is-open { display: block; } }
+.shop-search--grow { flex: 1; max-width: 360px; min-width: 220px; }
+/* The row's extra actions, laid out in flow rather than floating: no named grid
+   area, so they take a new implicit row spanning every column at all three
+   breakpoints and the card grows downward. Nothing is ever under anything. */
+.shop-req__more { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; gap: var(--shop-space-2); padding: var(--shop-space-2); background: var(--shop-surface-2); box-shadow: none; }
+.shop-req__more .shop-menu__item { width: auto; padding: 0 18px; background: var(--shop-surface); }
+.shop-req__more .shop-menu__sep { width: 100%; height: 0; margin: 0; }
 /* === APP ADDITIONS END === */

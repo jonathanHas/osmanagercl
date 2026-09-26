@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="shop.css">
+<style>body{margin:0;background:#f5ead8}</style>
+<!-- Claude Design "Screen 10 Requests staff v2.dc.html", saved 2026-09-25. Template placeholders ({{ open }}, {{ close }}, <sc-if>) are the prototype's own runtime: the sheet opens on "New request" and closes on Cancel / backdrop / ×. -->
+</head>
+<body>
+<div class="shop is-touch" data-screen-label="10 Requests staff v2">
+  <header class="shop-topbar">
+    <a class="shop-iconbtn" href="screen-01-home.html" aria-label="Back"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></a>
+    <h1 class="shop-topbar__title">Customer requests</h1>
+    <details class="shop-usermenu">
+      <summary class="shop-chip"><span class="shop-avatar">J</span><span class="shop-chip__name">Jonathan</span><svg class="shop-ico shop-ico--sm shop-chip__caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+      <div class="shop-menu" role="menu">
+        <a class="shop-menu__item" role="menuitem" href="screen-16-switch-user.html">Switch user</a>
+        <a class="shop-menu__item" role="menuitem" href="screen-18-locked.html">Lock</a>
+        <a class="shop-menu__item" role="menuitem" href="#">Office</a>
+        <div class="shop-menu__sep"></div>
+        <a class="shop-menu__item shop-menu__item--danger" role="menuitem" href="#">Log out</a>
+      </div>
+    </details>
+  </header>
+  <main class="shop-page">
+    <div class="shop-between">
+      <div class="shop-seg" role="radiogroup" aria-label="Show"><label class="shop-seg__opt"><input type="radio" name="v" checked>Open 4</label><label class="shop-seg__opt"><input type="radio" name="v">Put aside 1</label><label class="shop-seg__opt"><input type="radio" name="v">Done</label></div>
+      <div class="shop-search" style="flex:1;max-width:360px;min-width:220px"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg><input class="shop-input" type="search" placeholder="Search customer or item"></div>
+    </div>
+    <section class="shop-stack shop-stack--tight">
+      <h2 class="shop-group-title">Due today <small>1</small></h2>
+      <div class="shop-reqs">
+      <article class="shop-req">
+        <div class="shop-req__date is-today"><span>Today</span><strong>25</strong><span>Sep</span></div>
+        <div class="shop-req__main"><h3 class="shop-req__title">Beetroot vacuum 500 g</h3><div class="shop-req__meta"><span>The Count · 1</span><span class="shop-pill shop-pill--muted">Pre-order</span></div></div>
+        <ol class="shop-steps" aria-label="Status"><li class="shop-step">Ordered</li><li class="shop-step">Put aside</li><li class="shop-step">Collected</li></ol>
+        <div class="shop-req__actions"><button class="shop-btn shop-btn--primary" type="button">Mark ordered</button>
+          <details class="shop-more"><summary class="shop-iconbtn" aria-label="More actions"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg></summary><div class="shop-menu" role="menu"><button class="shop-menu__item" type="button" role="menuitem">Edit</button><button class="shop-menu__item" type="button" role="menuitem">Undo last step</button><button class="shop-menu__item" type="button" role="menuitem">Not available</button><div class="shop-menu__sep"></div><button class="shop-menu__item shop-menu__item--danger" type="button" role="menuitem">Cancel request</button></div></details>
+        </div>
+      </article>
+      </div>
+    </section>
+    <section class="shop-stack shop-stack--tight">
+      <h2 class="shop-group-title">Coming up <small>3</small></h2>
+      <div class="shop-reqs">
+      <article class="shop-req">
+        <div class="shop-req__date"><span>Mon</span><strong>28</strong><span>Sep</span></div>
+        <div class="shop-req__main"><h3 class="shop-req__title">Zonnemaire Bread Casino brown sliced 1200 g</h3><div class="shop-req__meta"><span>Martin · 1</span><span class="shop-inline" style="gap:4px"><svg class="shop-ico shop-ico--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>057 9125881</span><span class="shop-pill shop-pill--muted">Pre-order</span></div></div>
+        <ol class="shop-steps" aria-label="Status"><li class="shop-step is-done">Ordered</li><li class="shop-step is-done is-current">Put aside</li><li class="shop-step">Collected</li></ol>
+        <div class="shop-req__actions"><button class="shop-btn shop-btn--primary" type="button">Collected</button>
+          <details class="shop-more"><summary class="shop-iconbtn" aria-label="More actions"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg></summary><div class="shop-menu" role="menu"><button class="shop-menu__item" type="button" role="menuitem">Edit</button><button class="shop-menu__item" type="button" role="menuitem">Undo last step</button><button class="shop-menu__item" type="button" role="menuitem">Not available</button><div class="shop-menu__sep"></div><button class="shop-menu__item shop-menu__item--danger" type="button" role="menuitem">Cancel request</button></div></details>
+        </div>
+      </article>
+      <article class="shop-req">
+        <div class="shop-req__date"><span>Wed</span><strong>30</strong><span>Sep</span></div>
+        <div class="shop-req__main"><h3 class="shop-req__title">Vegetarian frozen sausages</h3><div class="shop-req__meta"><span>Veggie Lady · 1</span><span class="shop-pill shop-pill--muted">Sourcing</span></div></div>
+        <ol class="shop-steps" aria-label="Status"><li class="shop-step">Ordered</li><li class="shop-step">Put aside</li><li class="shop-step">Collected</li></ol>
+        <div class="shop-req__actions"><button class="shop-btn shop-btn--secondary" type="button">Mark ordered</button>
+          <details class="shop-more"><summary class="shop-iconbtn" aria-label="More actions"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg></summary><div class="shop-menu" role="menu"><button class="shop-menu__item" type="button" role="menuitem">Edit</button><button class="shop-menu__item" type="button" role="menuitem">Undo last step</button><button class="shop-menu__item" type="button" role="menuitem">Not available</button><div class="shop-menu__sep"></div><button class="shop-menu__item shop-menu__item--danger" type="button" role="menuitem">Cancel request</button></div></details>
+        </div>
+      </article>
+      <article class="shop-req">
+        <div class="shop-req__date"><span>Thu</span><strong>1</strong><span>Oct</span></div>
+        <div class="shop-req__main"><h3 class="shop-req__title">Oat drink, barista — crate of 12</h3><div class="shop-req__meta"><span>Café Noor · 2 crates</span><span class="shop-pill shop-pill--muted">Pre-order</span></div></div>
+        <ol class="shop-steps" aria-label="Status"><li class="shop-step is-done is-current">Ordered</li><li class="shop-step">Put aside</li><li class="shop-step">Collected</li></ol>
+        <div class="shop-req__actions"><button class="shop-btn shop-btn--secondary" type="button">Put aside</button>
+          <details class="shop-more"><summary class="shop-iconbtn" aria-label="More actions"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg></summary><div class="shop-menu" role="menu"><button class="shop-menu__item" type="button" role="menuitem">Edit</button><button class="shop-menu__item" type="button" role="menuitem">Undo last step</button><button class="shop-menu__item" type="button" role="menuitem">Not available</button><div class="shop-menu__sep"></div><button class="shop-menu__item shop-menu__item--danger" type="button" role="menuitem">Cancel request</button></div></details>
+        </div>
+      </article>
+      </div>
+    </section>
+    <div class="shop-actions"><button class="shop-btn shop-btn--primary shop-btn--lg" type="button"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>New request</button></div>
+  </main>
+  <!-- Shown when the New request button is pressed -->
+  <div class="shop-sheet-backdrop">
+    <section class="shop-sheet" role="dialog" aria-label="New request">
+      <div class="shop-sheet__head"><h2 class="shop-subtitle">New request</h2><button class="shop-iconbtn shop-iconbtn--ghost" type="button" aria-label="Close"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div>
+      <div class="shop-sheet__body">
+        <div class="shop-seg shop-seg--block" role="radiogroup" aria-label="Type"><label class="shop-seg__opt"><input type="radio" name="t" checked>Pre-order</label><label class="shop-seg__opt"><input type="radio" name="t">Sourcing</label></div>
+        <div class="shop-field"><label for="i">Item</label><div class="shop-search"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path><path d="M8 7v10"></path><path d="M12 7v10"></path><path d="M17 7v10"></path></svg><input class="shop-input" id="i" placeholder="Type a name or scan a barcode"></div></div>
+        <div class="shop-field"><label for="c">Customer</label><input class="shop-input" id="c" placeholder="Name"></div>
+        <div class="shop-facts shop-facts--2" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+          <div class="shop-field"><label for="q">Quantity</label><input class="shop-input" id="q" inputmode="numeric" value="1"></div>
+          <div class="shop-field"><label for="d">Due</label><input class="shop-input" id="d" type="date"></div>
+        </div>
+        <div class="shop-field"><label for="p">Phone <span style="font-weight:500">· not shown on the public board</span></label><input class="shop-input" id="p" inputmode="tel" placeholder="Optional"></div>
+      </div>
+      <div class="shop-sheet__foot"><button class="shop-btn shop-btn--secondary shop-btn--lg" type="button">Cancel</button><button class="shop-btn shop-btn--primary shop-btn--lg" type="button"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Add request</button></div>
+    </section>
+  </div>
+</div>
+</body>
+</html>

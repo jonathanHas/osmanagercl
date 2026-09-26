@@ -1,0 +1,324 @@
+<?php
+
+namespace Tests\Feature\Shop;
+
+use App\Models\CustomerRequest;
+use App\Models\CustomerRequestItem;
+use App\Models\Permission;
+use App\Models\Role;
+use App\Models\User;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
+use Tests\TestCase;
+
+/**
+ * The customer-requests board as a Shop mode screen.
+ *
+ * The URL, route name, permissions and every write endpoint are unchanged from
+ * the office board — CustomerRequestTest still covers those. What is new here is
+ * the rendering: one card per line, a guest view with no phone numbers and a
+ * meta refresh, and staff actions as plain PATCH forms.
+ */
+class ShopRequestsTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Config::set('database.connections.pos', [
+            'driver' => 'sqlite',
+            'database' => ':memory:',
+            'prefix' => '',
+        ]);
+        DB::purge('pos');
+
+        $pos = DB::connection('pos')->getSchemaBuilder();
+
+        $pos->create('PRODUCTS', function (Blueprint $table) {
+            $table->string('ID')->primary();
+            $table->string('NAME')->nullable();
+            $table->string('CODE')->unique();
+            $table->string('REFERENCE')->nullable();
+            $table->string('CATEGORY')->nullable();
+            $table->decimal('PRICESELL', 10, 4)->default(0);
+            $table->string('TAXCAT')->nullable();
+        });
+        $pos->create('supplier_link', function (Blueprint $table) {
+            $table->string('Barcode');
+            $table->string('SupplierCode')->nullable();
+            $table->string('SupplierID')->nullable();
+        });
+
+        DB::connection('pos')->table('PRODUCTS')->insert([
+            ['ID' => 'p1', 'NAME' => 'Oat drink 1 L', 'CODE' => '5000000000017', 'REFERENCE' => 'OAT1', 'CATEGORY' => 'c1', 'PRICESELL' => 2.10, 'TAXCAT' => '001'],
+        ]);
+    }
+
+    private function employee(): User
+    {
+        $role = Role::firstOrCreate(['name' => 'employee'], ['display_name' => 'Employee']);
+        $permission = Permission::firstOrCreate(
+            ['name' => 'customer-requests.manage'],
+            ['display_name' => 'Manage Customer Requests', 'module' => 'Customer Requests']
+        );
+        $role->givePermissionTo($permission);
+
+        return User::factory()->create(['role_id' => $role->id]);
+    }
+
+    /**
+     * A due request for "Walk-in Wendy" with one stocked line.
+     */
+    private function seedDueRequest(): CustomerRequestItem
+    {
+        $request = CustomerRequest::factory()->create([
+            'customer_name' => 'Walk-in Wendy',
+            'customer_phone' => '087 111',
+            'wanted_on' => today(),
+        ]);
+
+        return CustomerRequestItem::factory()->for($request, 'request')->create([
+            'product_code' => '5000000000017',
+            'product_name' => 'Oat milk',
+            'quantity' => 2,
+            'status' => CustomerRequestItem::STATUS_PENDING,
+            'position' => 1,
+        ]);
+    }
+
+    public function test_guest_board_is_shop_styled_and_read_only(): void
+    {
+        $this->seedDueRequest();
+
+        $response = $this->get('/customer-requests')->assertOk();
+
+        $response->assertSee('data-shell="shop"', false);
+        $response->assertSee('shop-page--wide', false);
+        $response->assertSee('http-equiv="refresh" content="300"', false);
+        $response->assertSee('Walk-in Wendy');
+        $response->assertSee('Oat milk');
+        $response->assertSee('Due today');
+        $response->assertSee('Staff sign in');
+
+        // Nothing a customer should not see, and nothing they could act on.
+        $response->assertDontSee('087 111');
+        $response->assertDontSee('New request');
+        $response->assertDontSee(route('customer-requests.items.status', 1), false);
+
+        // Guests keep the cycle 12 cards: none of the staff v2 furniture.
+        $response->assertSee('shop-request', false);
+        $response->assertDontSee('shop-req__date', false);
+        $response->assertDontSee('shop-steps', false);
+        $response->assertDontSee('Search customer or item');
+    }
+
+    public function test_staff_board_shows_actions_and_form(): void
+    {
+        $item = $this->seedDueRequest();
+
+        $response = $this->actingAs($this->employee())
+            ->get('/customer-requests')
+            ->assertOk();
+
+        // v2 furniture: request rows with the lifecycle strip.
+        $response->assertSee('shop-req__date', false);
+        $response->assertSee('shop-steps', false);
+        $response->assertSee('#more', false);
+
+        // A pending line offers "Mark ordered" and can be put aside or marked
+        // unavailable from the menu; there is nothing yet to undo.
+        $response->assertSee(route('customer-requests.items.status', $item), false);
+        $response->assertSee('Mark ordered');
+        $response->assertSee('Put aside now');
+        $response->assertSee('Not available');
+        $response->assertDontSee('Undo last step');
+
+        $response->assertSee(route('customer-requests.cancel', $item->request), false);
+        $response->assertSee(route('customer-requests.edit', $item->request), false);
+        $response->assertSee('087 111');
+
+        // Filter, search and the sheet.
+        $response->assertSee('Open 1');
+        $response->assertSee('Search customer or item');
+        $response->assertSee('New request');
+        $response->assertSee('data-search-url="'.e(route('api.products.search')).'"', false);
+        $response->assertSee('id="new-request-form"', false);
+        $response->assertSee('form="new-request-form"', false);
+
+        $response->assertSee('class="shop-thumb"', false);
+        $response->assertSee('x-on:error="imageFailed(p)"', false);
+        $response->assertDontSee('http-equiv="refresh"', false);
+
+        // Search hides whole groups, not just rows, and says when nothing is left.
+        $response->assertSee('x-show="groupMatches($el)"', false);
+        $response->assertSee('Nothing matches your search.');
+
+        // The extra actions expand inside the card rather than floating over the
+        // rows around it, so no control is ever underneath another.
+        $response->assertSee('x-data="{ more: false }"', false);
+        $response->assertSee(':aria-expanded="more"', false);
+        $response->assertSee('shop-menu--static shop-req__more', false);
+        $response->assertSee('x-show="more"', false);
+    }
+
+    public function test_rows_are_grouped_and_counted(): void
+    {
+        $due = CustomerRequest::factory()->create(['customer_name' => 'Two Liner', 'wanted_on' => today()]);
+        CustomerRequestItem::factory()->for($due, 'request')->create(['description' => 'Line one', 'position' => 1]);
+        CustomerRequestItem::factory()->for($due, 'request')->create([
+            'description' => 'Line two', 'position' => 2, 'status' => CustomerRequestItem::STATUS_ORDERED,
+        ]);
+
+        $later = CustomerRequest::factory()->create(['customer_name' => 'Later Larry', 'wanted_on' => null]);
+        CustomerRequestItem::factory()->for($later, 'request')->create(['description' => 'Someday', 'position' => 1]);
+
+        $aside = CustomerRequest::factory()->create(['customer_name' => 'Aside Amy', 'wanted_on' => today()]);
+        CustomerRequestItem::factory()->for($aside, 'request')->create([
+            'description' => 'Waiting', 'position' => 1, 'status' => CustomerRequestItem::STATUS_PUT_ASIDE,
+        ]);
+
+        $response = $this->actingAs($this->employee())->get('/customer-requests')->assertOk();
+
+        $response->assertSee('Due today <small>2</small>', false);
+        $response->assertSee('Coming up <small>1</small>', false);
+        $response->assertSee('Open 3');
+        $response->assertSee('Put aside 1');
+
+        // The put-aside line is not on the Open view; it has its own.
+        $response->assertDontSee('Waiting');
+        $this->actingAs($this->employee())
+            ->get(route('customer-requests.index', ['show' => 'aside']))
+            ->assertOk()
+            ->assertSee('Waiting');
+    }
+
+    public function test_done_view_lists_finished_lines_from_the_last_30_days(): void
+    {
+        $request = CustomerRequest::factory()->create(['customer_name' => 'Done Dora', 'wanted_on' => today()]);
+
+        CustomerRequestItem::factory()->for($request, 'request')->create([
+            'description' => 'Collected just now', 'position' => 1,
+            'status' => CustomerRequestItem::STATUS_COLLECTED, 'status_changed_at' => now()->subHours(2),
+        ]);
+        CustomerRequestItem::factory()->for($request, 'request')->create([
+            'description' => 'Cancelled recently', 'position' => 2,
+            'status' => CustomerRequestItem::STATUS_CANCELLED, 'status_changed_at' => now()->subDays(2),
+        ]);
+        CustomerRequestItem::factory()->for($request, 'request')->create([
+            'description' => 'Unavailable ages ago', 'position' => 3,
+            'status' => CustomerRequestItem::STATUS_NOT_AVAILABLE, 'status_changed_at' => now()->subDays(40),
+        ]);
+
+        $response = $this->actingAs($this->employee())
+            ->get(route('customer-requests.index', ['show' => 'done']))
+            ->assertOk();
+
+        $response->assertSee('Done recently');
+        $response->assertSee('Collected just now');
+        $response->assertSee('Undo last step');
+        $response->assertSee('Cancelled recently');
+        $response->assertSee('Reopen');
+        $response->assertDontSee('Unavailable ages ago');
+
+        // ?closed=1 is kept as an alias so old links still work.
+        $this->actingAs($this->employee())
+            ->get(route('customer-requests.index', ['closed' => 1]))
+            ->assertOk()
+            ->assertSee('Done recently')
+            ->assertSee('Collected just now');
+    }
+
+    public function test_put_aside_view_shows_collected_as_primary(): void
+    {
+        $request = CustomerRequest::factory()->create(['customer_name' => 'Aside Amy', 'wanted_on' => today()->addWeek()]);
+        $item = CustomerRequestItem::factory()->for($request, 'request')->create([
+            'description' => 'Waiting', 'position' => 1, 'status' => CustomerRequestItem::STATUS_PUT_ASIDE,
+        ]);
+
+        $response = $this->actingAs($this->employee())
+            ->get(route('customer-requests.index', ['show' => 'aside']))
+            ->assertOk();
+
+        // Collected is always primary, even when the request is not due yet.
+        $response->assertSee('shop-btn shop-btn--primary" type="submit">Collected', false);
+        $response->assertSee('Undo last step');
+        $response->assertSee(route('customer-requests.cancel', $request), false);
+        $this->assertSame(
+            [CustomerRequestItem::STATUS_COLLECTED, CustomerRequestItem::STATUS_ORDERED, CustomerRequestItem::STATUS_CANCELLED],
+            $item->fresh()->nextStatuses()
+        );
+    }
+
+    public function test_overdue_row_uses_the_late_block_and_keeps_the_sr_text(): void
+    {
+        $request = CustomerRequest::factory()->create([
+            'customer_name' => 'Overdue Olly', 'wanted_on' => today()->subDay(),
+        ]);
+        CustomerRequestItem::factory()->for($request, 'request')->create(['description' => 'Late thing', 'position' => 1]);
+
+        $response = $this->actingAs($this->employee())->get('/customer-requests')->assertOk();
+
+        $response->assertSee('shop-req__date is-late', false);
+        $response->assertSee('Late');
+        // The old board's phrasing survives for screen readers.
+        $response->assertSee('Overdue 1d');
+    }
+
+    public function test_store_from_the_shop_form_creates_a_single_line_request(): void
+    {
+        $employee = $this->employee();
+
+        $this->actingAs($employee)
+            ->post(route('customer-requests.store'), [
+                'customer_name' => 'Form Fiona',
+                'wanted_on' => today()->toDateString(),
+                'items' => [
+                    ['product_code' => '5000000000017', 'quantity' => 2],
+                ],
+            ])
+            ->assertRedirect(route('customer-requests.index'))
+            ->assertSessionHas('status');
+
+        $this->actingAs($employee)
+            ->get('/customer-requests')
+            ->assertOk()
+            ->assertSee('Form Fiona')
+            // The service snapshots the POS name for a stocked line.
+            ->assertSee('Oat drink 1 L');
+    }
+
+    public function test_failed_submission_reopens_the_form_with_old_input(): void
+    {
+        $employee = $this->employee();
+
+        $this->actingAs($employee)
+            ->from('/customer-requests')
+            ->post(route('customer-requests.store'), [
+                'customer_name' => '',
+                'items' => [
+                    ['description' => 'Kept line', 'quantity' => 1],
+                ],
+            ])
+            ->assertRedirect('/customer-requests');
+
+        // Old input is re-seeded the way the office board's test does it: a
+        // separate test request does not carry the previous one's flash.
+        $response = $this->actingAs($employee)
+            ->withSession(['_old_input' => [
+                'customer_name' => 'Kept Name',
+                'items' => [['description' => 'Kept line', 'quantity' => 1]],
+            ]])
+            ->get('/customer-requests')
+            ->assertOk();
+
+        $response->assertSee('x-data="{ open: true }"', false);
+        $response->assertSee('Kept Name', false);
+        // The line comes back through the Alpine seed rather than a value
+        // attribute, because the description input is x-model bound.
+        $response->assertSee('Kept line', false);
+    }
+}

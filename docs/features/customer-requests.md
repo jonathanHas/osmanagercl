@@ -182,3 +182,50 @@ php artisan test --filter=CustomerRequest
 ## Changelog
 
 - **2026-09-10**: Initial release.
+
+## Staff board v2 (cycle 13)
+
+The staff view is a list of request **rows**, not cards:
+
+- **Views** via `?show=`: `open` (pending or ordered, the default), `aside`
+  (put aside), `done` (collected / not available / cancelled in the last 30 days,
+  newest first). `?closed=1` is kept as an alias of `show=done`. Guests are always
+  given the `board` view — everything still outstanding, put-aside lines included
+  — on the unchanged cycle 12 cards.
+- **A row** is a date block (Today / Late / the date, or "No date"), the item and
+  customer, a three-step lifecycle strip (Ordered → Put aside → Collected), one
+  primary next-step button and a `<details>` "more" menu (Edit, Put aside now,
+  Undo last step, Not available, Cancel request). Finished lines get `is-done`;
+  not-available and cancelled lines strike the strip through with `is-stopped`.
+- Every action is still a plain form to the existing endpoints. There is no
+  confirm dialog: "Undo last step" and "Reopen" are the safety net, which is what
+  the backwards transitions in `ALLOWED_TRANSITIONS` are for.
+- **Search** filters the rows already on screen (`data-text` + `x-show`); it does
+  not fetch. **New request** lives in the sticky bottom bar and opens a sheet
+  (a side sheet, a bottom sheet on phones) holding the cycle 12 form.
+- `CustomerRequestService::boardRows($view)` replaces `boardCards()` and returns
+  `due` / `open` / `done` / `counts`.
+
+## Shop mode board (cycle 12)
+
+The board at `/customer-requests` renders through the Shop mode shell
+(`resources/views/shop/requests.blade.php` plus `shop/partials/request-card` and
+`shop/partials/request-form`). The URL, route name, public access and every write
+endpoint are unchanged.
+
+- **One card per line**, not per request: `CustomerRequestService::boardCards()`
+  flattens `board()` into `['item' => …, 'request' => …]` entries. A line
+  collected or cancelled in the last day stays on the board so a mis-tap can be
+  undone there.
+- **Guests** get the read-only board, a 5-minute meta refresh (`ShopLayout`'s
+  `guestRefresh` prop, rendered only when signed out) and no phone numbers.
+- **Staff** with `customer-requests.manage` additionally get the status buttons —
+  the same PATCH forms as the office partial, same labels — a pencil link to the
+  office edit page, and the "New request" card.
+- **The New request card takes one line**, either a pre-order (a stocked product
+  found via `api.products.search`) or a sourcing request (free text). It is a
+  plain HTML POST to `customer-requests.store`, so the redirect-and-flash contract
+  is untouched; the only JavaScript is the typeahead in
+  `resources/js/shop/requests.js`.
+- `show` and `edit` still use `BoardLayout` and are unchanged — they are the next
+  cycle's work.

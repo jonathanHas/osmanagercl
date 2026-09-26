@@ -76,6 +76,12 @@ class UiMode
      */
     public function landingUrl(?User $user): string
     {
+        // Baristas have no Shop Home to land on since cycle 12 removed the Coffee
+        // orders tile; the KDS is the whole of their job.
+        if ($user?->isBarista()) {
+            return route('kds.index', absolute: false);
+        }
+
         $mode = self::OFFICE;
 
         if (session('auth_via') === 'pin') {
