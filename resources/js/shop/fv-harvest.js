@@ -31,6 +31,8 @@ export default () => mix(productImages(), {
     loading: true,
     toast: null,
     toastTimer: null,
+    // { label, product, copies, sending, result } while a print is on offer.
+    print: null,
 
     init() {
         this.load();
@@ -42,6 +44,20 @@ export default () => mix(productImages(), {
 
     get saveUrl() {
         return this.$root.dataset.saveUrl;
+    },
+
+    /**
+     * The per-label print URL with `__ID__` where the id goes. Blade builds it so
+     * no route helper appears here, the same rule as every other URL on this screen.
+     */
+    get printUrlTemplate() {
+        return this.$root.dataset.printUrlTemplate;
+    },
+
+    get sizeText() {
+        const l = this.print?.label;
+
+        return `${l?.width_mm ?? '?'} × ${l?.height_mm ?? '?'} mm`;
     },
 
     get csrf() {
@@ -126,13 +142,28 @@ export default () => mix(productImages(), {
         }
     },
 
+    /**
+     * The unit today's row is already in, or null when nothing is logged yet.
+     *
+     * The endpoint keeps one unit per product per day and refuses a mismatch, so
+     * the switch follows the day's row rather than the product's preference and
+     * staff never meet the refusal in normal use.
+     */
+    get lockedUnit() {
+        return this.selected?.logged > 0 ? (this.selected.logged_unit ?? null) : null;
+    },
+
     select(p) {
         this.selected = p;
-        this.unit = p.unit;
+        this.unit = p.logged > 0 && p.logged_unit ? p.logged_unit : p.unit;
         this.typed = '';
     },
 
     setUnit(u) {
+        if (this.lockedUnit && u !== this.lockedUnit) {
+            return;
+        }
+
         this.unit = u;
     },
 
@@ -170,6 +201,7 @@ export default () => mix(productImages(), {
 
         this.busy = true;
         const added = this.amountText;
+        const amount = this.amount;
         const name = this.selected.name;
 
         try {
@@ -183,15 +215,96 @@ export default () => mix(productImages(), {
             if (data.success) {
                 this.typed = '';
                 this.showToast('ok', `Logged ${added} ${name} · ${data.logged} ${data.unit} today`);
+
+                // The entry is already saved; the offer never blocks it.
+                if (this.selected?.label) {
+                    this.offerPrint(this.selected, amount);
+                }
+
                 // The server accumulated and stamped who and when; re-read it.
                 await this.load();
             } else {
                 this.showToast('bad', data.message ?? 'Could not log that');
+                // Most likely a unit clash from a stale screen — another till logged
+                // this product first. Re-read so the lock catches up and the second
+                // attempt is not refused too.
+                await this.load();
             }
         } catch (e) {
             this.showToast('bad', 'Could not log that');
         } finally {
             this.busy = false;
+        }
+    },
+
+    /**
+     * Offer a print. Copies default to the amount just logged, rounded as the office
+     * page rounds it: 4.2 kg of leaves is four labels, and a count maps one to one.
+     */
+    offerPrint(p, amount) {
+        if (! p?.label) {
+            return;
+        }
+
+        this.print = {
+            label: p.label,
+            product: p.name,
+            copies: this.clampCopies(Math.round(amount)),
+            sending: false,
+            result: null,
+        };
+    },
+
+    /** From a Today row: the same offer, defaulting to everything logged so far. */
+    reprint(row) {
+        this.offerPrint(row, row.logged);
+    },
+
+    dismissPrint() {
+        this.print = null;
+    },
+
+    clampCopies(n) {
+        return Math.min(99, Math.max(1, Math.round(Number(n) || 1)));
+    },
+
+    bumpCopies(n) {
+        if (this.print) {
+            this.print.copies = this.clampCopies(this.print.copies + n);
+        }
+    },
+
+    async sendPrint() {
+        if (! this.print || this.print.sending) {
+            return;
+        }
+
+        this.print.sending = true;
+        const copies = this.print.copies;
+
+        try {
+            const url = this.printUrlTemplate.replace('__ID__', this.print.label.id);
+            const data = await this.post(url, { copies });
+
+            if (data.success) {
+                this.showToast('ok', data.message);
+                this.print = null;
+
+                return;
+            }
+
+            // Keep the card open so the printer can be fixed and Print tried again.
+            this.showToast('bad', data.message || 'Print failed');
+            this.print.result = data.message || 'Print failed';
+        } catch (e) {
+            this.showToast('bad', 'Could not reach the printer');
+            if (this.print) {
+                this.print.result = 'Could not reach the printer';
+            }
+        } finally {
+            if (this.print) {
+                this.print.sending = false;
+            }
         }
     },
 

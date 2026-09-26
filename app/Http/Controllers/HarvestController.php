@@ -68,7 +68,13 @@ class HarvestController extends Controller
                     'name' => $row['name'],
                     'unit' => $row['unit'],
                     'image_url' => $row['image_url'],
+                    // The Zebra label, so the Shop screen can offer a print after a
+                    // log and a reprint from a Today row, as the office page does.
+                    'label' => $row['label'],
                     'logged' => $row['logged'],
+                    // The unit today's row is actually in, which can differ from the
+                    // product's remembered preference; null when nothing is logged.
+                    'logged_unit' => $entry?->unit,
                     'updated_at' => $entry?->updated_at?->toIso8601String(),
                     'by' => $entry?->created_by ? $names->get($entry->created_by) : null,
                 ];
@@ -78,6 +84,7 @@ class HarvestController extends Controller
                 'name' => $p['name'],
                 'unit' => $p['unit'],
                 'image_url' => $p['image_url'],
+                'label' => $p['label'],
             ])->values(),
         ]);
     }
@@ -183,7 +190,33 @@ class HarvestController extends Controller
             ], 422);
         }
 
-        // Remember the per-product unit for future harvest logs.
+        // Not firstOrNew: its attribute array becomes `where harvest_date = '<Y-m-d>'`,
+        // which a date column only matches on MySQL (see WasteController::entry).
+        $harvest = Harvest::whereDate('harvest_date', $date)
+            ->where('product_code', $code)
+            ->first() ?? new Harvest(['harvest_date' => $date, 'product_code' => $code]);
+
+        // One unit per product per day. Saves accumulate, and there is a single
+        // quantity column, so adding kilograms to a count produced nonsense: 5.2 kg
+        // then 2 units used to read "7.2 unit". Refuse instead, and say what is
+        // there and how to change it.
+        if ($harvest->exists && $harvest->unit !== $unit) {
+            return response()->json([
+                'success' => false,
+                'message' => sprintf(
+                    "Already logged %s %s of %s today. Log in %s, or remove today's entry on the office harvest page to change the unit.",
+                    $this->trimZeros((float) $harvest->quantity),
+                    $this->unitLabel($harvest->unit),
+                    $product->NAME,
+                    $this->unitLabel($harvest->unit)
+                ),
+                'logged' => (float) $harvest->quantity,
+                'unit' => $harvest->unit,
+            ], 422);
+        }
+
+        // Remember the per-product unit for future harvest logs. After the check,
+        // so a refused entry does not quietly change the preference.
         HarvestProductUnit::updateOrCreate(
             ['product_code' => $code],
             ['unit' => $unit]
@@ -191,12 +224,6 @@ class HarvestController extends Controller
 
         // Accumulate onto any existing line for the date (single-user store, so
         // a plain read-add-save is safe).
-        // Not firstOrNew: its attribute array becomes `where harvest_date = '<Y-m-d>'`,
-        // which a date column only matches on MySQL (see WasteController::entry).
-        $harvest = Harvest::whereDate('harvest_date', $date)
-            ->where('product_code', $code)
-            ->first() ?? new Harvest(['harvest_date' => $date, 'product_code' => $code]);
-
         $harvest->fill([
             'product_name' => $product->NAME,
             'quantity' => (float) ($harvest->quantity ?? 0) + $amount,
@@ -263,6 +290,20 @@ class HarvestController extends Controller
             'w' => 112,
             'v' => substr(md5($product->IMAGE), 0, 8),
         ]);
+    }
+
+    /**
+     * "5.2" rather than "5.20", and "2" rather than "2.00" — the message is read
+     * aloud on a shop floor, not parsed.
+     */
+    private function trimZeros(float $n): string
+    {
+        return rtrim(rtrim(number_format($n, 2, '.', ''), '0'), '.');
+    }
+
+    private function unitLabel(?string $unit): string
+    {
+        return $unit === 'kg' ? 'kg' : 'units';
     }
 
     private function jonProducts()

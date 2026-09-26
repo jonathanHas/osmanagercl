@@ -8,6 +8,8 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\WasteLog;
+use App\Models\ZebraLabel;
+use App\Services\ZebraPrintService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
@@ -187,6 +189,23 @@ class ShopFruitVegTest extends TestCase
         }
     }
 
+    /**
+     * An active Zebra label for a product. The ZPL carries its own ^PW/^LL so
+     * labelPayload() reports real dimensions rather than the stored fallbacks.
+     */
+    private function label(string $code, string $name = 'Mossfield salad'): ZebraLabel
+    {
+        return ZebraLabel::create([
+            'name' => $name,
+            'product_code' => $code,
+            'zpl_content' => "^XA^PW900^LL600^FT30,60^A0N,28,28^FD{$name}^FS^PQ1^XZ",
+            'label_width_mm' => 112.6,
+            'label_height_mm' => 75.1,
+            'default_copies' => 1,
+            'is_active' => true,
+        ]);
+    }
+
     private function jonsProduct(string $code, string $name, bool $withImage = false): void
     {
         $this->product($code, $name, withImage: $withImage);
@@ -234,7 +253,15 @@ class ShopFruitVegTest extends TestCase
             ->assertSee('class="shop-choice shop-choice--pic"', false)
             ->assertSee('class="shop-thumb"', false)
             ->assertSee('#carrot', false)
-            ->assertDontSee('#package', false);
+            ->assertDontSee('#package', false)
+            // Cycle 17f: the unit switch follows the day's row, and says so.
+            ->assertSee('lockedUnit', false)
+            ->assertSee("remove today's entry on the office page", false)
+            // Cycle 19: print after a log, and reprint from a Today row.
+            ->assertSee('data-print-url-template="'.route('zebra-labels.print', ['zebraLabel' => '__ID__']).'"', false)
+            ->assertSee('Print labels', false)
+            ->assertSee('Check the printer has', false)
+            ->assertSee('aria-label="Print labels"', false);
     }
 
     public function test_barista_is_forbidden(): void
@@ -336,6 +363,7 @@ class ShopFruitVegTest extends TestCase
         $this->jonsProduct('2001', 'Spinach');
         $this->jonsProduct('2002', 'Salad mix', withImage: true);
         $this->jonsProduct('2003', 'Radish', withImage: true);
+        $label = $this->label('2002');
         $this->product('9999', 'Somebody else\'s carrots', onTill: true);
 
         Harvest::create([
@@ -354,11 +382,19 @@ class ShopFruitVegTest extends TestCase
         $this->assertEqualsCanonicalizing(['2001', '2002'], $rows->keys()->all());
         $this->assertEquals(0, $rows['2001']['logged']);
         $this->assertEquals(3.2, $rows['2002']['logged']);
+        // The unit today's row is in, as opposed to the product's preference.
+        $this->assertNull($rows['2001']['logged_unit']);
+        $this->assertSame('kg', $rows['2002']['logged_unit']);
         $this->assertSame('Ben Doyle', $rows['2002']['by']);
         $this->assertNotNull($rows['2002']['updated_at']);
         $this->assertNull($rows['2001']['by']);
 
         $this->assertSame($this->expectedImageUrl('2002'), $rows['2002']['image_url']);
+
+        // Cycle 19: the Shop screen offers a print for a product that has a label.
+        $this->assertSame($label->id, $rows['2002']['label']['id']);
+        $this->assertSame('Mossfield salad', $rows['2002']['label']['name']);
+        $this->assertNull($rows['2001']['label']);
         $this->assertNull($rows['2001']['image_url']);
 
         // Not keyBy('code'): the codes are numeric strings, and Collection turns
@@ -370,6 +406,10 @@ class ShopFruitVegTest extends TestCase
             $this->expectedImageUrl('2003'),
             $available->firstWhere('code', '2003')['image_url']
         );
+
+        // An available product without a label carries null, so the screen offers
+        // nothing rather than rendering a print card it cannot use.
+        $this->assertNull($available->firstWhere('code', '2003')['label']);
 
         // A product that is not Jon's is neither a row nor available.
         $this->assertNotContains('9999', $rows->keys()->all());
@@ -395,14 +435,70 @@ class ShopFruitVegTest extends TestCase
         $this->assertEquals(5.2, (float) Harvest::first()->quantity);
 
         // The unit is remembered per product for next time.
+        $this->assertSame('kg', HarvestProductUnit::where('product_code', '2002')->value('unit'));
+    }
+
+    public function test_harvest_refuses_a_second_unit_on_the_same_day(): void
+    {
+        $user = $this->userWith('employee', ['fruit_veg.operate']);
+        $this->jonsProduct('2002', 'Salad mix');
+        $this->jonsProduct('2004', 'Radish');
+        $date = now()->toDateString();
+
         $this->actingAs($user)->postJson(route('fruit-veg.harvest.save-row'), [
-            'date' => $date, 'code' => '2002', 'amount' => 2, 'unit' => 'unit',
+            'date' => $date, 'code' => '2002', 'amount' => 5.2, 'unit' => 'kg',
         ])->assertOk();
 
-        $this->assertSame('unit', HarvestProductUnit::where('product_code', '2002')->value('unit'));
-        $this->assertSame('unit', collect(
-            $this->actingAs($user)->getJson(route('fruit-veg.harvest.rows'))->json('rows')
-        )->firstWhere('code', '2002')['unit']);
+        // There is one quantity column and saves accumulate, so adding a count to
+        // a weight used to produce "7.2 unit". Refused now, and told why.
+        $response = $this->actingAs($user)->postJson(route('fruit-veg.harvest.save-row'), [
+            'date' => $date, 'code' => '2002', 'amount' => 2, 'unit' => 'unit',
+        ])->assertStatus(422);
+
+        $response->assertJson(['success' => false, 'logged' => 5.2, 'unit' => 'kg']);
+        $this->assertStringContainsString('Already logged 5.2 kg of Salad mix today', $response->json('message'));
+        $this->assertStringContainsString("remove today's entry on the office harvest page", $response->json('message'));
+
+        // Nothing moved: not the row, and not the remembered preference.
+        $this->assertSame(1, Harvest::count());
+        $this->assertEquals(5.2, (float) Harvest::first()->quantity);
+        $this->assertSame('kg', Harvest::first()->unit);
+        $this->assertSame('kg', HarvestProductUnit::where('product_code', '2002')->value('unit'));
+
+        // The same unit still accumulates.
+        $this->actingAs($user)->postJson(route('fruit-veg.harvest.save-row'), [
+            'date' => $date, 'code' => '2002', 'amount' => 1, 'unit' => 'kg',
+        ])->assertOk()->assertJson(['logged' => 6.2]);
+
+        // A product with no row today takes either unit, and remembers it.
+        $this->actingAs($user)->postJson(route('fruit-veg.harvest.save-row'), [
+            'date' => $date, 'code' => '2004', 'amount' => 3, 'unit' => 'unit',
+        ])->assertOk()->assertJson(['success' => true, 'logged' => 3]);
+
+        $this->assertSame('unit', HarvestProductUnit::where('product_code', '2004')->value('unit'));
+
+        $rows = collect($this->actingAs($user)->getJson(route('fruit-veg.harvest.rows'))->json('rows'));
+        $this->assertSame('unit', $rows->firstWhere('code', '2004')['logged_unit']);
+        $this->assertSame('kg', $rows->firstWhere('code', '2002')['logged_unit']);
+    }
+
+    public function test_harvest_refusal_message_reads_without_trailing_zeros(): void
+    {
+        $user = $this->userWith('employee', ['fruit_veg.operate']);
+        $this->jonsProduct('2002', 'Salad mix');
+        $date = now()->toDateString();
+
+        $this->actingAs($user)->postJson(route('fruit-veg.harvest.save-row'), [
+            'date' => $date, 'code' => '2002', 'amount' => 3, 'unit' => 'unit',
+        ])->assertOk();
+
+        $message = $this->actingAs($user)->postJson(route('fruit-veg.harvest.save-row'), [
+            'date' => $date, 'code' => '2002', 'amount' => 1, 'unit' => 'kg',
+        ])->assertStatus(422)->json('message');
+
+        // "3 units", not "3.00 unit" — the message is read on a shop floor.
+        $this->assertStringContainsString('Already logged 3 units of Salad mix today', $message);
+        $this->assertStringContainsString('Log in units', $message);
     }
 
     public function test_harvest_refuses_a_product_that_is_not_jons(): void
@@ -415,6 +511,50 @@ class ShopFruitVegTest extends TestCase
         ])->assertStatus(422)->assertJson(['success' => false]);
 
         $this->assertSame(0, Harvest::count());
+    }
+
+    public function test_harvest_print_uses_the_zebra_endpoint(): void
+    {
+        $captured = [];
+
+        // A printer that records the ZPL instead of shelling out to lp.
+        $this->app->bind(ZebraPrintService::class, function () use (&$captured) {
+            return (new ZebraPrintService('printer.test', '631', 'TEST-PRINTER', 1))
+                ->usingRunner(function (string $command) use (&$captured) {
+                    if (preg_match("/-o raw '([^']+)'/", $command, $m) && is_file($m[1])) {
+                        $captured[] = file_get_contents($m[1]);
+                    }
+
+                    return 'request id is TEST-PRINTER-1 (1 file(s))';
+                });
+        });
+
+        $user = $this->userWith('employee', ['fruit_veg.operate', 'labels.print']);
+        $this->jonsProduct('2002', 'Salad mix');
+        $label = $this->label('2002');
+
+        $this->actingAs($user)
+            ->postJson(route('zebra-labels.print', $label), ['copies' => 3])
+            ->assertOk()
+            ->assertJson(['success' => true, 'message' => 'Print job sent (3 copies)']);
+
+        // The controller rewrites ^PQ rather than repeating the ZPL, so three
+        // copies is one job asking the printer for three.
+        $this->assertCount(1, $captured);
+        $this->assertStringContainsString('^PQ3', $captured[0]);
+        $this->assertStringContainsString('Mossfield salad', $captured[0]);
+    }
+
+    public function test_printing_needs_the_labels_permission(): void
+    {
+        $this->jonsProduct('2002', 'Salad mix');
+        $label = $this->label('2002');
+
+        $barista = $this->userWith('barista', ['coffee.kds']);
+
+        $this->actingAs($barista)
+            ->postJson(route('zebra-labels.print', $label), ['copies' => 1])
+            ->assertForbidden();
     }
 
     public function test_office_pages_still_render(): void

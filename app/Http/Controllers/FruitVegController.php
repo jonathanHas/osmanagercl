@@ -16,6 +16,7 @@ use App\Services\ProductThumbnailService;
 use App\Services\SalesDataSyncService;
 use App\Services\TillVisibilityService;
 use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
@@ -1024,7 +1025,7 @@ class FruitVegController extends Controller
 
         $cacheControl = $versioned
             ? 'public, max-age=604800, immutable'
-            : 'public, max-age='.($request->has('t') ? 300 : 0).', must-revalidate';
+            : 'public, max-age=0, must-revalidate';
 
         // Detect image format from first few bytes (magic numbers). Skipped for a
         // thumbnail, which is a JPEG we just encoded ourselves.
@@ -1060,6 +1061,26 @@ class FruitVegController extends Controller
             'ETag' => $etag,
             'Last-Modified' => gmdate('D, d M Y H:i:s T'),
         ]);
+    }
+
+    /**
+     * Tidy the thumbnail cache from the manage page.
+     *
+     * The same prune the weekly command runs, but through a web request — which is
+     * the reliable path, because the cache folder belongs to the web server and a
+     * shell run as anyone else cannot delete from it.
+     */
+    public function pruneThumbnails(ProductThumbnailService $thumbnails): RedirectResponse
+    {
+        $result = $thumbnails->prune(ProductThumbnailService::currentPhotoProducts());
+
+        $summary = "Tidied thumbnails: kept {$result['kept']}, deleted {$result['deleted']}.";
+
+        if ($result['failed'] !== []) {
+            return back()->with('error', $summary.' '.count($result['failed']).' could not be deleted.');
+        }
+
+        return back()->with('success', $summary);
     }
 
     /**

@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\Product;
+use App\Models\SupplierLink;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\ImageManager;
 
@@ -59,21 +62,123 @@ class ProductThumbnailService
             return null;
         }
 
+        // A replaced photo writes a new key, so without this the old thumbnail would
+        // sit in the folder forever. Only on a miss, and only this product's files
+        // at this size, so it is one directory read on a rare path.
+        $prefix = $this->prefix($code, $size);
+
+        foreach ($disk->files(self::FOLDER) as $existing) {
+            if ($existing !== $path && str_starts_with(basename($existing), $prefix)) {
+                $disk->delete($existing);
+            }
+        }
+
         $disk->put($path, $jpeg);
 
         return $jpeg;
     }
 
+    /**
+     * Delete every cached file that does not belong to a current product photo.
+     *
+     * The sweep in jpeg() only runs when a thumbnail is written, so a product whose
+     * photo never changes again keeps any orphan it already has. This is the
+     * catch-all: give it every product that currently has a photo and anything else
+     * in the folder goes.
+     *
+     * Deletion can fail on permissions — the folder is created by the web server,
+     * so a shell run as another user cannot remove from it. That is reported, never
+     * thrown: a prune that cannot delete should say so, not blow up a cron job.
+     *
+     * @param  iterable<\App\Models\Product>  $productsWithPhotos  each with IMAGE loaded
+     * @return array{kept: int, deleted: int, failed: array<int, string>}
+     */
+    public function prune(iterable $productsWithPhotos): array
+    {
+        $expected = [];
+
+        foreach ($productsWithPhotos as $product) {
+            if ($product->IMAGE === null) {
+                continue;
+            }
+
+            foreach (self::SIZES as $size) {
+                $expected[basename($this->path($product->CODE, $product->IMAGE, $size))] = true;
+            }
+        }
+
+        $disk = Storage::disk(self::DISK);
+        $kept = 0;
+        $deleted = 0;
+        $failed = [];
+
+        foreach ($disk->files(self::FOLDER) as $file) {
+            if (isset($expected[basename($file)])) {
+                $kept++;
+
+                continue;
+            }
+
+            try {
+                if ($disk->delete($file)) {
+                    $deleted++;
+                } else {
+                    $failed[] = $file;
+                }
+            } catch (\Throwable $e) {
+                $failed[] = $file;
+            }
+        }
+
+        return ['kept' => $kept, 'deleted' => $deleted, 'failed' => $failed];
+    }
+
+    /**
+     * Every product whose photo could legitimately be in the cache: the fruit & veg
+     * range, plus Jon's own produce, which the harvest screen lists and which is not
+     * always in an F&V category.
+     *
+     * @return \Illuminate\Support\Collection<int, \App\Models\Product>
+     */
+    public static function currentPhotoProducts(): Collection
+    {
+        $jonCodes = SupplierLink::where('SupplierID', (string) config('suppliers.jon'))
+            ->pluck('Barcode')
+            ->unique()
+            ->all();
+
+        return Product::query()
+            ->whereNotNull('IMAGE')
+            ->where(function ($q) use ($jonCodes) {
+                $q->whereIn('CATEGORY', TillVisibilityService::CATEGORY_MAPPINGS['fruit_veg']);
+
+                if ($jonCodes !== []) {
+                    $q->orWhereIn('CODE', $jonCodes);
+                }
+            })
+            ->get()
+            ->unique('CODE')
+            ->values();
+    }
+
     private function path(string $code, string $blob, int $size): string
     {
-        // The code can contain anything the POS allows, so it is hashed too rather
-        // than trusted as a path segment.
         return sprintf(
-            '%s/%s-%d-%s.jpg',
+            '%s/%s%s.jpg',
             self::FOLDER,
-            substr(md5($code), 0, 12),
-            $size,
+            $this->prefix($code, $size),
             substr(md5($blob), 0, 12)
         );
+    }
+
+    /**
+     * Everything in the file name that identifies the product and size, without the
+     * blob's hash — so one product's thumbnails at one size can be found and
+     * replaced. The code can contain anything the POS allows, so it is hashed
+     * rather than trusted as a path segment.
+     */
+    private function prefix(string $code, int $size): string
+    {
+        return substr(md5($code), 0, 12).'-'.$size.'-';
     }
 }

@@ -445,6 +445,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/prices', [FruitVegController::class, 'prices'])->name('prices')->middleware('permission:fruit_veg.manage');
         Route::post('/prices/update', [FruitVegController::class, 'updatePrice'])->name('prices.update')->middleware('permission:fruit_veg.manage');
         Route::get('/manage', [FruitVegController::class, 'manage'])->name('manage')->middleware('permission:fruit_veg.manage');
+        Route::post('/thumbnails/prune', [FruitVegController::class, 'pruneThumbnails'])->name('thumbnails.prune')->middleware('permission:fruit_veg.manage');
         Route::get('/labels', [FruitVegController::class, 'labels'])->name('labels')->middleware('permission:fruit_veg.operate');
         Route::get('/labels/preview', [FruitVegController::class, 'previewLabels'])->name('labels.preview')->middleware('permission:fruit_veg.operate');
         Route::post('/labels/print', [FruitVegController::class, 'printLabels'])->name('labels.print')->middleware('permission:fruit_veg.operate');

@@ -117,6 +117,53 @@ Added automatic hex decode/encode in the Zebra Label Storage UI. Common currency
 
 ## Frontend Issues
 
+### Scheduled Jobs Declared in `app/Console/Kernel.php` Never Ran
+**Status:** Fixed (2026-09-26)
+
+#### Problem
+Four data imports were declared in `app/Console/Kernel.php::schedule()` and none of
+them had been running: yesterday's sales import, the weekly seven-day catch-up, the
+sales-accounting import and the POS daily summaries. Nothing failed and nothing was
+logged — `schedule:run` simply had nothing to run. The code looked correct in the one
+file anybody would think to check.
+
+#### Root Cause
+This is a Laravel 11/12 application. `bootstrap/app.php` uses
+`Application::configure()->withRouting(commands: routes/console.php)` and **binds no
+console kernel**, so `App\Console\Kernel` was never instantiated and its `schedule()`
+method was never called. The file was a leftover from the pre-11 structure. Only
+`routes/console.php` is read.
+
+Found while adding an unrelated weekly job (cycle 17g): the new entry did not appear
+in `php artisan schedule:list`, which is what exposed the other four.
+
+#### Solution
+The four data jobs moved to `routes/console.php` with their commands, options, times
+and overlap settings unchanged, and `app/Console/Kernel.php` was deleted.
+`tests/Feature/ScheduleTest.php` now pins the whole schedule — the commands, their
+cron expressions, that every scheduled command is registered, and that each uses
+`onOneServer()` and `withoutOverlapping()`. Both deployment documents gained a
+post-deploy `php artisan schedule:list` check listing the eight expected commands.
+
+`kds:monitor` was **not** restored. The KDS page detects orders itself, its
+`MonitorCoffeeOrdersJob` is documented as a legacy queue job kept for backward
+compatibility, and the last time it ran unattended it left ~3.9M stale queue rows
+(see the queue-worker entry in this document). The command still exists for manual use.
+
+#### Catching up the gap
+Data older than the jobs' own windows stays missing until it is backfilled by hand.
+Run once, adjusting the dates to cover the period the jobs were off:
+
+```bash
+php artisan sales:import-daily --start-date=YYYY-MM-DD --end-date=YYYY-MM-DD
+php artisan sales-accounting:import --start-date=YYYY-MM-DD --end-date=YYYY-MM-DD --force
+php artisan pos:populate-daily-summaries --last-days=N --force
+```
+
+#### Lesson
+A scheduled job that is declared is not a scheduled job that runs. `schedule:list` is
+the only statement of truth, and it is now a post-deploy check and a test.
+
 ### Waste and Harvest Day Lookups Only Worked on MySQL
 **Status:** Fixed (2026-09-26)
 

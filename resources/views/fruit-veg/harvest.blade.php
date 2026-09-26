@@ -104,16 +104,17 @@
                                         <div class="flex items-center gap-2">
                                             <input type="number" step="0.01" min="0" x-model="row.input"
                                                    @keydown.enter.prevent="saveRow(row)"
+                                                   @input="row.error = ''"
                                                    :disabled="row.saving"
                                                    placeholder="add..."
                                                    class="w-24 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                             <label class="inline-flex items-center text-sm text-gray-600">
                                                 <input type="radio" :name="`unit_${row.code}`" value="kg"
-                                                       x-model="row.unit" class="mr-1 text-indigo-600 focus:ring-indigo-500"> kg
+                                                       x-model="row.unit" @change="row.error = ''" class="mr-1 text-indigo-600 focus:ring-indigo-500"> kg
                                             </label>
                                             <label class="inline-flex items-center text-sm text-gray-600">
                                                 <input type="radio" :name="`unit_${row.code}`" value="unit"
-                                                       x-model="row.unit" class="mr-1 text-indigo-600 focus:ring-indigo-500"> unit
+                                                       x-model="row.unit" @change="row.error = ''" class="mr-1 text-indigo-600 focus:ring-indigo-500"> unit
                                             </label>
                                             <button type="button" @click="saveRow(row)" :disabled="row.saving"
                                                     class="px-3 py-1.5 bg-teal-600 text-white rounded-md text-sm font-medium hover:bg-teal-700 transition disabled:opacity-50">
@@ -129,6 +130,7 @@
                                             <button type="button" x-show="row.added" @click="removeRow(row.code)"
                                                     class="text-gray-400 hover:text-red-600" title="Remove row">&times;</button>
                                         </div>
+                                        <p x-show="row.error" x-cloak class="mt-1 text-xs text-red-600" x-text="row.error"></p>
                                     </td>
                                     <td class="px-6 py-3">
                                         <input type="text" x-model="row.notes"
@@ -201,7 +203,7 @@
                 date,
                 available,          // [{ code, name, category, unit, label }]
                 // Server rows get client-only fields for inline editing.
-                rows: rows.map(r => ({ ...r, input: '', notes: '', saving: false, added: false })),
+                rows: rows.map(r => ({ ...r, input: '', notes: '', saving: false, added: false, error: '' })),
                 search: '',
                 open: false,
                 printModal: {
@@ -219,7 +221,7 @@
                 },
 
                 addRow(p) {
-                    this.rows.unshift({ ...p, logged: 0, input: '', notes: '', saving: false, added: true });
+                    this.rows.unshift({ ...p, logged: 0, input: '', notes: '', saving: false, added: true, error: '' });
                     this.search = '';
                     this.open = false;
                 },
@@ -232,6 +234,7 @@
                     const amount = parseFloat(row.input);
                     if (row.saving || !amount || amount <= 0) return;
                     row.saving = true;
+                    row.error = '';
 
                     try {
                         const res = await fetch('{{ route('fruit-veg.harvest.save-row') }}', {
@@ -249,10 +252,14 @@
                             row.input = '';
                             if (row.label) this.openPrintModal(row, amount);
                         } else {
-                            alert(data.message || 'Save failed.');
+                            // Inline rather than a browser dialog: the commonest
+                            // failure is now the one-unit-per-day refusal, whose
+                            // message tells you what to do, and a dialog hides the
+                            // row you need to look at while you read it.
+                            row.error = data.message || 'Save failed.';
                         }
                     } catch (err) {
-                        alert('Save failed: ' + err.message);
+                        row.error = 'Save failed: ' + err.message;
                     }
                     row.saving = false;
                 },

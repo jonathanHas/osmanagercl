@@ -1,4 +1,4 @@
-# Shop mode cycle 17e — Versioned thumbnail URLs so warm opens cost nothing — implementation
+# Shop mode cycle 19 — Harvest: print labels as you log — implementation
 
 Status: DONE
 Plan revision: 1
@@ -7,211 +7,207 @@ Date: 2026-09-26
 
 ## Baseline
 
-HEAD: 030e3e14, 39 dirty paths — cycles 15, 17, 17b, 17c, 17d (mine, archived but
-uncommitted) and the parallel delivery-row session. Files changed at the end is
-exact.
+HEAD: 9a41cc3d, 26 dirty paths — cycles 17f, 17g and 18, all mine, accepted and
+archived but uncommitted. Files changed at the end separates them.
 
-Test baseline from 17d: 15 failed / 611 passed (2555 assertions).
-
-Warm-open baseline to beat, measured in 17d with the tab in the foreground:
-**95 requests, 28 kB, all 304.**
+Test baseline: 15 failed / 634 passed (2707 assertions).
 
 ## Pre-flight
 
-The route is as the plan describes. Two things it does not mention that the change
-has to account for, both found by reading `productImage()` rather than assuming:
+Every piece the plan relies on exists:
 
-1. **`$imageData` is reassigned to the thumbnail**, so the version has to be
-   computed from a separately held copy of the original blob, not from
-   `$imageData` at the point of the check.
-2. **There are two places that emit `Cache-Control`** — the 200 and the
-   `If-None-Match` 304 — and the plan only describes the 200. If the 304 kept
-   `max-age=0, must-revalidate`, a client that revalidated once would be downgraded
-   out of the week-long lifetime and go back to asking every time, which is the
-   exact cost this cycle exists to remove. I build the header once and use it in
-   both. Recorded under Deviations.
+- `zebra-labels.print` is `POST labels/zebra/manage/{zebraLabel}/print` behind
+  `PermissionMiddleware:labels.print` — which employees hold, so the Shop screen can
+  reach it.
+- `ZebraLabelController::print()` clamps copies 1–99, rewrites `^PQ` rather than
+  repeating the ZPL, and returns the three messages the plan quotes with 200/500.
+- `HarvestController::labelPayload()` returns `{ id, name, width_mm, height_mm }`,
+  falling back from the ZPL's own dimensions to the stored ones.
+- Design classes `shop-inline`, `shop-btn--secondary`, `shop-iconbtn--ghost`,
+  `shop-stepper`, `shop-card--flat`, `shop-between`, `shop-subtitle` and the icons
+  `printer`, `alert`, `x` are all present. No `APP ADDITIONS` expected.
+- `DeliveryTranslatedLabelPrintingTest::fakePrinter()` binds a `ZebraPrintService`
+  with `usingRunner()` that captures the ZPL from the temp file named in the `lp`
+  command — the pattern to copy so no test touches a real printer.
+
+**I will not print on the real printer.** The plan puts that with the owner and I
+have kept to it; everything below is tests, a node exercise, and browser checks that
+stop short of sending a job.
 
 ## Steps
 
-### 1. Rows carry the version — done
+### 1. Rows carry the label — done
 
-Changed: `app/Http/Controllers/WasteController.php`,
-`app/Http/Controllers/HarvestController.php`,
-`tests/Feature/Shop/ShopFruitVegTest.php`.
+Changed: `app/Http/Controllers/HarvestController.php` — `'label'` on each item of
+`rows` and of `available` in `rows()`. Two lines plus a comment; `dataFor()` already
+had the payload.
 
-Each controller gained a small private `imageUrl(Product $product)` rather than
-growing the expression inline — the row arrays are already dense, and the reason
-the version exists needs a comment somewhere the next reader will find it.
+### 2. Behaviour: the offer and the print — done
 
-The Shop test's fake blob became a named constant with an `expectedImageUrl()`
-helper, so the three assertions derive the version the same way the controller does
-instead of hard-coding a hash.
+Changed: `resources/js/shop/fv-harvest.js` — `print` state, `printUrlTemplate` and
+`sizeText` getters, `offerPrint()`, `reprint()`, `dismissPrint()`, `clampCopies()`,
+`bumpCopies()`, `sendPrint()`, and the hook in `log()`.
+
+`log()` needed one extra line beyond the plan: it reads `this.amount` through a
+getter derived from `typed`, and `typed` is cleared on success before the offer
+would be made, so the amount is captured into a local first. Without it the copies
+default would always have been 1.
+
+```
+$ node scratchpad/print19.mjs
+ok   offer appears after a log: true
+ok   copies default from the amount (4.2 -> 4): 4
+ok   product on the card: "Salad mix"
+ok   sizeText: "112.6 × 75.1 mm"
+ok   bumpCopies clamps low: 1            ok   bumpCopies clamps high: 99
+ok   posted to the templated url: "/labels/zebra/manage/7/print"
+ok   posted copies: {"copies":4}
+     toast: "Print job sent (4 copies)"
+ok   card closes on success: null
+ok   card stays open on failure: true    ok   result shown on the card: "Print failed"
+ok   not stuck sending: false
+ok   retry closes the card: null
+ok   network failure keeps the card: true
+ok   network failure message: "Could not reach the printer"
+ok   no label: no offer: null
+ok   reprint copies from logged: 3       ok   dismiss clears: null
+ok   reprint on a row with no label does nothing: null
+ok   count maps one to one: 7
+$ grep -c "route(" resources/js/shop/fv-harvest.js → 0
+```
+Three cases beyond the plan's list, all about not getting stuck: a retry after a
+failure succeeds and closes the card; `sending` is reset in a `finally` so a failed
+print never leaves the button disabled forever; and `reprint()` on a row without a
+label is a no-op rather than opening an unusable card.
+
+### 3. The screen — done
+
+Changed: `resources/views/shop/fv-harvest.blade.php` — the `data-print-url-template`
+attribute, the print card above the unit/numpad card, and the printer button on
+Today rows.
+
+```
+$ php artisan test --filter=ShopViewContractTest → 19 passed
+$ rendered page contains: data-print-url-template, "Print labels",
+  "Check the printer has", aria-label="Print labels", __ID__
+```
+
+### 4. A print test through the real endpoint — done
+
+Changed: `tests/Feature/Shop/ShopFruitVegTest.php` — a `label()` helper, label
+assertions on the rows test, and two print tests.
 
 ```
 $ php artisan test --filter=ShopFruitVegTest
-Tests:    10 passed (83 assertions)
+✓ harvest print uses the zebra endpoint
+✓ printing needs the labels permission
+  ... plus 12
+Tests:    14 passed (119 assertions)
 ```
+The print test binds a `ZebraPrintService` whose runner captures the ZPL from the
+temp file, so nothing reaches a printer, and asserts `^PQ3` — which pins the
+behaviour the Shop screen depends on: three copies is one job asking for three, not
+the ZPL sent three times.
 
-### 2. The route honours a matching version — done
+### 5. Docs, format, build — done
 
-Changed: `app/Http/Controllers/FruitVegController.php` (`productImage()` only),
-`tests/Feature/FruitVegProductImageTest.php` (extended — and this time I read it
-first).
-
-```
-$ php artisan test --filter=FruitVegProductImageTest
-✓ a matching version on a thumbnail caches for a week
-✓ a wrong version is treated as absent
-✓ a version without a size changes nothing
-✓ a product without an image ignores the version
-✓ a revalidated versioned thumbnail keeps the long lifetime
-✓ replacing the photo changes the version and the old one stops matching
-  ... plus the 11 from 17d and earlier
-Tests:    17 passed (114 assertions)
-```
-
-Two of those go beyond the plan's list and are the ones I would not want missing:
-
-- **`a revalidated versioned thumbnail keeps the long lifetime`** covers the 304
-  branch. Without it a client that revalidated once would be handed
-  `max-age=0, must-revalidate` and go back to asking every time.
-- **`a wrong version is treated as absent`** tries four kinds of wrong, including
-  the correct hash in **uppercase** — `hash_equals` is case-sensitive, so an
-  uppercased link is correctly treated as a miss rather than accidentally matching.
-
-One assertion I wrote was wrong and the code was right. I had asserted that after
-replacing a photo, the stale-`v` response and the fresh-`v` response would have
-different ETags. They do not, and should not: a wrong version is treated as absent,
-so **both** serve a thumbnail of the *current* photo. The test now asserts the thing
-that actually matters — the bytes differ from what the browser held before the
-swap, and the stale link shows the current picture rather than the old one.
-
-### 3. Docs, format — done
-
-Changed: `docs/features/fruit-veg-system.md` — a paragraph on `v`, the week-long
-lifetime, the 304, the must-match rule, and why versioning is thumbnails-only.
-```
-$ ./vendor/bin/pint --test --dirty → PASS 14 files
-```
+`docs/features/fruit-veg-system.md` and `docs/design/shop-mode/README.md`; the
+README records the URL-template pattern, which is how a per-record route reaches a
+Shop module without a route helper in JavaScript.
+`./vendor/bin/pint --test --dirty` → PASS; `npm run build` → built.
 
 ## Verification
 
 **1. Tests**
 ```
-$ php artisan test --filter="Shop|FruitVegProductImage|ProductThumbnail"
-Tests:    216 passed (989 assertions)
-
+$ php artisan test --filter="Shop|FruitVeg"
+Tests:    2 failed, 217 passed          ← the 2 are FruitVegLabelPrintingTest, known
 $ php artisan test
-Tests:    15 failed, 617 passed (2603 assertions)
+Tests:    15 failed, 636 passed (2721 assertions)
 ```
-15 failed, the identical set (Udea ×7, CashReconciliation ×3,
-FruitVegLabelPrinting ×2, Product ×2, TestScraper ×1). 617 = 611 + the 6 new tests.
+The identical set. 636 = 634 + 2.
 
-**2. `git diff app/Http/Controllers/FruitVegController.php`** — three hunks: the
-`use` line, and two inside `productImage()`. Every deleted line is one I replaced;
-I read them rather than trusting the hunk headers.
-
-**3. Manual, dev app, tab rendering throughout (the 17c lesson applied — every
-measurement below follows a screenshot that forces a render).**
-
-*Cold open*, browser cache empty for these URLs because the `v` parameter makes
-them new:
+**2. Contract**
 ```
-95 image requests, 339,285 bytes (331 kB), largest 5.9 kB, median 3.5 kB
-Cache-Control: immutable, max-age=604800, public
-all 95 loaded, every URL carrying v=<8 hex>
+route( in fv-harvest.js        → 0
+<script|<style in shop views   → 0
+design block cmp               → IDENTICAL   (no stylesheet change)
 ```
 
-*Re-open*, after navigating to Harvest and back — the way staff actually return to
-a screen:
-```
-95 image entries, 0 bytes transferred, all 95 rendered
-deliveryType:    { "cache": 95 }
-responseStatus:  { "200": 95 }
-```
-`deliveryType: "cache"` on every one: not a 304, no network at all. This is the
-whole point of the cycle, and the progression across three cycles is:
-```
-17c   cold 3.15 MB / 87 imgs      warm 95 requests, 28 kB (all 304)
-17d   cold 329 kB  / 95 imgs      warm 95 requests, 28 kB (all 304)
-17e   cold 331 kB  / 95 imgs      warm 0 requests, 0 bytes
-```
+**3. `git diff app/Http/Controllers/HarvestController.php`** — five hunks, of which
+**two are mine**, both inside `rows()`. The other three are cycle 17f's
+`saveRow()`/`imageUrl()` work, still uncommitted in this tree. I read the diff
+rather than reporting the file as "rows() only".
 
-*Replacing a photo.* I backed up Apricots' blob to a file, replaced it with a
-rotated copy (a visibly different picture, so the screen could be judged by eye),
-and reopened:
-```
-apricots v: a9875577 → da7e3245
-95 tiles: 65 served from cache, exactly 1 fetched from the network (3,231 bytes)
-```
-and the tile visibly showed the upside-down apricots. One photo changed, one image
-fetched, everything else untouched — which is the property that makes a week-long
-lifetime safe. The original blob was restored afterwards and verified by md5
-(`a9875577ca93a2577b699e70f42d148b`, 79,177 bytes, identical to the backup).
+**4. Manual, dev app — the screen exercised, and deliberately stopped short of
+printing.** The plan reserves the real print for the owner and I have kept to that:
+no job was sent to the printer at any point.
 
-*Office pages.* `/fruit-veg/availability`: 50 product images, **none** asking for a
-size or a version, natural sizes still the originals (313×161, 500×516, 100×100,
-1×1). A full-size image with a real photo answers
-`max-age=0, must-revalidate, public` — byte-for-byte the behaviour it had before
-this cycle.
+Dev has three of Jon's products with active labels. The label payload arrives:
+`Rocket Mossfield 100g → { Rocket_Mossfield, 112.6 × 75.1 mm }`.
+
+There was already a harvest row for today — "Mixed Salad 100g, 1 unit", logged by
+`jonathanE` at 15:49, after my last cycle's cleanup. **Not mine, and left alone.**
+It was also the ideal subject, because tapping a Today row's printer button opens
+the card without creating any data:
+
+```
+tap the printer icon on the Today row →
+  print = { label: { id 18, "Mixed Salad", 112.6 × 75.1 }, product: "Mixed Salad 100g",
+            copies: 1, sending: false, result: null }
+  card: "Print labels" ×, "Mixed Salad 100g · Mixed Salad",
+        "Check the printer has 112.6 × 75.1 mm labels loaded.",
+        COPIES stepper at 1, "Skip" and "Print 1 label"
++ twice  → copies 3, button "Print 3 labels"     (plural)
+− three  → copies 1, button "Print 1 label"      (singular, clamped at 1)
+Skip     → print null, card hidden, the Today row unchanged at 1
+```
+Console clean throughout.
+
+The two things only the owner can check are the printer actually producing the
+labels, and the "Couldn't confirm the print job" path with the printer off. Both are
+in the plan's manual list for them.
 
 ## Deviations
 
-**One.** The plan describes the header change on the 200 only. I apply the same
-`Cache-Control` to the `If-None-Match` 304 as well, because the two are emitted
-from the same method and leaving the 304 at `max-age=0, must-revalidate` would drop
-any client that revalidates once straight back into asking every time — the exact
-cost this cycle removes. Covered by
-`test_a_revalidated_versioned_thumbnail_keeps_the_long_lifetime`.
+None. One addition the plan does not mention but the code needed: capturing the
+amount into a local in `log()` before `typed` is cleared, described in step 2.
 
 ## Files changed
 
 Mine, this cycle:
 ```
-app/Http/Controllers/FruitVegController.php     productImage(): version check, shared header
-app/Http/Controllers/WasteController.php        imageUrl() helper, +v
-app/Http/Controllers/HarvestController.php      imageUrl() helper, +v
-tests/Feature/FruitVegProductImageTest.php      6 new tests (existing file, extended)
-tests/Feature/Shop/ShopFruitVegTest.php         BLOB constant + expectedImageUrl()
-docs/features/fruit-veg-system.md               one paragraph
+ M app/Http/Controllers/HarvestController.php     two lines in rows()
+ M resources/js/shop/fv-harvest.js                the print offer
+ M resources/views/shop/fv-harvest.blade.php      the card and the row button
+ M tests/Feature/Shop/ShopFruitVegTest.php        label + print tests
+ M docs/features/fruit-veg-system.md
+ M docs/design/shop-mode/README.md
 ```
-`storage/app/private/fv-thumbs/` now holds 96 files — the 95 from 17d plus one for
-the replaced-photo test; gitignored, not in the diff. Dev data is as I found it:
-no waste or harvest rows today, 406 F&V photos, Apricots' blob restored exactly.
+Those six files also carry cycles 17f and 19's work in some cases; cycles 17f, 17g
+and 18 remain uncommitted in this tree alongside them.
 
-Still in the tree and not mine: cycles 15, 17, 17b, 17c, 17d, and the parallel
-delivery-row session.
-
-**Not committed, not pushed, not deployed.**
+**Not committed, not pushed, not deployed. Nothing was printed.**
 
 ## Notes for Planner
 
-1. **The full-size URLs are now the only ones still revalidating**, and the office
-   pages open 50 of them at a time. They cannot take a week-long lifetime as they
-   stand, because the URL carries no hash — that is the asymmetry I flagged in 17d
-   and this cycle deliberately only fixed the safe half. If the office pages are
-   ever worth the same treatment, the move is to give them `?v=` too (the blob is
-   already in memory where those views are built), not to lengthen the unversioned
-   lifetime.
+1. **Only 3 of Jon's 111 products have an active label on dev.** The offer is
+   therefore rare in practice — most harvest logs will show no card at all, which
+   is correct but means the feature will look like it is not working until someone
+   checks which products have labels. Worth telling the owner which three they are
+   (`Spinach_Mossfield`, `Mixed Salad`, `Rocket_Mossfield`) so the first test is
+   done on one that can work.
 
-2. **`?t=` on this route looks like dead weight.** `productImage()` still honours a
-   `t` parameter with a 300-second lifetime, from before any of this. Nothing live
-   passes it *to this route*: the only grep hit under `resources/` is in
-   `fruit-veg/sales.blade.php.backup`, and it is a false positive (`x-text=`
-   matching `t=`). The cache-busting `?t=` pattern is real, but it belongs to
-   `products.image` in a different controller
-   (`resources/views/products/edit.blade.php:1751`). So this route now has three
-   caching paths — versioned, `t`, and neither — and the next reader will wonder
-   which applies. Worth removing in housekeeping; I have not, because it is outside
-   this cycle and a `t` could be arriving from somewhere I cannot grep, such as a
-   bookmark.
+2. **The copies default rounds a weight to a count of labels**, which is the
+   office's rule and is right for punnets and bags, but 0.4 kg rounds to **zero**
+   and is then clamped to 1. That is the sensible floor, and it is worth knowing
+   that a small weight always offers one label rather than none.
 
-3. **The thumbnail cache grows by one file per photo revision and never shrinks.**
-   Replacing a photo leaves the old thumbnail behind forever — I created one such
-   orphan during this walkthrough. At 3 kB each this is not a problem for years,
-   but it is the reason a clearing mechanism will eventually be wanted, and note 3
-   of 17d still applies: the folder is `www-data`-owned, so clearing it needs to be
-   something the web server does.
+3. **A print failure is reported twice** — a toast and a line on the card. That is
+   deliberate: the toast fades, and the card has to explain why it is still open.
+   If the Planner would rather have one, the card line is the one to keep.
 
-4. **Cycle 17's harvest-accumulates-across-units defect is still open** (5.2 kg then
-   2 units gives "7.2 unit"). Fifth cycle carrying this note.
+4. **The office harvest page and the Shop screen now offer the same print through
+   the same endpoint but with different copy-count UIs** (a number input there, a
+   stepper here). No behavioural difference; noting it so the two are not assumed
+   to share code.

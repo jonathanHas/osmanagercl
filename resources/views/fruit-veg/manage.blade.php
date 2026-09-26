@@ -46,12 +46,31 @@
                         </div>
                     </div>
                 </div>
+                <form method="POST" action="{{ route('fruit-veg.thumbnails.prune') }}" class="flex flex-col items-end">
+                    @csrf
+                    <button type="submit"
+                            class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors">
+                        Tidy thumbnail cache
+                    </button>
+                    <span class="mt-1 text-xs text-gray-500">Removes cached pictures that no longer match a product photo.</span>
+                </form>
                 <a href="{{ route('fruit-veg.index') }}" class="text-blue-600 hover:text-blue-800">
                     ← Back to Dashboard
                 </a>
             </div>
         </div>
     </x-slot>
+
+    {{-- Thumbnail cache tidy-up. This has to be a web request rather than a shell
+         command: the cache folder belongs to the web server, so only this process
+         can delete from it. --}}
+    @if (session('success') || session('error'))
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+            <div class="rounded-md p-3 text-sm {{ session('error') ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200' }}">
+                {{ session('error') ?: session('success') }}
+            </div>
+        </div>
+    @endif
 
     {{-- Loading placeholder shown until Alpine initializes --}}
     <div x-data="{ ready: false }" x-init="$nextTick(() => ready = true)">

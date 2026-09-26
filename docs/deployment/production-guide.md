@@ -160,6 +160,29 @@ DB::listen(function ($query) {
 
 ## 📝 Post-Deployment Notes
 
+### Scheduled Jobs (check after every deploy)
+
+```bash
+php artisan schedule:list
+```
+must list **eight** commands. If any is missing, the schedule file did not deploy:
+
+| When | Command |
+|---|---|
+| Sun 05:00 | `sales:import-daily --last-week` |
+| Sun 05:30 | `fruit-veg:prune-thumbnails` |
+| 06:00 | `sales:import-daily --yesterday` |
+| 06:10 | `sales-accounting:import --days=7` |
+| 06:15 | `pos:populate-daily-summaries --last-days=7` |
+| 20:00 | `sales:import-daily --today` |
+| 20:15 | `suppliers:send-daily-sales` |
+| 1st of month 07:00 | `customers:send-statements` |
+
+Every schedule lives in `routes/console.php`. There is deliberately no
+`app/Console/Kernel.php`: this application's `bootstrap/app.php` does not bind a
+console kernel, so a `schedule()` method there is never called — which is how four
+of these jobs silently stopped running (cycle 18).
+
 ### Maintenance Tasks
 
 1. **Regular Index Maintenance**:

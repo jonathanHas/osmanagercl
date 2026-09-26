@@ -53,6 +53,44 @@ class FruitVegProductImageTest extends TestCase
             $table->binary('IMAGE')->nullable();
         });
 
+        // The manage page and currentPhotoProducts() reach past PRODUCTS.
+        $pos = DB::connection('pos')->getSchemaBuilder();
+
+        $pos->create('PRODUCTS_CAT', function (Blueprint $table) {
+            $table->string('PRODUCT')->primary();
+        });
+
+        $pos->create('CATEGORIES', function (Blueprint $table) {
+            $table->string('ID')->primary();
+            $table->string('NAME')->nullable();
+        });
+
+        $pos->create('units', function (Blueprint $table) {
+            $table->string('ID')->primary();
+            $table->string('name')->nullable();
+        });
+
+        $pos->create('class', function (Blueprint $table) {
+            $table->string('ID')->primary();
+            $table->integer('classNum')->nullable();
+            $table->string('name')->nullable();
+        });
+
+        $pos->create('vegDetails', function (Blueprint $table) {
+            $table->string('ID')->primary();
+            $table->string('product')->nullable();
+            $table->integer('countryCode')->nullable();
+            $table->string('classId')->nullable();
+            $table->string('unitId')->nullable();
+        });
+
+        $pos->create('supplier_link', function (Blueprint $table) {
+            $table->id();
+            $table->string('Barcode');
+            $table->string('SupplierCode')->nullable();
+            $table->string('SupplierID')->nullable();
+        });
+
         $im = imagecreatetruecolor(300, 200);
         imagefill($im, 0, 0, imagecolorallocate($im, 30, 120, 60));
         ob_start();
@@ -333,6 +371,56 @@ class FruitVegProductImageTest extends TestCase
         // And the stale link, though served short-lived, still shows the CURRENT
         // photo rather than the one it was made for.
         $this->assertSame($fresh->getContent(), $stale->getContent());
+    }
+
+    // --- cycle 17g: the manage-page prune button ---------------------------
+
+    public function test_a_manager_can_tidy_the_thumbnail_cache(): void
+    {
+        $manager = $this->userWith('manager', ['fruit_veg.operate', 'fruit_veg.manage']);
+        $disk = Storage::disk('local');
+
+        // One thumbnail for P1's current photo, and one orphan.
+        $this->actingAs($manager)->get($this->url('P1', ['w' => 112]))->assertOk();
+        $this->assertCount(1, $disk->allFiles('fv-thumbs'));
+        $disk->put('fv-thumbs/'.str_repeat('a', 12).'-112-'.str_repeat('b', 12).'.jpg', 'orphan');
+
+        $response = $this->actingAs($manager)
+            ->from(route('fruit-veg.manage'))
+            ->post(route('fruit-veg.thumbnails.prune'));
+
+        $response->assertRedirect(route('fruit-veg.manage'));
+        $response->assertSessionHas('success');
+        $this->assertStringContainsString('deleted 1', session('success'));
+
+        // The orphan is gone and P1's current thumbnail is not.
+        $files = $disk->allFiles('fv-thumbs');
+        $this->assertCount(1, $files);
+        $this->assertStringNotContainsString(str_repeat('a', 12), $files[0]);
+    }
+
+    public function test_the_prune_button_needs_manage_not_just_operate(): void
+    {
+        $this->actingAs($this->staff())
+            ->post(route('fruit-veg.thumbnails.prune'))
+            ->assertForbidden();
+    }
+
+    public function test_a_guest_cannot_prune(): void
+    {
+        // Its own test: actingAs() persists for the rest of a test method, so a
+        // "guest" request after one would still be the signed-in user.
+        $this->post(route('fruit-veg.thumbnails.prune'))->assertRedirect('/login');
+    }
+
+    public function test_the_manage_page_offers_the_button(): void
+    {
+        $manager = $this->userWith('manager', ['fruit_veg.operate', 'fruit_veg.manage']);
+
+        $this->actingAs($manager)->get(route('fruit-veg.manage'))
+            ->assertOk()
+            ->assertSee(route('fruit-veg.thumbnails.prune'), false)
+            ->assertSee('Tidy thumbnail cache', false);
     }
 
     /**

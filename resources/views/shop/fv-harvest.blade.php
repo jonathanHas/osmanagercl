@@ -1,7 +1,9 @@
 <x-shop-layout title="Fruit & veg" :back="route('shop.home')">
     <main class="shop-page" x-data="shopFvHarvest()"
           data-rows-url="{{ route('fruit-veg.harvest.rows') }}"
-          data-save-url="{{ route('fruit-veg.harvest.save-row') }}">
+          data-save-url="{{ route('fruit-veg.harvest.save-row') }}"
+          {{-- Per-label route, built here so no route helper reaches the module. --}}
+          data-print-url-template="{{ route('zebra-labels.print', ['zebraLabel' => '__ID__']) }}">
         @include('shop.partials.fv-nav', ['active' => 'harvest'])
 
         <div class="shop-split">
@@ -57,6 +59,8 @@
                                 </div>
                                 <div class="shop-row__aside">
                                     <span class="shop-row__qty" x-text="r.logged + ' ' + r.unit"></span>
+                                    <button class="shop-iconbtn shop-iconbtn--ghost" type="button" x-show="r.label" x-cloak
+                                            aria-label="Print labels" @click="reprint(r)"><x-shop.icon name="printer" /></button>
                                 </div>
                             </div>
                         </template>
@@ -64,17 +68,57 @@
                 </section>
             </div>
 
+            {{-- Offered after a log, and from a Today row. The entry is already
+                 saved by this point, so skipping the print costs nothing. --}}
+            <section class="shop-card" x-show="print" x-cloak>
+                <div class="shop-between">
+                    <h2 class="shop-subtitle">Print labels</h2>
+                    <button class="shop-iconbtn shop-iconbtn--ghost" type="button" aria-label="Skip printing"
+                            @click="dismissPrint()"><x-shop.icon name="x" /></button>
+                </div>
+
+                <p class="shop-meta" x-text="print ? print.product + ' · ' + print.label.name : ''"></p>
+
+                <div class="shop-card shop-card--flat">
+                    <x-shop.icon name="alert" size="sm" />
+                    <p class="shop-meta">Check the printer has <strong x-text="sizeText"></strong> labels loaded.</p>
+                </div>
+
+                <h3 class="shop-label">Copies</h3>
+                <div class="shop-stepper">
+                    <button class="shop-iconbtn shop-iconbtn--lg" type="button" aria-label="One fewer"
+                            @click="bumpCopies(-1)"><x-shop.icon name="minus" size="lg" /></button>
+                    <output class="shop-stepper__value" x-text="print?.copies"></output>
+                    <button class="shop-iconbtn shop-iconbtn--lg" type="button" aria-label="One more"
+                            @click="bumpCopies(1)"><x-shop.icon name="plus" size="lg" /></button>
+                </div>
+
+                <p class="shop-meta" x-show="print?.result" x-cloak x-text="print?.result"></p>
+
+                <div class="shop-inline">
+                    <button class="shop-btn shop-btn--secondary" type="button" @click="dismissPrint()">Skip</button>
+                    <button class="shop-btn shop-btn--primary" type="button" :disabled="print?.sending" @click="sendPrint()">
+                        <x-shop.icon name="printer" />
+                        <span x-text="print ? (print.sending ? 'Sending…' : 'Print ' + print.copies + (print.copies === 1 ? ' label' : ' labels')) : ''"></span>
+                    </button>
+                </div>
+            </section>
+
             <section class="shop-card" x-show="selected" x-cloak>
                 <div class="shop-seg shop-seg--block" role="radiogroup" aria-label="Unit">
                     <label class="shop-seg__opt">
-                        <input type="radio" name="hunit" value="kg" :checked="unit === 'kg'" @change="setUnit('kg')">
+                        <input type="radio" name="hunit" value="kg" :checked="unit === 'kg'" :disabled="lockedUnit && lockedUnit !== 'kg'" @change="setUnit('kg')">
                         kg
                     </label>
                     <label class="shop-seg__opt">
-                        <input type="radio" name="hunit" value="unit" :checked="unit === 'unit'" @change="setUnit('unit')">
+                        <input type="radio" name="hunit" value="unit" :checked="unit === 'unit'" :disabled="lockedUnit && lockedUnit !== 'unit'" @change="setUnit('unit')">
                         units
                     </label>
                 </div>
+                {{-- One unit per product per day: the server refuses a mismatch, so
+                     say why the switch is fixed rather than letting it be tapped. --}}
+                <p class="shop-meta" x-show="lockedUnit" x-cloak
+                   x-text="'Logged in ' + (lockedUnit === 'kg' ? 'kg' : 'units') + &quot; today · to change, remove today's entry on the office page&quot;"></p>
 
                 <div class="shop-numpad">
                     <div class="shop-numpad__display">
