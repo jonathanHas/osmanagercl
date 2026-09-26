@@ -117,6 +117,53 @@ Added automatic hex decode/encode in the Zebra Label Storage UI. Common currency
 
 ## Frontend Issues
 
+### Customer Requests and Vouchers Tiles Missing on Production
+**Status:** Fixed (2026-09-26)
+
+#### Problem
+On the live system the Shop mode Home tiles for **Customer requests** and
+**Vouchers** did not appear for anybody, and the customer-invoicing pages were
+unreachable for managers. Nothing errored; the tiles are permission-filtered, so a
+permission that does not exist simply hides them.
+
+#### Root Cause
+The `permissions` table on production had no `customer-requests.manage`,
+`vouchers.redeem`, `vouchers.manage` or `customer-invoices.manage` rows. Both
+features' documentation said to run
+`php artisan db:seed --class=RolesAndPermissionsSeeder` as a deploy step. Nobody
+ever did, and nothing in the deploy does it automatically — `migrate --force` runs,
+`db:seed` does not.
+
+Re-running the seeder is also not the repair it looks like: the live database holds
+permissions the seeder does not list (`cash_reconciliation.*`, `till_review.export`),
+so the seeder is a fresh-install tool, not a reconciliation tool.
+
+#### Solution
+Migration `2026_09_26_120000_add_customer_requests_and_voucher_permissions.php`
+creates the four and grants them exactly as the seeder does — employees get
+`customer-requests.manage` and `vouchers.redeem`, managers add `vouchers.manage`
+and `customer-invoices.manage`, admins get all four. It is additive
+(`firstOrCreate` + `syncWithoutDetaching`), so no role loses anything and running it
+twice changes nothing. It ships with the next deploy's `migrate --force`.
+
+`tests/Feature/Shop/RolePermissionGrantsTest.php` now also asserts that the
+migration grants **exactly what the seeder grants** for these four, so the two
+sources of truth cannot drift.
+
+#### The rule going forward
+**A new permission ships as a migration, never only in the seeder.** The seeder is
+the fresh-install path. Anything that must reach an existing database goes in
+`database/migrations/`, because that is the only thing a deploy runs.
+
+Verify after a deploy:
+```bash
+php artisan tinker --execute='echo App\Models\Role::where("name","employee")->first()
+  ->permissions->pluck("name")
+  ->filter(fn($p) => str_starts_with($p, "vouchers") || str_starts_with($p, "customer-"))
+  ->values();'
+```
+must list `customer-requests.manage` and `vouchers.redeem`.
+
 ### Scheduled Jobs Declared in `app/Console/Kernel.php` Never Ran
 **Status:** Fixed (2026-09-26)
 

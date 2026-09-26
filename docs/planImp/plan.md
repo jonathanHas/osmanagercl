@@ -1,4 +1,4 @@
-# Shop mode cycle 19 — Harvest: print labels as you log
+# Cycle 20 — Grant the customer-requests, voucher and customer-invoice permissions on the live database
 
 Status: READY
 Revision: 1
@@ -7,67 +7,57 @@ Date: 2026-09-26
 
 ## Goal
 
-The office harvest page offers to print Zebra labels right after a harvest entry is saved, defaulting the copy count to the amount just logged, and has a per-row print button for reprints. The Shop harvest screen lost this when cycle 17 dropped the label payload (Zebra printing was parked). Restore it in Shop style: after a successful log for a product that has an active Zebra label, a card offers "Print N labels" with a stepper, sends the print, and reports the printer's answer; each Today row with a label gets a print button for a reprint. Products without a label behave exactly as now.
+On production the Home tiles for Customer requests and Vouchers do not appear because the permissions behind them do not exist there. Checked read-only on the production database: the `permissions` table lacks four names the seeder defines: `customer-requests.manage`, `vouchers.redeem`, `vouchers.manage` and `customer-invoices.manage`. Both features' docs said "run the roles seeder on deploy", which never happened. This codebase's established fix is a migration that creates permissions and grants them to roles additively (`2025_08_11_232011_add_cash_reconciliation_permissions.php`, `2026_09_23_150000_add_shop_mode_permissions.php`); the deploy runs `migrate --force`, so this ships without anyone remembering a seeder. Grants follow the seeder exactly: employees get `customer-requests.manage` and `vouchers.redeem`; managers get those plus `vouchers.manage` and `customer-invoices.manage`; admins get all four. Nothing is removed from any role.
 
 ## Context
 
-- **Office behaviour** (`resources/views/fruit-veg/harvest.blade.php`): after `saveRow()` succeeds, `if (row.label) this.openPrintModal(row, amount)`; the modal shows product, label name, a "check the loaded labels" note with the label size, a copies input defaulting to `Math.min(99, Math.max(1, Math.round(amount)))`, Print/Cancel; `sendPrint()` POSTs `/labels/zebra/manage/{id}/print` with `{ copies }` and shows `data.message` (or `Failed: …`), closing 1.5 s after success. `printRow(row)` reopens it with the typed amount or 1.
-- **Endpoint**: `ZebraLabelController::print(Request, ZebraLabel)` (`zebra-labels.print`, `permission:labels.print`, which employees hold): `copies` clamped 1–99, optional `fields`; returns `{ success, message, output }`, 200 or 500; messages "Print job sent (N copies)" / "Couldn't confirm the print job — the printer may not have responded." / "Print failed". The printer call can take up to 15 s.
-- **Label payload**: `HarvestController::labelPayload(?ZebraLabel)` → `{ id, name, width_mm, height_mm }` or null; `dataFor()` already attaches it to each `productLookup` entry and to `rows` (`'label' => …`) but `rows()` (the Shop JSON) omits it for both `rows` and `available` ("Label payloads are dropped, as the plan says"). `available` items come from `productLookup`, which has the label too.
-- **Shop harvest** (`resources/js/shop/fv-harvest.js`, `fv-harvest.blade.php`): `log()` posts, and on success toasts `Logged … · N unit today` and calls `load()`; `today` rows render name, time, user, quantity; a card on the right holds the unit switch and numpad; `shop-actions` has the log button. Design pieces available: `shop-card`, `shop-stepper` (delivery-scan pattern), `shop-pill--warn`, `shop-btn--secondary/--primary`, `shop-iconbtn` with the `printer` icon, toasts.
-- **Vouchers/Zebra plan (parked)** describe the same print contract; nothing from it is needed here beyond the endpoint.
-- Tests: `ShopFruitVegTest` (12; harvest fixture uses a POS `PRODUCTS` table and `supplier_link`), `DeliveryTranslatedLabelPrintingTest` shows how to bind a fake `ZebraPrintService` (`usingRunner`) so a print test never shells out. `ZebraLabel` lives on the default DB (`zebra_labels`, migrated).
-- Suite baseline: 15 failed / 634 passed.
+- Production check (2026-09-26, read-only via the deploy host): roles admin/manager/employee hold `products.view`, `deliveries.process`, `labels.print`, `stocking.scan`, `fruit_veg.operate` from the earlier migrations; the four names above are absent from the `permissions` table; production also holds `cash_reconciliation.*` and `till_review.export`, which the seeder does not list, so the seeder must never be used as a replacement on the live database. The `shop.vouchers` and `customer-requests.index` routes exist on production.
+- Seeder definitions to copy verbatim (`database/seeders/RolesAndPermissionsSeeder.php` lines 227–252): `customer-invoices.manage` "Manage Customer Invoices" module "Customer Invoicing"; `customer-requests.manage` "Manage Customer Requests" module "Customer Requests"; `vouchers.redeem` "Redeem Vouchers" module "Voucher Management"; `vouchers.manage` "Manage Vouchers" module "Voucher Management" (take the `description` lines from the same block).
+- Pattern: `2026_09_23_150000_add_shop_mode_permissions.php` (constants for the grant lists, `Permission::firstOrCreate` with `display_name`/`description`/`module`, `Role::where('name', …)->first()` guarded with `if`, `permissions()->syncWithoutDetaching(Permission::whereIn('name', …)->pluck('id'))`, a `down()` that detaches and deletes). Note the cash-reconciliation migration passes `guard_name`, which the `permissions` table does not have on every install; the shop-mode migration does not pass it: **follow the shop-mode one**.
+- `HasPermissions`: admins bypass permission checks, so the admin grant is for completeness, as the seeder does.
+- Tests: `tests/Feature/Shop/RolePermissionGrantsTest.php` has `MIGRATION` constant + `role()` helper, `test_seeder_grants_the_shop_floor_permissions_to_employees`, `test_seeder_leaves_the_barista_with_kds_only`, `test_migration_grants_the_same_permissions_on_an_existing_database` (creates roles, `require`s the migration file, calls `up()`, asserts grants). Home tile tests: `ShopVouchersTest::home_tile_links_to_the_shop_screen`, `ShopRequestsTest` (employee with `customer-requests.manage`).
+- Suite baseline: 15 failed / 636 passed.
 
 ## Constraints
 
-- Do not commit, push or deploy.
-- The print goes through the existing `zebra-labels.print` endpoint unchanged; no ZPL handling in Shop code.
-- The offer appears only when the logged product has an active label; it never blocks the log (the entry is already saved before the offer).
-- Contract rules; design block byte-identical; app rules only if needed (none expected).
+- Do not commit, push or deploy. Say in `implemented.md` that this ships with the next deploy's `migrate --force` and needs no seeder run.
+- Additive only (`syncWithoutDetaching`); no role loses anything; barista gets nothing.
+- Idempotent: running on a database that already has some of the four (dev) changes nothing but fills gaps.
 
 ## Out of scope
 
-- Price/country field overrides (the parked Zebra cycle).
-- Printing from the waste screen (waste has no label flow in the office either).
-- Changing which products have labels.
+- Reconciling the seeder with the live database's extra permissions (`cash_reconciliation.*`, `till_review.export`); they came from a migration and are fine.
+- Any change to the permission checks in the app.
 
 ## Steps
 
-### 1. Rows carry the label
-Files: `app/Http/Controllers/HarvestController.php`
-What: in `rows()`, include `'label' => $row['label']` on each of `rows` and `'label' => $p['label']` on each of `available` (the same `{ id, name, width_mm, height_mm }` or null the office gets). Nothing else changes.
-Check: `ShopFruitVegTest::harvest_rows_lists_recent_and_available_jon_products` extended: seed an active `ZebraLabel` with `product_code` `2002` (and `zpl_content` with a `^PW`/`^LL` pair or explicit `label_width_mm`/`label_height_mm`) → that row's `label.id` and `label.name` match; the product without one has `label` null.
+### 1. The migration
+Files: `database/migrations/2026_09_26_120000_add_customer_requests_and_voucher_permissions.php (new)`
+What: mirror the shop-mode migration. Constants: `PERMISSIONS` (the four, with display names, descriptions and modules from the seeder), `EMPLOYEE_GRANTS = ['customer-requests.manage', 'vouchers.redeem']`, `MANAGER_GRANTS = EMPLOYEE_GRANTS + ['vouchers.manage', 'customer-invoices.manage']`, admin = all four. `up()`: `firstOrCreate` each permission; for each role that exists, `syncWithoutDetaching` its list. `down()`: detach the four from every role, then delete them (as the shop-mode migration's `down()` does). Docblock: why (production never had the seeder run; tiles invisible; 2026-09-26).
+Check: `php artisan migrate` on dev runs clean (dev already has all four, so it reports nothing changed in effect); `php artisan migrate:rollback --step=1` then `migrate` again both clean; `php artisan tinker --execute='echo App\Models\Role::where("name","employee")->first()->permissions->pluck("name")->filter(fn($p)=>str_starts_with($p,"vouchers")||str_starts_with($p,"customer-"))->values();'` shows `vouchers.redeem`, `customer-requests.manage` (and on dev possibly more from the seeder).
 
-### 2. Behaviour: the offer and the print
-Files: `resources/js/shop/fv-harvest.js`
-What: state `print = null` (`{ label, product, copies, sending, result }`). In `log()` after a successful save, before `load()`: if `this.selected.label` → `this.offerPrint(this.selected, this.amount)`. `offerPrint(p, amount)`: `print = { label: p.label, product: p.name, copies: Math.min(99, Math.max(1, Math.round(amount))), sending: false, result: null }`. `bumpCopies(n)` clamps 1–99. `sizeText` getter → `${label.width_mm ?? '?'} × ${label.height_mm ?? '?'} mm`. `sendPrint()`: `sending = true`; POST `this.$root.dataset.printUrlTemplate.replace('__ID__', print.label.id)` with `{ copies }` (the URL template comes from Blade; no route helper in JS); on `data.success` → toast ok `data.message`, `print = null`; else toast bad `data.message || 'Print failed'` and keep the card open with `result = data.message` so the user can retry; network → toast bad "Could not reach the printer", keep open. `dismissPrint()` → `print = null`. `reprint(r)` (from a Today row) → `offerPrint(r, r.logged)`.
-Check: node exercise with stubbed fetch: log 4.2 kg of a product with a label → `print.copies` 4, `sizeText` "112.6 × 75.1 mm"; `bumpCopies(-10)` → 1; `bumpCopies(200)` → 99; `sendPrint()` posts `{ copies }` to `/labels/zebra/manage/7/print` (template replaced) → success toast and `print` null; a 500 `{ success: false, message: 'Print failed' }` → `print` still set, `result` "Print failed"; a product without a label → `print` stays null after log; `reprint({ label, name, logged: 3 })` → copies 3; `grep -c "route(" resources/js/shop/fv-harvest.js` → 0.
+### 2. Tests
+Files: `tests/Feature/Shop/RolePermissionGrantsTest.php`
+What: add a second `MIGRATION` constant for the new file and three tests in the shape of the existing migration test: `migration_creates_the_four_permissions_and_grants_them_by_role` (roles created bare; `up()`; employee has exactly the two, manager the four, admin the four, barista none); `migration_is_additive_and_idempotent` (give the employee an unrelated permission first, run `up()` twice; the unrelated one survives, the two are present once); `migration_down_removes_only_the_four` (after `up()`, `down()` leaves the unrelated permission and removes the four from roles and from the table).
+Check: `php artisan test --filter=RolePermissionGrantsTest` green.
 
-### 3. The screen
-Files: `resources/views/shop/fv-harvest.blade.php`
-What: `<main …>` gains `data-print-url-template="{{ route('zebra-labels.print', ['zebraLabel' => '__ID__']) }}"`. Add a print card in the right-hand column above the unit/numpad card: `<section class="shop-card" x-show="print" x-cloak>` with `shop-between` (`h2.shop-subtitle` "Print labels", ghost × `@click="dismissPrint()"`), `shop-meta` `x-text="print?.product + ' · ' + print?.label.name"`, a `shop-card shop-card--flat` note with the `alert` icon: "Check the printer has <strong x-text="sizeText"></strong> labels loaded.", a `shop-label` "Copies" with a `shop-stepper` (`bumpCopies(-1)`, value `print?.copies`, `bumpCopies(1)`), `shop-meta` `x-show="print?.result"` `x-text="print?.result"` for a failure, and two buttons in a `shop-inline`: `shop-btn shop-btn--secondary` "Skip" (`dismissPrint()`) and `shop-btn shop-btn--primary` with the `printer` icon and `x-text="print?.sending ? 'Sending…' : 'Print ' + print?.copies + (print?.copies === 1 ? ' label' : ' labels')"` (`:disabled="print?.sending"`, `@click="sendPrint()"`). Today rows: after the quantity, `<button class="shop-iconbtn shop-iconbtn--ghost" type="button" x-show="r.label" aria-label="Print labels" @click="reprint(r)"><x-shop.icon name="printer" /></button>`. While `print` is set the log button in `shop-actions` stays as it is (the entry is already saved).
-Check: `php artisan test --filter="ShopFruitVegTest|ShopViewContractTest"` green; `employee_can_open_both_screens` also asserts `data-print-url-template`, "Print labels", "Check the printer has" and `aria-label="Print labels"`.
+### 3. Docs
+Files: `docs/features/customer-requests.md`, `docs/features/voucher-management.md`, `docs/development/known-issues.md`, `DEPLOYMENT_SCRIPTS_README.md`
+What: replace the "run the seeder on deploy" instructions in both feature docs with "granted by migration `2026_09_26_120000_…`; the seeder is for fresh installs only". Known issues: an entry "Customer requests and Vouchers tiles missing on production (2026-09-26)": cause (permissions never created because the seeder was never run on the live database), fix (this migration), and the rule going forward: **new permissions ship as a migration, never only in the seeder**. Deploy README: add that rule to the post-deploy notes next to the `schedule:list` check, with a one-line verification: `php artisan tinker --execute='echo App\Models\Permission::count();'` is too vague; instead list the four names and the tinker snippet from step 1.
+Check: `grep -n "db:seed --class=RolesAndPermissionsSeeder" docs/features/customer-requests.md docs/features/voucher-management.md` → only in a "fresh install" sentence, if at all.
 
-### 4. A print test through the real endpoint
-Files: `tests/Feature/Shop/ShopFruitVegTest.php`
-What: `harvest_print_uses_the_zebra_endpoint`: bind a fake `ZebraPrintService` as `DeliveryTranslatedLabelPrintingTest` does (capture the ZPL written to the temp file); seed an active label for `2002` with ZPL `^XA^FT30,60^A0N,28,28^FDSalad mix^FS^PQ1^XZ`; employee POSTs `route('zebra-labels.print', $label)` with `{ copies: 3 }` → 200 `success` true, message "Print job sent (3 copies)", captured ZPL contains `^PQ3`; a barista → 403. (This pins the contract the Shop screen relies on; the Shop code itself is covered by the node exercise and the markup assertions.)
-Check: `php artisan test --filter=ShopFruitVegTest` green.
-
-### 5. Docs, format, build
-Files: `docs/features/fruit-veg-system.md`, `docs/design/shop-mode/README.md`, all touched
-What: feature doc: the Shop harvest print offer (after a log, and from a Today row), copies default, the endpoint. README: the harvest print card and the URL-template pattern for a per-record route. `./vendor/bin/pint --dirty`; `npm run build`.
-Check: `./vendor/bin/pint --test --dirty` clean; build succeeds.
+### 4. Format
+What: `./vendor/bin/pint --dirty`.
+Check: `./vendor/bin/pint --test --dirty` clean.
 
 ## Verification
 
-1. `php artisan test --filter="Shop|FruitVeg"` → green; `php artisan test` → 15 failed, the identical set; passed = 634 + new tests.
-2. Contract greps; `grep -c "route(" resources/js/shop/fv-harvest.js` → 0; design block `cmp` identical.
-3. `git diff app/Http/Controllers/HarvestController.php` → `rows()` only.
-4. Manual, on production after deploy with the Zebra printer on, or on dev with the printer reachable (the implementer must not print on the real printer unasked; the owner does this part): log 4 kg of a product that has a label → the print card offers 4 copies with the label size; adjust to 2; Print → the printer produces 2, the toast says so, the card closes; log a product without a label → no card; tap the printer icon on a Today row → the card with the logged amount as copies; Skip closes it; with the printer off → "Couldn't confirm the print job…" stays on the card and Print can be retried.
+1. `php artisan test --filter="RolePermissionGrantsTest|ShopVouchersTest|ShopRequestsTest|ShopHomeTest"` → green; `php artisan test` → 15 failed, the identical set; passed = 636 + 3.
+2. `php artisan migrate:status | grep 2026_09_26_120000` → Ran (dev).
+3. After the owner deploys: sign in on production as an employee → Home shows Customer requests and Vouchers; as a manager, the vouchers screen offers activation; the office customer-invoices pages are reachable for managers.
 
 ## Risks
 
-- **Printer wait**: the endpoint can block up to 15 s; the button shows "Sending…" and is disabled meanwhile, as the office does.
-- **Copies default from a kg amount**: 4.2 kg → 4 labels, the office's rounding rule; a units amount maps one to one.
-- **`rows` payload grows** by a small object per product; negligible.
+- **Nothing destructive**: `syncWithoutDetaching` and `firstOrCreate` only add. `down()` is provided for symmetry and would remove the four; nobody should run it on production.
+- **Role names**: the migration looks roles up by name and skips any that do not exist, as the earlier migrations do.
+- **The seeder still exists and still grants more** (e.g. `fruit_veg.manage` to employees) than the migrations do; that is the fresh-install path and is unchanged.

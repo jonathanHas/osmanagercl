@@ -92,13 +92,13 @@ A request's `closed_at` is recomputed by `CustomerRequest::refreshClosedState()`
 
 ## Configuration
 
-No environment variables. One permission, seeded by `RolesAndPermissionsSeeder`:
+No environment variables. One permission:
 
 | Permission | Granted to |
 |---|---|
 | `customer-requests.manage` | employee, manager (inherited), admin (implicit) |
 
-**Deploy step**: run `php artisan migrate && php artisan db:seed --class=RolesAndPermissionsSeeder`. The seeder is idempotent. Without it every staff write returns 403.
+**Deploy step**: none beyond `php artisan migrate --force`. The permission is created and granted by migration `2026_09_26_120000_add_customer_requests_and_voucher_permissions.php`. It is also in `RolesAndPermissionsSeeder`, but the seeder is for **fresh installs only** — it must never be run against the live database, which holds permissions the seeder does not list. Until that migration existed this section said to run the seeder on deploy, nobody did, and the permission was simply absent on production, so the Home tile was invisible to everyone (2026-09-26).
 
 ## Usage
 

@@ -1,4 +1,4 @@
-# Shop mode cycle 19 — Harvest: print labels as you log — implementation
+# Cycle 20 — Grant the customer-requests, voucher and customer-invoice permissions — implementation
 
 Status: DONE
 Plan revision: 1
@@ -7,207 +7,188 @@ Date: 2026-09-26
 
 ## Baseline
 
-HEAD: 9a41cc3d, 26 dirty paths — cycles 17f, 17g and 18, all mine, accepted and
-archived but uncommitted. Files changed at the end separates them.
+HEAD: 35c861c6 — the earlier cycles are now committed, so the tree is clean apart
+from this cycle's own files.
 
-Test baseline: 15 failed / 634 passed (2707 assertions).
+Test baseline: 15 failed / 636 passed (2721 assertions).
 
 ## Pre-flight
 
-Every piece the plan relies on exists:
+The four permission definitions and the role grants were read from the seeder
+rather than taken from the plan, and they match:
 
-- `zebra-labels.print` is `POST labels/zebra/manage/{zebraLabel}/print` behind
-  `PermissionMiddleware:labels.print` — which employees hold, so the Shop screen can
-  reach it.
-- `ZebraLabelController::print()` clamps copies 1–99, rewrites `^PQ` rather than
-  repeating the ZPL, and returns the three messages the plan quotes with 200/500.
-- `HarvestController::labelPayload()` returns `{ id, name, width_mm, height_mm }`,
-  falling back from the ZPL's own dimensions to the stored ones.
-- Design classes `shop-inline`, `shop-btn--secondary`, `shop-iconbtn--ghost`,
-  `shop-stepper`, `shop-card--flat`, `shop-between`, `shop-subtitle` and the icons
-  `printer`, `alert`, `x` are all present. No `APP ADDITIONS` expected.
-- `DeliveryTranslatedLabelPrintingTest::fakePrinter()` binds a `ZebraPrintService`
-  with `usingRunner()` that captures the ZPL from the temp file named in the `lp`
-  command — the pattern to copy so no test touches a real printer.
+```
+database/seeders/RolesAndPermissionsSeeder.php:227  customer-invoices.manage
+                                              :235  customer-requests.manage
+                                              :243  vouchers.redeem
+                                              :249  vouchers.manage
+employee list (line 343-344): vouchers.redeem, customer-requests.manage
+manager list: array_merge($employeePermissions, [... customer-invoices.manage,
+                                                 vouchers.manage ...])
+admin: every permission
+```
+So managers inherit the employee two and add the other two — which is the
+`EMPLOYEE_GRANTS` + extras shape the plan describes.
 
-**I will not print on the real printer.** The plan puts that with the owner and I
-have kept to it; everything below is tests, a node exercise, and browser checks that
-stop short of sending a job.
+The pattern migration `2026_09_23_150000_add_shop_mode_permissions.php` does **not**
+pass `guard_name`, confirming the plan's instruction to follow it rather than the
+cash-reconciliation one.
+
+**I have not verified the production database myself** — I have no access to it.
+The claim that the four names are absent there is the Planner's, made read-only via
+the deploy host, and everything here is additive and idempotent, so it is correct
+whether or not they are already present.
 
 ## Steps
 
-### 1. Rows carry the label — done
+### 1. The migration — done
 
-Changed: `app/Http/Controllers/HarvestController.php` — `'label'` on each item of
-`rows` and of `available` in `rows()`. Two lines plus a comment; `dataFor()` already
-had the payload.
+Changed: `database/migrations/2026_09_26_120000_add_customer_requests_and_voucher_permissions.php (new)`.
 
-### 2. Behaviour: the offer and the print — done
+Modelled on the shop-mode migration: `firstOrCreate` for each permission,
+`syncWithoutDetaching` per role, roles looked up by name and skipped if absent, no
+`guard_name`. The four definitions are copied verbatim from the seeder.
 
-Changed: `resources/js/shop/fv-harvest.js` — `print` state, `printUrlTemplate` and
-`sizeText` getters, `offerPrint()`, `reprint()`, `dismissPrint()`, `clampCopies()`,
-`bumpCopies()`, `sendPrint()`, and the hook in `log()`.
-
-`log()` needed one extra line beyond the plan: it reads `this.amount` through a
-getter derived from `typed`, and `typed` is cleared on success before the offer
-would be made, so the amount is captured into a local first. Without it the copies
-default would always have been 1.
-
+Check output — dev already had all four from the seeder, so `up()` alone proves
+little. The rollback/re-migrate cycle is what proves it works on a database that
+does **not** have them, which is the production case:
 ```
-$ node scratchpad/print19.mjs
-ok   offer appears after a log: true
-ok   copies default from the amount (4.2 -> 4): 4
-ok   product on the card: "Salad mix"
-ok   sizeText: "112.6 × 75.1 mm"
-ok   bumpCopies clamps low: 1            ok   bumpCopies clamps high: 99
-ok   posted to the templated url: "/labels/zebra/manage/7/print"
-ok   posted copies: {"copies":4}
-     toast: "Print job sent (4 copies)"
-ok   card closes on success: null
-ok   card stays open on failure: true    ok   result shown on the card: "Print failed"
-ok   not stuck sending: false
-ok   retry closes the card: null
-ok   network failure keeps the card: true
-ok   network failure message: "Could not reach the printer"
-ok   no label: no offer: null
-ok   reprint copies from logged: 3       ok   dismiss clears: null
-ok   reprint on a row with no label does nothing: null
-ok   count maps one to one: 7
-$ grep -c "route(" resources/js/shop/fv-harvest.js → 0
-```
-Three cases beyond the plan's list, all about not getting stuck: a retry after a
-failure succeeds and closes the card; `sending` is reset in a `finally` so a failed
-print never leaves the button disabled forever; and `reprint()` on a row without a
-label is a no-op rather than opening an unusable card.
+$ php artisan migrate                       → DONE
+employee  ["customer-requests.manage","vouchers.redeem"]
+manager   ["customer-invoices.manage","customer-requests.manage","vouchers.manage","vouchers.redeem"]
+admin     ["customer-invoices.manage","customer-requests.manage","vouchers.manage","vouchers.redeem"]
+barista   []
 
-### 3. The screen — done
+$ php artisan migrate:rollback --step=1     → DONE
+permissions table has: 0 of the four
+employee still has: 12 permissions          ← unrelated grants intact
 
-Changed: `resources/views/shop/fv-harvest.blade.php` — the `data-print-url-template`
-attribute, the print card above the unit/numpad card, and the printer button on
-Today rows.
-
-```
-$ php artisan test --filter=ShopViewContractTest → 19 passed
-$ rendered page contains: data-print-url-template, "Print labels",
-  "Check the printer has", aria-label="Print labels", __ID__
+$ php artisan migrate                       → DONE
+restored: 4 of the four
+employee: ["customer-requests.manage","vouchers.redeem"]
 ```
 
-### 4. A print test through the real endpoint — done
+### 2. Tests — done
 
-Changed: `tests/Feature/Shop/ShopFruitVegTest.php` — a `label()` helper, label
-assertions on the rows test, and two print tests.
+Changed: `tests/Feature/Shop/RolePermissionGrantsTest.php` — four tests.
 
 ```
-$ php artisan test --filter=ShopFruitVegTest
-✓ harvest print uses the zebra endpoint
-✓ printing needs the labels permission
-  ... plus 12
-Tests:    14 passed (119 assertions)
+$ php artisan test --filter=RolePermissionGrantsTest
+✓ requests migration creates the four permissions and grants them by role
+✓ requests migration is additive and idempotent
+✓ requests migration down removes only the four
+✓ the migration grants what the seeder grants
+  ... plus the 6 that were there
+Tests:    10 passed (75 assertions)
 ```
-The print test binds a `ZebraPrintService` whose runner captures the ZPL from the
-temp file, so nothing reaches a printer, and asserts `^PQ3` — which pins the
-behaviour the Shop screen depends on: three copies is one job asking for three, not
-the ZPL sent three times.
 
-### 5. Docs, format, build — done
+The fourth is beyond the plan and is the one I would keep if only one survived:
+**it asserts the migration grants exactly what the seeder grants** for these four,
+per role. The whole incident is two sources of truth disagreeing about who holds
+what, and nothing was checking they agreed. It ends with
+`assertNotSame([], $fromSeeder['employee'])` so it cannot pass vacuously.
 
-`docs/features/fruit-veg-system.md` and `docs/design/shop-mode/README.md`; the
-README records the URL-template pattern, which is how a per-record route reaches a
-Shop module without a route helper in JavaScript.
-`./vendor/bin/pint --test --dirty` → PASS; `npm run build` → built.
+Two things the harness made me fix, both worth recording because they would
+silently have made the tests meaningless:
+
+- **`RefreshDatabase` runs this migration**, since it lives in
+  `database/migrations/`. So the four permissions already exist in every test
+  database and `assertDatabaseMissing` failed. The helper now deletes them first,
+  which is what makes the tests exercise `up()` rather than assert the state the
+  harness built.
+- **`till_review.export` is created by the cash-reconciliation migration**, so
+  `Permission::create` for it hit a unique constraint. `firstOrCreate` instead —
+  and it is a better fixture for it, being genuinely pre-existing, exactly like the
+  live database's extras.
+
+I also broke three passing tests briefly by calling `$this->refreshDatabase()`
+inside a test; it rolls back the transaction `RefreshDatabase` is holding. The
+comparison test now reaches the "production" state by deleting the four in place.
+
+### 3. Docs — done
+
+Changed: `docs/features/customer-requests.md` and
+`docs/features/voucher-management.md` (the "run the seeder on deploy" instructions
+replaced — both now say the migration does it and that the seeder is fresh-install
+only), `docs/development/known-issues.md` (a full entry with the verification
+snippet), `DEPLOYMENT_SCRIPTS_README.md` (a "Permissions (post-deploy check)"
+section next to the `schedule:list` one from cycle 18).
+
+Both new documents carry the rule in the same words: **a new permission ships as a
+migration, never only in the seeder.**
+
+### 4. Format — done. `./vendor/bin/pint --test --dirty` → PASS.
 
 ## Verification
 
 **1. Tests**
 ```
-$ php artisan test --filter="Shop|FruitVeg"
-Tests:    2 failed, 217 passed          ← the 2 are FruitVegLabelPrintingTest, known
+$ php artisan test --filter="RolePermissionGrantsTest|ShopVouchersTest|ShopRequestsTest|ShopHomeTest"
+Tests:    44 passed (270 assertions)
 $ php artisan test
-Tests:    15 failed, 636 passed (2721 assertions)
+Tests:    15 failed, 640 passed (2762 assertions)
 ```
-The identical set. 636 = 634 + 2.
+The identical set. 640 = 636 + 4 (the plan budgeted 3; the seeder-comparison test
+is the extra).
 
-**2. Contract**
+**2. `php artisan migrate:status`**
 ```
-route( in fv-harvest.js        → 0
-<script|<style in shop views   → 0
-design block cmp               → IDENTICAL   (no stylesheet change)
+2026_09_26_120000_add_customer_requests_and_voucher_permissions ... [94] Ran
 ```
 
-**3. `git diff app/Http/Controllers/HarvestController.php`** — five hunks, of which
-**two are mine**, both inside `rows()`. The other three are cycle 17f's
-`saveRow()`/`imageUrl()` work, still uncommitted in this tree. I read the diff
-rather than reporting the file as "rows() only".
-
-**4. Manual, dev app — the screen exercised, and deliberately stopped short of
-printing.** The plan reserves the real print for the owner and I have kept to that:
-no job was sent to the printer at any point.
-
-Dev has three of Jon's products with active labels. The label payload arrives:
-`Rocket Mossfield 100g → { Rocket_Mossfield, 112.6 × 75.1 mm }`.
-
-There was already a harvest row for today — "Mixed Salad 100g, 1 unit", logged by
-`jonathanE` at 15:49, after my last cycle's cleanup. **Not mine, and left alone.**
-It was also the ideal subject, because tapping a Today row's printer button opens
-the card without creating any data:
-
+**3. After the owner deploys** — not something I can do. What I could close is the
+link between the permission and the tile, which is the whole point of the fix: on
+dev, Home as the signed-in employee renders
 ```
-tap the printer icon on the Today row →
-  print = { label: { id 18, "Mixed Salad", 112.6 × 75.1 }, product: "Mixed Salad 100g",
-            copies: 1, sending: false, result: null }
-  card: "Print labels" ×, "Mixed Salad 100g · Mixed Salad",
-        "Check the printer has 112.6 × 75.1 mm labels loaded.",
-        COPIES stepper at 1, "Skip" and "Print 1 label"
-+ twice  → copies 3, button "Print 3 labels"     (plural)
-− three  → copies 1, button "Print 1 label"      (singular, clamped at 1)
-Skip     → print null, card hidden, the Today row unchanged at 1
+["Stock scan","Find product","Receive delivery","Print labels",
+ "Customer requests","Vouchers","Fruit & veg"]
 ```
-Console clean throughout.
+Both tiles present, with their badges. That is the state production should reach
+once `migrate --force` runs.
 
-The two things only the owner can check are the printer actually producing the
-labels, and the "Couldn't confirm the print job" path with the printer off. Both are
-in the plan's manual list for them.
+**This ships with the next deploy's `php artisan migrate --force`. No seeder run is
+needed, and the seeder must not be run against the live database.**
 
 ## Deviations
 
-None. One addition the plan does not mention but the code needed: capturing the
-amount into a local in `log()` before `typed` is cleared, described in step 2.
+None.
 
 ## Files changed
 
-Mine, this cycle:
 ```
- M app/Http/Controllers/HarvestController.php     two lines in rows()
- M resources/js/shop/fv-harvest.js                the print offer
- M resources/views/shop/fv-harvest.blade.php      the card and the row button
- M tests/Feature/Shop/ShopFruitVegTest.php        label + print tests
- M docs/features/fruit-veg-system.md
- M docs/design/shop-mode/README.md
+?? database/migrations/2026_09_26_120000_add_customer_requests_and_voucher_permissions.php
+ M tests/Feature/Shop/RolePermissionGrantsTest.php
+ M docs/features/customer-requests.md
+ M docs/features/voucher-management.md
+ M docs/development/known-issues.md
+ M DEPLOYMENT_SCRIPTS_README.md
 ```
-Those six files also carry cycles 17f and 19's work in some cases; cycles 17f, 17g
-and 18 remain uncommitted in this tree alongside them.
+The tree was clean at the start of this cycle, so this is the whole of it.
 
-**Not committed, not pushed, not deployed. Nothing was printed.**
+**Not committed, not pushed, not deployed.**
 
 ## Notes for Planner
 
-1. **Only 3 of Jon's 111 products have an active label on dev.** The offer is
-   therefore rare in practice — most harvest logs will show no card at all, which
-   is correct but means the feature will look like it is not working until someone
-   checks which products have labels. Worth telling the owner which three they are
-   (`Spinach_Mossfield`, `Mixed Salad`, `Rocket_Mossfield`) so the first test is
-   done on one that can work.
+1. **I could not verify production myself.** The claim that the four names are
+   absent there is the Planner's, from a read-only check. Everything in this cycle
+   is additive and idempotent, so it is correct either way — but the post-deploy
+   check in the deploy README is what will actually confirm it, and it is worth
+   someone running the tinker snippet once after the deploy rather than assuming.
 
-2. **The copies default rounds a weight to a count of labels**, which is the
-   office's rule and is right for punnets and bags, but 0.4 kg rounds to **zero**
-   and is then clamped to 1. That is the sensible floor, and it is worth knowing
-   that a small weight always offers one label rather than none.
+2. **The seeder still grants employees more than any migration does** — notably
+   `fruit_veg.manage`, `coffee.manage`, `kds.access`, `deliveries.view`,
+   `labels.view`, `categories.view`. If production is missing those too, the same
+   class of problem exists for whatever they gate, and this cycle did not look.
+   Comparing the seeder's full employee list against the live database would be a
+   short, purely read-only cycle and would find any remaining gaps in one pass.
 
-3. **A print failure is reported twice** — a toast and a line on the card. That is
-   deliberate: the toast fades, and the card has to explain why it is still open.
-   If the Planner would rather have one, the card line is the one to keep.
+3. **`RolesAndPermissionsSeeder` is now documented as fresh-install-only in three
+   places** but nothing enforces it. A guard in the seeder — refuse to run when the
+   database already holds permissions it does not list, unless `--force` — would
+   make the rule mechanical. Worth considering; I did not add it, as it is beyond
+   this cycle and changes a tool people may be using deliberately.
 
-4. **The office harvest page and the Shop screen now offer the same print through
-   the same endpoint but with different copy-count UIs** (a number input there, a
-   stepper here). No behavioural difference; noting it so the two are not assumed
-   to share code.
+4. **Admins bypass permission checks**, so the admin grants here change nothing
+   functional. They are for completeness, as the seeder does it, and so that any
+   future code that reads permissions directly rather than through `hasPermission`
+   sees a consistent picture.

@@ -248,6 +248,25 @@ Every schedule lives in `routes/console.php`. There is deliberately no
 console kernel, so a `schedule()` method there is never called — which is how four
 of these jobs silently stopped running (cycle 18).
 
+### Permissions (post-deploy check)
+
+**A new permission ships as a migration, never only in the seeder.** The deploy runs
+`php artisan migrate --force`; it does **not** run `db:seed`, and
+`RolesAndPermissionsSeeder` must not be run against the live database (it does not
+list permissions that database already holds). A permission that exists only in the
+seeder is invisible in production, which is how the Customer requests and Vouchers
+tiles went missing (2026-09-26).
+
+```bash
+php artisan tinker --execute='echo App\Models\Role::where("name","employee")->first()
+  ->permissions->pluck("name")
+  ->filter(fn($p) => str_starts_with($p, "vouchers") || str_starts_with($p, "customer-"))
+  ->values();'
+```
+
+must list `customer-requests.manage` and `vouchers.redeem`. Managers additionally
+hold `vouchers.manage` and `customer-invoices.manage`.
+
 ### Log Files
 
 **Deployment Logs:**

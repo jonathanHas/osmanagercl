@@ -100,7 +100,7 @@ Three tiers, enforced by route middleware **and** in the UI:
 | **Activate**, **generate**, **print**, list, transactions | `vouchers.manage` | ❌ | ✅ | ✅ |
 | **Deactivate** / **reactivate** | `vouchers.manage` + `role:admin` | ❌ | ❌ | ✅ |
 
-Employees get a cut-down till screen: they can ring up a voucher payment but cannot create value (activate), generate, or manage. Scanning an unknown/inactive voucher as an employee shows "Voucher not active — please ask a manager". Permissions are defined in `database/seeders/RolesAndPermissionsSeeder.php` (module *Voucher Management*); in Blade they are checked with `auth()->user()->can(...)` (not `@can`).
+Employees get a cut-down till screen: they can ring up a voucher payment but cannot create value (activate), generate, or manage. Scanning an unknown/inactive voucher as an employee shows "Voucher not active — please ask a manager". Permissions are created and granted by migration `2026_09_26_120000_add_customer_requests_and_voucher_permissions.php`, so `php artisan migrate --force` on deploy is all that is needed; they are also listed in `database/seeders/RolesAndPermissionsSeeder.php` (module *Voucher Management*), which is for **fresh installs only** and must not be run against the live database. Before that migration existed neither `vouchers.redeem` nor `vouchers.manage` was present on production and the Vouchers tile never appeared (2026-09-26). In Blade they are checked with `auth()->user()->can(...)` (not `@can`).
 
 ## Routes
 
