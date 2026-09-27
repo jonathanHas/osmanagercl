@@ -52,6 +52,7 @@
             <div class="shop-list" x-show="discrepancies.length" x-cloak>
                 <template x-for="row in discrepancies" :key="row.barcode">
                     <div class="shop-row">
+                        <x-shop.product-thumb expr="row" />
                         <div class="shop-row__main">
                             <span class="shop-row__title" x-text="row.name"></span>
                             <span class="shop-row__meta shop-code" x-text="meta(row)"></span>

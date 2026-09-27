@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Role;
 use App\Models\User;
+use App\Rules\NotTrivialPin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -46,7 +47,11 @@ class UserManagementController extends Controller
         $roles = Role::orderBy('name')->get();
         $defaultRole = Role::where('name', 'employee')->first();
 
-        return view('users.create', compact('roles', 'defaultRole'));
+        return view('users.create', [
+            'roles' => $roles,
+            'defaultRole' => $defaultRole,
+            'pinRoleIds' => $this->pinRoleIds($roles),
+        ]);
     }
 
     public function store(Request $request)
@@ -57,7 +62,10 @@ class UserManagementController extends Controller
             'username' => 'nullable|string|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
             'role_id' => 'nullable|exists:roles,id',
+            'pin' => ['nullable', 'digits_between:4,6', 'confirmed', new NotTrivialPin],
         ]);
+
+        $this->guardPinRole($request, Role::find($request->role_id));
 
         $user = User::create([
             'name' => $request->name,
@@ -67,10 +75,50 @@ class UserManagementController extends Controller
             'role_id' => $request->role_id,
         ]);
 
+        if ($request->filled('pin')) {
+            $user->setPin($request->input('pin'));
+        }
+
         $roleName = $user->role ? $user->role->display_name : 'No Role';
 
         return redirect()->route('users.index')
             ->with('success', "User '{$user->name}' created successfully with role: {$roleName}.");
+    }
+
+    /**
+     * Role ids the Shop PIN block should appear for, so the form can hide it
+     * without hard-coding a role name in Blade.
+     *
+     * @param  \Illuminate\Support\Collection<int, Role>  $roles
+     * @return array<int, int>
+     */
+    private function pinRoleIds($roles): array
+    {
+        $names = config('shop.pin_roles', ['employee']);
+
+        return $roles->filter(fn (Role $role) => in_array($role->name, $names, true))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Only shop-floor roles may hold a PIN: a PIN session is confined to the
+     * Shop (config('shop.pin_roles'), App\Http\Middleware\ConfinePinSession),
+     * so giving a manager one would be a credential that opens nothing.
+     */
+    private function guardPinRole(Request $request, ?Role $role): void
+    {
+        if (! $request->filled('pin')) {
+            return;
+        }
+
+        if (! $role || ! in_array($role->name, config('shop.pin_roles', ['employee']), true)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'pin' => 'Only shop-floor staff can have a PIN.',
+            ]);
+        }
     }
 
     public function edit(User $user)
@@ -78,7 +126,11 @@ class UserManagementController extends Controller
         $roles = Role::orderBy('name')->get();
         $user->load('role');
 
-        return view('users.edit', compact('user', 'roles'));
+        return view('users.edit', [
+            'user' => $user,
+            'roles' => $roles,
+            'pinRoleIds' => $this->pinRoleIds($roles),
+        ]);
     }
 
     public function update(Request $request, User $user)
@@ -89,7 +141,10 @@ class UserManagementController extends Controller
             'username' => 'nullable|string|max:255|unique:users,username,'.$user->id,
             'password' => 'nullable|string|min:8|confirmed',
             'role_id' => 'nullable|exists:roles,id',
+            'pin' => ['nullable', 'digits_between:4,6', 'confirmed', new NotTrivialPin],
         ]);
+
+        $this->guardPinRole($request, Role::find($request->role_id));
 
         // Prevent users from changing their own role to a lower privilege
         if ($user->id === Auth::id() && $request->role_id != $user->role_id) {
@@ -132,7 +187,21 @@ class UserManagementController extends Controller
         }
 
         $user->update($data);
+
+        // Shop PIN (cycle 26). Clearing wins over setting, so a half-filled
+        // form with the box ticked cannot leave an old PIN in place. A role
+        // change away from the shop floor takes the PIN with it.
+        if ($request->boolean('clear_pin')) {
+            $user->clearPin();
+        } elseif ($request->filled('pin')) {
+            $user->setPin($request->input('pin'));
+        }
+
         $user->load('role');
+
+        if ($user->hasPin() && ! $user->canUsePin()) {
+            $user->clearPin();
+        }
 
         $newRole = $user->role ? $user->role->display_name : 'No Role';
         $message = "User '{$user->name}' updated successfully.";

@@ -12,12 +12,13 @@ export default () => ({
     failed: {},
 
     /**
-     * The search API's products carry `id`; the fruit & veg rows are built from POS
-     * products and carry `code` instead. `id` wins where both exist, so nothing
-     * that worked before changes key.
+     * The search API's products carry `id`; fruit & veg rows carry `code`; delivery
+     * rows carry `barcode`, and their `code` is the *supplier's* code, which can be
+     * empty or shared between products — so `barcode` is tried first of the two.
+     * `id` still wins where it exists, so nothing that worked before changes key.
      */
     key(p) {
-        return p?.id ?? p?.code ?? null;
+        return p?.id ?? p?.barcode ?? p?.code ?? null;
     },
 
     hasImage(p) {

@@ -590,4 +590,6 @@ textarea.shop-input { min-height: 112px; padding: 14px 20px; border-radius: var(
 .shop-choice--pic { flex-direction: row; align-items: center; gap: var(--shop-space-3); padding-left: 10px; }
 .shop-choice--pic .shop-thumb, .shop-choice--pic .shop-row__lead { width: 56px; height: 56px; border-radius: var(--shop-radius-sm); }
 .shop-choice__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+/* The design's delivery item row is a two-column grid; a picture needs a third. */
+.shop-item--pic { grid-template-columns: auto minmax(0, 1fr) auto; }
 /* === APP ADDITIONS END === */

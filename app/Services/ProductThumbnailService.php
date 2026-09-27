@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\CustomerRequestItem;
 use App\Models\Product;
 use App\Models\SupplierLink;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\ImageManager;
 
@@ -79,6 +81,38 @@ class ProductThumbnailService
     }
 
     /**
+     * The `?v=` each product's thumbnail URL should carry: the first 8 hex of the
+     * photo's md5, keyed by CODE. A code with no photo is absent.
+     *
+     * Hashed in SQL where the driver can. A product photo runs to a megabyte, and
+     * pulling every one into PHP on a page that re-renders after each scan is the
+     * cost this avoids; SQLite has no `md5()`, so tests take the other branch.
+     *
+     * @param  array<int, string|null>  $codes
+     * @return array<string, string>
+     */
+    public function versions(array $codes): array
+    {
+        $codes = array_values(array_filter($codes, fn ($c) => $c !== null && $c !== ''));
+
+        if ($codes === []) {
+            return [];
+        }
+
+        $query = Product::whereIn('CODE', $codes)->whereRaw('IMAGE IS NOT NULL');
+
+        if (DB::connection($query->getModel()->getConnectionName())->getDriverName() === 'mysql') {
+            return $query->get(['CODE', DB::raw('MD5(IMAGE) as image_md5')])
+                ->mapWithKeys(fn ($p) => [$p->CODE => substr((string) $p->image_md5, 0, 8)])
+                ->all();
+        }
+
+        return $query->get(['CODE', 'IMAGE'])
+            ->mapWithKeys(fn ($p) => [$p->CODE => substr(md5((string) $p->IMAGE), 0, 8)])
+            ->all();
+    }
+
+    /**
      * Delete every cached file that does not belong to a current product photo.
      *
      * The sweep in jpeg() only runs when a thumbnail is written, so a product whose
@@ -134,9 +168,15 @@ class ProductThumbnailService
     }
 
     /**
-     * Every product whose photo could legitimately be in the cache: the fruit & veg
-     * range, plus Jon's own produce, which the harvest screen lists and which is not
-     * always in an F&V category.
+     * Every product whose photo could legitimately be in the cache — which is to
+     * say, every product a Shop or office screen might draw.
+     *
+     * The fruit & veg range and Jon's own produce (the harvest screen lists those,
+     * and they are not always in an F&V category), plus two sets added in cycle 25
+     * because the prune was deleting pictures that were in daily use: products on a
+     * current customer request line, and products scanned on a delivery in the last
+     * RECENT_DAYS. Without them every Sunday's prune threw away the delivery and
+     * request thumbnails, which were then re-encoded on the next view.
      *
      * @return \Illuminate\Support\Collection<int, \App\Models\Product>
      */
@@ -147,13 +187,34 @@ class ProductThumbnailService
             ->unique()
             ->all();
 
+        $requestCodes = CustomerRequestItem::query()
+            ->whereNotNull('product_code')
+            ->whereHas('request', fn ($q) => $q
+                ->whereNull('closed_at')
+                ->orWhere('closed_at', '>=', now()->subDays(CustomerRequestService::RECENT_DAYS))
+            )
+            ->pluck('product_code')
+            ->unique()
+            ->all();
+
+        // dateUpload is a string column in the legacy POS table, so compare with a
+        // formatted string: a Carbon instance binds differently on SQLite.
+        $deliveryCodes = DB::connection('pos')->table('deliveriesScanItems')
+            ->join('deliveriesScan', 'deliveriesScan.ID', '=', 'deliveriesScanItems.delID')
+            ->where('deliveriesScan.dateUpload', '>=', now()->subDays(CustomerRequestService::RECENT_DAYS)->format('Y-m-d H:i:s'))
+            ->distinct()
+            ->pluck('deliveriesScanItems.barcode')
+            ->all();
+
         return Product::query()
             ->whereNotNull('IMAGE')
-            ->where(function ($q) use ($jonCodes) {
+            ->where(function ($q) use ($jonCodes, $requestCodes, $deliveryCodes) {
                 $q->whereIn('CATEGORY', TillVisibilityService::CATEGORY_MAPPINGS['fruit_veg']);
 
-                if ($jonCodes !== []) {
-                    $q->orWhereIn('CODE', $jonCodes);
+                foreach ([$jonCodes, $requestCodes, $deliveryCodes] as $codes) {
+                    if ($codes !== []) {
+                        $q->orWhereIn('CODE', $codes);
+                    }
                 }
             })
             ->get()

@@ -187,6 +187,10 @@ For a complete list of all features with detailed descriptions, see **[Features 
 - Camera Invoice Capture
 - AI Diagnostics & Settings
 
+**Shop Mode**
+- Shop Mode shell (`/shop`, touch-first, `<x-shop-layout>`, view contract)
+- Trusted Devices, PIN Sign-in & Idle Lock (shared shop-floor tablets)
+
 **POS Integration**
 - Receipts Management
 - Coffee KDS (Kitchen Display)
@@ -248,6 +252,7 @@ php artisan optimize:clear     # Clear caches
 - 🔥 **Performance**: [Sales Data Import Plan](./docs/features/sales-data-import-plan.md)
 - **AI Integration**: [AI Integration](./docs/features/ai-integration.md) - Multi-provider AI config, camera capture, diagnostics
 - **Product Search**: [Product Search](./docs/features/product-search.md) - `x-product-search` component, `/api/products/search` JSON shape, POS collation performance rules
+- **Shop Mode**: [Shop Mode](./docs/features/shop-mode.md) - The `/shop` shell and view contract, trusted devices, PIN sign-in and confinement, idle lock
 - **Customer Accounts**: [Customer Statements & Receivables](./docs/features/customer-statements.md) - Invoicing, payment matching, statements, aged debtors
 - **Customer Requests**: [Customer Requests](./docs/features/customer-requests.md) - Public board, login-gated writes, line status lifecycle, delivery put-aside flag
 - **Order Comparison**: [Order Comparison & Difference Orders](./docs/features/order-management/order-comparison.md) - Comparing two orders, and creating an order from the difference

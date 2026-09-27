@@ -66,6 +66,24 @@ Route::get('/customer-requests/photo/{code}', [CustomerRequestController::class,
     ->middleware('throttle:120,1')
     ->name('customer-requests.photo');
 
+// Shop mode switch-user, PIN and Locked (cycle 26). Outside the auth group on
+// purpose: these are the screens a signed-out shared tablet shows, and the whole
+// point is getting from nobody to somebody without a keyboard. What gates them is
+// the trusted-device cookie, not a session — see Shop\SwitchUserController.
+Route::prefix('shop')->name('shop.')->group(function () {
+    Route::get('/switch', [\App\Http\Controllers\Shop\SwitchUserController::class, 'index'])->name('switch');
+    Route::get('/switch/{user}', [\App\Http\Controllers\Shop\SwitchUserController::class, 'pin'])->name('switch.pin');
+    // Rate limiting is in the controller, not `throttle:pin`: the named-limiter
+    // middleware hashes its cache key, so a correct PIN could never clear the
+    // counter. See SwitchUserController::limiterKey().
+    Route::post('/switch/{user}', [\App\Http\Controllers\Shop\SwitchUserController::class, 'authenticate'])
+        ->name('switch.authenticate');
+    // GET, like the existing GET logout: a tab open past its CSRF token must
+    // still lock rather than throw a 419, and the idle timer just navigates.
+    Route::get('/lock', [\App\Http\Controllers\Shop\SwitchUserController::class, 'lock'])->name('lock');
+    Route::get('/locked', [\App\Http\Controllers\Shop\SwitchUserController::class, 'locked'])->name('locked');
+});
+
 Route::get('/dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
@@ -85,6 +103,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/labels', [\App\Http\Controllers\Shop\LabelsController::class, 'index'])
             ->middleware('permission:labels.print')
             ->name('labels');
+        // A product picture for any signed-in staff member. Not behind a task
+        // permission: a Shop screen that shows the name may show the picture.
+        Route::get('/products/{code}/photo', [\App\Http\Controllers\Shop\ProductPhotoController::class, 'show'])
+            ->where('code', '[A-Za-z0-9_-]+')
+            ->name('product-photo');
+
         Route::get('/vouchers', [\App\Http\Controllers\Shop\VouchersController::class, 'index'])
             ->middleware('permission:vouchers.redeem')
             ->name('vouchers');
@@ -92,6 +116,13 @@ Route::middleware('auth')->group(function () {
         Route::middleware('permission:fruit_veg.operate')->group(function () {
             Route::get('/fv/waste', [\App\Http\Controllers\Shop\FruitVegController::class, 'waste'])->name('fv.waste');
             Route::get('/fv/harvest', [\App\Http\Controllers\Shop\FruitVegController::class, 'harvest'])->name('fv.harvest');
+        });
+
+        // Trusting this device for PIN sign-in. A manager's password is the
+        // whole security of the arrangement, so only they and admins may do it.
+        Route::middleware('role:manager,admin')->group(function () {
+            Route::get('/devices/trust', [\App\Http\Controllers\Shop\ShopDeviceController::class, 'create'])->name('devices.trust');
+            Route::post('/devices/trust', [\App\Http\Controllers\Shop\ShopDeviceController::class, 'store'])->name('devices.trust.store');
         });
 
         Route::middleware('permission:deliveries.process')->group(function () {

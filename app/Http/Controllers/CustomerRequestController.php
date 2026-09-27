@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ServesProductThumbnails;
 use App\Http\Requests\CustomerRequestRequest;
 use App\Http\Requests\UpdateCustomerRequestItemStatusRequest;
 use App\Models\CustomerRequest;
@@ -18,11 +19,10 @@ use Symfony\Component\HttpFoundation\Response;
 
 class CustomerRequestController extends Controller
 {
+    use ServesProductThumbnails;
+
     /** The board draws these at 48 px; 112 covers a 2x screen. */
     private const PHOTO_SIZE = 112;
-
-    /** Matches the staff board's "Done" window. */
-    private const PHOTO_WINDOW_DAYS = 30;
 
     public function __construct(
         private CustomerRequestService $service,
@@ -111,30 +111,7 @@ class CustomerRequestController extends Controller
 
         abort_if($product === null || $product->IMAGE === null || $product->IMAGE === '', 404);
 
-        $jpeg = $thumbnails->jpeg($code, $product->IMAGE, self::PHOTO_SIZE);
-
-        // Null means the encoder could not read the blob. The full photo is not an
-        // acceptable fallback here — this route is public and must never serve it.
-        abort_if($jpeg === null, 404);
-
-        $versioned = ($version = (string) $request->query('v')) !== ''
-            && hash_equals(substr(md5($product->IMAGE), 0, 8), $version);
-
-        $cacheControl = $versioned
-            ? 'public, max-age=604800, immutable'
-            : 'public, max-age=0, must-revalidate';
-
-        $etag = '"'.md5($jpeg).'"';
-
-        if ($request->headers->get('If-None-Match') === $etag) {
-            return response('', 304, ['ETag' => $etag, 'Cache-Control' => $cacheControl]);
-        }
-
-        return response($jpeg, 200, [
-            'Content-Type' => 'image/jpeg',
-            'Cache-Control' => $cacheControl,
-            'ETag' => $etag,
-        ]);
+        return $this->thumbnailResponse($product, self::PHOTO_SIZE, $request, $thumbnails);
     }
 
     /**
@@ -148,7 +125,7 @@ class CustomerRequestController extends Controller
         return CustomerRequestItem::where('product_code', $code)
             ->whereHas('request', fn ($q) => $q
                 ->whereNull('closed_at')
-                ->orWhere('closed_at', '>=', now()->subDays(self::PHOTO_WINDOW_DAYS))
+                ->orWhere('closed_at', '>=', now()->subDays(CustomerRequestService::RECENT_DAYS))
             )
             ->exists();
     }

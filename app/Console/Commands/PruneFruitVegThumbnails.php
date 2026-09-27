@@ -6,7 +6,12 @@ use App\Services\ProductThumbnailService;
 use Illuminate\Console\Command;
 
 /**
- * Remove cached fruit & veg thumbnails that no longer match a product photo.
+ * Remove cached product thumbnails that no longer match a product photo.
+ *
+ * Despite the command's name it covers every thumbnail the Shop and the office
+ * draw — fruit & veg, Jon's produce, products on a current customer request and
+ * products scanned on a recent delivery. The name is kept because the schedule and
+ * ScheduleTest pin it.
  *
  * `ProductThumbnailService::jpeg()` already clears a product's older files when it
  * writes a new one, so this only matters for a product whose photo will never
@@ -20,7 +25,7 @@ class PruneFruitVegThumbnails extends Command
 {
     protected $signature = 'fruit-veg:prune-thumbnails';
 
-    protected $description = 'Delete cached F&V product thumbnails that no longer match a product photo';
+    protected $description = 'Delete cached product thumbnails that no longer match a product photo';
 
     public function handle(ProductThumbnailService $thumbnails): int
     {

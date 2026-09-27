@@ -21,8 +21,21 @@
         @vite(['resources/css/app.css', 'resources/css/shop.css', 'resources/js/shop.js', 'resources/js/app.js'])
         <style>body{margin:0;background:#f5ead8}[x-cloak]{display:none!important}</style>
     </head>
+    @php
+        // Idle lock (cycle 26). Only a trusted shared device locks itself — a
+        // staff member's own phone is theirs to leave open. Never on the Switch
+        // user, PIN or Locked screens: there is nobody signed in to lock out.
+        $idleLock = auth()->check()
+            && ($shopDevice ?? null)
+            && ! request()->routeIs('shop.switch', 'shop.switch.*', 'shop.lock', 'shop.locked');
+    @endphp
     <body data-shell="shop">
-        <div class="shop" id="shop-root">
+        <div class="shop" id="shop-root"
+            @if ($idleLock)
+                data-idle-lock-seconds="{{ (int) round(config('shop.idle_lock_minutes') * 60) }}"
+                data-idle-lock-url="{{ route('shop.lock') }}"
+            @endif
+        >
         {{-- Before paint, so the touch-only controls do not flash in on the till PC. --}}
         <script>if (window.matchMedia('(pointer: coarse)').matches) document.getElementById('shop-root').classList.add('is-touch');</script>
 
@@ -60,7 +73,7 @@
                     .then(r => r.json())
                     .then(data => {
                         if (!data.authenticated) {
-                            window.location.href = '{{ route("login", ["redirect" => request()->getRequestUri()]) }}';
+                            window.location.href = '{{ ($shopDevice ?? null) ? route("shop.switch") : route("login", ["redirect" => request()->getRequestUri()]) }}';
                         }
                     })
                     .catch(() => {});

@@ -11,15 +11,24 @@
 import deliveryScan from './shop/delivery-scan';
 import deliverySummary from './shop/delivery-summary';
 import findProduct from './shop/find-product';
+import startIdleLock from './shop/idle-lock';
 import fvHarvest from './shop/fv-harvest';
 import fvWaste from './shop/fv-waste';
 import labels from './shop/labels';
+import pinPad from './shop/pin-pad';
 import requestEdit from './shop/request-edit';
 import requestForm from './shop/requests';
 import requestsBoard from './shop/requests-board';
 import scanInput from './shop/scan-input';
 import stockScan from './shop/stock-scan';
 import vouchers from './shop/vouchers';
+
+// Outside alpine:init: the idle lock is plain DOM and must run even if Alpine
+// never boots — a tablet left signed in is the thing this prevents.
+const shopRoot = document.getElementById('shop-root');
+if (shopRoot?.dataset.idleLockSeconds) {
+    startIdleLock(Number(shopRoot.dataset.idleLockSeconds), shopRoot.dataset.idleLockUrl);
+}
 
 document.addEventListener('alpine:init', () => {
     Alpine.data('shopScanInput', scanInput);
@@ -34,4 +43,5 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('shopVouchers', vouchers);
     Alpine.data('shopFvWaste', fvWaste);
     Alpine.data('shopFvHarvest', fvHarvest);
+    Alpine.data('shopPinPad', pinPad);
 });

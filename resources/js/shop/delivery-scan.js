@@ -21,9 +21,12 @@
  * quantities and the statuses, and re-deriving them here would be a second
  * implementation of the office page's rules.
  */
+import mix from './mix.js';
+import productImages from './product-images.js';
+
 const TOAST_MS = 3000;
 
-export default () => ({
+export default () => mix(productImages(), {
     session: null,
     rows: [],
     progress: { total: 0, checked: 0, issues: 0 },
@@ -107,15 +110,24 @@ export default () => ({
     },
 
     /**
-     * "New first" puts the items just scanned at the top, then everything still
-     * unscanned, then the rest by name. "Scanned first" is the reverse emphasis:
-     * what has been counted, then what has not.
+     * The pending scan's product, as a plain reference. `x-shop.product-thumb`
+     * puts `expr` inside `imageFailed(...)` too, and an optional chain there would
+     * be an assignment target Alpine cannot evaluate.
      */
+    get pendingProduct() {
+        return this.pending?.product ?? null;
+    },
+
     /** The row the correction card is editing, or null. */
     get editingRow() {
         return this.rows.find((r) => r.barcode === this.editing) ?? null;
     },
 
+    /**
+     * "New first" puts the items just scanned at the top, then everything still
+     * unscanned, then the rest by name. "Scanned first" is the reverse emphasis:
+     * what has been counted, then what has not.
+     */
     get sorted() {
         const byName = (a, b) => (a.name ?? '').localeCompare(b.name ?? '');
 
@@ -155,6 +167,12 @@ export default () => ({
             this.rows = data.rows;
             this.progress = data.progress;
             this.error = null;
+
+            // Correcting an unexpected row to 0 deletes it server-side, so the
+            // card would otherwise sit there with nothing in it.
+            if (this.editing !== null && this.editingRow === null) {
+                this.editing = null;
+            }
         } catch (e) {
             this.error = 'Could not load the invoice lines';
         }
@@ -361,11 +379,15 @@ export default () => ({
     },
 
     /**
-     * STOCKCURRENT.UNITS is a decimal, so a whole number arrives as 4 and must not
-     * read "4.0"; a weighed item can be 1.25. Up to 3 dp, trailing zeros trimmed.
+     * A STOCKCURRENT figure as a person would read it. The column is a decimal, so
+     * a whole number arrives as 4 and must not read "4.0", and a weighed item can
+     * arrive as 1.5200000000000011. Up to 3 dp, trailing zeros trimmed.
+     *
+     * Takes the number rather than the row, because the scan prompt has the figure
+     * on `pending.product.currentStock` while rows have it on `row.stock`.
      */
-    stockText(row) {
-        const n = Number(row?.stock ?? 0);
+    stockText(value) {
+        const n = Number(value ?? 0);
 
         return Number.isInteger(n) ? String(n) : String(parseFloat(n.toFixed(3)));
     },

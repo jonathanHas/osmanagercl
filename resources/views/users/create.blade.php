@@ -15,7 +15,8 @@
         <div class="max-w-2xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
-                    <form method="POST" action="{{ route('users.store') }}">
+                    <form method="POST" action="{{ route('users.store') }}"
+                          x-data="{ roleId: '{{ old('role_id', $defaultRole?->id) }}', pinRoles: @js($pinRoleIds) }">
                         @csrf
 
                         <!-- Name -->
@@ -42,7 +43,7 @@
                         <!-- Role -->
                         <div class="mb-4">
                             <x-input-label for="role_id" :value="__('Role')" />
-                            <select id="role_id" name="role_id" class="block mt-1 w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
+                            <select id="role_id" name="role_id" x-model="roleId" class="block mt-1 w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
                                 <option value="">No Role Assigned</option>
                                 @foreach($roles as $role)
                                     <option value="{{ $role->id }}" 
@@ -82,6 +83,25 @@
                             <x-input-label for="password_confirmation" :value="__('Confirm Password')" />
                             <x-text-input id="password_confirmation" class="block mt-1 w-full" type="password" name="password_confirmation" required />
                             <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
+                        </div>
+
+                        <!-- Shop PIN (cycle 26) — shop-floor roles only -->
+                        <div class="mb-6 p-4 bg-gray-50 rounded-md" x-show="pinRoles.includes(Number(roleId))" x-cloak>
+                            <h3 class="font-semibold text-sm text-gray-800">Shop PIN</h3>
+                            <p class="mt-1 text-sm text-gray-600">
+                                A 4–6 digit PIN lets this person take over a trusted shop-floor device without typing a password.
+                                A PIN session can only reach Shop mode; anything in the office asks for their password.
+                                Leave blank for no PIN.
+                            </p>
+                            <div class="mt-3">
+                                <x-input-label for="pin" :value="__('PIN')" />
+                                <x-text-input id="pin" class="block mt-1 w-full" type="password" name="pin" inputmode="numeric" autocomplete="off" maxlength="6" />
+                                <x-input-error :messages="$errors->get('pin')" class="mt-2" />
+                            </div>
+                            <div class="mt-3">
+                                <x-input-label for="pin_confirmation" :value="__('Confirm PIN')" />
+                                <x-text-input id="pin_confirmation" class="block mt-1 w-full" type="password" name="pin_confirmation" inputmode="numeric" autocomplete="off" maxlength="6" />
+                            </div>
                         </div>
 
                         <div class="flex items-center justify-end">

@@ -948,6 +948,17 @@ Real-time coffee order tracking system for baristas with optimized performance.
 
 ## User Management
 
+### Shop Mode (NEW! 2026-09-23, Updated 2026-09-27)
+The simplified, touch-first interface for shop-floor staff at `/shop` — the same models and endpoints as the office, in a different shell.
+- **Shell**: `<x-shop-layout>`, `shop-*` classes only, behaviour in `resources/js/shop/`, enforced by `ShopViewContractTest`
+- **Trusted devices**: A manager trusts a shared tablet once with their password; the device holds a hashed, one-year cookie
+- **PIN sign-in**: Shop-floor staff take over a trusted device with a 4–6 digit PIN (screens 16–18: Switch user, Enter PIN, Locked)
+- **Confined**: A PIN session reaches the Shop and nothing else; the office asks for the password, which then ends the confinement
+- **Idle lock**: A trusted device locks itself after 5 minutes of no input and shows a clock; a personal phone never locks
+- **Audited**: `shop_switch_logs` records every trust, switch, failed PIN, lockout and lock
+
+📖 [Shop Mode Documentation](./features/shop-mode.md)
+
 ### User Roles & Permissions System
 Role-based access control (RBAC) with granular permissions.
 - **Three-tier Role System**: Admin, Manager, and Employee roles with hierarchical permissions

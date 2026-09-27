@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\InvoiceAttachment;
 use App\Models\Product;
 use App\Observers\ProductObserver;
+use App\Services\Shop\ShopDeviceService;
 use App\Support\UiMode;
 use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
 use Illuminate\Support\Facades\Route;
@@ -18,6 +19,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->scoped(UiMode::class);
+        $this->app->scoped(ShopDeviceService::class);
     }
 
     /**
@@ -38,5 +40,6 @@ class AppServiceProvider extends ServiceProvider
 
         // Keep kitchen ingredient profile costs in step with product cost prices
         Product::observe(ProductObserver::class);
+
     }
 }

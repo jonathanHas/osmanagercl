@@ -7,7 +7,10 @@
  * submission rather than a fetch this file could fire by accident; all this
  * object does is gate the confirmation.
  */
-export default () => ({
+import mix from './mix.js';
+import productImages from './product-images.js';
+
+export default () => mix(productImages(), {
     session: null,
     rows: [],
     progress: null,

@@ -1,6 +1,6 @@
 # Plan: Shop mode cycle 23 — Delivery scan v2 (Screen 05 v2)
 
-**Status:** READY
+**Status:** ACCEPTED
 **Planner:** Fable 5.1
 **Date:** 2026-09-26
 

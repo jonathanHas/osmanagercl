@@ -53,6 +53,11 @@ class CustomerRequestDeliveryFlagTest extends TestCase
             $table->string('TAXCAT')->nullable();
             $table->decimal('PRICEBUY', 10, 4)->default(0);
             $table->decimal('PRICESELL', 10, 4)->default(0);
+            // This test drives delivery-legacy.scan-increment, which since cycle 24
+            // resolves a product picture; the resolver reads these columns.
+            $table->string('DISPLAY')->nullable();
+            $table->boolean('ISSERVICE')->default(false);
+            $table->binary('IMAGE')->nullable();
         });
         $pos->create('CATEGORIES', function (Blueprint $table) {
             $table->string('ID')->primary();

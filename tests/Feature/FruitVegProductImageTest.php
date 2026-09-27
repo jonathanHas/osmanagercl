@@ -84,6 +84,21 @@ class FruitVegProductImageTest extends TestCase
             $table->string('unitId')->nullable();
         });
 
+        // Cycle 25: the prune's keep-set now reaches recent delivery scans.
+        $pos->create('deliveriesScan', function (Blueprint $table) {
+            $table->string('ID')->primary();
+            $table->string('supID')->nullable();
+            $table->dateTime('dateUpload')->nullable();
+            $table->integer('status')->default(0);
+        });
+
+        $pos->create('deliveriesScanItems', function (Blueprint $table) {
+            $table->string('ID')->primary();
+            $table->string('delID');
+            $table->string('barcode');
+            $table->decimal('quantity', 10, 2)->default(0);
+        });
+
         $pos->create('supplier_link', function (Blueprint $table) {
             $table->id();
             $table->string('Barcode');
@@ -371,6 +386,104 @@ class FruitVegProductImageTest extends TestCase
         // And the stale link, though served short-lived, still shows the CURRENT
         // photo rather than the one it was made for.
         $this->assertSame($fresh->getContent(), $stale->getContent());
+    }
+
+    // --- cycle 25: the prune keeps what the Shop is using -------------------
+
+    /**
+     * A product that is deliberately outside the old keep-set: not an F&V category
+     * and not one of Jon's. Before cycle 25 its thumbnail was pruned every Sunday
+     * however much the Shop was showing it.
+     */
+    private function nonFvProductWithPhoto(string $code): void
+    {
+        DB::connection('pos')->table('PRODUCTS')->insert([
+            'ID' => 'ID-'.$code,
+            'NAME' => 'Product '.$code,
+            'CODE' => $code,
+            'CATEGORY' => 'GROCERY',
+            'PRICESELL' => 1.0,
+            'IMAGE' => $this->png,
+        ]);
+    }
+
+    private function scannedOnSession(string $code, string $sessionId, string $dateUpload): void
+    {
+        DB::connection('pos')->table('deliveriesScan')->insertOrIgnore([
+            'ID' => $sessionId, 'supID' => '7', 'dateUpload' => $dateUpload, 'status' => 0,
+        ]);
+        DB::connection('pos')->table('deliveriesScanItems')->insert([
+            'ID' => $sessionId.'-'.$code, 'delID' => $sessionId, 'barcode' => $code, 'quantity' => 1,
+        ]);
+    }
+
+    private function onAnOpenRequestLine(string $code): void
+    {
+        $request = \App\Models\CustomerRequest::create([
+            'customer_name' => 'Keep Me Kate',
+            'closed_at' => null,
+        ]);
+
+        \App\Models\CustomerRequestItem::create([
+            'customer_request_id' => $request->id,
+            'product_code' => $code,
+            'product_name' => 'Product '.$code,
+            'description' => 'Product '.$code,
+            'quantity' => 1,
+            'status' => 'pending',
+            'position' => 1,
+        ]);
+    }
+
+    public function test_the_prune_keeps_thumbnails_for_recent_deliveries_and_request_lines(): void
+    {
+        // Deliberately NOT fruit & veg and not Jon's: before cycle 25 all three
+        // would have been pruned, and two of them are in daily use.
+        $this->nonFvProductWithPhoto('1111111111111');   // scanned yesterday
+        $this->nonFvProductWithPhoto('2222222222222');   // scanned 40 days ago
+        $this->nonFvProductWithPhoto('3333333333333');   // on an open request line
+
+        $this->scannedOnSession('1111111111111', 'sess-recent', now()->subDay()->format('Y-m-d H:i:s'));
+        $this->scannedOnSession('2222222222222', 'sess-old', now()->subDays(40)->format('Y-m-d H:i:s'));
+        $this->onAnOpenRequestLine('3333333333333');
+
+        $keep = ProductThumbnailService::currentPhotoProducts()->pluck('CODE');
+
+        $this->assertContains('1111111111111', $keep->all(), 'A product scanned on a recent delivery is in use.');
+        $this->assertContains('3333333333333', $keep->all(), 'A product on an open request line is in use.');
+        $this->assertNotContains('2222222222222', $keep->all(), 'A 40-day-old scan is outside the window.');
+    }
+
+    public function test_the_prune_does_not_delete_the_files_it_keeps(): void
+    {
+        $disk = Storage::disk('local');
+        $service = app(ProductThumbnailService::class);
+
+        $this->nonFvProductWithPhoto('1111111111111');
+        $this->nonFvProductWithPhoto('2222222222222');
+        $this->scannedOnSession('1111111111111', 'sess-recent', now()->subDay()->format('Y-m-d H:i:s'));
+        $this->scannedOnSession('2222222222222', 'sess-old', now()->subDays(40)->format('Y-m-d H:i:s'));
+
+        // A cached thumbnail for each, as viewing the scan page would create.
+        $service->jpeg('1111111111111', $this->png, 112);
+        $service->jpeg('2222222222222', $this->png, 112);
+        $this->assertCount(2, $disk->allFiles('fv-thumbs'));
+
+        $result = $service->prune(ProductThumbnailService::currentPhotoProducts());
+
+        $files = $disk->allFiles('fv-thumbs');
+        $prefix = fn (string $code) => substr(md5($code), 0, 12);
+
+        // The recent one survives the Sunday prune; the stale one does not.
+        $this->assertTrue(
+            collect($files)->contains(fn ($f) => str_contains($f, $prefix('1111111111111'))),
+            'The thumbnail for a recently scanned product must survive the prune.'
+        );
+        $this->assertFalse(
+            collect($files)->contains(fn ($f) => str_contains($f, $prefix('2222222222222'))),
+            'A thumbnail for a product nothing is showing is still an orphan.'
+        );
+        $this->assertSame(1, $result['deleted']);
     }
 
     // --- cycle 17g: the manage-page prune button ---------------------------

@@ -75,6 +75,12 @@
                                                                 You
                                                             </span>
                                                         @endif
+                                                        @if($user->hasPin())
+                                                            {{-- Shop PIN (cycle 26). The badge says "set", never the length or the hash. --}}
+                                                            <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800" title="Shop PIN set {{ $user->pin_set_at?->format('j M Y') }}">
+                                                                PIN set
+                                                            </span>
+                                                        @endif
                                                     </div>
                                                 </div>
                                             </div>

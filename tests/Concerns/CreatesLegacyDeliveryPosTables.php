@@ -17,6 +17,18 @@ use Illuminate\Support\Facades\DB;
  */
 trait CreatesLegacyDeliveryPosTables
 {
+    /** A real PNG for the product that has a photo. */
+    public static function photoBlob(): string
+    {
+        $im = imagecreatetruecolor(60, 40);
+        imagefill($im, 0, 0, imagecolorallocate($im, 20, 120, 200));
+        ob_start();
+        imagepng($im);
+        imagedestroy($im);
+
+        return ob_get_clean();
+    }
+
     protected function createLegacyDeliveryPosTables(): void
     {
         Config::set('database.connections.pos', [
@@ -37,6 +49,12 @@ trait CreatesLegacyDeliveryPosTables
             $table->string('TAXCAT')->nullable();
             $table->decimal('PRICEBUY', 10, 4)->default(0);
             $table->decimal('PRICESELL', 10, 4)->default(0);
+            // The rest of ProductSearchService::SELECT_COLUMNS plus the photo
+            // column, which the picture resolver reaches for (cycle 24). It never
+            // selects IMAGE itself, only LENGTH(IMAGE) via the has_image expression.
+            $table->string('DISPLAY')->nullable();
+            $table->boolean('ISSERVICE')->default(false);
+            $table->binary('IMAGE')->nullable();
         });
         $pos->create('CATEGORIES', function (Blueprint $table) {
             $table->string('ID')->primary();
@@ -104,8 +122,11 @@ trait CreatesLegacyDeliveryPosTables
         $pos->table('TAXES')->insert(['ID' => 't1', 'CATEGORY' => '001', 'RATE' => 0]);
 
         $pos->table('PRODUCTS')->insert([
-            ['ID' => 'p1', 'NAME' => 'Oat drink 1 L', 'CODE' => '5000000000017', 'CATEGORY' => 'c1', 'TAXCAT' => '001', 'PRICEBUY' => 1.2, 'PRICESELL' => 2.1],
-            ['ID' => 'p2', 'NAME' => 'Leeks', 'CODE' => '5000000000024', 'CATEGORY' => 'c2', 'TAXCAT' => '001', 'PRICEBUY' => 0.8, 'PRICESELL' => 1.5],
+            // p1 carries a real (tiny) PNG so the thumbnail service can encode it:
+            // the photo route 404s on a blob it cannot read.
+            ['ID' => 'p1', 'NAME' => 'Oat drink 1 L', 'CODE' => '5000000000017', 'CATEGORY' => 'c1', 'TAXCAT' => '001', 'PRICEBUY' => 1.2, 'PRICESELL' => 2.1, 'IMAGE' => self::photoBlob()],
+            // Explicitly null: a batch insert needs the same columns in every row.
+            ['ID' => 'p2', 'NAME' => 'Leeks', 'CODE' => '5000000000024', 'CATEGORY' => 'c2', 'TAXCAT' => '001', 'PRICEBUY' => 0.8, 'PRICESELL' => 1.5, 'IMAGE' => null],
         ]);
         $pos->table('STOCKCURRENT')->insert([
             ['PRODUCT' => 'p1', 'UNITS' => 3],

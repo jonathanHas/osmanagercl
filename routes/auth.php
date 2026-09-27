@@ -50,7 +50,10 @@ Route::middleware('auth')->group(function () {
     Route::get('confirm-password', [ConfirmablePasswordController::class, 'show'])
         ->name('password.confirm');
 
-    Route::post('confirm-password', [ConfirmablePasswordController::class, 'store']);
+    // Named so ConfinePinSession can allow it: a PIN session is redirected here
+    // and an unnamed POST would be blocked, looping back to the form for ever.
+    Route::post('confirm-password', [ConfirmablePasswordController::class, 'store'])
+        ->name('password.confirm.store');
 
     Route::put('password', [PasswordController::class, 'update'])->name('password.update');
 

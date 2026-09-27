@@ -29,6 +29,7 @@
 
                 <section class="shop-card" x-show="pending" x-cloak x-ref="prompt">
                     <div class="shop-between">
+                        <x-shop.product-thumb expr="pendingProduct" />
                         <div class="shop-stack shop-stack--tight">
                             <h2 class="shop-subtitle" x-text="pending?.product.name"></h2>
                             <span class="shop-row__meta shop-code" x-text="pending ? [pending.product.barcode, pending.product.categoryName].filter(Boolean).join(' · ') : ''"></span>
@@ -49,7 +50,7 @@
                         </div>
                         <div class="shop-fact">
                             <span class="shop-label">In stock</span>
-                            <span class="shop-fact__value" x-text="pending?.product.currentStock ?? '—'"></span>
+                            <span class="shop-fact__value" x-text="pending?.product.currentStock == null ? '—' : stockText(pending.product.currentStock)"></span>
                         </div>
                         <div class="shop-fact" x-show="pending?.scanType === 'case'" x-cloak>
                             <span class="shop-label">Outer</span>
@@ -98,11 +99,14 @@
                         </button>
                     </div>
 
-                    <div class="shop-stack shop-stack--tight">
-                        <span class="shop-row__title" x-text="editingRow?.name"></span>
-                        <span class="shop-row__meta shop-code" x-text="editingRow?.code || editingRow?.barcode"></span>
-                        <span class="shop-meta" x-show="editingRow?.stock !== null && editingRow" x-cloak
-                              x-text="editingRow ? 'Stock ' + stockText(editingRow) : ''"></span>
+                    <div class="shop-inline">
+                        <x-shop.product-thumb expr="editingRow" />
+                        <div class="shop-stack shop-stack--tight">
+                            <span class="shop-row__title" x-text="editingRow?.name"></span>
+                            <span class="shop-row__meta shop-code" x-text="editingRow?.code || editingRow?.barcode"></span>
+                            <span class="shop-meta" x-show="editingRow?.stock !== null && editingRow" x-cloak
+                                  x-text="editingRow ? 'Stock ' + stockText(editingRow.stock) : ''"></span>
+                        </div>
                     </div>
 
                     <div class="shop-stepper">
@@ -133,14 +137,15 @@
 
                 <div class="shop-list" x-show="rows.length" x-cloak>
                     <template x-for="row in sorted" :key="row.barcode">
-                        <button class="shop-row shop-item" type="button"
+                        <button class="shop-row shop-item shop-item--pic" type="button"
                                 :class="{ 'is-latest': row.barcode === latest, 'is-off': row.status === 'not_scanned' }"
                                 :aria-pressed="editing === row.barcode" @click="edit(row)">
+                            <x-shop.product-thumb expr="row" />
                             <span class="shop-row__main">
                                 <span class="shop-row__title" x-text="row.name"></span>
                                 <span class="shop-row__meta">
                                     <span class="shop-code" x-text="row.code || row.barcode"></span>
-                                    <span class="shop-row__stock" x-show="row.stock !== null" x-cloak x-text="'Stock ' + stockText(row)"></span>
+                                    <span class="shop-row__stock" x-show="row.stock !== null" x-cloak x-text="'Stock ' + stockText(row.stock)"></span>
                                 </span>
                             </span>
                             <span class="shop-row__aside">

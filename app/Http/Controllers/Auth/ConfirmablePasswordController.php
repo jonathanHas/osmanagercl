@@ -35,6 +35,12 @@ class ConfirmablePasswordController extends Controller
 
         $request->session()->put('auth.password_confirmed_at', time());
 
+        // The session started as a PIN sign-in and was therefore confined to
+        // the Shop (ConfinePinSession). The person has now typed their own
+        // password, which is exactly what that confinement was asking for, so
+        // it becomes an ordinary session.
+        $request->session()->forget('auth_via');
+
         return redirect()->intended(route('dashboard', absolute: false));
     }
 }

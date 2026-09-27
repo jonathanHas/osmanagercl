@@ -136,6 +136,108 @@ class ShopDeliveryTest extends TestCase
             ->assertForbidden();
     }
 
+    // --- cycle 24: pictures on delivery rows --------------------------------
+
+    private function photoUrl(string $code = '5000000000017'): string
+    {
+        return route('shop.product-photo', [
+            'code' => $code,
+            'v' => substr(md5(self::photoBlob()), 0, 8),
+        ]);
+    }
+
+    public function test_items_carry_picture_urls(): void
+    {
+        $rows = collect(
+            $this->actingAs($this->employee())
+                ->getJson(route('delivery-legacy.items', ['delID' => 'd-1', 'supplierID' => 999]))
+                ->assertOk()
+                ->json('rows')
+        )->keyBy('barcode');
+
+        // Every row carries the key, so the front end never has to guess.
+        foreach ($rows as $row) {
+            $this->assertArrayHasKey('image_url', $row);
+        }
+
+        // The product with a till photo resolves to the Shop thumbnail route,
+        // versioned by the photo itself — never to the full-size products.image.
+        $this->assertSame($this->photoUrl(), $rows['5000000000017']['image_url']);
+        $this->assertStringNotContainsString('/products/p1/image', (string) $rows['5000000000017']['image_url']);
+
+        // No photo and no supplier picture: nothing, so the placeholder shows.
+        $this->assertNull($rows['5000000000024']['image_url']);
+    }
+
+    public function test_scan_increment_returns_the_picture(): void
+    {
+        $product = $this->actingAs($this->employee())
+            ->postJson(route('delivery-legacy.scan-increment'), [
+                'delID' => 'd-1',
+                // A string: the endpoint validates supplierID as one.
+                'supplierID' => '999',
+                'barcode' => '5000000000017',
+                'quantity' => 0,
+            ])
+            ->assertOk()
+            ->json('product');
+
+        $this->assertSame($this->photoUrl(), $product['image_url']);
+    }
+
+    public function test_product_photo_route_serves_a_thumbnail(): void
+    {
+        $user = $this->employee();
+        $version = substr(md5(self::photoBlob()), 0, 8);
+
+        $good = $this->actingAs($user)
+            ->get(route('shop.product-photo', ['code' => '5000000000017', 'v' => $version]))
+            ->assertOk();
+
+        $good->assertHeader('Content-Type', 'image/jpeg');
+        $this->assertSame([112, 112], array_slice(getimagesizefromstring($good->getContent()), 0, 2));
+        $this->assertStringContainsString('max-age=604800', $good->headers->get('Cache-Control'));
+        $this->assertStringContainsString('immutable', $good->headers->get('Cache-Control'));
+
+        // The stored blob is never what comes back.
+        $this->assertNotSame(self::photoBlob(), $good->getContent());
+
+        // A wrong version is served short-lived, so a stale link pins nothing.
+        $wrong = $this->actingAs($user)
+            ->get(route('shop.product-photo', ['code' => '5000000000017', 'v' => 'deadbeef']))
+            ->assertOk();
+        $this->assertStringContainsString('must-revalidate', $wrong->headers->get('Cache-Control'));
+
+        // A revalidation keeps the long lifetime.
+        $revalidated = $this->actingAs($user)->get(
+            route('shop.product-photo', ['code' => '5000000000017', 'v' => $version]),
+            ['If-None-Match' => $good->headers->get('ETag')]
+        );
+        $revalidated->assertStatus(304);
+        $this->assertStringContainsString('max-age=604800', $revalidated->headers->get('Cache-Control'));
+    }
+
+    public function test_product_photo_route_needs_a_login(): void
+    {
+        $this->get(route('shop.product-photo', ['code' => '5000000000017']))->assertRedirect('/login');
+    }
+
+    public function test_product_photo_route_404s_without_a_photo(): void
+    {
+        $user = $this->employee();
+
+        $this->actingAs($user)->get(route('shop.product-photo', ['code' => '5000000000024']))->assertNotFound();
+        $this->actingAs($user)->get(route('shop.product-photo', ['code' => '9999999999999']))->assertNotFound();
+    }
+
+    public function test_the_summary_page_shows_pictures(): void
+    {
+        $this->actingAs($this->employee())
+            ->get(route('shop.deliveries.summary', ['delID' => 'd-1', 'supplierID' => 999]))
+            ->assertOk()
+            ->assertSee('hasImage(row)', false);
+    }
+
     public function test_items_endpoint_classifies_the_session(): void
     {
         $json = $this->actingAs($this->employee())
@@ -192,7 +294,9 @@ class ShopDeliveryTest extends TestCase
 
         // Screen 05 v2 (cycle 23): a row is a button that opens a correction card,
         // the top bar carries a second line, and the scan field is the compact one.
-        $response->assertSee('class="shop-row shop-item"', false);
+        // Cycle 24 adds the picture column to the row.
+        $response->assertSee('class="shop-row shop-item shop-item--pic"', false);
+        $response->assertSee('hasImage(row)', false);
         $response->assertSee('shop-row__stock', false);
         $response->assertSee('shop-scan--inline', false);
         $response->assertSee('shop-topbar__sub', false);

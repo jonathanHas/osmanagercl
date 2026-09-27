@@ -21,4 +21,74 @@ return [
         ['key' => 'vouchers', 'label' => 'Vouchers', 'hint' => 'Balance and redeem', 'icon' => 'gift', 'route' => 'shop.vouchers', 'permissions' => ['vouchers.redeem'], 'badge' => null],
         ['key' => 'fruit-veg', 'label' => 'Fruit & veg', 'hint' => 'Waste and harvest logs', 'icon' => 'carrot', 'route' => 'shop.fv.waste', 'permissions' => ['fruit_veg.operate'], 'badge' => null, 'tone' => 'sage'],
     ],
+
+    /**
+     * Minutes of no input before a trusted shared device locks itself.
+     * Owner's trial value (cycle 26): five minutes.
+     */
+    'idle_lock_minutes' => 5,
+
+    /**
+     * Roles whose members may sign in with a PIN. Managers and admins are
+     * deliberately absent: a PIN session is confined to the Shop.
+     */
+    'pin_roles' => ['employee'],
+
+    /**
+     * Wrong PINs allowed before that one person's PIN is refused, and for how
+     * long. Keyed per user (see SwitchUserController::limiterKey), so one
+     * fumbling employee cannot lock the tablet for everyone.
+     */
+    'pin_attempts' => 5,
+    'pin_lockout_minutes' => 15,
+
+    /** Cookie holding the trusted-device token. */
+    'device_cookie' => 'shop_device',
+
+    /**
+     * Route names a PIN session may reach without confirming a password
+     * (Str::is patterns; see App\Http\Middleware\ConfinePinSession).
+     *
+     * Cycle 26. Everything here is either the Shop shell itself or an office
+     * endpoint a Shop screen calls; ShopPinRouteAllowListTest asserts that
+     * every route named in resources/views/shop/** is covered, so a new Shop
+     * screen that calls a new endpoint fails the suite rather than 403-ing on
+     * the shop floor.
+     */
+    'pin_session_routes' => [
+        'shop.*',
+        'api.products.search',
+        'customer-requests.*',
+        'delivery-legacy.items',
+        'delivery-legacy.scan-increment',
+        'delivery-legacy.update-quantity',
+        'delivery-legacy.complete',
+        'delivery-legacy.create-session',
+        'fruit-veg.harvest.rows',
+        'fruit-veg.harvest.save-row',
+        'fruit-veg.waste.entry',
+        'fruit-veg.waste.rows',
+        'fruit-veg.waste.search',
+        'fruit-veg.product-image',
+        'labels.dismiss',
+        'labels.dismiss-all',
+        'labels.print-a4',
+        'labels.queue',
+        'labels.scan',
+        'labels.shelf-labels',
+        'stocking.lookup',
+        'stocking.update-stock',
+        'vouchers.activate',
+        'vouchers.deduct',
+        'vouchers.lookup',
+        'zebra-labels.print',
+        'ui-mode.set',
+        'login',
+        'logout',
+        'logout.get',
+        'auth.check',
+        'password.confirm',
+        'password.confirm.store',
+        'verification.*',
+    ],
 ];

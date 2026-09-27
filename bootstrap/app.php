@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->web(append: [
             \App\Http\Middleware\ShareUiMode::class,
+            \App\Http\Middleware\ConfinePinSession::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

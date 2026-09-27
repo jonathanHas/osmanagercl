@@ -50,6 +50,18 @@ class UserFactory extends Factory
     }
 
     /**
+     * Give the user a Shop PIN. The default is the one the cycle-26 tests use.
+     */
+    public function withPin(string $pin = '2580'): static
+    {
+        return $this->state(fn () => [
+            'pin_hash' => Hash::make($pin),
+            'pin_length' => strlen($pin),
+            'pin_set_at' => now(),
+        ]);
+    }
+
+    /**
      * Indicate that the model's email address should be unverified.
      */
     public function unverified(): static

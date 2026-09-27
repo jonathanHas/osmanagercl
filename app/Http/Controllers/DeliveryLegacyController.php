@@ -9,6 +9,7 @@ use App\Models\ProductTranslation;
 use App\Models\ZebraLabel;
 use App\Services\CustomerRequestService;
 use App\Services\IihfGoodsReturnPdfService;
+use App\Services\Shop\ProductImageUrls;
 use App\Services\SupplierService;
 use App\Services\ZebraPrintService;
 use Illuminate\Database\QueryException;
@@ -29,8 +30,11 @@ class DeliveryLegacyController extends Controller
 
     private CustomerRequestService $customerRequests;
 
-    public function __construct(SupplierService $supplierService, ZebraPrintService $zebraPrint, CustomerRequestService $customerRequests)
+    private ProductImageUrls $images;
+
+    public function __construct(SupplierService $supplierService, ZebraPrintService $zebraPrint, CustomerRequestService $customerRequests, ProductImageUrls $images)
     {
+        $this->images = $images;
         $this->supplierService = $supplierService;
         $this->zebraPrint = $zebraPrint;
         $this->customerRequests = $customerRequests;
@@ -944,6 +948,14 @@ class DeliveryLegacyController extends Controller
             ];
         }
 
+        // One batched lookup for the whole list; a till photo resolves to the Shop's
+        // thumbnail route, a supplier picture to its CDN, and neither to null.
+        $urls = $this->images->byCode(array_column($rows, 'barcode'));
+
+        foreach ($rows as $i => $row) {
+            $rows[$i]['image_url'] = $urls[$row['barcode']] ?? null;
+        }
+
         $issues = count(array_filter(
             $rows,
             fn (array $r) => in_array($r['status'], ['short', 'over', 'unexpected'], true)
@@ -1434,6 +1446,7 @@ class DeliveryLegacyController extends Controller
                 'supplierCode' => $product->supplierCode,
                 'categoryName' => $product->categoryName,
                 'currentStock' => $product->currentStock,
+                'image_url' => $this->images->byCode([$resolvedBarcode])[$resolvedBarcode] ?? null,
             ] : null,
             'expectedQty' => $expectedQty,
             'newQuantity' => $newQuantity,

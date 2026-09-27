@@ -19,8 +19,17 @@ use Illuminate\Support\Facades\DB;
  */
 class CustomerRequestService
 {
+    /**
+     * How far back "recent" reaches for a request: the Done view, its counts, the
+     * public photo route's gate and the thumbnail prune's keep-set all use this,
+     * and they must agree — a picture kept for a line the board no longer shows is
+     * waste, and one dropped for a line it does show is a placeholder.
+     */
+    public const RECENT_DAYS = 30;
+
     public function __construct(
         private ProductSearchService $productSearch,
+        private ProductThumbnailService $thumbnails,
     ) {}
 
     /**
@@ -184,7 +193,7 @@ class CustomerRequestService
         $closed = collect();
         if ($includeClosed) {
             $closed = CustomerRequest::closed()
-                ->where('closed_at', '>=', now()->subDays(30))
+                ->where('closed_at', '>=', now()->subDays(self::RECENT_DAYS))
                 ->with(['items.statusChanger', 'creator', 'closer'])
                 ->orderByDesc('closed_at')
                 ->get();
@@ -227,7 +236,7 @@ class CustomerRequestService
             $done = $this->rowsFrom(
                 CustomerRequestItem::query()
                     ->whereIn('status', CustomerRequestItem::DONE_STATUSES)
-                    ->where('status_changed_at', '>=', now()->subDays(30))
+                    ->where('status_changed_at', '>=', now()->subDays(self::RECENT_DAYS))
                     ->with(['request.creator', 'statusChanger'])
                     ->orderByDesc('status_changed_at')
                     ->get()
@@ -302,7 +311,7 @@ class CustomerRequestService
      */
     public function imageUrlsForRequestLines(array $codes): array
     {
-        $versions = $this->photoVersions($codes);
+        $versions = $this->thumbnails->versions($codes);
 
         return $this->productSearch->imageUrlsByCode(
             $codes,
@@ -311,39 +320,6 @@ class CustomerRequestService
                 'v' => $versions[$product->CODE] ?? null,
             ]))
         );
-    }
-
-    /**
-     * First 8 hex of each product photo's md5, keyed by code — the `?v=` that earns
-     * the thumbnail route's week-long cache.
-     *
-     * Hashed in SQL where the driver can, because a product photo runs to a
-     * megabyte and this would otherwise pull every board product's photo into PHP
-     * on every render, including the guest board's auto-refresh. SQLite has no
-     * `md5()`, so tests take the other branch.
-     *
-     * @param  array<int, string|null>  $codes
-     * @return array<string, string>
-     */
-    private function photoVersions(array $codes): array
-    {
-        $codes = array_values(array_filter($codes, fn ($c) => $c !== null && $c !== ''));
-
-        if ($codes === []) {
-            return [];
-        }
-
-        $query = Product::whereIn('CODE', $codes)->whereRaw('IMAGE IS NOT NULL');
-
-        if (DB::connection($query->getModel()->getConnectionName())->getDriverName() === 'mysql') {
-            return $query->get(['CODE', DB::raw('MD5(IMAGE) as image_md5')])
-                ->mapWithKeys(fn ($p) => [$p->CODE => substr((string) $p->image_md5, 0, 8)])
-                ->all();
-        }
-
-        return $query->get(['CODE', 'IMAGE'])
-            ->mapWithKeys(fn ($p) => [$p->CODE => substr(md5((string) $p->IMAGE), 0, 8)])
-            ->all();
     }
 
     /**

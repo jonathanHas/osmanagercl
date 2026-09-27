@@ -29,6 +29,14 @@
             <summary class="shop-chip"><span class="shop-avatar">{{ $initials }}</span><span class="shop-chip__name">{{ $firstName }}</span><x-shop.icon name="chevron-down" size="sm" class="shop-chip__caret" /></summary>
             <div class="shop-menu" role="menu">
                 <div class="shop-menu__head"><span class="shop-avatar">{{ $initials }}</span><div><div class="shop-menu__name">{{ $user->name }}</div><div class="shop-meta">{{ $user->role?->display_name }}</div></div></div>
+                {{-- Shared devices (cycle 26). A manager trusts the device once with
+                     their password; after that the grid and the PIN pad appear here. --}}
+                @if ($shopDevice ?? null)
+                    <a class="shop-menu__item" role="menuitem" href="{{ route('shop.switch') }}"><x-shop.icon name="users" />Switch user</a>
+                @elseif ($user->isManager() || $user->isAdmin())
+                    <a class="shop-menu__item" role="menuitem" href="{{ route('shop.devices.trust') }}"><x-shop.icon name="lock" />Trust this device</a>
+                @endif
+                <a class="shop-menu__item" role="menuitem" href="{{ route('shop.lock') }}"><x-shop.icon name="lock" />Lock</a>
                 @unless ($user->isBarista())
                     <form method="POST" action="{{ route('ui-mode.set', 'office') }}">
                         @csrf
