@@ -11,12 +11,22 @@
  * Listens on window for `shop-scan-done` / `shop-scan-error` so the page can
  * clear or set the error state and hand focus back, and for `shop-scan-saved`
  * so the camera comes back after a save if the user had it open.
+ *
+ * The camera has three states, not two. Detecting a code *pauses* the decoder
+ * and freezes the picture on the frame it read; the page's `shop-scan-saved`
+ * resumes it, which is instant because the stream never closed; only the
+ * user's own camera button stops it and releases the device. Pausing rather
+ * than stopping is what makes scanning a delivery feel continuous — a restart
+ * re-enumerates cameras and re-initialises the decoder, one to three seconds
+ * on a phone.
  */
 export default () => ({
     value: '',
     keyboard: false,
     cameraOpen: false,
     cameraWanted: false,
+    // The stream is open but the decoder is frozen on the frame it just read.
+    paused: false,
     error: null,
     cameraId: 'shop-camera-' + Math.random().toString(36).slice(2),
     lastCode: null,
@@ -166,9 +176,43 @@ export default () => ({
         this.lastCode = text;
         this.lastAt = now;
 
-        this.stop();
+        // Pause, not stop: the page resumes us on `shop-scan-saved` and a
+        // resume is instant, where a restart costs a second or three.
+        this.pause();
         this.value = text;
         this.submit();
+    },
+
+    /**
+     * Freeze the decoder on the frame just read. The camera block stays on
+     * screen showing that frame, so `cameraOpen` stays true.
+     */
+    async pause() {
+        try {
+            const scanner = await import('../barcode-scanner');
+            this.paused = scanner.pauseScanner();
+        } catch (e) {
+            this.paused = false;
+        }
+    },
+
+    /**
+     * Unfreeze. Returns false when the scanner was not in a resumable state —
+     * a backgrounded tab on a phone can have had its stream dropped from under
+     * us — so the caller can fall back to a full restart.
+     */
+    async resume() {
+        try {
+            const scanner = await import('../barcode-scanner');
+
+            if (scanner.resumeScanner()) {
+                this.paused = false;
+
+                return true;
+            }
+        } catch (e) { /* fall through to the caller's restart */ }
+
+        return false;
     },
 
     async stop() {
@@ -180,22 +224,41 @@ export default () => ({
         } catch (e) { /* nothing to stop */ }
 
         this.cameraOpen = false;
+        this.paused = false;
     },
 
     /**
-     * Saving refocuses the input, which would otherwise leave the camera dark;
-     * reopen it only if the user had it open.
+     * The page has finished with the scan, so give the camera back.
      *
-     * The item just recorded is usually still under the lens when the camera
-     * comes back about a second later, and the de-duplication window in
-     * detected() is measured from the *original* detection, which by then has
-     * expired. Push lastAt forward so the reopened camera does not read the
-     * same item straight back in. One mechanism, not a second flag: the window
-     * stays wherever detected() left it for any other code.
+     * Normally that is a resume of a paused decoder, which is instant. The
+     * restart path below is for a camera that was never started, that failed,
+     * or whose stream a backgrounded tab dropped.
+     *
+     * The item just recorded is usually still under the lens, and the
+     * de-duplication window in detected() is measured from the *original*
+     * detection, which by then has expired. Push lastAt forward so the camera
+     * does not read the same item straight back in. One mechanism, not a
+     * second flag: the window stays wherever detected() left it for any other
+     * code.
      */
-    restartCameraIfWanted() {
-        if (this.cameraWanted && ! this.cameraOpen) {
-            this.lastAt = Date.now() + 1500;
+    async restartCameraIfWanted() {
+        if (! this.cameraWanted) {
+            return;
+        }
+
+        this.lastAt = Date.now() + 1500;
+
+        if (this.cameraOpen && this.paused) {
+            if (await this.resume()) {
+                return;
+            }
+
+            // Paused but not resumable: the stream is gone. Tear down and
+            // start again so the user still ends up with a camera.
+            await this.stop();
+        }
+
+        if (! this.cameraOpen) {
             this.toggleCamera();
         }
     },

@@ -208,4 +208,51 @@ class ShopStockScanTest extends TestCase
             'source' => 'stocking',
         ]);
     }
+
+    /**
+     * Cycle 30. A camera scan used to stop the stream, and the restart cost a
+     * second or three on a phone — long enough that the next item could not be
+     * scanned fluently. The decoder is paused and resumed instead.
+     *
+     * The camera cannot run on dev (plain HTTP), so this pins the wiring at the
+     * source level, in the cycle-29 style. It lives here because this is the
+     * scan field's home page.
+     */
+    public function test_the_scan_field_pauses_the_decoder_rather_than_stopping_it(): void
+    {
+        $wrapper = file_get_contents(resource_path('js/barcode-scanner.js'));
+        $field = file_get_contents(resource_path('js/shop/scan-input.js'));
+
+        // The wrapper offers pause/resume alongside start/stop.
+        $this->assertStringContainsString('export function pauseScanner()', $wrapper);
+        $this->assertStringContainsString('export function resumeScanner()', $wrapper);
+
+        // Detection pauses. The old behaviour — a full stop on every read — is
+        // the thing that must not come back.
+        $detectedAt = strpos($field, 'detected(text) {');
+        $stopAt = strpos($field, 'async stop()');
+        $this->assertNotFalse($detectedAt);
+        $this->assertNotFalse($stopAt);
+        $this->assertGreaterThan($detectedAt, $stopAt);
+
+        $detected = substr($field, $detectedAt, $stopAt - $detectedAt);
+        $this->assertStringContainsString('this.pause();', $detected);
+        $this->assertStringNotContainsString(
+            'this.stop();',
+            $detected,
+            'detected() must pause the decoder, not tear the stream down: restarting it costs seconds on a phone.'
+        );
+
+        // pause()/resume() call through to the wrapper, and the restart event
+        // resumes.
+        $this->assertStringContainsString('scanner.pauseScanner()', $field);
+        $this->assertStringContainsString('scanner.resumeScanner()', $field);
+
+        $restartAt = strpos($field, 'async restartCameraIfWanted()');
+        $this->assertNotFalse($restartAt);
+        $this->assertStringContainsString('await this.resume()', substr($field, $restartAt));
+
+        // The user's own camera button still releases the device.
+        $this->assertStringContainsString('stopScanner()', $field);
+    }
 }

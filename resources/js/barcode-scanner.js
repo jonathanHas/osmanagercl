@@ -7,7 +7,7 @@
  *
  * Global: window.BarcodeScanner
  */
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
 
 let scanner = null;
 
@@ -80,9 +80,55 @@ export async function stopScanner() {
     }
 }
 
+/**
+ * Freeze the decoder on the frame it just read, without closing the stream.
+ *
+ * Stopping and restarting costs one to three seconds on a phone: the restart
+ * re-enumerates cameras, asks for the stream again and re-initialises the
+ * decoder. Pausing costs nothing to undo, which is what makes scanning a
+ * delivery item-by-item feel continuous. `pause(true)` also freezes the video
+ * element, so the shopper sees the frame that was captured rather than a live
+ * picture that is no longer being read.
+ *
+ * @returns {boolean} whether it actually paused
+ */
+export function pauseScanner() {
+    try {
+        if (scanner && scanner.getState() === Html5QrcodeScannerState.SCANNING) {
+            scanner.pause(true);
+
+            return true;
+        }
+    } catch (e) { /* not in a state that can pause */ }
+
+    return false;
+}
+
+/**
+ * Unfreeze the decoder. The stream was never closed, so this is immediate.
+ *
+ * @returns {boolean} whether it actually resumed
+ */
+export function resumeScanner() {
+    try {
+        if (scanner && scanner.getState() === Html5QrcodeScannerState.PAUSED) {
+            scanner.resume();
+
+            return true;
+        }
+    } catch (e) { /* not in a state that can resume */ }
+
+    return false;
+}
+
+/**
+ * True while a stream is open — including while paused: the library's own
+ * `isScanning` flag is set on start and cleared on stop, and pause() does not
+ * touch it.
+ */
 export function isRunning() {
     return scanner !== null && scanner.isScanning;
 }
 
 // Register on window for production compatibility
-window.BarcodeScanner = { scanFile, startScanner, stopScanner, isRunning };
+window.BarcodeScanner = { scanFile, startScanner, stopScanner, pauseScanner, resumeScanner, isRunning };
