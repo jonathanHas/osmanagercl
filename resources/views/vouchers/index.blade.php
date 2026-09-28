@@ -7,6 +7,9 @@
             </h2>
             @if ($canManage)
                 <div class="flex gap-2 text-sm">
+                    @if ($exceptionCount > 0)
+                        <a href="{{ route('vouchers.exceptions') }}" class="text-red-600 hover:text-red-800 font-medium">Till exceptions ({{ $exceptionCount }})</a>
+                    @endif
                     <a href="{{ route('vouchers.generate') }}" class="text-blue-600 hover:text-blue-800">Generate</a>
                     <a href="{{ route('vouchers.list') }}" class="text-blue-600 hover:text-blue-800">All vouchers</a>
                 </div>
@@ -122,9 +125,37 @@
                     <div class="py-2">
                         <span class="text-5xl sm:text-6xl font-bold text-green-700" x-text="'€' + balance.toFixed(2)"></span>
                     </div>
+                    <p class="text-xs text-gray-500">Redeem at the till: scan this voucher, then pay with the Voucher tender.</p>
 
-                    <div class="border-t pt-4 mt-2">
-                        <p class="text-sm text-gray-500 mb-2">Deduct amount:</p>
+                    <!-- History: till redemptions show as "Till #N" -->
+                    <div x-show="history.length" class="text-left border-t mt-3 pt-3">
+                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">History</p>
+                        <ul class="divide-y divide-gray-100 text-sm">
+                            <template x-for="(t, i) in history" :key="i">
+                                <li class="flex items-center justify-between py-1.5 gap-3">
+                                    <div class="min-w-0">
+                                        <p class="text-gray-800" x-text="t.label"></p>
+                                        <p class="text-xs text-gray-500 truncate" x-text="when(t.at) + ' · ' + t.user"></p>
+                                    </div>
+                                    <div class="text-right whitespace-nowrap">
+                                        <p class="font-medium"
+                                           :class="t.amount > 0 ? 'text-green-700' : (t.amount < 0 ? 'text-blue-700' : 'text-gray-400')"
+                                           x-text="money(t.amount)"></p>
+                                        <p class="text-xs text-gray-500" x-text="'bal €' + Number(t.balance_after).toFixed(2)"></p>
+                                    </div>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+
+                    <div class="flex gap-2 justify-center mt-4" x-show="!manualOpen">
+                        <button @click="manualOpen = true"
+                                class="px-4 py-3 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg font-medium touch-manipulation">Manual deduct</button>
+                        <button @click="reset()" class="px-4 py-3 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium touch-manipulation">Done</button>
+                    </div>
+
+                    <div class="border-t pt-4 mt-4" x-show="manualOpen">
+                        <p class="text-sm text-gray-500 mb-2">Manual deduct (only if the till could not take the voucher):</p>
                         <div class="flex items-center justify-center gap-2 mb-3">
                             <span class="text-2xl font-bold text-gray-700">€</span>
                             <input type="number"
@@ -168,6 +199,27 @@
                     <p class="text-sm font-mono text-gray-500 mb-2" x-text="code"></p>
                     <p class="text-2xl font-bold text-gray-700">Voucher exhausted</p>
                     <p class="text-sm text-gray-500 mt-1">€0.00 remaining</p>
+
+                    <!-- History: till redemptions show as "Till #N" -->
+                    <div x-show="history.length" class="text-left border-t mt-3 pt-3">
+                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">History</p>
+                        <ul class="divide-y divide-gray-100 text-sm">
+                            <template x-for="(t, i) in history" :key="i">
+                                <li class="flex items-center justify-between py-1.5 gap-3">
+                                    <div class="min-w-0">
+                                        <p class="text-gray-800" x-text="t.label"></p>
+                                        <p class="text-xs text-gray-500 truncate" x-text="when(t.at) + ' · ' + t.user"></p>
+                                    </div>
+                                    <div class="text-right whitespace-nowrap">
+                                        <p class="font-medium"
+                                           :class="t.amount > 0 ? 'text-green-700' : (t.amount < 0 ? 'text-blue-700' : 'text-gray-400')"
+                                           x-text="money(t.amount)"></p>
+                                        <p class="text-xs text-gray-500" x-text="'bal €' + Number(t.balance_after).toFixed(2)"></p>
+                                    </div>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
                     <button @click="reset()" class="mt-4 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium touch-manipulation">Scan next</button>
                 </div>
             </div>
@@ -187,6 +239,8 @@
                 balance: 0,
                 startingBalance: '',
                 deductAmount: '',
+                history: [],
+                manualOpen: false,
                 keyboardEnabled: false,
                 feedback: null,
                 feedbackSuccess: true,
@@ -305,6 +359,8 @@
                     this.loading = true;
                     this.feedback = null;
                     this.mode = 'idle';
+                    this.history = [];
+                    this.manualOpen = false;
 
                     try {
                         const response = await fetch('{{ route("vouchers.lookup") }}', {
@@ -316,6 +372,7 @@
                             body: JSON.stringify({ code }),
                         });
                         const data = await response.json();
+                        this.history = data.history || [];
 
                         if (!data.found || data.status === 'inactive') {
                             // Unknown or not-yet-issued → offer to activate
@@ -389,6 +446,8 @@
                             this.balance = Number(data.new_balance);
                             this.flash('Deducted. New balance €' + this.balance.toFixed(2), true);
                             this.deductAmount = '';
+                            this.manualOpen = false;
+                            this.refreshHistory();
                             if (data.status === 'exhausted') {
                                 this.mode = 'exhausted';
                             }
@@ -407,6 +466,35 @@
                     }
                 },
 
+                // Re-read the history after a manual deduct without disturbing the screen.
+                async refreshHistory() {
+                    try {
+                        const response = await fetch('{{ route("vouchers.lookup") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                            },
+                            body: JSON.stringify({ code: this.code.trim() }),
+                        });
+                        const data = await response.json();
+                        this.history = data.history || [];
+                    } catch (error) {
+                        console.error('History refresh error:', error);
+                    }
+                },
+
+                when(iso) {
+                    if (!iso) return '';
+                    return new Date(iso).toLocaleString('en-IE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+                },
+
+                money(amount) {
+                    const n = Number(amount);
+                    if (n === 0) return '—';
+                    return (n > 0 ? '+' : '−') + '€' + Math.abs(n).toFixed(2);
+                },
+
                 flash(message, success) {
                     this.feedback = message;
                     this.feedbackSuccess = success;
@@ -419,6 +507,8 @@
                     this.balance = 0;
                     this.startingBalance = '';
                     this.deductAmount = '';
+                    this.history = [];
+                    this.manualOpen = false;
                     this.scanner.lastScannedBarcode = '';
                     this.$nextTick(() => this.$refs.codeInput.focus());
                     this.restartCameraIfActive();

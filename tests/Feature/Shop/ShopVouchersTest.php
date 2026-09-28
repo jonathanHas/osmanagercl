@@ -6,8 +6,10 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\Voucher;
+use App\Models\VoucherTillRedemption;
 use App\Models\VoucherTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
 
 /**
@@ -21,6 +23,14 @@ use Tests\TestCase;
 class ShopVouchersTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // lookup() would otherwise try the till sync against the test POS connection.
+        Config::set('vouchers.sync.on_lookup', false);
+    }
 
     /**
      * @param  array<int, string>  $permissions
@@ -117,11 +127,34 @@ class ShopVouchersTest extends TestCase
         ]);
         $issue->forceFill(['created_at' => now()->subDays(3)])->save();
 
-        $voucher->transactions()->create([
+        $deduct = $voucher->transactions()->create([
             'type' => VoucherTransaction::TYPE_DEDUCT,
             'amount' => 7.50,
             'balance_after' => 42.50,
             'user_id' => $employee->id,
+        ]);
+        $deduct->forceFill(['created_at' => now()->subDay()])->save();
+
+        // Redeemed at the till (cycle 28): no user, the ticket number instead.
+        $till = $voucher->transactions()->create([
+            'type' => VoucherTransaction::TYPE_DEDUCT,
+            'source' => VoucherTransaction::SOURCE_TILL,
+            'amount' => 10,
+            'balance_after' => 32.50,
+            'note' => 'Till #430025',
+            'user_id' => null,
+        ]);
+        VoucherTillRedemption::create([
+            'pos_ticket_id' => 'ticket-1',
+            'pos_product_id' => 'product-1',
+            'voucher_code' => $voucher->code,
+            'ticket_number' => 430025,
+            'sold_at' => now(),
+            'voucher_tender' => 10,
+            'amount_deducted' => 10,
+            'status' => VoucherTillRedemption::STATUS_APPLIED,
+            'voucher_id' => $voucher->id,
+            'voucher_transaction_id' => $till->id,
         ]);
 
         $response = $this->actingAs($employee)
@@ -139,16 +172,23 @@ class ShopVouchersTest extends TestCase
 
         $this->assertNotNull($response->json('issued_at'));
 
-        $this->assertSame('Redeemed', $response->json('history.0.label'));
-        $this->assertSame(-7.5, $response->json('history.0.amount'));
-        $this->assertSame('Maya Jensen', $response->json('history.0.user'));
+        $this->assertSame('Redeemed at till', $response->json('history.0.label'));
+        $this->assertSame('Till #430025', $response->json('history.0.user'));
+        $this->assertSame('till', $response->json('history.0.source'));
+        $this->assertSame(430025, $response->json('history.0.ticket_number'));
 
-        $this->assertSame('Issued', $response->json('history.1.label'));
+        $this->assertSame('Redeemed', $response->json('history.1.label'));
+        $this->assertSame(-7.5, $response->json('history.1.amount'));
+        $this->assertSame('Maya Jensen', $response->json('history.1.user'));
+        $this->assertSame('manual', $response->json('history.1.source'));
+        $this->assertNull($response->json('history.1.ticket_number'));
+
+        $this->assertSame('Issued', $response->json('history.2.label'));
         // json_encode writes a whole float as `50`, so it decodes as an int here.
         // Harmless in the browser, where Number(50) and 50.0 are the same value,
         // but assertSame would be asserting the JSON artefact rather than the amount.
-        $this->assertEquals(50.0, $response->json('history.1.amount'));
-        $this->assertSame('Tom Byrne', $response->json('history.1.user'));
+        $this->assertEquals(50.0, $response->json('history.2.amount'));
+        $this->assertSame('Tom Byrne', $response->json('history.2.user'));
     }
 
     public function test_lookup_reports_an_unknown_code(): void

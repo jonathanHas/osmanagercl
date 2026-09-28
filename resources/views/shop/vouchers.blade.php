@@ -53,7 +53,7 @@
                             <div class="shop-row">
                                 <div class="shop-row__main">
                                     <span class="shop-row__title" x-text="t.label"></span>
-                                    <span class="shop-row__meta" x-text="when(t.at) + ' · ' + t.user"></span>
+                                    <span class="shop-row__meta" x-text="when(t.at) + ' · ' + who(t)"></span>
                                 </div>
                                 <div class="shop-row__aside">
                                     <span class="shop-row__qty" x-text="t.amount ? signed(t.amount) : ''"></span>
@@ -62,9 +62,15 @@
                         </template>
                     </div>
                 </section>
+
+                {{-- Vouchers are redeemed at the till (scan, then the Voucher tender);
+                     the numpad is the fallback, one tap away. --}}
+                <button class="shop-btn shop-btn--ghost" type="button"
+                        x-show="mode === 'active' && ! manualOpen" x-cloak
+                        @click="manualOpen = true">Manual deduct</button>
             </div>
 
-            <div class="shop-stack" x-show="mode === 'active' || activating" x-cloak>
+            <div class="shop-stack" x-show="(mode === 'active' && manualOpen) || activating" x-cloak>
                 <section class="shop-card">
                     <div class="shop-numpad">
                         <div class="shop-numpad__display">
@@ -81,13 +87,13 @@
                     <p class="shop-meta" x-show="mode === 'active'">Remaining after: <strong x-text="format(remaining)"></strong></p>
                 </section>
 
-                <button class="shop-btn shop-btn--ghost" type="button" x-show="mode === 'active'" @click="useFull()">Use full balance</button>
+                <button class="shop-btn shop-btn--ghost" type="button" x-show="mode === 'active' && manualOpen" @click="useFull()">Use full balance</button>
             </div>
         </div>
 
-        <div class="shop-actions" x-show="mode === 'active' || activating" x-cloak>
+        <div class="shop-actions" x-show="(mode === 'active' && manualOpen) || activating" x-cloak>
             <button class="shop-btn shop-btn--primary shop-btn--lg" type="button"
-                    x-show="mode === 'active'"
+                    x-show="mode === 'active' && manualOpen"
                     :disabled="! canDeduct || busy" @click="deduct()" x-text="deductLabel"></button>
             @if ($canActivate)
                 <button class="shop-btn shop-btn--primary shop-btn--lg" type="button"

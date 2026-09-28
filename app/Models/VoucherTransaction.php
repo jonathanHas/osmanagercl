@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class VoucherTransaction extends Model
 {
@@ -18,9 +19,17 @@ class VoucherTransaction extends Model
 
     const TYPE_ACTIVATE = 'activate';     // admin re-enabled a disabled voucher
 
+    /**
+     * Where a transaction came from.
+     */
+    const SOURCE_MANUAL = 'manual'; // a person on the office or shop screen
+
+    const SOURCE_TILL = 'till';     // the uniCenta Voucher tender, via vouchers:sync-till
+
     protected $fillable = [
         'voucher_id',
         'type',
+        'source',
         'amount',
         'balance_after',
         'note',
@@ -40,5 +49,10 @@ class VoucherTransaction extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function tillRedemption(): HasOne
+    {
+        return $this->hasOne(VoucherTillRedemption::class, 'voucher_transaction_id');
     }
 }

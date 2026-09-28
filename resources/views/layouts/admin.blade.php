@@ -315,6 +315,14 @@
                                 </svg>
                                 Generate
                             </a>
+
+                            <a href="{{ route('vouchers.exceptions') }}"
+                               class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('vouchers.exceptions') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                                <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.664-.833-2.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                                </svg>
+                                Till exceptions
+                            </a>
                             @endif
                         </div>
                         @endif
@@ -726,7 +734,10 @@
                         @endif
 
                         <!-- ADMINISTRATION SECTION -->
-                        @if(auth()->user()->can('users.view') || auth()->user()->can('settings.view') || auth()->user()->isAdmin())
+                        {{-- isManager() joined this guard in cycle 27: a manager who holds
+                             neither users.view nor settings.view can still trust and revoke
+                             Shop devices, so the section has something for them. --}}
+                        @if(auth()->user()->can('users.view') || auth()->user()->can('settings.view') || auth()->user()->isAdmin() || auth()->user()->isManager())
                         <div class="px-2 pt-4">
                             <button @click="adminOpen = !adminOpen" 
                                     class="w-full flex items-center justify-between text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-300 py-2">
@@ -745,6 +756,19 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                                 </svg>
                                 Users
+                            </a>
+                            @endif
+
+                            {{-- Shop devices (cycle 27). Guarded by role, not a permission:
+                                 trusting a device is role:manager,admin, so seeing and
+                                 revoking them is the same audience. --}}
+                            @if(auth()->user()->isManager() || auth()->user()->isAdmin())
+                            <a href="{{ route('shop-devices.index') }}"
+                               class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('shop-devices.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                                <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                </svg>
+                                Shop devices
                             </a>
                             @endif
 

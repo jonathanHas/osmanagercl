@@ -34,6 +34,7 @@ class Voucher extends Model
 
     protected $fillable = [
         'code',
+        'pos_product_id',
         'initial_value',
         'current_balance',
         'status',
@@ -48,6 +49,11 @@ class Voucher extends Model
     public function transactions(): HasMany
     {
         return $this->hasMany(VoucherTransaction::class)->latest();
+    }
+
+    public function tillRedemptions(): HasMany
+    {
+        return $this->hasMany(VoucherTillRedemption::class);
     }
 
     public function creator(): BelongsTo

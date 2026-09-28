@@ -155,7 +155,10 @@ export default () => ({
             navigator.vibrate(100);
         }
 
-        // The camera fires repeatedly while the barcode is in frame.
+        // The camera fires repeatedly while the barcode is in frame. The window
+        // is measured from the last detection, and restartCameraIfWanted()
+        // pushes lastAt forward, so after a reopen the same code is ignored for
+        // about 3.5 s in total while a different code is accepted at once.
         const now = Date.now();
         if (text === this.lastCode && now - this.lastAt < 2000) {
             return;
@@ -182,9 +185,17 @@ export default () => ({
     /**
      * Saving refocuses the input, which would otherwise leave the camera dark;
      * reopen it only if the user had it open.
+     *
+     * The item just recorded is usually still under the lens when the camera
+     * comes back about a second later, and the de-duplication window in
+     * detected() is measured from the *original* detection, which by then has
+     * expired. Push lastAt forward so the reopened camera does not read the
+     * same item straight back in. One mechanism, not a second flag: the window
+     * stays wherever detected() left it for any other code.
      */
     restartCameraIfWanted() {
         if (this.cameraWanted && ! this.cameraOpen) {
+            this.lastAt = Date.now() + 1500;
             this.toggleCamera();
         }
     },

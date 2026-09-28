@@ -1,7 +1,9 @@
 /**
  * Shop mode vouchers page.
  *
- * Scan a voucher, read its balance and history, tap an amount, deduct. Every
+ * Scan a voucher, read its balance and history. Vouchers are normally redeemed at
+ * the till (scan the label, pay with the Voucher tender; vouchers:sync-till
+ * deducts it); "Manual deduct" opens the numpad as the fallback. Every
  * endpoint is the office one, whose URL arrives as a data-* attribute on the page
  * root:
  *   - vouchers.lookup   POST  the voucher, its status, balance and history
@@ -25,6 +27,7 @@ export default () => ({
     voucher: null,
     mode: 'idle',
     typed: '',
+    manualOpen: false,
     busy: false,
     toast: null,
     toastTimer: null,
@@ -126,6 +129,7 @@ export default () => ({
             const data = await this.post(this.lookupUrl, { code });
 
             this.typed = '';
+            this.manualOpen = false;
 
             if (data.found) {
                 this.voucher = data;
@@ -209,6 +213,7 @@ export default () => ({
                 this.voucher.status = data.status;
                 this.mode = data.status;
                 this.typed = '';
+                this.manualOpen = false;
                 this.showToast('ok', `Deducted ${this.format(spent)} · ${this.format(data.new_balance)} left`);
                 await this.refresh();
             } else {
@@ -260,6 +265,11 @@ export default () => ({
     /** The design uses a typographic minus, not a hyphen. */
     signed(n) {
         return (n < 0 ? '−' : '+') + this.format(Math.abs(n));
+    },
+
+    /** Who made a history row: the till ticket for till redemptions. */
+    who(t) {
+        return t.source === 'till' ? 'Till #' + t.ticket_number : t.user;
     },
 
     when(iso) {

@@ -70,6 +70,10 @@ return [
         'fruit-veg.waste.rows',
         'fruit-veg.waste.search',
         'fruit-veg.product-image',
+        // The search API hands Shop screens route('products.image', …) as a
+        // product's picture when the POS holds a blob (cycle 27). The route
+        // keeps its own products.view gate.
+        'products.image',
         'labels.dismiss',
         'labels.dismiss-all',
         'labels.print-a4',

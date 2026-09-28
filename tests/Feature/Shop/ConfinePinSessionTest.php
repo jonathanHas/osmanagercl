@@ -67,11 +67,28 @@ class ConfinePinSessionTest extends TestCase
 
     public function test_an_off_list_json_request_is_refused_rather_than_redirected(): void
     {
-        $this->pinUser(['products.view']);
+        $this->pinUser(['settings.view']);
 
-        $this->getJson(route('products.image', 1))
+        $this->getJson(route('settings.index'))
             ->assertForbidden()
             ->assertJson(['message' => 'Confirm your password to use the office.']);
+    }
+
+    /**
+     * Cycle 27. The product search API hands Shop screens
+     * route('products.image', …) as a picture URL whenever the POS holds a
+     * blob, so leaving it off the list cost PIN users their thumbnails on Find
+     * product and the request typeahead. A 200 would need a real blob; what
+     * matters here is that it is not the confinement redirect or 403.
+     */
+    public function test_a_pin_session_may_load_a_product_picture(): void
+    {
+        $this->pinUser(['products.view']);
+
+        $response = $this->get(route('products.image', 1));
+
+        $this->assertNotSame(403, $response->status());
+        $this->assertNotSame(route('password.confirm'), $response->headers->get('Location'));
     }
 
     public function test_an_unnamed_route_is_not_allowed(): void

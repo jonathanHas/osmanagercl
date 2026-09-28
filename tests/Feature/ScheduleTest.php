@@ -50,6 +50,8 @@ class ScheduleTest extends TestCase
             'suppliers:send-daily-sales' => '15 20 * * *',
             'fruit-veg:prune-thumbnails' => '30 5 * * 0',
             'customers:send-statements' => '0 7 1 * *',
+            // Cycle 28: till-driven gift voucher redemption.
+            'vouchers:sync-till' => '* * * * *',
         ];
 
         $actual = $this->scheduled();
@@ -65,7 +67,7 @@ class ScheduleTest extends TestCase
         // A new entry is fine, but it should be added here deliberately rather than
         // appearing by accident — the point of this file is that the schedule is
         // something someone has looked at.
-        $this->assertCount(8, $this->scheduled());
+        $this->assertCount(9, $this->scheduled());
     }
 
     public function test_the_kds_monitor_is_not_scheduled(): void

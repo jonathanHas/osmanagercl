@@ -90,6 +90,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    // Own Shop PIN, with the current password (cycle 27).
+    Route::put('/profile/pin', [ProfileController::class, 'updatePin'])->name('profile.pin.update');
 
     // Shop mode — the simplified shop-floor interface.
     Route::prefix('shop')->name('shop.')->group(function () {
@@ -756,6 +758,16 @@ Route::middleware('auth')->group(function () {
     });
 
     // User Management routes (protected by permissions)
+    // Trusted shop-floor devices and the switch log (cycle 27). Trusting is a
+    // Shop-menu action on the device itself; this is the office half — see it,
+    // revoke it, read who took over which tablet.
+    Route::middleware('role:manager,admin')->group(function () {
+        Route::get('/shop-devices', [\App\Http\Controllers\ShopDeviceAdminController::class, 'index'])
+            ->name('shop-devices.index');
+        Route::post('/shop-devices/{device}/revoke', [\App\Http\Controllers\ShopDeviceAdminController::class, 'revoke'])
+            ->name('shop-devices.revoke');
+    });
+
     Route::prefix('users')->name('users.')->group(function () {
         Route::get('/', [UserManagementController::class, 'index'])
             ->middleware('permission:users.view')
@@ -766,9 +778,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/', [UserManagementController::class, 'store'])
             ->middleware('permission:users.create')
             ->name('store');
-        Route::get('/{user}', [UserManagementController::class, 'show'])
-            ->middleware('permission:users.view')
-            ->name('show');
         Route::get('/{user}/edit', [UserManagementController::class, 'edit'])
             ->middleware('permission:users.edit')
             ->name('edit');
@@ -1203,6 +1212,9 @@ Route::middleware('auth')->group(function () {
         Route::get('vouchers/print', [VoucherController::class, 'print'])->name('vouchers.print');
         Route::post('vouchers/print', [VoucherController::class, 'printZebra'])->name('vouchers.print.send');
         Route::get('vouchers/list', [VoucherController::class, 'list'])->name('vouchers.list');
+        Route::get('vouchers/exceptions', [VoucherController::class, 'exceptions'])->name('vouchers.exceptions');
+        Route::post('vouchers/exceptions/{redemption}/reviewed', [VoucherController::class, 'markReviewed'])
+            ->name('vouchers.exceptions.reviewed');
         Route::get('vouchers/{voucher}/transactions', [VoucherController::class, 'transactions'])->name('vouchers.transactions');
 
         // Admin-only status management

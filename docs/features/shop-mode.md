@@ -82,7 +82,10 @@ number of dots and `pin_set_at` for the "PIN set" badge. `pin_hash` is in the
 model's `$hidden`. `App\Rules\NotTrivialPin` rejects `1111`, `1234`, `0123`,
 `1212` and the like.
 
-Self-service PIN changes on the profile page are not built yet.
+Staff can also set, change or remove their own PIN on `/profile` under **Shop
+PIN** (`PUT /profile/pin`, `ProfileController::updatePin`). It requires their
+current password — a PIN is the weaker credential, so it is minted by the
+stronger one — and the section only renders for a role that can use a PIN.
 
 ### Signing in
 
@@ -116,7 +119,10 @@ Confirming the password calls `session()->forget('auth_via')`, and from then on
 it is an ordinary session.
 
 The allow-list is the Shop itself plus every office endpoint a Shop screen
-calls. `ConfinePinSessionTest::test_every_route_a_shop_view_names_is_on_the_allow_list`
+calls. `products.image` is on it (cycle 27): `ProductSearchService::imageUrl()`
+hands Shop screens that URL as a product's picture whenever the POS holds a
+blob, and leaving it off cost PIN users their thumbnails on Find product and
+the request typeahead. The route keeps its own `products.view` gate. `ConfinePinSessionTest::test_every_route_a_shop_view_names_is_on_the_allow_list`
 greps `resources/views/shop/**`, the Shop components, the Shop layout and
 `resources/js/shop/**` for `route('…')` and fails the suite if one is missing —
 so a new Shop screen that calls a new endpoint breaks a test rather than 403-ing
@@ -144,18 +150,29 @@ the Locked screen needs no JavaScript.
 ### The audit trail
 
 `shop_switch_logs` records one row per change of hands: `trust`, `switch`,
-`switch_failed`, `switch_blocked`, `lock`, with the device, the user and the IP.
+`switch_failed`, `switch_blocked`, `lock`, `revoke`, with the device, the user
+and the IP. The last 100 rows are shown on the Shop devices page.
 The Laravel-side audit fields elsewhere (waste, harvest, labels, requests)
 record `auth()->id()` and become correct once the right person is signed in.
 The POS `deliveriesScanItems` table has no "scanned by" column, so there is
 nothing to attribute there.
 
-There is no log viewer yet; read the table directly.
+### The Shop devices page
 
-### Revoking a device
+`/shop-devices` (`role:manager,admin`, in the admin sidebar under
+Administration) lists every trusted device — name, who trusted it, who used it
+last and when, active or revoked — and, below that, the last 100 switch-log
+rows with human labels (Trusted, Switched, Wrong PIN, Locked out, Locked,
+Revoked).
 
-Not yet a page. Set `revoked_at` on the `shop_devices` row and the device stops
-being trusted immediately (`ShopDevice::findByToken()` filters on it).
+**Revoking** is a POST from that page. It sets `revoked_at`, writes a `revoke`
+log row, and the device stops being trusted on its *next* request
+(`ShopDevice::findByToken()` filters on `revoked_at`). It does **not** sign out
+whoever is currently on the device — they keep their session until the screen
+locks or the idle timer fires. There is no undo button because there does not
+need to be one: a manager trusts the device again from the Shop menu on the
+device itself. Trusting is deliberately not an office action — the point is to
+mark *this* hardware.
 
 ### Deploying this
 

@@ -52,6 +52,9 @@
                             <td class="px-4 py-2 text-gray-400 text-xs">{{ $tx->created_at?->format('d M Y H:i') }}</td>
                             <td class="px-4 py-2">
                                 <span class="text-xs px-2 py-0.5 rounded {{ $badge }}">{{ ucfirst($tx->type) }}</span>
+                                @if ($tx->source === 'till')
+                                    <span class="text-xs px-1.5 py-0.5 rounded bg-purple-800/50 text-purple-300">till</span>
+                                @endif
                             </td>
                             <td class="px-4 py-2 text-right {{ $amountClass }}">
                                 @if ($sign !== null)
@@ -61,7 +64,13 @@
                                 @endif
                             </td>
                             <td class="px-4 py-2 text-right">€{{ number_format($tx->balance_after, 2) }}</td>
-                            <td class="px-4 py-2 text-gray-300">{{ $tx->user?->name ?? '—' }}</td>
+                            <td class="px-4 py-2 text-gray-300">
+                                @if ($tx->source === 'till')
+                                    Till #{{ $tx->tillRedemption?->ticket_number ?? '?' }}
+                                @else
+                                    {{ $tx->user?->name ?? '—' }}
+                                @endif
+                            </td>
                             <td class="px-4 py-2 text-gray-400 text-xs">{{ $tx->note ?? '' }}</td>
                         </tr>
                     @empty

@@ -76,3 +76,12 @@ Schedule::command('customers:send-statements')
     ->monthlyOn(1, '07:00')
     ->onOneServer()
     ->withoutOverlapping(30);
+
+// Gift vouchers redeemed at the till: deduct each voucher line's paperin tender.
+// The voucher lookup screens also run this sync (throttled, see
+// VoucherTillSyncService::syncIfDue), so a lookup is never more than a few
+// seconds stale even if the scheduler is not running.
+Schedule::command('vouchers:sync-till')
+    ->everyMinute()
+    ->onOneServer()
+    ->withoutOverlapping(5);

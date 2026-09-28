@@ -144,21 +144,26 @@ Payment details for each receipt.
 | RECEIPT | string | Foreign key to RECEIPTS.ID |
 | PAYMENT | string | Payment type |
 | TOTAL | decimal | Payment amount |
-| TRANSID | string | Transaction ID |
+| TRANSID | string | Transaction ID (a random 12-digit id the till generates for every payment type; not a voucher number) |
 | RETURNMSG | bytea | Return message |
-| TENDERED | decimal | Amount tendered |
+| TENDERED | decimal | Amount tendered (0 for `paperin`) |
 | CARDNAME | string | Card type if applicable |
-| VOUCHER | string | Voucher ID if used |
+| NOTES | text | Free-text notes |
 
-**Payment Types:**
+There is no `VOUCHER` column: which gift voucher was used is identified by its hidden product line on the ticket (see [Voucher Management](../features/voucher-management.md#till-redemption-unicenta)).
+
+**Payment Types** (as seen in the live table):
 - `cash` - Cash payment
 - `cashrefund` - Cash refund
+- `cashout` - Cash out
 - `magcard` - Card payment
 - `magcardrefund` - Card refund
+- `bank` - Bank transfer
+- `cheque` - Cheque
 - `debt` - Account/credit
 - `debtpaid` - Account payment
 - `free` - Complimentary
-- `voucher` - Voucher payment
+- `paperin` - Gift voucher redemption (the till's Voucher tender; amount in `TOTAL`)
 
 ### TICKETS
 Line items for receipts.

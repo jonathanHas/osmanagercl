@@ -99,6 +99,8 @@ export default () => ({
             await this.load();
             this.showToast('ok', `Added: ${data.product?.name ?? code}`);
             this.announceDone();
+            // Detecting a code stops the camera; bring it back for the next item.
+            window.dispatchEvent(new CustomEvent('shop-scan-saved'));
         } catch (e) {
             this.announceError('Could not add');
         } finally {

@@ -588,7 +588,8 @@ Interactive review interface with inline editing and approval workflow.
 Gift-voucher system with scannable barcodes, server-tracked balances and a full audit trail, redeemable at the till.
 - **Unique Barcodes**: App-generated, randomised, non-sequential CODE-128 codes (`GV` + 10 chars, CSPRNG) — printable on the Zebra small label (56×30mm)
 - **Lifecycle**: `inactive` (printed, not sold) → `active` (issued with a balance) → `exhausted`; plus admin `deactivated` (balance preserved)
-- **Till Redemption**: Mobile/tablet screen reusing the shared camera scanner (same as `/stocking`), with photo-decode and manual-entry fallbacks
+- **Till Redemption** (2026-09-27): Redeemed in the normal uniCenta sale — scan the voucher label (a hidden €0.00 product whose name shows the balance), pay with the till's Voucher tender; `vouchers:sync-till` (every minute + on lookup) deducts it automatically and logs `Till #N`. Anything odd (over-tender, no voucher tender, inactive voucher, refund) lands on the manager **Till exceptions** page (`/vouchers/exceptions`)
+- **Manual Fallback**: Mobile/tablet screen reusing the shared camera scanner (same as `/stocking`), with photo-decode and manual-entry fallbacks; leads with balance + history, manual deduct one tap away
 - **Double-Spend Safe**: `DB::transaction` + `lockForUpdate()` row locking re-validates the balance under lock; no overspend across concurrent tills
 - **Full Audit Log**: `voucher_transactions` records every issue/deduct/deactivate/activate with amount, balance-after, optional note, user and timestamp
 - **Admin Controls**: Edit modal to deactivate/reactivate a voucher (with reason); admin-only
@@ -955,7 +956,9 @@ The simplified, touch-first interface for shop-floor staff at `/shop` — the sa
 - **PIN sign-in**: Shop-floor staff take over a trusted device with a 4–6 digit PIN (screens 16–18: Switch user, Enter PIN, Locked)
 - **Confined**: A PIN session reaches the Shop and nothing else; the office asks for the password, which then ends the confinement
 - **Idle lock**: A trusted device locks itself after 5 minutes of no input and shows a clock; a personal phone never locks
-- **Audited**: `shop_switch_logs` records every trust, switch, failed PIN, lockout and lock
+- **Audited**: `shop_switch_logs` records every trust, switch, failed PIN, lockout, lock and revoke
+- **Managed**: `/shop-devices` lists trusted devices and the switch log, and revokes a device that has walked off
+- **Self-service**: Staff set or remove their own PIN on the profile page, with their password
 
 📖 [Shop Mode Documentation](./features/shop-mode.md)
 

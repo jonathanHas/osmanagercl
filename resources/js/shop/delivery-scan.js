@@ -11,7 +11,9 @@
  * zero quantity, which records nothing, a prompt shows the product with what has
  * been scanned so far, the invoice figure and the stock, and only "Add N" records
  * it. Scanning an outer/case barcode adds whole cases, which the endpoint works
- * out.
+ * out. Detecting a code stops the camera, so `shop-scan-saved` reopens it once
+ * the prompt has closed — never while it is open, or the code still in frame
+ * would confirm the prompt and silently add another unit.
  *
  * Screen 05 v2: a row is a button. Tapping it opens a correction card beside the
  * list, because a button cannot hold the stepper's own buttons. Sort is a single
@@ -203,6 +205,7 @@ export default () => mix(productImages(), {
 
             if (! data.success || ! data.product) {
                 this.announceError(`Product not found for ${code}`);
+                this.announceSaved();
 
                 return;
             }
@@ -274,6 +277,7 @@ export default () => mix(productImages(), {
             await this.load();
             this.reportRow(this.latest);
             this.announceDone();
+            this.announceSaved();
         } catch (e) {
             this.showToast('bad', 'Not saved, try again');
         } finally {
@@ -284,6 +288,7 @@ export default () => mix(productImages(), {
     cancelPending() {
         this.pending = null;
         this.announceDone();
+        this.announceSaved();
     },
 
     /**
@@ -428,5 +433,15 @@ export default () => mix(productImages(), {
 
     announceError(message) {
         window.dispatchEvent(new CustomEvent('shop-scan-error', { detail: message }));
+    },
+
+    /**
+     * Detecting a code stops the camera; bring it back once the prompt has
+     * closed. Deliberately not called when a lookup opens the prompt: the code
+     * is usually still under the lens, and a second detection would commit the
+     * open prompt and reopen it for one more unit that nobody scanned.
+     */
+    announceSaved() {
+        window.dispatchEvent(new CustomEvent('shop-scan-saved'));
     },
 });

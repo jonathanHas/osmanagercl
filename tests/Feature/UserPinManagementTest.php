@@ -179,6 +179,22 @@ class UserPinManagementTest extends TestCase
             ->assertSee('PIN set');
     }
 
+    /**
+     * Cycle 27. `GET /users/{user}` used to route to UserManagementController@show,
+     * which does not exist — it 500'd for anyone who reached it, and nothing
+     * linked to it. The route is gone; this pins that down.
+     *
+     * 405, not 404: the URI still exists for PATCH and DELETE, so Laravel
+     * rejects the verb rather than the path. What matters is that it is no
+     * longer a 500.
+     */
+    public function test_there_is_no_user_show_page(): void
+    {
+        $user = User::factory()->create(['role_id' => $this->role('employee')->id]);
+
+        $this->actingAs($this->admin())->get('/users/'.$user->id)->assertStatus(405);
+    }
+
     public function test_the_pin_hash_is_never_serialised(): void
     {
         $employee = User::factory()->withPin()->create(['role_id' => $this->role('employee')->id]);

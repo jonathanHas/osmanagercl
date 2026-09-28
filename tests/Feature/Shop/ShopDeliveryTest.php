@@ -541,6 +541,41 @@ class ShopDeliveryTest extends TestCase
             ->assertSee('This delivery is completed');
     }
 
+    /**
+     * Cycle 29. A camera scan stops the camera, so the page must dispatch
+     * `shop-scan-saved` to bring it back — otherwise staff press the camera
+     * button before every item.
+     *
+     * What this pins is the *ordering* rule, which is the part that is easy to
+     * undo by accident: the restart must not be dispatched while the quantity
+     * prompt is open. If it were, the barcode still under the lens would
+     * confirm the prompt and silently record a unit nobody scanned. A source
+     * assertion in the cycle-14 style, because the behaviour is camera-only and
+     * cannot be driven from a feature test.
+     */
+    public function test_the_delivery_scan_page_reopens_the_camera_but_not_while_the_prompt_is_open(): void
+    {
+        $js = file_get_contents(resource_path('js/shop/delivery-scan.js'));
+
+        $this->assertStringContainsString("'shop-scan-saved'", $js);
+
+        // Three restarts: a committed add, a cancelled prompt, a code that is
+        // not in the delivery.
+        $this->assertSame(3, substr_count($js, 'this.announceSaved();'));
+
+        // ...and none of them between the prompt being built and its own
+        // announceDone(), which is the lookup that opens the prompt.
+        $promptAt = strpos($js, 'this.pending = {');
+        $this->assertNotFalse($promptAt);
+        $doneAt = strpos($js, 'this.announceDone();', $promptAt);
+        $this->assertNotFalse($doneAt);
+        $this->assertStringNotContainsString(
+            'announceSaved',
+            substr($js, $promptAt, $doneAt - $promptAt),
+            'The camera must not reopen while the quantity prompt is open: the code still in frame would confirm it and add an extra unit.'
+        );
+    }
+
     public function test_home_tile_links_to_the_shop_delivery_list(): void
     {
         $response = $this->actingAs($this->employee())

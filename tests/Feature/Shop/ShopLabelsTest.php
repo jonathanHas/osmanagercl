@@ -437,4 +437,18 @@ class ShopLabelsTest extends TestCase
             count($rows)
         );
     }
+
+    /**
+     * Cycle 29. Print labels has the same scan-and-next rhythm as Stock scan,
+     * so it dispatches the same restart after a successful add. There is no
+     * two-step prompt here, so no ordering rule to pin — only that the page
+     * asks for the camera back at all.
+     */
+    public function test_the_labels_page_reopens_the_camera_after_an_add(): void
+    {
+        $this->assertStringContainsString(
+            "new CustomEvent('shop-scan-saved')",
+            file_get_contents(resource_path('js/shop/labels.js'))
+        );
+    }
 }

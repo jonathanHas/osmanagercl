@@ -5,6 +5,10 @@
             <a href="{{ route('vouchers.list') }}" class="text-blue-400 hover:text-blue-300 text-sm">Back to vouchers</a>
         </div>
 
+        @if (session('warning'))
+            <div class="mb-4 rounded px-4 py-3 bg-yellow-700 text-white text-sm">{{ session('warning') }}</div>
+        @endif
+
         @if ($labels->isEmpty())
             <div class="bg-gray-800 rounded p-6 text-center text-gray-400">No vouchers selected to print.</div>
         @else

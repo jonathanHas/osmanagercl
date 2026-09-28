@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Voucher;
+use App\Models\VoucherTillRedemption;
 use App\Models\VoucherTransaction;
+use App\Services\VoucherPosProductService;
+use App\Services\VoucherTillSyncService;
 use App\Services\ZebraPrintService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -16,14 +19,20 @@ class VoucherController extends Controller
 {
     public function __construct(
         protected ZebraPrintService $zebraPrint,
+        protected VoucherPosProductService $posProducts,
+        protected VoucherTillSyncService $tillSync,
     ) {}
 
     /**
      * The till screen — scan, activate and redeem vouchers.
      */
-    public function index(): View
+    public function index(Request $request): View
     {
-        return view('vouchers.index');
+        $exceptionCount = $request->user()->can('vouchers.manage')
+            ? VoucherTillRedemption::exceptions()->unreviewed()->count()
+            : 0;
+
+        return view('vouchers.index', compact('exceptionCount'));
     }
 
     /**
@@ -51,7 +60,7 @@ class VoucherController extends Controller
      */
     public function transactions(Voucher $voucher): View
     {
-        $voucher->load(['transactions.user', 'creator']);
+        $voucher->load(['transactions.user', 'transactions.tillRedemption', 'creator']);
 
         return view('vouchers.transactions', compact('voucher'));
     }
@@ -61,6 +70,9 @@ class VoucherController extends Controller
      */
     public function lookup(Request $request): JsonResponse
     {
+        // Pick up till redemptions first so the balance shown is current.
+        $this->tillSync->syncIfDue();
+
         $data = $request->validate([
             'code' => ['required', 'string', 'max:64'],
         ]);
@@ -111,14 +123,16 @@ class VoucherController extends Controller
     private function history(Voucher $voucher): array
     {
         return $voucher->transactions()
-            ->with('user')
+            ->with(['user', 'tillRedemption'])
             ->limit(20)
             ->get()
             ->map(fn (VoucherTransaction $t) => [
                 'type' => $t->type,
                 'label' => match ($t->type) {
                     VoucherTransaction::TYPE_ISSUE => 'Issued',
-                    VoucherTransaction::TYPE_DEDUCT => 'Redeemed',
+                    VoucherTransaction::TYPE_DEDUCT => $t->source === VoucherTransaction::SOURCE_TILL
+                        ? 'Redeemed at till'
+                        : 'Redeemed',
                     VoucherTransaction::TYPE_DEACTIVATE => 'Deactivated',
                     VoucherTransaction::TYPE_ACTIVATE => 'Reactivated',
                     default => ucfirst($t->type),
@@ -129,8 +143,12 @@ class VoucherController extends Controller
                     default => 0.0,
                 },
                 'balance_after' => (float) $t->balance_after,
-                'user' => $t->user?->name ?? 'Office',
+                'user' => $t->source === VoucherTransaction::SOURCE_TILL
+                    ? 'Till #'.($t->tillRedemption?->ticket_number ?? '?')
+                    : ($t->user?->name ?? 'Office'),
                 'at' => $t->created_at?->toIso8601String(),
+                'source' => $t->source,
+                'ticket_number' => $t->tillRedemption?->ticket_number,
             ])
             ->all();
     }
@@ -177,6 +195,10 @@ class VoucherController extends Controller
                 'current_balance' => (float) $voucher->current_balance,
             ];
         });
+
+        if ($result['success']) {
+            $this->syncPosProduct($data['code']);
+        }
 
         return response()->json($result, $result['success'] ? 200 : 422);
     }
@@ -241,6 +263,10 @@ class VoucherController extends Controller
                 'new_balance' => (float) $voucher->current_balance,
             ];
         });
+
+        if ($result['success']) {
+            $this->syncPosProduct($data['code']);
+        }
 
         return response()->json($result, $result['success'] ? 200 : 422);
     }
@@ -318,6 +344,10 @@ class VoucherController extends Controller
             return ['success' => true, 'message' => $successMessage, 'status' => $locked->status];
         });
 
+        if ($result['success']) {
+            $this->syncPosProduct($voucher->code);
+        }
+
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
@@ -351,7 +381,16 @@ class VoucherController extends Controller
             }
         });
 
-        return redirect()->route('vouchers.print', ['ids' => implode(',', $ids)]);
+        // Each printed label needs its POS product, or the till says "product not found".
+        $summary = $this->posProducts->syncMany(Voucher::whereIn('id', $ids)->get());
+
+        $redirect = redirect()->route('vouchers.print', ['ids' => implode(',', $ids)]);
+
+        if ($summary['failed'] > 0) {
+            $redirect->with('warning', "{$summary['failed']} voucher products could not be created on the till; run vouchers:sync-pos-products");
+        }
+
+        return $redirect;
     }
 
     /**
@@ -402,6 +441,58 @@ class VoucherController extends Controller
                 : ($result->timedOut ? "Couldn't confirm the print job — the printer may not have responded." : 'Print failed'),
             'output' => $result->output,
         ], $result->success ? 200 : 500);
+    }
+
+    /**
+     * Manager list of till redemptions that need a look (anything not `applied`).
+     */
+    public function exceptions(Request $request): View
+    {
+        $showAll = $request->boolean('all');
+
+        $redemptions = VoucherTillRedemption::with(['voucher', 'reviewer'])
+            ->exceptions()
+            ->when(! $showAll, fn ($q) => $q->unreviewed())
+            ->latest('sold_at')
+            ->paginate(50)
+            ->withQueryString();
+
+        return view('vouchers.exceptions', compact('redemptions', 'showAll'));
+    }
+
+    /**
+     * Mark a till exception as reviewed, optionally with a note.
+     */
+    public function markReviewed(Request $request, VoucherTillRedemption $redemption): RedirectResponse
+    {
+        $data = $request->validate([
+            'note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $note = trim((string) ($data['note'] ?? ''));
+        if ($note !== '') {
+            $note = substr(trim(($redemption->note ? $redemption->note.' · ' : '').$note), 0, 500);
+        }
+
+        $redemption->forceFill([
+            'reviewed_at' => now(),
+            'reviewed_by' => Auth::id(),
+            'note' => $note !== '' ? $note : $redemption->note,
+        ])->save();
+
+        return back()->with('status', 'Till #'.$redemption->ticket_number.' marked reviewed.');
+    }
+
+    /**
+     * Rename (or create) the voucher's POS product after a balance or status
+     * change. Reloads by code: the instance changed inside the transaction is
+     * out of scope. Never throws (see VoucherPosProductService::sync).
+     */
+    private function syncPosProduct(string $code): void
+    {
+        if ($voucher = Voucher::where('code', $code)->first()) {
+            $this->posProducts->sync($voucher);
+        }
     }
 
     /**

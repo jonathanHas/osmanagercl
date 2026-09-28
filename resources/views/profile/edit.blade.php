@@ -26,6 +26,16 @@
                 </div>
             </div>
 
+            {{-- Shop PIN (cycle 27). Only for roles that can use one; managers and
+                 admins sign in with a password, so the section would be noise. --}}
+            @if (auth()->user()->canUsePin())
+                <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
+                    <div class="max-w-xl">
+                        @include('profile.partials.update-pin-form')
+                    </div>
+                </div>
+            @endif
+
             <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
                 <div class="max-w-xl">
                     @include('profile.partials.delete-user-form')
