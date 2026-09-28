@@ -143,6 +143,8 @@ export default () => ({
 
             // Either answer is a successful lookup; the screen explains the state.
             this.announceDone();
+            // Detecting a code pauses the camera; bring it back for the next item.
+            window.dispatchEvent(new CustomEvent('shop-scan-saved'));
         } catch (e) {
             this.announceError('Could not look up voucher');
         } finally {

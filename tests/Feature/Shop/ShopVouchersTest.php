@@ -255,4 +255,26 @@ class ShopVouchersTest extends TestCase
 
         $this->assertDatabaseMissing('vouchers', ['code' => 'GV34567890BC']);
     }
+
+    /**
+     * Cycle 31. Cycle 30 made a camera read *pause* the decoder rather than
+     * stop it, and the page's `shop-scan-saved` is what resumes it. Vouchers
+     * never dispatched that event, so after a camera scan its frame stayed
+     * frozen on "Got it" until the user closed the camera.
+     *
+     * Source assertion in the cycle-29 style: the camera cannot run on dev.
+     */
+    public function test_the_vouchers_page_resumes_the_camera_after_a_lookup(): void
+    {
+        $js = file_get_contents(resource_path('js/shop/vouchers.js'));
+
+        $this->assertStringContainsString("new CustomEvent('shop-scan-saved')", $js);
+
+        // After the lookup's announceDone(), not before it.
+        $doneAt = strpos($js, 'this.announceDone();');
+        $savedAt = strpos($js, "new CustomEvent('shop-scan-saved')");
+        $this->assertNotFalse($doneAt);
+        $this->assertNotFalse($savedAt);
+        $this->assertGreaterThan($doneAt, $savedAt);
+    }
 }

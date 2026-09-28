@@ -1,4 +1,4 @@
-# Shop mode cycle 30 — Pause the camera instead of stopping it — implementation
+# Shop mode cycle 31 — Camera pause loose ends — implementation
 
 Status: DONE
 Plan revision: 1
@@ -6,248 +6,230 @@ Implementer: Opus
 Date: 2026-09-28
 
 ## Baseline
-HEAD: 421df081 — cycles 27, 28 and 29 are now committed, so unlike last cycle
-the tree started clean.
+HEAD: 5a17281d
 
 ```
- M docs/planImp/.needed.txt.kate-swp
+R  docs/planImp/implemented.md -> docs/planImp/archive/2026-09-28-shop-mode-cycle-30/implemented.md
+RM docs/planImp/plan.md -> docs/planImp/archive/2026-09-28-shop-mode-cycle-30/plan.md
 ?? docs/planImp/plan.md
 ```
-(The Kate swap file is tracked in the repo and was already modified; not mine,
-not touched. See Notes for Planner 4.)
+(Cycle 30's archive move was already staged by the owner. Not mine, untouched.)
 
-**Test baseline measured, as the plan asks: `15 failed, 799 passed (3390 assertions)`.**
-The voucher track had not moved it.
+**Test baseline measured: `15 failed, 800 passed (3402 assertions)`** — matching
+the plan's Context.
 
 ## Steps
 
-### 1. Pause/resume in the wrapper — done
-Changed: `resources/js/barcode-scanner.js`.
+### 1. Hide the library's paused banner — done
+Changed: `resources/css/shop.css` (APP ADDITIONS only).
 
-**The plan's first Risk does not apply.** `Html5QrcodeScannerState` *is*
-exported from the package entry in 2.3.8 — `node_modules/html5-qrcode/esm/index.d.ts`
-line 4, `export { Html5QrcodeScannerState } from "./state-manager";` — so I
-imported it by name rather than falling back to numeric constants. The enum
-reads `UNKNOWN 0, NOT_STARTED 1, SCANNING 2, PAUSED 3`, matching the plan.
+**The banner is a direct child of our mount in this version, so the plan's
+selector needed no adjustment** — verified rather than assumed:
+`createScannerPausedUiElement(this.element)` is called at
+`node_modules/html5-qrcode/esm/html5-qrcode.js:517`, and `this.element` is the
+element whose id we hand to `new Html5Qrcode(elementId)` — our
+`div.shop-scan__mount`. The banner itself (`:522–535`) is a `<div>` with no id
+and no class.
 
-`pauseScanner()` calls `scanner.pause(true)` only when `getState() === SCANNING`;
-`resumeScanner()` calls `scanner.resume()` only when the state is `PAUSED`. Both
-are wrapped in try/catch and return a boolean saying whether they acted, so the
-caller can tell "did nothing" from "worked". Both added to `window.BarcodeScanner`.
+I also checked what else is a direct-child `div` so the `:not()` is exhaustive:
+only `#qr-shaded-region`, appended by `possiblyInsertShadingElement` with
+`shadingElement.id = Constants.SHADED_REGION_ELEMENT_ID` (`:778`, `:796`). Its
+own border children are nested inside *it*, not the mount. The video is a
+`<video>` and the canvas a `<canvas>`, so neither is matched.
 
-**`isRunning()` needs no change — confirmed at the source, as the plan asked.**
-`Html5Qrcode.isScanning` is an instance field set true in `start()`
-(`html5-qrcode.js:163`) and false in `stop()` (`:260`). `pause()`
-(`:189–201`) only moves the state manager to `PAUSED`, calls `showPausedState()`
-and optionally pauses the video element — it never touches `isScanning`. So the
-flag stays true across a pause, which is what we want: a paused scanner *is*
-still running.
-
-Check — `grep -n "^export" resources/js/barcode-scanner.js`:
-```
-32:export async function scanFile(file)
-52:export async function startScanner(elementId, onSuccess, onError = null)
-75:export async function stopScanner()
-95:export function pauseScanner()
-112:export function resumeScanner()
-129:export function isRunning()
-```
-`npm run build` clean (see step 5).
-
-### 2. The scan field pauses on detection and resumes on the restart event — done
-Changed: `resources/js/shop/scan-input.js`.
-
-Added `paused`, plus `pause()` and `resume()` methods that call through to the
-wrapper. `detected()` now calls `this.pause()` instead of `this.stop()`.
-`stop()` also clears `paused`. `toggleCamera()`'s closing branch is unchanged —
-a full stop, so the user's own button still releases the device.
-`restartCameraIfWanted()` became `async` and now: returns early unless
-`cameraWanted`; pushes `lastAt` forward 1500 ms (cycle 29's rule, unchanged);
-resumes if `cameraOpen && paused`, and if that resume returns false falls back
-to `stop()` then `toggleCamera()`; otherwise takes the old restart path when
-the camera is closed.
-
-**The state machine in four lines, as the plan asked:**
-
-- `cameraWanted` — the user's intent. Only the camera button sets it, and only
-  it and a camera failure clear it. Everything else is a no-op when it is false.
-- `cameraOpen` — a stream exists. True from `toggleCamera()` opening until
-  `stop()`; **stays true across a pause**, because the frozen frame is still on
-  screen.
-- `paused` — a stream exists but the decoder is frozen on the frame it read.
-  Set by `detected()`, cleared by `resume()` and by `stop()`.
-- The only three-state transitions: detect → `open+paused`; `shop-scan-saved` →
-  `open`; camera button → `closed`. A failed resume collapses to `closed` and
-  immediately reopens.
-
-### 3. Say "captured" on the frozen frame — done
-Changed: `resources/views/components/shop/scan-input.blade.php`.
-
-`<span class="shop-scan__camlabel" x-text="paused ? 'Got it' : 'Point at the barcode'">Point at the barcode</span>`.
-No new class, no CSS.
-
-Check — the plan asked me to grep for the literal first:
-`grep -rn "Point at the barcode" tests/ resources/` returns **only** the
-component itself, so no test pinned it. The server-rendered fallback text is
-kept as shown regardless.
-
-### 4. Tests — done
-Changed: `tests/Feature/Shop/ShopStockScanTest.php`.
-
-One documented test,
-`test_the_scan_field_pauses_the_decoder_rather_than_stopping_it`, asserting:
-the wrapper exports `pauseScanner` and `resumeScanner`; `detected()` contains
-`this.pause();`; `detected()` does **not** contain `this.stop();` (with a
-failure message saying why that regression matters); `scanner.pauseScanner()`
-and `scanner.resumeScanner()` are both called; `restartCameraIfWanted()`
-contains `await this.resume()`; and `stopScanner()` still exists so the camera
-button can release the device. The `detected`/`stop` boundary is found with
-`strpos` in the cycle-29 style.
-
-Check — `php artisan test --filter='ShopStockScanTest|ShopDeliveryTest|ShopLabelsTest|ShopVouchersTest|ShopViewContractTest'`:
-```
-Tests:    87 passed (542 assertions)
+Rule added beside the existing `#qr-shaded-region` line, with a comment naming
+the library version, the element it targets and the failure mode if a future
+version wraps the video in a div (the plan's Risk):
+```css
+.shop-scan__mount > div:not(#qr-shaded-region) { display: none !important; }
 ```
 
-### 5. Build and tidy — done
+Check: `cmp` on the design block prints nothing (below); `ShopViewContractTest`
+green; browser check in Verification 3.
+
+### 2. Vouchers resumes the camera — done
+Changed: `resources/js/shop/vouchers.js`, `tests/Feature/Shop/ShopVouchersTest.php`.
+
+`window.dispatchEvent(new CustomEvent('shop-scan-saved'))` after the successful
+lookup's `announceDone()`, with the same one-line comment as labels (wording
+updated to "pauses" to match what cycle 30 actually does now).
+
+`test_the_vouchers_page_resumes_the_camera_after_a_lookup` asserts the event is
+dispatched and that it comes *after* `announceDone()`, in the cycle-29 style,
+with a docblock explaining why the screen needed it.
+
+Check — `php artisan test --filter=ShopVouchersTest`:
 ```
-npm run build   → shop-DY00LEbL.js 36.85 kB │ gzip 10.23 kB
-                  barcode-scanner-Cd7BctxD.js 335.82 kB │ gzip 100.49 kB
-                  ✓ built in 6.57s
-php artisan view:clear                            → cleared
-./vendor/bin/pint tests/Feature/Shop/ShopStockScanTest.php → PASS, 1 file
+Tests:    11 passed (49 assertions)
 ```
-Pint was scoped to the one file I changed, per the plan and my own cycle-29
-note.
+
+### 3. Untrack the swap file — done
+Changed: `.gitignore`; `docs/planImp/.needed.txt.kate-swp` removed from the
+index only.
+
+```
+$ git rm --cached docs/planImp/.needed.txt.kate-swp
+rm 'docs/planImp/.needed.txt.kate-swp'
+
+$ ls -la docs/planImp/.needed.txt.kate-swp
+-rw------- 1 jon jon 11047 Sep 28 17:40 docs/planImp/.needed.txt.kate-swp   ← still on disk, as required
+```
+
+`.gitignore` gained, at the end:
+```
+# editor swap files
+*.kate-swp
+.*.swp
+```
+
+Check:
+```
+$ git check-ignore -v docs/planImp/.needed.txt.kate-swp
+.gitignore:28:*.kate-swp	docs/planImp/.needed.txt.kate-swp
+
+$ git status --short
+ M .gitignore
+D  docs/planImp/.needed.txt.kate-swp     ← staged deletion
+...
+```
+Left staged for the owner, not committed, per the Constraints.
+
+**Three more tracked swap files exist that the plan does not name** — see
+Notes for Planner 1. I did not touch them.
+
+### 4. Build and tidy — done
+```
+npm run build   → shop-1xElYovb.css 45.64 kB │ gzip 7.97 kB
+                  shop-mE9ZAbCU.js  36.90 kB │ gzip 10.23 kB
+                  ✓ built in 7.31s
+php artisan view:clear                             → cleared
+./vendor/bin/pint tests/Feature/Shop/ShopVouchersTest.php → PASS, 1 file
+```
 
 ## Deviations
 
 None.
 
-Nothing under **Out of scope** was touched: the cycle-29 ordering rule stands
-(the frozen frame is what shows during the prompt), and `fps`, `qrbox` and the
-decoder formats are untouched.
+Nothing under **Out of scope** was touched: `docs/planImp/needed.txt` is
+untouched, and no other camera behaviour changed — the pause/resume state
+machine from cycle 30 is byte-identical.
 
 ## Verification
 
-1. **`php artisan test`** → `Tests: 15 failed, 800 passed (3402 assertions)`.
-   The same 15 pre-existing failures, unchanged in name and count (Udea ×7,
-   CashReconciliation ×3, FruitVegLabelPrinting ×2, Product ×2, TestScraper ×1).
-   Passing went 799 → 800: the one new test. **No new failures.**
+1. **`php artisan test`** → `Tests: 15 failed, 801 passed (3406 assertions)`.
+   The same 15 pre-existing failures, unchanged in name and count. Passing went
+   800 → 801: the one new test. **No new failures.**
 
-2. **Contract.** `ShopViewContractTest` green (inside the 87 above).
+2. **Contract.**
    `head -c $(stat -c %s docs/design/shop-mode/shop.css) resources/css/shop.css | cmp - docs/design/shop-mode/shop.css`
-   prints nothing (`DESIGN-BLOCK-IDENTICAL`), and `git status resources/css/` is
-   empty — no CSS was touched at all.
+   prints nothing (`DESIGN-BLOCK-IDENTICAL`) — the new rule is inside APP
+   ADDITIONS. `ShopViewContractTest` green.
 
-3. **Wiring without a camera**, in Chrome on the real delivery scan page,
-   signed in as katelyn by PIN on a seeded trusted device.
-
-   First, the **real wrapper module** was imported exactly as the component
-   imports it, to prove the new guards are safe when nothing is running (dev is
-   HTTP, so no scanner can exist):
+3. **Step 1, in the browser.** On `/shop/stock-scan` with the camera block
+   revealed, I appended to `.shop-scan__mount`: (a) the library's paused banner
+   built attribute-for-attribute as `createScannerPausedUiElement` builds it,
+   then flipped to `display:block` inline exactly as `pause()` does; (b) a
+   `div#qr-shaded-region`; (c) a `<video>`.
    ```
-   {"exportsPause":"function","exportsResume":"function",
-    "pauseWithNoScanner":false,"resumeWithNoScanner":false,"isRunning":false,
-    "windowApi":["scanFile","startScanner","stopScanner","pauseScanner","resumeScanner","isRunning"]}
+   {"mountFound":true,
+    "bannerInlineStyle":"block",     ← what the library sets
+    "bannerComputed":"none",         ← our rule wins
+    "shadedComputed":"none",         ← unchanged behaviour
+    "videoComputed":"block",         ← picture NOT hidden
+    "bannerText":"Scanner paused"}
    ```
-   Neither threw; both returned false; all six are on `window.BarcodeScanner`.
 
-   Then the state machine, with `cameraOpen` forced true to simulate a live
-   stream and the component's `pause`/`resume`/`stop`/`toggleCamera` replaced by
-   spies that do what the real ones do on success — so the transitions and the
-   `x-text` label are exercised for real. A real POS barcode was used, so the
-   lookup and the commit are genuine round trips.
+   **Step 2, in the browser**, on `/shop/vouchers` with `pause`/`resume` spied.
+   My first run showed `pause 1, resume 1` but sampled too late to see the
+   frozen state, so I slowed the lookup by 1200 ms and looked again — the whole
+   cycle is visible:
+   ```
+   duringLookup: {"pause":1,"resume":0,"paused":true,  "label":"Got it"}
+   afterLookup:  {"pause":1,"resume":1,"paused":false,"cameraOpen":true,
+                  "label":"Point at the barcode"}
+   ```
+   That is the bug fixed: before this cycle the `afterLookup` row would still
+   have read `paused: true, label: "Got it"` indefinitely.
 
-   | step | observed | expected |
-   |---|---|---|
-   | start | label "Point at the barcode", `cameraOpen` true, `paused` false | — |
-   | detect a code | `pause` ×1, **`stop` ×0**, `paused` **true**, `cameraOpen` **true**, label **"Got it"**, prompt open | pause once, no stop, stays open |
-   | Add (`commit()`) | `resume` ×1, **`start` ×0**, `stop` ×0, `paused` **false**, `cameraOpen` true, label back to **"Point at the barcode"** | resume once, no restart |
-   | camera button | `stop` ×1, `cameraOpen` **false**, `cameraWanted` **false**, `paused` false | full stop |
+   **Step 3's git output** is quoted in full under step 3 above.
 
-   `start ×0` on the Add row is the whole point of the cycle: the stream was
-   never re-created.
+   Console across the whole run: **no errors or exceptions**.
 
-   Two checks beyond the plan:
-   - **The dead-stream fallback is exercisable, not just readable** (the plan's
-     second Risk said to report if I could only see the code path). Forcing
-     `resume()` to return false gave
-     `{"resumeCalls":1,"stopCalls":1,"startCalls":1,"cameraOpen":true,"paused":false}`
-     — it tore down and restarted, and the user still ends up with a camera.
-   - **Cycle 29's rule survived the rewrite** (a Constraint):
-     `{"lastAtPushedMs":1500,"sameCodeSuppressedForMs":3500,
-     "sameCodeIgnoredNow":true,"differentCodeAccepted":true}`, and a
-     keyboard-wedge user (`cameraWanted` false) got
-     `{"resumeCalls":0,"startCalls":0}` — still a no-op.
-
-   Console over the whole run, including a reload to catch page-load output:
-   two `Alpine.js started` logs, **no errors or exceptions**.
-
-4. **Real camera** — not verifiable here and not attempted: the camera needs a
-   secure context and dev is plain HTTP. **Owner-verified on production after
-   deploy**: scan → the picture should freeze with "Got it" → Add → live again
-   immediately → the next item reads without a wait.
+4. **Owner on production after deploy:** after a scan the frozen frame should
+   show only "Got it" with no dark "Scanner paused" strip across the top; and
+   on Vouchers the camera should come back by itself once the lookup returns.
 
 ## Files changed
 
 ```
- M resources/js/barcode-scanner.js
- M resources/js/shop/scan-input.js
- M resources/views/components/shop/scan-input.blade.php
- M tests/Feature/Shop/ShopStockScanTest.php
-?? docs/planImp/implemented.md          (this file)
+ M .gitignore
+D  docs/planImp/.needed.txt.kate-swp     (staged deletion; file kept on disk)
+ M resources/css/shop.css
+ M resources/js/shop/vouchers.js
+ M tests/Feature/Shop/ShopVouchersTest.php
+?? docs/planImp/implemented.md           (this file)
 ```
-Plus `public/build/*` from `npm run build`.
+Plus `public/build/*` from `npm run build`. The staged rename of cycle 30's
+files into `archive/` was already there when I started.
 
-No commits, no deploys, as the Constraints required.
+No commits, no deploys.
 
 ## Dev state
 
-The browser check writes through real endpoints, so it left real data. All
-removed, each removal verified:
-
-- `shop_devices` row id 4 "Cycle 30 browser check" — **deleted**
-  (`devices remaining: 1`, the pre-existing revoked "Dev browser check").
-- Delivery session `4149c0a2-…`: the Add in the check recorded one unit of
-  barcode `5412533401912` (`31bb4856-…`). **Deleted**; the session is back to
-  `remaining for session: 0`, where it started.
-- Label queue was already `total: 0` and stayed there — nothing to undo this
-  cycle.
-- The `shop_device` cookie was cleared and the tab closed.
-
-katelyn (id 3) still has PIN `2580`. No config file was modified.
+This cycle's checks were read-only apart from one seeded device, now removed.
+Verified after cleanup:
+```
+devices remaining: 1        (the pre-existing revoked "Dev browser check")
+delivery scan rows: 0
+label queue: 0
+stock adjustments today: 0
+```
+The `shop_device` cookie was cleared and the tab closed. katelyn (id 3) still
+has PIN `2580`. No config file was modified.
 
 ## Notes for Planner
 
-1. **Vouchers now shows "Got it" indefinitely**, as the plan predicted. Worth
-   deciding rather than leaving: the screen never dispatches
-   `shop-scan-saved`, so after a camera scan the frame stays frozen with "Got
-   it" until the user taps the camera off. Before this cycle it was a dark
-   block, so it is not a regression — but "Got it" on screen for a minute reads
-   like the app is waiting for something. It is genuinely one line
-   (`announceSaved()`-equivalent after the voucher lookup). I did not do it: it
-   is named as out of scope and the vouchers flow is one-voucher-per-visit, so
-   resuming the camera may be the wrong call anyway. A cheaper alternative if
-   you would rather not resume: have the vouchers page stop the camera outright
-   after a scan, which restores exactly the old behaviour.
+1. **Three more Kate swap files are tracked, and the new `.gitignore` rule now
+   puts them in a confusing half-state.** `git ls-files | grep kate-swp` after
+   my change:
+   ```
+   .delivery-specialist-agent-recommendation.md.kate-swp
+   JFolder_temp/.questions.txt.kate-swp
+   docs/jons_docs/.todo.md.kate-swp
+   ```
+   The plan named only `docs/planImp/.needed.txt.kate-swp`, so that is the only
+   one I untracked. But `.gitignore` does nothing for a file that is already
+   tracked, so those three will keep appearing in `git status` whenever the
+   editor touches them — now while *also* matching an ignore rule, which is the
+   kind of thing that wastes ten minutes in six months' time. One command
+   finishes the job the plan started:
+   ```
+   git rm --cached .delivery-specialist-agent-recommendation.md.kate-swp \
+                   JFolder_temp/.questions.txt.kate-swp \
+                   docs/jons_docs/.todo.md.kate-swp
+   ```
+   I did not run it: they are outside the plan's scope and two of them are in
+   the owner's own areas. Worth a one-line follow-up or an amendment to this
+   cycle.
 
-2. **`restartCameraIfWanted()` is now `async` and nobody awaits it.** The Blade
-   listener calls it fire-and-forget (`@shop-scan-saved.window="restartCameraIfWanted()"`),
-   which is fine — Alpine ignores the promise and nothing downstream depends on
-   the resume having finished. Flagging it only because an unawaited async
-   function is the kind of thing a future reader "fixes" into something that
-   blocks the event handler.
+2. **The `:not(#qr-shaded-region)` selector is load-bearing and version-tied.**
+   It is correct for html5-qrcode 2.3.8, which I verified in the library source
+   rather than by inspection of a running camera (dev cannot start one). The
+   comment in the CSS names the version and the risk. If the library is ever
+   upgraded, this rule and `pauseScanner`/`resumeScanner`'s state constants are
+   the two places to re-check — worth a line in whatever checklist covers
+   dependency bumps, if one exists.
 
-3. **The pause path swallows failures silently.** If `pauseScanner()` returns
-   false — the scanner was mid-teardown, say — `paused` stays false and the
-   camera keeps decoding while the prompt is open. The cycle-29 suppression
-   window (3.5 s on the same code) is what stops that becoming a double-add,
-   which is a second line of defence I am relying on rather than one I designed.
-   It holds, but if you ever shorten that window, this is the thing that breaks.
+3. **Still open from cycle 30, neither addressed nor explicitly deferred**
+   (flagging once more rather than assuming they were dropped on purpose):
+   - `restartCameraIfWanted()` is `async` and called fire-and-forget from the
+     Blade listener. Harmless today; a future reader may "fix" it into
+     something that blocks the handler.
+   - `pauseScanner()` returning false is swallowed silently, leaving the
+     decoder live while the prompt is open. Cycle 29's 3.5 s same-code
+     suppression is what stops that becoming a double-add — a second line of
+     defence I am relying on rather than one designed for the job. If that
+     window is ever shortened, this breaks.
 
-4. **`docs/planImp/.needed.txt.kate-swp` is tracked in git** and shows as
-   modified. An editor swap file almost certainly committed by accident — it
-   will keep appearing in every `git status` and every cycle's baseline. Worth
-   `git rm --cached` plus a `.gitignore` line, in whichever cycle is cheapest.
-   Not mine to do under the Constraints.
+   Both are "worth knowing", not "must fix". A one-line decision in the next
+   review would close them out either way.

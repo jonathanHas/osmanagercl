@@ -579,6 +579,14 @@ textarea.shop-input { min-height: 112px; padding: 14px 20px; border-radius: var(
 .shop-scan__mount { position: absolute !important; inset: 0; width: 100%; height: 100%; }
 .shop-scan__mount video { width: 100% !important; height: 100% !important; object-fit: cover; }
 .shop-scan__mount #qr-shaded-region { display: none; }   /* the design draws its own reticle */
+/* html5-qrcode 2.3.8 appends its own "Scanner paused" strip to the mount as an
+   id-less <div> and flips it to display:block inline when paused (see
+   createScannerPausedUiElement, html5-qrcode.js:522). The camera label says
+   "Got it" instead, so hide theirs; !important is needed to beat the inline
+   style. Targets only direct-child divs, which in this version are exactly that
+   strip and #qr-shaded-region — the video and canvas are not divs. If a later
+   version wraps the <video> in a div, this rule would hide the picture. */
+.shop-scan__mount > div:not(#qr-shaded-region) { display: none !important; }
 /* Choice tiles with a picture (F&V): thumbnail at the left, text beside it; the
    design's check mark keeps the right-hand 44 px, so only the left padding moves. */
 /* The design's choice grid is minmax(148px) for text-only tiles. A 56 px picture
