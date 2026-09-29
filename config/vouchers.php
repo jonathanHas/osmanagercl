@@ -30,7 +30,12 @@ return [
         'exhausted' => '€0.00 used up',
         'inactive' => 'not active',
         'deactivated' => 'deactivated',
+        // An inactive voucher with a face value: its till product is priced to sell.
+        'for_sale' => 'for sale €%s',
     ],
+
+    // Highest value a batch of vouchers can be generated with.
+    'max_face_value' => 1000,
 
     /*
     |--------------------------------------------------------------------------

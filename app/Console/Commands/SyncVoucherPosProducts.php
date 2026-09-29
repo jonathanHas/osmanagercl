@@ -7,7 +7,8 @@ use App\Services\VoucherPosProductService;
 use Illuminate\Console\Command;
 
 /**
- * Backfill (or refresh) the hidden uniCenta product behind each gift voucher.
+ * Backfill (or refresh) the hidden uniCenta product behind each gift voucher:
+ * its name, and its price (the face value while a voucher is for sale).
  *
  * Every status is included by default: a printed-but-unsold label must still
  * scan at the till, or uniCenta says "product not found".
@@ -41,10 +42,16 @@ class SyncVoucherPosProducts extends Command
                 $totals[$action] = ($totals[$action] ?? 0) + 1;
             }
 
-            $rows[] = [$voucher->code, $voucher->status, number_format((float) $voucher->current_balance, 2), $action];
+            $rows[] = [
+                $voucher->code,
+                $voucher->status,
+                $voucher->face_value !== null ? number_format((float) $voucher->face_value, 2) : '—',
+                number_format((float) $voucher->current_balance, 2),
+                $action,
+            ];
         }
 
-        $this->table(['code', 'status', 'balance', 'action'], $rows);
+        $this->table(['code', 'status', 'value', 'balance', 'action'], $rows);
 
         if ($dryRun) {
             $this->info(count($rows).' voucher(s) would be synced (dry run, nothing written).');

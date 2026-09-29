@@ -1,4 +1,4 @@
-# Voucher activity screen (vouchers cycle 2) — implementation
+# Selling a voucher at the till activates it (vouchers cycle 3) — implementation
 
 Status: DONE
 Plan revision: 1
@@ -6,33 +6,13 @@ Implementer: Opus
 Date: 2026-09-29
 
 ## Baseline
-HEAD: 3fbfcc44
-Pre-existing dirty files (Shop mode track and planning files, not mine):
+HEAD: 88447f40
+Pre-existing dirty files (planning files, not mine):
 ```
-D  .delivery-specialist-agent-recommendation.md.kate-swp
-D  JFolder_temp/.questions.txt.kate-swp
- M app/Http/Controllers/DeliveryLegacyController.php
- M docs/development/quick-start-guide.md
- M docs/features/shop-mode.md
-D  docs/jons_docs/.todo.md.kate-swp
-R  docs/planImp/implemented.md -> docs/planImp/archive/2026-09-28-shop-mode-cycle-31/implemented.md
-RM docs/planImp/plan.md -> docs/planImp/archive/2026-09-28-shop-mode-cycle-31/plan.md
- M docs/planImp/needed.txt
-D  docs/planImp/plan-wedge-focus.md
  M docs/vouchers/README.md
  D docs/vouchers/implemented.md
  M docs/vouchers/plan.md
- M resources/js/shop/delivery-scan.js
- M resources/js/shop/scan-input.js
- M resources/views/components/shop/scan-input.blade.php
- M resources/views/shop/delivery-scan.blade.php
- M tests/Feature/Shop/ShopDeliveryTest.php
- M tests/Feature/Shop/ShopStockScanTest.php
-?? docs/planImp/archive/2026-09-28-shop-mode-cycle-32/
-?? docs/planImp/implemented.md
-?? docs/planImp/plan.md
-?? docs/vouchers/archive/2026-09-27-cycle-28-till-voucher-redemption/
-?? docs/vouchers/findings/2026-09-29-production-backfill-not-run.md
+?? docs/vouchers/archive/2026-09-29-cycle-2-activity-screen/
 ```
 `php artisan test` before any change:
 ```
@@ -41,169 +21,166 @@ D  docs/planImp/plan-wedge-focus.md
    FAIL  Tests\Feature\FruitVegLabelPrintingTest
    FAIL  Tests\Feature\ProductTest
    FAIL  Tests\Feature\TestScraperControllerTest
-  Tests:    15 failed, 806 passed (3441 assertions)
+  Tests:    15 failed, 835 passed (3577 assertions)
 ```
 
 ## Steps
 
 ### 0. Baseline — done
-Recorded above; matches the plan's expected `15 failed, 806 passed`.
+Matches the expected `15 failed, 835 passed`.
 
-### 1. Config — done
-Changed: `config/vouchers.php` (`activity` block after `sync`)
+### 1. Migrations — done
+Changed: `database/migrations/2026_09_30_100000_add_face_value_to_vouchers_table.php`, `2026_09_30_100001_add_sale_amount_to_voucher_till_redemptions_table.php` (both new; neither existed)
 Check output:
 ```
-$ php artisan tinker --execute="echo config('vouchers.activity.poll_seconds');"
-5
+  2026_09_30_100000_add_face_value_to_vouchers_table ............ 79.67ms DONE
+  2026_09_30_100001_add_sale_amount_to_voucher_till_redemptions_table  75.11ms DONE
+bool(true) bool(true)
 ```
 
-### 2. Heartbeat — done
-Changed: `app/Services/VoucherSyncHeartbeat.php` (new; did not exist)
-Key names are class constants (`KEY_LAST`, `KEY_LAST_OK`, `KEY_LAST_SCHEDULED`) so the tests use the same strings.
-Check: covered by step 8's `VoucherSyncHeartbeatTest`.
+### 2. Models and config — done
+Changed: `app/Models/Voucher.php` (`face_value` fillable + cast, `isForSale()`), `app/Models/VoucherTillRedemption.php` (`STATUS_ACTIVATED`, `STATUS_SALE_FLAGGED`, `sale_flagged` in `EXCEPTION_STATUSES`, `sale_amount` fillable + cast), `config/vouchers.php` (`pos_balance_text.for_sale`, `max_face_value`)
+Check output:
+```
+$ php artisan tinker --execute="$v=new App\Models\Voucher(['status'=>'inactive','face_value'=>20]); var_dump($v->isForSale());"
+bool(true)
+```
 
-### 3. Sync records the heartbeat — done
+### 3. Till product carries the price — done
+Changed: `app/Services/VoucherPosProductService.php` (`productPrice()`, for-sale name, create at price, name-or-price drift updates both columns, reported as `renamed`), `app/Console/Commands/SyncVoucherPosProducts.php` (`value` column)
+Check output:
+```
+$ php artisan vouchers:sync-pos-products --all
+| code         | status | value | balance | action    |
+| GVLH4AU7ASAT | active | —     | 20.00   | unchanged |
+| GVVUF2SUACUM | active | —     | 9.00    | unchanged |
+0 created, 0 linked, 0 renamed, 2 unchanged, 0 failed.
+```
+
+### 4. Generate with a value — done
+Changed: `app/Http/Controllers/VoucherController.php` (`amount` validation, `face_value` on create; `print()` passes `face_value`), `resources/views/vouchers/generate.blade.php` (value input, new help text incl. "keep batches of different values apart"), `resources/views/vouchers/print.blade.php` (value under the code on screen; ZPL unchanged)
+`tests/Feature/VoucherPosProductServiceTest.php`: the two generate tests now post `amount` (named in the plan); **also** `test_generating_vouchers_creates_their_products` asserted three `[not active]` names, which are now `[for sale €20.00]` (see Deviations).
+Check output: `php artisan test --filter=VoucherPosProductServiceTest` → `11 passed (41 assertions)`. Step 4's own check (3 products priced 20, validation error without amount) is in step 8's tests.
+
+### 5. The till check learns about sales — done
 Changed: `app/Services/VoucherTillSyncService.php`
-The old body of `sync()` is now `private run()`; `sync($since, $source)` wraps it, records ok/failed and rethrows on failure. `errors` added last in `COUNT_KEYS`, incremented in the per-ticket catch. `syncIfDue($source = lookup)` passes its source through.
-Check output (the plan says 27 tests at cycle 1; the file has 18):
-```
-$ php artisan test --filter='VoucherTillSyncServiceTest|ScheduleTest'
-  Tests:    23 passed (141 assertions)
-```
-
-### 4. Command flag and schedule — done
-Changed: `app/Console/Commands/SyncVoucherTillRedemptions.php`, `routes/console.php`, `tests/Feature/ScheduleTest.php`
+- New private `voucherGroups()`: reads `LINE, PRODUCT, UNITS, PRICE, CODE, tx.RATE` (left join `TAXES`), groups per product in order of first LINE, sums `units` and `sale_total = Σ UNITS × PRICE × (1 + RATE)`, rounded to 2 dp; `isSale = |sale_total| > 0.005`.
+- `syncTicket()` now loops over the groups; sale groups go to the new `applySale()`, redemption groups to the unchanged `applyLine()`. `isLast` is "this product is the last *redemption* group".
+- `applySale()` rules in the plan's order (refund, unknown, not inactive, Free tender, units ≠ 1, value mismatch, activate), every row with `sale_amount`, `amount_deducted 0`, `shortfall 0`; activation writes the redemption row first, then the voucher, then an `issue`/`till` transaction with note `Till #N`, then links it.
+- After the loop, every voucher deducted from or activated gets `posProducts->sync()` (price 0, `[bal €X]` for an activated one).
+- `COUNT_KEYS`: `activated`, `sale_flagged` inserted after `refund`.
 Check output:
 ```
-$ php artisan schedule:list | grep voucher
-  *  *  * * *  php artisan vouchers:sync-till --scheduled  Next Due: 2 seconds from now
-$ php artisan vouchers:sync-till
-| tickets | applied | partial | no_tender | inactive | unknown | refund | skipped | errors |
-| 2       | 0       | 0       | 0         | 0        | 0       | 0      | 2       | 0      |
-```
-(ScheduleTest passes inside the 23 above.)
-
-### 5. Activity service — done
-Changed: `app/Services/VoucherActivityService.php` (new; did not exist)
-- Merge order: sorted by `created_at` timestamp desc, then by an internal order (`tx` id×2, `red` id×2+1) instead of the literal `key` string, because string-sorting `tx-9` against `tx-10` puts them the wrong way round. The internal fields are stripped before returning.
-- `totals()` sums deducts grouped by `source` in one query.
-- Status-change messages format times as `j M H:i`.
-Check (dev data, tinker `payload(7, null)`):
-```
-health: state warn, messages ["The scheduler has never run the till check. This page checks the till itself while it is open."],
-        last_check_source command, scheduler_stale 1, last_errors 0, vouchers_without_till_product 0
-totals: redeemed_today 0, issued_today 0, outstanding_balance 29, active_vouchers 2, unreviewed_exceptions 1
-5 events; newest: tx-14 redeem_till "Redeemed at till" GVVUF2SUACUM -6 → 9, who "Till #430816", status applied
+$ php artisan test --filter=VoucherTillSyncServiceTest
+  Tests:    23 passed (108 assertions)
 ```
 
-### 6. Controller and routes — done
-Changed: `app/Http/Controllers/VoucherActivityController.php` (new; did not exist), `routes/web.php` (import + two routes directly above `vouchers/{voucher}/transactions`)
+### 6. Screens say what happened — done
+Changed: `app/Http/Controllers/VoucherController.php` (`lookup()` + `face_value`, `for_sale`; `history()` till `issue` → "Sold at till"), `app/Services/VoucherActivityService.php` (till `issue` → "Sold at till"; `sale_flagged` → "Sale not activated"; `sale_amount` on both mappers), `resources/views/vouchers/exceptions.blade.php` (red "Sale not activated" pill, "Sale" column after "Voucher tender", empty-state colspan 10 → 11), `resources/views/vouchers/activity.blade.php` ("charged €X" second line behind `x-if`; `replace` → `replaceAll` so `sale_flagged` reads "sale flagged"), `resources/views/vouchers/list.blade.php` and `transactions.blade.php` ("€20.00 for sale" yellow pill when `initial_value` is NULL and `face_value` is set).
 Check output:
 ```
-$ php artisan route:list --name=vouchers.activity
-  GET|HEAD       vouchers/activity vouchers.activity › VoucherActivityControl…
-  GET|HEAD       vouchers/activity/feed vouchers.activity.feed › VoucherActiv…
-routes/web.php:1219 vouchers/activity, :1220 vouchers/activity/feed, :1221 vouchers/{voucher}/transactions
+$ node --check <activity inline script>   → NODE_OK
+$ php artisan test --filter='VoucherActivityTest|VoucherTillExceptionsTest|ShopVouchersTest'
+  Tests:    37 passed (174 assertions)
 ```
-The route-order test is in step 8.
 
-### 7. View, navigation — done
-Changed: `resources/views/vouchers/activity.blade.php` (new; did not exist), `resources/views/layouts/admin.blade.php` ("Voucher activity" link after "Till exceptions"), `resources/views/vouchers/index.blade.php` ("Activity" before "Generate"), `resources/views/vouchers/exceptions.blade.php` ("Activity" before "All vouchers")
-- All Alpine event bindings in the new view use `x-on:`; nullable parts (health messages, `sold_at`, `shortfall`, `voucher_url`) are behind `x-if` templates or `||` defaults.
-- A filter change while a fetch is in flight sets `pending` and re-fetches once the first returns (the in-flight guard would otherwise drop the filter change until the next tick).
-- Changing the period clears the "seen" set so a different period's rows are not highlighted as new.
-- `npm run build` ran clean (the view uses Tailwind classes not used elsewhere, e.g. `bg-purple-800/50`, `bg-blue-900/40`).
-Check output (script written to the scratchpad, not `/tmp`):
+### 7. Lookup screens for an unsold voucher — done
+Changed: `resources/views/vouchers/index.blade.php`, `resources/views/shop/vouchers.blade.php`, `resources/js/shop/vouchers.js`
+- Office: `faceValue`/`forSale` state from the lookup (reset in `reset()`); managers get a yellow "Value €20.00. Normally sold at the till…" line and the starting balance pre-filled; employees get "Not sold yet (€20.00). Sell it at the till: scan the label as an item." in place of "Please ask a manager." (both texts are in the markup, toggled by `x-show`). A new `money2()` helper formats the value (the existing `money()` is the signed history formatter).
+- Shop: `forSale`/`faceValue` getters; the for-sale employee card; `needsManager && ! forSale`; the manager hint split into the original text (`activating && ! forSale`) and the for-sale text; `onScan()` pre-fills `typed` with the face value for a manager on a for-sale voucher. Only `shop-*` classes, no new `route()`.
+Check output:
 ```
-$ php -r '…preg_match_all("/<script>(.*?)<\/script>/s",…)' && node --check …/voucher-activity.js && echo NODE_OK
-NODE_OK
+$ node --check resources/js/shop/vouchers.js && echo JS_OK   → JS_OK
+$ node --check <index inline script>                          → NODE_OK
+$ npm run build                                               → ✓ built in 9.84s
+$ php artisan test --filter='ShopVouchersTest|ShopViewContractTest|ConfinePinSessionTest'
+  Tests:    43 passed (369 assertions)
 ```
 
 ### 8. Tests — done
-Changed: `tests/Feature/VoucherSyncHeartbeatTest.php` (new; did not exist), `tests/Feature/VoucherActivityTest.php` (new; did not exist), `tests/Feature/VoucherTillSyncServiceTest.php` (5 tests added, none changed)
-- Heartbeat "broken cache": `Cache::shouldReceive('forever'|'get')->andThrow(...)` (the facade mock), with `Log::spy()` asserting two warnings.
-- Per-ticket failure: the POS `TAXES` table is dropped after the sale is created; the ticket-total query joins it, so the ticket fails inside the loop after the ticket list was read (`tickets 1, errors 1`, heartbeat `ok = true`).
-- Route-order test asserts the matched route name is `vouchers.activity`.
-- Health "stale" test checks both messages: never ran, and `…since 29 Sep 12:00…` after 10 minutes.
+Changed (additions only, except where named): `tests/Feature/VoucherPosProductServiceTest.php` (+7), `tests/Feature/VoucherTillSyncServiceTest.php` (+13), `tests/Feature/VoucherTillExceptionsTest.php` (+1), `tests/Feature/VoucherActivityTest.php` (+2), `tests/Feature/Shop/ShopVouchersTest.php` (+4, and the class now also uses `CreatesVoucherPosTables` for the manual-activation test)
+- Changed assertions: the two generate tests post `amount` (named in the plan) and the `[not active]` name count became `[for sale €20.00]` (Deviations 1).
+- Beyond the plan's list: `amount` with 3 decimals and above `max_face_value` rejected; the print page shows the value; active/valueless vouchers report `for_sale false` / `face_value null`.
+- Test fix while writing: "after activation the label redeems normally" first failed because my `ticket()` helper priced the voucher line at `face_value` (which stays 20 after activation); on the till the product's price is 0 by then. The test now reads the product's current price for that line. The code was right.
 Check output:
 ```
-$ php artisan test --filter='VoucherSyncHeartbeatTest|VoucherTillSyncServiceTest'
-  Tests:    29 passed (128 assertions)
-$ php artisan test --filter=VoucherActivityTest
-  Tests:    18 passed (94 assertions)
-$ php artisan test --filter='Voucher|Schedule'
-  Tests:    82 passed (398 assertions)
+$ php artisan test --filter='Voucher|ShopVouchers|Schedule|ConfinePinSession|ShopViewContract'
+  Tests:    141 passed (837 assertions)
 ```
 
-### 9. Docs — done
-Changed: `docs/features/voucher-management.md` (new `## Activity screen (/vouchers/activity)` after the till section, with a health-state table saying what to do for each; `### The sync` mentions `--scheduled`, the heartbeat and `errors`; routes and key files), `docs/FEATURES_INDEX.md` ("Live Activity Screen" bullet), `CLAUDE.md` (voucher line), `docs/deployment/production-guide.md` (nine commands, the `vouchers:sync-till --scheduled` row, the `/etc/cron.d/osmanager` paragraph with how to confirm it and "exactly one trigger"), `docs/deployment/production-deployment-guide.md` (user-crontab instruction replaced with the `/etc/cron.d` form, the same checks).
+### 9. Dev helper and docs — done
+Changed: `docs/vouchers/scripts/simsale.php` (`SALE=1`, `PRICE`, `UNITS`, `PAY`; without `SALE` the same lines and payments as before; header documents both), `docs/features/voucher-management.md` (Overview lifecycle steps 1-4 rewritten; `inactive` status row; `face_value`/`sale_amount` in Data model; new `## Selling a voucher at the till` with cashier steps, "never use the quantity key", keep batches apart, the flag table, the one-minute window, manual activation, products 6012-6014, finance unchanged; `activated`/`sale_flagged` in the exception table; generate-form paragraph; POS product price; key files incl. new migrations and the dev scripts), `docs/FEATURES_INDEX.md` ("Sold at the Till" bullet), `CLAUDE.md` (voucher line).
 Check output:
 ```
-$ grep -n "nine\|cron.d/osmanager" docs/deployment/*.md
-production-deployment-guide.md:320, 325, 326, 329, 331 (… nine commands, including vouchers:sync-till --scheduled)
-production-guide.md:168 must list **nine** commands … 183 **`/etc/cron.d/osmanager`** … 188 cat /etc/cron.d/osmanager
+$ grep -c "sale_flagged\|face_value" docs/features/voucher-management.md
+10
+$ php -l docs/vouchers/scripts/simsale.php
+No syntax errors detected
 ```
 
 ## Deviations
 
-1. **Event order tie-break.** The plan says sort by `at` desc, then `key` desc. `key` is a string (`tx-9`, `tx-10`), so a string sort puts same-second rows in the wrong order. The service sorts by the `created_at` timestamp, then by an internal integer (`tx` id×2, `red` id×2+1), stripped before returning. Same intent, same output shape.
-2. **Queued re-fetch.** Step 7 says skip a tick while a fetch is in flight. A *filter change* during a fetch would then be dropped until the next tick (up to 5 s), so the view sets `pending` and re-fetches once the current request returns. Polling ticks are still skipped, not queued.
-3. **`npm run build`** was run (not listed in the plan) because the new view uses Tailwind classes no other view used. No CSS file changed.
-4. **The `node --check` script** was written to the session scratchpad instead of `/tmp/voucher-activity.js`. Same command otherwise.
-5. **Plan fact corrected:** step 3 says `VoucherTillSyncServiceTest` had 27 tests at cycle 1; it had 18. All 18 still pass unchanged; 5 were added (23).
+1. **One more changed assertion than the plan named.** `VoucherPosProductServiceTest::test_generating_vouchers_creates_their_products` asserted three products named `%[not active]`. With the now-required `amount`, generated vouchers are for sale and named `[for sale €20.00]`, so that assertion now counts `%[for sale €20.00]` (commented in the test). The plan only named the extra `amount` parameter.
+2. **`ShopVouchersTest` uses `CreatesVoucherPosTables`** (trait added to the class) for the plan's "manager activating a for-sale voucher by hand leaves the product at price 0" test, which needs POS tables. No existing test in the class changed.
+3. **Office `index.blade.php` gained a `money2()` helper** (plain `€0.00` formatting). The existing `money()` is the signed history formatter ("+€20.00", "—" for zero) and would read wrongly in "Value €20.00".
+4. **`simsale.php` was run through Pint** (single-quote fix) because it failed `pint --test`; not strictly application code.
+5. The Shop manager-hint change keeps the original sentence behind `activating && ! forSale` and shows the for-sale sentence behind `activating && forSale` (the plan says "the hint reads …"; both are in the markup, as the plan requires for the no-value case).
 
 ## Verification
 
-1. `./vendor/bin/pint --test` on the 12 PHP files I changed or created → `PASS … 12 files`.
-2. `php artisan test --filter='Voucher|Schedule|ConfinePinSession'` → `Tests:    90 passed (479 assertions)`.
-3. `php artisan test` → `Tests:    15 failed, 835 passed (3577 assertions)`. Failing classes: UdeaScrapingServiceTest, CashReconciliationTest, FruitVegLabelPrintingTest, ProductTest, TestScraperControllerTest — the same 15 as the step 0 baseline; 806 + 29 new tests = 835.
-4. `php artisan schedule:list | grep voucher` → `*  *  * * *  php artisan vouchers:sync-till --scheduled  Next Due: 53 seconds from now`.
-5. `php artisan route:list --name=vouchers` → `vouchers/activity`, `vouchers/activity/feed`, then `vouchers/{voucher}/transactions`; in `routes/web.php` they are lines 1219, 1220, 1221.
-6. `node --check` of the extracted inline script → no output (`NODE_OK` echoed after it).
-7. Dev heartbeat:
-   ```
-   $ php artisan vouchers:sync-till --scheduled; tinker read()
-   source=schedule ok=true last_scheduled_at=2026-09-29T13:31:12+01:00 stale=false
-   after clearing last-scheduled: stale=true
-   ```
-   (Cleared the `last-scheduled` key rather than waiting 3 minutes. Dev has no cron, so from here on the dev page will say the scheduler has never run, which is correct on dev.)
-8. Simulated till sale on dev: `VOUCHER=GVLH4AU7ASAT TENDER=3 TICKET=999903 … simsale.php` → ticket id `5f459fe5-c7c9-4a93-852a-ea560fbae1c0`; `vouchers:sync-till` → `tickets 3 | applied 1 | skipped 2 | errors 0`; `payload(7, null)` newest event: `tx-15 | Redeemed at till | GVLH4AU7ASAT | -3 -> 17 | Till #999903 | applied`.
-   Cleanup: POS rows for that ticket deleted (PAYMENTS 1, TICKETLINES 2, TICKETS 1, RECEIPTS 1). `reset_voucher.php` put GVLH4AU7ASAT back to active €20 (it adds an `activate` audit row with note "Dev reset for till testing"; it does not delete history). The local redemption row (id 7) and its transaction (tx 15) stay in the dev database and in the activity log; they now point at a deleted POS ticket, which is harmless on dev.
-9. **Browser check: for the owner** (the Chrome session is a Shop PIN session and office pages go to `/confirm-password`). Checklist is in the plan's Verification 9. Things to look at in particular: the amber "scheduler has never run" banner is expected on dev (no cron); rows from the real till tests show a second line "till HH:mm" that is an hour behind the "When" time (the dev till's UTC clock, finding 3 of `findings/2026-09-28-till-testing.md`).
+1. `./vendor/bin/pint --test` on the 16 PHP files I changed or created → `PASS … 16 files` (after the `simsale.php` fix above).
+2. `php artisan test --filter='Voucher|ShopVouchers|Schedule|ConfinePinSession|ShopViewContract'` → `Tests:    141 passed (837 assertions)`.
+3. `php artisan test` → `Tests:    15 failed, 862 passed (3696 assertions)`. Failing classes: UdeaScrapingServiceTest, CashReconciliationTest, FruitVegLabelPrintingTest, ProductTest, TestScraperControllerTest — identical to step 0; 835 + 27 new = 862.
+4. `node --check resources/js/shop/vouchers.js`, and the extracted inline scripts of `vouchers/index.blade.php` and `vouchers/activity.blade.php` → clean (`ALL_NODE_OK`). `npm run build` → `✓ built in 9.84s`.
+5. Dev run (tinker + `docs/vouchers/scripts/simsale.php`):
+   - Created vouchers id 5 `GVDEVSALE001` and id 6 `GVDEVSALE002`, €20 for sale. POS products `e60041b7-c2b9-460e-96d1-9b20d542652d` and `32482827-55c6-4e55-ab61-06b842b7cfca`: `Gift Voucher GVDEVSALE00x [for sale €20.00] | PRICESELL 20`.
+   - `SALE=1 VOUCHER=GVDEVSALE001 TICKET=999910` (ticket `c86d13ad-…`, magcard 32.30) → `vouchers:sync-till`: `tickets 1 | activated 1`. Voucher `active 20.00`; product `[bal €20.00] | PRICESELL 0`; `payload(7, null)`: `Sold at till · Till #999910 · 20 · charged 20`.
+   - Redemption `TENDER=5 TICKET=999911` (ticket `812e76f2-…`) → `tickets 2 | applied 1 | skipped 1`; `GVDEVSALE001: active 15.00 | [bal €15.00] | PRICESELL 0`.
+   - `SALE=1 UNITS=2 PAY=cash VOUCHER=GVDEVSALE002 TICKET=999912` (ticket `cb471912-…`) → `tickets 3 | sale_flagged 1 | skipped 2`; `GVDEVSALE002: inactive 0.00 | [for sale €20.00] | PRICESELL 20`; redemption note `Quantity 2 on one voucher (charged €40.00). Not activated: each voucher is scanned itself.`
+   - Cleanup: POS PAYMENTS 3, TICKETLINES 6, TICKETS 3, RECEIPTS 3 deleted for the three ticket ids; the two POS products deleted; local redemptions 8, 9, 10, voucher_transactions 2, vouchers 5 and 6 (force-deleted). Left: the 2 original dev vouchers, no `GVDEV%` products, no till tickets ≥ 999900. The heartbeat keys moved (last run `command`).
+6. **Owner, on the dev till and in the browser** (not done by me: office pages need a password from the PIN session, and the till is yours): the plan's Verification 6 checklist. With no cron on dev, run `php artisan vouchers:sync-till` after each till sale.
 
 ## Files changed
 
-Mine (vouchers cycle 2):
+Mine (vouchers cycle 3):
 ```
+?? database/migrations/2026_09_30_100000_add_face_value_to_vouchers_table.php
+?? database/migrations/2026_09_30_100001_add_sale_amount_to_voucher_till_redemptions_table.php
  M CLAUDE.md
- M app/Console/Commands/SyncVoucherTillRedemptions.php
+ M app/Console/Commands/SyncVoucherPosProducts.php
+ M app/Http/Controllers/VoucherController.php
+ M app/Models/Voucher.php
+ M app/Models/VoucherTillRedemption.php
+ M app/Services/VoucherActivityService.php
+ M app/Services/VoucherPosProductService.php
  M app/Services/VoucherTillSyncService.php
  M config/vouchers.php
  M docs/FEATURES_INDEX.md
- M docs/deployment/production-deployment-guide.md
- M docs/deployment/production-guide.md
  M docs/features/voucher-management.md
- M docs/vouchers/implemented.md        (was " D": the committed cycle 1 report had been archived; this file is the new report)
- M resources/views/layouts/admin.blade.php
+ M docs/vouchers/implemented.md          (was " D": the cycle 2 report was archived; this is the new report)
+ M docs/vouchers/scripts/simsale.php
+ M resources/js/shop/vouchers.js
+ M resources/views/shop/vouchers.blade.php
+ M resources/views/vouchers/activity.blade.php
  M resources/views/vouchers/exceptions.blade.php
+ M resources/views/vouchers/generate.blade.php
  M resources/views/vouchers/index.blade.php
- M routes/console.php
- M routes/web.php
- M tests/Feature/ScheduleTest.php
+ M resources/views/vouchers/list.blade.php
+ M resources/views/vouchers/print.blade.php
+ M resources/views/vouchers/transactions.blade.php
+ M tests/Feature/Shop/ShopVouchersTest.php
+ M tests/Feature/VoucherActivityTest.php
+ M tests/Feature/VoucherPosProductServiceTest.php
+ M tests/Feature/VoucherTillExceptionsTest.php
  M tests/Feature/VoucherTillSyncServiceTest.php
-?? app/Http/Controllers/VoucherActivityController.php
-?? app/Services/VoucherActivityService.php
-?? app/Services/VoucherSyncHeartbeat.php
-?? resources/views/vouchers/activity.blade.php
-?? tests/Feature/VoucherActivityTest.php
-?? tests/Feature/VoucherSyncHeartbeatTest.php
 ```
-Everything in the Baseline list is untouched (Shop mode track and planning files). Not committed.
+Baseline files (`docs/vouchers/README.md`, `plan.md`, the cycle 2 archive folder) untouched. No Shop-track files other than the two the plan allows. Not committed.
 
 ## Notes for Planner
 
-1. **Transaction timestamps vs till time.** The log's "When" is when the app *recorded* the event (`created_at`); for till rows that is up to a minute after the sale (the scheduler interval). The till's own time is the second line. On production both should be Irish local time; on the dev VirtualBox till the second line is an hour behind (dev artefact).
-2. **The seen-set is per period and search.** Changing the period or the search does not highlight the new result set; only rows that arrive on later polls are highlighted. Changing the search does not reset `seen`, so rows that come back into view after clearing a search are highlighted. Harmless; a stricter rule could also reset `seen` on a search change.
-3. **The events limit applies per source before merging.** Each of the two queries takes the newest `limit` rows, then the merge takes `limit` again. The result is exact (the newest `limit` across both), but a 30-day window with more than 100 events shows only the newest 100 with no "more" hint. A "showing newest 100" line might help if managers use the 30-day view.
-4. **Unreviewed `partial` rows** show as `partial` in red on the log; once reviewed the pill reads "partial · reviewed". Exceptions without a transaction behave the same way. Nothing on this page marks them reviewed (out of scope, as planned).
-5. **Dev data left:** redemption id 7 / tx 15 (simulated ticket 999903, POS rows deleted) and two "Dev reset for till testing" `activate` rows on GVLH4AU7ASAT (this cycle) and GVVUF2SUACUM (2026-09-28). All dev-only.
+1. **`face_value` stays set after activation.** The plan did not say whether to clear it; I kept it (it records what the voucher was sold for, and `isForSale()` is false once active). Side effect worth knowing: `reset_voucher.php` or a manager setting a used voucher back to `inactive` would make it "for sale" again at its old value. Nothing in the app sets a voucher back to inactive today.
+2. **Deactivate/reactivate of an unsold voucher.** `changeStatus()` only deactivates `active` vouchers, so a for-sale voucher cannot be deactivated (e.g. a lost unsold label). Its till product keeps charging. A future "void unsold voucher" action may be wanted.
+3. **A sale line and a redemption line of the same voucher on one ticket** (scan to sell, then scan again to spend it at once) are one product, so they group into one line with `units 2` and a charge → `sale_flagged` (quantity). Correct by the owner's rule, but the note says "Quantity 2", which may confuse; the cashier really did a sell-then-redeem. Worth a line in cashier training.
+4. **The sale's charge includes tax**: `sale_total` uses the line's `TAXID` rate. Voucher products are `TAXCAT 000` so this is 0% today; if a till user ever changed the tax on the line, the charge would differ from the value and be flagged, which is the intended safety.
+5. **Old vouchers** (no `face_value`) behave exactly as before: `[not active]`, price 0, manual activation. The 37 production vouchers without a till product (parked finding) are all of this kind.
+6. **Label wording**: the till line for an unsold voucher reads `Gift Voucher GV… [for sale €20.00]` from `config('vouchers.pos_balance_text.for_sale')`; the receipt prints it the same way. The owner can reword it in config.

@@ -86,6 +86,15 @@ export default () => ({
         return ! this.activateUrl && (this.mode === 'unknown' || this.mode === 'inactive');
     },
 
+    /** Generated with a value and not sold yet: selling it at the till activates it. */
+    get forSale() {
+        return !! this.voucher?.for_sale;
+    },
+
+    get faceValue() {
+        return Number(this.voucher?.face_value ?? 0);
+    },
+
     get displayLabel() {
         return this.activating ? 'Starting balance €' : 'Deduct €';
     },
@@ -135,6 +144,11 @@ export default () => ({
                 this.voucher = data;
                 this.mode = data.status;
                 this.code = data.code;
+
+                // A manager on an unsold voucher: pre-fill its value for a manual activation.
+                if (this.activating && this.forSale) {
+                    this.typed = this.faceValue.toFixed(2);
+                }
             } else {
                 this.voucher = null;
                 this.mode = 'unknown';

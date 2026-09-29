@@ -17,7 +17,13 @@
             </div>
             <div class="bg-gray-800 rounded p-4 text-center">
                 <p class="text-xs text-gray-400">Initial</p>
-                <p class="text-lg font-semibold text-gray-100">{{ $voucher->initial_value !== null ? '€'.number_format($voucher->initial_value, 2) : '—' }}</p>
+                <p class="text-lg font-semibold text-gray-100">@if ($voucher->initial_value !== null)
+                        €{{ number_format($voucher->initial_value, 2) }}
+                    @elseif ($voucher->face_value !== null)
+                        <span class="text-sm px-2 py-0.5 rounded bg-yellow-800/50 text-yellow-300">€{{ number_format($voucher->face_value, 2) }} for sale</span>
+                    @else
+                        —
+                    @endif</p>
             </div>
             <div class="bg-gray-800 rounded p-4 text-center">
                 <p class="text-xs text-gray-400">Balance</p>

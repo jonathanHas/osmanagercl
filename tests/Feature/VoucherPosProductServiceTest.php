@@ -159,12 +159,13 @@ class VoucherPosProductServiceTest extends TestCase
     public function test_generating_vouchers_creates_their_products(): void
     {
         $this->actingAs($this->manager())
-            ->post(route('vouchers.generate.store'), ['count' => 3])
+            ->post(route('vouchers.generate.store'), ['count' => 3, 'amount' => 20])
             ->assertRedirect()
             ->assertSessionMissing('warning');
 
         $this->assertSame(3, DB::connection('pos')->table('PRODUCTS')->where('CODE', 'like', 'GV%')->count());
-        $this->assertSame(3, DB::connection('pos')->table('PRODUCTS')->where('NAME', 'like', '%[not active]')->count());
+        // Generated with a value, so priced to sell (vouchers cycle 3; was "[not active]").
+        $this->assertSame(3, DB::connection('pos')->table('PRODUCTS')->where('NAME', 'like', '%[for sale €20.00]')->count());
         $this->assertSame(0, Voucher::whereNull('pos_product_id')->count());
     }
 
@@ -173,7 +174,7 @@ class VoucherPosProductServiceTest extends TestCase
         DB::connection('pos')->getSchemaBuilder()->drop('PRODUCTS');
 
         $this->actingAs($this->manager())
-            ->post(route('vouchers.generate.store'), ['count' => 2])
+            ->post(route('vouchers.generate.store'), ['count' => 2, 'amount' => 10])
             ->assertRedirect()
             ->assertSessionHas('warning');
 
@@ -201,5 +202,106 @@ class VoucherPosProductServiceTest extends TestCase
             ->assertOk();
 
         $this->assertSame('Gift Voucher GV7KQFM2RA9T [bal €2.50]', $this->product('GV7KQFM2RA9T')->NAME);
+    }
+
+    // --- Vouchers cycle 3: vouchers generated with a value are sold at the till ---
+
+    private function forSale(float $value = 20, string $code = 'GV7KQFM2RA9T'): Voucher
+    {
+        return Voucher::create([
+            'code' => $code,
+            'face_value' => $value,
+            'current_balance' => 0,
+            'status' => Voucher::STATUS_INACTIVE,
+        ]);
+    }
+
+    public function test_a_for_sale_voucher_is_priced_at_its_value(): void
+    {
+        $voucher = $this->forSale(20);
+
+        $this->service()->sync($voucher);
+
+        $product = $this->product('GV7KQFM2RA9T');
+        $this->assertEquals(20, $product->PRICESELL);
+        $this->assertSame('Gift Voucher GV7KQFM2RA9T [for sale €20.00]', $product->NAME);
+        $this->assertSame('000', $product->TAXCAT);
+    }
+
+    public function test_activating_it_drops_the_price_to_zero(): void
+    {
+        $voucher = $this->forSale(20);
+        $this->service()->sync($voucher);
+
+        $voucher->update(['status' => Voucher::STATUS_ACTIVE, 'initial_value' => 20, 'current_balance' => 20]);
+        $service = $this->service();
+        $service->sync($voucher->fresh());
+
+        $product = $this->product('GV7KQFM2RA9T');
+        $this->assertEquals(0, $product->PRICESELL);
+        $this->assertSame('Gift Voucher GV7KQFM2RA9T [bal €20.00]', $product->NAME);
+        $this->assertSame('renamed', $service->lastAction());
+    }
+
+    public function test_a_valueless_inactive_voucher_stays_unpriced(): void
+    {
+        $voucher = $this->voucher(Voucher::STATUS_INACTIVE, 0);
+
+        $this->service()->sync($voucher);
+
+        $product = $this->product('GV7KQFM2RA9T');
+        $this->assertEquals(0, $product->PRICESELL);
+        $this->assertSame('Gift Voucher GV7KQFM2RA9T [not active]', $product->NAME);
+    }
+
+    public function test_a_price_changed_on_the_till_side_is_put_back(): void
+    {
+        $voucher = $this->forSale(20);
+        $this->service()->sync($voucher);
+        DB::connection('pos')->table('PRODUCTS')->where('CODE', 'GV7KQFM2RA9T')->update(['PRICESELL' => 15]);
+
+        $service = $this->service();
+        $service->sync($voucher->fresh());
+
+        $this->assertEquals(20, $this->product('GV7KQFM2RA9T')->PRICESELL);
+        $this->assertSame('renamed', $service->lastAction());
+    }
+
+    public function test_generating_with_a_value_prices_every_product(): void
+    {
+        $this->actingAs($this->manager())
+            ->post(route('vouchers.generate.store'), ['count' => 3, 'amount' => 20])
+            ->assertRedirect();
+
+        $this->assertSame(3, Voucher::where('face_value', 20)->where('status', Voucher::STATUS_INACTIVE)->whereNull('initial_value')->count());
+        $this->assertSame(3, DB::connection('pos')->table('PRODUCTS')->where('PRICESELL', 20)->where('NAME', 'like', '%[for sale €20.00]')->count());
+    }
+
+    public function test_generating_needs_a_value(): void
+    {
+        $this->actingAs($this->manager())
+            ->from(route('vouchers.generate'))
+            ->post(route('vouchers.generate.store'), ['count' => 3])
+            ->assertSessionHasErrors('amount');
+
+        $this->actingAs($this->manager())
+            ->post(route('vouchers.generate.store'), ['count' => 1, 'amount' => '20.555'])
+            ->assertSessionHasErrors('amount');
+
+        $this->actingAs($this->manager())
+            ->post(route('vouchers.generate.store'), ['count' => 1, 'amount' => config('vouchers.max_face_value') + 1])
+            ->assertSessionHasErrors('amount');
+
+        $this->assertSame(0, Voucher::count());
+    }
+
+    public function test_the_print_page_shows_the_value_on_screen(): void
+    {
+        $voucher = $this->forSale(25);
+
+        $this->actingAs($this->manager())
+            ->get(route('vouchers.print', ['ids' => $voucher->id]))
+            ->assertOk()
+            ->assertSee('€25.00');
     }
 }

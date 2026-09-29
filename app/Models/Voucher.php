@@ -35,6 +35,7 @@ class Voucher extends Model
     protected $fillable = [
         'code',
         'pos_product_id',
+        'face_value',
         'initial_value',
         'current_balance',
         'status',
@@ -42,6 +43,7 @@ class Voucher extends Model
     ];
 
     protected $casts = [
+        'face_value' => 'decimal:2',
         'initial_value' => 'decimal:2',
         'current_balance' => 'decimal:2',
     ];
@@ -69,6 +71,15 @@ class Voucher extends Model
     public function isInactive(): bool
     {
         return $this->status === self::STATUS_INACTIVE;
+    }
+
+    /**
+     * Generated with a value and not sold yet: its till product carries that
+     * price, and selling it at the till activates it (vouchers cycle 3).
+     */
+    public function isForSale(): bool
+    {
+        return $this->status === self::STATUS_INACTIVE && (float) $this->face_value > 0;
     }
 
     public function isExhausted(): bool

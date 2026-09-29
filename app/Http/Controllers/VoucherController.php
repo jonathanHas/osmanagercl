@@ -92,6 +92,9 @@ class VoucherController extends Controller
             'current_balance' => (float) $voucher->current_balance,
             'issued_at' => $this->issuedAt($voucher),
             'history' => $this->history($voucher),
+            // Vouchers cycle 3: the value an unsold voucher is sold for at the till.
+            'face_value' => $voucher->face_value !== null ? (float) $voucher->face_value : null,
+            'for_sale' => $voucher->isForSale(),
         ]);
     }
 
@@ -129,7 +132,9 @@ class VoucherController extends Controller
             ->map(fn (VoucherTransaction $t) => [
                 'type' => $t->type,
                 'label' => match ($t->type) {
-                    VoucherTransaction::TYPE_ISSUE => 'Issued',
+                    VoucherTransaction::TYPE_ISSUE => $t->source === VoucherTransaction::SOURCE_TILL
+                        ? 'Sold at till'
+                        : 'Issued',
                     VoucherTransaction::TYPE_DEDUCT => $t->source === VoucherTransaction::SOURCE_TILL
                         ? 'Redeemed at till'
                         : 'Redeemed',
@@ -366,6 +371,7 @@ class VoucherController extends Controller
     {
         $data = $request->validate([
             'count' => ['required', 'integer', 'min:1', 'max:200'],
+            'amount' => ['required', 'numeric', 'gt:0', 'max:'.config('vouchers.max_face_value'), 'decimal:0,2'],
         ]);
 
         $ids = [];
@@ -373,6 +379,8 @@ class VoucherController extends Controller
             for ($i = 0; $i < $data['count']; $i++) {
                 $voucher = Voucher::create([
                     'code' => Voucher::generateUniqueCode(),
+                    // Unsold: selling it at the till activates it with this value.
+                    'face_value' => round((float) $data['amount'], 2),
                     'current_balance' => 0,
                     'status' => Voucher::STATUS_INACTIVE,
                     'created_by' => Auth::id(),
@@ -403,6 +411,8 @@ class VoucherController extends Controller
         $labels = $vouchers->map(fn (Voucher $v) => [
             'id' => $v->id,
             'code' => $v->code,
+            // On screen only; the printed label does not show the amount (owner decision 7).
+            'face_value' => $v->face_value !== null ? (float) $v->face_value : null,
             'zpl' => $v->toZplLabel(),
         ])->values();
 

@@ -55,14 +55,17 @@ class VoucherPosProductService
     }
 
     /**
-     * e.g. "Gift Voucher GV7KQFM2RA9T [bal €42.50]".
+     * e.g. "Gift Voucher GV7KQFM2RA9T [bal €42.50]", or "[for sale €20.00]" for
+     * an unsold voucher with a value.
      */
     public function productName(Voucher $voucher): string
     {
         $texts = config('vouchers.pos_balance_text');
         $text = $texts[$voucher->status] ?? $voucher->status;
 
-        if ($voucher->status === Voucher::STATUS_ACTIVE) {
+        if ($voucher->isForSale()) {
+            $text = sprintf($texts['for_sale'], number_format((float) $voucher->face_value, 2));
+        } elseif ($voucher->status === Voucher::STATUS_ACTIVE) {
             $text = sprintf($text, number_format((float) $voucher->current_balance, 2));
         }
 
@@ -70,7 +73,18 @@ class VoucherPosProductService
     }
 
     /**
-     * Ensure the voucher's POS product exists and its NAME is current.
+     * The till price: the face value while the voucher is for sale, so scanning
+     * the label as an item charges it; €0.00 otherwise (a redemption line).
+     * PRICESELL is ex-VAT, and the product is TAXCAT 000 (0%), so this is also
+     * what the customer pays.
+     */
+    public function productPrice(Voucher $voucher): float
+    {
+        return $voucher->isForSale() ? round((float) $voucher->face_value, 2) : 0.0;
+    }
+
+    /**
+     * Ensure the voucher's POS product exists and its NAME and price are current.
      *
      * @return string|null the POS product id, or null when the POS could not be written
      */
@@ -80,6 +94,7 @@ class VoucherPosProductService
 
         try {
             $name = $this->productName($voucher);
+            $price = $this->productPrice($voucher);
             $action = 'unchanged';
 
             $product = $voucher->pos_product_id ? Product::find($voucher->pos_product_id) : null;
@@ -99,7 +114,7 @@ class VoucherPosProductService
                     'REFERENCE' => $voucher->code,
                     'CATEGORY' => $this->categoryId(),
                     'TAXCAT' => config('vouchers.pos_taxcat'),
-                    'PRICESELL' => 0,
+                    'PRICESELL' => $price,
                     'PRICEBUY' => 0,
                 ]);
                 // A service product: the till records no stock movement for it.
@@ -107,8 +122,9 @@ class VoucherPosProductService
                 $action = 'created';
             }
 
-            if ($product->NAME !== $name) {
-                Product::whereKey($product->ID)->update(['NAME' => $name]);
+            // A price change is reported as `renamed` too, so callers' totals keep working.
+            if ($product->NAME !== $name || round((float) $product->PRICESELL, 2) !== $price) {
+                Product::whereKey($product->ID)->update(['NAME' => $name, 'PRICESELL' => $price]);
                 $action = $action === 'unchanged' ? 'renamed' : $action;
             }
 

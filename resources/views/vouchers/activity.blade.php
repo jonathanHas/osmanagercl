@@ -126,6 +126,9 @@
                                 <template x-if="e.shortfall">
                                     <span class="block text-xs text-red-300" x-text="'short ' + money(e.shortfall)"></span>
                                 </template>
+                                <template x-if="e.sale_amount">
+                                    <span class="block text-xs text-gray-400" x-text="'charged ' + money(e.sale_amount)"></span>
+                                </template>
                             </td>
                             <td class="px-4 py-2 font-mono">
                                 <template x-if="e.voucher_url">
@@ -306,7 +309,7 @@
                         case 'redeem_till': return { cls: 'bg-purple-800/50 text-purple-300', text: 'till' };
                         case 'redeem_manual': return { cls: 'bg-blue-800/50 text-blue-300', text: 'manual' };
                         case 'issue': return { cls: 'bg-green-800/50 text-green-300', text: 'issue' };
-                        case 'exception': return { cls: 'bg-yellow-800/50 text-yellow-300', text: (e.status || 'exception').replace('_', ' ') + (e.reviewed ? ' · reviewed' : '') };
+                        case 'exception': return { cls: 'bg-yellow-800/50 text-yellow-300', text: (e.status || 'exception').replaceAll('_', ' ') + (e.reviewed ? ' · reviewed' : '') };
                         default: return { cls: 'bg-gray-700 text-gray-300', text: 'status' };
                     }
                 },

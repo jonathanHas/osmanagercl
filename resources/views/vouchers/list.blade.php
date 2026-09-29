@@ -55,7 +55,13 @@
                                 ][$voucher->status] ?? 'bg-yellow-800/50 text-yellow-300')
                                 <span class="text-xs px-2 py-0.5 rounded {{ $badge }}">{{ ucfirst($voucher->status) }}</span>
                             </td>
-                            <td class="px-4 py-2 text-right">{{ $voucher->initial_value !== null ? '€'.number_format($voucher->initial_value, 2) : '—' }}</td>
+                            <td class="px-4 py-2 text-right">@if ($voucher->initial_value !== null)
+                                    €{{ number_format($voucher->initial_value, 2) }}
+                                @elseif ($voucher->face_value !== null)
+                                    <span class="text-xs px-2 py-0.5 rounded bg-yellow-800/50 text-yellow-300 whitespace-nowrap">€{{ number_format($voucher->face_value, 2) }} for sale</span>
+                                @else
+                                    —
+                                @endif</td>
                             <td class="px-4 py-2 text-right font-medium">€{{ number_format($voucher->current_balance, 2) }}</td>
                             <td class="px-4 py-2 text-gray-300">{{ $voucher->creator?->name ?? '—' }}</td>
                             <td class="px-4 py-2 text-gray-400 text-xs">{{ $voucher->created_at?->format('d M Y H:i') }}</td>

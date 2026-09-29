@@ -426,4 +426,51 @@ class VoucherActivityTest extends TestCase
             ->assertOk()
             ->assertSee('href="'.route('vouchers.activity').'"', false);
     }
+
+    // --- Vouchers cycle 3 ---
+
+    public function test_a_till_sale_shows_as_sold_at_till_and_counts_as_issued(): void
+    {
+        $v = $this->voucher('GVSALE000001', 20);
+        $t = $this->tx($v, VoucherTransaction::TYPE_ISSUE, 20, 20, now()->subMinute(), [
+            'source' => VoucherTransaction::SOURCE_TILL,
+            'note' => 'Till #430300',
+        ]);
+        $this->redemption([
+            'voucher_id' => $v->id,
+            'voucher_code' => $v->code,
+            'ticket_number' => 430300,
+            'status' => VoucherTillRedemption::STATUS_ACTIVATED,
+            'sale_amount' => 20,
+            'voucher_transaction_id' => $t->id,
+        ], now()->subMinute());
+
+        $response = $this->feed();
+        $events = $response->json('events');
+
+        $this->assertCount(1, $events);
+        $this->assertSame('issue', $events[0]['kind']);
+        $this->assertSame('Sold at till', $events[0]['label']);
+        $this->assertEquals(20, $events[0]['amount']);
+        $this->assertSame('Till #430300', $events[0]['who']);
+        $this->assertEquals(20, $events[0]['sale_amount']);
+        $this->assertEquals(20, $response->json('totals.issued_today'));
+    }
+
+    public function test_a_flagged_sale_appears_once(): void
+    {
+        $this->redemption([
+            'ticket_number' => 430301,
+            'status' => VoucherTillRedemption::STATUS_SALE_FLAGGED,
+            'sale_amount' => 40,
+        ]);
+
+        $events = $this->feed()->json('events');
+
+        $this->assertCount(1, $events);
+        $this->assertSame('exception', $events[0]['kind']);
+        $this->assertSame('Sale not activated', $events[0]['label']);
+        $this->assertSame('sale_flagged', $events[0]['status']);
+        $this->assertEquals(40, $events[0]['sale_amount']);
+    }
 }

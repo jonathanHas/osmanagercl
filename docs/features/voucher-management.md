@@ -7,9 +7,9 @@ Gift-voucher system for the shop. Customers buy vouchers and redeem them against
 **Purpose**: Track gift vouchers with a server-side balance and a full audit trail, redeemable by scanning at the till.
 
 **Lifecycle**:
-1. A manager **generates** a batch of vouchers — each gets a random code and starts `inactive` (printed but not sold).
-2. Codes are **printed** as CODE-128 barcode labels on the Zebra printer.
-3. When sold, a manager **activates** a voucher with a starting balance (status → `active`).
+1. A manager **generates** a batch of vouchers **with a value** (e.g. 10 × €20). Each gets a random code, starts `inactive` (unsold) with that `face_value`, and its hidden till product is **priced at the value** (`[for sale €20.00]`).
+2. Codes are **printed** as CODE-128 barcode labels on the Zebra printer (the label does not show the value).
+3. **Sold at the till**: the cashier scans the label as an item, the till charges its value, and the next till check (within a minute) **activates** the voucher with that value (status → `active`) and drops the till price to €0.00 (see [Selling a voucher at the till](#selling-a-voucher-at-the-till)). Anything unusual activates nothing and is flagged. A manager can still activate by hand on `/vouchers` (the fallback, and the only way for vouchers generated before 2026-09-30, which have no value).
 4. Staff **redeem** it at the uniCenta till: scan the voucher label, pay with the till's **Voucher** tender, and the app deducts the amount within a minute (see [Till redemption](#till-redemption-unicenta)). A manual deduct on `/vouchers` or `/shop/vouchers` is the fallback. At €0 the status → `exhausted`.
 5. An admin can **deactivate** a voucher (e.g. reported lost/stolen) and later **reactivate** it; the balance is preserved.
 
@@ -17,7 +17,7 @@ Gift-voucher system for the shop. Customers buy vouchers and redeem them against
 
 | Status | Meaning | Redeemable? |
 |---|---|---|
-| `inactive` | Generated/printed, not yet sold | No — must be activated first |
+| `inactive` | Generated/printed, not yet sold. With a `face_value` it is **for sale**: its till product charges that value and the sale activates it | No — must be sold (or activated by a manager) first |
 | `active` | Issued with a balance | Yes |
 | `exhausted` | Balance fully spent (€0) | No |
 | `deactivated` | Admin-disabled (balance preserved) | No — until reactivated |
@@ -26,8 +26,9 @@ Gift-voucher system for the shop. Customers buy vouchers and redeem them against
 
 - **`vouchers`** — `code` (unique), `initial_value`, `current_balance`, `status`, `created_by`, timestamps, soft deletes. Model: `app/Models/Voucher.php`.
 - **`vouchers.pos_product_id`** — the uniCenta `PRODUCTS.ID` of the voucher's hidden redemption product (nullable, unique; cycle 28).
+- **`vouchers.face_value`** — the value an unsold voucher is sold for at the till (nullable; vouchers cycle 3). Set by generation; NULL for vouchers generated before it. `initial_value` stays NULL until the voucher is activated.
 - **`voucher_transactions`** — full audit log: `voucher_id`, `type` (`issue` / `deduct` / `deactivate` / `activate`), `source` (`manual` / `till`, default `manual`), `amount`, `balance_after`, `note` (optional admin reason; `Till #N` for till redemptions), `user_id` (null for till rows), timestamps. Model: `app/Models/VoucherTransaction.php`.
-- **`voucher_till_redemptions`** — one row per voucher line seen on a till ticket: `pos_ticket_id` + `pos_product_id` (unique pair, the idempotency backstop), `voucher_code` snapshot, `ticket_number`, `ticket_type`, `sold_at`, `voucher_tender`, `ticket_total`, `amount_deducted`, `shortfall`, `status`, `voucher_id`, `voucher_transaction_id`, `note`, `reviewed_at`, `reviewed_by`. Model: `app/Models/VoucherTillRedemption.php`.
+- **`voucher_till_redemptions`** — one row per voucher line seen on a till ticket: `pos_ticket_id` + `pos_product_id` (unique pair, the idempotency backstop), `voucher_code` snapshot, `ticket_number`, `ticket_type`, `sold_at`, `voucher_tender`, `ticket_total`, `sale_amount` (what the till charged for the voucher's own line on a sale; NULL on redemptions; vouchers cycle 3), `amount_deducted`, `shortfall`, `status`, `voucher_id`, `voucher_transaction_id`, `note`, `reviewed_at`, `reviewed_by`. Model: `app/Models/VoucherTillRedemption.php`.
 
 Every value-changing action (issue, deduct) and every admin status change (deactivate/reactivate) writes a transaction row, viewable per voucher at `/vouchers/{voucher}/transactions`.
 
@@ -36,6 +37,43 @@ Every value-changing action (issue, deduct) and every admin status change (deact
 - **Symbology**: CODE-128 (alphanumeric, in the scanner's supported-format list; auto-selected by `LabelService::generateBarcode()` for non-numeric strings).
 - **Scheme**: `GV` + 10 characters from an unambiguous uppercase set (`23456789ABCDEFGHJKLMNPQRSTUVWXYZ`, excludes `0/O/1/I`). Example: `GV7KQFM2RA9T`.
 - `Voucher::generateUniqueCode()` uses a CSPRNG (`random_int`), checks for collisions and retries; the `code` unique index is the hard backstop. Codes are fixed length, so printed barcodes are a constant width.
+
+## Selling a voucher at the till
+
+Added in vouchers cycle 3 (2026-09-30). A voucher generated with a value is sold like any product, and the sale activates it. No manager step and no separate "Voucher 20 Euro" product.
+
+### Cashier steps
+
+1. Take a label from the batch of the value the customer wants.
+2. **Scan the label as an item.** The till shows a line `Gift Voucher GV… [for sale €20.00]` charging €20.00.
+3. **Scan each voucher itself. Never use the quantity key**: three €20 vouchers are three scans of three labels, not one label × 3.
+4. Take payment as normal (cash, card, or even another voucher's Voucher tender).
+5. Within a minute the app activates the voucher with €20.00, and the same label then scans as a €0.00 line `[bal €20.00]` for redemption.
+
+Labels look the same whatever their value (the value is not printed), so **keep batches of different values apart**. The price on the till line at scan is the only check.
+
+### What activates and what is flagged
+
+The till check (`vouchers:sync-till`) treats a voucher-category line that carries a price as a **sale**; a €0.00 line is a redemption as before. A sale activates the voucher (`activated`: `initial_value` = balance = `face_value`, an `issue` transaction with `source = till` and note `Till #N`, shown as "Sold at till") only when everything matches. Otherwise nothing is activated and the line goes to `/vouchers/exceptions`:
+
+| Status | When | What to do |
+|---|---|---|
+| `sale_flagged` | The voucher was already active, exhausted or deactivated ("Charged €X but the voucher was already … Nothing was added.") | Sold twice, or scanned for sale instead of redemption; refund or correct by hand |
+| `sale_flagged` | The receipt was paid with the **Free** tender | Activate by hand if it was a deliberate gift |
+| `sale_flagged` | **Quantity** other than 1 (a quantity key, or the same label scanned twice) | Each extra voucher is unactivated; activate the right labels by hand |
+| `sale_flagged` | The amount charged differs from the voucher's value (a price edited at the till), or the voucher has no value | Activate by hand with the right amount |
+| `refund` | A refund ticket carrying a voucher sale ("Refund of a voucher sale (€X)…") | **Deactivate** the voucher by hand if it was handed back |
+| `unknown` | A priced product in the voucher category with no voucher in the app | Investigate |
+
+Each row carries `sale_amount`, shown in the "Sale" column on the exceptions page and as "charged €X" on the activity screen.
+
+**The one-minute window**: until the next till check the sold voucher's product still carries its price. A redemption attempted in that minute charges the value again and is flagged (`already active`). On production the scheduler checks every minute; on dev (no cron) run `php artisan vouchers:sync-till`.
+
+**Manual activation** stays for managers and admins (`vouchers.manage`): scanning an unsold voucher on `/vouchers` or `/shop/vouchers` shows "Value €20.00. Normally sold at the till…" with the starting balance pre-filled. Employees see "Not sold yet (€20.00). Sell it at the till: scan the label as an item." A manual activation also drops the till price to €0.00.
+
+**Products `6012-6014`** ("Voucher 10/20/50 Euro") still exist and still work the old way (sell the product, a manager activates a label by hand) during the changeover. A voucher sold that way is never scanned, so it stays unsold until activated by hand.
+
+**Finance** is unchanged: the voucher product is `TAXCAT 000`, so its sale counts as 0% VAT revenue exactly as a "Voucher 20 Euro" sale does, and redemption is still `paperin`. Sales reports by POS category show these sales under "Gift Voucher Redemption" (misleading name; renaming it is a follow-up).
 
 ## Till redemption (uniCenta)
 
@@ -60,7 +98,8 @@ uniCenta's Voucher tender is recorded as `PAYMENTS.PAYMENT = 'paperin'` with the
 - One product per voucher: `ID` uuid, `CODE` = `REFERENCE` = voucher code, `PRICESELL 0`, `PRICEBUY 0`, `TAXCAT '000'`, `ISSERVICE 1` (no stock movement), `NAME` carrying the balance.
 - Category **"Gift Voucher Redemption"** (child of `033` Seasonal, `CATSHOWNAME 0`), created on first use. Configurable via `VOUCHER_POS_CATEGORY` / `VOUCHER_POS_CATEGORY_PARENT`.
 - **Never** a `PRODUCTS_CAT` row (so no till button), no `STOCKCURRENT` or metadata rows.
-- Created when vouchers are generated or an unknown code is activated; renamed after every activate / deduct / deactivate / reactivate and every till redemption. uniCenta reads a scanned product from the database on each scan, so a rename shows on the next scan.
+- **Price**: `PRICESELL` = the face value while the voucher is for sale (inactive with a value), €0.00 otherwise. `sync()` corrects a drifted price as well as the name; `vouchers:sync-pos-products --all` does it for every voucher.
+- Created when vouchers are generated or an unknown code is activated; renamed (and repriced) after every activate / deduct / deactivate / reactivate and every till redemption or sale. uniCenta reads a scanned product from the database on each scan, so a rename shows on the next scan.
 - Every POS write is wrapped: if the POS is down, generation/activation/deduction still succeed, a warning is logged, and generation flashes "N voucher products could not be created on the till; run vouchers:sync-pos-products".
 - If `pos_product_id` is missing but a product with the voucher's `CODE` exists, it is linked rather than duplicated.
 
@@ -88,7 +127,9 @@ Backfill / repair: `php artisan vouchers:sync-pos-products [--dry-run] [--all]` 
 | `no_tender` | Voucher scanned but paid by cash/card | untouched |
 | `inactive` | Voucher was inactive, deactivated or exhausted | untouched |
 | `unknown` | A product in the voucher category with no voucher in the app | — |
-| `refund` | Refund ticket carrying a voucher line; re-credit by hand if needed | untouched |
+| `refund` | Refund ticket carrying a voucher line; re-credit by hand if needed (for a refunded *sale*, deactivate the voucher) | untouched |
+| `activated` | A till sale activated the voucher (not an exception) | set to the face value |
+| `sale_flagged` | A voucher sale that activated nothing; see [What activates and what is flagged](#what-activates-and-what-is-flagged) | untouched |
 
 Managers (`vouchers.manage`) see unreviewed exceptions at **Vouchers → Till exceptions** (also a "Till exceptions (N)" link in the `/vouchers` header), fix anything on the voucher itself, and **Mark reviewed** with an optional note. "Show reviewed" lists everything.
 
@@ -181,6 +222,7 @@ screen is unaffected:
 Vouchers print on the shop's Zebra label printer (the same one used by `/labels`) on the **small label (56×30mm / 673×366 dots)**.
 
 - `Voucher::toZplLabel()` builds one `^XA…^XZ` ZPL block: a "GIFT VOUCHER" title, a CODE-128 barcode (`^BC`, with the human-readable code printed under the bars).
+- The generate form (`/vouchers/generate`) takes a **count and one value** for the whole batch (value €0.01 to `vouchers.max_face_value`, default €1000, 2 dp). The print page shows the value under each code on screen; the printed label does not.
 - After generating, the user lands on a **preview + print** page (`resources/views/vouchers/print.blade.php`) that renders each label via the in-browser `ZplPreview` emulator (`resources/js/zpl-preview.js`) and has a **Print to Zebra** button.
 - Printing goes through `ZebraPrintService::sendRaw()` (`app/Services/ZebraPrintService.php`) — ZPL → temp file → a `timeout`-guarded `lp … -o raw` (CUPS raw print over IPP), with the printer from `config('services.zebra.*')`. The same service backs every other Zebra print path in the app; do not shell out to `lp` directly. 📖 [Label Translation System Documentation](./label-translation-system.md)
 - Voucher ZPL carries no `^PQ` (each code is unique, so there is nothing to repeat), which means `ZebraLabel::setZplQuantity()` is not involved — one `^XA…^XZ` block per voucher is concatenated into a single job.
@@ -227,7 +269,8 @@ Employees get a cut-down till screen: they can ring up a voucher payment but can
 - **Models**: `app/Models/Voucher.php`, `app/Models/VoucherTransaction.php`, `app/Models/VoucherTillRedemption.php`
 - **Till redemption**: `app/Services/VoucherPosProductService.php`, `app/Services/VoucherTillSyncService.php`, `app/Console/Commands/SyncVoucherPosProducts.php`, `app/Console/Commands/SyncVoucherTillRedemptions.php`, `config/vouchers.php`
 - **Activity screen**: `app/Services/VoucherActivityService.php`, `app/Services/VoucherSyncHeartbeat.php`
-- **Migrations**: `database/migrations/2026_06_24_120000_create_vouchers_table.php`, `..._120001_create_voucher_transactions_table.php`, `2026_06_25_120000_add_note_to_voucher_transactions_table.php`, `2026_09_28_100000_create_voucher_till_redemptions_table.php`, `..._100001_add_source_to_voucher_transactions_table.php`, `..._100002_add_pos_product_id_to_vouchers_table.php`
+- **Migrations**: `database/migrations/2026_06_24_120000_create_vouchers_table.php`, `..._120001_create_voucher_transactions_table.php`, `2026_06_25_120000_add_note_to_voucher_transactions_table.php`, `2026_09_28_100000_create_voucher_till_redemptions_table.php`, `..._100001_add_source_to_voucher_transactions_table.php`, `..._100002_add_pos_product_id_to_vouchers_table.php`, `2026_09_30_100000_add_face_value_to_vouchers_table.php`, `..._100001_add_sale_amount_to_voucher_till_redemptions_table.php`
 - **Views**: `resources/views/vouchers/{index,list,generate,print,transactions,exceptions,activity}.blade.php`
 - **Permissions/nav**: `database/seeders/RolesAndPermissionsSeeder.php`, `resources/views/layouts/admin.blade.php`
+- **Dev helpers** (never against production): `docs/vouchers/scripts/` — `simsale.php` (fake till sale; `SALE=1` sells a voucher as an item), `numeric_barcode.php`, `reset_voucher.php`
 - **Reused**: `resources/js/barcode-scanner.js`, `resources/js/zpl-preview.js`, `app/Services/LabelService.php`, `config/services.php` (`zebra`)

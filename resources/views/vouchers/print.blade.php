@@ -36,6 +36,9 @@
                         <img x-ref="preview_{{ $label['id'] }}" alt="Label preview for {{ $label['code'] }}"
                              class="max-w-full h-auto border border-gray-200" />
                         <p class="mt-2 font-mono text-sm text-gray-700">{{ $label['code'] }}</p>
+                        @if ($label['face_value'] !== null)
+                            <p class="text-sm font-semibold text-gray-800">€{{ number_format($label['face_value'], 2) }}</p>
+                        @endif
                     </div>
                 @endforeach
             </div>

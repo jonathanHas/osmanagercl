@@ -25,6 +25,11 @@ use Illuminate\Support\Facades\Log;
  * with no voucher tender deducts nothing and is flagged `no_tender`; refunds
  * are recorded, never reversed.
  *
+ * Vouchers cycle 3: a voucher line that carries a price is the voucher being
+ * *sold* (its product is priced at the face value while it is for sale). That
+ * sale activates the voucher (`activated`), or, when anything is unusual,
+ * activates nothing and is flagged (`sale_flagged`, `refund`). See applySale().
+ *
  * Pattern follows KdsRealtimeController::checkNewOrders(): a watermark from the
  * local table's latest sold_at (with an overlap so a late-committed ticket is
  * not missed), a capped look-back, and a per-row existence check backed by a
@@ -33,7 +38,7 @@ use Illuminate\Support\Facades\Log;
 class VoucherTillSyncService
 {
     // `errors` counts tickets that failed inside the loop (logged, retried next run).
-    private const COUNT_KEYS = ['tickets', 'applied', 'partial', 'no_tender', 'inactive', 'unknown', 'refund', 'skipped', 'errors'];
+    private const COUNT_KEYS = ['tickets', 'applied', 'partial', 'no_tender', 'inactive', 'unknown', 'refund', 'activated', 'sale_flagged', 'skipped', 'errors'];
 
     public function __construct(
         protected VoucherPosProductService $posProducts,
@@ -152,18 +157,9 @@ class VoucherTillSyncService
     {
         $pos = DB::connection('pos');
 
-        // A double scan of one voucher collapses to its first line; UNITS is ignored.
-        $lines = $pos->table('TICKETLINES as tl')
-            ->join('PRODUCTS as p', 'tl.PRODUCT', '=', 'p.ID')
-            ->where('tl.TICKET', $ticket->ID)
-            ->where('p.CATEGORY', $categoryId)
-            ->orderBy('tl.LINE')
-            ->select('tl.LINE', 'tl.PRODUCT', 'p.CODE')
-            ->get()
-            ->unique('PRODUCT')
-            ->values();
+        $groups = $this->voucherGroups($pos, $ticket->ID, $categoryId);
 
-        if ($lines->isEmpty()) {
+        if ($groups === []) {
             return;
         }
 
@@ -171,6 +167,12 @@ class VoucherTillSyncService
             ->where('RECEIPT', $ticket->ID)
             ->where('PAYMENT', 'paperin')
             ->sum('TOTAL'), 2);
+
+        // Owner decision 4 (2026-09-29): a voucher sale paid with the Free tender activates nothing.
+        $paidFree = $pos->table('PAYMENTS')
+            ->where('RECEIPT', $ticket->ID)
+            ->where('PAYMENT', 'free')
+            ->exists();
 
         // Same formula as TillTransactionRepository::formatReceipt().
         $ticketTotal = round((float) $pos->table('TICKETLINES as tl')
@@ -190,16 +192,20 @@ class VoucherTillSyncService
 
         $pool = $tender;
         $changed = [];
-        $lastIndex = $lines->count() - 1;
 
-        foreach ($lines as $index => $line) {
+        // `isLast` (which decides `partial`) is counted over redemption lines only,
+        // so a voucher sold on the same ticket can neither take nor create a shortfall.
+        $redemptionProducts = array_keys(array_filter($groups, fn ($g) => ! $g->isSale));
+        $lastRedemption = end($redemptionProducts);
+
+        foreach ($groups as $line) {
             $existing = VoucherTillRedemption::where('pos_ticket_id', $ticket->ID)
                 ->where('pos_product_id', $line->PRODUCT)
                 ->first();
 
             if ($existing) {
                 // Already recorded (overlap window, or a retry after a partial failure):
-                // its deduction still used up part of the shared tender.
+                // its deduction still used up part of the shared tender (0 for a sale).
                 $pool = round($pool - (float) $existing->amount_deducted, 2);
                 $counts['skipped']++;
 
@@ -209,9 +215,11 @@ class VoucherTillSyncService
             $voucher = $this->resolveVoucher($line);
 
             try {
-                [$status, $deducted, $voucherId] = DB::transaction(
-                    function () use ($base, $line, $voucher, &$pool, $index, $lastIndex, $ticket) {
-                        return $this->applyLine($base, $line, $voucher, $pool, $index === $lastIndex, $ticket);
+                [$status, $touched, $voucherId] = DB::transaction(
+                    function () use ($base, $line, $voucher, &$pool, $lastRedemption, $ticket, $paidFree) {
+                        return $line->isSale
+                            ? $this->applySale($base, $line, $voucher, $ticket, $paidFree)
+                            : $this->applyLine($base, $line, $voucher, $pool, $line->PRODUCT === $lastRedemption, $ticket);
                     }
                 );
             } catch (QueryException $e) {
@@ -227,17 +235,57 @@ class VoucherTillSyncService
 
             $counts[$status]++;
 
-            if ($deducted > 0 && $voucherId) {
+            if ($touched > 0 && $voucherId) {
                 $changed[$voucherId] = true;
             }
         }
 
-        // Rename each touched voucher's POS product to its new balance.
+        // Rename (and reprice) each deducted or activated voucher's POS product.
         foreach (array_keys($changed) as $voucherId) {
             if ($voucher = Voucher::find($voucherId)) {
                 $this->posProducts->sync($voucher);
             }
         }
+    }
+
+    /**
+     * The ticket's voucher-category lines, one group per product in order of its
+     * first LINE: a double scan collapses to one group, with `units` summed and
+     * `sale_total` the charged amount incl. tax. A group with a charge is a sale
+     * (the voucher sold as an item); a €0.00 group is a redemption.
+     *
+     * @return array<string, object>
+     */
+    private function voucherGroups($pos, string $ticketId, string $categoryId): array
+    {
+        $lines = $pos->table('TICKETLINES as tl')
+            ->join('PRODUCTS as p', 'tl.PRODUCT', '=', 'p.ID')
+            ->leftJoin('TAXES as tx', 'tx.ID', '=', 'tl.TAXID')
+            ->where('tl.TICKET', $ticketId)
+            ->where('p.CATEGORY', $categoryId)
+            ->orderBy('tl.LINE')
+            ->select('tl.LINE', 'tl.PRODUCT', 'tl.UNITS', 'tl.PRICE', 'p.CODE', 'tx.RATE')
+            ->get();
+
+        $groups = [];
+        foreach ($lines as $l) {
+            $g = $groups[$l->PRODUCT] ??= (object) [
+                'LINE' => $l->LINE,
+                'PRODUCT' => $l->PRODUCT,
+                'CODE' => $l->CODE,
+                'units' => 0.0,
+                'sale_total' => 0.0,
+            ];
+            $g->units += (float) $l->UNITS;
+            $g->sale_total += (float) $l->UNITS * (float) $l->PRICE * (1 + (float) ($l->RATE ?? 0));
+        }
+
+        foreach ($groups as $g) {
+            $g->sale_total = round($g->sale_total, 2);
+            $g->isSale = abs($g->sale_total) > 0.005;
+        }
+
+        return $groups;
     }
 
     /**
@@ -347,5 +395,90 @@ class VoucherTillSyncService
         $redemption->update(['voucher_transaction_id' => $transaction->id]);
 
         return [$status, $deduct, $locked->id];
+    }
+
+    /**
+     * A voucher sold as an item on this ticket (its line carries a price). The
+     * sale activates the voucher with its face value when everything matches;
+     * anything unusual activates nothing and is flagged for a manager (owner
+     * decisions 1-4, 2026-09-29). Runs inside the caller's transaction; the
+     * redemption row is inserted before the voucher changes.
+     *
+     * @param  array<string, mixed>  $base
+     * @return array{0: string, 1: float, 2: ?int} status, amount activated, voucher id
+     */
+    private function applySale(array $base, object $line, ?Voucher $voucher, object $ticket, bool $paidFree): array
+    {
+        $charged = round(abs($line->sale_total), 2);
+        $chargedText = '€'.number_format($charged, 2);
+
+        $row = $base + [
+            'pos_product_id' => $line->PRODUCT,
+            'voucher_code' => $line->CODE !== null ? substr((string) $line->CODE, 0, 20) : null,
+            'voucher_id' => $voucher?->id,
+            'sale_amount' => $charged,
+            'amount_deducted' => 0,
+            'shortfall' => 0,
+        ];
+
+        $flag = function (string $status, string $note) use ($row, $voucher): array {
+            VoucherTillRedemption::create($row + ['status' => $status, 'note' => $note]);
+
+            return [$status, 0.0, $voucher?->id];
+        };
+
+        if ((int) $ticket->TICKETTYPE === 1) {
+            return $flag(VoucherTillRedemption::STATUS_REFUND,
+                "Refund of a voucher sale ({$chargedText}). Deactivate the voucher if it was handed back.");
+        }
+
+        if (! $voucher) {
+            return $flag(VoucherTillRedemption::STATUS_UNKNOWN, 'No voucher with this code in the app.');
+        }
+
+        $locked = Voucher::whereKey($voucher->id)->lockForUpdate()->first();
+        $faceValue = round((float) $locked->face_value, 2);
+
+        if ($locked->status !== Voucher::STATUS_INACTIVE) {
+            return $flag(VoucherTillRedemption::STATUS_SALE_FLAGGED,
+                "Charged {$chargedText} but the voucher was already {$locked->status} (balance €"
+                .number_format((float) $locked->current_balance, 2).'). Nothing was added.');
+        }
+
+        if ($paidFree) {
+            return $flag(VoucherTillRedemption::STATUS_SALE_FLAGGED, 'Paid with the Free tender. Not activated.');
+        }
+
+        if (abs($line->units - 1) > 0.0001) {
+            $units = rtrim(rtrim(number_format($line->units, 3, '.', ''), '0'), '.');
+
+            return $flag(VoucherTillRedemption::STATUS_SALE_FLAGGED,
+                "Quantity {$units} on one voucher (charged {$chargedText}). Not activated: each voucher is scanned itself.");
+        }
+
+        if ($faceValue <= 0 || abs($faceValue - $charged) > 0.005) {
+            return $flag(VoucherTillRedemption::STATUS_SALE_FLAGGED,
+                "Charged {$chargedText} but the voucher's value is €".number_format($faceValue, 2).'. Not activated.');
+        }
+
+        $redemption = VoucherTillRedemption::create($row + ['status' => VoucherTillRedemption::STATUS_ACTIVATED]);
+
+        $locked->initial_value = $faceValue;
+        $locked->current_balance = $faceValue;
+        $locked->status = Voucher::STATUS_ACTIVE;
+        $locked->save();
+
+        $transaction = $locked->transactions()->create([
+            'type' => VoucherTransaction::TYPE_ISSUE,
+            'source' => VoucherTransaction::SOURCE_TILL,
+            'amount' => $faceValue,
+            'balance_after' => $faceValue,
+            'note' => 'Till #'.$base['ticket_number'],
+            'user_id' => null,
+        ]);
+
+        $redemption->update(['voucher_transaction_id' => $transaction->id]);
+
+        return [VoucherTillRedemption::STATUS_ACTIVATED, $faceValue, $locked->id];
     }
 }

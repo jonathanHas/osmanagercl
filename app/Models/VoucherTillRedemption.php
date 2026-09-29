@@ -25,12 +25,17 @@ class VoucherTillRedemption extends Model
 
     const STATUS_REFUND = 'refund';       // refund ticket; recorded, not reversed
 
+    const STATUS_ACTIVATED = 'activated'; // the till sale activated the voucher (not an exception)
+
+    const STATUS_SALE_FLAGGED = 'sale_flagged'; // a voucher sale that activated nothing
+
     const EXCEPTION_STATUSES = [
         self::STATUS_PARTIAL,
         self::STATUS_NO_TENDER,
         self::STATUS_INACTIVE,
         self::STATUS_UNKNOWN,
         self::STATUS_REFUND,
+        self::STATUS_SALE_FLAGGED,
     ];
 
     protected $fillable = [
@@ -42,6 +47,7 @@ class VoucherTillRedemption extends Model
         'sold_at',
         'voucher_tender',
         'ticket_total',
+        'sale_amount',
         'amount_deducted',
         'shortfall',
         'status',
@@ -57,6 +63,7 @@ class VoucherTillRedemption extends Model
         'reviewed_at' => 'datetime',
         'voucher_tender' => 'decimal:2',
         'ticket_total' => 'decimal:2',
+        'sale_amount' => 'decimal:2',
         'amount_deducted' => 'decimal:2',
         'shortfall' => 'decimal:2',
     ];

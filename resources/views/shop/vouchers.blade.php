@@ -27,9 +27,13 @@
 
                 {{-- Why this voucher cannot be redeemed, in the words the office
                      till screen uses, so staff hear the same thing either way. --}}
-                <section class="shop-card shop-card--flat" x-show="needsManager" x-cloak>
+                <section class="shop-card shop-card--flat" x-show="needsManager && ! forSale" x-cloak>
                     <x-shop.icon name="alert" size="sm" />
                     <p class="shop-meta">Voucher not active. Please ask a manager.</p>
+                </section>
+                <section class="shop-card shop-card--flat" x-show="forSale && ! activateUrl" x-cloak>
+                    <x-shop.icon name="alert" size="sm" />
+                    <p class="shop-meta" x-text="'Not sold yet (' + format(faceValue) + '). Sell it at the till: scan the label as an item.'"></p>
                 </section>
                 <section class="shop-card shop-card--flat" x-show="mode === 'deactivated'" x-cloak>
                     <x-shop.icon name="alert" size="sm" />
@@ -40,9 +44,13 @@
                     <p class="shop-meta">Nothing left on this voucher.</p>
                 </section>
                 @if ($canActivate)
-                    <section class="shop-card shop-card--flat" x-show="activating" x-cloak>
+                    <section class="shop-card shop-card--flat" x-show="activating && ! forSale" x-cloak>
                         <x-shop.icon name="alert" size="sm" />
                         <p class="shop-meta">Not yet active. Enter the starting balance and activate.</p>
+                    </section>
+                    <section class="shop-card shop-card--flat" x-show="activating && forSale" x-cloak>
+                        <x-shop.icon name="alert" size="sm" />
+                        <p class="shop-meta">Not sold yet. Normally sold at the till; to activate by hand, confirm the value.</p>
                     </section>
                 @endif
 

@@ -163,4 +163,34 @@ class VoucherTillExceptionsTest extends TestCase
             ->expectsOutputToContain('no_tender')
             ->assertExitCode(0);
     }
+
+    // --- Vouchers cycle 3 ---
+
+    public function test_a_flagged_sale_shows_with_its_amount_and_an_activation_does_not(): void
+    {
+        $this->redemption([
+            'ticket_number' => 430200,
+            'status' => VoucherTillRedemption::STATUS_SALE_FLAGGED,
+            'sale_amount' => 40,
+            'amount_deducted' => 0,
+            'shortfall' => 0,
+            'voucher_tender' => 0,
+            'note' => 'Quantity 2 on one voucher (charged €40.00). Not activated: each voucher is scanned itself.',
+        ]);
+        $this->redemption([
+            'ticket_number' => 430201,
+            'status' => VoucherTillRedemption::STATUS_ACTIVATED,
+            'sale_amount' => 20,
+            'amount_deducted' => 0,
+            'shortfall' => 0,
+        ]);
+
+        $this->actingAs($this->manager())->get(route('vouchers.exceptions'))
+            ->assertOk()
+            ->assertSee('430200')
+            ->assertSee('Sale not activated')
+            ->assertSee('Quantity 2 on one voucher')
+            ->assertSee('€40.00')
+            ->assertDontSee('430201');
+    }
 }

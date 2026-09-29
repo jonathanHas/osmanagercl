@@ -34,6 +34,7 @@
                         <th class="px-4 py-2 text-left">Voucher</th>
                         <th class="px-4 py-2 text-left">Status</th>
                         <th class="px-4 py-2 text-right">Voucher tender</th>
+                        <th class="px-4 py-2 text-right">Sale</th>
                         <th class="px-4 py-2 text-right">Deducted</th>
                         <th class="px-4 py-2 text-right">Shortfall</th>
                         <th class="px-4 py-2 text-right">Ticket total</th>
@@ -46,6 +47,7 @@
                         @php
                             [$pill, $label] = match ($row->status) {
                                 'partial' => ['bg-red-800/50 text-red-300', 'Partial'],
+                                'sale_flagged' => ['bg-red-800/50 text-red-300', 'Sale not activated'],
                                 'no_tender' => ['bg-yellow-800/50 text-yellow-300', 'No voucher tender'],
                                 'inactive' => ['bg-yellow-800/50 text-yellow-300', 'Not active'],
                                 'unknown' => ['bg-gray-700 text-gray-300', 'Unknown voucher'],
@@ -67,6 +69,7 @@
                                 <span class="text-xs px-2 py-0.5 rounded whitespace-nowrap {{ $pill }}">{{ $label }}</span>
                             </td>
                             <td class="px-4 py-2 text-right whitespace-nowrap">€{{ number_format((float) $row->voucher_tender, 2) }}</td>
+                            <td class="px-4 py-2 text-right whitespace-nowrap">{{ $row->sale_amount !== null ? '€'.number_format((float) $row->sale_amount, 2) : '—' }}</td>
                             <td class="px-4 py-2 text-right whitespace-nowrap">€{{ number_format((float) $row->amount_deducted, 2) }}</td>
                             <td class="px-4 py-2 text-right whitespace-nowrap {{ (float) $row->shortfall > 0 ? 'text-red-300 font-medium' : 'text-gray-500' }}">
                                 €{{ number_format((float) $row->shortfall, 2) }}
@@ -92,7 +95,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="10" class="px-4 py-8 text-center text-gray-500">
+                            <td colspan="11" class="px-4 py-8 text-center text-gray-500">
                                 {{ $showAll ? 'No till voucher exceptions yet.' : 'Nothing to review. Every till voucher redemption was applied.' }}
                             </td>
                         </tr>

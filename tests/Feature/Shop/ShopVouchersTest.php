@@ -10,6 +10,8 @@ use App\Models\VoucherTillRedemption;
 use App\Models\VoucherTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
+use Tests\Concerns\CreatesVoucherPosTables;
 use Tests\TestCase;
 
 /**
@@ -22,7 +24,7 @@ use Tests\TestCase;
  */
 class ShopVouchersTest extends TestCase
 {
-    use RefreshDatabase;
+    use CreatesVoucherPosTables, RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -276,5 +278,79 @@ class ShopVouchersTest extends TestCase
         $this->assertNotFalse($doneAt);
         $this->assertNotFalse($savedAt);
         $this->assertGreaterThan($doneAt, $savedAt);
+    }
+
+    // --- Vouchers cycle 3: vouchers generated with a value are sold at the till ---
+
+    private function forSaleVoucher(float $value = 20, string $code = 'GV45678901CD'): Voucher
+    {
+        return Voucher::create([
+            'code' => $code,
+            'face_value' => $value,
+            'current_balance' => 0,
+            'status' => Voucher::STATUS_INACTIVE,
+        ]);
+    }
+
+    public function test_lookup_of_a_for_sale_voucher_reports_its_value(): void
+    {
+        $user = $this->userWith('employee', ['vouchers.redeem']);
+        $voucher = $this->forSaleVoucher(20);
+
+        $this->actingAs($user)->postJson(route('vouchers.lookup'), ['code' => $voucher->code])
+            ->assertOk()
+            ->assertJson([
+                'found' => true,
+                'status' => 'inactive',
+                'face_value' => 20,
+                'for_sale' => true,
+            ]);
+
+        // An active voucher is not for sale, and a valueless one has no face value.
+        $active = $this->activeVoucher(10, 'GV56789012DE');
+        $this->actingAs($user)->postJson(route('vouchers.lookup'), ['code' => $active->code])
+            ->assertJsonPath('for_sale', false)
+            ->assertJsonPath('face_value', null);
+    }
+
+    public function test_the_shop_page_has_both_the_for_sale_and_the_ask_a_manager_wording(): void
+    {
+        $this->actingAs($this->userWith('employee', ['vouchers.redeem']))->get('/shop/vouchers')
+            ->assertOk()
+            ->assertSee('Sell it at the till: scan the label as an item.', false)
+            ->assertSee('Voucher not active. Please ask a manager.', false);
+
+        $this->actingAs($this->userWith('manager', ['vouchers.redeem', 'vouchers.manage']))->get('/shop/vouchers')
+            ->assertOk()
+            ->assertSee('Normally sold at the till; to activate by hand, confirm the value.', false)
+            ->assertSee('Not yet active. Enter the starting balance and activate.', false);
+    }
+
+    public function test_employees_still_cannot_activate_a_for_sale_voucher(): void
+    {
+        $voucher = $this->forSaleVoucher(20);
+
+        $this->actingAs($this->userWith('employee', ['vouchers.redeem']))
+            ->postJson(route('vouchers.activate'), ['code' => $voucher->code, 'starting_balance' => '20.00'])
+            ->assertForbidden();
+
+        $this->assertSame(Voucher::STATUS_INACTIVE, $voucher->fresh()->status);
+    }
+
+    public function test_a_manager_activating_a_for_sale_voucher_by_hand_drops_its_till_price(): void
+    {
+        $this->createVoucherPosTables();
+        $voucher = $this->forSaleVoucher(20);
+        app(\App\Services\VoucherPosProductService::class)->sync($voucher);
+        $this->assertEquals(20, DB::connection('pos')->table('PRODUCTS')->where('CODE', $voucher->code)->value('PRICESELL'));
+
+        $this->actingAs($this->userWith('manager', ['vouchers.redeem', 'vouchers.manage']))
+            ->postJson(route('vouchers.activate'), ['code' => $voucher->code, 'starting_balance' => '20.00'])
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        $product = DB::connection('pos')->table('PRODUCTS')->where('CODE', $voucher->code)->first();
+        $this->assertEquals(0, $product->PRICESELL);
+        $this->assertSame('Gift Voucher GV45678901CD [bal €20.00]', $product->NAME);
     }
 }

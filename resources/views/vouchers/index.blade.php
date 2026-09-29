@@ -84,6 +84,8 @@
                     <div class="text-center">
                         <p class="text-sm text-gray-500">New voucher</p>
                         <p class="text-lg font-mono font-semibold text-gray-900 mb-4" x-text="code"></p>
+                        <p x-show="forSale" class="text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded p-2 mb-3"
+                           x-text="'Value ' + money2(faceValue) + '. Normally sold at the till: scan the label as an item and it activates itself.'"></p>
                         <p class="text-sm text-gray-600 mb-2">Enter starting balance to activate:</p>
                         <div class="flex items-center justify-center gap-2 mb-4">
                             <span class="text-2xl font-bold text-gray-700">€</span>
@@ -112,7 +114,9 @@
                     <div class="text-center">
                         <p class="text-sm font-mono text-gray-500 mb-2" x-text="code"></p>
                         <p class="text-2xl font-bold text-yellow-700">Voucher not active</p>
-                        <p class="text-sm text-yellow-600 mt-1">This voucher hasn't been activated. Please ask a manager.</p>
+                        <p x-show="! forSale" class="text-sm text-yellow-600 mt-1">This voucher hasn't been activated. Please ask a manager.</p>
+                        <p x-show="forSale" class="text-sm text-yellow-600 mt-1"
+                           x-text="'Not sold yet (' + money2(faceValue) + '). Sell it at the till: scan the label as an item.'"></p>
                         <button @click="reset()" class="mt-4 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium touch-manipulation">Scan next</button>
                     </div>
                 </div>
@@ -241,6 +245,8 @@
                 startingBalance: '',
                 deductAmount: '',
                 history: [],
+                faceValue: null,
+                forSale: false,
                 manualOpen: false,
                 keyboardEnabled: false,
                 feedback: null,
@@ -374,10 +380,13 @@
                         });
                         const data = await response.json();
                         this.history = data.history || [];
+                        this.faceValue = data.face_value ?? null;
+                        this.forSale = !! data.for_sale;
 
                         if (!data.found || data.status === 'inactive') {
                             // Unknown or not-yet-issued → offer to activate
-                            this.startingBalance = '';
+                            // An unsold voucher with a value: pre-fill it for a manual activation.
+                            this.startingBalance = this.forSale ? Number(this.faceValue).toFixed(2) : '';
                             this.mode = 'activate';
                         } else if (data.status === 'active') {
                             this.balance = Number(data.current_balance);
@@ -490,6 +499,10 @@
                     return new Date(iso).toLocaleString('en-IE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
                 },
 
+                money2(amount) {
+                    return '€' + Number(amount || 0).toFixed(2);
+                },
+
                 money(amount) {
                     const n = Number(amount);
                     if (n === 0) return '—';
@@ -509,6 +522,8 @@
                     this.startingBalance = '';
                     this.deductAmount = '';
                     this.history = [];
+                    this.faceValue = null;
+                    this.forSale = false;
                     this.manualOpen = false;
                     this.scanner.lastScannedBarcode = '';
                     this.$nextTick(() => this.$refs.codeInput.focus());

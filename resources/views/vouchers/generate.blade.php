@@ -13,10 +13,16 @@
             @csrf
             <label class="block text-sm text-gray-300 mb-2">How many vouchers to generate?</label>
             <input type="number" name="count" value="{{ old('count', 10) }}" min="1" max="200"
+                   class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100 text-lg mb-4">
+            <label class="block text-sm text-gray-300 mb-2" for="voucher-amount">Value of each voucher (€)</label>
+            <input type="number" id="voucher-amount" name="amount" value="{{ old('amount') }}"
+                   min="0.01" max="{{ config('vouchers.max_face_value') }}" step="0.01" required inputmode="decimal"
+                   placeholder="20.00"
                    class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100 text-lg mb-2">
             <p class="text-xs text-gray-500 mb-4">
-                Each voucher gets a unique random barcode and starts inactive.
-                You'll be taken to a printable sheet, then activate vouchers with a balance at the till.
+                Each voucher gets a unique random barcode and starts unsold, carrying this value.
+                Selling it at the till (scan the label as an item; the till charges the value) activates it with this value.
+                Labels look the same whatever their value, so keep batches of different values apart.
             </p>
             <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded">
                 Generate &amp; Print

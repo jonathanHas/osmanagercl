@@ -448,4 +448,266 @@ class VoucherTillSyncServiceTest extends TestCase
         $this->assertSame('schedule', $this->lastBeat()['source']);
         $this->assertFalse(app(VoucherSyncHeartbeat::class)->read()['scheduler_stale']);
     }
+
+    // --- Vouchers cycle 3: selling a voucher at the till activates it ---
+
+    /**
+     * An unsold voucher with a value, and its till product priced at that value.
+     */
+    private function forSale(float $value = 20, string $code = 'GVSALE000001'): Voucher
+    {
+        $voucher = Voucher::create([
+            'code' => $code,
+            'face_value' => $value,
+            'current_balance' => 0,
+            'status' => Voucher::STATUS_INACTIVE,
+        ]);
+        app(VoucherPosProductService::class)->sync($voucher);
+
+        return $voucher->fresh();
+    }
+
+    /**
+     * A ticket with a goods line, then the given voucher lines (price at the
+     * voucher's face value unless given, units 1 unless given).
+     *
+     * @param  array<int, array{voucher: Voucher|string, price?: float, units?: float}>  $voucherLines
+     * @param  array<int, array{payment: string, total: float}>  $payments
+     */
+    private function ticket(int $ticketNo, array $voucherLines, array $payments, int $type = 0, bool $goods = true): string
+    {
+        $lines = $goods ? [['product' => $this->goods, 'price' => 10, 'units' => $type === 1 ? -1 : 1, 'tax' => '001']] : [];
+        foreach ($voucherLines as $l) {
+            $v = $l['voucher'];
+            $lines[] = [
+                'product' => $v instanceof Voucher ? $v->pos_product_id : $v,
+                'price' => $l['price'] ?? ($v instanceof Voucher ? (float) $v->face_value : 0),
+                'units' => $l['units'] ?? 1,
+                'tax' => '000',
+            ];
+        }
+
+        return $this->posSale($ticketNo, $lines, $payments, now()->subMinutes(2), $type);
+    }
+
+    private function posPrice(Voucher $voucher): float
+    {
+        return (float) DB::connection('pos')->table('PRODUCTS')->where('ID', $voucher->pos_product_id)->value('PRICESELL');
+    }
+
+    public function test_selling_a_voucher_for_its_value_activates_it(): void
+    {
+        $voucher = $this->forSale(20);
+        $this->assertEquals(20, $this->posPrice($voucher));
+        $this->ticket(430100, [['voucher' => $voucher]], [['payment' => 'magcard', 'total' => 32.30]]);
+
+        $counts = $this->sync();
+
+        $this->assertSame(1, $counts['activated']);
+        $voucher->refresh();
+        $this->assertSame(Voucher::STATUS_ACTIVE, $voucher->status);
+        $this->assertSame('20.00', $voucher->initial_value);
+        $this->assertSame('20.00', $voucher->current_balance);
+
+        $tx = $voucher->transactions()->sole();
+        $this->assertSame(VoucherTransaction::TYPE_ISSUE, $tx->type);
+        $this->assertSame(VoucherTransaction::SOURCE_TILL, $tx->source);
+        $this->assertSame('20.00', $tx->amount);
+        $this->assertSame('Till #430100', $tx->note);
+        $this->assertNull($tx->user_id);
+
+        $row = VoucherTillRedemption::sole();
+        $this->assertSame(VoucherTillRedemption::STATUS_ACTIVATED, $row->status);
+        $this->assertSame('20.00', $row->sale_amount);
+        $this->assertSame('0.00', $row->amount_deducted);
+        $this->assertSame($tx->id, $row->voucher_transaction_id);
+
+        $this->assertEquals(0, $this->posPrice($voucher));
+        $this->assertSame('Gift Voucher GVSALE000001 [bal €20.00]', $this->posName($voucher));
+    }
+
+    public function test_quantity_above_one_activates_nothing(): void
+    {
+        $voucher = $this->forSale(20);
+        $this->ticket(430101, [['voucher' => $voucher, 'units' => 2]], [['payment' => 'cash', 'total' => 52.30]]);
+
+        $counts = $this->sync();
+
+        $this->assertSame(1, $counts['sale_flagged']);
+        $this->assertSame(Voucher::STATUS_INACTIVE, $voucher->fresh()->status);
+        $this->assertEquals(20, $this->posPrice($voucher));
+        $row = VoucherTillRedemption::sole();
+        $this->assertSame('40.00', $row->sale_amount);
+        $this->assertSame('Quantity 2 on one voucher (charged €40.00). Not activated: each voucher is scanned itself.', $row->note);
+    }
+
+    public function test_the_same_voucher_on_two_lines_activates_nothing(): void
+    {
+        $voucher = $this->forSale(20);
+        $this->ticket(430102, [['voucher' => $voucher], ['voucher' => $voucher]], [['payment' => 'cash', 'total' => 52.30]]);
+
+        $counts = $this->sync();
+
+        $this->assertSame(1, $counts['sale_flagged']);
+        $this->assertSame(1, VoucherTillRedemption::count());
+        $this->assertSame(Voucher::STATUS_INACTIVE, $voucher->fresh()->status);
+    }
+
+    public function test_a_sale_paid_with_the_free_tender_activates_nothing(): void
+    {
+        $voucher = $this->forSale(20);
+        $this->ticket(430103, [['voucher' => $voucher]], [['payment' => 'free', 'total' => 32.30]]);
+
+        $this->sync();
+
+        $row = VoucherTillRedemption::sole();
+        $this->assertSame(VoucherTillRedemption::STATUS_SALE_FLAGGED, $row->status);
+        $this->assertSame('Paid with the Free tender. Not activated.', $row->note);
+        $this->assertSame(Voucher::STATUS_INACTIVE, $voucher->fresh()->status);
+    }
+
+    public function test_a_price_edited_at_the_till_activates_nothing(): void
+    {
+        $voucher = $this->forSale(20);
+        $this->ticket(430104, [['voucher' => $voucher, 'price' => 15]], [['payment' => 'cash', 'total' => 27.30]]);
+
+        $this->sync();
+
+        $row = VoucherTillRedemption::sole();
+        $this->assertSame(VoucherTillRedemption::STATUS_SALE_FLAGGED, $row->status);
+        $this->assertSame("Charged €15.00 but the voucher's value is €20.00. Not activated.", $row->note);
+        $this->assertSame(Voucher::STATUS_INACTIVE, $voucher->fresh()->status);
+    }
+
+    public function test_selling_an_active_or_deactivated_voucher_adds_nothing(): void
+    {
+        $active = $this->voucher(15, Voucher::STATUS_ACTIVE, 'GVACTIVE0001');
+        $deactivated = $this->voucher(15, Voucher::STATUS_DEACTIVATED, 'GVDEACT00001');
+        $this->ticket(430105, [['voucher' => $active, 'price' => 20]], [['payment' => 'cash', 'total' => 32.30]]);
+        $this->ticket(430106, [['voucher' => $deactivated, 'price' => 20]], [['payment' => 'cash', 'total' => 32.30]]);
+
+        $counts = $this->sync();
+
+        $this->assertSame(2, $counts['sale_flagged']);
+        $this->assertSame('15.00', $active->fresh()->current_balance);
+        $this->assertSame(Voucher::STATUS_DEACTIVATED, $deactivated->fresh()->status);
+        $this->assertSame(0, VoucherTransaction::count());
+        $this->assertSame(
+            'Charged €20.00 but the voucher was already active (balance €15.00). Nothing was added.',
+            VoucherTillRedemption::where('ticket_number', 430105)->value('note')
+        );
+    }
+
+    public function test_a_refunded_voucher_sale_is_flagged_and_the_voucher_untouched(): void
+    {
+        $voucher = $this->forSale(20);
+        $this->ticket(430107, [['voucher' => $voucher, 'units' => -1]], [['payment' => 'cashrefund', 'total' => -32.30]], type: 1);
+
+        $counts = $this->sync();
+
+        $this->assertSame(1, $counts['refund']);
+        $row = VoucherTillRedemption::sole();
+        $this->assertSame(VoucherTillRedemption::STATUS_REFUND, $row->status);
+        $this->assertSame('20.00', $row->sale_amount);
+        $this->assertSame('Refund of a voucher sale (€20.00). Deactivate the voucher if it was handed back.', $row->note);
+        $this->assertSame(Voucher::STATUS_INACTIVE, $voucher->fresh()->status);
+    }
+
+    public function test_an_unknown_product_sold_at_a_price_is_unknown_with_the_amount(): void
+    {
+        DB::connection('pos')->table('PRODUCTS')->insert([
+            'ID' => 'orphan-sale',
+            'NAME' => 'Gift Voucher GV99999999ZZ [for sale €30.00]',
+            'CODE' => 'GV99999999ZZ',
+            'REFERENCE' => 'GV99999999ZZ',
+            'CATEGORY' => app(VoucherPosProductService::class)->categoryId(),
+            'TAXCAT' => '000',
+            'PRICESELL' => 30,
+        ]);
+        $this->ticket(430108, [['voucher' => 'orphan-sale', 'price' => 30]], [['payment' => 'cash', 'total' => 42.30]]);
+
+        $counts = $this->sync();
+
+        $this->assertSame(1, $counts['unknown']);
+        $row = VoucherTillRedemption::sole();
+        $this->assertSame('30.00', $row->sale_amount);
+        $this->assertSame('No voucher with this code in the app.', $row->note);
+    }
+
+    public function test_a_sale_and_a_redemption_on_one_ticket(): void
+    {
+        $sold = $this->forSale(20, 'GVSALE000001');
+        $redeemed = $this->voucher(50, code: 'GVREDEEM0001');
+        $this->ticket(430109, [['voucher' => $sold], ['voucher' => $redeemed]], [
+            ['payment' => 'magcard', 'total' => 22.30],
+            ['payment' => 'paperin', 'total' => 10],
+        ]);
+
+        $counts = $this->sync();
+
+        $this->assertSame(1, $counts['activated']);
+        $this->assertSame(1, $counts['applied']);
+        $this->assertSame('20.00', $sold->fresh()->current_balance);
+        $this->assertSame('40.00', $redeemed->fresh()->current_balance);
+    }
+
+    public function test_a_sale_does_not_count_as_the_last_redemption_line(): void
+    {
+        // The redemption comes first and the sale last: the redemption must still be `partial`.
+        $redeemed = $this->voucher(5, code: 'GVREDEEM0001');
+        $sold = $this->forSale(20, 'GVSALE000001');
+        $this->ticket(430110, [['voucher' => $redeemed], ['voucher' => $sold]], [
+            ['payment' => 'paperin', 'total' => 8],
+            ['payment' => 'cash', 'total' => 24.30],
+        ]);
+
+        $counts = $this->sync();
+
+        $this->assertSame(1, $counts['partial']);
+        $this->assertSame(1, $counts['activated']);
+        $row = VoucherTillRedemption::where('voucher_id', $redeemed->id)->sole();
+        $this->assertSame('3.00', $row->shortfall);
+    }
+
+    public function test_a_voucher_bought_with_a_voucher(): void
+    {
+        $sold = $this->forSale(20, 'GVSALE000001');
+        $redeemed = $this->voucher(50, code: 'GVREDEEM0001');
+        $this->ticket(430111, [['voucher' => $sold], ['voucher' => $redeemed]], [['payment' => 'paperin', 'total' => 20]], goods: false);
+
+        $counts = $this->sync();
+
+        $this->assertSame(1, $counts['activated']);
+        $this->assertSame(1, $counts['applied']);
+        $this->assertSame('20.00', $sold->fresh()->current_balance);
+        $this->assertSame('30.00', $redeemed->fresh()->current_balance);
+    }
+
+    public function test_after_activation_the_label_redeems_normally(): void
+    {
+        $voucher = $this->forSale(20);
+        $this->ticket(430112, [['voucher' => $voucher]], [['payment' => 'cash', 'total' => 32.30]]);
+        $this->sync();
+
+        $second = $this->sync();
+        $this->assertSame(0, $second['activated']);
+        $this->assertSame(1, $second['skipped']);
+
+        // Price is now 0: a later scan is a €0.00 redemption line.
+        $this->assertEquals(0, $this->posPrice($voucher));
+        $this->ticket(430113, [['voucher' => $voucher->fresh(), 'price' => $this->posPrice($voucher)]], [['payment' => 'paperin', 'total' => 5], ['payment' => 'cash', 'total' => 7.30]]);
+        $counts = $this->sync();
+
+        $this->assertSame(1, $counts['applied']);
+        $this->assertSame('15.00', $voucher->fresh()->current_balance);
+        $this->assertSame('Gift Voucher GVSALE000001 [bal €15.00]', $this->posName($voucher));
+    }
+
+    public function test_the_counts_include_sales(): void
+    {
+        $counts = $this->sync();
+
+        $this->assertArrayHasKey('activated', $counts);
+        $this->assertArrayHasKey('sale_flagged', $counts);
+    }
 }

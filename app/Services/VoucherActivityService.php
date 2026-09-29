@@ -85,7 +85,7 @@ class VoucherActivityService
         $redemption = $t->tillRedemption;
 
         [$kind, $label] = match ($t->type) {
-            VoucherTransaction::TYPE_ISSUE => ['issue', 'Issued'],
+            VoucherTransaction::TYPE_ISSUE => ['issue', $till ? 'Sold at till' : 'Issued'],
             VoucherTransaction::TYPE_DEDUCT => $till ? ['redeem_till', 'Redeemed at till'] : ['redeem_manual', 'Redeemed'],
             VoucherTransaction::TYPE_DEACTIVATE => ['deactivate', 'Deactivated'],
             VoucherTransaction::TYPE_ACTIVATE => ['reactivate', 'Reactivated'],
@@ -112,6 +112,7 @@ class VoucherActivityService
                 : ($t->user?->name ?? 'Office'),
             'status' => $till ? $redemption?->status : null,
             'shortfall' => $shortfall > 0 ? $shortfall : null,
+            'sale_amount' => $redemption?->sale_amount !== null ? (float) $redemption->sale_amount : null,
             'sold_at' => $till ? $redemption?->sold_at?->toIso8601String() : null,
             'note' => $t->note,
             'reviewed' => $redemption?->status === VoucherTillRedemption::STATUS_PARTIAL
@@ -136,6 +137,7 @@ class VoucherActivityService
                 VoucherTillRedemption::STATUS_INACTIVE => 'Voucher not active',
                 VoucherTillRedemption::STATUS_UNKNOWN => 'Unknown voucher',
                 VoucherTillRedemption::STATUS_REFUND => 'Refund',
+                VoucherTillRedemption::STATUS_SALE_FLAGGED => 'Sale not activated',
                 default => ucfirst(str_replace('_', ' ', $r->status)),
             },
             'code' => $r->voucher?->code ?? $r->voucher_code,
@@ -145,6 +147,7 @@ class VoucherActivityService
             'who' => 'Till #'.$r->ticket_number,
             'status' => $r->status,
             'shortfall' => null,
+            'sale_amount' => $r->sale_amount !== null ? (float) $r->sale_amount : null,
             'sold_at' => $r->sold_at?->toIso8601String(),
             'note' => $r->note,
             'reviewed' => $r->reviewed_at !== null,
