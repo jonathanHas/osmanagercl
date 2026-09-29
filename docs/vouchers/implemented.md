@@ -1,237 +1,209 @@
-# Till-driven gift voucher redemption (cycle 28) — implementation
+# Voucher activity screen (vouchers cycle 2) — implementation
 
 Status: DONE
 Plan revision: 1
 Implementer: Opus
-Date: 2026-09-27
+Date: 2026-09-29
 
 ## Baseline
-HEAD: 4e7373ea
-Pre-existing dirty files (cycle 27 work, not mine):
+HEAD: 3fbfcc44
+Pre-existing dirty files (Shop mode track and planning files, not mine):
 ```
- M app/Http/Controllers/ProfileController.php
- M config/shop.php
- M docs/FEATURES_INDEX.md
+D  .delivery-specialist-agent-recommendation.md.kate-swp
+D  JFolder_temp/.questions.txt.kate-swp
+ M app/Http/Controllers/DeliveryLegacyController.php
+ M docs/development/quick-start-guide.md
  M docs/features/shop-mode.md
- M resources/views/layouts/admin.blade.php
- M resources/views/profile/edit.blade.php
- M routes/web.php
- M tests/Feature/Shop/ConfinePinSessionTest.php
- M tests/Feature/UserPinManagementTest.php
-?? app/Http/Controllers/ShopDeviceAdminController.php
-?? docs/planImp/archive/2026-09-27-shop-mode-cycle-27/
+D  docs/jons_docs/.todo.md.kate-swp
+R  docs/planImp/implemented.md -> docs/planImp/archive/2026-09-28-shop-mode-cycle-31/implemented.md
+RM docs/planImp/plan.md -> docs/planImp/archive/2026-09-28-shop-mode-cycle-31/plan.md
+ M docs/planImp/needed.txt
+D  docs/planImp/plan-wedge-focus.md
+ M docs/vouchers/README.md
+ D docs/vouchers/implemented.md
+ M docs/vouchers/plan.md
+ M resources/js/shop/delivery-scan.js
+ M resources/js/shop/scan-input.js
+ M resources/views/components/shop/scan-input.blade.php
+ M resources/views/shop/delivery-scan.blade.php
+ M tests/Feature/Shop/ShopDeliveryTest.php
+ M tests/Feature/Shop/ShopStockScanTest.php
+?? docs/planImp/archive/2026-09-28-shop-mode-cycle-32/
+?? docs/planImp/implemented.md
 ?? docs/planImp/plan.md
-?? resources/views/profile/partials/update-pin-form.blade.php
-?? resources/views/shop-devices/
-?? tests/Feature/ProfilePinTest.php
-?? tests/Feature/ShopDeviceAdminTest.php
+?? docs/vouchers/archive/2026-09-27-cycle-28-till-voucher-redemption/
+?? docs/vouchers/findings/2026-09-29-production-backfill-not-run.md
 ```
-Note: `docs/FEATURES_INDEX.md`, `resources/views/layouts/admin.blade.php` and `routes/web.php` were already dirty; my edits to them are additive voucher hunks only.
+`php artisan test` before any change:
+```
+   FAIL  Tests\Unit\UdeaScrapingServiceTest
+   FAIL  Tests\Feature\CashReconciliationTest
+   FAIL  Tests\Feature\FruitVegLabelPrintingTest
+   FAIL  Tests\Feature\ProductTest
+   FAIL  Tests\Feature\TestScraperControllerTest
+  Tests:    15 failed, 806 passed (3441 assertions)
+```
 
 ## Steps
+
+### 0. Baseline — done
+Recorded above; matches the plan's expected `15 failed, 806 passed`.
+
 ### 1. Config — done
-Changed: `config/vouchers.php` (new; did not exist)
+Changed: `config/vouchers.php` (`activity` block after `sync`)
 Check output:
 ```
-$ php artisan tinker --execute="echo config('vouchers.pos_category_name');"
-Gift Voucher Redemption
+$ php artisan tinker --execute="echo config('vouchers.activity.poll_seconds');"
+5
 ```
 
-### 2. Migrations — done
-Changed: `database/migrations/2026_09_28_100000_create_voucher_till_redemptions_table.php`, `2026_09_28_100001_add_source_to_voucher_transactions_table.php`, `2026_09_28_100002_add_pos_product_id_to_vouchers_table.php` (all new)
-Check output:
+### 2. Heartbeat — done
+Changed: `app/Services/VoucherSyncHeartbeat.php` (new; did not exist)
+Key names are class constants (`KEY_LAST`, `KEY_LAST_OK`, `KEY_LAST_SCHEDULED`) so the tests use the same strings.
+Check: covered by step 8's `VoucherSyncHeartbeatTest`.
+
+### 3. Sync records the heartbeat — done
+Changed: `app/Services/VoucherTillSyncService.php`
+The old body of `sync()` is now `private run()`; `sync($since, $source)` wraps it, records ok/failed and rethrows on failure. `errors` added last in `COUNT_KEYS`, incremented in the per-ticket catch. `syncIfDue($source = lookup)` passes its source through.
+Check output (the plan says 27 tests at cycle 1; the file has 18):
 ```
-  2026_09_28_100000_create_voucher_till_redemptions_table ...... 582.96ms DONE
-  2026_09_28_100001_add_source_to_voucher_transactions_table .... 50.38ms DONE
-  2026_09_28_100002_add_pos_product_id_to_vouchers_table ....... 126.27ms DONE
-bool(true) bool(true) bool(true)
+$ php artisan test --filter='VoucherTillSyncServiceTest|ScheduleTest'
+  Tests:    23 passed (141 assertions)
 ```
 
-### 3. Models — done
-Changed: `app/Models/VoucherTillRedemption.php` (new), `app/Models/VoucherTransaction.php`, `app/Models/Voucher.php`
-Check output:
-```
-till
-```
-
-### 4. POS product service — done
-Changed: `app/Services/VoucherPosProductService.php` (new)
-Added a small `lastAction()` accessor (created|linked|renamed|unchanged|failed) so `syncMany()` and the backfill command can report what happened without changing `sync()`'s `?string` return.
-Check output (dev POS copy, 127.0.0.1:3307):
-```
-sync(Voucher 1) → "922add2e-8ea0-4df4-9b17-45bcd1f512ad", lastAction "created"
-PRODUCTS: NAME "Gift Voucher GVLH4AU7ASAT [bal €20.00]", CODE/REFERENCE GVLH4AU7ASAT,
-          CATEGORY 482fba08-… , TAXCAT 000, PRICESELL 0, ISSERVICE 1
-CATEGORIES: 482fba08-fe6c-4b12-a6b6-256d7c118f44 "Gift Voucher Redemption", PARENTID 033, CATSHOWNAME 0
-PRODUCTS_CAT rows for GV products: 0
-```
-
-### 5. Backfill command — done
-Changed: `app/Console/Commands/SyncVoucherPosProducts.php` (new)
-Returns FAILURE when any voucher failed to sync.
-Check output (dry run lists one voucher, not two: step 4's check had already created voucher 1's product):
-```
-$ php artisan vouchers:sync-pos-products --dry-run
-| GVVUF2SUACUM | active | 20.00   | would create |
-1 voucher(s) would be synced (dry run, nothing written).
-$ php artisan vouchers:sync-pos-products
-| GVVUF2SUACUM | active | 20.00   | created |
-1 created, 0 linked, 0 renamed, 0 unchanged, 0 failed.
-$ php artisan vouchers:sync-pos-products
-0 created, 0 linked, 0 renamed, 0 unchanged, 0 failed.
-$ php artisan vouchers:sync-pos-products --all
-| GVLH4AU7ASAT | active | 20.00   | unchanged |
-| GVVUF2SUACUM | active | 20.00   | unchanged |
-0 created, 0 linked, 0 renamed, 2 unchanged, 0 failed.
-```
-
-### 6. Till sync service — done
-Changed: `app/Services/VoucherTillSyncService.php` (new); also `database/migrations/2026_09_28_100000_…` (see Deviations: `voucher_tender`/`shortfall` widened to decimal(16,2); rolled back batch 96 and re-migrated, then `vouchers:sync-pos-products` re-linked both vouchers via the CODE self-heal: `0 created, 2 linked`).
-Implementation notes:
-- An already-recorded line (overlap window / retry) is skipped but its `amount_deducted` is still taken off the shared tender pool, so a ticket half-recorded before a failure splits the tender the same way on retry.
-- Non-applied rows get a short explanatory `note` (e.g. `Voucher was deactivated (balance €20.00).`, `Voucher scanned but not paid with the Voucher tender.`, `No voucher with this code in the app.`) so the exceptions page explains itself; `markReviewed` appends to it.
-- Refund rows still resolve and link `voucher_id` (for the exceptions page link) but never touch the balance.
-Check: covered by step 11's `VoucherTillSyncServiceTest` (results below).
-
-### 7. Sync command and schedule — done
-Changed: `app/Console/Commands/SyncVoucherTillRedemptions.php` (new), `routes/console.php`, `tests/Feature/ScheduleTest.php`
+### 4. Command flag and schedule — done
+Changed: `app/Console/Commands/SyncVoucherTillRedemptions.php`, `routes/console.php`, `tests/Feature/ScheduleTest.php`
 Check output:
 ```
 $ php artisan schedule:list | grep voucher
-  *  *  * * *  php artisan vouchers:sync-till .. Next Due: 46 seconds from now
-$ php artisan test --filter=ScheduleTest
-  Tests:    5 passed (55 assertions)
+  *  *  * * *  php artisan vouchers:sync-till --scheduled  Next Due: 2 seconds from now
 $ php artisan vouchers:sync-till
-| tickets | applied | partial | no_tender | inactive | unknown | refund | skipped |
-| 0       | 0       | 0       | 0         | 0        | 0       | 0      | 0       |
+| tickets | applied | partial | no_tender | inactive | unknown | refund | skipped | errors |
+| 2       | 0       | 0       | 0         | 0        | 0       | 0      | 2       | 0      |
+```
+(ScheduleTest passes inside the 23 above.)
+
+### 5. Activity service — done
+Changed: `app/Services/VoucherActivityService.php` (new; did not exist)
+- Merge order: sorted by `created_at` timestamp desc, then by an internal order (`tx` id×2, `red` id×2+1) instead of the literal `key` string, because string-sorting `tx-9` against `tx-10` puts them the wrong way round. The internal fields are stripped before returning.
+- `totals()` sums deducts grouped by `source` in one query.
+- Status-change messages format times as `j M H:i`.
+Check (dev data, tinker `payload(7, null)`):
+```
+health: state warn, messages ["The scheduler has never run the till check. This page checks the till itself while it is open."],
+        last_check_source command, scheduler_stale 1, last_errors 0, vouchers_without_till_product 0
+totals: redeemed_today 0, issued_today 0, outstanding_balance 29, active_vouchers 2, unreviewed_exceptions 1
+5 events; newest: tx-14 redeem_till "Redeemed at till" GVVUF2SUACUM -6 → 9, who "Till #430816", status applied
 ```
 
-### 8. Controller: hooks, history, exceptions — done
-Changed: `app/Http/Controllers/VoucherController.php`, `routes/web.php`
-- `index()` now takes `Request` to check `vouchers.manage` for `exceptionCount`.
-- POS sync after activate/deduct/changeStatus goes through one private `syncPosProduct(string $code)` (reloads by code, then `VoucherPosProductService::sync`, which never throws).
-- `markReviewed` appends the note to any existing note with ` · `, capped at 500 chars.
+### 6. Controller and routes — done
+Changed: `app/Http/Controllers/VoucherActivityController.php` (new; did not exist), `routes/web.php` (import + two routes directly above `vouchers/{voucher}/transactions`)
 Check output:
 ```
-$ php artisan route:list --name=vouchers | grep -i exception
-  GET|HEAD   vouchers/exceptions vouchers.exceptions › VoucherController@exce…
-  POST       vouchers/exceptions/{redemption}/reviewed vouchers.exceptions.re…
-$ php artisan test --filter=ShopVouchersTest
-  Tests:    10 passed (39 assertions)
+$ php artisan route:list --name=vouchers.activity
+  GET|HEAD       vouchers/activity vouchers.activity › VoucherActivityControl…
+  GET|HEAD       vouchers/activity/feed vouchers.activity.feed › VoucherActiv…
+routes/web.php:1219 vouchers/activity, :1220 vouchers/activity/feed, :1221 vouchers/{voucher}/transactions
+```
+The route-order test is in step 8.
+
+### 7. View, navigation — done
+Changed: `resources/views/vouchers/activity.blade.php` (new; did not exist), `resources/views/layouts/admin.blade.php` ("Voucher activity" link after "Till exceptions"), `resources/views/vouchers/index.blade.php` ("Activity" before "Generate"), `resources/views/vouchers/exceptions.blade.php` ("Activity" before "All vouchers")
+- All Alpine event bindings in the new view use `x-on:`; nullable parts (health messages, `sold_at`, `shortfall`, `voucher_url`) are behind `x-if` templates or `||` defaults.
+- A filter change while a fetch is in flight sets `pending` and re-fetches once the first returns (the in-flight guard would otherwise drop the filter change until the next tick).
+- Changing the period clears the "seen" set so a different period's rows are not highlighted as new.
+- `npm run build` ran clean (the view uses Tailwind classes not used elsewhere, e.g. `bg-purple-800/50`, `bg-blue-900/40`).
+Check output (script written to the scratchpad, not `/tmp`):
+```
+$ php -r '…preg_match_all("/<script>(.*?)<\/script>/s",…)' && node --check …/voucher-activity.js && echo NODE_OK
+NODE_OK
 ```
 
-### 9. Office views — done
-Changed: `resources/views/vouchers/index.blade.php`, `resources/views/vouchers/transactions.blade.php`, `resources/views/vouchers/exceptions.blade.php` (new; did not exist), `resources/views/layouts/admin.blade.php`, `resources/views/vouchers/print.blade.php` (see Deviations)
-- index: `history`/`manualOpen` state; history list under the balance (ACTIVE) and under "€0.00 remaining" (EXHAUSTED); "Manual deduct" button reveals the old input/"Use full balance"/Deduct; a one-line hint "Redeem at the till: scan this voucher, then pay with the Voucher tender."; after a manual deduct the history is re-read quietly (`refreshHistory()`); header link "Till exceptions (N)" for managers when N > 0. No Blade-clashing `@` shorthands.
-- transactions: purple "till" badge next to the type; By = `Till #N`.
-- exceptions: dark table (list.blade.php styling), pills as specified, "Show reviewed"/"Hide reviewed" toggle, inline "Mark reviewed" form with optional note, empty state, pagination.
-Check: rendering covered by `VoucherTillExceptionsTest` (step 11); browser check in Verification 8.
-
-### 10. Shop view — done
-Changed: `resources/views/shop/vouchers.blade.php`, `resources/js/shop/vouchers.js`
-- `manualOpen` state; ghost "Manual deduct" button at the bottom of the left column (`mode === 'active' && ! manualOpen`); numpad column, "Use full balance" and actions row show on `(mode === 'active' && manualOpen) || activating`, so activation is unchanged. `who(t)` helper in the history meta. `manualOpen` resets on scan and after a successful deduct. No `route()` calls added. `npm run build` ran clean.
+### 8. Tests — done
+Changed: `tests/Feature/VoucherSyncHeartbeatTest.php` (new; did not exist), `tests/Feature/VoucherActivityTest.php` (new; did not exist), `tests/Feature/VoucherTillSyncServiceTest.php` (5 tests added, none changed)
+- Heartbeat "broken cache": `Cache::shouldReceive('forever'|'get')->andThrow(...)` (the facade mock), with `Log::spy()` asserting two warnings.
+- Per-ticket failure: the POS `TAXES` table is dropped after the sale is created; the ticket-total query joins it, so the ticket fails inside the loop after the ticket list was read (`tickets 1, errors 1`, heartbeat `ok = true`).
+- Route-order test asserts the matched route name is `vouchers.activity`.
+- Health "stale" test checks both messages: never ran, and `…since 29 Sep 12:00…` after 10 minutes.
 Check output:
 ```
-$ php artisan test --filter='ShopVouchersTest|ConfinePinSessionTest'
-  Tests:    18 passed (120 assertions)
+$ php artisan test --filter='VoucherSyncHeartbeatTest|VoucherTillSyncServiceTest'
+  Tests:    29 passed (128 assertions)
+$ php artisan test --filter=VoucherActivityTest
+  Tests:    18 passed (94 assertions)
+$ php artisan test --filter='Voucher|Schedule'
+  Tests:    82 passed (398 assertions)
 ```
 
-### 11. Tests — done
-Changed: `tests/Concerns/CreatesVoucherPosTables.php` (new), `tests/Feature/VoucherPosProductServiceTest.php` (new), `tests/Feature/VoucherTillSyncServiceTest.php` (new), `tests/Feature/VoucherTillExceptionsTest.php` (new), `tests/Feature/Shop/ShopVouchersTest.php` — all four new files checked first; none existed.
-- Trait also has `posGoods()` for the non-voucher line; TAXES seeded with `000` (0) and `001` (0.23).
-- Extra cases beyond the plan list: status-driven names, two vouchers both fully applied, `--since` override, ordinary sales ignored, `syncIfDue` throttle + off switch + POS outage, generate warning when POS is down, manual deduct renames the product, employee cannot mark reviewed, header link hidden at 0.
-- `ShopVouchersTest::test_lookup_includes_history_and_issued_at`: the till row is newest, so the existing assertions moved from `history.0/1` to `history.1/2`; the existing manual deduct row got `created_at = now()->subDay()` so `latest()` ordering is deterministic against the new till row (same-second rows would tie). No assertion was removed.
-- One fix while writing: the reviewed-row test first failed because the un-followed redirect's flash ("Till #430025 marked reviewed.") rendered on the next GET; the test now spends the flash first.
+### 9. Docs — done
+Changed: `docs/features/voucher-management.md` (new `## Activity screen (/vouchers/activity)` after the till section, with a health-state table saying what to do for each; `### The sync` mentions `--scheduled`, the heartbeat and `errors`; routes and key files), `docs/FEATURES_INDEX.md` ("Live Activity Screen" bullet), `CLAUDE.md` (voucher line), `docs/deployment/production-guide.md` (nine commands, the `vouchers:sync-till --scheduled` row, the `/etc/cron.d/osmanager` paragraph with how to confirm it and "exactly one trigger"), `docs/deployment/production-deployment-guide.md` (user-crontab instruction replaced with the `/etc/cron.d` form, the same checks).
 Check output:
 ```
-$ php artisan test --filter='Voucher|ShopVouchers|Schedule|ConfinePinSession'
-  Tests:    60 passed (339 assertions)
-```
-
-### 12. Docs — done
-Changed: `docs/features/voucher-management.md` (new "Till redemption (uniCenta)" section: cashier steps, why a product line, the POS product, backfill command, the sync, exception statuses table, manual fallback, follow-ups; plus lifecycle step 4, data model, till/shop screen descriptions, lookup `source`/`ticket_number`, routes table, key files), `docs/FEATURES_INDEX.md` (voucher bullets), `CLAUDE.md` (voucher line), `docs/finance_manager/database-schema.md` (PAYMENTS: `NOTES` not `VOUCHER`, TRANSID/TENDERED explained, live payment types incl. `paperin`).
-Check output:
-```
-$ grep -n "sync-till" docs/features/voucher-management.md
-71:`App\Services\VoucherTillSyncService`, run by `php artisan vouchers:sync-till [--since=ISO]` **every minute** …
+$ grep -n "nine\|cron.d/osmanager" docs/deployment/*.md
+production-deployment-guide.md:320, 325, 326, 329, 331 (… nine commands, including vouchers:sync-till --scheduled)
+production-guide.md:168 must list **nine** commands … 183 **`/etc/cron.d/osmanager`** … 188 cat /etc/cron.d/osmanager
 ```
 
 ## Deviations
 
-1. **`voucher_tender` and `shortfall` are `decimal(16,2)`, not `decimal(14,2)`.** The plan's own Risk item says the live 5,390,746,000,620 `paperin` row should land as `partial` with a huge shortfall, but `decimal(14,2)` holds at most 12 integer digits (999,999,999,999.99); that value has 13, so on MySQL strict mode the insert would fail and the ticket would be logged and retried forever instead of showing up on the exceptions page. Confirmed on the dev POS copy: `TOTAL = 5390746000620` (column type `double`). Rolled back batch 96 (no data yet) and re-migrated.
-2. **`resources/views/vouchers/print.blade.php`** gained a 3-line `session('warning')` banner. Step 8 flashes the "could not be created on the till" warning onto the redirect to the print page, but neither that page nor the admin layout renders flashes, so the warning would have been invisible.
-3. **`VoucherPosProductService::lastAction()`** added (see step 4) so `syncMany()` can count `created` and the backfill command can print an action per row; `sync()` still returns `?string` as specified.
-4. **Explanatory `note` on non-applied redemption rows** (`inactive`, `no_tender`, `unknown`); the plan left `note` for the reviewer only. `markReviewed` appends the reviewer's note after ` · `.
-5. **`ShopVouchersTest` history test**: existing manual deduct row back-dated one day so the new till row is deterministically newest; indices shifted by one. No assertion removed.
+1. **Event order tie-break.** The plan says sort by `at` desc, then `key` desc. `key` is a string (`tx-9`, `tx-10`), so a string sort puts same-second rows in the wrong order. The service sorts by the `created_at` timestamp, then by an internal integer (`tx` id×2, `red` id×2+1), stripped before returning. Same intent, same output shape.
+2. **Queued re-fetch.** Step 7 says skip a tick while a fetch is in flight. A *filter change* during a fetch would then be dropped until the next tick (up to 5 s), so the view sets `pending` and re-fetches once the current request returns. Polling ticks are still skipped, not queued.
+3. **`npm run build`** was run (not listed in the plan) because the new view uses Tailwind classes no other view used. No CSS file changed.
+4. **The `node --check` script** was written to the session scratchpad instead of `/tmp/voucher-activity.js`. Same command otherwise.
+5. **Plan fact corrected:** step 3 says `VoucherTillSyncServiceTest` had 27 tests at cycle 1; it had 18. All 18 still pass unchanged; 5 were added (23).
 
 ## Verification
 
-1. `./vendor/bin/pint --test <my 19 PHP files>` → `PASS … 19 files`. (Ran on my files only, not `--dirty`, because `--dirty` would also reformat the pre-existing cycle 27 dirty files.)
-2. `php artisan migrate` → `INFO  Nothing to migrate.` (the three migrations ran earlier, see step 2/6).
-3. `php artisan test --filter='Voucher|ShopVouchers|Schedule|ConfinePinSession|RoutePermissions'` → `Tests:    117 passed (397 assertions)`.
-4. `php artisan test` → `Tests:    15 failed, 797 passed (3384 assertions)`. Failing classes: UdeaScrapingServiceTest ×7, CashReconciliationTest ×3, FruitVegLabelPrintingTest ×2, ProductTest ×2, TestScraperControllerTest ×1 — identical to the baseline; no new failures.
-5. `php artisan schedule:list` → `*  *  * * *  php artisan vouchers:sync-till .. Next Due: 46 seconds from now`.
-6. `php artisan vouchers:sync-pos-products` on the dev POS: both vouchers have products (created in steps 4/5, re-linked after the migration re-run). `PRODUCTS WHERE CODE LIKE 'GV%'`:
+1. `./vendor/bin/pint --test` on the 12 PHP files I changed or created → `PASS … 12 files`.
+2. `php artisan test --filter='Voucher|Schedule|ConfinePinSession'` → `Tests:    90 passed (479 assertions)`.
+3. `php artisan test` → `Tests:    15 failed, 835 passed (3577 assertions)`. Failing classes: UdeaScrapingServiceTest, CashReconciliationTest, FruitVegLabelPrintingTest, ProductTest, TestScraperControllerTest — the same 15 as the step 0 baseline; 806 + 29 new tests = 835.
+4. `php artisan schedule:list | grep voucher` → `*  *  * * *  php artisan vouchers:sync-till --scheduled  Next Due: 53 seconds from now`.
+5. `php artisan route:list --name=vouchers` → `vouchers/activity`, `vouchers/activity/feed`, then `vouchers/{voucher}/transactions`; in `routes/web.php` they are lines 1219, 1220, 1221.
+6. `node --check` of the extracted inline script → no output (`NODE_OK` echoed after it).
+7. Dev heartbeat:
    ```
-   Gift Voucher GVLH4AU7ASAT [bal €20.00] | GVLH4AU7ASAT | 482fba08-… | PRICESELL 0 | ISSERVICE 1
-   Gift Voucher GVVUF2SUACUM [bal €20.00] | GVVUF2SUACUM | 482fba08-… | PRICESELL 0 | ISSERVICE 1
-   PRODUCTS_CAT rows for them: 0
+   $ php artisan vouchers:sync-till --scheduled; tinker read()
+   source=schedule ok=true last_scheduled_at=2026-09-29T13:31:12+01:00 stale=false
+   after clearing last-scheduled: stale=true
    ```
-   No `[not active]` rows because the only two dev vouchers are active (naming of other statuses is covered by `VoucherPosProductServiceTest::test_names_follow_the_status`).
-7. Simulated till sales on the dev POS (script: scratchpad `simsale.php`; goods line "Belvoir Strawberry & Raspberry Cordial 500ml" €10 + tax `002`, GV line, `paperin` payment, `DATENEW = now()`):
-   - Ticket 999901 (`19c3580b-85bd-4731-942c-281fa8de5b38`), GVLH4AU7ASAT, tender 5.00 → `vouchers:sync-till`: `tickets 1 | applied 1`; redemption `applied`, ticket_total 12.30, voucher 20 → 15; POS NAME `Gift Voucher GVLH4AU7ASAT [bal €15.00]`. `POST /vouchers/lookup` (from the browser session) → `current_balance 15`, `history[0] = {label "Redeemed at till", user "Till #999901", source "till", ticket_number 999901}`.
-   - Ticket 999902 (`929813ad-9d7a-41c3-8197-95cf6b5fad26`), GVVUF2SUACUM (balance 20), tender 25.00 → `tickets 2 | partial 1 | skipped 1` (999901 re-read in the overlap window and skipped); redemption `partial`, deducted 20.00, shortfall 5.00; voucher exhausted; POS NAME `[€0.00 used up]`; transaction note `Till #999902 · short €5.00`.
-   - **Not done in the browser: viewing `/vouchers/exceptions` and marking the row reviewed.** The Chrome session is a shop PIN session, and cycle 27's `ConfinePinSession` sends every office page to `/confirm-password`; I do not type account passwords. Rendering, the review POST, and the `?all=1` toggle are covered by `VoucherTillExceptionsTest` (8 tests).
-   - Cleanup: POS rows deleted for both ticket ids (PAYMENTS 2, TICKETLINES 4, TICKETS 2, RECEIPTS 2). Local dev data restored to baseline: redemptions 1–2 and voucher_transactions 7, 8, 9 (7/8 till, 9 the browser's manual €1) deleted, vouchers 1 and 2 reset to €20.00 active, `vouchers:sync-pos-products --all` → `2 renamed` back to `[bal €20.00]`. Left in place on the dev POS: the "Gift Voucher Redemption" category and the two GV products (the backfill's intended state).
-8. Browser, `/shop/vouchers` as employee "katelyn" (PIN session): scanned GVLH4AU7ASAT → €15.00 Active, history "Redeemed at till · 27 Sept · Till #999901 −€5.00", "Issued · Jonathan +€20.00", numpad hidden, "Manual deduct" visible. Tapped Manual deduct → numpad, "Use full balance" and Deduct visible, toggle hidden. 1 → Deduct → toast "Deducted €1.00 · €14.00 left", new top row "Redeemed · katelyn −€1.00", numpad closed again. Console: only "Alpine.js started…", no errors. (The first scan did not register: the tool typed before the input had focus; the retry did.) **Office `/vouchers` not checked in the browser** for the same `/confirm-password` reason; its Blade renders in `VoucherTillExceptionsTest` (header link counts), the Alpine changes are unexercised in a browser.
+   (Cleared the `last-scheduled` key rather than waiting 3 minutes. Dev has no cron, so from here on the dev page will say the scheduler has never run, which is correct on dev.)
+8. Simulated till sale on dev: `VOUCHER=GVLH4AU7ASAT TENDER=3 TICKET=999903 … simsale.php` → ticket id `5f459fe5-c7c9-4a93-852a-ea560fbae1c0`; `vouchers:sync-till` → `tickets 3 | applied 1 | skipped 2 | errors 0`; `payload(7, null)` newest event: `tx-15 | Redeemed at till | GVLH4AU7ASAT | -3 -> 17 | Till #999903 | applied`.
+   Cleanup: POS rows for that ticket deleted (PAYMENTS 1, TICKETLINES 2, TICKETS 1, RECEIPTS 1). `reset_voucher.php` put GVLH4AU7ASAT back to active €20 (it adds an `activate` audit row with note "Dev reset for till testing"; it does not delete history). The local redemption row (id 7) and its transaction (tx 15) stay in the dev database and in the activity log; they now point at a deleted POS ticket, which is harmless on dev.
+9. **Browser check: for the owner** (the Chrome session is a Shop PIN session and office pages go to `/confirm-password`). Checklist is in the plan's Verification 9. Things to look at in particular: the amber "scheduler has never run" banner is expected on dev (no cron); rows from the real till tests show a second line "till HH:mm" that is an hour behind the "When" time (the dev till's UTC clock, finding 3 of `findings/2026-09-28-till-testing.md`).
 
 ## Files changed
 
-Mine (cycle 28):
+Mine (vouchers cycle 2):
 ```
  M CLAUDE.md
- M app/Http/Controllers/VoucherController.php
- M app/Models/Voucher.php
- M app/Models/VoucherTransaction.php
- M docs/FEATURES_INDEX.md                         (was already dirty from cycle 27; voucher hunk only)
+ M app/Console/Commands/SyncVoucherTillRedemptions.php
+ M app/Services/VoucherTillSyncService.php
+ M config/vouchers.php
+ M docs/FEATURES_INDEX.md
+ M docs/deployment/production-deployment-guide.md
+ M docs/deployment/production-guide.md
  M docs/features/voucher-management.md
- M docs/finance_manager/database-schema.md
- M resources/js/shop/vouchers.js
- M resources/views/layouts/admin.blade.php        (was already dirty; "Till exceptions" link only)
- M resources/views/shop/vouchers.blade.php
+ M docs/vouchers/implemented.md        (was " D": the committed cycle 1 report had been archived; this file is the new report)
+ M resources/views/layouts/admin.blade.php
+ M resources/views/vouchers/exceptions.blade.php
  M resources/views/vouchers/index.blade.php
- M resources/views/vouchers/print.blade.php
- M resources/views/vouchers/transactions.blade.php
  M routes/console.php
- M routes/web.php                                  (was already dirty; two voucher routes only)
+ M routes/web.php
  M tests/Feature/ScheduleTest.php
- M tests/Feature/Shop/ShopVouchersTest.php
-?? app/Console/Commands/SyncVoucherPosProducts.php
-?? app/Console/Commands/SyncVoucherTillRedemptions.php
-?? app/Models/VoucherTillRedemption.php
-?? app/Services/VoucherPosProductService.php
-?? app/Services/VoucherTillSyncService.php
-?? config/vouchers.php
-?? database/migrations/2026_09_28_100000_create_voucher_till_redemptions_table.php
-?? database/migrations/2026_09_28_100001_add_source_to_voucher_transactions_table.php
-?? database/migrations/2026_09_28_100002_add_pos_product_id_to_vouchers_table.php
-?? docs/planImp/implemented.md
-?? resources/views/vouchers/exceptions.blade.php
-?? tests/Concerns/CreatesVoucherPosTables.php
-?? tests/Feature/VoucherPosProductServiceTest.php
-?? tests/Feature/VoucherTillExceptionsTest.php
-?? tests/Feature/VoucherTillSyncServiceTest.php
+ M tests/Feature/VoucherTillSyncServiceTest.php
+?? app/Http/Controllers/VoucherActivityController.php
+?? app/Services/VoucherActivityService.php
+?? app/Services/VoucherSyncHeartbeat.php
+?? resources/views/vouchers/activity.blade.php
+?? tests/Feature/VoucherActivityTest.php
+?? tests/Feature/VoucherSyncHeartbeatTest.php
 ```
-Pre-existing (cycle 27, untouched by me): `ProfileController.php`, `config/shop.php`, `docs/features/shop-mode.md`, `profile/edit.blade.php`, `ConfinePinSessionTest.php`, `UserPinManagementTest.php`, `ShopDeviceAdminController.php`, `docs/planImp/archive/2026-09-27-shop-mode-cycle-27/`, `docs/planImp/plan.md`, `update-pin-form.blade.php`, `shop-devices/`, `ProfilePinTest.php`, `ShopDeviceAdminTest.php`.
-Not committed.
+Everything in the Baseline list is untouched (Shop mode track and planning files). Not committed.
 
 ## Notes for Planner
 
-1. **Office pages can't be browser-checked from a shop PIN session.** Every cycle that touches an office screen will hit `/confirm-password` in the owner's Chrome. Either the owner does the office checks (`/vouchers` scan + Manual deduct, `/vouchers/exceptions` + Mark reviewed), or a plan provides a local test login the Implementer can use.
-2. **A leftover tender is not recorded when the last voucher line isn't applied.** Rule 5 sets `partial`/`shortfall` only when the *last* line is applied. On a two-voucher ticket where the first line is applied and the second is `inactive`/`no_tender`, any unused tender shows only as the second row's status, and no row carries a shortfall. Rare, and the row still lands on the exceptions page. A plan could put the leftover pool on the last row whatever its status.
-3. **Watermark and batch limit.** If more than 50 voucher tickets fall inside the 15-minute overlap, every run re-reads the same first 50 (all skipped), so the sync never moves forward. Unrealistic for this shop's volume, but a later refinement could order by `DATENEW` and skip tickets that already have rows in SQL.
-4. **The sync is only as current as the scheduler.** `schedule:run` must be in production cron (the plan's Risk). Nothing here checks that.
-5. Out-of-scope items seen, untouched: `TillTransactionRepository::formatReceipt` first-payment-only; cash-rec `voucher_used`; GV products in product search / `SalesImportService`. All listed as follow-ups in `voucher-management.md`.
-6. The sidebar "Till exceptions" link has no count badge; the count appears only in the `/vouchers` header. Possible later polish.
-7. **Real-till test, 2026-09-28** (after this report was written). The owner rang two sales on a uniCenta till in VirtualBox against the dev POS: #430813 `applied` (€20.00 → €8.81) and #430814 `partial` (€8.81 → €0.00, shortfall €8.18). Both behaved as planned. Three findings (numeric-only till keypad, the till accepting any Voucher tender, a one-hour clock offset on the dev till) are in `docs/vouchers/findings/2026-09-28-till-testing.md`. `GVVUF2SUACUM`'s till product now has the dev-only numeric `CODE 2990000000019`.
-8. **This cycle moved.** At the owner's request, `plan.md` and `implemented.md` moved from `docs/planImp/` to `docs/vouchers/` (their own plan/implement track, same protocol in `docs/vouchers/planimp.md`). No content of `plan.md` was changed. Helper scripts for till testing are in `docs/vouchers/scripts/`.
+1. **Transaction timestamps vs till time.** The log's "When" is when the app *recorded* the event (`created_at`); for till rows that is up to a minute after the sale (the scheduler interval). The till's own time is the second line. On production both should be Irish local time; on the dev VirtualBox till the second line is an hour behind (dev artefact).
+2. **The seen-set is per period and search.** Changing the period or the search does not highlight the new result set; only rows that arrive on later polls are highlighted. Changing the search does not reset `seen`, so rows that come back into view after clearing a search are highlighted. Harmless; a stricter rule could also reset `seen` on a search change.
+3. **The events limit applies per source before merging.** Each of the two queries takes the newest `limit` rows, then the merge takes `limit` again. The result is exact (the newest `limit` across both), but a 30-day window with more than 100 events shows only the newest 100 with no "more" hint. A "showing newest 100" line might help if managers use the 30-day view.
+4. **Unreviewed `partial` rows** show as `partial` in red on the log; once reviewed the pill reads "partial · reviewed". Exceptions without a transaction behave the same way. Nothing on this page marks them reviewed (out of scope, as planned).
+5. **Dev data left:** redemption id 7 / tx 15 (simulated ticket 999903, POS rows deleted) and two "Dev reset for till testing" `activate` rows on GVLH4AU7ASAT (this cycle) and GVVUF2SUACUM (2026-09-28). All dev-only.

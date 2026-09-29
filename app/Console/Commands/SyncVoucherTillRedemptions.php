@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\VoucherSyncHeartbeat;
 use App\Services\VoucherTillSyncService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -14,7 +15,8 @@ use Illuminate\Console\Command;
 class SyncVoucherTillRedemptions extends Command
 {
     protected $signature = 'vouchers:sync-till
-                            {--since= : ISO datetime overriding the watermark}';
+                            {--since= : ISO datetime overriding the watermark}
+                            {--scheduled : Set by the scheduler, so the activity screen can tell its runs from a manual one}';
 
     protected $description = 'Apply gift voucher redemptions taken at the uniCenta till';
 
@@ -22,7 +24,8 @@ class SyncVoucherTillRedemptions extends Command
     {
         try {
             $since = $this->option('since') ? Carbon::parse($this->option('since')) : null;
-            $counts = $service->sync($since);
+            $source = $this->option('scheduled') ? VoucherSyncHeartbeat::SOURCE_SCHEDULE : VoucherSyncHeartbeat::SOURCE_COMMAND;
+            $counts = $service->sync($since, $source);
         } catch (\Throwable $e) {
             $this->error('Voucher till sync failed: '.$e->getMessage());
 

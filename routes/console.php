@@ -81,7 +81,9 @@ Schedule::command('customers:send-statements')
 // The voucher lookup screens also run this sync (throttled, see
 // VoucherTillSyncService::syncIfDue), so a lookup is never more than a few
 // seconds stale even if the scheduler is not running.
-Schedule::command('vouchers:sync-till')
+// --scheduled marks the run in the heartbeat, so /vouchers/activity can tell a
+// live scheduler from the page's own checks.
+Schedule::command('vouchers:sync-till --scheduled')
     ->everyMinute()
     ->onOneServer()
     ->withoutOverlapping(5);

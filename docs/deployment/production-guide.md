@@ -165,7 +165,7 @@ DB::listen(function ($query) {
 ```bash
 php artisan schedule:list
 ```
-must list **eight** commands. If any is missing, the schedule file did not deploy:
+must list **nine** commands. If any is missing, the schedule file did not deploy:
 
 | When | Command |
 |---|---|
@@ -177,6 +177,21 @@ must list **eight** commands. If any is missing, the schedule file did not deplo
 | 20:00 | `sales:import-daily --today` |
 | 20:15 | `suppliers:send-daily-sales` |
 | 1st of month 07:00 | `customers:send-statements` |
+| every minute | `vouchers:sync-till --scheduled` |
+
+**What triggers the scheduler.** Production runs `schedule:run` every minute from
+**`/etc/cron.d/osmanager`** as `www-data`. It is a system cron file, not a user
+crontab, so `crontab -l` (as any user) shows nothing; that is by design. To confirm
+it is running:
+
+```bash
+cat /etc/cron.d/osmanager
+journalctl -u cron --since "10 min ago" | grep artisan
+```
+
+There must be **exactly one** trigger. Never add a user crontab entry as well, or
+every job runs twice. The voucher activity screen (`/vouchers/activity`) warns when
+the scheduler has not run the till check for three minutes.
 
 Every schedule lives in `routes/console.php`. There is deliberately no
 `app/Console/Kernel.php`: this application's `bootstrap/app.php` does not bind a

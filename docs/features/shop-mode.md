@@ -45,6 +45,45 @@ sign-in is always Shop; otherwise the `ui_mode` cookie, then the role
 (employees and baristas default to Shop). `UiMode::landingUrl()` decides where
 a sign-in lands — baristas go to the KDS, not Shop Home.
 
+### Camera scanning
+
+Live scanning is [html5-qrcode](https://github.com/mebjas/html5-qrcode) **2.3.8**,
+wrapped by `resources/js/barcode-scanner.js` and driven by
+`resources/js/shop/scan-input.js`. It needs a secure context, so it runs on
+production (HTTPS) and not on a plain-HTTP dev host.
+
+Reading a code **pauses** the decoder rather than stopping it, and the page
+resumes it by dispatching `shop-scan-saved` once its action is done. Stopping
+and restarting costs one to three seconds on a phone — the stream is torn down,
+cameras are re-enumerated and the decoder re-initialised — which is too slow to
+scan a delivery item by item. A pause costs nothing to undo. If the library
+refuses to pause, the field stops the camera instead: a live decoder under an
+open quantity prompt would read the item still under the lens and confirm it.
+
+**Three things are tied to that library version. A dependency bump must
+re-check all three on a real phone, because none of them can be exercised on
+dev:**
+
+1. `pauseScanner()` / `resumeScanner()` in `resources/js/barcode-scanner.js`
+   guard on `Html5QrcodeScannerState.SCANNING` and `.PAUSED`. The enum is
+   exported from the package entry in 2.3.8; earlier versions may not export
+   it.
+2. `.shop-scan__mount > div:not(#qr-shaded-region)` in `resources/css/shop.css`
+   hides the library's own "Scanner paused" banner, which it appends to the
+   mount as an id-less `<div>` with an inline `display:block`. The selector is
+   safe only while the video and canvas are not wrapped in a `div`.
+3. The mount's pinned-absolute rules (cycle 16), also in `shop.css`: the
+   library sizes its `<video>` from the mount's `clientWidth` as an inline
+   style, so the mount has to fill the camera box or the scan region collapses.
+
+A USB hand scanner is a keyboard, not a camera: it types the digits and an
+Enter into whatever has focus. `capture()` in `scan-input.js` takes those
+keystrokes into the scan field when the focus is somewhere that cannot use
+them — a stepper button, say — and treats an Enter within a second of the last
+character as the end of a scan. A lone Enter still presses a focused button.
+As a backstop, the delivery endpoints cap `quantity` at 9999, so a barcode can
+never be written as a quantity.
+
 ## Shared devices, PINs and locking
 
 Typing a password on a greasy 10-inch touchscreen, several times a shift, is

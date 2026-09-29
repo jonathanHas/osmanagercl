@@ -315,9 +315,20 @@ sudo supervisorctl start osmanager-queue-worker:*
 ```
 
 ### **2. Scheduled Tasks (Cron Jobs)**
+
+Production runs the Laravel scheduler from a system cron file,
+**`/etc/cron.d/osmanager`**, as `www-data`, not from a user crontab. `crontab -l`
+therefore shows nothing; that is by design. There must be **exactly one** trigger:
+do not also add a user crontab, or every job runs twice.
+
 ```bash
-# Add Laravel scheduler to crontab
-echo "* * * * * cd /var/www/html/osmanager && php artisan schedule:run >> /dev/null 2>&1" | sudo -u www-data crontab -
+# /etc/cron.d/osmanager (note the user field, required in /etc/cron.d)
+echo '* * * * * www-data cd /var/www/html/osmanager && /usr/bin/php artisan schedule:run >> /dev/null 2>&1' | sudo tee /etc/cron.d/osmanager
+
+# Confirm it is running
+cat /etc/cron.d/osmanager
+journalctl -u cron --since "10 min ago" | grep artisan
+php artisan schedule:list   # nine commands, including vouchers:sync-till --scheduled
 ```
 
 ### **3. Log Rotation**

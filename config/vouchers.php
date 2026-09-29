@@ -51,4 +51,16 @@ return [
         'lookup_throttle_seconds' => 5,
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Activity screen (/vouchers/activity)
+    |--------------------------------------------------------------------------
+    */
+
+    'activity' => [
+        'poll_seconds' => 5,              // how often the activity page asks for the feed
+        'limit' => 100,                   // newest events returned per poll
+        'scheduler_stale_seconds' => 180, // no scheduled till check for this long = warning
+    ],
+
 ];

@@ -382,6 +382,26 @@ MAIL_MAILER=log
 
 ### Common Issues
 
+**Tests fail with `file_put_contents(storage/framework/views/...): Permission denied`**
+
+Nothing is wrong with your code. `storage/framework/views` is
+`drwxrwsr-x jon www-data`, so a view the **web server** compiled is owned by
+`www-data` with mode 644 — not group-writable. When you then edit that Blade
+file, the CLI test runner (running as your user) cannot recompile it. It shows
+up most often right after a browser check, and the stack trace points into
+Laravel's `Filesystem`, which makes it look like a framework bug.
+
+```bash
+php artisan view:clear      # workaround, safe to run any time
+```
+
+The durable fix, run once by the machine owner (needs the `acl` package):
+
+```bash
+sudo setfacl -Rm  g:www-data:rwx storage/framework/views bootstrap/cache
+sudo setfacl -Rdm g:www-data:rwx storage/framework/views bootstrap/cache
+```
+
 For comprehensive troubleshooting, see:
 - [Known Issues](./known-issues.md) - Previously resolved issues and solutions
 - [Troubleshooting Guide](./troubleshooting.md) - Detailed debugging procedures

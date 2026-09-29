@@ -1276,7 +1276,10 @@ class DeliveryLegacyController extends Controller
         $validated = $request->validate([
             'delID' => 'required|string',
             'barcode' => 'required|string',
-            'quantity' => 'required|numeric|min:0',
+            // max:9999 keeps a scanner burst out of the quantity column: a
+            // barcode is 8-14 digits and a delivery line never approaches
+            // 9999. min:0 stays — a correction to nothing is legitimate.
+            'quantity' => 'required|numeric|min:0|max:9999',
             'supplierID' => 'required|string',
         ]);
 
@@ -1324,7 +1327,7 @@ class DeliveryLegacyController extends Controller
         $validated = $request->validate([
             'delID' => 'required|string',
             'barcode' => 'required|string',
-            'quantity' => 'nullable|numeric|min:0',
+            'quantity' => 'nullable|numeric|min:0|max:9999',
             'supplierID' => 'required|string',
         ]);
 

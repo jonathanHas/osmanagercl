@@ -1,1 +1,6 @@
- 
+
+on the new request page - the users should be able to search for destocked products as well - destocked products could appear greyed out but should be selectable so we can restock if there is enough demand or a good reason to.
+
+the delivery scan screen, the user needs to scroll down after scanning and entering a products quantity to update - this should be visible without scrolling to speed up entry - summary is always visible but will only be needed at the end so could be collapsed to free up space
+
+The original scanning screen /delivery-legacy/match?delID= is a faster and smoother experience for the user with regards the scanning

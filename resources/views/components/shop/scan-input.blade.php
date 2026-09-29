@@ -10,8 +10,15 @@
     'inline' => false,
 ])
 
+{{-- x-on:keydown.window, not @keydown.enter.window: ShopDeliveryTest guards
+     against that second form, which once double-committed a scan (cycle 14).
+     capture() decides for itself what to do with the key. --}}
 <div class="shop-scan{{ $inline ? ' shop-scan--inline' : '' }}" x-data="shopScanInput()" :class="{ 'is-camera': cameraOpen, 'is-error': error !== null }"
+     x-on:keydown.window="capture($event)"
      @shop-scan-done.window="done()" @shop-scan-error.window="fail($event.detail)"
+     {{-- restartCameraIfWanted() is async and deliberately not awaited: nothing
+          downstream depends on the resume having finished, and awaiting it would
+          hold this event handler open across a camera restart. --}}
      @shop-scan-saved.window="restartCameraIfWanted()">
     <label class="shop-scan__field">
         <x-shop.icon name="scan" size="lg" />

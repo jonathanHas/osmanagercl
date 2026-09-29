@@ -19,6 +19,13 @@
  * than stopping is what makes scanning a delivery feel continuous — a restart
  * re-enumerates cameras and re-initialises the decoder, one to three seconds
  * on a phone.
+ *
+ * Two timing constants guard the same failure — an unintended second read —
+ * from opposite directions, so tune them together: the 1 s burst window in
+ * capture() decides whether an Enter belongs to a scan or to a person, and the
+ * 1500 ms lastAt push in restartCameraIfWanted() (3.5 s in total with
+ * detected()'s 2 s de-duplication) stops the resumed camera re-reading the item
+ * still under the lens.
  */
 export default () => ({
     value: '',
@@ -31,6 +38,9 @@ export default () => ({
     cameraId: 'shop-camera-' + Math.random().toString(36).slice(2),
     lastCode: null,
     lastAt: 0,
+    // When the last character of a keyboard-wedge burst arrived. A scanner
+    // types its digits in a few milliseconds; a person does not.
+    burstAt: 0,
 
     init() {
         this.focus();
@@ -76,7 +86,72 @@ export default () => ({
 
         this.error = null;
         this.value = '';
+        this.burstAt = 0;
         this.$dispatch('scan', { code });
+    },
+
+    /**
+     * Catch a hand-scanner burst that is going somewhere useless.
+     *
+     * The till PC's USB scanner types its digits and an Enter into whatever
+     * has focus. `refocus()` deliberately lets a button keep focus — tapping
+     * the quantity stepper has to work — so a scan taken right after someone
+     * clicks "+" with the mouse used to send the digits nowhere and let the
+     * trailing Enter press "+" again. The barcode was lost and the quantity
+     * crept up.
+     *
+     * So: printable characters typed while nothing text-like is focused are
+     * appended to the scan field, and an Enter that arrives within a second of
+     * them submits. An Enter on its own is left alone, so a person can still
+     * press a focused button with the keyboard.
+     *
+     * Bound on the component root, so it assumes one scan field per page —
+     * true of every Shop screen.
+     */
+    capture(event) {
+        if (event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey) {
+            return;
+        }
+
+        if (this.isTextEntry(document.activeElement)) {
+            return;
+        }
+
+        // A printable character. Space is excluded: it activates a focused
+        // button, and no barcode we read contains one.
+        if (event.key.length === 1 && event.key !== ' ') {
+            event.preventDefault();
+            this.value += event.key;
+            this.burstAt = Date.now();
+            this.focus();
+
+            return;
+        }
+
+        if (event.key === 'Enter' && this.value !== '' && Date.now() - this.burstAt < 1000) {
+            event.preventDefault();
+            this.submit();
+        }
+    },
+
+    /**
+     * Does this element take typed text? Our own input is included, so its own
+     * bindings handle the keystroke and capture() stays out of the way.
+     */
+    isTextEntry(el) {
+        const tag = el?.tagName?.toLowerCase();
+
+        if (tag === 'textarea' || tag === 'select' || el?.isContentEditable) {
+            return true;
+        }
+
+        if (tag !== 'input') {
+            return false;
+        }
+
+        const nonText = ['button', 'submit', 'reset', 'checkbox', 'radio', 'hidden', 'range', 'file'];
+
+        return ! nonText.includes((el.type || 'text').toLowerCase());
     },
 
     /**
@@ -193,6 +268,15 @@ export default () => ({
             this.paused = scanner.pauseScanner();
         } catch (e) {
             this.paused = false;
+        }
+
+        // Pause normally, stop if we cannot, but never leave the decoder
+        // running: the page is about to show a prompt, and a live camera
+        // reading the item still under the lens would confirm it. Closing the
+        // stream costs a slow restart on the next item, which
+        // restartCameraIfWanted() handles — rare, and the right trade.
+        if (! this.paused) {
+            await this.stop();
         }
     },
 

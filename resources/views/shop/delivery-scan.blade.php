@@ -18,15 +18,9 @@
           @scan-empty="pending && commit()">
         <div class="shop-split">
             <div class="shop-stack">
-                @if ($session['completed'])
-                    <section class="shop-card shop-card--flat">
-                        <h2 class="shop-label">Completed</h2>
-                        <p class="shop-meta">This delivery is completed. Corrections are made on the office page.</p>
-                    </section>
-                @else
-                    <x-shop.scan-input inline placeholder="Scan item" hint="Ready — scan the next item" />
-                @endif
-
+                {{-- First in the stack, above the scan field: on a phone the camera
+                     block is ~268 px tall, and with the prompt below it "Add" landed
+                     off the bottom of the screen on every single item. --}}
                 <section class="shop-card" x-show="pending" x-cloak x-ref="prompt">
                     <div class="shop-between">
                         <x-shop.product-thumb expr="pendingProduct" />
@@ -72,6 +66,15 @@
                         <span x-text="addLabel"></span>
                     </button>
                 </section>
+
+                @if ($session['completed'])
+                    <section class="shop-card shop-card--flat">
+                        <h2 class="shop-label">Completed</h2>
+                        <p class="shop-meta">This delivery is completed. Corrections are made on the office page.</p>
+                    </section>
+                @else
+                    <x-shop.scan-input inline placeholder="Scan item" hint="Ready — scan the next item" />
+                @endif
 
                 <p class="shop-notice" x-show="! hasInvoice" x-cloak>
                     <x-shop.icon name="info" size="sm" />No invoice lines, so quantities can't be checked.
@@ -128,11 +131,21 @@
             <div class="shop-stack">
                 <div class="shop-between">
                     <h2 class="shop-group-title">Items <small x-text="rows.length"></small></h2>
-                    {{-- The label names the order in force; tapping it flips. --}}
-                    <button class="shop-btn shop-btn--ghost" type="button" @click="toggleSort()">
-                        <x-shop.icon name="sort" size="sm" />
-                        <span x-text="sort === 'new' ? 'New first' : 'Scanned first'"></span>
-                    </button>
+                    <div class="shop-inline">
+                        {{-- The label names the order in force; tapping it flips. --}}
+                        <button class="shop-btn shop-btn--ghost" type="button" @click="toggleSort()">
+                            <x-shop.icon name="sort" size="sm" />
+                            <span x-text="sort === 'new' ? 'New first' : 'Scanned first'"></span>
+                        </button>
+                        {{-- Summary lives here rather than in a sticky bar: it is wanted
+                             once, at the end, and the bar cost a strip of every screen.
+                             Icon and count only: measured at 390 px, the word as well
+                             pushed this header onto a third line (160 px). The full
+                             label is on the button where the list ends. --}}
+                        <a class="shop-btn shop-btn--ghost" title="Summary" href="{{ route('shop.deliveries.summary', ['delID' => $session['id'], 'supplierID' => $session['supplierId']]) }}">
+                            <x-shop.icon name="list-checks" size="sm" /><span class="shop-sr-only">Summary</span><span class="shop-btn__count" x-show="progress.issues > 0" x-cloak x-text="progress.issues"></span>
+                        </a>
+                    </div>
                 </div>
 
                 <div class="shop-list" x-show="rows.length" x-cloak>
@@ -166,8 +179,10 @@
             </div>
         </div>
 
-        <div class="shop-actions">
-            {{-- The top bar's back button is the way back to Deliveries. --}}
+        {{-- Static, not sticky: where the list ends is where someone who has
+             worked down it wants Summary. The header link covers everyone else.
+             The top bar's back button is the way back to Deliveries. --}}
+        <div class="shop-actions shop-actions--static">
             <a class="shop-btn shop-btn--primary shop-btn--lg" href="{{ route('shop.deliveries.summary', ['delID' => $session['id'], 'supplierID' => $session['supplierId']]) }}">
                 Summary
                 <span class="shop-btn__count" x-show="progress.issues > 0" x-cloak x-text="progress.issues"></span>

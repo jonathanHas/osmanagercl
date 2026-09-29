@@ -6,6 +6,7 @@ use App\Models\Voucher;
 use App\Models\VoucherTillRedemption;
 use App\Models\VoucherTransaction;
 use App\Services\VoucherPosProductService;
+use App\Services\VoucherSyncHeartbeat;
 use App\Services\VoucherTillSyncService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -368,5 +369,83 @@ class VoucherTillSyncServiceTest extends TestCase
         DB::connection('pos')->getSchemaBuilder()->drop('TICKETS');
 
         $this->assertNull(app(VoucherTillSyncService::class)->syncIfDue());
+    }
+
+    // --- Heartbeat (vouchers cycle 2) ---
+
+    private function lastBeat(): ?array
+    {
+        return app(VoucherSyncHeartbeat::class)->read()['last'];
+    }
+
+    public function test_a_successful_sync_records_the_heartbeat_with_its_counts_and_source(): void
+    {
+        $voucher = $this->voucher(50);
+        $this->sale(430025, [$voucher], [['payment' => 'paperin', 'total' => 30]]);
+
+        $counts = app(VoucherTillSyncService::class)->sync(null, VoucherSyncHeartbeat::SOURCE_SCHEDULE);
+
+        $beat = $this->lastBeat();
+        $this->assertTrue($beat['ok']);
+        $this->assertSame('schedule', $beat['source']);
+        $this->assertSame($counts, $beat['counts']);
+        $this->assertSame(1, $beat['counts']['applied']);
+        $this->assertSame(0, $beat['counts']['errors']);
+    }
+
+    public function test_an_unreachable_till_records_a_failed_heartbeat_and_still_throws(): void
+    {
+        DB::connection('pos')->getSchemaBuilder()->drop('TICKETS');
+
+        try {
+            $this->sync();
+            $this->fail('sync() should rethrow');
+        } catch (\Illuminate\Database\QueryException $e) {
+            // expected
+        }
+
+        $beat = $this->lastBeat();
+        $this->assertFalse($beat['ok']);
+        $this->assertSame('command', $beat['source']);
+        $this->assertNotEmpty($beat['error']);
+        $this->assertNull(app(VoucherSyncHeartbeat::class)->read()['last_ok_at']);
+    }
+
+    public function test_a_ticket_that_fails_inside_the_loop_counts_as_an_error_but_the_run_is_ok(): void
+    {
+        $voucher = $this->voucher(50);
+        $this->sale(430025, [$voucher], [['payment' => 'paperin', 'total' => 30]]);
+        // The ticket-total query joins TAXES, so dropping it fails this ticket
+        // inside the loop, after the ticket list has been read.
+        DB::connection('pos')->getSchemaBuilder()->drop('TAXES');
+
+        $counts = $this->sync();
+
+        $this->assertSame(1, $counts['tickets']);
+        $this->assertSame(1, $counts['errors']);
+        $this->assertSame(0, $counts['applied']);
+        $this->assertSame('50.00', $voucher->fresh()->current_balance);
+
+        $beat = $this->lastBeat();
+        $this->assertTrue($beat['ok']);
+        $this->assertSame(1, $beat['counts']['errors']);
+    }
+
+    public function test_sync_if_due_records_the_given_source(): void
+    {
+        app(VoucherTillSyncService::class)->syncIfDue(VoucherSyncHeartbeat::SOURCE_ACTIVITY);
+
+        $this->assertSame('activity', $this->lastBeat()['source']);
+    }
+
+    public function test_the_command_records_schedule_only_with_the_flag(): void
+    {
+        $this->artisan('vouchers:sync-till')->assertExitCode(0);
+        $this->assertSame('command', $this->lastBeat()['source']);
+        $this->assertNull(app(VoucherSyncHeartbeat::class)->read()['last_scheduled_at']);
+
+        $this->artisan('vouchers:sync-till --scheduled')->assertExitCode(0);
+        $this->assertSame('schedule', $this->lastBeat()['source']);
+        $this->assertFalse(app(VoucherSyncHeartbeat::class)->read()['scheduler_stale']);
     }
 }

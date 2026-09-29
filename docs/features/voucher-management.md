@@ -68,7 +68,10 @@ Backfill / repair: `php artisan vouchers:sync-pos-products [--dry-run] [--all]` 
 
 ### The sync
 
-`App\Services\VoucherTillSyncService`, run by `php artisan vouchers:sync-till [--since=ISO]` **every minute** (`routes/console.php`; production must run `schedule:run`) and on every voucher lookup (throttled to once per 5 s; off switch `vouchers.sync.on_lookup`). A POS outage during lookup is logged and ignored.
+`App\Services\VoucherTillSyncService`, run by `php artisan vouchers:sync-till [--since=ISO] [--scheduled]` **every minute** (`routes/console.php` schedules it with `--scheduled`; production runs `schedule:run` from `/etc/cron.d/osmanager`), on every voucher lookup and by the activity screen while it is open (both throttled together to once per 5 s; off switch `vouchers.sync.on_lookup`). A POS outage during lookup is logged and ignored.
+
+- Every run records a **heartbeat** (`App\Services\VoucherSyncHeartbeat`, see [Activity screen](#activity-screen-vouchersactivity)): when, which source (`schedule`, `command`, `lookup`, `activity`), ok or failed, and the counts.
+- The counts table has an **`errors`** column: tickets that failed inside the run (logged with `Log::error`, left unrecorded, retried on the next run inside the overlap window). A run with errors still counts as ok (the till was read).
 
 - Reads tickets (sales and refunds) after a watermark (latest recorded `sold_at` minus 15 min overlap, floored at 24 h back) that carry a product in the voucher category, 50 per run.
 - Per ticket: voucher lines in `LINE` order (a double scan collapses to one), `voucher_tender` = sum of the receipt's `paperin` payments, `ticket_total` = Σ price × units × (1 + tax rate).
@@ -99,6 +102,36 @@ Both `/vouchers` and `/shop/vouchers` now lead with the balance and history (til
 - `TillTransactionRepository::formatReceipt` reads only the first payment of a receipt.
 - Auto-activating vouchers at the till (a "Voucher 50 Euro" sale line plus a blank GV label).
 - GV products show in the app's product search and as €0 lines in `SalesImportService`; exclude the voucher category if noisy.
+
+## Activity screen (`/vouchers/activity`)
+
+Added in vouchers cycle 2 (2026-09-29). One office page showing what is happening to gift vouchers as it happens, and whether the till check is healthy. **Managers and admins** (`vouchers.manage`); linked from the sidebar ("Voucher activity"), the `/vouchers` header and the exceptions page. It watches only: corrections stay on the voucher's own pages and on `/vouchers/exceptions`.
+
+**Live updates**: the page polls `GET /vouchers/activity/feed` every `vouchers.activity.poll_seconds` (5 s), like the coffee display (no websockets). It skips a tick while paused, while the browser tab is hidden, or while a request is still out, and fetches at once when the tab becomes visible again. New rows are highlighted for 10 s. "Live" / "Paused" / "Offline" in the title: Offline means the page's own request to the server failed; it clears on the next success and keeps the rows it had.
+
+**The page runs the till check itself** while open: each feed request calls `syncIfDue('activity')`, sharing the lookup screens' 5-second throttle, so several managers watching still read the till at most once per 5 s. The first page render does not, so a slow till database never delays the page.
+
+**Health banner**:
+
+| State | Shown when | What to do |
+|---|---|---|
+| green "Till checked N s ago" | the last check succeeded, the scheduler ran recently, no errors, every voucher can be scanned | nothing |
+| red | the last till check failed: "The till database could not be read: …" | check the POS database/host is up; the error is the database's |
+| amber, "The scheduler has not run the till check since …" / "…has never run…" | no `--scheduled` run for `vouchers.activity.scheduler_stale_seconds` (180 s) | on production check `/etc/cron.d/osmanager` and the cron journal (see the production guide). While the page is open it checks the till itself, so balances still update; when it is closed, only lookups do. On a dev box with no cron this is always shown |
+| amber, "N till ticket(s) could not be applied on the last check" | the last run had `errors > 0` | read the application log (`Voucher till sync failed for ticket`) |
+| amber, "N voucher(s) have no till product…" | active or inactive vouchers with no `pos_product_id` | run `php artisan vouchers:sync-pos-products` |
+
+Under the banner: when the last check ran and from where, and when the scheduler last ran it. The scheduler time comes only from runs with `--scheduled`, so the page's own checks can never hide a dead scheduler.
+
+**Tiles**: Redeemed today (split till / manual), Issued today, Outstanding balance (sum over active vouchers, with the count), Unreviewed exceptions (links to `/vouchers/exceptions`, red above zero).
+
+**Filters**: Today / 7 days (default) / 30 days, and a code search (substring, 300 ms debounce).
+
+**The log** (newest first, at most `vouchers.activity.limit` = 100): every `voucher_transactions` row, plus the till redemptions that never made a transaction (`no_tender`, `inactive`, `unknown`, `refund`). `applied` and `partial` redemptions always have a transaction, so they appear once. Columns: When (for till rows a second line "till HH:mm", the till's own time), Event (label + pill: till purple, manual blue, issue green, status change grey, exception amber, `partial` red with "short €x"), Voucher (linked unless the voucher was deleted), Amount (signed), Balance after, By (`Till #N`, the staff name, or "Office"), Note.
+
+**Heartbeat keys** (default cache store, `Cache::forever`, one key per fact): `vouchers:till-sync:last` (at, ok, source, counts, error cut to 300 chars), `vouchers:till-sync:last-ok`, `vouchers:till-sync:last-scheduled` (written by every `--scheduled` run, successful or not). Recording or reading them never fails a sync, a lookup or the feed.
+
+Code: `app/Http/Controllers/VoucherActivityController.php`, `app/Services/VoucherActivityService.php`, `app/Services/VoucherSyncHeartbeat.php`, `resources/views/vouchers/activity.blade.php` (inline Alpine), config `vouchers.activity.*`.
 
 ## Till screen (`/vouchers`)
 
@@ -184,14 +217,17 @@ Employees get a cut-down till screen: they can ring up a voucher payment but can
 | `vouchers.transactions` | GET `/vouchers/{voucher}/transactions` | manage |
 | `vouchers.exceptions` | GET `/vouchers/exceptions` (`?all=1` includes reviewed) | manage |
 | `vouchers.exceptions.reviewed` | POST `/vouchers/exceptions/{redemption}/reviewed` | manage |
+| `vouchers.activity` | GET `/vouchers/activity` | manage |
+| `vouchers.activity.feed` | GET `/vouchers/activity/feed?days=1\|7\|30&q=` (JSON) | manage |
 | `vouchers.deactivate` / `.reactivate` | POST `/vouchers/{voucher}/...` | admin |
 
 ## Key files
 
-- **Controller**: `app/Http/Controllers/VoucherController.php`, `app/Http/Controllers/Shop/VouchersController.php`
+- **Controller**: `app/Http/Controllers/VoucherController.php`, `app/Http/Controllers/VoucherActivityController.php`, `app/Http/Controllers/Shop/VouchersController.php`
 - **Models**: `app/Models/Voucher.php`, `app/Models/VoucherTransaction.php`, `app/Models/VoucherTillRedemption.php`
 - **Till redemption**: `app/Services/VoucherPosProductService.php`, `app/Services/VoucherTillSyncService.php`, `app/Console/Commands/SyncVoucherPosProducts.php`, `app/Console/Commands/SyncVoucherTillRedemptions.php`, `config/vouchers.php`
+- **Activity screen**: `app/Services/VoucherActivityService.php`, `app/Services/VoucherSyncHeartbeat.php`
 - **Migrations**: `database/migrations/2026_06_24_120000_create_vouchers_table.php`, `..._120001_create_voucher_transactions_table.php`, `2026_06_25_120000_add_note_to_voucher_transactions_table.php`, `2026_09_28_100000_create_voucher_till_redemptions_table.php`, `..._100001_add_source_to_voucher_transactions_table.php`, `..._100002_add_pos_product_id_to_vouchers_table.php`
-- **Views**: `resources/views/vouchers/{index,list,generate,print,transactions,exceptions}.blade.php`
+- **Views**: `resources/views/vouchers/{index,list,generate,print,transactions,exceptions,activity}.blade.php`
 - **Permissions/nav**: `database/seeders/RolesAndPermissionsSeeder.php`, `resources/views/layouts/admin.blade.php`
 - **Reused**: `resources/js/barcode-scanner.js`, `resources/js/zpl-preview.js`, `app/Services/LabelService.php`, `config/services.php` (`zebra`)

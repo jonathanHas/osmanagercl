@@ -51,7 +51,7 @@ class ScheduleTest extends TestCase
             'fruit-veg:prune-thumbnails' => '30 5 * * 0',
             'customers:send-statements' => '0 7 1 * *',
             // Cycle 28: till-driven gift voucher redemption.
-            'vouchers:sync-till' => '* * * * *',
+            'vouchers:sync-till --scheduled' => '* * * * *',
         ];
 
         $actual = $this->scheduled();

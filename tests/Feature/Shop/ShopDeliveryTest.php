@@ -185,6 +185,105 @@ class ShopDeliveryTest extends TestCase
         $this->assertSame($this->photoUrl(), $product['image_url']);
     }
 
+    /**
+     * Cycle 32. A USB hand scanner types its digits into whatever has focus. If
+     * that is the quantity field or a stepper button, a 13-digit barcode could
+     * be posted as a quantity and written to the delivery. The client-side fix
+     * is capture() in scan-input.js; this is the backstop, and it also covers
+     * the office page, which posts the same endpoints.
+     */
+    /**
+     * Cycle 33. On a 390 px phone the camera block is ~268 px tall, so with the
+     * prompt below the scan field its "Add" button landed off the bottom of the
+     * screen on every item. The prompt is now the first thing in the left
+     * column, and the page scrolls it into view for someone who had scrolled
+     * down the list.
+     */
+    public function test_the_quantity_prompt_comes_before_the_scan_field(): void
+    {
+        $html = $this->actingAs($this->employee())->get($this->scanUrl())->assertOk()->getContent();
+
+        $promptAt = strpos($html, 'x-ref="prompt"');
+        $fieldAt = strpos($html, 'shop-scan__input');
+        $this->assertNotFalse($promptAt);
+        $this->assertNotFalse($fieldAt);
+        $this->assertLessThan(
+            $fieldAt,
+            $promptAt,
+            'The quantity prompt must render above the scan field, or "Add" falls below the fold on a phone.'
+        );
+
+        $this->assertStringContainsString(
+            "this.\$refs.prompt?.scrollIntoView({ block: 'nearest' })",
+            file_get_contents(resource_path('js/shop/delivery-scan.js'))
+        );
+    }
+
+    /**
+     * Cycle 33. The sticky bar took a strip of every screen for a link wanted
+     * once, at the end. Summary now sits in the Items header, and the bar after
+     * the list is the static variant.
+     */
+    public function test_summary_is_in_the_header_and_the_bottom_bar_is_not_sticky(): void
+    {
+        $response = $this->actingAs($this->employee())->get($this->scanUrl())->assertOk();
+
+        // Two links to the summary now: one in the Items header, one in the
+        // static bar after the list. Both carry the issue count.
+        $html = $response->getContent();
+        $href = 'href="'.e($this->summaryUrl()).'"';
+        $this->assertSame(2, substr_count($html, $href), 'Expected the header link and the end-of-list link.');
+        $this->assertSame(2, substr_count($html, 'shop-btn__count'));
+
+        // The header one is inside the Items header's shop-inline, before the list.
+        $headerAt = strpos($html, 'shop-group-title');
+        $listAt = strpos($html, 'class="shop-list"');
+        $firstLinkAt = strpos($html, $href);
+        $this->assertGreaterThan($headerAt, $firstLinkAt);
+        $this->assertLessThan($listAt, $firstLinkAt);
+
+        // The sticky variant is gone; only the static one remains.
+        $response->assertDontSee('<div class="shop-actions">', false);
+        $response->assertSee('<div class="shop-actions shop-actions--static">', false);
+    }
+
+    public function test_a_barcode_sized_quantity_is_refused_by_both_endpoints(): void
+    {
+        $user = $this->employee();
+
+        $increment = $this->actingAs($user)
+            ->postJson(route('delivery-legacy.scan-increment'), [
+                'delID' => 'd-1',
+                'supplierID' => '999',
+                'barcode' => '5000000000017',
+                'quantity' => '5412533401912',
+            ]);
+        $increment->assertStatus(422)->assertJsonValidationErrors('quantity');
+
+        $update = $this->actingAs($user)
+            ->patchJson(route('delivery-legacy.update-quantity'), [
+                'delID' => 'd-1',
+                'supplierID' => '999',
+                'barcode' => '5000000000017',
+                'quantity' => '5412533401912',
+            ]);
+        $update->assertStatus(422)->assertJsonValidationErrors('quantity');
+
+        $this->assertDatabaseMissing('deliveriesScanItems', ['quantity' => '5412533401912'], 'pos');
+    }
+
+    public function test_a_plausible_quantity_is_still_accepted(): void
+    {
+        $this->actingAs($this->employee())
+            ->postJson(route('delivery-legacy.scan-increment'), [
+                'delID' => 'd-1',
+                'supplierID' => '999',
+                'barcode' => '5000000000017',
+                'quantity' => 9999,
+            ])
+            ->assertOk();
+    }
+
     public function test_product_photo_route_serves_a_thumbnail(): void
     {
         $user = $this->employee();

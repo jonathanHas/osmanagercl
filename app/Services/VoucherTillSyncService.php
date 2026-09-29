@@ -32,17 +32,19 @@ use Illuminate\Support\Facades\Log;
  */
 class VoucherTillSyncService
 {
-    private const COUNT_KEYS = ['tickets', 'applied', 'partial', 'no_tender', 'inactive', 'unknown', 'refund', 'skipped'];
+    // `errors` counts tickets that failed inside the loop (logged, retried next run).
+    private const COUNT_KEYS = ['tickets', 'applied', 'partial', 'no_tender', 'inactive', 'unknown', 'refund', 'skipped', 'errors'];
 
     public function __construct(
         protected VoucherPosProductService $posProducts,
+        protected VoucherSyncHeartbeat $heartbeat,
     ) {}
 
     /**
      * Run the sync from the lookup screens, at most once per throttle window.
      * Never throws: a POS outage must not break a voucher lookup.
      */
-    public function syncIfDue(): ?array
+    public function syncIfDue(string $source = VoucherSyncHeartbeat::SOURCE_LOOKUP): ?array
     {
         if (! config('vouchers.sync.on_lookup')) {
             return null;
@@ -53,7 +55,7 @@ class VoucherTillSyncService
         }
 
         try {
-            return $this->sync();
+            return $this->sync(null, $source);
         } catch (\Throwable $e) {
             Log::warning('Voucher till sync on lookup failed', ['error' => $e->getMessage()]);
 
@@ -62,9 +64,31 @@ class VoucherTillSyncService
     }
 
     /**
+     * Run the till check and record the heartbeat (VoucherSyncHeartbeat). A run
+     * with per-ticket `errors` still counts as ok: the till was read. A failure
+     * before the ticket loop (till database unreachable) is recorded and rethrown.
+     *
      * @return array<string, int>
      */
-    public function sync(?Carbon $since = null): array
+    public function sync(?Carbon $since = null, string $source = VoucherSyncHeartbeat::SOURCE_COMMAND): array
+    {
+        try {
+            $counts = $this->run($since);
+        } catch (\Throwable $e) {
+            $this->heartbeat->record($source, false, null, $e->getMessage());
+
+            throw $e;
+        }
+
+        $this->heartbeat->record($source, true, $counts);
+
+        return $counts;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function run(?Carbon $since): array
     {
         $counts = array_fill_keys(self::COUNT_KEYS, 0);
         $since ??= $this->watermark();
@@ -92,6 +116,7 @@ class VoucherTillSyncService
                 $this->syncTicket($ticket, $categoryId, $counts);
             } catch (\Throwable $e) {
                 // Left unrecorded, so the next run (inside the overlap window) retries it.
+                $counts['errors']++;
                 Log::error('Voucher till sync failed for ticket', [
                     'ticket_id' => $ticket->ID,
                     'ticket_number' => $ticket->TICKETID,

@@ -40,6 +40,7 @@ use App\Http\Controllers\TillProductBrowserController;
 use App\Http\Controllers\UdeaDiagnosticsController;
 use App\Http\Controllers\UiModeController;
 use App\Http\Controllers\UserManagementController;
+use App\Http\Controllers\VoucherActivityController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\WasteController;
 use App\Http\Controllers\ZebraLabelController;
@@ -1215,6 +1216,8 @@ Route::middleware('auth')->group(function () {
         Route::get('vouchers/exceptions', [VoucherController::class, 'exceptions'])->name('vouchers.exceptions');
         Route::post('vouchers/exceptions/{redemption}/reviewed', [VoucherController::class, 'markReviewed'])
             ->name('vouchers.exceptions.reviewed');
+        Route::get('vouchers/activity', [VoucherActivityController::class, 'index'])->name('vouchers.activity');
+        Route::get('vouchers/activity/feed', [VoucherActivityController::class, 'feed'])->name('vouchers.activity.feed');
         Route::get('vouchers/{voucher}/transactions', [VoucherController::class, 'transactions'])->name('vouchers.transactions');
 
         // Admin-only status management

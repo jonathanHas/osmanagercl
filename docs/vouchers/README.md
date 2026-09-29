@@ -4,20 +4,20 @@ Gift-voucher work runs here, separate from the Shop mode cycles in `docs/planImp
 Same protocol, same file roles: see [`planimp.md`](./planimp.md) (a copy of
 `docs/planImp/planimp.md` with paths pointing here).
 
-## Where things stand (2026-09-28)
+## Where things stand (2026-09-29)
 
 | | |
 |---|---|
-| Cycle | 28 — till-driven gift voucher redemption |
-| `plan.md` | `Status: ACCEPTED`, Revision 1 (Planner: Fable 5.1), reviewed 2026-09-28 |
-| `implemented.md` | `Status: DONE` — reviewed and accepted; see `## Review` in `plan.md` |
-| Real-till test | Passed (applied + partial). See [`findings/2026-09-28-till-testing.md`](./findings/2026-09-28-till-testing.md) |
-| Committed? | No. All cycle 28 changes are uncommitted in the working tree |
+| Current cycle | Vouchers cycle 2 — voucher activity screen (`/vouchers/activity`) |
+| `plan.md` | `Status: ACCEPTED`, Revision 1 (Planner: Fable 5.1), reviewed 2026-09-29 |
+| `implemented.md` | `Status: DONE` — reviewed and accepted; uncommitted |
+| Previous cycle | Cycle 1 (called cycle 28 at the time), till-driven redemption: ACCEPTED, committed (421df081), deployed. Archived in `archive/2026-09-27-cycle-28-till-voucher-redemption/` |
+| Production | Scheduler runs every minute from `/etc/cron.d/osmanager` as `www-data`. `crontab -l` shows nothing, by design |
 
-Open items for the owner (see `## Review` in `plan.md`):
-1. Scan one printed GV label with the real scanner at the real till (finding 1; no code change unless it fails).
-2. Browser checks as a manager: office `/vouchers` scan + Manual deduct, and `/vouchers/exceptions` + Mark reviewed on #430814.
-3. Archive the cycle: `mkdir -p docs/vouchers/archive/2026-09-27-cycle-28-till-voucher-redemption` and move `plan.md` + `implemented.md` there.
+Open items for the owner:
+1. **Parked:** 37 of 39 production vouchers have no till product. See [`findings/2026-09-29-production-backfill-not-run.md`](./findings/2026-09-29-production-backfill-not-run.md).
+2. Scan one printed GV label with the real scanner at the real till (finding 1 in [`findings/2026-09-28-till-testing.md`](./findings/2026-09-28-till-testing.md)).
+3. Browser checks as a manager for cycle 1: office `/vouchers` scan + Manual deduct, and `/vouchers/exceptions` + Mark reviewed.
 
 ## Kickoff prompts
 

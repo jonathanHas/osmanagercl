@@ -10,6 +10,8 @@
                     <a href="{{ route('vouchers.exceptions', ['all' => 1]) }}"
                        class="bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded">Show reviewed</a>
                 @endif
+                <a href="{{ route('vouchers.activity') }}"
+                   class="bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded">Activity</a>
                 <a href="{{ route('vouchers.list') }}"
                    class="bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded">All vouchers</a>
             </div>

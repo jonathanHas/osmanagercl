@@ -169,7 +169,7 @@ For a complete list of all features with detailed descriptions, see **[Features 
 - OSAccounts Integration
 
 **Voucher Management**
-- Gift Vouchers (barcoded, balance tracking, Zebra label printing; redeemed at the uniCenta till via the Voucher tender, auto-synced by `vouchers:sync-till`, manager exceptions list)
+- Gift Vouchers (barcoded, balance tracking, Zebra label printing; redeemed at the uniCenta till via the Voucher tender, auto-synced by `vouchers:sync-till`, manager exceptions list, live activity screen with till-check health at `/vouchers/activity`)
 
 **Customer Accounts**
 - Customer Invoicing (draft → issue → void, PDF)

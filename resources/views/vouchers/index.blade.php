@@ -10,6 +10,7 @@
                     @if ($exceptionCount > 0)
                         <a href="{{ route('vouchers.exceptions') }}" class="text-red-600 hover:text-red-800 font-medium">Till exceptions ({{ $exceptionCount }})</a>
                     @endif
+                    <a href="{{ route('vouchers.activity') }}" class="text-blue-600 hover:text-blue-800">Activity</a>
                     <a href="{{ route('vouchers.generate') }}" class="text-blue-600 hover:text-blue-800">Generate</a>
                     <a href="{{ route('vouchers.list') }}" class="text-blue-600 hover:text-blue-800">All vouchers</a>
                 </div>

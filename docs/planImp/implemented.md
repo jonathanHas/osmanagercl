@@ -1,4 +1,4 @@
-# Shop mode cycle 31 — Camera pause loose ends — implementation
+# Shop mode cycle 33 — Delivery scan: prompt without scrolling, Summary out of the way — implementation
 
 Status: DONE
 Plan revision: 1
@@ -6,230 +6,254 @@ Implementer: Opus
 Date: 2026-09-28
 
 ## Baseline
-HEAD: 5a17281d
+HEAD: 3fbfcc44
 
+Cycle 32's code changes are still uncommitted, so the tree started dirty with
+them. Nothing reverted.
 ```
-R  docs/planImp/implemented.md -> docs/planImp/archive/2026-09-28-shop-mode-cycle-30/implemented.md
-RM docs/planImp/plan.md -> docs/planImp/archive/2026-09-28-shop-mode-cycle-30/plan.md
+D  .delivery-specialist-agent-recommendation.md.kate-swp
+D  JFolder_temp/.questions.txt.kate-swp
+ M app/Http/Controllers/DeliveryLegacyController.php
+ M docs/features/shop-mode.md
+D  docs/jons_docs/.todo.md.kate-swp
+R  docs/planImp/implemented.md -> docs/planImp/archive/2026-09-28-shop-mode-cycle-31/implemented.md
+RM docs/planImp/plan.md -> docs/planImp/archive/2026-09-28-shop-mode-cycle-31/plan.md
+D  docs/planImp/plan-wedge-focus.md
+ M resources/js/shop/scan-input.js
+ M resources/views/components/shop/scan-input.blade.php
+ M tests/Feature/Shop/ShopDeliveryTest.php
+ M tests/Feature/Shop/ShopStockScanTest.php
+?? docs/planImp/archive/2026-09-28-shop-mode-cycle-32/
 ?? docs/planImp/plan.md
 ```
-(Cycle 30's archive move was already staged by the owner. Not mine, untouched.)
 
-**Test baseline measured: `15 failed, 800 passed (3402 assertions)`** — matching
+**Test baseline measured: `15 failed, 804 passed (3429 assertions)`** — matching
 the plan's Context.
 
 ## Steps
 
-### 1. Hide the library's paused banner — done
-Changed: `resources/css/shop.css` (APP ADDITIONS only).
+### 1. Prompt above the scan field — done
+Changed: `resources/views/shop/delivery-scan.blade.php`,
+`resources/js/shop/delivery-scan.js`.
 
-**The banner is a direct child of our mount in this version, so the plan's
-selector needed no adjustment** — verified rather than assumed:
-`createScannerPausedUiElement(this.element)` is called at
-`node_modules/html5-qrcode/esm/html5-qrcode.js:517`, and `this.element` is the
-element whose id we hand to `new Html5Qrcode(elementId)` — our
-`div.shop-scan__mount`. The banner itself (`:522–535`) is a `<div>` with no id
-and no class.
+The prompt `section` is now the first child of the left `shop-stack`, before
+the completed/scan-input block, with a comment giving the measured reason.
+Contents unchanged. `onScan()` calls
+`this.$nextTick(() => this.$refs.prompt?.scrollIntoView({ block: 'nearest' }))`
+after building `pending` and before `announceDone()` — the same call the
+correction card makes.
 
-I also checked what else is a direct-child `div` so the `:not()` is exhaustive:
-only `#qr-shaded-region`, appended by `possiblyInsertShadingElement` with
-`shadingElement.id = Constants.SHADED_REGION_ELEMENT_ID` (`:778`, `:796`). Its
-own border children are nested inside *it*, not the mount. The video is a
-`<video>` and the canvas a `<canvas>`, so neither is matched.
-
-Rule added beside the existing `#qr-shaded-region` line, with a comment naming
-the library version, the element it targets and the failure mode if a future
-version wraps the video in a div (the plan's Risk):
-```css
-.shop-scan__mount > div:not(#qr-shaded-region) { display: none !important; }
+**Check, measured at a true 390 × 844 viewport** (see Verification 3 for how):
+```
+cameraBlockHeight: 257      promptTop: 89
+addButtonBottom: 693        viewportHeight: 844
+fitsWithoutScrolling: true  pageScrollY: 0
+```
+And the before/after, taken by moving the prompt back below the field in the
+live DOM and re-measuring the same button:
+```
+old order: "Add 1 unit" bottom = 1038 px   → 194 px below the fold
+new order: "Add 1 unit" bottom =  693 px
 ```
 
-Check: `cmp` on the design block prints nothing (below); `ShopViewContractTest`
-green; browser check in Verification 3.
+### 2. Summary out of the sticky bar — done
+Changed: `resources/views/shop/delivery-scan.blade.php`.
 
-### 2. Vouchers resumes the camera — done
-Changed: `resources/js/shop/vouchers.js`, `tests/Feature/Shop/ShopVouchersTest.php`.
+`div.shop-actions` is now `div.shop-actions shop-actions--static` after the
+list, keeping the primary-styled button. A second Summary link sits in the
+Items header, inside a new `div.shop-inline` with the sort button.
 
-`window.dispatchEvent(new CustomEvent('shop-scan-saved'))` after the successful
-lookup's `announceDone()`, with the same one-line comment as labels (wording
-updated to "pauses" to match what cycle 30 actually does now).
+**The header link is icon + count only, with the word in `shop-sr-only` — a
+deviation from the plan's markup, driven by measurement. See Deviations 1.**
 
-`test_the_vouchers_page_resumes_the_camera_after_a_lookup` asserts the event is
-dispatched and that it comes *after* `announceDone()`, in the cycle-29 style,
-with a docblock explaining why the screen needed it.
+### 3. Correction card placement — done (left where it is)
+No change, which is the plan's default. Measured at 390 px with the camera
+block open: the card is **332 px** tall in an 844 px viewport, and tapping a row
+puts "Done" at **827 px** — on screen. The 17 px margin looks tight but is not
+fragile: `scrollIntoView({ block: 'nearest' })` scrolls the *minimum* needed, so
+the card is positioned low by construction, and there is 512 px of slack before
+a taller card could not fit at all.
 
-Check — `php artisan test --filter=ShopVouchersTest`:
+### 4. Troubleshooting note — done
+Changed: `docs/development/quick-start-guide.md`, under `### Common Issues`.
+
+Entry for `file_put_contents(storage/framework/views/…): Permission denied`:
+what it is (views the web server compiled are owned by `www-data` mode 644, so
+the CLI runner cannot recompile them), when it bites (right after a browser
+check, and the trace points into Laravel so it looks like a framework bug), the
+workaround (`php artisan view:clear`) and the owner's one-time `setfacl` fix
+for both `storage/framework/views` and `bootstrap/cache`.
+
+### 5. One sentence in `scan-input.js` — done
+Changed: `resources/js/shop/scan-input.js` header comment. Names the 1 s burst
+window in `capture()` and the 1500 ms `lastAt` push in
+`restartCameraIfWanted()` (3.5 s total with `detected()`'s 2 s), says they
+guard the same failure from two directions, and says to tune them together. No
+code change.
+
+### 6. Tests, build, tidy — done
+Changed: `tests/Feature/Shop/ShopDeliveryTest.php`.
+
+`test_the_quantity_prompt_comes_before_the_scan_field` — `strpos` of
+`x-ref="prompt"` < `strpos` of `shop-scan__input` in the rendered HTML, with a
+failure message naming the consequence, plus a source assertion for the
+`scrollIntoView` call.
+
+`test_summary_is_in_the_header_and_the_bottom_bar_is_not_sticky` — exactly two
+summary hrefs and two `shop-btn__count`s; the first href falls between
+`shop-group-title` and `class="shop-list"`, so it really is in the header; the
+sticky `<div class="shop-actions">` is gone and the static variant is present.
+
 ```
-Tests:    11 passed (49 assertions)
-```
-
-### 3. Untrack the swap file — done
-Changed: `.gitignore`; `docs/planImp/.needed.txt.kate-swp` removed from the
-index only.
-
-```
-$ git rm --cached docs/planImp/.needed.txt.kate-swp
-rm 'docs/planImp/.needed.txt.kate-swp'
-
-$ ls -la docs/planImp/.needed.txt.kate-swp
--rw------- 1 jon jon 11047 Sep 28 17:40 docs/planImp/.needed.txt.kate-swp   ← still on disk, as required
-```
-
-`.gitignore` gained, at the end:
-```
-# editor swap files
-*.kate-swp
-.*.swp
-```
-
-Check:
-```
-$ git check-ignore -v docs/planImp/.needed.txt.kate-swp
-.gitignore:28:*.kate-swp	docs/planImp/.needed.txt.kate-swp
-
-$ git status --short
- M .gitignore
-D  docs/planImp/.needed.txt.kate-swp     ← staged deletion
-...
-```
-Left staged for the owner, not committed, per the Constraints.
-
-**Three more tracked swap files exist that the plan does not name** — see
-Notes for Planner 1. I did not touch them.
-
-### 4. Build and tidy — done
-```
-npm run build   → shop-1xElYovb.css 45.64 kB │ gzip 7.97 kB
-                  shop-mE9ZAbCU.js  36.90 kB │ gzip 10.23 kB
-                  ✓ built in 7.31s
-php artisan view:clear                             → cleared
-./vendor/bin/pint tests/Feature/Shop/ShopVouchersTest.php → PASS, 1 file
+npm run build   → shop-BSTjG56S.js 37.68 kB │ gzip 10.46 kB   ✓ built in 7.01s
+php artisan view:clear                                  → cleared
+./vendor/bin/pint tests/Feature/Shop/ShopDeliveryTest.php → PASS, 1 file
 ```
 
 ## Deviations
 
-None.
+1. **The header Summary link is icon + count, not icon + the word "Summary".**
+   The plan's markup produced a header **160 px tall on three lines** at 390 px
+   — title, then the sort button, then the Summary link, each on its own row.
+   That is worse than the ~80 px sticky bar the step removes, so I measured the
+   alternatives in the live phone layout before choosing:
 
-Nothing under **Out of scope** was touched: `docs/planImp/needed.txt` is
-untouched, and no other camera behaviour changed — the pause/resume state
-machine from cycle 30 is byte-identical.
+   | variant | lines | header height |
+   |---|---|---|
+   | plan as written | 3 | 160 px |
+   | drop the Summary icon | 3 | 160 px |
+   | **sort keeps its label; Summary = icon + count (chosen)** | **2** | **92 px** |
+   | sort icon-only; Summary keeps icon + word | 2 | 92 px |
+   | sort icon-only *and* Summary icon-only | 2 | 56 px |
+
+   The plan's own fallback was the fourth row — "shorten the sort label to an
+   icon-only ghost button". I chose the third instead: it costs the same 92 px
+   but keeps the sort label, which an earlier cycle chose deliberately ("the
+   label names the order in force; tapping it flips") and which an icon cannot
+   convey. What is lost is the visible word "Summary" in the header, where an
+   icon, a live issue count and a `title="Summary"` remain — and the
+   fully-labelled Summary button still sits at the end of the list. The word is
+   in `shop-sr-only`, so screen readers and the existing `assertSee('Summary')`
+   both still get it.
+
+   I did not take the 56 px variant because it gives up both labels to save a
+   further 36 px on one screen.
+
+2. **Both Summary links were kept.** The plan allowed dropping the bottom one
+   if it duplicated awkwardly. At 390 px it does not: the header one is a
+   compact glanceable count at the top, the bottom one is a full primary button
+   exactly where someone who has worked down the list finishes. They read as
+   different affordances rather than a repeat.
+
+Nothing under **Out of scope** was touched: the camera block still shows while
+the prompt is open, and neither the summary page nor the design copy changed.
 
 ## Verification
 
-1. **`php artisan test`** → `Tests: 15 failed, 801 passed (3406 assertions)`.
+1. **`php artisan test`** → `Tests: 15 failed, 806 passed (3441 assertions)`.
    The same 15 pre-existing failures, unchanged in name and count. Passing went
-   800 → 801: the one new test. **No new failures.**
+   804 → 806: the two new tests. **No new failures.**
 
-2. **Contract.**
-   `head -c $(stat -c %s docs/design/shop-mode/shop.css) resources/css/shop.css | cmp - docs/design/shop-mode/shop.css`
-   prints nothing (`DESIGN-BLOCK-IDENTICAL`) — the new rule is inside APP
-   ADDITIONS. `ShopViewContractTest` green.
+2. **Contract.** `ShopViewContractTest` green (inside the 54 below);
+   design-block `cmp` prints nothing; `git diff --stat resources/css/shop.css`
+   is empty — no CSS change at all, as the Constraints require.
+   `php artisan test --filter='ShopDeliveryTest|ShopViewContractTest'` →
+   `54 passed (413 assertions)`.
 
-3. **Step 1, in the browser.** On `/shop/stock-scan` with the camera block
-   revealed, I appended to `.shop-scan__mount`: (a) the library's paused banner
-   built attribute-for-attribute as `createScannerPausedUiElement` builds it,
-   then flipped to `display:block` inline exactly as `pause()` does; (b) a
-   `div#qr-shaded-region`; (c) a `<video>`.
-   ```
-   {"mountFound":true,
-    "bannerInlineStyle":"block",     ← what the library sets
-    "bannerComputed":"none",         ← our rule wins
-    "shadedComputed":"none",         ← unchanged behaviour
-    "videoComputed":"block",         ← picture NOT hidden
-    "bannerText":"Scanner paused"}
-   ```
+3. **Browser at 390 × 844.** A note on method, because it matters for how much
+   the numbers are worth: `resize_window` did **not** change the page viewport
+   on this machine — the window resized but `innerWidth` stayed 826. Rather
+   than report measurements from the wrong width, I rendered the page in a
+   same-origin iframe sized exactly 390 × 844. Media queries, `innerWidth` and
+   `getBoundingClientRect` all resolve against the iframe's own viewport, so
+   the layout is the real mobile one: `splitColumns` came back as a single
+   `354px` column, confirming the phone breakpoint was active.
 
-   **Step 2, in the browser**, on `/shop/vouchers` with `pause`/`resume` spied.
-   My first run showed `pause 1, resume 1` but sampled too late to see the
-   frozen state, so I slowed the lookup by 1200 ms and looked again — the whole
-   cycle is visible:
-   ```
-   duringLookup: {"pause":1,"resume":0,"paused":true,  "label":"Got it"}
-   afterLookup:  {"pause":1,"resume":1,"paused":false,"cameraOpen":true,
-                  "label":"Point at the barcode"}
-   ```
-   That is the bug fixed: before this cycle the `afterLookup` row would still
-   have read `paused: true, label: "Got it"` indefinitely.
+   - **Prompt fully visible without scrolling.** `addButtonBottom: 693` against
+     `viewportHeight: 844`, `pageScrollY: 0`. Before the change, same
+     measurement: **1038 px, i.e. 194 px below the fold**.
+   - **Scan from the bottom of the list.** Scrolled to the end (`scrollY: 258`),
+     then scanned: the page moved to `scrollY: 89` and the prompt was fully
+     visible (`promptTop: 0`, `addButtonBottom: 604`). The `scrollIntoView`
+     does its job.
+   - **Correction card.** Tapping a row: `cardTop: 512`, `doneButtonBottom: 827`
+     against 844 — "Done" on screen. Card height 332 px, so 512 px of slack.
+   - **Items header at 390 px.** Two lines, 92 px: "Items 3" on the first,
+     "New first" and the Summary icon + count on the second. `overflowsWidth:
+     false`. Screenshot taken.
+   - **Bottom bar.** One `.shop-actions` element, class
+     `shop-actions shop-actions--static`, computed `position: static`, text
+     "Summary 3". No sticky bar remains.
 
-   **Step 3's git output** is quoted in full under step 3 above.
+4. **Browser at 1280 × 800** (same iframe, resized):
+   ```
+   splitColumns: "582.469px 529.531px"
+   prompt: left 65,  right 647
+   list:   left 671, right 1201     promptLeftOfList: true
+   headerHeight: 56 (one line)      sortLabel: "New first"
+   ```
+   Two columns, prompt left, list right, nothing overlapping, and the header
+   fits on one line with the sort label showing.
 
    Console across the whole run: **no errors or exceptions**.
 
-4. **Owner on production after deploy:** after a scan the frozen frame should
-   show only "Got it" with no dark "Scanner paused" strip across the top; and
-   on Vouchers the camera should come back by itself once the lookup returns.
+5. **Dev data** — restored, see below.
 
 ## Files changed
 
 ```
- M .gitignore
-D  docs/planImp/.needed.txt.kate-swp     (staged deletion; file kept on disk)
- M resources/css/shop.css
- M resources/js/shop/vouchers.js
- M tests/Feature/Shop/ShopVouchersTest.php
-?? docs/planImp/implemented.md           (this file)
+ M docs/development/quick-start-guide.md
+ M resources/js/shop/delivery-scan.js
+ M resources/js/shop/scan-input.js          (header comment only)
+ M resources/views/shop/delivery-scan.blade.php
+ M tests/Feature/Shop/ShopDeliveryTest.php
+?? docs/planImp/implemented.md              (this file)
 ```
-Plus `public/build/*` from `npm run build`. The staged rename of cycle 30's
-files into `archive/` was already there when I started.
+Plus `public/build/*` from `npm run build`. Everything else dirty in the tree
+is cycle 32's and is listed under Baseline.
 
 No commits, no deploys.
 
 ## Dev state
 
-This cycle's checks were read-only apart from one seeded device, now removed.
-Verified after cleanup:
+The browser check scans through real endpoints. Cleaned up, verified after:
 ```
-devices remaining: 1        (the pre-existing revoked "Dev browser check")
-delivery scan rows: 0
+delivery scan rows: 0        (three rows from the checks, deleted)
+devices remaining: 1         (the pre-existing revoked "Dev browser check")
 label queue: 0
 stock adjustments today: 0
 ```
-The `shop_device` cookie was cleared and the tab closed. katelyn (id 3) still
-has PIN `2580`. No config file was modified.
+Session `4149c0a2-…` is back to empty, where it started. The seeded "Cycle 33
+browser check" device was deleted, the cookie cleared, the tab closed. katelyn
+(id 3) still has PIN `2580`. No config file was modified.
 
 ## Notes for Planner
 
-1. **Three more Kate swap files are tracked, and the new `.gitignore` rule now
-   puts them in a confusing half-state.** `git ls-files | grep kate-swp` after
-   my change:
-   ```
-   .delivery-specialist-agent-recommendation.md.kate-swp
-   JFolder_temp/.questions.txt.kate-swp
-   docs/jons_docs/.todo.md.kate-swp
-   ```
-   The plan named only `docs/planImp/.needed.txt.kate-swp`, so that is the only
-   one I untracked. But `.gitignore` does nothing for a file that is already
-   tracked, so those three will keep appearing in `git status` whenever the
-   editor touches them — now while *also* matching an ignore rule, which is the
-   kind of thing that wastes ten minutes in six months' time. One command
-   finishes the job the plan started:
-   ```
-   git rm --cached .delivery-specialist-agent-recommendation.md.kate-swp \
-                   JFolder_temp/.questions.txt.kate-swp \
-                   docs/jons_docs/.todo.md.kate-swp
-   ```
-   I did not run it: they are outside the plan's scope and two of them are in
-   the owner's own areas. Worth a one-line follow-up or an amendment to this
-   cycle.
+1. **There is no "hide on narrow" utility, and that is what forced Deviation 1.**
+   `shop.css` has `.shop-touch-only` (shown only when `.is-touch`) and
+   `.shop-sr-only`, but nothing that varies by viewport width. With one, the
+   header could show "Summary" on the till PC — where there is room — and drop
+   to icon + count on a phone, and I would not have had to choose. A single
+   line under APP ADDITIONS would do it, e.g.
+   `@media (max-width: 640px) { .shop-wide-only { display: none !important; } }`.
+   The Constraints forbade a CSS change this cycle, so I did not add it. If you
+   want the word back on desktop, that is the cheap way.
 
-2. **The `:not(#qr-shaded-region)` selector is load-bearing and version-tied.**
-   It is correct for html5-qrcode 2.3.8, which I verified in the library source
-   rather than by inspection of a running camera (dev cannot start one). The
-   comment in the CSS names the version and the risk. If the library is ever
-   upgraded, this rule and `pauseScanner`/`resumeScanner`'s state constants are
-   the two places to re-check — worth a line in whatever checklist covers
-   dependency bumps, if one exists.
+2. **`resize_window` does not resize the page viewport on this machine**, which
+   is worth knowing before writing another "check it at 390 px" step. The
+   iframe technique in Verification 3 is reliable and cheap — same origin, real
+   media queries, real geometry — and I would suggest naming it in the plan
+   next time rather than leaving each cycle to discover it.
 
-3. **Still open from cycle 30, neither addressed nor explicitly deferred**
-   (flagging once more rather than assuming they were dropped on purpose):
-   - `restartCameraIfWanted()` is `async` and called fire-and-forget from the
-     Blade listener. Harmless today; a future reader may "fix" it into
-     something that blocks the handler.
-   - `pauseScanner()` returning false is swallowed silently, leaving the
-     decoder live while the prompt is open. Cycle 29's 3.5 s same-code
-     suppression is what stops that becoming a double-add — a second line of
-     defence I am relying on rather than one designed for the job. If that
-     window is ever shortened, this breaks.
+3. **The idle lock fired in the middle of the desktop measurement** and signed
+   the session out, which sent the iframe to `/login` and cost a re-auth. Not a
+   bug — it is cycle 26 working — but any future cycle whose browser check
+   involves long pauses on a trusted device will hit it. Either lower
+   `idle_lock_minutes` awareness into the plan's check steps, or untrust the
+   device for measurement work.
 
-   Both are "worth knowing", not "must fix". A one-line decision in the next
-   review would close them out either way.
+4. **The 17 px clearance under the correction card's "Done"** is safe today for
+   the reason given in step 3, but it is the tightest thing on the screen. If a
+   future change makes that card taller than ~840 px it will stop fitting
+   entirely and `scrollIntoView` will not save it. Not worth acting on now;
+   worth remembering if anyone adds a field to it.

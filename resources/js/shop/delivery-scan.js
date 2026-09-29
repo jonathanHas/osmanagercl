@@ -220,6 +220,11 @@ export default () => mix(productImages(), {
                 qty: 1,
             };
 
+            // The prompt sits above the scan field, but someone who has scrolled
+            // down the list would still not see it open. Same call the correction
+            // card makes.
+            this.$nextTick(() => this.$refs.prompt?.scrollIntoView({ block: 'nearest' }));
+
             this.announceDone();
         } catch (e) {
             this.announceError('Scan failed');

@@ -230,12 +230,14 @@ class ShopStockScanTest extends TestCase
         // Detection pauses. The old behaviour — a full stop on every read — is
         // the thing that must not come back.
         $detectedAt = strpos($field, 'detected(text) {');
-        $stopAt = strpos($field, 'async stop()');
+        // Bound by the next method, not by async stop(): since cycle 32 pause()
+        // sits between them and legitimately calls this.stop() as its fallback.
+        $pauseStart = strpos($field, 'async pause()');
         $this->assertNotFalse($detectedAt);
-        $this->assertNotFalse($stopAt);
-        $this->assertGreaterThan($detectedAt, $stopAt);
+        $this->assertNotFalse($pauseStart);
+        $this->assertGreaterThan($detectedAt, $pauseStart);
 
-        $detected = substr($field, $detectedAt, $stopAt - $detectedAt);
+        $detected = substr($field, $detectedAt, $pauseStart - $detectedAt);
         $this->assertStringContainsString('this.pause();', $detected);
         $this->assertStringNotContainsString(
             'this.stop();',
@@ -254,5 +256,64 @@ class ShopStockScanTest extends TestCase
 
         // The user's own camera button still releases the device.
         $this->assertStringContainsString('stopScanner()', $field);
+
+        // Cycle 32: a pause the library refuses must fall back to a stop, so
+        // the decoder is never live while the page shows a prompt. The stop
+        // has to come after the pauseScanner() attempt, not instead of it.
+        $pauseAt = strpos($field, 'async pause()');
+        $resumeAt = strpos($field, 'async resume()');
+        $this->assertNotFalse($pauseAt);
+        $this->assertNotFalse($resumeAt);
+        $pause = substr($field, $pauseAt, $resumeAt - $pauseAt);
+
+        $this->assertStringContainsString('await this.stop();', $pause);
+        $this->assertLessThan(
+            strpos($pause, 'await this.stop();'),
+            strpos($pause, 'scanner.pauseScanner()'),
+            'pause() must try pauseScanner() first and only stop when that fails.'
+        );
+    }
+
+    /**
+     * Cycle 32. The till PC's USB hand scanner types into whatever has focus,
+     * and refocus() deliberately lets a button keep focus so the quantity
+     * stepper works. A scan taken just after someone clicked "+" therefore
+     * lost its digits and let the trailing Enter press "+" again.
+     *
+     * capture() takes those keystrokes into the scan field. Source assertions
+     * plus the rendered binding, since a hand scanner cannot be driven from a
+     * feature test.
+     */
+    public function test_stray_keystrokes_are_captured_into_the_scan_field(): void
+    {
+        $field = file_get_contents(resource_path('js/shop/scan-input.js'));
+
+        // The rendered component binds it, using the window form the cycle-14
+        // guard permits (not keydown.enter.window).
+        $user = $this->userWith('employee', ['stocking.scan']);
+        $response = $this->actingAs($user)->get(route('shop.stock-scan'))->assertOk();
+        $response->assertSee('x-on:keydown.window="capture($event)"', false);
+        $response->assertDontSee('keydown.enter.window', false);
+
+        // The burst rule: an Enter only submits if it closely follows typing.
+        $captureAt = strpos($field, 'capture(event) {');
+        $this->assertNotFalse($captureAt);
+        $capture = substr($field, $captureAt, strpos($field, 'isTextEntry(el) {') - $captureAt);
+
+        $this->assertStringContainsString('this.burstAt = Date.now()', $capture);
+        $this->assertStringContainsString("event.key === 'Enter'", $capture);
+        $this->assertStringContainsString('Date.now() - this.burstAt < 1000', $capture);
+
+        // Modifier combinations and text fields are left alone.
+        $this->assertStringContainsString('event.ctrlKey', $capture);
+        $this->assertStringContainsString('this.isTextEntry(document.activeElement)', $capture);
+
+        // A finished scan resets the burst, so a later lone Enter is a person.
+        $submitAt = strpos($field, 'submit() {');
+        $this->assertNotFalse($submitAt);
+        $this->assertStringContainsString(
+            'this.burstAt = 0;',
+            substr($field, $submitAt, strpos($field, 'capture(event) {') - $submitAt)
+        );
     }
 }
