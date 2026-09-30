@@ -74,6 +74,7 @@ export default () => ({
 
     /** A manager is looking at a code that has no balance on it yet. */
     get activating() {
+        // Never in the `deleted` mode: a deleted voucher is not offered for activation.
         return !! this.activateUrl && (this.mode === 'unknown' || this.mode === 'inactive');
     },
 
@@ -151,7 +152,8 @@ export default () => ({
                 }
             } else {
                 this.voucher = null;
-                this.mode = 'unknown';
+                // Deleted by an admin (admin tools): unusable, and not offered for activation.
+                this.mode = data.deleted ? 'deleted' : 'unknown';
                 this.code = code;
             }
 

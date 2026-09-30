@@ -21,6 +21,7 @@ Gift-voucher system for the shop. Customers buy vouchers and redeem them against
 | `active` | Issued with a balance | Yes |
 | `exhausted` | Balance fully spent (€0) | No |
 | `deactivated` | Admin-disabled (balance preserved) | No — until reactivated |
+| *deleted* | Not a status: an admin soft-deleted the voucher ([Admin changeover tools](#admin-changeover-tools)). Its status and balance are kept but it is hidden from the list, the activity log and the totals, cannot be looked up, activated or redeemed, and its code stays reserved. Restorable | No |
 
 ## Data model
 
@@ -230,7 +231,47 @@ Vouchers print on the shop's Zebra label printer (the same one used by `/labels`
 
 ## Admin: deactivate / reactivate
 
+(For many vouchers at once, and for delete / restore / make for sale, see [Admin changeover tools](#admin-changeover-tools).)
+
 On the **All Vouchers** page (`/vouchers/list`), an admin-only **Edit** button (shown for `active`/`deactivated` rows) opens a modal to deactivate or reactivate the voucher with an optional reason/note. The action is logged to the voucher's transaction history (with the note). Deactivating preserves the balance and blocks redemption; reactivating restores it to `active`.
+
+## Admin changeover tools
+
+Added in vouchers cycle 4 (2026-09-29). Tools for bringing the vouchers that predate the sell-at-the-till process (activated by hand, 2026-06 to 2026-09) into it, and for clearing out test vouchers. **Admins only**, and all behind one switch, **`VOUCHER_ADMIN_TOOLS`** (`config('vouchers.admin_tools')`, default `true`): when false the five routes answer 404, the list page shows none of the controls, and the retire command refuses to run.
+
+### Bulk actions on `/vouchers/list`
+
+For an admin the list gets a checkbox per voucher, "select all on this page", a **per page** choice (25/50/100/200) and a **Deleted** status filter. The bar above the table shows how many are selected and their total balance, a note field, and the actions. Each action asks for confirmation in an in-page dialog, handles every voucher separately (one that does not qualify is skipped and named in the result banner, e.g. "Deactivated 36 vouchers. Skipped 1: GV… (not active).") and writes one `voucher_transactions` row per voucher with the admin as user and the note.
+
+| Action | Applies to | Effect |
+|---|---|---|
+| **Make for sale** | `active` or `deactivated` vouchers **nobody has used**: balance > 0, equal to the initial value, and no `deduct` row ever | Back to unsold: `face_value` = the balance, balance 0, `initial_value` cleared, status `inactive`. Transaction `for_sale` (shown as "Made for sale", a negative amount). The till product becomes `[for sale €X]` at price X (created if missing), so the label sells through the till and activates like a new voucher. Skipped with a reason otherwise: `deleted`, `not active or deactivated`, `no balance`, `has been spent from`, `balance differs from its initial value` |
+| **Deactivate selected** | `active` | → `deactivated` (balance kept). Transaction `deactivate`. Till product `[deactivated]` (created if missing) |
+| **Reactivate selected** | `deactivated` | → `active`. Transaction `activate` |
+| **Delete selected** | `inactive`, `deactivated`, `exhausted` (**not `active`**: deactivate it first, two deliberate steps before a balance disappears). **A reason is required** | Soft delete. Transaction `delete`. The voucher leaves the list, the activity log and the totals; its unreviewed till exceptions are marked reviewed; its till product stays (it may be on past tickets) renamed `[deleted]` at price 0; its code stays reserved (lookup says "This voucher was deleted. It cannot be used."; activation refused). A deleted label scanned at the till deducts nothing and appears on the exceptions page. **Destroy the physical labels** |
+| **Restore selected** (Deleted view) | deleted vouchers | Back with the status and balance they had. Transaction `restore`. Till product renamed back (a for-sale voucher is priced again) |
+
+**Undoing make for sale**: a manager scans the voucher on `/vouchers` and activates it by hand (the value is pre-filled). There is no undo button.
+
+"Activate the one voucher that was sold" needs no tool: leave it unticked, or reactivate it after a bulk deactivation.
+
+Code: `app/Services/VoucherAdminService.php`, `app/Http/Controllers/VoucherAdminToolsController.php`, `resources/views/vouchers/partials/admin-tools.blade.php` (the bar, the dialog and its `voucherBulk()` Alpine component), plus the `$adminTools` blocks in `resources/views/vouchers/list.blade.php` and `VoucherController::list()`.
+
+### Retiring the three fixed voucher products
+
+`php artisan vouchers:retire-fixed-products [--dry-run] [--restore]` works on `config('vouchers.legacy_product_codes')` = `6012` "Voucher 50 Euro", `6013` "Voucher 10 Euro", `6014` "Voucher 20 Euro". Retiring removes each one's till button (`PRODUCTS_CAT`), adds ` (retired)` to its name and changes its barcode to `RET6012` etc., so keying the old code on the till finds nothing. The product rows stay because past sales refer to them (reports show the new name). `--dry-run` prints the table and writes nothing; `--restore` puts code, name and button back. **Tills load their buttons at start-up: restart uniCenta on each till** afterwards.
+
+### Changeover on production (owner checklist)
+
+1. Find the one hand-activated voucher that was really sold and keep its code to hand.
+2. `/vouchers/list`, status **Active**, **200 per page**: tick all, **untick the sold one**, **Make for sale**. The banner should report 36 done.
+3. Filter to the test vouchers (**Deactivated**, then **Inactive**): **Delete selected**, with a reason. Destroy the physical test labels.
+4. On the server, as the web user: `php artisan vouchers:retire-fixed-products --dry-run`, then without `--dry-run`. Restart uniCenta on each till.
+5. `/vouchers/activity`: the health banner should be green, and "Outstanding balance" should be the sold voucher's balance only.
+
+### Removing the tools later
+
+Delete `app/Http/Controllers/VoucherAdminToolsController.php`, `app/Services/VoucherAdminService.php`, `resources/views/vouchers/partials/admin-tools.blade.php`, the five `vouchers.bulk.*` routes, `app/Console/Commands/RetireFixedVoucherProducts.php` and their tests; remove the `$adminTools` / `$showDeleted` / `per_page` parts of `VoucherController::list()` and the `@if ($adminTools)` blocks in `list.blade.php`; remove `admin_tools` and `legacy_product_codes` from `config/vouchers.php`. **Keep**, if any voucher has ever been deleted: the `withTrashed()` handling in `VoucherTillSyncService` (`resolveVoucher()`, `applyLine()`, `applySale()`), `VoucherController::lookup()` / `activate()`, the `[deleted]` name in `VoucherPosProductService`, the `whereHas('voucher')` filters in `VoucherActivityService`, and the transaction types and labels (`for_sale`, `delete`, `restore`), which stay in the history.
 
 ## Access control
 
@@ -262,6 +303,8 @@ Employees get a cut-down till screen: they can ring up a voucher payment but can
 | `vouchers.activity` | GET `/vouchers/activity` | manage |
 | `vouchers.activity.feed` | GET `/vouchers/activity/feed?days=1\|7\|30&q=` (JSON) | manage |
 | `vouchers.deactivate` / `.reactivate` | POST `/vouchers/{voucher}/...` | admin |
+| `vouchers.bulk.for-sale` / `.deactivate` / `.reactivate` / `.delete` / `.restore` | POST `/vouchers/bulk/{action}` (`ids[]`, `note`) | admin, and `VOUCHER_ADMIN_TOOLS` on |
+| `vouchers.list` extras | GET `/vouchers/list?per_page=25\|50\|100\|200&status=deleted` | `status=deleted` admin only |
 
 ## Key files
 
@@ -269,6 +312,7 @@ Employees get a cut-down till screen: they can ring up a voucher payment but can
 - **Models**: `app/Models/Voucher.php`, `app/Models/VoucherTransaction.php`, `app/Models/VoucherTillRedemption.php`
 - **Till redemption**: `app/Services/VoucherPosProductService.php`, `app/Services/VoucherTillSyncService.php`, `app/Console/Commands/SyncVoucherPosProducts.php`, `app/Console/Commands/SyncVoucherTillRedemptions.php`, `config/vouchers.php`
 - **Activity screen**: `app/Services/VoucherActivityService.php`, `app/Services/VoucherSyncHeartbeat.php`
+- **Admin changeover tools**: `app/Services/VoucherAdminService.php`, `app/Http/Controllers/VoucherAdminToolsController.php`, `resources/views/vouchers/partials/admin-tools.blade.php`, `app/Console/Commands/RetireFixedVoucherProducts.php`
 - **Migrations**: `database/migrations/2026_06_24_120000_create_vouchers_table.php`, `..._120001_create_voucher_transactions_table.php`, `2026_06_25_120000_add_note_to_voucher_transactions_table.php`, `2026_09_28_100000_create_voucher_till_redemptions_table.php`, `..._100001_add_source_to_voucher_transactions_table.php`, `..._100002_add_pos_product_id_to_vouchers_table.php`, `2026_09_30_100000_add_face_value_to_vouchers_table.php`, `..._100001_add_sale_amount_to_voucher_till_redemptions_table.php`
 - **Views**: `resources/views/vouchers/{index,list,generate,print,transactions,exceptions,activity}.blade.php`
 - **Permissions/nav**: `database/seeders/RolesAndPermissionsSeeder.php`, `resources/views/layouts/admin.blade.php`

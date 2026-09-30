@@ -35,6 +35,10 @@
                     <x-shop.icon name="alert" size="sm" />
                     <p class="shop-meta" x-text="'Not sold yet (' + format(faceValue) + '). Sell it at the till: scan the label as an item.'"></p>
                 </section>
+                <section class="shop-card shop-card--flat" x-show="mode === 'deleted'" x-cloak>
+                    <x-shop.icon name="alert" size="sm" />
+                    <p class="shop-meta">This voucher was deleted. It cannot be used.</p>
+                </section>
                 <section class="shop-card shop-card--flat" x-show="mode === 'deactivated'" x-cloak>
                     <x-shop.icon name="alert" size="sm" />
                     <p class="shop-meta">This voucher has been deactivated.</p>

@@ -63,7 +63,9 @@ class VoucherPosProductService
         $texts = config('vouchers.pos_balance_text');
         $text = $texts[$voucher->status] ?? $voucher->status;
 
-        if ($voucher->isForSale()) {
+        if ($voucher->trashed()) {
+            $text = $texts['deleted'];
+        } elseif ($voucher->isForSale()) {
             $text = sprintf($texts['for_sale'], number_format((float) $voucher->face_value, 2));
         } elseif ($voucher->status === Voucher::STATUS_ACTIVE) {
             $text = sprintf($text, number_format((float) $voucher->current_balance, 2));
@@ -80,7 +82,8 @@ class VoucherPosProductService
      */
     public function productPrice(Voucher $voucher): float
     {
-        return $voucher->isForSale() ? round((float) $voucher->face_value, 2) : 0.0;
+        // A deleted voucher's label scans as €0.00 (it can neither be sold nor spent).
+        return ! $voucher->trashed() && $voucher->isForSale() ? round((float) $voucher->face_value, 2) : 0.0;
     }
 
     /**

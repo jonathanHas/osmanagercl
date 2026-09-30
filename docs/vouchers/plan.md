@@ -1,196 +1,209 @@
-# Selling a voucher at the till activates it (vouchers cycle 3)
+# Admin tools for existing and test vouchers (vouchers cycle 4)
 
 Status: READY
-Revision: 1
+Revision: 2
 Planner: Fable 5.1
 Date: 2026-09-29
 
 ## Goal
 
-A voucher is created with a value. Its label is scanned at the till like any product, the till charges that value, and the sale itself activates the voucher with that amount: no manager step, no separate "Voucher 20 Euro" product. From then on the same label scans as the €0.00 redemption line that cycle 1 built. Anything unusual about the sale (quantity above 1, the Free tender, a voucher sold twice, a refund) activates nothing and lands on the manager exceptions page.
+An admin can bring the vouchers that predate the sell-at-the-till process into it, from the voucher list page: tick the printed labels that were activated by hand but never sold and **make them for sale at their value**, so they sell through the till like new ones; deactivate or reactivate many vouchers in one go; and delete vouchers that were only ever used for testing so they disappear from the list, the activity log and the totals. A deleted voucher can be restored. One command takes the three old fixed voucher products off the till. These are changeover tools: admins only, behind one switch, and built so they can be removed later without touching the rest.
+
+Revision 2 (2026-09-29, before implementation started) adds the "make for sale" action and the retire command, both at the owner's request.
 
 ## Context (verified 2026-09-29)
 
-**How vouchers are sold today.** The cashier rings a fixed till product ("Voucher 10 Euro" `6013`, "Voucher 20 Euro" `6014`, "Voucher 50 Euro" `6012`; category `033`, `TAXCAT 000`, till buttons in `PRODUCTS_CAT`) and a manager then activates a printed GV label by hand on `/vouchers`. Last 12 months in the POS copy: 196 sale lines, about €7,100; paid by card (102 tickets) or cash (51); **30 of the 196 lines had quantity above 1** (up to 9); no till price edits; no refund of a voucher ever. A `free` payment is never mixed with another payment on a receipt.
+**Production today (read-only check, 15:32):**
 
-**What cycles 1 and 2 built (all committed or accepted; archives under `docs/vouchers/archive/`):**
-- `app/Models/Voucher.php`: fillable `code, pos_product_id, initial_value, current_balance, status, created_by`. `initial_value` is set only at activation and is shown as "Initial" in `vouchers/list.blade.php` l.39/58 and `vouchers/transactions.blade.php` l.19-20. There is no field for an unsold voucher's value.
-- `app/Services/VoucherPosProductService.php`: `productName()` l.60 builds the NAME from `config('vouchers.pos_name_format')` and `pos_balance_text[status]`; `sync()` l.77 creates the product with `PRICESELL 0` (l.102) and afterwards only renames (l.110-112). It never changes a price. `lastAction()` reports `created|linked|renamed|unchanged|failed`.
-- `app/Services/VoucherTillSyncService.php`: `run()` l.91 finds tickets with a product in the voucher category, `TICKETTYPE IN (0,1)`; `syncTicket()` l.151 reads the voucher lines with `select('tl.LINE','tl.PRODUCT','p.CODE')` l.161 and `->unique('PRODUCT')` l.163 (so **price and units are not read today**), sums `paperin` l.172, and calls `applyLine()` l.271 per voucher in LINE order with a shared `$pool`; `isLast` (l.193, 214) decides `partial`. `applyLine()` order: refund l.279 → unknown l.285 → not active l.298 → no tender l.307 → deduct l.316. After the loop, vouchers with `deducted > 0` get `posProducts->sync()`. `COUNT_KEYS` ends `…,'refund','skipped','errors'`.
-- `app/Models/VoucherTillRedemption.php`: statuses `applied|partial|no_tender|inactive|unknown|refund`; `EXCEPTION_STATUSES` is all but `applied`. Unique `(pos_ticket_id, pos_product_id)`. Despite its name the table is "one row per voucher per till ticket"; this cycle adds sale rows to it and does not rename it.
-- `app/Http/Controllers/VoucherController.php`: `lookup()` l.71, `history()` l.123 (issue → "Issued"; till rows get `user` "Till #N"), `activate()` l.159 (route `vouchers.activate`, under `permission:vouchers.manage`, creates unknown codes on the fly, then `syncPosProduct()`), `generate()` l.365 (validates `count` only; creates vouchers, then `posProducts->syncMany()`), `print()` l.399.
-- `app/Services/VoucherActivityService.php`: `fromTransaction()` maps `issue` → kind `issue`, label "Issued"; `fromRedemption()` labels the four no-transaction statuses.
-- Views: `resources/views/vouchers/generate.blade.php` (one `count` input), `print.blade.php` (label previews with the code under each), `index.blade.php` (ACTIVATE block l.81-118: managers get a starting-balance input, employees get "Voucher not active … Please ask a manager."; script sets `mode = 'activate'` and `startingBalance = ''` at l.378-381), `exceptions.blade.php`, `activity.blade.php`. Shop: `resources/views/shop/vouchers.blade.php` l.30-47 and `resources/js/shop/vouchers.js` (`needsManager` l.85, `activating` l.76, `typed` reset in `onScan()` l.131).
-- **Manual activation is already managers and admins only**: `vouchers.activate` is in the `vouchers.manage` group and `vouchers.manage` is granted to manager and up (migration `2026_09_26_120000_add_customer_requests_and_voucher_permissions.php`). `ShopVouchersTest` already asserts an employee gets 403. No permission work is needed; the owner's decision 6 is met by keeping this.
-- Tests: `tests/Concerns/CreatesVoucherPosTables.php` (`posSale($ticketNo, $lines, $payments, $at, $type)` takes `price`, `units`, `tax` per line; `TAXES` seeded `000` = 0 and `001` = 0.23). Current counts: `VoucherTillSyncServiceTest` 23, `VoucherPosProductServiceTest` 11, `VoucherTillExceptionsTest` 8, `VoucherActivityTest` 18, `ShopVouchersTest` 11.
-- Dev helpers: `docs/vouchers/scripts/simsale.php` inserts a goods line, the voucher's line at `PRICE 0`, and a `paperin` payment; `numeric_barcode.php` gives a voucher product a numeric barcode for the till's numeric keypad; `reset_voucher.php`.
+| Status | Vouchers | Balance | With a value | With a till product |
+|---|---|---|---|---|
+| active | 37 | €860.00 | 0 | 2 |
+| deactivated | 4 | €42.24 | 2 | 2 |
+| inactive | 1 | €0.00 | 1 | 1 |
 
-**Till and finance facts:**
-- uniCenta reads a scanned product from the database on every scan, so a changed `PRICESELL` or `NAME` applies to the next scan. `PRICESELL` is ex-VAT; `TAXCAT 000` maps to `TAXES.ID 000`, `RATE 0`, so price equals the amount charged.
-- Finance counts a voucher as 0% VAT revenue when sold and deducts `paperin` when redeemed (`VatReturnController` l.183-275, `SalesAccountingReportController` l.328-345, `ProfitLossController` l.128-135, `RtdSubmission`). None of that code refers to products `6012-6014` or category `033`. A voucher's own product sold at `TAXCAT 000` is therefore treated exactly as a voucher sale is today.
-- Between the sale and the next till check (at most about a minute on production) the product still carries its price.
+- The 37 active vouchers were activated by hand (39 manual `issue` rows, €10 × 21, €20 × 5, €50 × 11) before the new process. The owner says one of them has really been sold; the other 36 are printed labels carrying a balance nobody paid for.
+- All 37 are untouched: balance equals the initial value and none has a `deduct` row (checked 2026-09-29).
+- The three fixed products `6012` "Voucher 50 Euro", `6013` "Voucher 10 Euro", `6014` "Voucher 20 Euro" (category `033`) each have a till button (`PRODUCTS_CAT` row, `CATORDER` NULL). One was sold on 2026-09-29 at 14:14, two lines since 1 September.
+- The five others are test vouchers: two from June, three from 29 September (two of those were sold and redeemed at the live till for €1 and €2, so their till products have ticket lines).
+- Nothing is soft-deleted yet.
 
-**Owner decisions (2026-09-29), do not re-open:**
-1. Quantity above 1 on a voucher sale: activate nothing, flag for a manager.
-2. A voucher sold again when it is already active (including a second scan before the price has dropped to zero): flag, add nothing.
-3. A refund ticket carrying a voucher sale: flag; the manager deactivates the voucher by hand.
-4. A voucher sale on a receipt paid with the Free tender: do not activate, flag.
-5. Products `6012-6014` stay as they are for now. Not part of this cycle.
-6. Manual activation stays, for managers and admins only (already the case).
-7. The printed label does not show the amount for now.
+**What exists:**
+- `app/Models/Voucher.php` uses `SoftDeletes`; nothing in the app deletes a voucher. `vouchers.code` is unique **including** soft-deleted rows, and `generateUniqueCode()` already checks `withTrashed()`.
+- Admin status change, one voucher at a time: `VoucherController::deactivate()` / `reactivate()` → private `changeStatus()` (l.309-355 before cycle 3's shifts; find it by name): `lockForUpdate`, only `active → deactivated` and `deactivated → active`, one `voucher_transactions` row (`deactivate` / `activate`, amount 0, optional note, user), then `syncPosProduct()`. Routes `vouchers.deactivate` / `vouchers.reactivate` sit in `Route::middleware('role:admin')` inside the `permission:vouchers.manage` group (`routes/web.php`, just after `vouchers/{voucher}/transactions`). `role` is `App\Http\Middleware\RoleMiddleware`.
+- `resources/views/vouchers/list.blade.php`: `@php($isAdmin = auth()->user()->hasRole('admin'))`; filter form (`q`, `status`); table Code / Status / Initial / Balance / Created by / Created / actions; an admin "Edit" modal per voucher driven by the inline `voucherAdmin()` Alpine component (posts JSON to the two routes, then reloads); a no-op `voucherAdmin()` for non-admins. `VoucherController::list()` paginates 25.
+- `app/Services/VoucherPosProductService.php`: `productName()` picks the text from `config('vouchers.pos_balance_text')[status]` (`for_sale` when `isForSale()`); `productPrice()`; `sync()` creates the product when missing and corrects name and price. So **deactivating a voucher that has no till product creates one**, named `[deactivated]`, price 0.
+- `app/Services/VoucherTillSyncService.php`: `resolveVoucher()` uses `Voucher::where(...)` (soft-deleted vouchers are invisible to it); `applyLine()` and `applySale()` lock with `Voucher::whereKey(...)->lockForUpdate()->first()`.
+- `app/Http/Controllers/VoucherController.php`: `lookup()` returns `['found' => false]` for an unknown code, and the screens then offer a manager the activation form; `activate()` creates an unknown code on the fly.
+- `app/Services/VoucherActivityService.php`: `events()` loads vouchers `withTrashed()` and shows their rows without a link; `totals()` sums transactions whatever their voucher's state. `tests/Feature/VoucherActivityTest.php::test_a_deleted_vouchers_rows_still_show_without_a_link` pins that behaviour.
+- `voucher_transactions.type` is `string(20)`; types today `issue|deduct|deactivate|activate`. `voucher_till_redemptions.voucher_id` is `nullOnDelete` (hard delete only).
+- The POS `TICKETLINES.PRODUCT` has a foreign key to `PRODUCTS`, so a till product that was ever sold or scanned on a ticket cannot be deleted.
+- Test helpers: `userWith($role, $permissions, $name)` in `tests/Feature/VoucherTillExceptionsTest.php`; `tests/Concerns/CreatesVoucherPosTables.php`.
+- Suite baseline: 15 failed, 862 passed.
+
+- `app/Models/ProductsCat.php` (till buttons): `isProductVisible()`, `addProduct($productId, ?int $order)`, `removeProduct($productId)`. The office product page already toggles till visibility one product at a time (`products.toggle-till-visibility`).
+
+**Owner's request (2026-09-29):** tools to deactivate the existing barcodes, to activate the one that was sold, and to delete barcodes used for testing; admin only; may be dropped once everyone knows the system. **Added the same day:** turn the unsold hand-activated labels into for-sale vouchers at their value, and retire the three old fixed products and take them off the till.
 
 **Planner decisions (record, do not re-open):**
-- The amount charged must equal the voucher's value. A different amount (a price edited at the till) activates nothing and is flagged, like decision 1.
-- Codes stay app-generated (`GV` + 10 characters). "Creates a voucher code and amount" means generating vouchers with a value.
-- One value per batch: the generate form takes a count and one amount.
+1. **Delete is a soft delete and can be undone.** Money records are never destroyed. "Deleted" means hidden everywhere and unusable; an admin can restore it.
+2. **An active voucher cannot be deleted.** It must be deactivated first. Two deliberate steps stand between an admin and wiping a customer's balance.
+3. **Delete needs a reason**; deactivate and reactivate take an optional note, as the single-voucher actions do today.
+4. **A deleted voucher's till product is kept**, renamed `[deleted]` at price 0. It cannot always be removed (foreign key), and a label that still scans should say what it is.
+5. **A deleted voucher's code stays reserved.** It cannot be activated or generated again.
+6. **Deleted vouchers leave the activity log and the totals.** That is the point of deleting test data. Their till exceptions are marked reviewed at the same moment.
+7. "Activate the one sold barcode" is met by leaving it unticked (it stays active), or by reactivating it after a bulk deactivation. No new kind of activation is added.
+8. **Make for sale is only for a voucher nobody has used**: status `active` or `deactivated`, a balance above zero equal to its initial value, and no `deduct` row ever. Anything else is skipped with its reason. The value it is sold for is the balance it carried.
+9. **Make for sale is undone by hand**: a manager activates the voucher on `/vouchers` (the value is pre-filled). No "undo" action is added.
+10. **Retiring a fixed product** removes its till button, renames it with ` (retired)` and changes its barcode to `RET` + the old code, so keying `6012` on the till finds nothing. The product row stays, because past sales refer to it. The command can put all three back.
 
 ## Constraints
 
-- Redemption behaviour from cycle 1 must not change: deduct = the receipt's summed `paperin`, LINE order, deduct to zero and `partial`, `no_tender`, `inactive`, `unknown`, `refund`, idempotency by the unique pair, heartbeat from cycle 2. Every existing test in the five files above keeps passing **unchanged**, except where this plan names a changed assertion.
-- Money rules: 2 dp, one `voucher_transactions` row per balance change, `lockForUpdate` on the voucher, the redemption row inserted before money moves.
-- Finance treatment must not change: voucher products stay `TAXCAT 000`; nothing in the finance controllers is touched.
-- POS writes stay limited to `PRODUCTS` (insert; `NAME` and now `PRICESELL` on voucher products only) and the one `CATEGORIES` row. Never `PRODUCTS_CAT`. Never `TICKETS`, `RECEIPTS`, `TICKETLINES`, `PAYMENTS` (the dev simulator script excepted, on dev only).
-- POS downtime must never fail generation, activation, deduction, lookup or the feed.
-- JSON shapes are additive: `vouchers.lookup` gains keys, loses none.
-- The ZPL label is unchanged (decision 7). Permissions unchanged. Products `6012-6014` untouched.
-- From the Shop tree only `resources/views/shop/vouchers.blade.php` and `resources/js/shop/vouchers.js` may change, with `shop-*` classes only and no new `route()` call. The Shop mode track has other uncommitted work in the same working tree; leave it alone.
-- Do not commit, push or deploy. Nothing runs against production.
+- Admin only: every new route is inside `role:admin` within the `vouchers.manage` group. Managers keep exactly what they have.
+- One switch: `config('vouchers.admin_tools')` (env `VOUCHER_ADMIN_TOOLS`, default `true`). When false the routes answer 404 and the list page shows none of the new controls.
+- Removable: the new behaviour lives in one new service, one new controller and one Blade partial. Existing methods (`changeStatus()`, the Edit modal) are not refactored.
+- Voucher money rules do not change. No balance is altered by any of these tools; status and deletion only. Every action writes one `voucher_transactions` row per voucher with the admin as `user_id`.
+- The till sync, the redemption and sale rules, and finance code keep their behaviour, except the two named changes for deleted vouchers (step 4).
+- POS writes stay limited to `PRODUCTS` rows of voucher products (name, price, insert when missing), plus, **in the retire command only**, the three fixed products named in `config('vouchers.legacy_product_codes')`: their `PRODUCTS_CAT` row, `NAME`, `CODE` and `REFERENCE`. Never the ticket tables. No voucher product ever gets a `PRODUCTS_CAT` row.
+- POS downtime must not fail an action: the local change commits, the till product is corrected by the next sync of that voucher or by `vouchers:sync-pos-products --all`.
+- From the Shop tree only `resources/views/shop/vouchers.blade.php` and `resources/js/shop/vouchers.js` may change; `shop-*` classes only; no new `route()` call there.
+- Do not commit, push or deploy. **Nothing runs against production**: the owner uses the tools there after deploying.
 
 ## Out of scope
 
-- Retiring or hiding products `6012-6014` (decision 5).
-- Printing the amount on the label (decision 7).
-- Topping up an active voucher at the till. Reversing a refund automatically.
-- Renaming the POS category "Gift Voucher Redemption" or the table `voucher_till_redemptions`.
-- The parked production backfill (`docs/vouchers/findings/2026-09-29-production-backfill-not-run.md`).
-- A uniCenta-side check on over-tender; cash reconciliation; `TillTransactionRepository`.
+- Hard delete, purge of deleted vouchers, editing a balance, changing a voucher's value by hand.
+- An "undo" for make for sale (decision 9). Deleting the fixed products' rows.
+- A bulk action for managers or employees; any Shop mode screen for these tools.
+- Running the parked production backfill (`findings/2026-09-29-production-backfill-not-run.md`). Note only: make for sale and bulk deactivation both create a missing till product as a side effect, which settles that finding for the vouchers they touch.
 
 ## Steps
 
 ### 0. Baseline
-What: record `git rev-parse --short HEAD`, `git status --short` and the `php artisan test` summary in `implemented.md` before any change. Expected about `15 failed, 835 passed`.
-Check: the summary line and failing class names are pasted.
+What: record `git rev-parse --short HEAD`, `git status --short` and the `php artisan test` summary in `implemented.md`. Expected about `15 failed, 862 passed`.
+Check: summary line and failing class names pasted.
 
-### 1. Migrations
-Files: `database/migrations/2026_09_30_100000_add_face_value_to_vouchers_table.php` (new), `database/migrations/2026_09_30_100001_add_sale_amount_to_voucher_till_redemptions_table.php` (new)
+### 1. Config and transaction types
+Files: `config/vouchers.php`, `app/Models/VoucherTransaction.php`
 What:
-- `vouchers.face_value`: `decimal(10,2)` nullable, after `pos_product_id`. The value an unsold voucher is sold for. NULL for every existing voucher.
-- `voucher_till_redemptions.sale_amount`: `decimal(12,2)` nullable, after `ticket_total`. What the till charged for the voucher's own line(s) on that ticket; NULL for redemption rows.
-Check: `php artisan migrate` clean; `php artisan tinker --execute="var_dump(Schema::hasColumn('vouchers','face_value'), Schema::hasColumn('voucher_till_redemptions','sale_amount'));"` → two `true`.
+- `config/vouchers.php`: `'admin_tools' => (bool) env('VOUCHER_ADMIN_TOOLS', true),` with a comment saying these are changeover tools; in `pos_balance_text` add `'deleted' => 'deleted'`.
+- `config/vouchers.php` also gets `'legacy_product_codes' => ['6012', '6013', '6014'],` with a comment naming the three products.
+- `VoucherTransaction`: `TYPE_DELETE = 'delete'`, `TYPE_RESTORE = 'restore'` and `TYPE_FOR_SALE = 'for_sale'` (a hand-activated voucher returned to unsold).
+Check: `php artisan tinker --execute="var_dump(config('vouchers.admin_tools'));"` → `bool(true)`.
 
-### 2. Models and config
-Files: `app/Models/Voucher.php`, `app/Models/VoucherTillRedemption.php`, `config/vouchers.php`
+### 2. Till product of a deleted voucher
+Files: `app/Services/VoucherPosProductService.php`
+What: in `productName()`, when `$voucher->trashed()` the text is `config('vouchers.pos_balance_text.deleted')`, checked before `isForSale()`: `Gift Voucher GV7KQFM2RA9T [deleted]`. In `productPrice()`, a trashed voucher is `0.0`. Nothing else changes.
+Check: step 7's tests.
+
+### 3. Admin service
+Files: `app/Services/VoucherAdminService.php` (new)
+What: constructor takes `VoucherPosProductService`. Five public methods, each taking `array $ids`, `?string $note`, `User $admin` and returning `['done' => int, 'skipped' => array<int, array{code: string, reason: string}>]`. Each voucher is handled in its own `DB::transaction` with `Voucher::withTrashed()->whereKey($id)->lockForUpdate()->first()`; after the transaction commits, `posProducts->sync()` for that voucher (it never throws). One voucher failing or being skipped never stops the rest.
+- `deactivate()`: status must be `active` → `deactivated`; transaction `deactivate`, amount 0, `balance_after` = current balance, note, `user_id`. Otherwise skipped with reason `not active`. A trashed voucher is skipped with `deleted`.
+- `reactivate()`: `deactivated` → `active`; transaction `activate`. Otherwise skipped `not deactivated` / `deleted`.
+- `delete()`: allowed when the status is `inactive`, `deactivated` or `exhausted` and the voucher is not already trashed. An `active` voucher is skipped with `active: deactivate it first`. Writes the transaction `delete` (amount 0, `balance_after` = current balance, the reason, `user_id`), then `$voucher->delete()`. Then marks the voucher's till rows reviewed: `VoucherTillRedemption::where('voucher_id', $id)->whereNull('reviewed_at')->update(['reviewed_at' => now(), 'reviewed_by' => $admin->id])`.
+- `restore()`: only a trashed voucher; `$voucher->restore()`, transaction `restore`, status and balance as they were. Otherwise skipped `not deleted`.
+- `makeForSale()`: under the lock, the voucher must be not trashed, status `active` or `deactivated`, `current_balance > 0`, `current_balance` equal to `initial_value` (2 dp), and have no transaction of type `deduct`. Skipped reasons: `deleted`, `not active or deactivated`, `no balance`, `has been spent from`, `balance differs from its initial value`. Effect: `face_value = current_balance`, `current_balance = 0`, `initial_value = NULL`, `status = inactive`. Transaction `for_sale`, `amount` = the value, `balance_after` 0, note, `user_id`. After commit the till product becomes `[for sale €X]` at price X (created when missing).
+- The same rules and wording as `changeStatus()` for the two status changes; do not call or change `changeStatus()`.
+Check: step 7's `VoucherAdminServiceTest`.
+
+### 4. Deleted vouchers elsewhere in the app
+Files: `app/Services/VoucherTillSyncService.php`, `app/Http/Controllers/VoucherController.php`, `app/Services/VoucherActivityService.php`
 What:
-- `Voucher`: `face_value` in fillable, cast `decimal:2`; `isForSale(): bool` = status `inactive` and `face_value > 0`.
-- `VoucherTillRedemption`: `STATUS_ACTIVATED = 'activated'` (the sale activated the voucher; not an exception) and `STATUS_SALE_FLAGGED = 'sale_flagged'` (a sale that activated nothing). Add `sale_flagged` to `EXCEPTION_STATUSES`. `sale_amount` in fillable, cast `decimal:2`.
-- `config/vouchers.php`: `'max_face_value' => 1000,` and in `pos_balance_text` a new entry `'for_sale' => 'for sale €%s'`.
-Check: `php artisan tinker --execute="\$v=new App\Models\Voucher(['status'=>'inactive','face_value'=>20]); var_dump(\$v->isForSale());"` → `true`.
+- **Till sync.** `resolveVoucher()` looks up `withTrashed()` (both by `pos_product_id` and by `code`). `applyLine()` and `applySale()` lock with `Voucher::withTrashed()->whereKey(...)->lockForUpdate()->first()`. Immediately after the lock, a trashed voucher is handled before any other rule (the refund rule still comes first): in `applyLine()` → status `inactive`, note `Voucher was deleted.`, nothing deducted; in `applySale()` → status `sale_flagged`, note `Charged €X but the voucher was deleted. Nothing was activated.`
+- **Lookup.** `lookup()` searches `withTrashed()`; for a trashed voucher it returns `['found' => false, 'deleted' => true]` and nothing else about it.
+- **Activate.** `activate()`: before creating an unknown code, if a trashed voucher has that code return 422 `['success' => false, 'message' => 'This voucher was deleted. It cannot be activated.']`.
+- **Labels for the new types.** `VoucherController::history()` and `VoucherActivityService::fromTransaction()`: `for_sale` → label `Made for sale`, amount **negative** (the balance went down by that value), kind `for_sale`; `delete` → `Deleted`; `restore` → `Restored` (both amount 0). `resources/views/vouchers/activity.blade.php` `pill()` needs no change (they fall to the grey `status` pill). `resources/views/vouchers/transactions.blade.php`: badge text for the three types, and the amount cell shows `−€X` for `for_sale`.
+- **Activity.** `events()`: leave out transactions and till rows whose voucher is trashed (`whereHas('voucher')` for transactions; for till rows, `where(fn ($q) => $q->whereNull('voucher_id')->orWhereHas('voucher'))` so `unknown` rows with no voucher still show). `totals()`: `redeemed_today*` and `issued_today` count only transactions whose voucher is not trashed. The `withTrashed()` eager load and the `voucher_url` null branch may stay; they are now unreachable for trashed vouchers.
+Check: `php artisan test --filter='VoucherTillSyncServiceTest|VoucherActivityTest'` → all pass after the one named change in step 7.
 
-### 3. Till product carries the price
-Files: `app/Services/VoucherPosProductService.php`, `app/Console/Commands/SyncVoucherPosProducts.php`
+### 5. Controller and routes
+Files: `app/Http/Controllers/VoucherAdminToolsController.php` (new), `routes/web.php`, `app/Http/Controllers/VoucherController.php`
 What:
-- `productPrice(Voucher $v): float`: `round((float) $v->face_value, 2)` when `$v->isForSale()`, else `0.0`.
-- `productName()`: when `isForSale()`, the balance text is `sprintf(config('vouchers.pos_balance_text.for_sale'), number_format(face_value, 2))`, giving `Gift Voucher GV7KQFM2RA9T [for sale €20.00]`. Every other status is unchanged (a valueless inactive voucher still reads `[not active]`).
-- `sync()`: create with `'PRICESELL' => productPrice`. After the create/link step, compare both: if `NAME` differs **or** `round((float) $product->PRICESELL, 2)` differs from `productPrice`, update both columns in one `Product::whereKey(...)->update([...])`. Report either change as `renamed` (no new action name, so the backfill command's totals keep working).
-- `SyncVoucherPosProducts`: add a `value` column to the printed table (face value or `—`). Behaviour otherwise unchanged; `--all` now also corrects prices.
-Check: covered by step 8; on dev `php artisan vouchers:sync-pos-products --all` reports the two existing vouchers `unchanged` (they have no face value, price stays 0).
+- `VoucherAdminToolsController`, constructor takes `VoucherAdminService`. Its constructor (or a first line in each action) aborts with 404 when `config('vouchers.admin_tools')` is false. Five actions, each validating `ids` (`required|array|min:1|max:200`, `ids.* integer`) and `note`:
+  - `deactivate` and `reactivate`: `note` `nullable|string|max:500`.
+  - `delete`: `note` `required|string|min:3|max:500`.
+  - `restore`: `note` `nullable|string|max:500`.
+  - `forSale`: `note` `nullable|string|max:500`.
+  Each calls the service and redirects back with a `status` flash such as `Deactivated 36 vouchers. Skipped 1: GVXXXXXXXXXX (not active).` (list at most 10 skipped codes, then "and N more").
+- Routes inside the existing `role:admin` group, **above** `vouchers/{voucher}/deactivate`:
+```php
+Route::post('vouchers/bulk/deactivate', [VoucherAdminToolsController::class, 'deactivate'])->name('vouchers.bulk.deactivate');
+Route::post('vouchers/bulk/reactivate', [VoucherAdminToolsController::class, 'reactivate'])->name('vouchers.bulk.reactivate');
+Route::post('vouchers/bulk/delete', [VoucherAdminToolsController::class, 'delete'])->name('vouchers.bulk.delete');
+Route::post('vouchers/bulk/restore', [VoucherAdminToolsController::class, 'restore'])->name('vouchers.bulk.restore');
+Route::post('vouchers/bulk/for-sale', [VoucherAdminToolsController::class, 'forSale'])->name('vouchers.bulk.for-sale');
+```
+- `VoucherController::list()`: `per_page` from the query, one of `25, 50, 100, 200` (default 25); a `status` value of `deleted` lists `onlyTrashed()` and is honoured **only** for an admin with the switch on (anyone else gets the normal list). Pass `adminTools` = admin and switch on.
+Check: `php artisan route:list --name=vouchers.bulk` lists five routes; with `VOUCHER_ADMIN_TOOLS=false` in a test they answer 404.
 
-### 4. Generate with a value
-Files: `app/Http/Controllers/VoucherController.php`, `resources/views/vouchers/generate.blade.php`, `resources/views/vouchers/print.blade.php`
+### 6. List page
+Files: `resources/views/vouchers/list.blade.php`, `resources/views/vouchers/partials/admin-tools.blade.php` (new)
+What: everything new is wrapped in `@if ($adminTools)`; with the switch off or for a manager the page renders as it does today.
+- Filter form: a "Per page" select (25/50/100/200) and, for admins, a "Deleted" option in the status select.
+- A `status` flash banner at the top (green), which the page does not show today.
+- Table: a first column of checkboxes (`name="ids[]"`, `form="voucher-bulk"`, value the voucher id) and a "select all on this page" checkbox in the header.
+- The partial holds one form `id="voucher-bulk"` (`method="POST"`, `@csrf`) with a note textarea and the action buttons, each a submit button with its own `formaction`: "Make for sale", "Deactivate selected", "Reactivate selected", "Delete selected"; on the Deleted view only "Restore selected". The bar shows "N selected" and is disabled at zero.
+- Each row's checkbox carries `data-status` and `data-balance`, so the bar can show the count and the total balance of the selection without a request.
+- Confirmation: Deactivate and Reactivate ask once in an in-page dialog ("Deactivate 36 vouchers?"). Make for sale asks: "36 vouchers worth €810.00 go back to unsold. Their balances become their sale value, and each activates again when it is sold at the till. Leave out any voucher a customer already holds." Delete opens a dialog that names the count, says deleted vouchers leave the list, the activity log and the totals and can be restored from the Deleted view, and keeps its confirm button disabled until the reason has at least 3 characters. Use an Alpine dialog like the existing Edit modal, not the browser's `confirm()`.
+- The Deleted view shows the same columns, a "Deleted" pill, the delete date, and no Edit / Log / Print links.
+- Alpine: a second, separate component for the bulk bar (`voucherBulk()`), defined inside the partial, so removing the partial removes all of it. Respect the Alpine rules in `planimp.md` (`x-on:` for anything that is also a Blade directive; `?.` behind `x-show`).
+Check: step 7's rendering tests; `node --check` of the page's inline scripts, extracted as in cycles 2 and 3.
+
+### 7. Lookup screens and tests
+Files: `resources/views/vouchers/index.blade.php`, `resources/views/shop/vouchers.blade.php`, `resources/js/shop/vouchers.js`, `tests/Feature/VoucherAdminServiceTest.php` (new), `tests/Feature/VoucherAdminToolsTest.php` (new), `tests/Feature/VoucherTillSyncServiceTest.php`, `tests/Feature/VoucherActivityTest.php`, `tests/Feature/VoucherPosProductServiceTest.php`, `tests/Feature/Shop/ShopVouchersTest.php`
 What:
-- `generate()`: validate `count` as now plus `amount` → `['required', 'numeric', 'gt:0', 'max:'.config('vouchers.max_face_value'), 'decimal:0,2']`. Each voucher is created with `face_value = round(amount, 2)`, `current_balance = 0`, `status = inactive`, `initial_value` left NULL. The rest of the method (POS `syncMany`, warning flash, redirect) is unchanged.
-- `generate.blade.php`: a second input "Value of each voucher (€)", `name="amount"`, `step="0.01"`, `min="0.01"`, required, `old('amount')`. Replace the help text: each voucher starts unsold; selling it at the till (scan the label as an item) activates it with this value.
-- `print()` adds `'face_value' => $v->face_value !== null ? (float) $v->face_value : null` to each label; `print.blade.php` shows it on screen under the code (`€20.00`, or nothing). The ZPL is not changed.
-Check: as a manager in a test, `POST vouchers/generate` with `count=3, amount=20` creates three vouchers with `face_value 20.00` and three POS products priced 20 named `[for sale €20.00]`; without `amount` → validation error.
-
-### 5. The till check learns about sales
-Files: `app/Services/VoucherTillSyncService.php`
-What:
-- **Read price and units.** In `syncTicket()` select `tl.LINE, tl.PRODUCT, tl.UNITS, tl.PRICE, p.CODE` and `tx.RATE` (`leftJoin('TAXES as tx', 'tx.ID', '=', 'tl.TAXID')`), ordered by LINE. Replace `->unique('PRODUCT')` with a group by `PRODUCT` that keeps: the lowest `LINE`, `CODE`, `units` = sum of `UNITS`, `sale_total` = `round(sum(UNITS * PRICE * (1 + RATE ?? 0)), 2)`. Keep the groups in order of their lowest LINE.
-- **Two kinds of group.** A group is a *sale* when `abs(sale_total) > 0.005`, otherwise a *redemption*. Redemption groups go through `applyLine()` exactly as now; `isLast` is computed over redemption groups only, so a sale on the same ticket cannot steal or create a `partial`.
-- **Free tender.** Once per ticket: does the receipt have a `PAYMENTS` row with `PAYMENT = 'free'`?
-- **Sale groups** go to a new `applySale()`, inside the same per-line `DB::transaction`, redemption row inserted first. Every row it writes carries `sale_amount = abs(sale_total)`, `amount_deducted 0`, `shortfall 0`. Rules in this order:
-  1. `TICKETTYPE = 1` → status `refund`, note `Refund of a voucher sale (€X). Deactivate the voucher if it was handed back.` Voucher untouched. (A refund of a redemption line keeps today's `refund` row with no note.)
-  2. No voucher for the product → `unknown`, note as today.
-  3. Lock the voucher (`lockForUpdate`). Status is not `inactive` → `sale_flagged`, note `Charged €X but the voucher was already <status> (balance €Y). Nothing was added.` (decision 2)
-  4. The receipt has a Free payment → `sale_flagged`, note `Paid with the Free tender. Not activated.` (decision 4)
-  5. `units` is not exactly 1 → `sale_flagged`, note `Quantity <n> on one voucher (charged €X). Not activated: each voucher is scanned itself.` (decision 1)
-  6. `face_value` is NULL/0, or differs from `abs(sale_total)` by more than 0.005 → `sale_flagged`, note `Charged €X but the voucher's value is €Y. Not activated.`
-  7. Otherwise **activate**: `initial_value = current_balance = face_value`, `status = active`; create the transaction `type issue`, `source till`, `amount = face_value`, `balance_after = face_value`, `user_id null`, `note 'Till #<TICKETID>'`; redemption row status `activated` with `voucher_transaction_id`.
-- **After the loop**, call `posProducts->sync()` for every voucher that was deducted from **or activated**. For an activated voucher that sets the price to 0 and the name to `[bal €X]`.
-- `COUNT_KEYS`: insert `'activated', 'sale_flagged'` after `'refund'`.
-- The pre-check for an already recorded pair, the 23000 catch, the per-ticket catch with `errors`, the watermark and the heartbeat are unchanged.
-Check: `php artisan test --filter=VoucherTillSyncServiceTest` → the existing 23 pass unchanged.
-
-### 6. Screens say what happened
-Files: `app/Http/Controllers/VoucherController.php`, `app/Services/VoucherActivityService.php`, `resources/views/vouchers/exceptions.blade.php`, `resources/views/vouchers/activity.blade.php`, `resources/views/vouchers/list.blade.php`, `resources/views/vouchers/transactions.blade.php`
-What:
-- `lookup()` adds `'face_value' => float|null` and `'for_sale' => $voucher->isForSale()`. `history()`: an `issue` row with `source = till` gets label `Sold at till` (its `user` is already `Till #N`).
-- `VoucherActivityService::fromTransaction()`: `issue` + till → kind `issue`, label `Sold at till`. `fromRedemption()`: `sale_flagged` → label `Sale not activated`; add `'sale_amount'` (float or null) to **both** mappers (from the till redemption when there is one).
-- `exceptions.blade.php`: pill for `sale_flagged` (red, "Sale not activated"); a "Sale" column after "Voucher tender" showing `sale_amount` or `—`.
-- `activity.blade.php`: `pill()` handles `sale_flagged` through the existing `exception` branch (no change needed if the status text reads well: it shows `sale flagged`; replace `_` globally, the current `.replace('_', ' ')` only replaces the first); show `sale_amount` as a second line under the label when present (`charged €X`), behind an `x-if`.
-- `list.blade.php` l.58 and `transactions.blade.php` l.19-20: when `initial_value` is NULL and `face_value` is not, show `€20.00 for sale` in the yellow pill colours instead of `—`.
-Check: step 8's tests; `node --check` of the activity view's inline script as in cycle 2.
-
-### 7. Lookup screens for an unsold voucher
-Files: `resources/views/vouchers/index.blade.php`, `resources/views/shop/vouchers.blade.php`, `resources/js/shop/vouchers.js`
-What:
-- Office `index.blade.php`: keep `faceValue` and `forSale` from the lookup in the Alpine state. In the ACTIVATE block: managers see, when `forSale`, a line "Value €20.00. Normally sold at the till: scan the label as an item and it activates itself." and the starting-balance input **pre-filled** with the face value (l.380 sets `startingBalance` to the face value instead of `''`); employees see, when `forSale`, "Not sold yet (€20.00). Sell it at the till: scan the label as an item." in place of "Please ask a manager." For a voucher without a value, both keep today's wording exactly.
-- Shop `vouchers.blade.php` / `vouchers.js`: getters `forSale` and `faceValue` from `voucher`; a new flat card shown when `forSale && ! activateUrl`: "Not sold yet (€20.00). Sell it at the till: scan the label as an item."; the existing `needsManager` card gains `&& ! forSale`. For a manager (`activating`) on a `forSale` voucher, `onScan()` sets `typed` to the face value (`faceValue.toFixed(2)`) instead of `''`, and the hint reads "Not sold yet. Normally sold at the till; to activate by hand, confirm the value." Keep "Voucher not active. Please ask a manager." and "Not yet active. Enter the starting balance and activate." in the markup for the no-value case. Respect the Alpine rules in `planimp.md`. `npm run build`.
-Check: `php artisan test --filter='ShopVouchersTest|ShopViewContractTest|ConfinePinSessionTest'` passes; `node --check resources/js/shop/vouchers.js`.
-
-### 8. Tests
-Files: `tests/Feature/VoucherTillSyncServiceTest.php`, `tests/Feature/VoucherPosProductServiceTest.php`, `tests/Feature/VoucherTillExceptionsTest.php`, `tests/Feature/VoucherActivityTest.php`, `tests/Feature/Shop/ShopVouchersTest.php`
-What (add; change no existing assertion unless named here):
-- `VoucherPosProductServiceTest`: a for-sale voucher's product is created priced at its value and named `[for sale €20.00]`; activating it (status active, balance 20) and syncing sets price 0 and `[bal €20.00]`; a valueless inactive voucher stays price 0 `[not active]`; a price drifted on the till side is corrected by `sync()`; generate with `count` + `amount` (step 4's check); generate without `amount` fails validation. **Changed assertion:** `test_generating_vouchers_creates_their_products` and `test_generating_warns_when_the_pos_is_down` must now post an `amount`; say so in Deviations if anything else had to change.
-- `VoucherTillSyncServiceTest`, with a helper `forSale(float $value, string $code)` creating an inactive voucher with a face value and its product:
-  - sold for its value, paid by card → `activated`; voucher active with `initial_value` and balance = value; transaction `issue`/`till`/`Till #N`, `user_id` null; redemption `sale_amount` = value; product price 0 and `[bal €20.00]`.
-  - quantity 2 on one line → `sale_flagged`, voucher still inactive, product still priced; two separate lines of the same voucher → the same.
-  - paid with `free` → `sale_flagged`.
-  - line price edited (value 20, charged 15) → `sale_flagged`.
-  - sold when already active → `sale_flagged`, balance unchanged; sold when deactivated → `sale_flagged`.
-  - refund ticket (`type 1`, units −1, price 20) → `refund` with the sale note, voucher untouched.
-  - unknown product sold at a price → `unknown` with `sale_amount`.
-  - one ticket: voucher A sold (20, card 20 + the rest) and voucher B redeemed with `paperin` 10 → A `activated`, B `applied` for 10; and a ticket with a sale plus one redemption whose tender exceeds its balance → the redemption is `partial` (a sale group does not count as the last redemption line).
-  - a voucher bought with a voucher: A sold for 20, paid entirely by `paperin` 20 with B's redemption line on the ticket → A `activated`, B `applied` 20.
-  - second run changes nothing; after activation and reprice a later €0.00 scan with `paperin` redeems normally.
-  - counts contain `activated` and `sale_flagged`.
-- `VoucherTillExceptionsTest`: a `sale_flagged` row shows on the page with its pill, note and Sale amount; `activated` rows do not.
-- `VoucherActivityTest`: a till activation appears as `Sold at till` with positive amount and `who` `Till #N`; a `sale_flagged` row appears once as `Sale not activated` with `sale_amount`; "Issued today" includes the till activation.
-- `ShopVouchersTest`: lookup of a for-sale voucher returns `face_value` and `for_sale = true`; the shop page contains both the for-sale wording and the original "ask a manager" wording; an employee still gets 403 on `vouchers.activate`; a manager activating a for-sale voucher by hand leaves the product at price 0.
+- Screens: when the lookup answers `deleted: true`, both screens show "This voucher was deleted. It cannot be used." and offer no activation, to managers as well. Office: a new `mode === 'deleted'` block. Shop: a `deleted` mode with a flat card; `needsManager` and `activating` must be false in that mode. `npm run build`.
+- `VoucherAdminServiceTest` (POS tables via `CreatesVoucherPosTables`): bulk deactivate changes only active vouchers and reports the rest as skipped with reasons; each writes one transaction with the admin and the note; a voucher without a till product gets one named `[deactivated]`; reactivate; delete refuses an active voucher, deletes an inactive, a deactivated and an exhausted one, writes the `delete` row, renames the product `[deleted]` at price 0 (also for a for-sale voucher that was priced), marks its unreviewed till rows reviewed; restore brings status, balance and product name back (a for-sale voucher is priced again); deleting twice skips; a POS outage (drop `PRODUCTS`) still completes the local change; one bad id does not stop the others.
+- `VoucherAdminServiceTest` also covers make for sale: an untouched active €10 voucher becomes inactive, `face_value 10.00`, balance 0, `initial_value` NULL, one `for_sale` row with amount 10 and the admin, till product `[for sale €10.00]` at price 10 (created when it had none); a deactivated untouched voucher converts too; a voucher with a deduct, a zero balance, an exhausted status, an already for-sale voucher and a deleted voucher are each skipped with the right reason; **the whole path**: convert, then a till sale at that price activates it through `VoucherTillSyncService` with the same value, and a later redemption works.
+- `VoucherAdminToolsTest`: manager → 403 on all five routes, employee → 403, guest → login; admin succeeds and the flash names done and skipped; `ids` empty → validation error; delete without a reason → validation error; more than 200 ids → validation error; switch off → 404 and the list page contains none of `voucher-bulk`, "Make for sale", "Deactivate selected", "Deleted"; list page for an admin has the checkboxes and the bar, for a manager it does not; `per_page=100` is honoured and `per_page=7` falls back to 25; `status=deleted` lists trashed vouchers for an admin and is ignored for a manager.
+- `VoucherTillSyncServiceTest` (add): a deleted voucher's label scanned with a Voucher tender → `inactive` "Voucher was deleted.", balance untouched; a deleted for-sale voucher sold at the till → `sale_flagged`, not activated; a restored voucher redeems normally.
+- `VoucherActivityTest` (add): a `for_sale` row shows as `Made for sale` with a negative amount and lowers "Outstanding balance".
+- `VoucherActivityTest`: **changed assertion, named here:** `test_a_deleted_vouchers_rows_still_show_without_a_link` becomes `test_a_deleted_vouchers_rows_are_hidden` and asserts zero events. Add: totals exclude a deleted voucher's issue and deduct of today; an `unknown` till row with no voucher still shows; restoring the voucher brings its rows back.
+- `VoucherPosProductServiceTest` (add): name and price of a trashed voucher.
+- `ShopVouchersTest` (add): lookup of a deleted code returns `found false, deleted true`; activating a deleted code as a manager → 422 with the message; the shop page contains the deleted wording.
 Check: `php artisan test --filter='Voucher|ShopVouchers|Schedule|ConfinePinSession|ShopViewContract'` → all pass.
 
-### 9. Dev helper and docs
-Files: `docs/vouchers/scripts/simsale.php`, `docs/features/voucher-management.md`, `docs/FEATURES_INDEX.md`, `CLAUDE.md`
-What:
-- `simsale.php`: new optional env `SALE=1` (the voucher line is inserted at `PRICE` = the voucher's face value, or `PRICE=<n>` when given, `UNITS=<n>` default 1, and the payment is `PAY=<type>` default `magcard` for the ticket total instead of `paperin`). Without `SALE` it behaves exactly as now. Document the new options in its header.
-- `voucher-management.md`: rewrite `## Overview` steps 1-4 for the new lifecycle; new `## Selling a voucher at the till` before `## Till redemption (uniCenta)`: cashier steps (scan the label as an item, the till charges its value, take payment as normal, **scan each voucher itself, never use quantity**), what activates and what is flagged (a table of the `sale_flagged` reasons and `refund`), the one-minute window, manual activation as the manager fallback, that labels of different values look the same so batches must be kept apart, and that products `6012-6014` still exist. Update `## Statuses`, `## Data model` (`face_value`, `sale_amount`, the two new statuses), the exception table, the generate section and `## Key files`.
-- `FEATURES_INDEX.md` and the `CLAUDE.md` voucher line: vouchers are generated with a value and activated by their sale at the till.
-Check: `grep -n "sale_flagged\|face_value" docs/features/voucher-management.md` finds both.
+### 8. Retire the three fixed voucher products
+Files: `app/Console/Commands/RetireFixedVoucherProducts.php` (new), `tests/Feature/RetireFixedVoucherProductsTest.php` (new)
+What: `vouchers:retire-fixed-products {--dry-run} {--restore}`. It works on the products whose `CODE` is in `config('vouchers.legacy_product_codes')`, or, for `--restore`, whose `CODE` is `RET` + one of those codes. It aborts with a clear message when `config('vouchers.admin_tools')` is false.
+- Retire, per product, inside one POS transaction: `ProductsCat::removeProduct($id)` (no error when there is no button); `NAME` gains the suffix ` (retired)` unless it already ends with it; `CODE` and `REFERENCE` become `RET` + the old code (`RET6012`). A product that is already retired is reported `already retired` and left alone. A code that matches no product is reported `not found`.
+- `--restore` reverses all three for each retired product: `CODE`/`REFERENCE` back to the bare code, the suffix removed, `ProductsCat::addProduct($id)` when it has no button.
+- `--dry-run` prints what would change and writes nothing.
+- Output: a table `code | name | till button | action`, then one line reminding that tills show their buttons from start-up, so **restart uniCenta on each till** to see the change.
+- Uses the `Product` and `ProductsCat` models. It never touches a voucher product, a ticket table or any other product.
+- Test (POS tables from `CreatesVoucherPosTables`, which already has `PRODUCTS` and `PRODUCTS_CAT`; add the three products and their buttons in the test): dry run changes nothing; retire removes the three buttons, renames and re-codes; a second run reports `already retired`; `--restore` puts name, code and button back; an unrelated product and its button are untouched; with the switch off the command fails and changes nothing.
+Check: `php artisan test --filter=RetireFixedVoucherProductsTest` passes. On dev: `php artisan vouchers:retire-fixed-products --dry-run` lists the three products from the dev POS copy; do **not** run it for real on dev unless you restore afterwards, and say which you did.
+
+### 9. Docs
+Files: `docs/features/voucher-management.md`, `docs/FEATURES_INDEX.md`
+What: a new `## Admin changeover tools` section: what each action does and to which statuses, that delete is reversible and what it hides, the two-step rule for active vouchers, the switch `VOUCHER_ADMIN_TOOLS`, and **how to remove the tools later** (delete the controller, the service, the partial, the five routes, the retire command, the config keys; what to keep: `withTrashed()` handling in the sync and lookup if any voucher has been deleted). Describe make for sale (which vouchers qualify, what it changes, how to undo it by manual activation) and the retire command (what it changes, `--dry-run`, `--restore`, restart the tills). Add a "Changeover on production" checklist for the owner:
+  1. Find the one voucher that was sold and keep its code to hand.
+  2. `/vouchers/list`, status Active, 200 per page: tick all, **untick the sold one**, Make for sale. The banner should report 36 done.
+  3. Filter to the test vouchers (Deactivated, then Inactive): Delete selected, with a reason. Destroy the physical test labels.
+  4. On the server, as the web user: `php artisan vouchers:retire-fixed-products --dry-run`, then without `--dry-run`. Restart uniCenta on each till.
+  5. `/vouchers/activity`: the health banner should be green, and "Outstanding balance" should be the sold voucher's balance only. Update `## Statuses`, `## Routes`, `## Key files`. One line in `FEATURES_INDEX.md`.
+Check: `grep -n "VOUCHER_ADMIN_TOOLS" docs/features/voucher-management.md` finds it.
 
 ## Verification (report every item with what you saw)
 
-1. `./vendor/bin/pint --test` on the PHP files you changed (not `--dirty`) → PASS.
+1. `./vendor/bin/pint --test` on the PHP files you changed → PASS.
 2. `php artisan test --filter='Voucher|ShopVouchers|Schedule|ConfinePinSession|ShopViewContract'` → all pass.
 3. `php artisan test` → no new failures against step 0. Paste the summary and failing class names.
-4. `node --check` on `resources/js/shop/vouchers.js` and on the extracted inline scripts of `vouchers/index.blade.php` and `vouchers/activity.blade.php` → clean. `npm run build` → built.
-5. Dev, by tinker and the scripts (record every id; clean up afterwards):
-   - Create one for-sale voucher of €20 (`Voucher::create` + `VoucherPosProductService::sync`, or through the generate form in a test). POS product: `PRICESELL 20`, NAME `[for sale €20.00]`.
-   - `SALE=1 VOUCHER=<code> TICKET=999910 … simsale.php`, then `php artisan vouchers:sync-till` → `activated 1`. Voucher active €20.00; POS product `PRICESELL 0`, NAME `[bal €20.00]`; `payload(7, null)` shows "Sold at till · Till #999910".
-   - A redemption on the same voucher (`TENDER=5`, no `SALE`) → `applied 1`, balance €15.00.
-   - A second for-sale voucher sold with `UNITS=2` → `sale_flagged 1`, voucher still inactive, product still priced.
-   - Delete the simulated POS rows and the test vouchers' POS products; delete the test vouchers and their local rows, or say exactly what was left.
-6. **Owner, on the dev till (VirtualBox uniCenta) and in the browser as a manager:** generate one €10 voucher; give it a numeric barcode with `numeric_barcode.php` if keying by hand; scan it at the till: a €10.00 line named `[for sale €10.00]`; pay by cash; run `php artisan vouchers:sync-till` (dev has no cron); `/vouchers/activity` shows "Sold at till"; scan the label again at the till: a €0.00 line `[bal €10.00]`; redeem €4 with the Voucher tender; balance €6.00. Then sell a second voucher with quantity 2 and confirm it appears on `/vouchers/exceptions` as "Sale not activated".
+4. `php artisan route:list --name=vouchers.bulk` → five routes, each showing the `role:admin` middleware (`-v`).
+5. `node --check` on `resources/js/shop/vouchers.js` and the extracted inline scripts of `vouchers/list.blade.php` and `vouchers/index.blade.php` → clean. `npm run build` → built.
+6. Dev, through tinker and the service (record ids; restore the dev data afterwards): create three vouchers (one active €10, one for sale €5, one deactivated); bulk deactivate all three → 1 done, 2 skipped with reasons; delete all three → the first now deletes (it is deactivated), and its POS product reads `[deleted]` at price 0; `VoucherActivityService::payload(7, null)` shows none of them; restore one → it is back with its status and product name. Then make for sale: an untouched active €10 voucher → inactive, `[for sale €10.00]` at price 10; `SALE=1 … simsale.php` on it and `vouchers:sync-till` → `activated 1`, balance €10.00.
+6b. `php artisan vouchers:retire-fixed-products --dry-run` on dev → three rows, nothing written.
+7. **Browser check: owner, signed in as an admin, on dev.** `/vouchers/list?per_page=200&status=active`: tick all, untick one, Deactivate selected with a note; the banner reports the count; the unticked voucher is still active. Filter Deactivated, tick a test voucher, Delete selected: the confirm button stays disabled until a reason is typed; afterwards the voucher is gone from the list and from `/vouchers/activity`. Status "Deleted": the voucher is there; Restore selected brings it back. Scan the deleted code on `/vouchers`: "This voucher was deleted." Tick two untouched active vouchers, Make for sale: the dialog names the count and the total; afterwards both read "€X for sale" and scanning one on `/vouchers` shows "Not sold yet". Console free of errors.
 
 ## Risks
 
-- **Quantity habit.** 30 of the last 196 voucher sale lines used a quantity above 1. With this process each voucher is scanned itself; a cashier who scans one label and keys ×3 charges €60 and activates nothing. The exceptions page catches it, but the customer has left with three dead vouchers. Cashier training matters more than any code here; the docs step says so.
-- **Labels look identical** whatever their value (decision 7). Batches of different values must be kept apart physically; the till line shows the price at scan, which is the only check.
-- **The one-minute window.** Until the next till check the sold voucher's product still carries its price. A redemption attempted in that minute would charge the value again and be flagged. On dev there is no cron, so the window lasts until someone runs the command or looks a voucher up.
-- **Price drift.** If a product's price is changed by hand in uniCenta, `vouchers:sync-pos-products --all` or the next sync of that voucher puts it back; until then a sale at the wrong price is flagged, not activated.
-- **Sales reports by category** will show voucher sales under the POS category "Gift Voucher Redemption". The name is misleading for sales; renaming it is out of scope and noted as a follow-up.
-- **Old and new side by side.** While `6012-6014` exist, a cashier can still sell "Voucher 20 Euro" and hand over a label that was never scanned; that voucher stays unsold until a manager activates it by hand. Expected during the changeover.
-- **Existing vouchers** have no face value: inactive ones stay `[not active]` at price 0 and need manual activation, as today.
+- **The changeover on production creates about 35 till products**, one for each hand-activated voucher that has none: `[for sale €X]` at its price after make for sale, or `[deactivated]` at price 0 after a deactivation. That is wanted, and it settles the parked backfill finding for those vouchers.
+- **The one sold voucher.** The tools cannot know which of the 37 it is. The owner must identify it and leave it unticked. If it is made for sale by mistake, the customer's label would ring up as an item to pay for; a manager fixes that by activating it by hand on `/vouchers` with its value.
+- **Labels of different values look the same** (€10, €20 and €50 among the 36). After make for sale the till shows each one's price when scanned; that is the only check, as for new vouchers.
+- **Retiring changes three real products.** Their names and barcodes change and their buttons go. Past sales keep pointing at the same product rows, so reports are unaffected except that the name now ends ` (retired)`. `--restore` undoes it. Tills keep showing the old buttons until uniCenta is restarted.
+- **Deleting hides history.** A deleted voucher's issue and redemption rows leave the activity log and today's totals. Restore brings them back. Finance reports are not affected: they read the till, not this log.
+- **A deleted label still scans at the till** as a €0.00 line reading `[deleted]`. A voucher tender taken against it deducts nothing and appears on the exceptions page. Destroy the physical labels.
+- **Selection is per page.** "Select all" ticks the vouchers on the page shown; with 200 per page that covers production's 42 vouchers in one go.
+- **Removal later.** Once any voucher has been deleted, the `withTrashed()` handling in the sync and the lookup must stay even if the tools are removed; the docs step records this.
 
 ## Review
 

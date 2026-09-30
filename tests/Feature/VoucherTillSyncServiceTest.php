@@ -710,4 +710,48 @@ class VoucherTillSyncServiceTest extends TestCase
         $this->assertArrayHasKey('activated', $counts);
         $this->assertArrayHasKey('sale_flagged', $counts);
     }
+
+    // --- Vouchers cycle 4: deleted vouchers at the till ---
+
+    public function test_a_deleted_vouchers_label_with_a_voucher_tender_deducts_nothing(): void
+    {
+        $voucher = $this->voucher(50);
+        $voucher->update(['status' => Voucher::STATUS_DEACTIVATED]);
+        $voucher->delete();
+        $this->sale(430600, [$voucher], [['payment' => 'paperin', 'total' => 10]]);
+
+        $counts = $this->sync();
+
+        $this->assertSame(1, $counts['inactive']);
+        $row = VoucherTillRedemption::sole();
+        $this->assertSame('Voucher was deleted.', $row->note);
+        $this->assertSame($voucher->id, $row->voucher_id);
+        $this->assertSame('50.00', Voucher::withTrashed()->find($voucher->id)->current_balance);
+        $this->assertSame(0, VoucherTransaction::where('type', 'deduct')->count());
+    }
+
+    public function test_a_deleted_for_sale_voucher_sold_at_the_till_is_not_activated(): void
+    {
+        $voucher = $this->forSale(20);
+        $voucher->delete();
+        // Sold before the till picked up the [deleted] price of 0.
+        $this->ticket(430601, [['voucher' => $voucher, 'price' => 20]], [['payment' => 'cash', 'total' => 32.30]]);
+
+        $counts = $this->sync();
+
+        $this->assertSame(1, $counts['sale_flagged']);
+        $this->assertSame('Charged €20.00 but the voucher was deleted. Nothing was activated.', VoucherTillRedemption::sole()->note);
+        $this->assertSame(Voucher::STATUS_INACTIVE, Voucher::withTrashed()->find($voucher->id)->status);
+    }
+
+    public function test_a_restored_voucher_redeems_normally(): void
+    {
+        $voucher = $this->voucher(50);
+        $voucher->delete();
+        $voucher->restore();
+        $this->sale(430602, [$voucher], [['payment' => 'paperin', 'total' => 10]]);
+
+        $this->assertSame(1, $this->sync()['applied']);
+        $this->assertSame('40.00', $voucher->fresh()->current_balance);
+    }
 }

@@ -11,6 +11,10 @@
             </div>
         </div>
 
+        @if ($adminTools && session('status'))
+            <div class="mb-4 rounded px-4 py-3 bg-green-700 text-white text-sm">{{ session('status') }}</div>
+        @endif
+
         <form method="GET" class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4 bg-gray-800 p-4 rounded">
             <div class="md:col-span-2">
                 <label class="block text-xs text-gray-400 mb-1">Search code</label>
@@ -24,16 +28,36 @@
                     <option value="active" @selected(request('status') === 'active')>Active</option>
                     <option value="deactivated" @selected(request('status') === 'deactivated')>Deactivated</option>
                     <option value="exhausted" @selected(request('status') === 'exhausted')>Exhausted</option>
+                    @if ($adminTools)
+                        <option value="deleted" @selected($showDeleted)>Deleted</option>
+                    @endif
                 </select>
+                @if ($adminTools)
+                    <select name="per_page" aria-label="Per page" class="bg-gray-900 border border-gray-700 rounded px-2 py-2 text-gray-100">
+                        @foreach ([25, 50, 100, 200] as $n)
+                            <option value="{{ $n }}" @selected($perPage === $n)>{{ $n }} per page</option>
+                        @endforeach
+                    </select>
+                @endif
                 <button type="submit" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded">Filter</button>
                 <a href="{{ route('vouchers.list') }}" class="text-gray-400 hover:text-gray-200 px-2 py-2">Reset</a>
             </div>
         </form>
 
+        @if ($adminTools)
+            @include('vouchers.partials.admin-tools')
+        @endif
+
         <div class="bg-gray-800 rounded shadow overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-700 text-sm">
                 <thead class="bg-gray-900 text-gray-400">
                     <tr>
+                        @if ($adminTools)
+                            <th class="px-4 py-2 w-8">
+                                <input type="checkbox" data-bulk-all aria-label="Select all on this page"
+                                       class="rounded bg-gray-900 border-gray-600">
+                            </th>
+                        @endif
                         <th class="px-4 py-2 text-left">Code</th>
                         <th class="px-4 py-2 text-left">Status</th>
                         <th class="px-4 py-2 text-right">Initial</th>
@@ -46,6 +70,14 @@
                 <tbody class="divide-y divide-gray-700 text-gray-200">
                     @forelse ($vouchers as $voucher)
                         <tr class="hover:bg-gray-700/40">
+                            @if ($adminTools)
+                                <td class="px-4 py-2">
+                                    <input type="checkbox" name="ids[]" form="voucher-bulk" value="{{ $voucher->id }}"
+                                           data-status="{{ $voucher->status }}" data-balance="{{ (float) $voucher->current_balance }}"
+                                           aria-label="Select {{ $voucher->code }}"
+                                           class="rounded bg-gray-900 border-gray-600">
+                                </td>
+                            @endif
                             <td class="px-4 py-2 font-mono font-medium">{{ $voucher->code }}</td>
                             <td class="px-4 py-2">
                                 @php($badge = [
@@ -54,6 +86,9 @@
                                     'exhausted' => 'bg-gray-700 text-gray-400',
                                 ][$voucher->status] ?? 'bg-yellow-800/50 text-yellow-300')
                                 <span class="text-xs px-2 py-0.5 rounded {{ $badge }}">{{ ucfirst($voucher->status) }}</span>
+                                @if ($voucher->trashed())
+                                    <span class="text-xs px-2 py-0.5 rounded bg-red-900 text-red-200">Deleted</span>
+                                @endif
                             </td>
                             <td class="px-4 py-2 text-right">@if ($voucher->initial_value !== null)
                                     €{{ number_format($voucher->initial_value, 2) }}
@@ -66,6 +101,9 @@
                             <td class="px-4 py-2 text-gray-300">{{ $voucher->creator?->name ?? '—' }}</td>
                             <td class="px-4 py-2 text-gray-400 text-xs">{{ $voucher->created_at?->format('d M Y H:i') }}</td>
                             <td class="px-4 py-2 text-right space-x-3 whitespace-nowrap">
+                                @if ($voucher->trashed())
+                                    <span class="text-xs text-red-300">Deleted {{ $voucher->deleted_at?->format('d M Y H:i') }}</span>
+                                @else
                                 @if ($isAdmin && in_array($voucher->status, ['active', 'deactivated']))
                                     <button type="button"
                                             @click="openEdit({{ $voucher->id }}, @js($voucher->code), @js($voucher->status), {{ (float) $voucher->current_balance }})"
@@ -73,10 +111,11 @@
                                 @endif
                                 <a href="{{ route('vouchers.transactions', $voucher) }}" class="text-blue-400 hover:text-blue-300">Log ({{ $voucher->transactions_count }})</a>
                                 <a href="{{ route('vouchers.print', ['ids' => $voucher->id]) }}" target="_blank" class="text-gray-400 hover:text-gray-200">Print</a>
+                                @endif
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">No vouchers yet.</td></tr>
+                        <tr><td colspan="{{ $adminTools ? 8 : 7 }}" class="px-4 py-8 text-center text-gray-500">{{ $showDeleted ? 'No deleted vouchers.' : 'No vouchers yet.' }}</td></tr>
                     @endforelse
                 </tbody>
             </table>

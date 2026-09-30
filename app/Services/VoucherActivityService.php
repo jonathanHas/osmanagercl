@@ -45,7 +45,9 @@ class VoucherActivityService
         $q = $q !== null && trim($q) !== '' ? trim($q) : null;
         $withVoucher = ['voucher' => fn ($r) => $r->withTrashed()];
 
+        // Deleted vouchers (admin tools) leave the log: whereHas() skips soft-deleted ones.
         $transactions = VoucherTransaction::with($withVoucher + ['user', 'tillRedemption'])
+            ->whereHas('voucher')
             ->where('created_at', '>=', $since)
             ->when($q, fn ($query) => $query->whereHas('voucher', fn ($r) => $r->withTrashed()->where('code', 'like', '%'.$q.'%')))
             ->orderByDesc('created_at')
@@ -56,6 +58,8 @@ class VoucherActivityService
 
         $tillOnly = VoucherTillRedemption::with($withVoucher)
             ->whereNull('voucher_transaction_id')
+            // An `unknown` row has no voucher and still shows; a deleted voucher's rows do not.
+            ->where(fn ($query) => $query->whereNull('voucher_id')->orWhereHas('voucher'))
             ->where('created_at', '>=', $since)
             ->when($q, fn ($query) => $query->where('voucher_code', 'like', '%'.$q.'%'))
             ->orderByDesc('created_at')
@@ -89,6 +93,9 @@ class VoucherActivityService
             VoucherTransaction::TYPE_DEDUCT => $till ? ['redeem_till', 'Redeemed at till'] : ['redeem_manual', 'Redeemed'],
             VoucherTransaction::TYPE_DEACTIVATE => ['deactivate', 'Deactivated'],
             VoucherTransaction::TYPE_ACTIVATE => ['reactivate', 'Reactivated'],
+            VoucherTransaction::TYPE_FOR_SALE => ['for_sale', 'Made for sale'],
+            VoucherTransaction::TYPE_DELETE => ['delete', 'Deleted'],
+            VoucherTransaction::TYPE_RESTORE => ['restore', 'Restored'],
             default => [$t->type, ucfirst($t->type)],
         };
 
@@ -103,7 +110,7 @@ class VoucherActivityService
             'voucher_url' => $this->voucherUrl($t->voucher),
             'amount' => match ($t->type) {
                 VoucherTransaction::TYPE_ISSUE => round((float) $t->amount, 2),
-                VoucherTransaction::TYPE_DEDUCT => -round((float) $t->amount, 2),
+                VoucherTransaction::TYPE_DEDUCT, VoucherTransaction::TYPE_FOR_SALE => -round((float) $t->amount, 2),
                 default => 0.0,
             },
             'balance_after' => round((float) $t->balance_after, 2),
@@ -168,7 +175,9 @@ class VoucherActivityService
     {
         $today = today();
 
+        // Deleted vouchers (admin tools) are left out of the totals.
         $deducts = VoucherTransaction::where('type', VoucherTransaction::TYPE_DEDUCT)
+            ->whereHas('voucher')
             ->where('created_at', '>=', $today)
             ->selectRaw('source, SUM(amount) as total')
             ->groupBy('source')
@@ -182,6 +191,7 @@ class VoucherActivityService
             'redeemed_today_till' => $till,
             'redeemed_today_manual' => $manual,
             'issued_today' => round((float) VoucherTransaction::where('type', VoucherTransaction::TYPE_ISSUE)
+                ->whereHas('voucher')
                 ->where('created_at', '>=', $today)->sum('amount'), 2),
             'outstanding_balance' => round((float) Voucher::where('status', Voucher::STATUS_ACTIVE)->sum('current_balance'), 2),
             'active_vouchers' => Voucher::where('status', Voucher::STATUS_ACTIVE)->count(),

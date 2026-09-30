@@ -968,6 +968,36 @@ Points that matter when this layout changes:
   branch sits earlier in `detect_supplier` but additionally requires `ORGANIC FARM` and excludes
   `ORGANIC STORE`, so it does not capture these invoices — verified against the sample.
 
+### Sonett Invoice Parser
+
+`scripts/invoice-parser/parsers/sonett.py` handles Sonett Ireland (Frank van Gent, Cornamona).
+There's one page and one rate: the line totals are net, and every product is standard-rated.
+
+```
+6 Laundry Liq. Lavender 30-95C 2 l 7.56 45.36
+1 Lavender 100% Organic Bodywash Soap 10 l refill 70.19 70.19
+418.38
+V.A.T. 23% 96.23
+Final amount in Euro
+514.61
+```
+
+Points that matter:
+
+- **The net subtotal has no label.** It is the figure on its own line directly above
+  `V.A.T. 23%`. That figure is authoritative. The line items only cross-check it, because a
+  freight charge (€7.50 on small orders, per the footer) may appear without the leading quantity
+  that the item pattern needs. When they disagree, the parser warns and keeps the stated net.
+- **The date is long-hand** (`3 April 2026`) on a line of its own. The pattern is anchored to
+  the start of the line so it skips the `to be paid before 3 May 2026` due date.
+- **Detection matches `SONETT IRELAND` / `sonettireland@`, not the brand**, and runs last in
+  `detect_supplier`. Wholesalers list Sonett products by name, so a bare `SONETT` would take
+  their invoices.
+- Returns `'Sonett'`, which is how `accounting_suppliers` records them (id 45).
+- Only one PDF sample exists (No. 2603), because earlier invoices were captured as photos. The
+  tests in `tests/test_sonett.py` add synthetic cases for thousands separators, a freight line
+  and a mismatched total.
+
 ### Menton's Organic Farm Invoice Parser
 
 `scripts/invoice-parser/parsers/mentons.py` handles Menton's Organic Farm. Unlike every other

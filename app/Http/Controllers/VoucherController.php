@@ -42,17 +42,26 @@ class VoucherController extends Controller
     {
         $query = Voucher::query()->with('creator')->withCount('transactions');
 
+        // Admin changeover tools (vouchers cycle 4): bulk actions and the Deleted view.
+        $adminTools = config('vouchers.admin_tools') && $request->user()->hasRole('admin');
+        $showDeleted = $adminTools && $request->query('status') === 'deleted';
+
         if ($term = trim((string) $request->query('q', ''))) {
             $query->where('code', 'like', '%'.$term.'%');
         }
 
-        if ($status = $request->query('status')) {
+        if ($showDeleted) {
+            $query->onlyTrashed();
+        } elseif (($status = $request->query('status')) && $status !== 'deleted') {
             $query->where('status', $status);
         }
 
-        $vouchers = $query->latest()->paginate(25)->withQueryString();
+        $perPage = (int) $request->query('per_page', 25);
+        $perPage = in_array($perPage, [25, 50, 100, 200], true) ? $perPage : 25;
 
-        return view('vouchers.list', compact('vouchers'));
+        $vouchers = $query->latest()->paginate($perPage)->withQueryString();
+
+        return view('vouchers.list', compact('vouchers', 'adminTools', 'showDeleted', 'perPage'));
     }
 
     /**
@@ -77,11 +86,16 @@ class VoucherController extends Controller
             'code' => ['required', 'string', 'max:64'],
         ]);
 
-        $voucher = Voucher::where('code', $data['code'])->first();
+        $voucher = Voucher::withTrashed()->where('code', $data['code'])->first();
 
         if (! $voucher) {
             // Unknown code — the client should offer to activate it.
             return response()->json(['found' => false]);
+        }
+
+        if ($voucher->trashed()) {
+            // Deleted by an admin (admin tools): unusable, and not offered for activation.
+            return response()->json(['found' => false, 'deleted' => true]);
         }
 
         return response()->json([
@@ -140,11 +154,14 @@ class VoucherController extends Controller
                         : 'Redeemed',
                     VoucherTransaction::TYPE_DEACTIVATE => 'Deactivated',
                     VoucherTransaction::TYPE_ACTIVATE => 'Reactivated',
+                    VoucherTransaction::TYPE_FOR_SALE => 'Made for sale',
+                    VoucherTransaction::TYPE_DELETE => 'Deleted',
+                    VoucherTransaction::TYPE_RESTORE => 'Restored',
                     default => ucfirst($t->type),
                 },
                 'amount' => match ($t->type) {
                     VoucherTransaction::TYPE_ISSUE => (float) $t->amount,
-                    VoucherTransaction::TYPE_DEDUCT => -(float) $t->amount,
+                    VoucherTransaction::TYPE_DEDUCT, VoucherTransaction::TYPE_FOR_SALE => -(float) $t->amount,
                     default => 0.0,
                 },
                 'balance_after' => (float) $t->balance_after,
@@ -170,6 +187,11 @@ class VoucherController extends Controller
 
         $result = DB::transaction(function () use ($data) {
             $voucher = Voucher::where('code', $data['code'])->lockForUpdate()->first();
+
+            if (! $voucher && Voucher::onlyTrashed()->where('code', $data['code'])->exists()) {
+                // A deleted voucher's code stays reserved.
+                return ['success' => false, 'message' => 'This voucher was deleted. It cannot be activated.'];
+            }
 
             if (! $voucher) {
                 // Unknown printed code — create it on the fly.

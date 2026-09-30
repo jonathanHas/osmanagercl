@@ -19,6 +19,12 @@ class VoucherTransaction extends Model
 
     const TYPE_ACTIVATE = 'activate';     // admin re-enabled a disabled voucher
 
+    const TYPE_DELETE = 'delete';         // admin soft-deleted the voucher (admin tools)
+
+    const TYPE_RESTORE = 'restore';       // admin restored a deleted voucher (admin tools)
+
+    const TYPE_FOR_SALE = 'for_sale';     // a hand-activated voucher returned to unsold (admin tools)
+
     /**
      * Where a transaction came from.
      */

@@ -304,4 +304,20 @@ class VoucherPosProductServiceTest extends TestCase
             ->assertOk()
             ->assertSee('€25.00');
     }
+
+    // --- Vouchers cycle 4: a deleted voucher's till product ---
+
+    public function test_a_deleted_vouchers_product_is_named_deleted_at_price_zero(): void
+    {
+        $voucher = $this->forSale(20);
+        $this->service()->sync($voucher);
+        $voucher->delete();
+
+        $this->service()->sync(Voucher::withTrashed()->find($voucher->id));
+
+        $product = $this->product('GV7KQFM2RA9T');
+        $this->assertSame('Gift Voucher GV7KQFM2RA9T [deleted]', $product->NAME);
+        $this->assertEquals(0, $product->PRICESELL);
+        $this->assertSame(0.0, $this->service()->productPrice(Voucher::withTrashed()->find($voucher->id)));
+    }
 }

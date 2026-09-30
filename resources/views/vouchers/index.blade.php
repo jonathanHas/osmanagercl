@@ -188,6 +188,16 @@
                 </div>
             </div>
 
+            <!-- DELETED (admin tools): unusable, never offered for activation -->
+            <div x-show="mode === 'deleted' && !loading" x-transition class="bg-red-50 border border-red-200 overflow-hidden shadow-sm sm:rounded-lg p-6 mb-3">
+                <div class="text-center">
+                    <p class="text-sm font-mono text-gray-500 mb-2" x-text="code"></p>
+                    <p class="text-2xl font-bold text-red-700">Voucher deleted</p>
+                    <p class="text-sm text-red-500 mt-1">This voucher was deleted. It cannot be used.</p>
+                    <button x-on:click="reset()" class="mt-4 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium touch-manipulation">Scan next</button>
+                </div>
+            </div>
+
             <!-- DEACTIVATED -->
             <div x-show="mode === 'deactivated' && !loading" x-transition class="bg-red-50 border border-red-200 overflow-hidden shadow-sm sm:rounded-lg p-6 mb-3">
                 <div class="text-center">
@@ -383,7 +393,9 @@
                         this.faceValue = data.face_value ?? null;
                         this.forSale = !! data.for_sale;
 
-                        if (!data.found || data.status === 'inactive') {
+                        if (data.deleted) {
+                            this.mode = 'deleted';
+                        } else if (!data.found || data.status === 'inactive') {
                             // Unknown or not-yet-issued → offer to activate
                             // An unsold voucher with a value: pre-fill it for a manual activation.
                             this.startingBalance = this.forSale ? Number(this.faceValue).toFixed(2) : '';

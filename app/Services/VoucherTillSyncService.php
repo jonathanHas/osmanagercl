@@ -293,13 +293,15 @@ class VoucherTillSyncService
      */
     private function resolveVoucher(object $line): ?Voucher
     {
-        $voucher = Voucher::where('pos_product_id', $line->PRODUCT)->first();
+        // withTrashed(): a deleted voucher's label still scans; applyLine()/applySale()
+        // then refuse it explicitly rather than treating it as unknown.
+        $voucher = Voucher::withTrashed()->where('pos_product_id', $line->PRODUCT)->first();
 
         if ($voucher) {
             return $voucher;
         }
 
-        $voucher = $line->CODE ? Voucher::where('code', $line->CODE)->first() : null;
+        $voucher = $line->CODE ? Voucher::withTrashed()->where('code', $line->CODE)->first() : null;
 
         if ($voucher && $voucher->pos_product_id !== $line->PRODUCT) {
             $voucher->forceFill(['pos_product_id' => $line->PRODUCT])->saveQuietly();
@@ -340,7 +342,16 @@ class VoucherTillSyncService
         }
 
         // Re-read the balance under the lock.
-        $locked = Voucher::whereKey($voucher->id)->lockForUpdate()->first();
+        $locked = Voucher::withTrashed()->whereKey($voucher->id)->lockForUpdate()->first();
+
+        if ($locked->trashed()) {
+            VoucherTillRedemption::create($row + [
+                'status' => VoucherTillRedemption::STATUS_INACTIVE,
+                'note' => 'Voucher was deleted.',
+            ]);
+
+            return [VoucherTillRedemption::STATUS_INACTIVE, 0.0, $locked->id];
+        }
         $balance = round((float) $locked->current_balance, 2);
 
         if ($locked->status !== Voucher::STATUS_ACTIVE || $balance <= 0) {
@@ -436,8 +447,13 @@ class VoucherTillSyncService
             return $flag(VoucherTillRedemption::STATUS_UNKNOWN, 'No voucher with this code in the app.');
         }
 
-        $locked = Voucher::whereKey($voucher->id)->lockForUpdate()->first();
+        $locked = Voucher::withTrashed()->whereKey($voucher->id)->lockForUpdate()->first();
         $faceValue = round((float) $locked->face_value, 2);
+
+        if ($locked->trashed()) {
+            return $flag(VoucherTillRedemption::STATUS_SALE_FLAGGED,
+                "Charged {$chargedText} but the voucher was deleted. Nothing was activated.");
+        }
 
         if ($locked->status !== Voucher::STATUS_INACTIVE) {
             return $flag(VoucherTillRedemption::STATUS_SALE_FLAGGED,

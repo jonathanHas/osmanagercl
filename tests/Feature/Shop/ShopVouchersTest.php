@@ -353,4 +353,31 @@ class ShopVouchersTest extends TestCase
         $this->assertEquals(0, $product->PRICESELL);
         $this->assertSame('Gift Voucher GV45678901CD [bal €20.00]', $product->NAME);
     }
+
+    // --- Vouchers cycle 4: deleted vouchers ---
+
+    public function test_a_deleted_code_is_reported_deleted_and_cannot_be_activated(): void
+    {
+        $voucher = $this->forSaleVoucher(20);
+        $voucher->delete();
+
+        $this->actingAs($this->userWith('employee', ['vouchers.redeem']))
+            ->postJson(route('vouchers.lookup'), ['code' => $voucher->code])
+            ->assertOk()
+            ->assertExactJson(['found' => false, 'deleted' => true]);
+
+        $this->actingAs($this->userWith('manager', ['vouchers.redeem', 'vouchers.manage']))
+            ->postJson(route('vouchers.activate'), ['code' => $voucher->code, 'starting_balance' => '20.00'])
+            ->assertStatus(422)
+            ->assertJson(['success' => false, 'message' => 'This voucher was deleted. It cannot be activated.']);
+
+        $this->assertSame(1, Voucher::withTrashed()->where('code', $voucher->code)->count());
+    }
+
+    public function test_the_shop_page_has_the_deleted_wording(): void
+    {
+        $this->actingAs($this->userWith('employee', ['vouchers.redeem']))->get('/shop/vouchers')
+            ->assertOk()
+            ->assertSee('This voucher was deleted. It cannot be used.', false);
+    }
 }

@@ -41,6 +41,7 @@ use App\Http\Controllers\UdeaDiagnosticsController;
 use App\Http\Controllers\UiModeController;
 use App\Http\Controllers\UserManagementController;
 use App\Http\Controllers\VoucherActivityController;
+use App\Http\Controllers\VoucherAdminToolsController;
 use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\WasteController;
 use App\Http\Controllers\ZebraLabelController;
@@ -1222,6 +1223,12 @@ Route::middleware('auth')->group(function () {
 
         // Admin-only status management
         Route::middleware('role:admin')->group(function () {
+            // Admin changeover tools (vouchers cycle 4); off when vouchers.admin_tools is false.
+            Route::post('vouchers/bulk/deactivate', [VoucherAdminToolsController::class, 'deactivate'])->name('vouchers.bulk.deactivate');
+            Route::post('vouchers/bulk/reactivate', [VoucherAdminToolsController::class, 'reactivate'])->name('vouchers.bulk.reactivate');
+            Route::post('vouchers/bulk/delete', [VoucherAdminToolsController::class, 'delete'])->name('vouchers.bulk.delete');
+            Route::post('vouchers/bulk/restore', [VoucherAdminToolsController::class, 'restore'])->name('vouchers.bulk.restore');
+            Route::post('vouchers/bulk/for-sale', [VoucherAdminToolsController::class, 'forSale'])->name('vouchers.bulk.for-sale');
             Route::post('vouchers/{voucher}/deactivate', [VoucherController::class, 'deactivate'])->name('vouchers.deactivate');
             Route::post('vouchers/{voucher}/reactivate', [VoucherController::class, 'reactivate'])->name('vouchers.reactivate');
         });

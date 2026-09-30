@@ -268,17 +268,15 @@ class VoucherActivityTest extends TestCase
         $this->assertEquals(45, $events[0]['balance_after']); // newest first
     }
 
-    public function test_a_deleted_vouchers_rows_still_show_without_a_link(): void
+    // Vouchers cycle 4 (named change): was test_a_deleted_vouchers_rows_still_show_without_a_link.
+    // Deleting test vouchers is meant to take them out of the log.
+    public function test_a_deleted_vouchers_rows_are_hidden(): void
     {
         $v = $this->voucher();
         $this->tx($v, VoucherTransaction::TYPE_ISSUE, 10, 10);
         $v->delete();
 
-        $events = $this->feed()->json('events');
-
-        $this->assertCount(1, $events);
-        $this->assertSame('GV7KQFM2RA9T', $events[0]['code']);
-        $this->assertNull($events[0]['voucher_url']);
+        $this->assertCount(0, $this->feed()->json('events'));
     }
 
     // --- Totals ---
@@ -472,5 +470,68 @@ class VoucherActivityTest extends TestCase
         $this->assertSame('Sale not activated', $events[0]['label']);
         $this->assertSame('sale_flagged', $events[0]['status']);
         $this->assertEquals(40, $events[0]['sale_amount']);
+    }
+
+    // --- Vouchers cycle 4: admin tools ---
+
+    public function test_a_for_sale_row_shows_as_made_for_sale_and_lowers_the_outstanding_balance(): void
+    {
+        $kept = $this->voucher('GVKEPT000001', 20);
+        $v = $this->voucher('GVFORSALE001', 10);
+        $this->assertEquals(30, $this->feed()->json('totals.outstanding_balance'));
+
+        $v->update(['status' => Voucher::STATUS_INACTIVE, 'face_value' => 10, 'current_balance' => 0, 'initial_value' => null]);
+        $this->tx($v, VoucherTransaction::TYPE_FOR_SALE, 10, 0, now(), ['user_id' => $this->userWith('admin', [], 'Ada Admin')->id]);
+
+        $response = $this->feed();
+        $event = $response->json('events.0');
+
+        $this->assertSame('for_sale', $event['kind']);
+        $this->assertSame('Made for sale', $event['label']);
+        $this->assertEquals(-10, $event['amount']);
+        $this->assertSame('Ada Admin', $event['who']);
+        $this->assertEquals(20, $response->json('totals.outstanding_balance'));
+    }
+
+    public function test_totals_leave_out_a_deleted_vouchers_rows_of_today(): void
+    {
+        $kept = $this->voucher('GVKEPT000001', 50);
+        $gone = $this->voucher('GVGONE000001', 50, Voucher::STATUS_DEACTIVATED);
+        foreach ([$kept, $gone] as $v) {
+            $this->tx($v, VoucherTransaction::TYPE_ISSUE, 50, 50, now()->subHours(2));
+            $this->tx($v, VoucherTransaction::TYPE_DEDUCT, 5, 45, now()->subHour());
+            $this->tillDeduct($v, 3, 42, 430000 + $v->id, at: now()->subMinutes(30));
+        }
+        $gone->delete();
+
+        $totals = $this->feed()->json('totals');
+
+        $this->assertEquals(50, $totals['issued_today']);
+        $this->assertEquals(8, $totals['redeemed_today']);
+        $this->assertEquals(3, $totals['redeemed_today_till']);
+        $this->assertEquals(5, $totals['redeemed_today_manual']);
+    }
+
+    public function test_an_unknown_till_row_without_a_voucher_still_shows(): void
+    {
+        $this->redemption(['voucher_id' => null, 'voucher_code' => 'GV99999999ZZ', 'status' => VoucherTillRedemption::STATUS_UNKNOWN]);
+
+        $events = $this->feed()->json('events');
+
+        $this->assertCount(1, $events);
+        $this->assertSame('Unknown voucher', $events[0]['label']);
+    }
+
+    public function test_restoring_a_voucher_brings_its_rows_back(): void
+    {
+        $v = $this->voucher('GVGONE000001', 10, Voucher::STATUS_DEACTIVATED);
+        $this->tx($v, VoucherTransaction::TYPE_ISSUE, 10, 10);
+        $this->redemption(['voucher_id' => $v->id, 'voucher_code' => $v->code, 'status' => VoucherTillRedemption::STATUS_NO_TENDER]);
+        $v->delete();
+        $this->assertCount(0, $this->feed()->json('events'));
+
+        $v->restore();
+
+        $this->assertCount(2, $this->feed()->json('events'));
     }
 }

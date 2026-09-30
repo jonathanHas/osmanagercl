@@ -8,18 +8,18 @@ Same protocol, same file roles: see [`planimp.md`](./planimp.md) (a copy of
 
 | | |
 |---|---|
-| Current cycle | Vouchers cycle 3 — selling a voucher at the till activates it |
-| `plan.md` | `Status: READY`, Revision 1 (Planner: Fable 5.1) |
+| Current cycle | Vouchers cycle 4 — admin changeover tools: make for sale, bulk deactivate / reactivate, delete, restore, and the command that retires the three fixed voucher products |
+| `plan.md` | `Status: READY`, Revision 2 (Planner: Fable 5.1) |
 | `implemented.md` | not started |
-| Cycle 2 | Activity screen `/vouchers/activity`: ACCEPTED 2026-09-29, uncommitted at acceptance. `archive/2026-09-29-cycle-2-activity-screen/` |
+| Cycle 3 | Selling a voucher at the till activates it: ACCEPTED 2026-09-29, committed (65477718), deployed and working on the live till. `archive/2026-09-29-cycle-3-sale-activates/` |
+| Cycle 2 | Activity screen `/vouchers/activity`: ACCEPTED 2026-09-29, committed (88447f40), deployed. `archive/2026-09-29-cycle-2-activity-screen/` |
 | Cycle 1 | Till-driven redemption (called cycle 28 at the time): ACCEPTED, committed (421df081), deployed. `archive/2026-09-27-cycle-28-till-voucher-redemption/` |
 | Production | Scheduler runs every minute from `/etc/cron.d/osmanager` as `www-data`. `crontab -l` shows nothing, by design |
 
 Open items for the owner:
-1. **Parked:** 37 of 39 production vouchers have no till product. See [`findings/2026-09-29-production-backfill-not-run.md`](./findings/2026-09-29-production-backfill-not-run.md).
-2. **Later, on request:** retire the till products Voucher 10/20/50 Euro (`6013`, `6014`, `6012`) once cycle 3 is working on production. The owner asked to be reminded then.
-3. Browser check of cycle 2 as a manager: `/vouchers/activity` (steps in the archived plan, Verification 9).
-4. Scan one printed GV label with the real scanner at the real till (finding 1 in [`findings/2026-09-28-till-testing.md`](./findings/2026-09-28-till-testing.md)).
+1. After cycle 4 is deployed: the "Changeover on production" checklist in `docs/features/voucher-management.md` (make the 36 unsold labels for sale, delete the test vouchers, retire the three fixed products, restart the tills).
+2. Identify the one hand-activated voucher that was really sold, before running the changeover. A fixed voucher product was sold on 2026-09-29 at 14:14.
+3. Scan one printed GV label with the real scanner at the real till (finding 1 in [`findings/2026-09-28-till-testing.md`](./findings/2026-09-28-till-testing.md)), if not already done during the production test.
 
 ## Kickoff prompts
 

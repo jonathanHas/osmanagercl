@@ -32,10 +32,31 @@ return [
         'deactivated' => 'deactivated',
         // An inactive voucher with a face value: its till product is priced to sell.
         'for_sale' => 'for sale €%s',
+        // A soft-deleted voucher (admin tools): its label still scans, at €0.00.
+        'deleted' => 'deleted',
     ],
 
     // Highest value a batch of vouchers can be generated with.
     'max_face_value' => 1000,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Admin changeover tools (vouchers cycle 4)
+    |--------------------------------------------------------------------------
+    |
+    | Bulk make-for-sale / deactivate / reactivate / delete / restore on the
+    | voucher list, and vouchers:retire-fixed-products. Changeover tools for
+    | bringing pre-2026-09-30 vouchers into the sell-at-the-till process; admins
+    | only, and meant to be removed once they are no longer needed (see
+    | docs/features/voucher-management.md, "Admin changeover tools").
+    |
+    */
+
+    'admin_tools' => (bool) env('VOUCHER_ADMIN_TOOLS', true),
+
+    // The old fixed voucher products: 6012 "Voucher 50 Euro", 6013 "Voucher 10 Euro",
+    // 6014 "Voucher 20 Euro". Only vouchers:retire-fixed-products touches them.
+    'legacy_product_codes' => ['6012', '6013', '6014'],
 
     /*
     |--------------------------------------------------------------------------
