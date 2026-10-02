@@ -6,6 +6,11 @@
     bottom bar and sheet own the open flag. Keeping the sheet's scope as a literal
     `{ open: … }` is also what keeps CustomerRequestTest's three assertions on
     that markup green.
+
+    The sheet's wrapper is `shop-contents` (display: contents): it generates no
+    box, so the bar is laid out as a child of <main> and sticks to the bottom of
+    the screen. As a plain div it was only as tall as the bar, so the bar could
+    not stick and sat at the end of the list.
 --}}
 @php
     $views = [
@@ -75,7 +80,7 @@
     @endif
 </div>
 
-<div x-data="{ open: @js($openNew) }" x-on:keydown.escape.window="open = false">
+<div class="shop-contents" x-data="{ open: @js($openNew) }" x-on:keydown.escape.window="open = false">
     <div class="shop-actions">
         <button class="shop-btn shop-btn--primary shop-btn--lg" type="button" @click="open = true">
             <x-shop.icon name="plus" />

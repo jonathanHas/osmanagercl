@@ -304,6 +304,76 @@ class ShopRequestsTest extends TestCase
             ->assertSee('shop-photo', false);
     }
 
+    /**
+     * A failed product search must not look like "no products": the shared
+     * typeahead records why it failed, and only the latest request writes.
+     */
+    public function test_the_typeahead_reports_a_failed_search(): void
+    {
+        $js = file_get_contents(resource_path('js/shop/product-typeahead.js'));
+
+        $this->assertStringContainsString('searchError', $js);
+        $this->assertStringContainsString("'signed-out'", $js);
+        $this->assertStringContainsString('response.ok', $js);
+        $this->assertStringContainsString('searchSeq', $js);
+
+        $employee = $this->employee();
+
+        // New request form (on the board) and the edit page both show it.
+        $this->actingAs($employee)
+            ->get('/customer-requests')
+            ->assertOk()
+            ->assertSee('x-text="searchMessage"', false)
+            ->assertSee('x-show="! picked && searchError === \'failed\'"', false);
+
+        $request = CustomerRequest::factory()->create(['customer_name' => 'Edit Edna']);
+
+        $this->actingAs($employee)
+            ->get(route('customer-requests.edit', $request))
+            ->assertOk()
+            ->assertSee('x-text="searchMessage"', false)
+            ->assertSee('Try again');
+    }
+
+    /**
+     * The "New request" bar is sticky, but a sticky element cannot leave its
+     * parent: the sheet's wrapper must generate no box (display: contents) or
+     * the bar sits at the end of a long list instead of on screen.
+     */
+    public function test_the_new_request_bar_is_laid_out_to_stick(): void
+    {
+        $this->actingAs($this->employee())
+            ->get('/customer-requests')
+            ->assertOk()
+            ->assertSee('<div class="shop-contents" x-data="{ open: false }"', false);
+    }
+
+    /**
+     * "No products match" shows only once the search for the text on screen has
+     * answered with nothing, not during the debounce before it has run.
+     */
+    public function test_the_typeahead_knows_when_a_search_found_nothing(): void
+    {
+        $js = file_get_contents(resource_path('js/shop/product-typeahead.js'));
+
+        $this->assertStringContainsString('answered', $js);
+        $this->assertStringContainsString('get noMatches()', $js);
+
+        $employee = $this->employee();
+
+        $this->actingAs($employee)
+            ->get('/customer-requests')
+            ->assertOk()
+            ->assertSee('x-show="! picked && noMatches" x-cloak>No products match', false);
+
+        $request = CustomerRequest::factory()->create(['customer_name' => 'Edit Edna']);
+
+        $this->actingAs($employee)
+            ->get(route('customer-requests.edit', $request))
+            ->assertOk()
+            ->assertSee('x-show="noMatches" x-cloak>No products match', false);
+    }
+
     public function test_staff_board_shows_actions_and_form(): void
     {
         $item = $this->seedDueRequest();

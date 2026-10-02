@@ -243,9 +243,17 @@ export default () => mix(productImages(), productTypeahead(), {
      * `manual` is a product picked by name: its prompt starts with an empty
      * field to type the amount into, and keeps focus there rather than handing
      * it to the scan field.
+     *
+     * A scan over a prompt with no valid amount typed (a picked item whose
+     * weight was never entered) cannot confirm it: that prompt is replaced and a
+     * toast says the item was not added.
      */
     async lookup(code, manual) {
-        if (this.pending) {
+        let dropped = null;
+
+        if (this.pending && this.qtyValue === null) {
+            dropped = this.pending.product?.name ?? 'Item';
+        } else if (this.pending) {
             await this.commit();
         }
 
@@ -263,6 +271,8 @@ export default () => mix(productImages(), productTypeahead(), {
             });
 
             if (! data.success || ! data.product) {
+                // No reportDropped() here: an unknown code leaves the open prompt
+                // in place, so the picked item is still waiting for its amount.
                 this.announceError(`Product not found for ${code}`);
                 this.announceSaved();
 
@@ -280,6 +290,8 @@ export default () => mix(productImages(), productTypeahead(), {
                 typed: manual ? '' : null,
                 manual,
             };
+
+            this.reportDropped(dropped);
 
             // The prompt sits above the scan field, but someone who has scrolled
             // down the list would still not see it open. Same call the correction
@@ -299,6 +311,13 @@ export default () => mix(productImages(), productTypeahead(), {
             this.announceError('Scan failed');
         } finally {
             this.busy = false;
+        }
+    },
+
+    /** After a lookup that replaced an unfilled prompt; one toast, shown last. */
+    reportDropped(name) {
+        if (name) {
+            this.showToast('warn', `${name} not added, no amount entered`);
         }
     },
 
@@ -433,7 +452,13 @@ export default () => mix(productImages(), productTypeahead(), {
         this.everywhere = false;
         this.query = '';
         this.results = [];
+        this.answered = null;
         this.total = 0;
+        this.searchError = null;
+        // An answer still in flight must not refill the closed list (and, being
+        // stale, will not reset the spinner itself).
+        this.searchSeq++;
+        this.searching = false;
         this.announceDone();
     },
 
@@ -469,9 +494,19 @@ export default () => mix(productImages(), productTypeahead(), {
      * Report from the reloaded row rather than the increment response, so the
      * toast and the row beside it can never quote different figures. (The legacy
      * endpoint derives `expectedQty` slightly differently for fractional orders.)
+     *
+     * With no invoice lines there is nothing to check against, so every row is
+     * "unexpected"; a warning on every item would be noise. Confirm the add and
+     * its running total instead.
      */
     reportRow(barcode) {
         const row = this.rows.find((r) => r.barcode === barcode);
+
+        if (! this.hasInvoice) {
+            this.showToast('ok', row ? `Added · ${this.stockText(row.scanned)} so far` : 'Added');
+
+            return;
+        }
 
         if (! row) {
             this.showToast('warn', 'Not on this invoice');
@@ -540,11 +575,17 @@ export default () => mix(productImages(), productTypeahead(), {
             return;
         }
 
-        await this.saveQuantity(this.editingRow, value);
-        this.editTyped = null;
+        // A failed save keeps the field open with what was typed, so it can be
+        // retried rather than looking as if it had worked.
+        if (await this.saveQuantity(this.editingRow, value)) {
+            this.editTyped = null;
+        }
     },
 
-    /** PATCH an absolute quantity for a row, then refetch the list. */
+    /**
+     * PATCH an absolute quantity for a row, then refetch the list. True when the
+     * save went through.
+     */
     async saveQuantity(row, target) {
         this.busy = true;
 
@@ -559,12 +600,16 @@ export default () => mix(productImages(), productTypeahead(), {
             if (! data.success) {
                 this.showToast('bad', 'Could not save');
 
-                return;
+                return false;
             }
 
             await this.load();
+
+            return true;
         } catch (e) {
             this.showToast('bad', 'Could not save');
+
+            return false;
         } finally {
             this.busy = false;
         }

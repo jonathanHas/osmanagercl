@@ -286,13 +286,20 @@ class ShopDeliveryTest extends TestCase
 
     /**
      * Weights are typed with decimals and added on PHP floats, which leaves a
-     * tail (1.94 + 3.74 = 5.680000000000001). Stored totals are rounded to 3 dp.
+     * tail (0.1 + 0.2 = 0.30000000000000004). Stored totals are rounded to 3 dp.
+     * The row starts from nothing: added to the seeded 6, many sequences happen
+     * to land on a representable double and would pass without the rounding.
      */
     public function test_weights_accumulate_without_a_floating_point_tail(): void
     {
         $user = $this->employee();
 
-        foreach (['1.94', '3.74', '0.111'] as $quantity) {
+        DB::connection('pos')->table('deliveriesScanItems')
+            ->where('delID', 'd-1')
+            ->where('barcode', '5000000000024')
+            ->delete();
+
+        foreach (['0.1', '0.2'] as $quantity) {
             $response = $this->actingAs($user)
                 ->postJson(route('delivery-legacy.scan-increment'), [
                     'delID' => 'd-1',
@@ -303,7 +310,7 @@ class ShopDeliveryTest extends TestCase
                 ->assertOk();
         }
 
-        $this->assertSame(11.791, (float) $response->json('newQuantity'));
+        $this->assertSame(0.3, (float) $response->json('newQuantity'));
 
         $rows = DB::connection('pos')->table('deliveriesScanItems')
             ->where('delID', 'd-1')
@@ -311,7 +318,7 @@ class ShopDeliveryTest extends TestCase
             ->pluck('quantity');
 
         $this->assertCount(1, $rows);
-        $this->assertSame(11.791, (float) $rows->first());
+        $this->assertSame(0.3, (float) $rows->first());
     }
 
     public function test_a_corrected_quantity_is_rounded_to_three_decimals(): void
@@ -891,6 +898,77 @@ class ShopDeliveryTest extends TestCase
             substr($js, $promptAt, $doneAt - $promptAt),
             'The camera must not reopen while the quantity prompt is open: the code still in frame would confirm it and add an extra unit.'
         );
+    }
+
+    private function scanJs(): string
+    {
+        return file_get_contents(resource_path('js/shop/delivery-scan.js'));
+    }
+
+    /**
+     * Without invoice lines every row is "unexpected", so the old warning showed
+     * on every item. The no-invoice guard must come before either warning.
+     */
+    public function test_adding_without_an_invoice_confirms_rather_than_warns(): void
+    {
+        $js = $this->scanJs();
+
+        $this->assertStringContainsString('so far', $js);
+
+        $reportAt = strpos($js, 'reportRow(barcode) {');
+        $this->assertNotFalse($reportAt);
+        $guardAt = strpos($js, 'if (! this.hasInvoice)', $reportAt);
+        $warnAt = strpos($js, "'Not on this invoice'", $reportAt);
+        $this->assertNotFalse($guardAt);
+        $this->assertNotFalse($warnAt);
+        $this->assertLessThan($warnAt, $guardAt);
+    }
+
+    public function test_a_scan_over_an_unfilled_prompt_says_the_item_was_not_added(): void
+    {
+        $this->assertStringContainsString('not added, no amount entered', $this->scanJs());
+    }
+
+    public function test_the_correction_card_has_one_primary_button_while_typing(): void
+    {
+        $this->actingAs($this->employee())
+            ->get($this->scanUrl())
+            ->assertOk()
+            ->assertSee(":class=\"editTyped !== null ? 'shop-btn--ghost' : 'shop-btn--primary'\"", false);
+
+        // A failed save keeps the typed field open: editTyped is cleared only
+        // when saveQuantity() reports success.
+        $js = $this->scanJs();
+        $setAt = strpos($js, 'async setCorrection() {');
+        $this->assertNotFalse($setAt);
+        $body = substr($js, $setAt, strpos($js, 'async saveQuantity(', $setAt) - $setAt);
+        $this->assertStringContainsString("if (await this.saveQuantity(this.editingRow, value)) {\n            this.editTyped = null;", $body);
+        $this->assertSame(1, substr_count($body, 'this.editTyped = null'));
+    }
+
+    public function test_not_stocked_is_part_of_the_result_meta_line(): void
+    {
+        $response = $this->actingAs($this->userWith('employee', ['deliveries.process', 'products.view']))
+            ->get($this->scanUrl())
+            ->assertOk();
+
+        $response->assertSee("(! p.is_stocked ? ' · Not stocked' : '')\"", false);
+        $response->assertDontSee('shop-pill--muted" x-show="! p.is_stocked"', false);
+    }
+
+    public function test_find_by_name_says_when_the_search_failed(): void
+    {
+        $response = $this->actingAs($this->userWith('employee', ['deliveries.process', 'products.view']))
+            ->get($this->scanUrl())
+            ->assertOk();
+
+        $response->assertSee('x-text="searchMessage"', false);
+        $response->assertSee('Try again');
+        $response->assertSee('x-show="searchError === \'failed\'"', false);
+        $response->assertSee('x-show="noMatches" x-cloak>No products match', false);
+
+        // Hidden until Alpine has started, so an early tap cannot be lost.
+        $response->assertSee('<button class="shop-btn shop-btn--ghost" type="button" x-show="! manual" x-cloak x-on:click="openManual()">', false);
     }
 
     public function test_home_tile_links_to_the_shop_delivery_list(): void

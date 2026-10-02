@@ -92,7 +92,7 @@
                     @if ($canSearch)
                         {{-- Items without a barcode (the weekly cheese): pick by name,
                              then type the amount. In flow, not a popup (README rule 6). --}}
-                        <button class="shop-btn shop-btn--ghost" type="button" x-show="! manual" x-on:click="openManual()">
+                        <button class="shop-btn shop-btn--ghost" type="button" x-show="! manual" x-cloak x-on:click="openManual()">
                             <x-shop.icon name="search" size="sm" />No barcode? Find by name
                         </button>
 
@@ -111,15 +111,20 @@
                                        :placeholder="everywhere ? 'Search all products' : {{ Js::from('Filter '.($session['supplier'] ?? 'supplier').' products') }}">
                             </div>
 
+                            {{-- A failed search must not read as "no products". --}}
+                            <p class="shop-notice" x-show="searchError" x-cloak><x-shop.icon name="alert" size="sm" /><span x-text="searchMessage"></span></p>
+                            <button class="shop-btn shop-btn--ghost" type="button" x-show="searchError === 'failed'" x-cloak x-on:click="search()">Try again</button>
+
                             <div class="shop-list" x-show="results.length" x-cloak>
                                 <template x-for="p in results" :key="p.id">
                                     <button class="shop-row" type="button" x-on:click="pickResult(p)">
                                         <x-shop.product-thumb />
                                         <div class="shop-row__main">
                                             <span class="shop-row__title" x-text="p.name"></span>
-                                            <span class="shop-row__meta shop-code" x-text="p.code + (p.stock_units !== null ? ' · Stock ' + stockText(p.stock_units) : '')"></span>
+                                            {{-- "Not stocked" is part of the meta line, not a pill: at
+                                                 phone width a pill squeezed the name into a narrow column. --}}
+                                            <span class="shop-row__meta shop-code" x-text="p.code + (p.stock_units !== null ? ' · Stock ' + stockText(p.stock_units) : '') + (! p.is_stocked ? ' · Not stocked' : '')"></span>
                                         </div>
-                                        <span class="shop-pill shop-pill--muted" x-show="! p.is_stocked">Not stocked</span>
                                     </button>
                                 </template>
                             </div>
@@ -127,7 +132,7 @@
                             <p class="shop-meta" x-show="total > results.length" x-cloak>
                                 Showing the first <span x-text="results.length"></span>, type to narrow
                             </p>
-                            <p class="shop-meta" x-show="! searching && query.trim() !== '' && ! results.length" x-cloak>No products match</p>
+                            <p class="shop-meta" x-show="noMatches" x-cloak>No products match</p>
 
                             <button class="shop-btn shop-btn--ghost" type="button" x-show="query.trim() !== '' && ! everywhere" x-cloak x-on:click="searchEverywhere()">
                                 <x-shop.icon name="search" size="sm" />Search all products
@@ -186,7 +191,8 @@
                     <button class="shop-btn shop-btn--primary shop-btn--block" type="button" x-show="editTyped !== null" x-cloak
                             :disabled="busy" x-on:click="setCorrection()">Set</button>
 
-                    <button class="shop-btn shop-btn--primary shop-btn--block" type="button" @click="editing = null">Done</button>
+                    {{-- Steps back while a correction is typed, so Set is the one prominent button. --}}
+                    <button class="shop-btn shop-btn--block" type="button" :class="editTyped !== null ? 'shop-btn--ghost' : 'shop-btn--primary'" @click="editing = null">Done</button>
                 </section>
 
                 <section class="shop-empty" x-show="error" x-cloak>

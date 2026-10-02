@@ -43,6 +43,14 @@ Two Alpine traps worth remembering:
   nullable behind an `x-show` guard needs `?.` in `:src`, `:alt` and handlers,
   or an `x-if` template instead.
 
+A bottom action bar (`.shop-actions`) is `position: sticky`, and a sticky
+element cannot leave its parent's box. It must be laid out as a child of the
+page's tall container: `<main class="shop-page">`, or a form that wraps the
+whole page. A wrapper that exists only for an Alpine scope or a form takes the
+`shop-contents` class (`display: contents`, so it generates no box). The
+Customer requests "New request" bar and the Print labels "Print" bar use it;
+without it they sat at the end of the list instead of on screen.
+
 ### Which interface a request belongs to
 
 `App\Support\UiMode` resolves it: a `shop.*` route is always Shop; a PIN
@@ -104,7 +112,17 @@ barcode? Find by name** button under the scan field (for anyone with
 flow, of the supplier's stocked products, with a filter; once something is
 typed, **Search all products** searches the whole catalogue instead, for a
 product not linked to the supplier. Both use `GET /api/products/search`
-through `product-typeahead.js`.
+through `product-typeahead.js`. The button appears once the page is ready
+(`x-cloak`), so an early tap is never lost.
+
+A product search that fails — here, on New request and on request edit, all
+through `product-typeahead.js` — says so rather than showing an empty list:
+"Could not load products." with **Try again**, or "You have been signed out.
+Reload the page to sign in." for a 401/419. Only the latest search writes its
+results, so a slow older answer cannot replace a newer one. A search that
+succeeds with nothing shows "No products match" (the typeahead's `noMatches`),
+only once the search for the text on screen has answered — never during the
+debounce before it has run.
 
 Picking a product opens the same quantity prompt a scan opens, with an empty
 **Quantity or weight** field focused and Add disabled until something valid is
@@ -113,7 +131,10 @@ typed. Typing `4.35` and Add records 4.35 (the product is stocked in kg, so
 `delivery-legacy.scan-increment`, exactly as a scan does, so nothing
 distinguishes a typed row from a scanned one. The list stays open between
 items — pick, type, Add, pick, type, Add — until it is closed, and scanning
-keeps working in the same delivery.
+keeps working in the same delivery. With no invoice loaded (Mossfield never
+has one) each add is confirmed as "Added · N so far" rather than warned about.
+A scan that arrives while a picked item has no amount typed replaces that
+prompt, and a warning says the item was not added.
 
 Typed amounts are also available where a quantity already exists: tap the
 number on a scan prompt (not on a case prompt, where the count stays whole on

@@ -15,10 +15,10 @@ changing it. Feature documentation: `docs/features/shop-mode.md`.
 
 | | |
 |---|---|
-| Current task | none. Last: "No barcode? Find by name" + typed quantities/weights on the delivery scan screen, and completion creating a missing stock record: ACCEPTED 2026-10-02, uncommitted, to be archived under `archive/2026-10-02-delivery-find-by-name/` |
-| HEAD when this track opened | `9f796b28` on `feature/modularization-phase1` |
-| Working tree | dirty with the BookStack SOP track's uncommitted work (help button, `HelpController`, `app/Services/BookStack/`, `resources/views/shop/help.blade.php`, topbar, `config/shop.php`, `shop.css`, sprite) and a Sonett parser change. Not this track's; the Implementer records it in each Baseline |
-| Test baseline | 15 failed / 933 passed (see "Test baseline" below) |
+| Current task | none. Accepted 2026-10-02 and uncommitted: delivery follow-ups (`archive/2026-10-02-delivery-follow-ups/`), product-search failure message (`archive/2026-10-02-search-failure-message/`), sticky "New request" / Print bars + "No products match" (`archive/2026-10-02-requests-sticky-bar/`). Committed: find-by-name, `9247c79e`. The owner's `ToDo.txt` item is done |
+| HEAD | `9247c79e` on `feature/modularization-phase1` (track opened at `9f796b28`) |
+| Working tree | three accepted tasks uncommitted (Shop delivery, typeahead, requests and labels views, `shop.css`, their tests, `docs/features/shop-mode.md`, `docs/shop_new/`) |
+| Test baseline | 15 failed / 942 passed (see "Test baseline" below) |
 
 ## Where the code is
 
@@ -73,7 +73,13 @@ KDS is deliberately outside the Shop view.
    `delivery-scan.js`).
 6. **Lists of identical rows**: never float a popup with one-tap actions over
    neighbouring rows; expand in flow instead (cycle 13b).
-7. **Project rules** from `CLAUDE.md`: Eloquent models, thin controllers,
+7. **Sticky action bars.** A sticky `.shop-actions` must be laid out as a
+   child of the page's tall container (`<main>`, or a form wrapping the whole
+   page). A wrapper that exists only for an Alpine scope or a form takes
+   `class="shop-contents"` (`display: contents`), or the bar sits at the end
+   of the page instead of the bottom of the screen (found on Customer requests
+   and Print labels, 2026-10-02).
+7a. **Project rules** from `CLAUDE.md`: Eloquent models, thin controllers,
    services for business logic, `<x-product-search>` / `GET /api/products/search`
    for product search (Shop uses `product-typeahead.js` on that endpoint),
    tests for new behaviour, `./vendor/bin/pint`.
@@ -94,6 +100,11 @@ KDS is deliberately outside the Shop view.
 - Hand-scanner keystrokes are captured at window level (`capture()`): a burst
   goes to the scan field, a lone Enter goes to the focused button. It assumes
   one scan field per page.
+- Focusing a field (`focusField()` in `delivery-scan.js`, `focus()` in
+  `scan-input.js`) waits on `requestAnimationFrame`, which never fires in a
+  hidden or backgrounded tab. In browser automation, bring the tab to the
+  front or click into fields by hand. If a device ever fails to focus,
+  `setTimeout(…, 0)` after `$nextTick` is the fallback.
 - html5-qrcode 2.3.8 version-tied points are listed in
   `docs/features/shop-mode.md` under "Camera scanning".
 
@@ -111,6 +122,13 @@ KDS is deliberately outside the Shop view.
 - Phone width: `resize_window` does not change the viewport on this machine;
   use a same-origin iframe sized 390 × 844.
 - The idle lock (5 min) fires on a trusted device during long checks.
+- On `/shop/labels` `total` is a getter (`rows.length`); to fake a queue in a
+  browser check, set `rows`.
+- Browser automation here runs in a hidden tab and degrades over a long
+  session (screenshots time out, clicks and keys stop arriving, `x-show`
+  reveals lag by seconds). Prefer reading component state over screenshots,
+  open a fresh tab for each pass, and expect to fall back to DOM events late
+  in a pass; say in the report which actions were real input.
 - Dev accounts: `katelyn` (id 3, employee) has PIN `2580`; `test` is the one
   manager account. Dev data written during a check is put back and listed
   under "Dev state" in the report.
@@ -123,7 +141,7 @@ KDS is deliberately outside the Shop view.
 
 The Planner takes it fresh when writing each plan (other tracks add tests).
 
-2026-10-02 (after the find-by-name task), `php artisan test`: **15 failed, 933 passed** (about 57 s). The 15
+2026-10-02 (after the sticky-bar task), `php artisan test`: **15 failed, 942 passed** (about 57 s). The 15
 are pre-existing and unrelated to the Shop view: `UdeaScrapingServiceTest` ×7,
 `CashReconciliationTest` ×3, `FruitVegLabelPrintingTest` ×2, `ProductTest` ×2,
 `TestScraperControllerTest` ×1. A task is clean when the same 15 fail and
@@ -133,14 +151,15 @@ nothing else does.
 
 Not started; the owner chooses.
 
-- **Follow-ups from the find-by-name task** (see the Review in its archived
-  plan): with no invoice lines every added item gets a warning-toned "Not on
-  this invoice" toast (recommended: an ok-toned "Added"); "Set" and "Done" are
-  both primary while typing a correction; a failed typed correction closes the
-  field; a scan arriving over a prompt with no valid typed amount drops it
-  silently; "Not stocked" pill squeezes names at 390 px; sharper float-tail
-  test. Also owner's choices: supplier list is stocked products only; the
-  by-name list does not reopen after leaving the page.
+- Owner to choose: on wide screens, when a page does not scroll, a sticky
+  action bar sits 8 px above the bottom edge (design block: 32 px page padding
+  against a 24 px bar margin). Every screen with a bar; not new.
+- If the sticky "New request" bar still feels slow at the counter, a second
+  way in (header button, Home shortcut) would be a new task.
+- Left from the find-by-name task, owner to choose: the by-name list sits
+  above Items on a phone; the supplier list is stocked products only; the
+  list does not reopen after leaving the page; supplier code vs product code
+  in the two lists.
 - Delivery summary could split units and kg; needs a reliable weighed flag
   (the cheese is not `ISSCALE`). The raw-float display itself is fixed.
 - **New request page should find destocked products** (greyed, still

@@ -634,4 +634,8 @@ textarea.shop-input { min-height: 112px; padding: 14px 20px; border-radius: var(
    already strips the border and inherits font and colour; a grid cell button
    still sizes to its content, so stretch it like the <output> it replaces. */
 .shop button.shop-stepper__value { width: 100%; }
+/* A wrapper that exists only for an Alpine scope or a form must not be a box,
+   or a sticky .shop-actions inside it cannot stick (it cannot leave a parent
+   that is only as tall as itself). */
+.shop .shop-contents { display: contents; }
 /* === APP ADDITIONS END === */

@@ -60,7 +60,8 @@
 
         {{-- The A4 sheet opens in a new tab, so this tab's queue is stale until the
              prints are logged; reload shortly after submitting. --}}
-        <form method="POST" action="{{ route('labels.print-a4') }}" target="_blank"
+        {{-- shop-contents (display: contents) so the sticky Print bar is laid out in <main> and sticks. --}}
+        <form class="shop-contents" method="POST" action="{{ route('labels.print-a4') }}" target="_blank"
               x-show="total > 0" x-cloak @submit="setTimeout(() => load(), 1500)">
             @csrf
             <template x-for="id in ids" :key="id">

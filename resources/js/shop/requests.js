@@ -47,5 +47,6 @@ export default (seed = null) => mix(productImages(), productTypeahead(), {
         this.picked = null;
         this.query = '';
         this.results = [];
+        this.answered = null;
     },
 });

@@ -131,6 +131,11 @@
                            aria-label="Add a stocked product">
                 </div>
 
+                {{-- A failed search must not read as "no products". --}}
+                <p class="shop-notice" x-show="searchError" x-cloak><x-shop.icon name="alert" size="sm" /><span x-text="searchMessage"></span></p>
+                <button class="shop-btn shop-btn--ghost" type="button" x-show="searchError === 'failed'" x-cloak x-on:click="search()">Try again</button>
+                <p class="shop-meta" x-show="noMatches" x-cloak>No products match</p>
+
                 <div class="shop-list" x-show="results.length" x-cloak>
                     <template x-for="p in results" :key="p.id">
                         <button class="shop-row" type="button" @click="pickResult(p)">

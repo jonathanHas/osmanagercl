@@ -130,6 +130,18 @@ class ShopLabelsTest extends TestCase
         $response->assertSee('! loading && ! error && total === 0', false);
     }
 
+    /**
+     * The Print bar is sticky; its form exists only to submit, so it must be
+     * display: contents or the bar cannot leave it and sits at the page end.
+     */
+    public function test_the_print_bar_is_laid_out_to_stick(): void
+    {
+        $this->actingAs($this->employee())
+            ->get(route('shop.labels'))
+            ->assertOk()
+            ->assertSee('<form class="shop-contents" method="POST" action="'.e(route('labels.print-a4')).'"', false);
+    }
+
     public function test_manager_sees_clear_queue(): void
     {
         $this->actingAs($this->manager())
